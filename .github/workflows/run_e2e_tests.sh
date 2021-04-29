@@ -7,7 +7,7 @@ avalanche_testing_repo="avaplatform/avalanche-testing"
 
 # Define avalanche byzantine version to use
 avalanchego_byzantine_version=${AVALANCHEGO_BYZANTINE_VERSION:-'v0.2.1'}
-avalanchego_byzantine_image="avaplatform/avalanche-byzantine:$avalanche_avalanchego_byzantine_version"
+avalanchego_byzantine_image="avaplatform/avalanche-byzantine:$avalanchego_byzantine_version"
 
 # Define avalanche testing version to use
 avalanche_testing_image="avaplatform/avalanche-testing:master"
