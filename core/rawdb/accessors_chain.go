@@ -604,12 +604,16 @@ func ReadReceipts(db ethdb.Reader, hash common.Hash, number uint64, config *para
 	if receipts == nil {
 		return nil
 	}
+	header := ReadHeader(db, hash, number)
+	if header == nil {
+		return nil
+	}
 	body := ReadBody(db, hash, number)
 	if body == nil {
 		log.Error("Missing body but have receipt", "hash", hash, "number", number)
 		return nil
 	}
-	if err := receipts.DeriveFields(config, hash, number, body.Transactions); err != nil {
+	if err := receipts.DeriveFields(config, hash, number, header.Time, body.Transactions); err != nil {
 		log.Error("Failed to derive block receipts fields", "hash", hash, "number", number, "err", err)
 		return nil
 	}
