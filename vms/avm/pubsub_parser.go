@@ -16,14 +16,12 @@ func NewPubSubParser(tx *Tx) pubsub.Parser {
 // Apply the filter on the addresses.
 func (p *parser) Filter(param *pubsub.FilterParam) *pubsub.FilterResponse {
 	for _, utxo := range p.tx.UTXOs() {
-		switch utxoOut := utxo.Out.(type) {
-		case avax.Addressable:
-			for _, address := range utxoOut.Addresses() {
+		if addresses, ok := utxo.Out.(avax.Addressable); ok {
+			for _, address := range addresses.Addresses() {
 				if param.CheckAddress(address) {
 					return &pubsub.FilterResponse{TxID: p.tx.ID(), AddressID: pubsub.ByteToID(address)}
 				}
 			}
-		default:
 		}
 	}
 	return nil
