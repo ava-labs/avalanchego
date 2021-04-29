@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/coreth/eth/filters"
 
@@ -31,7 +32,7 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	ethBackend := chain.APIBackend()
 	ethBackend.SubscribeAcceptedLogsEvent(acceptedLogsCh)
 
-	api := filters.NewPublicFilterAPI(ethBackend, true)
+	api := filters.NewPublicFilterAPI(ethBackend, true, 5*time.Minute)
 
 	// *NOTE* this was pre-compiled for the test..
 	/*

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/eth/ethconfig"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -177,7 +178,7 @@ func run(config *eth.Config, a1, a2, b1, b2 int, t *testing.T) {
 // a go channel and finally checks if they have the identical chain structure.
 func TestChain(t *testing.T) {
 	// configure the chain
-	config := eth.DefaultConfig
+	config := ethconfig.DefaultConfig
 	chainConfig := &params.ChainConfig{
 		ChainID:             big.NewInt(1),
 		HomesteadBlock:      big.NewInt(0),

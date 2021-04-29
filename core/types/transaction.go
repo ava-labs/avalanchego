@@ -303,7 +303,7 @@ func (tx *Transaction) RawSignatureValues() (v, r, s *big.Int) {
 
 // GasPriceCmp compares the gas prices of two transactions.
 func (tx *Transaction) GasPriceCmp(other *Transaction) int {
-	return tx.inner.gasPrice().Cmp(other.GasPrice())
+	return tx.inner.gasPrice().Cmp(other.inner.gasPrice())
 }
 
 // GasPriceIntCmp compares the gas price of the transaction against the given price.
@@ -328,7 +328,7 @@ func (tx *Transaction) Hash() common.Hash {
 }
 
 // Size returns the true RLP encoded storage size of the transaction, either by
-// encoding and returning it, or returning a previsouly cached value.
+// encoding and returning it, or returning a previously cached value.
 func (tx *Transaction) Size() common.StorageSize {
 	if size := tx.size.Load(); size != nil {
 		return size.(common.StorageSize)

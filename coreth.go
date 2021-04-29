@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/eth/ethconfig"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/rpc"
@@ -41,7 +42,7 @@ type ETHChain struct {
 // NewETHChain creates an Ethereum blockchain with the given configs.
 func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, initGenesis bool) *ETHChain {
 	if config == nil {
-		config = &eth.DefaultConfig
+		config = &ethconfig.DefaultConfig
 	}
 	if nodecfg == nil {
 		nodecfg = &node.Config{}

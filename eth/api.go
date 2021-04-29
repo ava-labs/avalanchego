@@ -32,7 +32,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"os"
 	"strings"
 
@@ -67,20 +66,6 @@ func (api *PublicEthereumAPI) Etherbase() (common.Address, error) {
 // Coinbase is the address that mining rewards will be send to (alias for Etherbase)
 func (api *PublicEthereumAPI) Coinbase() (common.Address, error) {
 	return api.Etherbase()
-}
-
-// Hashrate returns the POW hashrate
-func (api *PublicEthereumAPI) Hashrate() hexutil.Uint64 {
-	return hexutil.Uint64(api.e.Miner().HashRate())
-}
-
-// ChainId is the EIP-155 replay-protection chain id for the current ethereum chain config.
-func (api *PublicEthereumAPI) ChainId() hexutil.Uint64 {
-	chainID := new(big.Int)
-	if config := api.e.blockchain.Config(); config.IsEIP155(api.e.blockchain.CurrentBlock().Number()) {
-		chainID = config.ChainID
-	}
-	return (hexutil.Uint64)(chainID.Uint64())
 }
 
 // Original code:
@@ -335,22 +320,29 @@ type BadBlockArgs struct {
 // GetBadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
 // and returns them as a JSON list of block-hashes
 func (api *PrivateDebugAPI) GetBadBlocks(ctx context.Context) ([]*BadBlockArgs, error) {
-	blocks := api.eth.BlockChain().BadBlocks()
-	results := make([]*BadBlockArgs, len(blocks))
-
-	var err error
-	for i, block := range blocks {
-		results[i] = &BadBlockArgs{
-			Hash: block.Hash(),
-		}
+	var (
+		err     error
+		blocks  = api.eth.BlockChain().BadBlocks()
+		results = make([]*BadBlockArgs, 0, len(blocks))
+	)
+	for _, block := range blocks {
+		var (
+			blockRlp  string
+			blockJSON map[string]interface{}
+		)
 		if rlpBytes, err := rlp.EncodeToBytes(block); err != nil {
-			results[i].RLP = err.Error() // Hacky, but hey, it works
+			blockRlp = err.Error() // Hacky, but hey, it works
 		} else {
-			results[i].RLP = fmt.Sprintf("0x%x", rlpBytes)
+			blockRlp = fmt.Sprintf("0x%x", rlpBytes)
 		}
-		if results[i].Block, err = ethapi.RPCMarshalBlock(block, true, true); err != nil {
-			results[i].Block = map[string]interface{}{"error": err.Error()}
+		if blockJSON, err = ethapi.RPCMarshalBlock(block, true, true); err != nil {
+			blockJSON = map[string]interface{}{"error": err.Error()}
 		}
+		results = append(results, &BadBlockArgs{
+			Hash:  block.Hash(),
+			RLP:   blockRlp,
+			Block: blockJSON,
+		})
 	}
 	return results, nil
 }
@@ -417,7 +409,7 @@ func (api *PrivateDebugAPI) StorageRangeAt(blockHash common.Hash, txIndex int, c
 	if block == nil {
 		return StorageRangeResult{}, fmt.Errorf("block %#x not found", blockHash)
 	}
-	_, _, statedb, err := api.computeTxEnv(block, txIndex, 0)
+	_, _, statedb, err := api.eth.stateAtTransaction(block, txIndex, 0)
 	if err != nil {
 		return StorageRangeResult{}, err
 	}

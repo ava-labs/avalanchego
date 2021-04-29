@@ -31,7 +31,7 @@ import (
 )
 
 type (
-	executionFunc func(pc *uint64, interpreter *EVMInterpreter, callContext *callCtx) ([]byte, error)
+	executionFunc func(pc *uint64, interpreter *EVMInterpreter, callContext *ScopeContext) ([]byte, error)
 	gasFunc       func(*EVM, *Contract, *Stack, *Memory, uint64) (uint64, error) // last parameter is the requested memory size as a uint64
 	// memorySizeFunc returns the required size, and whether the operation overflowed a uint64
 	memorySizeFunc func(*Stack) (size uint64, overflow bool)
@@ -66,7 +66,6 @@ var (
 	byzantiumInstructionSet        = newByzantiumInstructionSet()
 	constantinopleInstructionSet   = newConstantinopleInstructionSet()
 	istanbulInstructionSet         = newIstanbulInstructionSet()
-	yoloV1InstructionSet           = newYoloV1InstructionSet()
 	apricotPhase1InstructionSet    = newApricotPhase1InstructionSet()
 	apricotPhase2InstructionSet    = newApricotPhase2InstructionSet()
 )
@@ -86,14 +85,6 @@ func newApricotPhase2InstructionSet() JumpTable {
 	instructionSet := newApricotPhase1InstructionSet()
 
 	enableAP2(&instructionSet)
-
-	return instructionSet
-}
-
-func newYoloV1InstructionSet() JumpTable {
-	instructionSet := newIstanbulInstructionSet()
-
-	enable2315(&instructionSet) // Subroutines - https://eips.ethereum.org/EIPS/eip-2315
 
 	return instructionSet
 }

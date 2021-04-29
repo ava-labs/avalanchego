@@ -60,9 +60,11 @@ func newStatePrefetcher(config *params.ChainConfig, bc *BlockChain, engine conse
 // only goal is to pre-cache transaction signatures and state trie nodes.
 func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, cfg vm.Config, interrupt *uint32) {
 	var (
-		header  = block.Header()
-		gaspool = new(GasPool).AddGas(block.GasLimit())
-		signer  = types.MakeSigner(p.config, header.Number, new(big.Int).SetUint64(header.Time))
+		header       = block.Header()
+		gaspool      = new(GasPool).AddGas(block.GasLimit())
+		blockContext = NewEVMBlockContext(header, p.bc, nil)
+		evm          = vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
+		signer       = types.MakeSigner(p.config, header.Number, new(big.Int).SetUint64(header.Time))
 	)
 	// Iterate over and process the individual transactions
 	byzantium := p.config.IsByzantium(block.Number())
@@ -76,10 +78,6 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 		if err != nil {
 			return // Also invalid block, bail out
 		}
-
-		author := msg.From()
-		context := NewEVMContext(msg, header, p.bc, &author)
-		evm := vm.NewEVM(context, statedb, p.config, cfg)
 
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
 		if err := precacheTransaction(msg, p.config, gaspool, statedb, header, evm); err != nil {
@@ -101,10 +99,7 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 // the transaction successfully, rather to warm up touched data slots.
 func precacheTransaction(msg types.Message, config *params.ChainConfig, gaspool *GasPool, statedb *state.StateDB, header *types.Header, evm *vm.EVM) error {
 	// Update the evm with the new transaction context.
-	evm.StateDB = statedb
-	evm.Context.Origin = msg.From()
-	evm.Context.GasPrice = new(big.Int).Set(msg.GasPrice())
-
+	evm.Reset(NewEVMTxContext(msg), statedb)
 	// Add addresses to access list if applicable
 	_, err := ApplyMessage(evm, msg, gaspool)
 	return err

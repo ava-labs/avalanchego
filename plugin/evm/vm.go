@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/eth/ethconfig"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
@@ -307,10 +307,10 @@ func (vm *VM) Initialize(
 	// Set the ApricotPhase1BlockTimestamp for mainnet/fuji
 	switch {
 	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
-		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotMainnetChainConfig.ApricotPhase1BlockTimestamp
+		g.Config = params.AvalancheMainnetChainConfig
 		phase0BlockValidator.extDataHashes = mainnetExtDataHashes
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
-		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotFujiChainConfig.ApricotPhase1BlockTimestamp
+		g.Config = params.AvalancheFujiChainConfig
 		phase0BlockValidator.extDataHashes = fujiExtDataHashes
 	}
 
@@ -322,7 +322,7 @@ func (vm *VM) Initialize(
 	vm.chainID = g.Config.ChainID
 	vm.txFee = txFee
 
-	config := eth.NewDefaultConfig()
+	config := ethconfig.NewDefaultConfig()
 	config.Genesis = g
 
 	// Set minimum gas price and launch goroutine to sleep until
