@@ -150,9 +150,7 @@ func (s *Server) Get(
 	}
 
 	currentSize := 0
-	resp := &gsharedmemoryproto.GetResponse{
-		Values: make([][]byte, 0, len(get.remainingValues)),
-	}
+	resp := &gsharedmemoryproto.GetResponse{}
 	for i, value := range get.remainingValues {
 		sizeChange := baseElementSize + len(value)
 		if newSize := currentSize + sizeChange; newSize > maxBatchSize && i > 0 {
@@ -238,7 +236,6 @@ func (s *Server) Indexed(
 
 	currentSize := 0
 	resp := &gsharedmemoryproto.IndexedResponse{
-		Values:    make([][]byte, 0, len(indexed.remainingValues)),
 		LastTrait: indexed.lastTrait,
 		LastKey:   indexed.lastKey,
 	}
