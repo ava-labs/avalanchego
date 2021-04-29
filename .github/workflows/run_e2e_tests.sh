@@ -17,7 +17,7 @@ if [[ -z ${DOCKER_USERNAME} ]]; then
     exit 1
 fi
 
-# Directory above this script
+# Avalanche root directory
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 
 # Load the versions
