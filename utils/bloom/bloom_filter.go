@@ -7,26 +7,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"strconv"
 	"sync"
-	"time"
 
-	"github.com/willf/bitset"
-
-	btcsuiteWire "github.com/btcsuite/btcd/wire"
-	btcsuite "github.com/btcsuite/btcutil/bloom"
 	"github.com/spaolacci/murmur3"
 	streakKnife "github.com/steakknife/bloomfilter"
-	willfBloom "github.com/willf/bloom"
 )
-
-type FilterType int
-
-var FilterTypeSteakKnife FilterType = 1
-var FilterTypeWillf FilterType = 2
-var FilterTypeBtcsuite FilterType = 3
-var FilterTypeDefault = FilterTypeSteakKnife
 
 var (
 	ErrMaxBytes = fmt.Errorf("too large")
@@ -41,63 +27,11 @@ type Filter interface {
 }
 
 func New(maxN uint64, p float64, maxBytes uint64) (Filter, error) {
-	switch FilterTypeDefault {
-	case FilterTypeSteakKnife:
-		neededBytes := BytesSteakKnifeFilter(maxN, p)
-		if neededBytes > maxBytes {
-			return nil, ErrMaxBytes
-		}
-		return NewSteakKnifeFilter(maxN, p)
-	case FilterTypeBtcsuite:
-		neededBytes := BytesBtcsuiteFilter(maxN, p)
-		if neededBytes > maxBytes {
-			return nil, ErrMaxBytes
-		}
-		return NewBtcsuiteFilter(maxN, p)
-	}
-	neededBytes := BytesWillfFilter(maxN, p)
+	neededBytes := BytesSteakKnifeFilter(maxN, p)
 	if neededBytes > maxBytes {
 		return nil, ErrMaxBytes
 	}
-	return NewWillfFilter(maxN, p)
-}
-
-type willfFilter struct {
-	lock    sync.RWMutex
-	bfilter *willfBloom.BloomFilter
-}
-
-func BytesWillfFilter(maxN uint64, p float64) uint64 {
-	// this is pulled from bitset.
-	// the calculation is the size of the bitset which would be created from this filter.
-	// to ensure we don't crash memory, we would ensure the size
-	m := uint(streakKnife.OptimalM(maxN, p))
-	// 8 == sizeof(uint64))
-	return uint64(WordsNeeded(m)) * 8
-}
-
-func NewWillfFilter(maxN uint64, p float64) (Filter, error) {
-	m := uint(streakKnife.OptimalM(maxN, p))
-	k := uint(streakKnife.OptimalK(uint64(m), maxN))
-	return &willfFilter{bfilter: willfBloom.New(m, k)}, nil
-}
-
-func (f *willfFilter) Add(bl ...[]byte) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	for _, b := range bl {
-		f.bfilter.Add(b)
-	}
-}
-
-func (f *willfFilter) Check(b []byte) bool {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	return f.bfilter.Test(b)
-}
-
-func (f *willfFilter) MarshalJSON() ([]byte, error) {
-	return f.bfilter.MarshalJSON()
+	return NewSteakKnifeFilter(maxN, p)
 }
 
 type steakKnifeFilter struct {
@@ -262,77 +196,4 @@ func (f *steakKnifeFilter) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	return json.Marshal(j)
-}
-
-type btcsuiteFilter struct {
-	lock    sync.RWMutex
-	bfilter *btcsuite.Filter
-}
-
-func BytesBtcsuiteFilter(maxN uint64, p float64) uint64 {
-	// ths is pulled from the btcsuite filter logic
-	dataLen := uint32(-1 * float64(maxN) * math.Log(p) / Ln2Squared)
-	dataLen = MinUint32(dataLen, btcsuiteWire.MaxFilterLoadFilterSize*8) / 8
-	return uint64(dataLen)
-}
-
-func NewBtcsuiteFilter(maxN uint64, p float64) (Filter, error) {
-	tweak := uint32(time.Now().UnixNano())
-
-	bfilter := btcsuite.NewFilter(uint32(maxN), tweak, p, btcsuiteWire.BloomUpdateNone)
-	return &btcsuiteFilter{bfilter: bfilter}, nil
-}
-
-func (f *btcsuiteFilter) Add(bl ...[]byte) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	for _, b := range bl {
-		f.bfilter.Add(b)
-	}
-}
-
-func (f *btcsuiteFilter) Check(b []byte) bool {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	return f.bfilter.Matches(b)
-}
-
-type MsgFilterLoadJSON struct {
-	HashFuncs uint32                       `json:"hashFuncs"`
-	Tweak     uint32                       `json:"tweak"`
-	Flags     btcsuiteWire.BloomUpdateType `json:"updateType"`
-	Filter    []byte                       `json:"filter"`
-}
-
-func (f *btcsuiteFilter) MarshalJSON() ([]byte, error) {
-	filterLoad := f.bfilter.MsgFilterLoad()
-	j := &MsgFilterLoadJSON{
-		Filter:    filterLoad.Filter,
-		HashFuncs: filterLoad.HashFuncs,
-		Tweak:     filterLoad.Tweak,
-		Flags:     filterLoad.Flags,
-	}
-	return json.Marshal(j)
-}
-
-// the wordSize of a bit set
-const wordSize = uint(64)
-
-// log2WordSize is lg(wordSize)
-const log2WordSize = uint(6)
-
-func WordsNeeded(i uint) int {
-	if i > (bitset.Cap() - wordSize + 1) {
-		return int(bitset.Cap() >> log2WordSize)
-	}
-	return int((i + (wordSize - 1)) >> log2WordSize)
-}
-
-const Ln2Squared = math.Ln2 * math.Ln2
-
-func MinUint32(a, b uint32) uint32 {
-	if a < b {
-		return a
-	}
-	return b
 }
