@@ -4,7 +4,6 @@
 package pubsub
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"sync"
@@ -19,6 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/gorilla/websocket"
+)
+
+type EventType int
+
+const (
+	Accepted EventType = iota
+	Rejected
+	Verified
 )
 
 const (
@@ -63,8 +70,8 @@ type errorMsg struct {
 }
 
 type Publish struct {
-	Channel string      `json:"channel"`
-	Value   interface{} `json:"value"`
+	EventType EventType   `json:"eventType"`
+	Value     interface{} `json:"value"`
 }
 
 var upgrader = websocket.Upgrader{
@@ -73,29 +80,28 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     func(*http.Request) bool { return true },
 }
 
-var (
-	errDuplicateChannel = errors.New("duplicate channel")
-)
-
 // Server maintains the set of active clients and sends messages to the clients.
 type Server struct {
-	log logging.Logger
-
-	hrp string
-
-	lock     sync.RWMutex
-	conns    map[*Connection]struct{}
-	channels map[string]*connContainer
+	lock sync.RWMutex
+	log  logging.Logger
+	hrp  string
+	// TODO make the key not a pointer
+	conns            map[*Connection]struct{}
+	eventTypeToConns map[EventType]*connContainer
 }
 
 // NewPubSubServer ...
 func New(networkID uint32, log logging.Logger) *Server {
 	hrp := constants.GetHRP(networkID)
 	return &Server{
-		log:      log,
-		hrp:      hrp,
-		conns:    make(map[*Connection]struct{}),
-		channels: make(map[string]*connContainer),
+		log:   log,
+		hrp:   hrp,
+		conns: make(map[*Connection]struct{}),
+		eventTypeToConns: map[EventType]*connContainer{
+			Accepted: newConnContainer(),
+			Rejected: newConnContainer(),
+			Verified: newConnContainer(),
+		},
 	}
 }
 
@@ -116,16 +122,19 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Publish ...
-func (s *Server) Publish(channel string, msg interface{}, parser Parser) {
-	cContainer := s.channelContainer(channel)
-	if cContainer == nil {
+func (s *Server) Publish(eventType EventType, msg interface{}, parser Parser) {
+	s.lock.RLock()
+	conns, ok := s.eventTypeToConns[eventType]
+	s.lock.RUnlock()
+	if !ok {
+		s.log.Warn("got unexpected event type %v", eventType)
 		return
 	}
 
-	for _, conn := range cContainer.Conns() {
+	for _, conn := range conns.Conns() {
 		m := &Publish{
-			Channel: channel,
-			Value:   msg,
+			EventType: eventType,
+			Value:     msg,
 		}
 		if conn.fp.HasFilter() {
 			fr := parser.Filter(conn.fp)
@@ -145,19 +154,6 @@ func (s *Server) publishMsg(conn *Connection, msg interface{}) {
 	}
 }
 
-// Register ...
-func (s *Server) Register(channel string) error {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	if _, exists := s.channels[channel]; exists {
-		return errDuplicateChannel
-	}
-
-	s.channels[channel] = newConnContainer()
-	return nil
-}
-
 func (s *Server) addConnection(conn *Connection) {
 	s.lock.Lock()
 	s.conns[conn] = struct{}{}
@@ -169,8 +165,8 @@ func (s *Server) addConnection(conn *Connection) {
 
 func (s *Server) removeConnection(conn *Connection) {
 	s.lock.RLock()
-	for _, cContainer := range s.channels {
-		cContainer.Remove(conn)
+	for _, conns := range s.eventTypeToConns {
+		conns.Remove(conn)
 	}
 	s.lock.RUnlock()
 
@@ -179,30 +175,26 @@ func (s *Server) removeConnection(conn *Connection) {
 	delete(s.conns, conn)
 }
 
-func (s *Server) addChannel(conn *Connection, channel string) {
-	cContainer := s.channelContainer(channel)
-	if cContainer == nil {
-		return
-	}
-	cContainer.Add(conn)
-}
-
-func (s *Server) removeChannel(conn *Connection, channel string) {
-	cContainer := s.channelContainer(channel)
-	if cContainer == nil {
-		return
-	}
-	cContainer.Remove(conn)
-}
-
-func (s *Server) channelContainer(channel string) *connContainer {
+func (s *Server) subscribe(conn *Connection, eventType EventType) {
 	s.lock.RLock()
-	cContainer, exists := s.channels[channel]
+	conns, ok := s.eventTypeToConns[eventType]
 	s.lock.RUnlock()
-	if exists {
-		return cContainer
+	if !ok {
+		s.log.Warn("got unexpected event type %v", eventType)
+		return
 	}
-	return nil
+	conns.Add(conn)
+}
+
+func (s *Server) unsubscribe(conn *Connection, eventType EventType) {
+	s.lock.RLock()
+	conns, ok := s.eventTypeToConns[eventType]
+	s.lock.RUnlock()
+	if !ok {
+		s.log.Warn("got unexpected event type %v", eventType)
+		return
+	}
+	conns.Remove(conn)
 }
 
 // Connection is a representation of the websocket connection.
@@ -331,9 +323,9 @@ func (c *Connection) readMessage() error {
 	switch cmdMsg.Command {
 	case "":
 		if cmdMsg.Unsubscribe {
-			c.s.removeChannel(c, cmdMsg.Channel)
+			c.s.subscribe(c, cmdMsg.EventType)
 		} else {
-			c.s.addChannel(c, cmdMsg.Channel)
+			c.s.unsubscribe(c, cmdMsg.EventType)
 		}
 		return nil
 	case CommandFilters:

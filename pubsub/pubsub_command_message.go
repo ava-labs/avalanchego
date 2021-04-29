@@ -21,8 +21,8 @@ type CommandMessage struct {
 	FilterMax uint64 `json:"filterMax,omitempty"`
 	// FilterError expected error rate of filter
 	FilterError float64 `json:"filterError,omitempty"`
-	// Channel subscription channel
-	Channel string `json:"channel"`
+	// subscription to this kind of messages
+	EventType EventType `json:"eventType"`
 	// Unsubscribe unsubscribe channel remove address or reset filter
 	Unsubscribe bool `json:"unsubscribe"`
 }

@@ -146,10 +146,6 @@ func (vm *VM) Initialize(
 	errs.Add(
 		vm.metrics.Initialize(ctx.Namespace, ctx.Metrics),
 
-		vm.pubsub.Register("accepted"),
-		vm.pubsub.Register("rejected"),
-		vm.pubsub.Register("verified"),
-
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
 		c.RegisterType(&OperationTx{}),
