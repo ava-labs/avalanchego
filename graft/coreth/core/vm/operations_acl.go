@@ -86,11 +86,11 @@ func gasSStoreEIP2929(evm *EVM, contract *Contract, stack *Stack, mem *Memory, m
 	original := evm.StateDB.GetCommittedState(contract.Address(), x.Bytes32())
 	if original == current {
 		if original == (common.Hash{}) { // create slot (2.1.1)
-			return cost + params.SstoreInitGasEIP2200, nil
+			return cost + params.SstoreSetGasEIP2200, nil
 		}
 		// EIP-2200 original clause:
 		//		return params.SstoreCleanGasEIP2200, nil // write existing slot (2.1.2)
-		return cost + (params.SstoreCleanGasEIP2200 - ColdSloadCostEIP2929), nil // write existing slot (2.1.2)
+		return cost + (params.SstoreResetGasEIP2200 - ColdSloadCostEIP2929), nil // write existing slot (2.1.2)
 	}
 
 	// EIP-2200 original clause:
