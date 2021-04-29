@@ -1481,7 +1481,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 
 	// Derive the sender.
 	bigblock := new(big.Int).SetUint64(blockNumber)
-	signer := types.MakeSigner(s.b.ChainConfig(), bigblock)
+	signer := types.MakeSigner(s.b.ChainConfig(), bigblock, big.NewInt(time.Now().Unix()))
 	from, _ := types.Sender(signer, tx)
 
 	fields := map[string]interface{}{
@@ -1657,7 +1657,7 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 		return common.Hash{}, err
 	}
 	if tx.To() == nil {
-		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number())
+		signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number(), big.NewInt(time.Now().Unix()))
 		from, err := types.Sender(signer, tx)
 		if err != nil {
 			return common.Hash{}, err

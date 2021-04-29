@@ -46,21 +46,18 @@ type sigCache struct {
 	from   common.Address
 }
 
-// MakeSigner returns a Signer based on the given chain config and block number.
-func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
-	var signer Signer
+// MakeSigner returns a Signer based on the given chain config and block number or time.
+func MakeSigner(config *params.ChainConfig, blockNumber *big.Int, blockTime *big.Int) Signer {
 	switch {
-	// TODO (TS): Fix to use block time!
-	case config.IsApricotPhase2(blockNumber):
-		signer = NewEIP2930Signer(config.ChainID)
+	case config.IsApricotPhase2(blockTime):
+		return NewEIP2930Signer(config.ChainID)
 	case config.IsEIP155(blockNumber):
-		signer = NewEIP155Signer(config.ChainID)
+		return NewEIP155Signer(config.ChainID)
 	case config.IsHomestead(blockNumber):
-		signer = HomesteadSigner{}
+		return HomesteadSigner{}
 	default:
-		signer = FrontierSigner{}
+		return FrontierSigner{}
 	}
-	return signer
 }
 
 // LatestSigner returns the 'most permissive' Signer available for the given chain

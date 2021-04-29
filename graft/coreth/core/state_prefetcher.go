@@ -62,7 +62,7 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 	var (
 		header  = block.Header()
 		gaspool = new(GasPool).AddGas(block.GasLimit())
-		signer  = types.MakeSigner(p.config, header.Number)
+		signer  = types.MakeSigner(p.config, header.Number, new(big.Int).SetUint64(header.Time))
 	)
 	// Iterate over and process the individual transactions
 	byzantium := p.config.IsByzantium(block.Number())

@@ -33,6 +33,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"runtime"
 	"sync"
@@ -208,7 +209,7 @@ func (api *PrivateDebugAPI) traceChain(ctx context.Context, start, end *types.Bl
 
 			// Fetch and execute the next block trace tasks
 			for task := range tasks {
-				signer := types.MakeSigner(api.eth.blockchain.Config(), task.block.Number())
+				signer := types.MakeSigner(api.eth.blockchain.Config(), task.block.Number(), new(big.Int).SetUint64(task.block.Time()))
 
 				// Trace all the transactions contained within
 				for i, tx := range task.block.Transactions() {
@@ -465,7 +466,7 @@ func (api *PrivateDebugAPI) traceBlock(ctx context.Context, block *types.Block, 
 	}
 	// Execute all the transaction contained within the block concurrently
 	var (
-		signer = types.MakeSigner(api.eth.blockchain.Config(), block.Number())
+		signer = types.MakeSigner(api.eth.blockchain.Config(), block.Number(), new(big.Int).SetUint64(block.Time()))
 
 		txs     = block.Transactions()
 		results = make([]*txTraceResult, len(txs))
@@ -566,7 +567,7 @@ func (api *PrivateDebugAPI) standardTraceBlockToFile(ctx context.Context, block 
 
 	// Execute transaction, either tracing all or just the requested one
 	var (
-		signer = types.MakeSigner(api.eth.blockchain.Config(), block.Number())
+		signer = types.MakeSigner(api.eth.blockchain.Config(), block.Number(), new(big.Int).SetUint64(block.Time()))
 		dumps  []string
 	)
 	for i, tx := range block.Transactions() {
@@ -847,7 +848,7 @@ func (api *PrivateDebugAPI) computeTxEnv(block *types.Block, txIndex int, reexec
 	}
 
 	// Recompute transactions up to the target index.
-	signer := types.MakeSigner(api.eth.blockchain.Config(), block.Number())
+	signer := types.MakeSigner(api.eth.blockchain.Config(), block.Number(), new(big.Int).SetUint64(block.Time()))
 
 	for idx, tx := range block.Transactions() {
 		// Assemble the transaction call message and return if the requested offset
