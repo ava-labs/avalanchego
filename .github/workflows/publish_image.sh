@@ -4,6 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# todo clean up comments
+
 # Skip if this is not on the main public repo or
 # if this is not a trusted build (Docker Credentials are not set)
 #if [[ $TRAVIS_REPO_SLUG != "ava-labs/avalanchego" || -z "$DOCKER_USERNAME"  ]]; then
@@ -40,6 +42,6 @@ fi
 echo "Pushing: $docker_image"
 
 #echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
-#
+
 ## pushing image with tags
 #docker push $docker_image
