@@ -15,6 +15,7 @@ jobs:
         uses: golangci/golangci-lint-action@v2
         with:
           version: latest
+          working-directory: .
 
   run_build_tests:
     needs: run_lint
