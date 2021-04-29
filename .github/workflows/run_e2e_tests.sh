@@ -46,6 +46,9 @@ fi
 
 echo "Using $avalanche_testing_image for e2e tests"
 
+# pulling the avalanche-testing image
+docker pull $avalanche_testing_image
+
 # Setting the build ID
 git_commit_id=$( git rev-list -1 HEAD )
 
