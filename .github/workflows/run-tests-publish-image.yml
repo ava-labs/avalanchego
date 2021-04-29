@@ -27,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: build_test
+        shell: bash
         run: .github/workflows/build_and_test.sh
 
 
