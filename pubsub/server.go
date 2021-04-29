@@ -6,6 +6,7 @@ package pubsub
 import (
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -79,12 +80,14 @@ var upgrader = websocket.Upgrader{
 
 // Server maintains the set of active clients and sends messages to the clients.
 type Server struct {
-	lock sync.RWMutex
-	log  logging.Logger
-	hrp  string
-	// TODO make the key not a pointer
-	conns            map[*Connection]struct{}
-	eventTypeToConns map[EventType]*connContainer
+	nextConnID int32
+	lock       sync.RWMutex
+	log        logging.Logger
+	hrp        string
+	conns      map[int32]*Connection
+	// Event Type --> Connection ID --> Connection
+	// where Connection is subscribed to the given event type
+	eventTypeToConns map[EventType]map[int32]*Connection
 }
 
 // NewPubSubServer ...
@@ -93,11 +96,11 @@ func New(networkID uint32, log logging.Logger) *Server {
 	return &Server{
 		log:   log,
 		hrp:   hrp,
-		conns: make(map[*Connection]struct{}),
-		eventTypeToConns: map[EventType]*connContainer{
-			Accepted: newConnContainer(),
-			Rejected: newConnContainer(),
-			Verified: newConnContainer(),
+		conns: make(map[int32]*Connection),
+		eventTypeToConns: map[EventType]map[int32]*Connection{
+			Accepted: {},
+			Rejected: {},
+			Verified: {},
 		},
 	}
 }
@@ -109,6 +112,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	conn := &Connection{
+		id:     atomic.AddInt32(&s.nextConnID, 1),
 		s:      s,
 		conn:   wsConn,
 		send:   make(chan interface{}, maxPendingMessages),
@@ -128,7 +132,7 @@ func (s *Server) Publish(eventType EventType, msg interface{}, parser Parser) {
 		return
 	}
 
-	for _, conn := range conns.Conns() {
+	for _, conn := range conns {
 		m := &Publish{
 			EventType: eventType,
 			Value:     msg,
@@ -153,45 +157,46 @@ func (s *Server) publishMsg(conn *Connection, msg interface{}) {
 
 func (s *Server) addConnection(conn *Connection) {
 	s.lock.Lock()
-	s.conns[conn] = struct{}{}
+	s.conns[conn.id] = conn
 	s.lock.Unlock()
 
 	go conn.writePump()
 	go conn.readPump()
 }
 
-func (s *Server) removeConnection(conn *Connection) {
-	s.lock.RLock()
-	for _, conns := range s.eventTypeToConns {
-		conns.Remove(conn)
-	}
-	s.lock.RUnlock()
-
+func (s *Server) removeConnection(connID int32) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	delete(s.conns, conn)
+
+	// TODO make sure the connection is closed
+	for _, conns := range s.eventTypeToConns {
+		delete(conns, connID)
+	}
+	delete(s.conns, connID)
 }
 
 func (s *Server) subscribe(conn *Connection, eventType EventType) {
-	s.lock.RLock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	conns, ok := s.eventTypeToConns[eventType]
-	s.lock.RUnlock()
 	if !ok {
 		s.log.Warn("got unexpected event type %v", eventType)
 		return
 	}
-	conns.Add(conn)
+	conns[conn.id] = conn
 }
 
-func (s *Server) unsubscribe(conn *Connection, eventType EventType) {
-	s.lock.RLock()
+func (s *Server) unsubscribe(connID int32, eventType EventType) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	conns, ok := s.eventTypeToConns[eventType]
-	s.lock.RUnlock()
 	if !ok {
 		s.log.Warn("got unexpected event type %v", eventType)
 		return
 	}
-	conns.Remove(conn)
+	delete(conns, connID)
 }
 
 func ByteToID(address []byte) ids.ShortID {
