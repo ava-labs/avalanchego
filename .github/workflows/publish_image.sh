@@ -12,8 +12,8 @@ set -o pipefail
 #  exit 0;
 #fi
 
-# Directory above this script
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Avalanche root directory
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 
 # Load the versions
 source "$AVALANCHE_PATH"/scripts/versions.sh
