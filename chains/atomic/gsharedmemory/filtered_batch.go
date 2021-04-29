@@ -27,22 +27,26 @@ func (b *filteredBatch) Delete(key []byte) error {
 }
 
 func (b *filteredBatch) PutRequests() []*gsharedmemoryproto.BatchPut {
-	reqs := make([]*gsharedmemoryproto.BatchPut, 0, len(b.writes))
+	reqs := make([]*gsharedmemoryproto.BatchPut, len(b.writes))
+	i := 0
 	for keyStr, value := range b.writes {
-		reqs = append(reqs, &gsharedmemoryproto.BatchPut{
+		reqs[i] = &gsharedmemoryproto.BatchPut{
 			Key:   []byte(keyStr),
 			Value: value,
-		})
+		}
+		i++
 	}
 	return reqs
 }
 
 func (b *filteredBatch) DeleteRequests() []*gsharedmemoryproto.BatchDelete {
-	reqs := make([]*gsharedmemoryproto.BatchDelete, 0, len(b.deletes))
+	reqs := make([]*gsharedmemoryproto.BatchDelete, len(b.deletes))
+	i := 0
 	for keyStr := range b.deletes {
-		reqs = append(reqs, &gsharedmemoryproto.BatchDelete{
+		reqs[i] = &gsharedmemoryproto.BatchDelete{
 			Key: []byte(keyStr),
-		})
+		}
+		i++
 	}
 	return reqs
 }
