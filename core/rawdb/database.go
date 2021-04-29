@@ -333,7 +333,7 @@ func InspectDatabase(db ethdb.Database) error {
 			trieSize += size
 		default:
 			var accounted bool
-			for _, meta := range [][]byte{databaseVerisionKey, headHeaderKey, headBlockKey, headFastBlockKey, fastTrieProgressKey} {
+			for _, meta := range [][]byte{databaseVersionKey, headHeaderKey, headBlockKey, headFastBlockKey, fastTrieProgressKey} {
 				if bytes.Equal(key, meta) {
 					metadata += size
 					accounted = true

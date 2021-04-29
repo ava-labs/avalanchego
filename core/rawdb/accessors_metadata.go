@@ -40,7 +40,7 @@ import (
 func ReadDatabaseVersion(db ethdb.KeyValueReader) *uint64 {
 	var version uint64
 
-	enc, _ := db.Get(databaseVerisionKey)
+	enc, _ := db.Get(databaseVersionKey)
 	if len(enc) == 0 {
 		return nil
 	}
@@ -57,7 +57,7 @@ func WriteDatabaseVersion(db ethdb.KeyValueWriter, version uint64) {
 	if err != nil {
 		log.Crit("Failed to encode database version", "err", err)
 	}
-	if err = db.Put(databaseVerisionKey, enc); err != nil {
+	if err = db.Put(databaseVersionKey, enc); err != nil {
 		log.Crit("Failed to store the database version", "err", err)
 	}
 }
