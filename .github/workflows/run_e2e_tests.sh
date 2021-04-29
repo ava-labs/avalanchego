@@ -43,8 +43,6 @@ fi
 
 echo "Using $avalanche_testing_image for e2e tests"
 
-kurtosis_core_dirpath="$AVALANCHE_PATH/.kurtosis"
-
 # Setting the build ID
 git_commit_id=$( git rev-list -1 HEAD )
 
@@ -69,6 +67,6 @@ custom_params_json="{
 }"
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 
-bash "${kurtosis_core_dirpath}/kurtosis.sh" \
+bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
     --custom-params "${custom_params_json}" \
     "${avalanche_testing_image}"
