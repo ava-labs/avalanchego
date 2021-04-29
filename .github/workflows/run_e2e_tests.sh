@@ -2,6 +2,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+echo "derp -> $@"
+
 # Testing specific variables
 avalanche_testing_repo="avaplatform/avalanche-testing"
 
@@ -69,4 +71,5 @@ custom_params_json="{
 
 bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
     --custom-params "${custom_params_json}" \
-    "${avalanche_testing_image}"
+    "${avalanche_testing_image}" \
+    $@
