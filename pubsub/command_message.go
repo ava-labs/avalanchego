@@ -14,8 +14,6 @@ import (
 // CommandMessage command message
 type CommandMessage struct {
 	Command string `json:"command"`
-	// AddressIds array of ids.ShortID
-	AddressIds [][]byte `json:"addressIds,omitempty"`
 	// Addresses array of avax addresses i.e. fuji123....
 	Addresses []string `json:"addresses,omitempty"`
 	// FilterMax size of bloom filter
@@ -26,6 +24,8 @@ type CommandMessage struct {
 	EventType EventType `json:"eventType"`
 	// Unsubscribe unsubscribe channel remove address or reset filter
 	Unsubscribe bool `json:"unsubscribe"`
+	// AddressIds array of addresses, kept as a [][]byte for use in the bloom filter
+	addressIds [][]byte `json:"-"`
 }
 
 func NewCommandMessage(r io.Reader) (*CommandMessage, error) {
@@ -52,15 +52,15 @@ func (c *CommandMessage) FilterOrDefault() {
 
 // TransposeAddress converts any b32 address to their byte equiv ids.ShortID.
 func (c *CommandMessage) TransposeAddress() {
-	if c.AddressIds == nil {
-		c.AddressIds = make([][]byte, 0, len(c.Addresses))
+	if c.addressIds == nil {
+		c.addressIds = make([][]byte, 0, len(c.Addresses))
 	}
 	for _, astr := range c.Addresses {
 		_, _, abytes, err := formatting.ParseAddress(astr)
 		if err != nil {
 			continue
 		}
-		c.AddressIds = append(c.AddressIds, abytes)
+		c.addressIds = append(c.addressIds, abytes)
 	}
 }
 
@@ -72,19 +72,18 @@ func (c *CommandMessage) ParseQuery(q map[string][]string) {
 	if len(q) == 0 {
 		return
 	}
-	if c.AddressIds == nil {
-		c.AddressIds = make([][]byte, 0, 10)
+	if c.addressIds == nil {
+		c.addressIds = make([][]byte, 0, 10)
 	}
 	for valuesk, valuesv := range q {
 		switch valuesk {
 		case ParamAddress:
 			for _, value := range valuesv {
 				sid, err := addressToID(value)
-				if err == nil {
-					c.AddressIds = append(c.AddressIds, sid[:])
+				if err != nil {
 					continue
 				}
-				c.AddressIds = append(c.AddressIds, []byte(value))
+				c.addressIds = append(c.addressIds, sid[:])
 			}
 		default:
 		}

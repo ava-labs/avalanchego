@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/gorilla/websocket"
@@ -184,10 +183,4 @@ func (s *Server) unsubscribe(conn *Connection, eventType EventType) {
 		return
 	}
 	conns.Remove(conn)
-}
-
-func ByteToID(address []byte) ids.ShortID {
-	var sid ids.ShortID
-	copy(sid[:], address)
-	return sid
 }

@@ -168,7 +168,7 @@ func (c *Connection) handleCommandFilterUpdate(cmdMsg *CommandMessage) error {
 		c.Send(&errorMsg{Error: fmt.Sprintf("filter create failed %v", err)})
 		return err
 	}
-	bfilter.Add(cmdMsg.AddressIds...)
+	bfilter.Add(cmdMsg.addressIds...)
 	return nil
 }
 
@@ -187,9 +187,9 @@ func (c *Connection) updateNewFilter(cmdMsg *CommandMessage) (bloom.Filter, erro
 }
 
 func (c *Connection) handleCommandAddressUpdate(cmdMsg *CommandMessage) {
-	if c.fp.Len()+len(cmdMsg.AddressIds) > MaxAddresses {
+	if c.fp.Len()+len(cmdMsg.addressIds) > MaxAddresses {
 		c.Send(&errorMsg{Error: "address limit reached"})
 		return
 	}
-	c.fp.UpdateAddressMulti(cmdMsg.Unsubscribe, cmdMsg.AddressIds...)
+	c.fp.UpdateAddressMulti(cmdMsg.Unsubscribe, cmdMsg.addressIds...)
 }

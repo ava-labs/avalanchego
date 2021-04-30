@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/hashing"
+
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 
@@ -34,7 +36,7 @@ func hex2Short(v string) (ids.ShortID, error) {
 func TestCommandMessage_TransposeAddress(t *testing.T) {
 	hrp := constants.GetHRP(5)
 	cmdMsg := &CommandMessage{}
-	cmdMsg.AddressIds = make([][]byte, 0, 1)
+	cmdMsg.addressIds = make([][]byte, 0, 1)
 	idsid1, _ := hex2Short("0000000000000000000000000000000000000001")
 	b32addr, _ := formatting.FormatBech32(hrp, idsid1[:])
 	if !strings.HasPrefix(b32addr, hrp) {
@@ -42,7 +44,7 @@ func TestCommandMessage_TransposeAddress(t *testing.T) {
 	}
 	cmdMsg.Addresses = append(cmdMsg.Addresses, "Z-"+b32addr)
 	cmdMsg.TransposeAddress()
-	if !bytes.Equal(cmdMsg.AddressIds[0], idsid1[:]) {
+	if !bytes.Equal(cmdMsg.addressIds[0], idsid1[:]) {
 		t.Fatalf("address transpose failed")
 	}
 }
@@ -74,20 +76,25 @@ func TestCommandMessage_Load(t *testing.T) {
 func TestFilterParamUpdateMulti(t *testing.T) {
 	fp := NewFilterParam()
 	bl := make([][]byte, 0, 10)
-	bl = append(bl, []byte("abc"))
-	bl = append(bl, []byte("def"))
-	bl = append(bl, []byte("xyz"))
+
+	addr1 := byteToID(hashing.ComputeHash160([]byte("abc")))
+	addr2 := byteToID(hashing.ComputeHash160([]byte("def")))
+	addr3 := byteToID(hashing.ComputeHash160([]byte("xyz")))
+
+	bl = append(bl, addr1[:])
+	bl = append(bl, addr2[:])
+	bl = append(bl, addr3[:])
 	fp.UpdateAddressMulti(false, bl...)
 	if len(fp.address) != 3 {
 		t.Fatalf("update multi failed")
 	}
-	if _, exists := fp.address[ByteToID([]byte("abc"))]; !exists {
+	if _, exists := fp.address[addr1]; !exists {
 		t.Fatalf("update multi failed")
 	}
-	if _, exists := fp.address[ByteToID([]byte("def"))]; !exists {
+	if _, exists := fp.address[addr2]; !exists {
 		t.Fatalf("update multi failed")
 	}
-	if _, exists := fp.address[ByteToID([]byte("xyz"))]; !exists {
+	if _, exists := fp.address[addr3]; !exists {
 		t.Fatalf("update multi failed")
 	}
 }
@@ -142,4 +149,12 @@ func TestCommandMessage(t *testing.T) {
 	if cm.FilterMax != 1 && cm.FilterError != .1 {
 		t.Fatalf("default filter check failed")
 	}
+}
+
+func byteToID(address []byte) ids.ShortID {
+	sid, err := ids.ToShortID(address)
+	if err != nil {
+		return ids.ShortEmpty
+	}
+	return sid
 }

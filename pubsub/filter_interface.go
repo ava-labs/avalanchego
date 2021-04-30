@@ -3,9 +3,7 @@
 
 package pubsub
 
-import "github.com/ava-labs/avalanchego/ids"
-
 type Parser interface {
 	// expected a txID or nil if filter doesn't match
-	Filter(*FilterParam) *ids.ID
+	Filter(*FilterParam) interface{}
 }

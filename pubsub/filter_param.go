@@ -35,8 +35,11 @@ func (f *FilterParam) CheckAddress(addr2check []byte) bool {
 	if f.filter != nil && f.filter.Check(addr2check) {
 		return true
 	}
-	addr2checkID := ByteToID(addr2check)
-	_, ok := f.address[addr2checkID]
+	addr, err := ids.ToShortID(addr2check)
+	if err != nil {
+		return false
+	}
+	_, ok := f.address[addr]
 	return ok
 }
 
@@ -48,7 +51,11 @@ func (f *FilterParam) HasFilter() bool {
 
 func (f *FilterParam) UpdateAddressMulti(unsubscribe bool, bl ...[]byte) {
 	for _, b := range bl {
-		f.UpdateAddress(unsubscribe, ByteToID(b))
+		addr, err := ids.ToShortID(b)
+		if err != nil {
+			continue
+		}
+		f.UpdateAddress(unsubscribe, addr)
 	}
 }
 
