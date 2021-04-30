@@ -7,7 +7,7 @@
 // - https://github.com/ethereum/go-ethereum/issues/22041
 // - https://github.com/ethereum/go-ethereum/pull/22092
 
-package tests
+package chain
 
 import (
 	"fmt"
