@@ -73,6 +73,9 @@ var (
 // JumpTable contains the EVM opcodes supported at a given fork.
 type JumpTable [256]*operation
 
+// newApricotPhase1InstructionSet returns the frontier,
+// homestead, byzantium, contantinople petersburg,
+// and istanbul instructions.
 func newApricotPhase1InstructionSet() JumpTable {
 	instructionSet := newIstanbulInstructionSet()
 
@@ -81,6 +84,9 @@ func newApricotPhase1InstructionSet() JumpTable {
 	return instructionSet
 }
 
+// newApricotPhase1InstructionSet returns the frontier,
+// homestead, byzantium, contantinople petersburg,
+// istanbul, and apricotPhase1 instructions.
 func newApricotPhase2InstructionSet() JumpTable {
 	instructionSet := newApricotPhase1InstructionSet()
 
@@ -89,8 +95,8 @@ func newApricotPhase2InstructionSet() JumpTable {
 	return instructionSet
 }
 
-// newIstanbulInstructionSet returns the frontier, homestead
-// byzantium, contantinople and petersburg instructions.
+// newIstanbulInstructionSet returns the frontier,
+// homestead, byzantium, contantinople and petersburg instructions.
 func newIstanbulInstructionSet() JumpTable {
 	instructionSet := newConstantinopleInstructionSet()
 
@@ -101,7 +107,7 @@ func newIstanbulInstructionSet() JumpTable {
 	return instructionSet
 }
 
-// newConstantinopleInstructionSet returns the frontier, homestead
+// newConstantinopleInstructionSet returns the frontier, homestead,
 // byzantium and contantinople instructions.
 func newConstantinopleInstructionSet() JumpTable {
 	instructionSet := newByzantiumInstructionSet()
@@ -577,12 +583,6 @@ func newFrontierInstructionSet() JumpTable {
 			minStack:    minStack(0, 0),
 			maxStack:    maxStack(0, 0),
 		},
-		//EMC: {
-		//	execute:     opEMC,
-		//	constantGas: params.EMCGas,
-		//	minStack:    minStack(0, 0),
-		//	maxStack:    maxStack(0, 0),
-		//},
 		PUSH1: {
 			execute:     opPush1,
 			constantGas: GasFastestStep,
