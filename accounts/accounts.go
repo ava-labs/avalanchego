@@ -29,10 +29,10 @@ package accounts
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/ava-labs/coreth/core/types"
 	ethereum "github.com/ethereum/go-ethereum"
-	"math/big"
-	// 	gethaccounts "github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"golang.org/x/crypto/sha3"
