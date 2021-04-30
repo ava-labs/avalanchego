@@ -35,18 +35,16 @@ import (
 	"strings"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ava-labs/coreth/core/state"
-	"github.com/ava-labs/coreth/core/state/snapshot"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/rlp"
-	"golang.org/x/crypto/sha3"
 )
 
 // StateTest checks transaction processing without block context.
@@ -93,13 +91,14 @@ type stEnv struct {
 	Timestamp  uint64         `json:"currentTimestamp"  gencodec:"required"`
 }
 
-type stEnvMarshaling struct {
-	Coinbase   common.UnprefixedAddress
-	Difficulty *math.HexOrDecimal256
-	GasLimit   math.HexOrDecimal64
-	Number     math.HexOrDecimal64
-	Timestamp  math.HexOrDecimal64
-}
+// Original code:
+// type stEnvMarshaling struct {
+// 	Coinbase   common.UnprefixedAddress
+// 	Difficulty *math.HexOrDecimal256
+// 	GasLimit   math.HexOrDecimal64
+// 	Number     math.HexOrDecimal64
+// 	Timestamp  math.HexOrDecimal64
+// }
 
 //go:generate gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 
@@ -114,12 +113,13 @@ type stTransaction struct {
 	PrivateKey  []byte              `json:"secretKey"`
 }
 
-type stTransactionMarshaling struct {
-	GasPrice   *math.HexOrDecimal256
-	Nonce      math.HexOrDecimal64
-	GasLimit   []math.HexOrDecimal64
-	PrivateKey hexutil.Bytes
-}
+// Original code:
+// type stTransactionMarshaling struct {
+// 	GasPrice   *math.HexOrDecimal256
+// 	Nonce      math.HexOrDecimal64
+// 	GasLimit   []math.HexOrDecimal64
+// 	PrivateKey hexutil.Bytes
+// }
 
 // GetChainConfig takes a fork definition and returns a chain config.
 // The fork definition can be
@@ -241,6 +241,8 @@ func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter boo
 
 	var snaps *snapshot.Tree
 	if snapshotter {
+		// FIXME update when snapshot package is migrated from v1.10.2
+		// snaps, _ = snapshot.New(db, sdb.TrieDB(), 1, root, false, true, false)
 		snaps = snapshot.New(db, sdb.TrieDB(), 1, root, false)
 	}
 	statedb, _ = state.New(root, sdb, snaps)
@@ -312,9 +314,10 @@ func (tx *stTransaction) toMessage(ps stPostState) (core.Message, error) {
 	return msg, nil
 }
 
-func rlpHash(x interface{}) (h common.Hash) {
-	hw := sha3.NewLegacyKeccak256()
-	rlp.Encode(hw, x)
-	hw.Sum(h[:0])
-	return h
-}
+// Original code:
+// func rlpHash(x interface{}) (h common.Hash) {
+// 	hw := sha3.NewLegacyKeccak256()
+// 	rlp.Encode(hw, x)
+// 	hw.Sum(h[:0])
+// 	return h
+// }

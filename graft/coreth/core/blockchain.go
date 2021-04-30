@@ -1115,10 +1115,10 @@ const (
 
 // Original code:
 // numberHash is just a container for a number and a hash, to represent a block
-type numberHash struct {
-	number uint64
-	hash   common.Hash
-}
+// type numberHash struct {
+// 	number uint64
+// 	hash   common.Hash
+// }
 
 // Original Code:
 // InsertReceiptChain attempts to complete an already existing header chain with
