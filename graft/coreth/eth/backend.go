@@ -151,13 +151,16 @@ func New(stack *node.Node, config *Config,
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
-	// HIGH PRIORITY TODO RecoverPruning once that package is migrated over
+	// FIXME RecoverPruning once that package is migrated over
+	// if err := pruner.RecoverPruning(stack.ResolvePath(""), chainDb, stack.ResolvePath(config.TrieCleanCacheJournal)); err != nil {
+	//             log.Error("Failed to recover state", "error", err)
+	// }
 	eth := &Ethereum{
 		config:            config,
 		chainDb:           chainDb,
 		eventMux:          stack.EventMux(),
 		accountManager:    stack.AccountManager(),
-		engine:            CreateConsensusEngine(cb),
+		engine:            dummy.NewDummyEngine(cb),
 		closeBloomHandler: make(chan struct{}),
 		networkID:         config.NetworkId,
 		gasPrice:          config.Miner.GasPrice,
@@ -200,9 +203,8 @@ func New(stack *node.Node, config *Config,
 			TrieDirtyLimit:      config.TrieDirtyCache,
 			TrieDirtyDisabled:   config.NoPruning,
 			TrieTimeLimit:       config.TrieTimeout,
-			// TODO re-enable snapshots
+			// FIXME re-enable snapshots and add preimages
 			// SnapshotLimit:       config.SnapshotCache,
-			// TODO add preimages
 			// Preimages: config.Preimages,
 		}
 	)
@@ -228,10 +230,14 @@ func New(stack *node.Node, config *Config,
 	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
 
 	eth.miner = miner.New(eth, &config.Miner, chainConfig, eth.EventMux(), eth.engine, eth.isLocalBlock, mcb)
-	// eth.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
-	// TODO use node config to pass in config param on whether or not to allow unprotected
-	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), true, eth, nil}
+	// FIXME use node config to pass in config param on whether or not to allow unprotected
+	// currently defaults to false.
+	allowUnprotectedTxs := false
+	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), false, eth, nil}
+	if allowUnprotectedTxs {
+		log.Info("Unprotected transactions allowed")
+	}
 	gpoParams := config.GPO
 	if gpoParams.Default == nil {
 		gpoParams.Default = config.Miner.GasPrice
@@ -260,11 +266,6 @@ func New(stack *node.Node, config *Config,
 		}
 	}
 	return eth, nil
-}
-
-// CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
-func CreateConsensusEngine(cb *dummy.ConsensusCallbacks) consensus.Engine {
-	return dummy.NewDummyEngine(cb)
 }
 
 // APIs return the collection of RPC services the ethereum package offers.
@@ -440,10 +441,10 @@ func (s *Ethereum) TxPool() *core.TxPool              { return s.txPool }
 func (s *Ethereum) EventMux() *event.TypeMux          { return s.eventMux }
 func (s *Ethereum) Engine() consensus.Engine          { return s.engine }
 func (s *Ethereum) ChainDb() ethdb.Database           { return s.chainDb }
-func (s *Ethereum) IsListening() bool                 { return true } // Always listening
-func (s *Ethereum) NetVersion() uint64                { return s.networkID }
 
-// TODO remove Downlaoder and Synced from here and the interfaces where they are used
+// FIXME remove NetVersion, IsListening, Downloader, and Synced
+func (s *Ethereum) IsListening() bool                  { return true } // Always listening
+func (s *Ethereum) NetVersion() uint64                 { return s.networkID }
 func (s *Ethereum) Downloader() *downloader.Downloader { return nil }  // s.protocolManager.downloader }
 func (s *Ethereum) Synced() bool                       { return true } // atomic.LoadUint32(&s.protocolManager.acceptTxs) == 1 }
 func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
@@ -458,7 +459,7 @@ func (s *Ethereum) Start() {
 
 // Stop implements node.Lifecycle, terminating all internal goroutines used by the
 // Ethereum protocol.
-// TODO remove error from type if this will never return an error
+// FIXME remove error from type if this will never return an error
 func (s *Ethereum) Stop() error {
 	s.bloomIndexer.Close()
 	close(s.closeBloomHandler)
