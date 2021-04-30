@@ -81,8 +81,6 @@ func ExampleGenerateChain() {
 	blockchain, _ := NewBlockChain(db, nil, gspec.Config, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), vm.Config{}, nil, nil, true)
 	defer blockchain.Stop()
 
-	blockchain.UnlockIndexing()
-
 	if i, err := blockchain.InsertChain(chain); err != nil {
 		fmt.Printf("insert error (block %d): %v\n", chain[i].NumberU64(), err)
 		return
