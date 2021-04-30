@@ -91,10 +91,6 @@ func (self *ETHChain) APIBackend() *eth.EthAPIBackend {
 	return self.backend.APIBackend
 }
 
-func (self *ETHChain) UnlockIndexing() {
-	self.backend.BlockChain().UnlockIndexing()
-}
-
 func (self *ETHChain) PendingSize() (int, error) {
 	pending, err := self.backend.TxPool().Pending()
 	count := 0
