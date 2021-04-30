@@ -42,7 +42,7 @@ import (
 	"github.com/ava-labs/coreth/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 )
 
 const (
@@ -120,7 +120,10 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 	}
 
 	u := new(uuid.UUID)
-	*u = uuid.Parse(keyJSON.Id)
+	*u, err = uuid.Parse(keyJSON.Id)
+	if err != nil {
+		return err
+	}
 	k.Id = *u
 	addr, err := hex.DecodeString(keyJSON.Address)
 	if err != nil {
@@ -137,8 +140,11 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 	return nil
 }
 
-func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
-	id := uuid.NewRandom()
+func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
+	id, err := uuid.NewRandom()
+	if err != nil {
+		panic(fmt.Sprintf("Could not create random uuid: %v", err))
+	}
 	key := &Key{
 		Id:         id,
 		Address:    crypto.PubkeyToAddress(privateKeyECDSA.PublicKey),
@@ -161,23 +167,23 @@ func NewKeyForDirectICAP(rand io.Reader) *Key {
 	if err != nil {
 		panic("key generation: ecdsa.GenerateKey failed: " + err.Error())
 	}
-	key := NewKeyFromECDSA(privateKeyECDSA)
+	key := newKeyFromECDSA(privateKeyECDSA)
 	if !strings.HasPrefix(key.Address.Hex(), "0x00") {
 		return NewKeyForDirectICAP(rand)
 	}
 	return key
 }
 
-func NewKey(rand io.Reader) (*Key, error) {
+func newKey(rand io.Reader) (*Key, error) {
 	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
 	if err != nil {
 		return nil, err
 	}
-	return NewKeyFromECDSA(privateKeyECDSA), nil
+	return newKeyFromECDSA(privateKeyECDSA), nil
 }
 
 func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Account, error) {
-	key, err := NewKey(rand)
+	key, err := newKey(rand)
 	if err != nil {
 		return nil, accounts.Account{}, err
 	}

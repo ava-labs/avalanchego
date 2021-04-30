@@ -29,11 +29,10 @@ package accounts
 
 import (
 	"fmt"
-	"math/big"
-
 	"github.com/ava-labs/coreth/core/types"
 	ethereum "github.com/ethereum/go-ethereum"
-	gethaccounts "github.com/ethereum/go-ethereum/accounts"
+	"math/big"
+	// 	gethaccounts "github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"golang.org/x/crypto/sha3"
@@ -212,7 +211,7 @@ func TextAndHash(data []byte) ([]byte, string) {
 
 // WalletEventType represents the different event types that can be fired by
 // the wallet subscription subsystem.
-type WalletEventType = gethaccounts.WalletEventType
+type WalletEventType int
 
 const (
 	// WalletArrived is fired when a new wallet is detected either via USB or via
