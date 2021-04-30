@@ -362,7 +362,9 @@ func TestTransactionChainFork(t *testing.T) {
 		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		statedb.AddBalance(addr, big.NewInt(100000000000000))
 
+		pool.chainLock.Lock()
 		pool.chain = &testBlockChain{statedb, 1000000, new(event.Feed)}
+		pool.chainLock.Unlock()
 		<-pool.requestReset(nil, nil)
 	}
 	resetState()
@@ -391,7 +393,9 @@ func TestTransactionDoubleNonce(t *testing.T) {
 		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		statedb.AddBalance(addr, big.NewInt(100000000000000))
 
+		pool.chainLock.Lock()
 		pool.chain = &testBlockChain{statedb, 1000000, new(event.Feed)}
+		pool.chainLock.Unlock()
 		<-pool.requestReset(nil, nil)
 	}
 	resetState()
@@ -561,7 +565,9 @@ func TestTransactionDropping(t *testing.T) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 4)
 	}
 	// Reduce the block gas limit, check that invalidated transactions are dropped
+	pool.chainLock.Lock()
 	pool.chain.(*testBlockChain).gasLimit = 100
+	pool.chainLock.Unlock()
 	<-pool.requestReset(nil, nil)
 
 	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
