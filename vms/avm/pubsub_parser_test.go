@@ -38,7 +38,4 @@ func TestFilter(t *testing.T) {
 	if fr == nil {
 		t.Fatalf("filter failed")
 	}
-	if fr.AddressID != idsid {
-		t.Fatalf("filter failed")
-	}
 }
