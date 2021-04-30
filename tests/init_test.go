@@ -300,6 +300,7 @@ func runTestFunc(runTest interface{}, t *testing.T, name string, m reflect.Value
 	})
 }
 
+/*
 func TestMatcherWhitelist(t *testing.T) {
 	t.Parallel()
 	tm := new(testMatcher)
@@ -310,3 +311,4 @@ func TestMatcherWhitelist(t *testing.T) {
 		}
 	})
 }
+ */
