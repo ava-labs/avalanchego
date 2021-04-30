@@ -1,3 +1,13 @@
+// (c) 2019-2020, Ava Labs, Inc.
+//
+// This file is a derived work, based on the go-ethereum library whose original
+// notices appear below.
+//
+// It is distributed under a license compatible with the licensing terms of the
+// original code from which it is derived.
+//
+// Much love to the original authors for their work.
+// **********
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -8,7 +18,7 @@
 // - https://github.com/ethereum/go-ethereum/issues/22041
 // - https://github.com/ethereum/go-ethereum/pull/22092
 
-package tests
+package chain
 
 import (
 	"crypto/rand"
@@ -18,7 +28,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -87,7 +96,7 @@ func TestMulticoin(t *testing.T) {
 	}
 	code := common.Hex2Bytes(contract)
 
-	chain := coreth.NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
+	chain := NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
 
 	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
 		t.Fatal(err)
