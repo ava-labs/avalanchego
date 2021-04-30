@@ -33,7 +33,10 @@ func NewCommandMessage(r io.Reader) (*CommandMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.ParseAddresses()
+	err = c.ParseAddresses()
+	if err != nil {
+		return nil, err
+	}
 	return &c, nil
 }
 
@@ -49,18 +52,19 @@ func (c *CommandMessage) FilterOrDefault() {
 	c.FilterError = DefaultFilterError
 }
 
-// TransposeAddress converts any b32 address to their byte equiv ids.ShortID.
-func (c *CommandMessage) ParseAddresses() {
+// ParseAddresses converts the bech32 addresses to their byte equiv ids.ShortID.
+func (c *CommandMessage) ParseAddresses() error {
 	if c.addressIds == nil {
 		c.addressIds = make([][]byte, 0, len(c.Addresses))
 	}
 	for _, astr := range c.Addresses {
 		_, _, abytes, err := formatting.ParseAddress(astr)
 		if err != nil {
-			continue
+			return err
 		}
 		c.addressIds = append(c.addressIds, abytes)
 	}
+	return nil
 }
 
 func (c *CommandMessage) Load(r io.Reader) error {
