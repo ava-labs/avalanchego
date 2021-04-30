@@ -65,13 +65,15 @@ func (f *FilterParam) HasFilter() bool {
 	return f.filter != nil || len(f.address) > 0
 }
 
-func (f *FilterParam) UpdateAddressMulti(unsubscribe bool, bl ...[]byte) {
+func (f *FilterParam) UpdateAddressMulti( bl ...[]byte) {
 	for _, b := range bl {
 		addr, err := ids.ToShortID(b)
 		if err != nil {
 			continue
 		}
-		f.UpdateAddress(unsubscribe, addr)
+		f.lock.Lock()
+		f.address[addr] = struct{}{}
+		f.lock.Unlock()
 	}
 }
 
@@ -79,19 +81,6 @@ func (f *FilterParam) Len() int {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	return len(f.address)
-}
-
-func (f *FilterParam) UpdateAddress(unsubscribe bool, address ids.ShortID) {
-	switch unsubscribe {
-	case true:
-		f.lock.Lock()
-		delete(f.address, address)
-		f.lock.Unlock()
-	default:
-		f.lock.Lock()
-		f.address[address] = struct{}{}
-		f.lock.Unlock()
-	}
 }
 
 func NewFilterParam() *FilterParam {
