@@ -31,10 +31,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 // [NOTE] Commented hashes are genereated by running the following callback on
