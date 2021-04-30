@@ -4,47 +4,53 @@
 package pubsub
 
 import (
-	"encoding/json"
-	"io"
-
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-// CommandMessage command message
-type CommandMessage struct {
-	Command string `json:"command"`
-	// Addresses array of avax addresses i.e. fuji123....
-	Addresses []string `json:"addresses,omitempty"`
+// NewBloom command for a new bloom filter
+type NewBloom struct {
 	// FilterMax size of bloom filter
-	FilterMax uint64 `json:"filterMax,omitempty"`
+	FilterMax uint64 `json:"filterMax"`
 	// FilterError expected error rate of filter
-	FilterError float64 `json:"filterError,omitempty"`
-	// subscription to this kind of messages
-	EventType EventType `json:"eventType"`
-	// Unsubscribe unsubscribe channel remove address or reset filter
-	Unsubscribe bool `json:"unsubscribe"`
+	FilterError float64 `json:"filterError"`
+}
+
+// NewSet command for a new map set
+type NewSet struct {
+}
+
+// AddAddresses command to add addresses
+type AddAddresses struct {
+	// Addresses bech 32 addresses toa add
+	Addresses []string `json:"addresses"`
 	// addressIds array of addresses, kept as a [][]byte for use in the bloom filter
 	addressIds [][]byte
 }
 
-func NewCommandMessage(r io.Reader) (*CommandMessage, error) {
-	c := CommandMessage{}
-	err := c.Load(r)
-	if err != nil {
-		return nil, err
-	}
-	err = c.ParseAddresses()
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
+// Command execution command
+type Command struct {
+	NewBloom     *NewBloom     `json:"newBloom,omitempty"`
+	NewSet       *NewSet       `json:"newSet,omitempty"`
+	AddAddresses *AddAddresses `json:"addAddresses,omitempty"`
 }
 
-func (c *CommandMessage) IsNewFilter() bool {
+func (c *Command) String() string {
+	switch {
+	case c.NewBloom != nil:
+		return "newBloom"
+	case c.NewSet != nil:
+		return "newSet"
+	case c.AddAddresses != nil:
+		return "addAddresses"
+	}
+	return "unknown"
+}
+
+func (c *NewBloom) IsNewFilter() bool {
 	return c.FilterMax > 0 && c.FilterError > 0
 }
 
-func (c *CommandMessage) FilterOrDefault() {
+func (c *NewBloom) FilterOrDefault() {
 	if c.IsNewFilter() {
 		return
 	}
@@ -53,7 +59,7 @@ func (c *CommandMessage) FilterOrDefault() {
 }
 
 // ParseAddresses converts the bech32 addresses to their byte equiv ids.ShortID.
-func (c *CommandMessage) ParseAddresses() error {
+func (c *AddAddresses) ParseAddresses() error {
 	if c.addressIds == nil {
 		c.addressIds = make([][]byte, 0, len(c.Addresses))
 	}
@@ -65,8 +71,4 @@ func (c *CommandMessage) ParseAddresses() error {
 		c.addressIds = append(c.addressIds, abytes)
 	}
 	return nil
-}
-
-func (c *CommandMessage) Load(r io.Reader) error {
-	return json.NewDecoder(r).Decode(c)
 }

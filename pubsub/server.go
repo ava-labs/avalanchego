@@ -13,14 +13,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type EventType int
-
-const (
-	Accepted EventType = iota
-	Rejected
-	Verified
-)
-
 const (
 	// Size of the ws read buffer
 	readBufferSize = 1024
@@ -62,11 +54,6 @@ type errorMsg struct {
 	Error string `json:"error"`
 }
 
-type Publish struct {
-	EventType EventType   `json:"eventType"`
-	Value     interface{} `json:"value"`
-}
-
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  readBufferSize,
 	WriteBufferSize: writeBufferSize,
@@ -75,22 +62,17 @@ var upgrader = websocket.Upgrader{
 
 // Server maintains the set of active clients and sends messages to the clients.
 type Server struct {
-	lock             sync.RWMutex
-	log              logging.Logger
-	conns            map[*Connection]struct{}
-	eventTypeToConns map[EventType]*connContainer
+	lock                 sync.RWMutex
+	log                  logging.Logger
+	conns                map[FilterInterface]struct{}
+	connectionsContainer *connContainer
 }
 
-// NewPubSubServer ...
 func New(networkID uint32, log logging.Logger) *Server {
 	return &Server{
-		log:   log,
-		conns: make(map[*Connection]struct{}),
-		eventTypeToConns: map[EventType]*connContainer{
-			Accepted: newConnContainer(),
-			Rejected: newConnContainer(),
-			Verified: newConnContainer(),
-		},
+		log:                  log,
+		conns:                make(map[FilterInterface]struct{}),
+		connectionsContainer: newConnContainer(),
 	}
 }
 
@@ -100,7 +82,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.log.Debug("Failed to upgrade %s", err)
 		return
 	}
-	conn := &Connection{
+	conn := &connection{
 		s:      s,
 		conn:   wsConn,
 		send:   make(chan interface{}, maxPendingMessages),
@@ -111,38 +93,20 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 // Publish ...
-func (s *Server) Publish(eventType EventType, msg interface{}, parser Parser) {
-	s.lock.RLock()
-	conns, ok := s.eventTypeToConns[eventType]
-	s.lock.RUnlock()
-	if !ok {
-		s.log.Warn("got unexpected event type %v", eventType)
-		return
-	}
-
-	for _, conn := range conns.Conns() {
-		m := &Publish{
-			EventType: eventType,
-			Value:     msg,
-		}
-		if conn.fp.HasFilter() {
-			fr := parser.Filter(conn.fp)
-			if fr == nil {
-				continue
-			}
-			m.Value = fr
-		}
-		s.publishMsg(conn, m)
+func (s *Server) Publish(msg interface{}, parser Parser) {
+	pubconns, msg := parser.Filter(s.connectionsContainer.Conns())
+	for _, c := range pubconns {
+		s.publishMsg(c.(*connection), msg)
 	}
 }
 
-func (s *Server) publishMsg(conn *Connection, msg interface{}) {
+func (s *Server) publishMsg(conn *connection, msg interface{}) {
 	if !conn.Send(msg) {
 		s.log.Verbo("dropping message to subscribed connection due to too many pending messages")
 	}
 }
 
-func (s *Server) addConnection(conn *Connection) {
+func (s *Server) addConnection(conn *connection) {
 	s.lock.Lock()
 	s.conns[conn] = struct{}{}
 	s.lock.Unlock()
@@ -151,36 +115,17 @@ func (s *Server) addConnection(conn *Connection) {
 	go conn.readPump()
 }
 
-func (s *Server) removeConnection(conn *Connection) {
-	s.lock.RLock()
-	for _, conns := range s.eventTypeToConns {
-		conns.Remove(conn)
-	}
-	s.lock.RUnlock()
-
+func (s *Server) removeConnection(conn *connection) {
+	s.unsubscribe(conn)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	delete(s.conns, conn)
 }
 
-func (s *Server) subscribe(conn *Connection, eventType EventType) {
-	s.lock.RLock()
-	conns, ok := s.eventTypeToConns[eventType]
-	s.lock.RUnlock()
-	if !ok {
-		s.log.Warn("got unexpected event type %v", eventType)
-		return
-	}
-	conns.Add(conn)
+func (s *Server) subscribe(conn *connection) {
+	s.connectionsContainer.Add(conn)
 }
 
-func (s *Server) unsubscribe(conn *Connection, eventType EventType) {
-	s.lock.RLock()
-	conns, ok := s.eventTypeToConns[eventType]
-	s.lock.RUnlock()
-	if !ok {
-		s.log.Warn("got unexpected event type %v", eventType)
-		return
-	}
-	conns.Remove(conn)
+func (s *Server) unsubscribe(conn *connection) {
+	s.connectionsContainer.Remove(conn)
 }

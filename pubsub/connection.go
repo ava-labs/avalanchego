@@ -4,16 +4,25 @@
 package pubsub
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/gorilla/websocket"
 )
 
-// Connection is a representation of the websocket connection.
-type Connection struct {
+var ErrFilterNotInitialized = fmt.Errorf("filter not initialized")
+
+type FilterInterface interface {
+	CheckAddress(addr ids.ShortID) bool
+}
+
+// connection is a representation of the websocket connection.
+type connection struct {
 	s *Server
 
 	// The websocket connection.
@@ -27,16 +36,20 @@ type Connection struct {
 	active uint32
 }
 
-func (c *Connection) isActive() bool {
+func (c *connection) CheckAddress(addr ids.ShortID) bool {
+	return c.fp.CheckAddressID(addr)
+}
+
+func (c *connection) isActive() bool {
 	active := atomic.LoadUint32(&c.active)
 	return active != 0
 }
 
-func (c *Connection) deactivate() {
+func (c *connection) deactivate() {
 	atomic.StoreUint32(&c.active, 0)
 }
 
-func (c *Connection) Send(msg interface{}) bool {
+func (c *connection) Send(msg interface{}) bool {
 	if !c.isActive() {
 		return false
 	}
@@ -53,7 +66,7 @@ func (c *Connection) Send(msg interface{}) bool {
 // The application runs readPump in a per-connection goroutine. The application
 // ensures that there is at most one reader on a connection by executing all
 // reads from this goroutine.
-func (c *Connection) readPump() {
+func (c *connection) readPump() {
 	defer func() {
 		c.deactivate()
 		c.s.removeConnection(c)
@@ -88,7 +101,7 @@ func (c *Connection) readPump() {
 // A goroutine running writePump is started for each connection. The
 // application ensures that there is at most one writer to a connection by
 // executing all writes from this goroutine.
-func (c *Connection) writePump() {
+func (c *connection) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		c.deactivate()
@@ -128,68 +141,65 @@ func (c *Connection) writePump() {
 	}
 }
 
-func (c *Connection) readMessage() error {
+func (c *connection) readMessage() error {
 	_, r, err := c.conn.NextReader()
 	if err != nil {
 		return err
 	}
-	cmdMsg, err := NewCommandMessage(r)
+	cmd := &Command{}
+	err = json.NewDecoder(r).Decode(cmd)
 	if err != nil {
 		return err
 	}
 
-	switch cmdMsg.Command {
-	case "":
-		if cmdMsg.Unsubscribe {
-			c.s.unsubscribe(c, cmdMsg.EventType)
-		} else {
-			c.s.subscribe(c, cmdMsg.EventType)
+	switch {
+	case cmd.NewBloom != nil:
+		c.fp.address = nil
+		err = c.handleNewBloom(cmd.NewBloom)
+		if err != nil {
+			return err
 		}
-		return nil
-	case CommandFilters:
-		return c.handleCommandFilterUpdate(cmdMsg)
-	case CommandAddresses:
-		c.handleCommandAddressUpdate(cmdMsg)
-		return nil
+	case cmd.NewSet != nil:
+		c.fp.ClearFilter()
+		c.fp.address = make(map[ids.ShortID]struct{})
+	case cmd.AddAddresses != nil:
+		err = cmd.AddAddresses.ParseAddresses()
+		if err != nil {
+			return err
+		}
+		switch {
+		case c.fp.Filter() != nil:
+			filter := c.fp.Filter()
+			filter.Add(cmd.AddAddresses.addressIds...)
+		case c.fp.address != nil:
+			c.handleAddAddress(cmd.AddAddresses)
+		default:
+			return ErrFilterNotInitialized
+		}
+		c.s.subscribe(c)
 	default:
-		errmsg := &errorMsg{Error: fmt.Sprintf("command '%s' invalid", cmdMsg.Command)}
+		errmsg := &errorMsg{Error: fmt.Sprintf("command '%s' invalid", cmd)}
 		c.Send(errmsg)
 		return fmt.Errorf(errmsg.Error)
 	}
-}
-
-func (c *Connection) handleCommandFilterUpdate(cmdMsg *CommandMessage) error {
-	if cmdMsg.Unsubscribe {
-		c.fp.SetFilter(nil)
-		return nil
-	}
-	bfilter, err := c.updateNewFilter(cmdMsg)
-	if err != nil {
-		c.Send(&errorMsg{Error: fmt.Sprintf("filter create failed %v", err)})
-		return err
-	}
-	bfilter.Add(cmdMsg.addressIds...)
 	return nil
 }
 
-func (c *Connection) updateNewFilter(cmdMsg *CommandMessage) (bloom.Filter, error) {
-	bfilter := c.fp.Filter()
-	if !(bfilter == nil || cmdMsg.IsNewFilter()) {
-		return bfilter, nil
-	}
+func (c *connection) handleNewBloom(cmdMsg *NewBloom) error {
 	// no filter exists..  Or they provided filter params
 	cmdMsg.FilterOrDefault()
 	bfilter, err := bloom.New(cmdMsg.FilterMax, cmdMsg.FilterError, MaxBytes)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return c.fp.SetFilter(bfilter), nil
+	c.fp.SetFilter(bfilter)
+	return nil
 }
 
-func (c *Connection) handleCommandAddressUpdate(cmdMsg *CommandMessage) {
+func (c *connection) handleAddAddress(cmdMsg *AddAddresses) {
 	if c.fp.Len()+len(cmdMsg.addressIds) > MaxAddresses {
 		c.Send(&errorMsg{Error: "address limit reached"})
 		return
 	}
-	c.fp.UpdateAddressMulti(cmdMsg.Unsubscribe, cmdMsg.addressIds...)
+	c.fp.UpdateAddressMulti(false, cmdMsg.addressIds...)
 }

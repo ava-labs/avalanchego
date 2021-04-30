@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -160,7 +159,7 @@ func (tx *UniqueTx) Accept() error {
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
-	tx.vm.pubsub.Publish(pubsub.Accepted, txID, NewPubSubParser(tx.Tx))
+	tx.vm.pubsub.Publish(txID, NewPubSubParser(tx.Tx))
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
@@ -185,7 +184,6 @@ func (tx *UniqueTx) Reject() error {
 		return err
 	}
 
-	tx.vm.pubsub.Publish(pubsub.Rejected, txID, NewPubSubParser(tx.Tx))
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
@@ -296,7 +294,6 @@ func (tx *UniqueTx) Verify() error {
 	}
 
 	tx.verifiedState = true
-	tx.vm.pubsub.Publish(pubsub.Verified, tx.ID(), NewPubSubParser(tx.Tx))
 	return nil
 }
 

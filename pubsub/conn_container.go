@@ -7,20 +7,20 @@ import "sync"
 
 type connContainer struct {
 	lock  sync.RWMutex
-	conns map[*Connection]struct{}
+	conns map[*connection]struct{}
 }
 
 func newConnContainer() *connContainer {
-	return &connContainer{conns: make(map[*Connection]struct{})}
+	return &connContainer{conns: make(map[*connection]struct{})}
 }
 
-func (c *connContainer) Conns() []*Connection {
+func (c *connContainer) Conns() []FilterInterface {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	resp := make([]*Connection, 0, len(c.conns))
+	resp := make([]FilterInterface, 0, len(c.conns))
 	for c := range c.conns {
 		// only active connections
-		if !c.isActive() {
+		if c.isActive() {
 			continue
 		}
 		resp = append(resp, c)
@@ -28,13 +28,13 @@ func (c *connContainer) Conns() []*Connection {
 	return resp
 }
 
-func (c *connContainer) Remove(conn *Connection) {
+func (c *connContainer) Remove(conn *connection) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	delete(c.conns, conn)
 }
 
-func (c *connContainer) Add(conn *Connection) {
+func (c *connContainer) Add(conn *connection) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	c.conns[conn] = struct{}{}

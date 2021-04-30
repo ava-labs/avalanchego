@@ -4,6 +4,5 @@
 package pubsub
 
 type Parser interface {
-	// expected an object or nil if filter doesn't match
-	Filter(*FilterParam) interface{}
+	Filter(connections []FilterInterface) ([]FilterInterface, interface{})
 }

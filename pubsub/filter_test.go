@@ -6,8 +6,6 @@ package pubsub
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
-	"reflect"
 	"strings"
 	"testing"
 
@@ -35,7 +33,7 @@ func hex2Short(v string) (ids.ShortID, error) {
 
 func TestCommandMessage_ParseAddresses(t *testing.T) {
 	hrp := constants.GetHRP(5)
-	cmdMsg := &CommandMessage{}
+	cmdMsg := &AddAddresses{}
 	cmdMsg.addressIds = make([][]byte, 0, 1)
 	idsid1, _ := hex2Short("0000000000000000000000000000000000000001")
 	b32addr, _ := formatting.FormatBech32(hrp, idsid1[:])
@@ -46,30 +44,6 @@ func TestCommandMessage_ParseAddresses(t *testing.T) {
 	_ = cmdMsg.ParseAddresses()
 	if !bytes.Equal(cmdMsg.addressIds[0], idsid1[:]) {
 		t.Fatalf("address transpose failed")
-	}
-}
-
-func TestCommandMessage_Load(t *testing.T) {
-	cmdMsg := &CommandMessage{}
-	cmdMsg.Command = "test123"
-	cmdMsg.Unsubscribe = true
-	cmdMsg.Addresses = make([]string, 0, 1)
-	cmdMsg.Addresses = append(cmdMsg.Addresses, "addr1")
-	j, _ := json.Marshal(cmdMsg)
-
-	cmdMsgTest := &CommandMessage{}
-	err := cmdMsgTest.Load(bytes.NewReader(j))
-	if err != nil {
-		t.Fatalf("load command message failed")
-	}
-	if cmdMsgTest.Command != cmdMsg.Command {
-		t.Fatalf("load command message failed")
-	}
-	if len(cmdMsgTest.Addresses) != 1 && cmdMsgTest.Addresses[1] != "addr1" {
-		t.Fatalf("load command message failed")
-	}
-	if !reflect.DeepEqual(cmdMsg, cmdMsgTest) {
-		t.Fatalf("load command message failed")
 	}
 }
 
@@ -134,8 +108,8 @@ func TestFilterParam(t *testing.T) {
 	}
 }
 
-func TestCommandMessage(t *testing.T) {
-	cm := &CommandMessage{}
+func TestNewBloom(t *testing.T) {
+	cm := &NewBloom{}
 	if cm.IsNewFilter() {
 		t.Fatalf("new filter check failed")
 	}

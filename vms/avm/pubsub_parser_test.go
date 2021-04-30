@@ -4,11 +4,11 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func hex2Short(v string) (ids.ShortID, error) {
@@ -23,6 +23,14 @@ func hex2Short(v string) (ids.ShortID, error) {
 	return idsid, nil
 }
 
+type MockFilterInterface struct {
+	ids ids.ShortID
+}
+
+func (f *MockFilterInterface) CheckAddress(addr ids.ShortID) bool {
+	return addr == f.ids
+}
+
 func TestFilter(t *testing.T) {
 	idsid, _ := hex2Short("0000000000000000000000000000000000000001")
 
@@ -34,8 +42,8 @@ func TestFilter(t *testing.T) {
 	parser := NewPubSubParser(&tx)
 	fp := pubsub.NewFilterParam()
 	fp.UpdateAddress(false, idsid)
-	fr := parser.Filter(fp)
-	if fr == nil {
+	fr, _ := parser.Filter([]pubsub.FilterInterface{&MockFilterInterface{ids: idsid}})
+	if len(fr) != 1 {
 		t.Fatalf("filter failed")
 	}
 }

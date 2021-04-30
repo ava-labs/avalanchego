@@ -16,6 +16,12 @@ type FilterParam struct {
 	filter  bloom.Filter
 }
 
+func (f *FilterParam) ClearFilter() {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.filter = nil
+}
+
 func (f *FilterParam) Filter() bloom.Filter {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
@@ -27,6 +33,16 @@ func (f *FilterParam) SetFilter(filter bloom.Filter) bloom.Filter {
 	defer f.lock.Unlock()
 	f.filter = filter
 	return f.filter
+}
+
+func (f *FilterParam) CheckAddressID(addr2check ids.ShortID) bool {
+	f.lock.RLock()
+	defer f.lock.RUnlock()
+	if f.filter != nil && f.filter.Check(addr2check[:]) {
+		return true
+	}
+	_, ok := f.address[addr2check]
+	return ok
 }
 
 func (f *FilterParam) CheckAddress(addr2check []byte) bool {
