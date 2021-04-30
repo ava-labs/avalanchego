@@ -24,7 +24,7 @@ type CommandMessage struct {
 	// Unsubscribe unsubscribe channel remove address or reset filter
 	Unsubscribe bool `json:"unsubscribe"`
 	// addressIds array of addresses, kept as a [][]byte for use in the bloom filter
-	addressIds [][]byte `json:"-"`
+	addressIds [][]byte
 }
 
 func NewCommandMessage(r io.Reader) (*CommandMessage, error) {
