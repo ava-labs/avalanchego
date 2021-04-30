@@ -141,9 +141,9 @@ func (c *Connection) readMessage() error {
 	switch cmdMsg.Command {
 	case "":
 		if cmdMsg.Unsubscribe {
-			c.s.subscribe(c, cmdMsg.EventType)
-		} else {
 			c.s.unsubscribe(c, cmdMsg.EventType)
+		} else {
+			c.s.subscribe(c, cmdMsg.EventType)
 		}
 		return nil
 	case CommandFilters:
