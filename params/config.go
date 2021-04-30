@@ -27,6 +27,7 @@
 package params
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -39,6 +40,8 @@ var (
 	AvalancheMainnetChainID = big.NewInt(43114)
 	// AvalancheFujiChainID ...
 	AvalancheFujiChainID = big.NewInt(43113)
+
+	errNonGenesisForkByHeight = errors.New("coreth only supports forking by height at the genesis block")
 )
 
 var (
@@ -248,6 +251,9 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "istanbulBlock", block: c.IstanbulBlock},
 		{name: "muirGlacierBlock", block: c.MuirGlacierBlock, optional: true},
 	} {
+		if cur.block != nil && common.Big0.Cmp(cur.block) != 0 {
+			return errNonGenesisForkByHeight
+		}
 		if lastFork.name != "" {
 			// Next one must be higher number
 			if lastFork.block == nil && cur.block != nil {

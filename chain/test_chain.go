@@ -1,14 +1,13 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package tests
+package chain
 
 import (
 	"crypto/rand"
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -48,7 +47,7 @@ func init() {
 	alice = genKey
 }
 
-func NewDefaultChain(t *testing.T) (*coreth.ETHChain, chan *types.Block, chan core.NewTxPoolHeadEvent, <-chan core.NewTxsEvent) {
+func NewDefaultChain(t *testing.T) (*ETHChain, chan *types.Block, chan core.NewTxPoolHeadEvent, <-chan core.NewTxsEvent) {
 	// configure the chain
 	config := ethconfig.NewDefaultConfig()
 	chainConfig := &params.ChainConfig{
@@ -76,7 +75,7 @@ func NewDefaultChain(t *testing.T) (*coreth.ETHChain, chan *types.Block, chan co
 		Alloc:      core.GenesisAlloc{fundedKey.Address: {Balance: initialBalance}},
 	}
 
-	chain := coreth.NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
+	chain := NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
 
 	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
 		t.Fatal(err)
