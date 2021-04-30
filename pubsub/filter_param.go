@@ -65,16 +65,17 @@ func (f *FilterParam) HasFilter() bool {
 	return f.filter != nil || len(f.address) > 0
 }
 
-func (f *FilterParam) UpdateAddressMulti( bl ...[]byte) {
+func (f *FilterParam) AddAddresses(bl ...[]byte) error {
 	for _, b := range bl {
 		addr, err := ids.ToShortID(b)
 		if err != nil {
-			continue
+			return err
 		}
 		f.lock.Lock()
 		f.address[addr] = struct{}{}
 		f.lock.Unlock()
 	}
+	return nil
 }
 
 func (f *FilterParam) Len() int {

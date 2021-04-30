@@ -58,7 +58,7 @@ func TestFilterParamUpdateMulti(t *testing.T) {
 	bl = append(bl, addr1[:])
 	bl = append(bl, addr2[:])
 	bl = append(bl, addr3[:])
-	fp.UpdateAddressMulti(false, bl...)
+	fp.AddAddresses(bl...)
 	if len(fp.address) != 3 {
 		t.Fatalf("update multi failed")
 	}
@@ -96,15 +96,6 @@ func TestFilterParam(t *testing.T) {
 	}
 	if fp.CheckAddress([]byte("bye")) {
 		t.Fatalf("check address failed")
-	}
-	idsv = ids.GenerateTestShortID()
-	fp.UpdateAddress(false, idsv)
-	if len(fp.address) != 1 {
-		t.Fatalf("update address failed")
-	}
-	fp.UpdateAddress(true, idsv)
-	if len(fp.address) != 0 {
-		t.Fatalf("update address failed")
 	}
 }
 

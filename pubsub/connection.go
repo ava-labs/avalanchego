@@ -15,7 +15,10 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var ErrFilterNotInitialized = fmt.Errorf("filter not initialized")
+var (
+	ErrFilterNotInitialized = fmt.Errorf("filter not initialized")
+	ErrAddressLimit         = fmt.Errorf("address limit exceeded")
+)
 
 type FilterInterface interface {
 	CheckAddress(addr ids.ShortID) bool
@@ -172,11 +175,14 @@ func (c *connection) readMessage() error {
 			filter := c.fp.Filter()
 			filter.Add(cmd.AddAddresses.addressIds...)
 		case c.fp.address != nil:
-			c.handleAddAddress(cmd.AddAddresses)
+			err = c.handleAddAddress(cmd.AddAddresses)
+			if err != nil {
+				return err
+			}
 		default:
 			return ErrFilterNotInitialized
 		}
-		c.s.subscribe(c)
+		c.s.subscribedConnections.Add(c)
 	default:
 		errmsg := &errorMsg{Error: fmt.Sprintf("command '%s' invalid", cmd)}
 		c.Send(errmsg)
@@ -196,10 +202,10 @@ func (c *connection) handleNewBloom(cmdMsg *NewBloom) error {
 	return nil
 }
 
-func (c *connection) handleAddAddress(cmdMsg *AddAddresses) {
+func (c *connection) handleAddAddress(cmdMsg *AddAddresses) error {
 	if c.fp.Len()+len(cmdMsg.addressIds) > MaxAddresses {
 		c.Send(&errorMsg{Error: "address limit reached"})
-		return
+		return ErrAddressLimit
 	}
-	c.fp.UpdateAddressMulti(false, cmdMsg.addressIds...)
+	return c.fp.AddAddresses(cmdMsg.addressIds...)
 }

@@ -62,17 +62,19 @@ var upgrader = websocket.Upgrader{
 
 // Server maintains the set of active clients and sends messages to the clients.
 type Server struct {
-	lock                 sync.RWMutex
-	log                  logging.Logger
-	conns                map[FilterInterface]struct{}
-	connectionsContainer *connContainer
+	lock sync.RWMutex
+	log  logging.Logger
+	// conns a list of all our connections
+	conns map[*connection]struct{}
+	// subscribedConnections the connections that have activated subscriptions
+	subscribedConnections *connContainer
 }
 
 func New(networkID uint32, log logging.Logger) *Server {
 	return &Server{
-		log:                  log,
-		conns:                make(map[FilterInterface]struct{}),
-		connectionsContainer: newConnContainer(),
+		log:                   log,
+		conns:                 make(map[*connection]struct{}),
+		subscribedConnections: newConnContainer(),
 	}
 }
 
@@ -94,7 +96,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // Publish ...
 func (s *Server) Publish(msg interface{}, parser Parser) {
-	pubconns, msg := parser.Filter(s.connectionsContainer.Conns())
+	pubconns, msg := parser.Filter(s.subscribedConnections.Conns())
 	for _, c := range pubconns {
 		s.publishMsg(c.(*connection), msg)
 	}
@@ -116,16 +118,8 @@ func (s *Server) addConnection(conn *connection) {
 }
 
 func (s *Server) removeConnection(conn *connection) {
-	s.unsubscribe(conn)
+	s.subscribedConnections.Remove(conn)
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	delete(s.conns, conn)
-}
-
-func (s *Server) subscribe(conn *connection) {
-	s.connectionsContainer.Add(conn)
-}
-
-func (s *Server) unsubscribe(conn *connection) {
-	s.connectionsContainer.Remove(conn)
 }

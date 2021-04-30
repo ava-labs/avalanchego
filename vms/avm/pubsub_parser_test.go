@@ -41,7 +41,7 @@ func TestFilter(t *testing.T) {
 	tx.UnsignedTx = &baseTx
 	parser := NewPubSubParser(&tx)
 	fp := pubsub.NewFilterParam()
-	fp.UpdateAddress(false, idsid)
+	fp.AddAddresses([][]byte{idsid[:]}...)
 	fr, _ := parser.Filter([]pubsub.FilterInterface{&MockFilterInterface{ids: idsid}})
 	if len(fr) != 1 {
 		t.Fatalf("filter failed")
