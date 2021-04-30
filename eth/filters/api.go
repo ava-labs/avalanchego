@@ -36,8 +36,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
-	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -312,12 +312,12 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 	)
 
 	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
-		logsSub, err = api.events.SubscribeLogs(ethereum.FilterQuery(crit), matchedLogs)
+		logsSub, err = api.events.SubscribeLogs(interfaces.FilterQuery(crit), matchedLogs)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		logsSub, err = api.events.SubscribeAcceptedLogs(ethereum.FilterQuery(crit), matchedLogs)
+		logsSub, err = api.events.SubscribeAcceptedLogs(interfaces.FilterQuery(crit), matchedLogs)
 		if err != nil {
 			return nil, err
 		}
@@ -344,8 +344,8 @@ func (api *PublicFilterAPI) Logs(ctx context.Context, crit FilterCriteria) (*rpc
 }
 
 // FilterCriteria represents a request to create a new filter.
-// Same as ethereum.FilterQuery but with UnmarshalJSON() method.
-type FilterCriteria ethereum.FilterQuery
+// Same as interfaces.FilterQuery but with UnmarshalJSON() method.
+type FilterCriteria interfaces.FilterQuery
 
 // NewFilter creates a new filter and returns the filter id. It can be
 // used to retrieve logs when the state changes. This method cannot be
@@ -368,12 +368,12 @@ func (api *PublicFilterAPI) NewFilter(crit FilterCriteria) (rpc.ID, error) {
 	)
 
 	if api.backend.GetVMConfig().AllowUnfinalizedQueries {
-		logsSub, err = api.events.SubscribeLogs(ethereum.FilterQuery(crit), logs)
+		logsSub, err = api.events.SubscribeLogs(interfaces.FilterQuery(crit), logs)
 		if err != nil {
 			return rpc.ID(""), err
 		}
 	} else {
-		logsSub, err = api.events.SubscribeAcceptedLogs(ethereum.FilterQuery(crit), logs)
+		logsSub, err = api.events.SubscribeAcceptedLogs(interfaces.FilterQuery(crit), logs)
 		if err != nil {
 			return rpc.ID(""), err
 		}

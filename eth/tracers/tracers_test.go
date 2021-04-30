@@ -32,12 +32,12 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/tests"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/tests"
 )
 
 // To generate a new callTracer test, copy paste the makeTest method below into
@@ -177,7 +177,7 @@ func TestPrestateTracerCreate2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create call tracer: %v", err)
 	}
-	evm := vm.NewEVM(context, txContext, statedb, params.MainnetChainConfig, vm.Config{Debug: true, Tracer: tracer})
+	evm := vm.NewEVM(context, txContext, statedb, params.AvalancheMainnetChainConfig, vm.Config{Debug: true, Tracer: tracer})
 
 	msg, err := tx.AsMessage(signer)
 	if err != nil {
@@ -230,7 +230,7 @@ func TestCallTracer(t *testing.T) {
 			if err := rlp.DecodeBytes(common.FromHex(test.Input), tx); err != nil {
 				t.Fatalf("failed to parse testcase input: %v", err)
 			}
-			signer := types.MakeSigner(test.Genesis.Config, new(big.Int).SetUint64(uint64(test.Context.Number)))
+			signer := types.MakeSigner(test.Genesis.Config, new(big.Int).SetUint64(uint64(test.Context.Number)), new(big.Int).SetUint64(uint64(test.Context.Number)))
 			origin, _ := signer.Sender(tx)
 			txContext := vm.TxContext{
 				Origin:   origin,

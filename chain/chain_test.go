@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package tests
+package chain
 
 import (
 	"crypto/rand"
@@ -9,7 +9,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ava-labs/coreth"
 	"github.com/ava-labs/coreth/accounts/keystore"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -28,7 +27,7 @@ type testChain struct {
 	hasBlock    map[common.Hash]struct{}
 	blocks      []common.Hash
 	blkCount    uint32
-	chain       *coreth.ETHChain
+	chain       *ETHChain
 	parentBlock common.Hash
 	outBlockCh  chan<- []byte
 	blockWait   sync.WaitGroup
@@ -49,7 +48,7 @@ func newTestChain(name string, config *eth.Config,
 		hasBlock:   make(map[common.Hash]struct{}),
 		blocks:     make([]common.Hash, 0),
 		blkCount:   0,
-		chain:      coreth.NewETHChain(config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true),
+		chain:      NewETHChain(config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true),
 		outBlockCh: outBlockCh,
 	}
 	tc.insertBlock(tc.chain.GetGenesisBlock())

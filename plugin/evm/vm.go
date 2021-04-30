@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/coreth"
+	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
