@@ -220,13 +220,11 @@ type ClientSubscription struct {
 	subid     string
 
 	// The in channel receives notification values from client dispatcher.
-	in        chan json.RawMessage
-
-	quitOnce sync.Once     // ensures quit is closed once
+	in chan json.RawMessage
 
 	// The error channel receives the error from the forwarding loop.
 	// It is closed by Unsubscribe.
-	err      chan error
+	err     chan error
 	errOnce sync.Once
 
 	// Closing of the subscription is requested by sending on 'quit'. This is handled by
@@ -242,11 +240,11 @@ var errUnsubscribed = errors.New("unsubscribed")
 
 func newClientSubscription(c *Client, namespace string, channel reflect.Value) *ClientSubscription {
 	sub := &ClientSubscription{
-		client:    c,
-		namespace: namespace,
-		etype:     channel.Type().Elem(),
-		channel:   channel,
-		in:        make(chan json.RawMessage),
+		client:      c,
+		namespace:   namespace,
+		etype:       channel.Type().Elem(),
+		channel:     channel,
+		in:          make(chan json.RawMessage),
 		quit:        make(chan error),
 		forwardDone: make(chan struct{}),
 		unsubDone:   make(chan struct{}),
@@ -312,7 +310,7 @@ func (sub *ClientSubscription) run() {
 	// Call the unsubscribe method on the server.
 	if unsubscribe {
 		sub.requestUnsubscribe()
-}
+	}
 
 	// Send the error.
 	if err != nil {
