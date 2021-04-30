@@ -160,7 +160,6 @@ func (e *GenesisMismatchError) Error() string {
 // The stored chain configuration will be updated if it is compatible (i.e. does not
 // specify a fork block below the local head block). In case of a conflict, the
 // error is a *params.ConfigCompatError and the new, unwritten config is returned.
-// TODO remove the common.Hash from the return value
 func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig, error) {
 	if genesis == nil {
 		return nil, ErrNoGenesis
@@ -214,7 +213,6 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 	// config is supplied. These chains would get AllProtocolChanges (and a compat error)
 	// if we just continued here.
 	// if genesis == nil && stored != params.MainnetGenesisHash {
-	// if genesis == nil {
 	// 	return storedcfg, stored, nil
 	// }
 
@@ -233,22 +231,22 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 }
 
 // Original Code:
-// func getConfig(g *Genesis, ghash common.Hash) (*params.ChainConfig, error) {
+// func (g *Genesis) configOrDefault(ghash common.Hash) *params.ChainConfig {
 // 	switch {
 // 	case g != nil:
-// 		return g.Config, nil
+// 		return g.Config
 // 	case ghash == params.MainnetGenesisHash:
-// 		return params.MainnetChainConfig, nil
+// 		return params.MainnetChainConfig
 // 	case ghash == params.RopstenGenesisHash:
-// 		return params.RopstenChainConfig, nil
+// 		return params.RopstenChainConfig
 // 	case ghash == params.RinkebyGenesisHash:
-// 		return params.RinkebyChainConfig, nil
+// 		return params.RinkebyChainConfig
 // 	case ghash == params.GoerliGenesisHash:
-// 		return params.GoerliChainConfig, nil
-// 	case ghash == params.YoloV1GenesisHash:
-// 		return params.YoloV1ChainConfig, nil
+// 		return params.GoerliChainConfig
+// 	case ghash == params.YoloV3GenesisHash:
+// 		return params.YoloV3ChainConfig
 // 	default:
-// 		return nil, errGenesisNoConfig
+// 		return params.AllEthashProtocolChanges
 // 	}
 // }
 
@@ -267,7 +265,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			statedb.SetState(addr, key, value)
 		}
 		if account.MCBalance != nil {
-			//statedb.ForceEnableMultiCoin(addr)
 			for coinID, value := range account.MCBalance {
 				statedb.AddBalanceMultiCoin(addr, coinID, value)
 			}
@@ -296,7 +293,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	statedb.Commit(false)
 	statedb.Database().TrieDB().Commit(root, true, nil)
 
-	return types.NewBlock(head, nil, nil, nil, new(trie.Trie), nil, false)
+	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil), nil, false)
 }
 
 // Commit writes the block and state of a genesis specification to the database.
