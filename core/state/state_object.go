@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -75,6 +76,10 @@ func (s Storage) Copy() Storage {
 type stateObject struct {
 	address  common.Address
 	addrHash common.Hash // hash of ethereum address of the account
+	// dataLock protects the [data] field to prevent a race condition
+	// in the transaction pool tests. TODO remove after re-implementing
+	// tx pool to be synchronous.
+	dataLock sync.RWMutex
 	data     Account
 	db       *StateDB
 
@@ -578,6 +583,8 @@ func (s *stateObject) SetNonce(nonce uint64) {
 }
 
 func (s *stateObject) setNonce(nonce uint64) {
+	s.dataLock.Lock()
+	defer s.dataLock.Unlock()
 	s.data.Nonce = nonce
 }
 
@@ -622,6 +629,8 @@ func (s *stateObject) EnableMultiCoin() bool {
 }
 
 func (s *stateObject) Nonce() uint64 {
+	s.dataLock.RLock()
+	defer s.dataLock.RUnlock()
 	return s.data.Nonce
 }
 
