@@ -30,6 +30,7 @@
 package miner
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -325,6 +326,9 @@ func (w *worker) isRunning() bool {
 // close terminates all background threads maintained by the worker.
 // Note the worker does not support being closed multiple times.
 func (w *worker) close() {
+	if w.current != nil && w.current.state != nil {
+		w.current.state.StopPrefetcher()
+	}
 	atomic.StoreInt32(&w.running, 0)
 	close(w.exitCh)
 }
@@ -354,10 +358,14 @@ func recalcRecommit(minRecommit, prev time.Duration, target float64, inc bool) t
 func (w *worker) genBlock() {
 	interrupt := new(int32)
 	*interrupt = commitInterruptNone
-	w.newWorkCh <- &newWorkReq{
+	select {
+	case w.newWorkCh <- &newWorkReq{
 		interrupt: interrupt,
 		noempty:   false,
 		timestamp: time.Now().Unix(),
+	}:
+	case <-w.exitCh:
+		return
 	}
 }
 
@@ -379,7 +387,11 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			atomic.StoreInt32(interrupt, s)
 		}
 		interrupt = new(int32)
-		w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}
+		select {
+		case w.newWorkCh <- &newWorkReq{interrupt: interrupt, noempty: noempty, timestamp: timestamp}:
+		case <-w.exitCh:
+			return
+		}
 		timer.Reset(recommit)
 		atomic.StoreInt32(&w.newTxs, 0)
 	}
@@ -544,6 +556,15 @@ func (w *worker) mainLoop() {
 				// 	w.updateSnapshot()
 				// }
 			}
+			// Original code:
+			// } else {
+			// 	// Special case, if the consensus engine is 0 period clique(dev mode),
+			// 	// submit mining work here since all empty submission will be rejected
+			// 	// by clique. Of course the advance sealing(empty submission) is disabled.
+			// 	if w.chainConfig.Clique != nil && w.chainConfig.Clique.Period == 0 {
+			// 		w.commitNewWork(nil, true, time.Now().Unix())
+			// 	}
+			// }
 			atomic.AddInt32(&w.newTxs, int32(len(ev.Txs)))
 
 		// System stopped
@@ -659,9 +680,7 @@ func (w *worker) resultLoop() {
 				logs = append(logs, receipt.Logs...)
 			}
 			// Commit block and state to database.
-			//fmt.Printf("parent1: %s\n", w.chain.CurrentBlock().Hash().String())
 			_, err := w.chain.WriteBlockWithState(block, receipts, logs, task.state, true)
-			//fmt.Printf("parent2: %s\n", w.chain.CurrentBlock().Hash().String())
 			if err != nil {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
@@ -688,10 +707,13 @@ func (w *worker) resultLoop() {
 
 // makeCurrent creates a new environment for the current cycle.
 func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
+	// Retrieve the parent state to execute on top and start a prefetcher for
+	// the miner to speed block sealing up a bit
 	state, err := w.chain.StateAt(parent.Root())
 	if err != nil {
 		return err
 	}
+	state.StartPrefetcher("miner")
 	env := &environment{
 		signer: types.MakeSigner(w.chainConfig, header.Number, new(big.Int).SetUint64(header.Time)),
 		state:  state,
@@ -713,6 +735,12 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 
 	// Keep track of transactions which return errors so they can be removed
 	env.tcount = 0
+
+	// Swap out the old work with the new one, terminating any leftover prefetcher
+	// processes in the mean time and starting a new one.
+	if w.current != nil && w.current.state != nil {
+		w.current.state.StopPrefetcher()
+	}
 	w.current = env
 	return nil
 }
@@ -736,51 +764,37 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 // 	env.uncles.Add(uncle.Hash())
 // 	return nil
 // }
-
-// Original code:
+//
 // // updateSnapshot updates pending snapshot block and state.
 // // Note this function assumes the current variable is thread safe.
 // func (w *worker) updateSnapshot() {
 // 	w.snapshotMu.Lock()
 // 	defer w.snapshotMu.Unlock()
 //
-// 	// Original code:
-// 	// var uncles []*types.Header
-// 	// w.current.uncles.Each(func(item interface{}) bool {
-// 	// 	hash, ok := item.(common.Hash)
-// 	// 	if !ok {
-// 	// 		return false
-// 	// 	}
-// 	// 	uncle, exist := w.localUncles[hash]
-// 	// 	if !exist {
-// 	// 		uncle, exist = w.remoteUncles[hash]
-// 	// 	}
-// 	// 	if !exist {
-// 	// 		return false
-// 	// 	}
-// 	// 	uncles = append(uncles, uncle.Header())
-// 	// 	return false
-// 	// })
-// 	//
-// 	// w.snapshotBlock = types.NewBlock(
-// 	// 	w.current.header,
-// 	// 	w.current.txs,
-// 	// 	uncles,
-// 	// 	w.current.receipts,
-// 	// 	new(trie.Trie),
-// 	// 	nil,
-// 	// )
+// 	var uncles []*types.Header
+// 	w.current.uncles.Each(func(item interface{}) bool {
+// 		hash, ok := item.(common.Hash)
+// 		if !ok {
+// 			return false
+// 		}
+// 		uncle, exist := w.localUncles[hash]
+// 		if !exist {
+// 			uncle, exist = w.remoteUncles[hash]
+// 		}
+// 		if !exist {
+// 			return false
+// 		}
+// 		uncles = append(uncles, uncle.Header())
+// 		return false
+// 	})
 //
 // 	w.snapshotBlock = types.NewBlock(
 // 		w.current.header,
 // 		w.current.txs,
-// 		nil,
+// 		uncles,
 // 		w.current.receipts,
-// 		new(trie.Trie),
-// 		nil,
-// 		false,
+// 		trie.NewStackTrie(nil),
 // 	)
-//
 // 	w.snapshotState = w.current.state.Copy()
 // }
 
@@ -858,29 +872,29 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 		w.current.state.Prepare(tx.Hash(), common.Hash{}, w.current.tcount)
 
 		logs, err := w.commitTransaction(tx, coinbase)
-		switch err {
-		case core.ErrGasLimitReached:
+		switch {
+		case errors.Is(err, core.ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
 			log.Trace("Gas limit exceeded for current block", "sender", from)
 			txs.Pop()
 
-		case core.ErrNonceTooLow:
+		case errors.Is(err, core.ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
 			log.Trace("Skipping transaction with low nonce", "sender", from, "nonce", tx.Nonce())
 			txs.Shift()
 
-		case core.ErrNonceTooHigh:
+		case errors.Is(err, core.ErrNonceTooHigh):
 			// Reorg notification data race between the transaction pool and miner, skip account =
 			log.Trace("Skipping account with high nonce", "sender", from, "nonce", tx.Nonce())
 			txs.Pop()
 
-		case nil:
+		case errors.Is(err, nil):
 			// Everything ok, collect the logs and shift in the next transaction from the same account
 			coalescedLogs = append(coalescedLogs, logs...)
 			w.current.tcount++
 			txs.Shift()
 
-		case core.ErrTxTypeNotSupported:
+		case errors.Is(err, core.ErrTxTypeNotSupported):
 			// Pop the unsupported transaction without shifting in the next from the account
 			log.Trace("Skipping unsupported transaction type", "sender", from, "type", tx.Type())
 			txs.Pop()
