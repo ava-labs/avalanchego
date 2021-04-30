@@ -319,6 +319,18 @@ func (b *EthAPIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction 
 
 func (b *EthAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
 	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.eth.ChainDb(), txHash)
+
+	// Respond as if the transaction does not exist if it is not yet in an
+	// accepted block. We explicitly choose not to error here to avoid breaking
+	// expectations with clients (expect an empty response when a transaction
+	// does not exist).
+	acceptedBlock := b.eth.LastAcceptedBlock()
+	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil && tx != nil {
+		if blockNumber > acceptedBlock.NumberU64() {
+			return nil, common.Hash{}, 0, 0, nil
+		}
+	}
+
 	return tx, blockHash, blockNumber, index, nil
 }
 
