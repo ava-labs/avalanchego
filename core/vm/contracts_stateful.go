@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package vm
 
 import (
@@ -22,21 +25,6 @@ var (
 	nativeAssetBalanceAddr       = common.HexToAddress("0x0100000000000000000000000000000000000001")
 	nativeAssetCallAddr          = common.HexToAddress("0x0100000000000000000000000000000000000002")
 )
-
-var PrecompiledContractsApricot = map[common.Address]StatefulPrecompiledContract{
-	common.BytesToAddress([]byte{1}): newWrappedPrecompiledContract(&ecrecover{}),
-	common.BytesToAddress([]byte{2}): newWrappedPrecompiledContract(&sha256hash{}),
-	common.BytesToAddress([]byte{3}): newWrappedPrecompiledContract(&ripemd160hash{}),
-	common.BytesToAddress([]byte{4}): newWrappedPrecompiledContract(&dataCopy{}),
-	common.BytesToAddress([]byte{5}): newWrappedPrecompiledContract(&bigModExp{}),
-	common.BytesToAddress([]byte{6}): newWrappedPrecompiledContract(&bn256AddIstanbul{}),
-	common.BytesToAddress([]byte{7}): newWrappedPrecompiledContract(&bn256ScalarMulIstanbul{}),
-	common.BytesToAddress([]byte{8}): newWrappedPrecompiledContract(&bn256PairingIstanbul{}),
-	common.BytesToAddress([]byte{9}): newWrappedPrecompiledContract(&blake2F{}),
-	genesisMulticoinContractAddr:     &genesisContract{},
-	nativeAssetBalanceAddr:           &nativeAssetBalance{gasCost: params.AssetBalanceApricot},
-	nativeAssetCallAddr:              &nativeAssetCall{gasCost: params.AssetCallApricot},
-}
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 // This wraps the PrecompiledContracts native to Ethereum and allows adding in stateful
