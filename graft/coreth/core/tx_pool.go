@@ -338,8 +338,8 @@ func (pool *TxPool) loop() {
 		evict   = time.NewTicker(evictionInterval)
 		journal = time.NewTicker(pool.config.Rejournal)
 		// Track the previous head headers for transaction reorgs
+		head = pool.chain.CurrentBlock()
 	)
-	head := pool.chain.CurrentBlock()
 	defer report.Stop()
 	defer evict.Stop()
 	defer journal.Stop()
