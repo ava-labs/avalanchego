@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/rlp"
 	"golang.org/x/crypto/sha3"
@@ -268,79 +269,88 @@ func TestHeadStorage(t *testing.T) {
 	}
 }
 
-// HIGH PRIORITY TODO: Fix this failing test
 // Tests that receipts associated with a single block can be stored and retrieved.
-// func TestBlockReceiptStorage(t *testing.T) {
-// 	db := NewMemoryDatabase()
+func TestBlockReceiptStorage(t *testing.T) {
+	db := NewMemoryDatabase()
 
-// 	// Create a live block since we need metadata to reconstruct the receipt
-// 	tx1 := types.NewTransaction(1, common.HexToAddress("0x1"), big.NewInt(1), 1, big.NewInt(1), nil)
-// 	tx2 := types.NewTransaction(2, common.HexToAddress("0x2"), big.NewInt(2), 2, big.NewInt(2), nil)
+	// Create a live block since we need metadata to reconstruct the receipt
+	tx1 := types.NewTransaction(1, common.HexToAddress("0x1"), big.NewInt(1), 1, big.NewInt(1), nil)
+	tx2 := types.NewTransaction(2, common.HexToAddress("0x2"), big.NewInt(2), 2, big.NewInt(2), nil)
 
-// 	body := &types.Body{Transactions: types.Transactions{tx1, tx2}}
+	body := &types.Body{Transactions: types.Transactions{tx1, tx2}}
 
-// 	// Create the two receipts to manage afterwards
-// 	receipt1 := &types.Receipt{
-// 		Status:            types.ReceiptStatusFailed,
-// 		CumulativeGasUsed: 1,
-// 		Logs: []*types.Log{
-// 			{Address: common.BytesToAddress([]byte{0x11})},
-// 			{Address: common.BytesToAddress([]byte{0x01, 0x11})},
-// 		},
-// 		TxHash:          tx1.Hash(),
-// 		ContractAddress: common.BytesToAddress([]byte{0x01, 0x11, 0x11}),
-// 		GasUsed:         111111,
-// 	}
-// 	receipt1.Bloom = types.CreateBloom(types.Receipts{receipt1})
+	// Create the two receipts to manage afterwards
+	receipt1 := &types.Receipt{
+		Status:            types.ReceiptStatusFailed,
+		CumulativeGasUsed: 1,
+		Logs: []*types.Log{
+			{Address: common.BytesToAddress([]byte{0x11})},
+			{Address: common.BytesToAddress([]byte{0x01, 0x11})},
+		},
+		TxHash:          tx1.Hash(),
+		ContractAddress: common.BytesToAddress([]byte{0x01, 0x11, 0x11}),
+		GasUsed:         111111,
+	}
+	receipt1.Bloom = types.CreateBloom(types.Receipts{receipt1})
 
-// 	receipt2 := &types.Receipt{
-// 		PostState:         common.Hash{2}.Bytes(),
-// 		CumulativeGasUsed: 2,
-// 		Logs: []*types.Log{
-// 			{Address: common.BytesToAddress([]byte{0x22})},
-// 			{Address: common.BytesToAddress([]byte{0x02, 0x22})},
-// 		},
-// 		TxHash:          tx2.Hash(),
-// 		ContractAddress: common.BytesToAddress([]byte{0x02, 0x22, 0x22}),
-// 		GasUsed:         222222,
-// 	}
-// 	receipt2.Bloom = types.CreateBloom(types.Receipts{receipt2})
-// 	receipts := []*types.Receipt{receipt1, receipt2}
+	receipt2 := &types.Receipt{
+		PostState:         common.Hash{2}.Bytes(),
+		CumulativeGasUsed: 2,
+		Logs: []*types.Log{
+			{Address: common.BytesToAddress([]byte{0x22})},
+			{Address: common.BytesToAddress([]byte{0x02, 0x22})},
+		},
+		TxHash:          tx2.Hash(),
+		ContractAddress: common.BytesToAddress([]byte{0x02, 0x22, 0x22}),
+		GasUsed:         222222,
+	}
+	receipt2.Bloom = types.CreateBloom(types.Receipts{receipt2})
+	receipts := []*types.Receipt{receipt1, receipt2}
 
-// 	// Check that no receipt entries are in a pristine database
-// 	hash := common.BytesToHash([]byte{0x03, 0x14})
-// 	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) != 0 {
-// 		t.Fatalf("non existent receipts returned: %v", rs)
-// 	}
-// 	// Insert the body that corresponds to the receipts
-// 	WriteBody(db, hash, 0, body)
+	// Check that no receipt entries are in a pristine database
+	header := &types.Header{Number: big.NewInt(0), Extra: []byte("test header")}
+	hash := header.Hash()
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) != 0 {
+		t.Fatalf("non existent receipts returned: %v", rs)
+	}
+	// Insert the body that corresponds to the receipts
+	WriteHeader(db, header)
+	WriteBody(db, hash, 0, body)
+	if header := ReadHeader(db, hash, 0); header == nil {
+		t.Fatal("header is nil")
+	}
 
-// 	// Insert the receipt slice into the database and check presence
-// 	WriteReceipts(db, hash, 0, receipts)
-// 	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) == 0 {
-// 		t.Fatalf("no receipts returned")
-// 	} else {
-// 		if err := checkReceiptsRLP(rs, receipts); err != nil {
-// 			t.Fatalf(err.Error())
-// 		}
-// 	}
-// 	// Delete the body and ensure that the receipts are no longer returned (metadata can't be recomputed)
-// 	DeleteBody(db, hash, 0)
-// 	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); rs != nil {
-// 		t.Fatalf("receipts returned when body was deleted: %v", rs)
-// 	}
-// 	// Ensure that receipts without metadata can be returned without the block body too
-// 	if err := checkReceiptsRLP(ReadRawReceipts(db, hash, 0), receipts); err != nil {
-// 		t.Fatalf(err.Error())
-// 	}
-// 	// Sanity check that body alone without the receipt is a full purge
-// 	WriteBody(db, hash, 0, body)
+	// Insert the receipt slice into the database and check presence
+	WriteReceipts(db, hash, 0, receipts)
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) == 0 {
+		t.Fatalf("no receipts returned")
+	} else {
+		if err := checkReceiptsRLP(rs, receipts); err != nil {
+			t.Fatalf(err.Error())
+		}
+	}
+	// Delete the body and ensure that the receipts are no longer returned (metadata can't be recomputed)
+	DeleteHeader(db, hash, 0)
+	DeleteBody(db, hash, 0)
+	if header := ReadHeader(db, hash, 0); header != nil {
+		t.Fatal("header is not nil")
+	}
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); rs != nil {
+		t.Fatalf("receipts returned when body was deleted: %v", rs)
+	}
+	// Ensure that receipts without metadata can be returned without the block body too
+	if err := checkReceiptsRLP(ReadRawReceipts(db, hash, 0), receipts); err != nil {
+		t.Fatalf(err.Error())
+	}
+	// Sanity check that body and header alone without the receipt is a full purge
+	WriteHeader(db, header)
+	WriteBody(db, hash, 0, body)
 
-// 	DeleteReceipts(db, hash, 0)
-// 	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) != 0 {
-// 		t.Fatalf("deleted receipts returned: %v", rs)
-// 	}
-// }
+	DeleteReceipts(db, hash, 0)
+	if rs := ReadReceipts(db, hash, 0, params.TestChainConfig); len(rs) != 0 {
+		t.Fatalf("deleted receipts returned: %v", rs)
+	}
+}
 
 func checkReceiptsRLP(have, want types.Receipts) error {
 	if len(have) != len(want) {
