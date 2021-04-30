@@ -10,8 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/formatting"
-
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/gorilla/websocket"
@@ -137,7 +135,6 @@ func (s *Server) Publish(eventType EventType, msg interface{}, parser Parser) {
 			if fr == nil {
 				continue
 			}
-			fr.Address, _ = formatting.FormatBech32(s.hrp, fr.AddressID[:])
 			m.Value = fr
 		}
 		s.publishMsg(conn, m)
