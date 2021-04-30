@@ -133,7 +133,7 @@ func (c *Connection) readMessage() error {
 	if err != nil {
 		return err
 	}
-	cmdMsg, err := NewCommandMessage(r, c.s.hrp)
+	cmdMsg, err := NewCommandMessage(r)
 	if err != nil {
 		return err
 	}

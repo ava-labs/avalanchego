@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/gorilla/websocket"
@@ -79,17 +78,14 @@ var upgrader = websocket.Upgrader{
 type Server struct {
 	lock             sync.RWMutex
 	log              logging.Logger
-	hrp              string
 	conns            map[*Connection]struct{}
 	eventTypeToConns map[EventType]*connContainer
 }
 
 // NewPubSubServer ...
 func New(networkID uint32, log logging.Logger) *Server {
-	hrp := constants.GetHRP(networkID)
 	return &Server{
 		log:   log,
-		hrp:   hrp,
 		conns: make(map[*Connection]struct{}),
 		eventTypeToConns: map[EventType]*connContainer{
 			Accepted: newConnContainer(),

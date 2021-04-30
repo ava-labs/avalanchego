@@ -41,7 +41,7 @@ func TestCommandMessage_TransposeAddress(t *testing.T) {
 		t.Fatalf("address transpose failed")
 	}
 	cmdMsg.Addresses = append(cmdMsg.Addresses, "Z-"+b32addr)
-	cmdMsg.TransposeAddress(hrp)
+	cmdMsg.TransposeAddress()
 	if !bytes.Equal(cmdMsg.AddressIds[0], idsid1[:]) {
 		t.Fatalf("address transpose failed")
 	}

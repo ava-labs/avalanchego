@@ -30,13 +30,13 @@ type CommandMessage struct {
 	Unsubscribe bool `json:"unsubscribe"`
 }
 
-func NewCommandMessage(r io.Reader, hrp string) (*CommandMessage, error) {
+func NewCommandMessage(r io.Reader) (*CommandMessage, error) {
 	c := CommandMessage{}
 	err := c.Load(r)
 	if err != nil {
 		return nil, err
 	}
-	c.TransposeAddress(hrp)
+	c.TransposeAddress()
 	return &c, nil
 }
 
@@ -53,20 +53,12 @@ func (c *CommandMessage) FilterOrDefault() {
 }
 
 // TransposeAddress converts any b32 address to their byte equiv ids.ShortID.
-func (c *CommandMessage) TransposeAddress(hrp string) {
+func (c *CommandMessage) TransposeAddress() {
 	if c.AddressIds == nil {
 		c.AddressIds = make([][]byte, 0, len(c.Addresses))
 	}
 	for _, astr := range c.Addresses {
-		// remove chain prefix if found..  X-fuji....
-		addressParts := strings.SplitN(astr, "-", 2)
-		if len(addressParts) >= 2 {
-			astr = addressParts[1]
-		}
-		if !strings.HasPrefix(astr, hrp) {
-			continue
-		}
-		_, _, abytes, err := formatting.ParseAddress("X-" + astr)
+		_, _, abytes, err := formatting.ParseAddress(astr)
 		if err != nil {
 			continue
 		}
