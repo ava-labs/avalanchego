@@ -23,7 +23,7 @@ type CommandMessage struct {
 	EventType EventType `json:"eventType"`
 	// Unsubscribe unsubscribe channel remove address or reset filter
 	Unsubscribe bool `json:"unsubscribe"`
-	// AddressIds array of addresses, kept as a [][]byte for use in the bloom filter
+	// addressIds array of addresses, kept as a [][]byte for use in the bloom filter
 	addressIds [][]byte `json:"-"`
 }
 

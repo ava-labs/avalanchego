@@ -4,6 +4,6 @@
 package pubsub
 
 type Parser interface {
-	// expected a txID or nil if filter doesn't match
+	// expected an object or nil if filter doesn't match
 	Filter(*FilterParam) interface{}
 }
