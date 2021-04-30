@@ -5,6 +5,7 @@ package database
 
 import (
 	"bytes"
+	"crypto/rand"
 	"testing"
 )
 
@@ -20,12 +21,15 @@ var (
 		TestBatchRewrite,
 		TestBatchReplay,
 		TestBatchInner,
+		TestBatchLargeSize,
 		TestIterator,
 		TestIteratorStart,
 		TestIteratorPrefix,
 		TestIteratorStartPrefix,
 		TestIteratorMemorySafety,
 		TestIteratorClosed,
+		TestIteratorError,
+		TestIteratorErrorAfterRelease,
 		TestStatNoPanic,
 		TestCompactNoPanic,
 		TestMemorySafetyDatabase,
@@ -547,6 +551,42 @@ func TestBatchInner(t *testing.T, db Database) {
 	}
 }
 
+// TestBatchLargeSize tests to make sure that the batch can support a large
+// amount of entries.
+//nolint:interfacer // This function must match the test function definition
+func TestBatchLargeSize(t *testing.T, db Database) {
+	totalSize := 8 * 1024 * 1024 // 8 MiB
+	elementSize := 4 * 1024      // 4 KiB
+	pairSize := 2 * elementSize  // 8 KiB
+
+	bytes := make([]byte, totalSize)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	batch := db.NewBatch()
+	if batch == nil {
+		t.Fatalf("db.NewBatch returned nil")
+	}
+
+	for len(bytes) > pairSize {
+		key := bytes[:elementSize]
+		bytes = bytes[elementSize:]
+
+		value := bytes[:elementSize]
+		bytes = bytes[elementSize:]
+
+		if err := batch.Put(key, value); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := batch.Write(); err != nil {
+		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+}
+
 // TestIterator tests to make sure the database iterates over the database
 // contents lexicographically.
 func TestIterator(t *testing.T, db Database) {
@@ -801,6 +841,75 @@ func TestIteratorClosed(t *testing.T, db Database) {
 	} else if value := iterator.Value(); value != nil {
 		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
 	} else if err := iterator.Error(); err != ErrClosed {
+		t.Fatalf("Expected %s on iterator.Error", ErrClosed)
+	}
+}
+
+// TestIteratorError tests to make sure that an iterator still works after the
+// database is closed.
+func TestIteratorError(t *testing.T, db Database) {
+	key := []byte("hello1")
+	value := []byte("world1")
+
+	if err := db.Put(key, value); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	iterator := db.NewIterator()
+	if iterator == nil {
+		t.Fatalf("db.NewIterator returned nil")
+	}
+	defer iterator.Release()
+
+	if err := db.Close(); err != nil {
+		t.Fatalf("Unexpected error on db.Close: %s", err)
+	}
+
+	if !iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
+	}
+	if itKey := iterator.Key(); !bytes.Equal(itKey, key) {
+		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", itKey, key)
+	}
+	if itValue := iterator.Value(); !bytes.Equal(itValue, value) {
+		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", itValue, value)
+	}
+	if err := iterator.Error(); err != nil {
+		t.Fatalf("Expected no error on iterator.Error but got %s", err)
+	}
+}
+
+// TestIteratorErrorAfterRelease tests to make sure that an iterator that was
+// released still reports the error correctly.
+func TestIteratorErrorAfterRelease(t *testing.T, db Database) {
+	key := []byte("hello1")
+	value := []byte("world1")
+
+	if err := db.Put(key, value); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatalf("Unexpected error on db.Close: %s", err)
+	}
+
+	iterator := db.NewIterator()
+	if iterator == nil {
+		t.Fatalf("db.NewIterator returned nil")
+	}
+
+	iterator.Release()
+
+	if iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
+	}
+	if key := iterator.Key(); key != nil {
+		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
+	}
+	if value := iterator.Value(); value != nil {
+		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
+	}
+	if err := iterator.Error(); err != ErrClosed {
 		t.Fatalf("Expected %s on iterator.Error", ErrClosed)
 	}
 }

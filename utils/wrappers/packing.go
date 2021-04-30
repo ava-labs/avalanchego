@@ -4,8 +4,10 @@
 package wrappers
 
 import (
+	"crypto/x509"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -26,6 +28,8 @@ const (
 	LongLen = 8
 	// BoolLen is the number of bytes per bool
 	BoolLen = 1
+	// IPLen is the number of bytes per IP
+	IPLen = 16 + ShortLen
 )
 
 var (
@@ -501,4 +505,97 @@ func TryPackIPList(packer *Packer, valIntf interface{}) {
 // TryUnpackIPList attempts to unpack the value as an ip port pair list
 func TryUnpackIPList(packer *Packer) interface{} {
 	return packer.UnpackIPs()
+}
+
+// PackLong returns the byte representation of a uint64
+func PackLong(val uint64) []byte {
+	bytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(bytes, val)
+	return bytes
+}
+
+// PackLong returns the byte representation of a uint64.
+// Returns an error if len(bytes) != 8
+func UnpackLong(bytes []byte) (uint64, error) {
+	if len(bytes) != 8 {
+		return 0, fmt.Errorf("expected len(bytes) to be 8 but is %d", len(bytes))
+	}
+	return binary.BigEndian.Uint64(bytes), nil
+}
+
+func TryPackX509Certificate(packer *Packer, valIntf interface{}) {
+	if val, ok := valIntf.(*x509.Certificate); ok {
+		packer.PackX509Certificate(val)
+	} else {
+		packer.Add(errBadType)
+	}
+}
+
+func TryUnpackX509Certificate(packer *Packer) interface{} {
+	return packer.UnpackX509Certificate()
+}
+
+func (p *Packer) PackX509Certificate(cert *x509.Certificate) {
+	p.PackBytes(cert.Raw)
+}
+
+func (p *Packer) UnpackX509Certificate() *x509.Certificate {
+	b := p.UnpackBytes()
+	if len(b) == 0 {
+		return nil
+	}
+	cert, err := x509.ParseCertificate(b)
+	if err != nil {
+		p.Add(err)
+		return nil
+	}
+	return cert
+}
+
+func TryPackIPCert(packer *Packer, valIntf interface{}) {
+	if val, ok := valIntf.(utils.IPCertDesc); ok {
+		packer.PackIPCert(val)
+	} else {
+		packer.Add(errBadType)
+	}
+}
+
+func TryUnpackIPCert(packer *Packer) interface{} {
+	return packer.UnpackIPCert()
+}
+
+func (p *Packer) PackIPCert(ipCert utils.IPCertDesc) {
+	p.PackX509Certificate(ipCert.Cert)
+	p.PackIP(ipCert.IPDesc)
+	p.PackLong(ipCert.Time)
+	p.PackBytes(ipCert.Signature)
+}
+
+func (p *Packer) UnpackIPCert() utils.IPCertDesc {
+	var ipCert utils.IPCertDesc
+	ipCert.Cert = p.UnpackX509Certificate()
+	ipCert.IPDesc = p.UnpackIP()
+	ipCert.Time = p.UnpackLong()
+	ipCert.Signature = p.UnpackBytes()
+	return ipCert
+}
+
+func TryPackIPCertList(packer *Packer, valIntf interface{}) {
+	if ipCertList, ok := valIntf.([]utils.IPCertDesc); ok {
+		packer.PackInt(uint32(len(ipCertList)))
+		for _, ipc := range ipCertList {
+			packer.PackIPCert(ipc)
+		}
+	} else {
+		packer.Add(errBadType)
+	}
+}
+
+func TryUnpackIPCertList(packer *Packer) interface{} {
+	sliceSize := packer.UnpackInt()
+	ips := []utils.IPCertDesc(nil)
+	for i := uint32(0); i < sliceSize && !packer.Errored(); i++ {
+		ips = append(ips, packer.UnpackIPCert())
+	}
+	return ips
 }

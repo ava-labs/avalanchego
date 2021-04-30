@@ -53,7 +53,7 @@ func TestShutdown(t *testing.T) {
 	engine.ShutdownF = func() error { shutdownCalled <- struct{}{}; return nil }
 
 	handler := &Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
@@ -65,6 +65,7 @@ func TestShutdown(t *testing.T) {
 		prometheus.NewRegistry(),
 		&Delay{},
 	)
+	assert.NoError(t, err)
 
 	go handler.Dispatch()
 
@@ -127,7 +128,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	engine.ShutdownF = func() error { *closed++; return nil }
 
 	handler := &Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
@@ -139,6 +140,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		prometheus.NewRegistry(),
 		&Delay{},
 	)
+	assert.NoError(t, err)
 
 	chainRouter.AddChain(handler)
 
@@ -226,7 +228,7 @@ func TestRouterTimeout(t *testing.T) {
 	engine.ContextF = snow.DefaultContextTest
 
 	handler := &Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
@@ -238,6 +240,7 @@ func TestRouterTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 		&Delay{},
 	)
+	assert.NoError(t, err)
 
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()
@@ -293,7 +296,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 	engine.ContextF = snow.DefaultContextTest
 
 	handler := &Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
@@ -305,6 +308,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		prometheus.NewRegistry(),
 		&Delay{},
 	)
+	assert.NoError(t, err)
 
 	chainRouter.AddChain(handler)
 	go handler.Dispatch()

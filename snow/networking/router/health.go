@@ -16,9 +16,8 @@ type HealthConfig struct {
 	// Must be > 0
 	MaxOutstandingRequests int
 
-	// Reports unhealthy if there is at least 1 outstanding request continuously
-	// for longer than this
-	MaxTimeSinceNoOutstandingRequests time.Duration
+	// Reports unhealthy if there is a request outstanding for longer than this
+	MaxOutstandingDuration time.Duration
 
 	// Reports unhealthy if there is at least 1 outstanding not processed
 	// before this mark

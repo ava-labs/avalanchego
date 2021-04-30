@@ -120,7 +120,7 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedVtxIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, vtxID := range containerIDs {
-		if vtx, err := b.Manager.Get(vtxID); err == nil && vtx.Status() == choices.Accepted {
+		if vtx, err := b.Manager.GetVtx(vtxID); err == nil && vtx.Status() == choices.Accepted {
 			acceptedVtxIDs = append(acceptedVtxIDs, vtxID)
 		}
 	}
@@ -142,7 +142,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		}
 
 		// Make sure we don't already have this vertex
-		if _, err := b.Manager.Get(vtxID); err == nil {
+		if _, err := b.Manager.GetVtx(vtxID); err == nil {
 			continue
 		}
 
@@ -195,7 +195,11 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 				b.numFetchedVts.Inc()
 				b.NumFetched++ // Progress tracker
 				if b.NumFetched%common.StatusUpdateFrequency == 0 {
-					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
+					if !b.Restarted {
+						b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
+					} else {
+						b.Ctx.Log.Debug("fetched %d vertices", b.NumFetched)
+					}
 				}
 			} else {
 				b.Ctx.Log.Verbo("couldn't push to vtxBlocked: %s", err)
@@ -268,7 +272,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	}
 
 	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
-	vtx, err := b.Manager.Parse(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
+	vtx, err := b.Manager.ParseVtx(vtxs[0]) // first vertex should be the one we requested in GetAncestors request
 	if err != nil {
 		if !requested {
 			b.Ctx.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
@@ -309,7 +313,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	}
 
 	for _, vtxBytes := range vtxs[1:] { // Parse/persist all the vertices
-		vtx, err := b.Manager.Parse(vtxBytes) // Persists the vtx
+		vtx, err := b.Manager.ParseVtx(vtxBytes) // Persists the vtx
 		if err != nil {
 			b.Ctx.Log.Debug("failed to parse vertex: %s", err)
 			b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxBytes})
@@ -356,7 +360,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	b.NumFetched = 0
 	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
 	for _, vtxID := range acceptedContainerIDs {
-		if vtx, err := b.Manager.Get(vtxID); err == nil {
+		if vtx, err := b.Manager.GetVtx(vtxID); err == nil {
 			toProcess = append(toProcess, vtx) // Process this vertex.
 		} else {
 			b.needToFetch.Add(vtxID) // We don't have this vertex. Mark that we have to fetch it.
@@ -373,15 +377,22 @@ func (b *Bootstrapper) checkFinish() error {
 		return nil
 	}
 
-	b.Ctx.Log.Info("bootstrapping fetched %d vertices. executing transaction state transitions...",
-		b.NumFetched)
+	if !b.Restarted {
+		b.Ctx.Log.Info("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
+	} else {
+		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
+	}
 
 	_, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
 	if err != nil {
 		return err
 	}
 
-	b.Ctx.Log.Info("executing vertex state transitions...")
+	if !b.Restarted {
+		b.Ctx.Log.Info("executing vertex state transitions...")
+	} else {
+		b.Ctx.Log.Debug("executing vertex state transitions...")
+	}
 	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
 	if err != nil {
 		return err
@@ -394,11 +405,9 @@ func (b *Bootstrapper) checkFinish() error {
 	// bootstrapping process will terminate even as new vertices are being
 	// issued.
 	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.RetryBootstrap {
-		b.Ctx.Log.Info("bootstrapping is checking for more vertices before finishing the bootstrap process...")
+		b.Ctx.Log.Debug("checking for more vertices before finishing bootstrapping")
 		return b.RestartBootstrap(true)
 	}
-
-	b.Ctx.Log.Info("bootstrapping fetched enough vertices to finish the bootstrap process...")
 
 	// Notify the subnet that this chain is synced
 	b.Subnet.Bootstrapped(b.Ctx.ChainID)
@@ -406,7 +415,11 @@ func (b *Bootstrapper) checkFinish() error {
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Subnet.IsBootstrapped() {
-		b.Ctx.Log.Info("bootstrapping is waiting for the remaining chains in this subnet to finish syncing...")
+		if !b.Restarted {
+			b.Ctx.Log.Info("waiting for the remaining chains in this subnet to finish syncing")
+		} else {
+			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
+		}
 		// Delay new incoming messages to avoid consuming unnecessary resources
 		// while keeping up to date on the latest tip.
 		b.Config.Delay.Delay(b.delayAmount)
@@ -426,6 +439,7 @@ func (b *Bootstrapper) finish() error {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}
+	b.processedCache.Flush()
 
 	// Start consensus
 	if err := b.OnFinished(); err != nil {
@@ -441,6 +455,11 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 
 	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
 		b.Ctx.Log.Debug("Executing: %s", job.ID())
+		// Note that events.Accept must be called before
+		// job.Execute to honor EventDispatcher.Accept's invariant.
+		if err := events.Accept(b.Ctx, job.ID(), job.Bytes()); err != nil {
+			return numExecuted, err
+		}
 		if err := jobs.Execute(job); err != nil {
 			b.Ctx.Log.Error("Error executing: %s", err)
 			return numExecuted, err
@@ -450,12 +469,19 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher)
 		}
 		numExecuted++
 		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			b.Ctx.Log.Info("executed %d operations", numExecuted)
+			if !b.Restarted {
+				b.Ctx.Log.Info("executed %d operations", numExecuted)
+			} else {
+				b.Ctx.Log.Debug("executed %d operations", numExecuted)
+			}
 		}
 
-		events.Accept(b.Ctx, job.ID(), job.Bytes())
 	}
-	b.Ctx.Log.Info("executed %d operations", numExecuted)
+	if !b.Restarted {
+		b.Ctx.Log.Info("executed %d operations", numExecuted)
+	} else {
+		b.Ctx.Log.Debug("executed %d operations", numExecuted)
+	}
 	return numExecuted, nil
 }
 

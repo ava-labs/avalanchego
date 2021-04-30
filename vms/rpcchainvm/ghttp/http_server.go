@@ -12,6 +12,7 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
@@ -42,13 +43,14 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 	if err != nil {
 		return nil, err
 	}
-	defer writerConn.Close()
 
 	readerConn, err := s.broker.Dial(req.Request.Body)
 	if err != nil {
+		// Drop any error that occurs during closing to return the original
+		// error.
+		_ = writerConn.Close()
 		return nil, err
 	}
-	defer readerConn.Close()
 
 	writerHeaders := make(http.Header)
 	for _, elem := range req.ResponseWriter.Header {
@@ -147,6 +149,10 @@ func (s *Server) Handle(ctx context.Context, req *ghttpproto.HTTPRequest) (*ghtt
 
 	s.handler.ServeHTTP(writer, request)
 
-	// return the response
-	return &ghttpproto.HTTPResponse{}, nil
+	errs := wrappers.Errs{}
+	errs.Add(
+		writerConn.Close(),
+		readerConn.Close(),
+	)
+	return &ghttpproto.HTTPResponse{}, errs.Err
 }

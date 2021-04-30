@@ -19,9 +19,9 @@ var (
 
 // DatabaseServer is a database that is managed over RPC.
 type DatabaseServer struct {
-	lock  sync.Mutex
-	db    database.Database
-	batch database.Batch
+	lock    sync.Mutex
+	db      database.Database
+	batches map[int64]database.Batch
 
 	nextIteratorID uint64
 	iterators      map[uint64]database.Iterator
@@ -31,7 +31,7 @@ type DatabaseServer struct {
 func NewServer(db database.Database) *DatabaseServer {
 	return &DatabaseServer{
 		db:        db,
-		batch:     db.NewBatch(),
+		batches:   make(map[int64]database.Batch),
 		iterators: make(map[uint64]database.Iterator),
 	}
 }
@@ -95,21 +95,36 @@ func (db *DatabaseServer) WriteBatch(_ context.Context, req *rpcdbproto.WriteBat
 	db.lock.Lock()
 	defer db.lock.Unlock()
 
-	db.batch.Reset()
+	batch, exists := db.batches[req.Id]
+	if !exists {
+		batch = db.db.NewBatch()
+	}
 
 	for _, put := range req.Puts {
-		if err := db.batch.Put(put.Key, put.Value); err != nil {
+		if err := batch.Put(put.Key, put.Value); err != nil {
+			// Because we are reporting an error, we free the allocated batch.
+			delete(db.batches, req.Id)
+
 			return &rpcdbproto.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 		}
 	}
 
 	for _, del := range req.Deletes {
-		if err := db.batch.Delete(del.Key); err != nil {
+		if err := batch.Delete(del.Key); err != nil {
+			// Because we are reporting an error, we free the allocated batch.
+			delete(db.batches, req.Id)
+
 			return &rpcdbproto.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 		}
 	}
 
-	err := db.batch.Write()
+	if req.Continues {
+		db.batches[req.Id] = batch
+		return &rpcdbproto.WriteBatchResponse{}, nil
+	}
+
+	delete(db.batches, req.Id)
+	err := batch.Write()
 	return &rpcdbproto.WriteBatchResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 }
 
@@ -162,9 +177,12 @@ func (db *DatabaseServer) IteratorRelease(_ context.Context, req *rpcdbproto.Ite
 	defer db.lock.Unlock()
 
 	it, exists := db.iterators[req.Id]
-	if exists {
-		delete(db.iterators, req.Id)
-		it.Release()
+	if !exists {
+		return &rpcdbproto.IteratorReleaseResponse{Err: 0}, nil
 	}
-	return &rpcdbproto.IteratorReleaseResponse{}, nil
+
+	delete(db.iterators, req.Id)
+	err := it.Error()
+	it.Release()
+	return &rpcdbproto.IteratorReleaseResponse{Err: errorToErrCode[err]}, errorToRPCError(err)
 }

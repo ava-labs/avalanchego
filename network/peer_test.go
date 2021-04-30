@@ -1,6 +1,7 @@
 package network
 
 import (
+	"crypto"
 	"net"
 	"testing"
 	"time"
@@ -61,11 +62,21 @@ func TestPeer_Close(t *testing.T) {
 		},
 		outbounds: make(map[string]*testListener),
 	}
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
 
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
+
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
 
 	netwrk := NewDefaultNetwork(
 		prometheus.NewRegistry(),
@@ -73,12 +84,12 @@ func TestPeer_Close(t *testing.T) {
 		id,
 		ip,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener,
 		caller,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler,
@@ -88,11 +99,11 @@ func TestPeer_Close(t *testing.T) {
 		false,
 		0,
 		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, netwrk)
 

@@ -85,7 +85,7 @@ func TestTimeout(t *testing.T) {
 	}
 
 	handler := router.Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
@@ -97,6 +97,8 @@ func TestTimeout(t *testing.T) {
 		prometheus.NewRegistry(),
 		&router.Delay{},
 	)
+	assert.NoError(t, err)
+
 	go handler.Dispatch()
 
 	chainRouter.AddChain(&handler)
@@ -159,7 +161,7 @@ func TestReliableMessages(t *testing.T) {
 	}
 
 	handler := router.Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
@@ -171,6 +173,8 @@ func TestReliableMessages(t *testing.T) {
 		prometheus.NewRegistry(),
 		&router.Delay{},
 	)
+	assert.NoError(t, err)
+
 	go handler.Dispatch()
 
 	chainRouter.AddChain(&handler)
@@ -242,7 +246,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 	}
 
 	handler := router.Handler{}
-	handler.Initialize(
+	err = handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
@@ -254,6 +258,8 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		prometheus.NewRegistry(),
 		&router.Delay{},
 	)
+	assert.NoError(t, err)
+
 	go handler.Dispatch()
 
 	chainRouter.AddChain(&handler)

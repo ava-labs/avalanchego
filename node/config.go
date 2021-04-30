@@ -50,7 +50,6 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
-	EnableP2PTLS          bool
 	EnableStaking         bool
 	StakingKeyFile        string
 	StakingCertFile       string
@@ -85,6 +84,7 @@ type Config struct {
 	HTTPSCertFile       string
 	APIRequireAuthToken bool
 	APIAuthPassword     string
+	APIAllowedOrigins   []string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
@@ -92,6 +92,7 @@ type Config struct {
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
+	IndexAPIEnabled    bool
 
 	// Logging configuration
 	LoggingConfig logging.Config
@@ -136,6 +137,8 @@ type Config struct {
 
 	// Coreth
 	CorethConfig string
+
+	IndexAllowIncomplete bool
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
