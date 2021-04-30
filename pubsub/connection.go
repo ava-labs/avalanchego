@@ -14,8 +14,6 @@ import (
 
 // Connection is a representation of the websocket connection.
 type Connection struct {
-	id int32
-
 	s *Server
 
 	// The websocket connection.
@@ -58,7 +56,7 @@ func (c *Connection) Send(msg interface{}) bool {
 func (c *Connection) readPump() {
 	defer func() {
 		c.deactivate()
-		c.s.removeConnection(c.id)
+		c.s.removeConnection(c)
 
 		// close is called by both the writePump and the readPump so one of them
 		// will always error
@@ -95,7 +93,7 @@ func (c *Connection) writePump() {
 	defer func() {
 		c.deactivate()
 		ticker.Stop()
-		c.s.removeConnection(c.id)
+		c.s.removeConnection(c)
 
 		// close is called by both the writePump and the readPump so one of them
 		// will always error
@@ -145,7 +143,7 @@ func (c *Connection) readMessage() error {
 		if cmdMsg.Unsubscribe {
 			c.s.subscribe(c, cmdMsg.EventType)
 		} else {
-			c.s.unsubscribe(c.id, cmdMsg.EventType)
+			c.s.unsubscribe(c, cmdMsg.EventType)
 		}
 		return nil
 	case CommandFilters:
