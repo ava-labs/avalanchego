@@ -25,12 +25,29 @@ func (m Builder) Version(networkID, nodeID uint32, myTime uint64, ip utils.IPDes
 	})
 }
 
+// SignedVersion message
+func (m Builder) SignedVersion(networkID, nodeID uint32, myTime uint64, ip utils.IPDesc, myVersion string, myVersionTime uint64, sig []byte) (Msg, error) {
+	return m.Pack(SignedVersion, map[Field]interface{}{
+		NetworkID:   networkID,
+		NodeID:      nodeID,
+		MyTime:      myTime,
+		IP:          ip,
+		VersionStr:  myVersion,
+		VersionTime: myVersionTime,
+		SigBytes:    sig,
+	})
+}
+
 // GetPeerList message
 func (m Builder) GetPeerList() (Msg, error) { return m.Pack(GetPeerList, nil) }
 
 // PeerList message
-func (m Builder) PeerList(ipDescs []utils.IPDesc) (Msg, error) {
-	return m.Pack(PeerList, map[Field]interface{}{Peers: ipDescs})
+func (m Builder) PeerList(peers []utils.IPDesc) (Msg, error) {
+	return m.Pack(PeerList, map[Field]interface{}{Peers: peers})
+}
+
+func (m Builder) SignedPeerList(peers []utils.IPCertDesc) (Msg, error) {
+	return m.Pack(SignedPeerList, map[Field]interface{}{SignedPeers: peers})
 }
 
 // Ping message
