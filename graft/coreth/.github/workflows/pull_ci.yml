@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         go: ['1.15']
-        os: [macos-10.15, ubuntu-18.04, ubuntu-20.04, windows-latest]
+        os: [macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-latest]
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v1
