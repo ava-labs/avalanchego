@@ -267,7 +267,6 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 			statedb.SetState(addr, key, value)
 		}
 		if account.MCBalance != nil {
-			//statedb.ForceEnableMultiCoin(addr)
 			for coinID, value := range account.MCBalance {
 				statedb.AddBalanceMultiCoin(addr, coinID, value)
 			}

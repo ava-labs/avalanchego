@@ -226,7 +226,6 @@ type BlockChain struct {
 	badBlocks      *lru.Cache              // Bad block cache
 	shouldPreserve func(*types.Block) bool // Function used to determine whether should preserve the given block.
 	// terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
-	writeLegacyJournal bool // Testing flag used to flush the snapshot journal in legacy format.
 
 	lastAccepted *types.Block // Prevents reorgs past this height
 
@@ -1041,15 +1040,8 @@ func (bc *BlockChain) Stop() {
 	var snapBase common.Hash
 	if bc.snaps != nil {
 		var err error
-		if bc.writeLegacyJournal {
-			// FIXME
-			// if snapBase, err = bc.snaps.LegacyJournal(bc.CurrentBlock().Root()); err != nil {
-			// 	log.Error("Failed to journal state snapshot", "err", err)
-			// }
-		} else {
-			if snapBase, err = bc.snaps.Journal(bc.CurrentBlock().Root()); err != nil {
-				log.Error("Failed to journal state snapshot", "err", err)
-			}
+		if snapBase, err = bc.snaps.Journal(bc.CurrentBlock().Root()); err != nil {
+			log.Error("Failed to journal state snapshot", "err", err)
 		}
 	}
 	// Ensure the state of a recent block is also stored to disk before exiting.
@@ -2558,8 +2550,6 @@ func (bc *BlockChain) addBadBlock(block *types.Block) {
 }
 
 // reportBlock logs a bad block error.
-// HIGH PRIORITY TODO, should we remove bad blocks entirely and make additional changes to remove
-// use of BadBlocks.. I'm afraid we could ban a block unintentionally
 func (bc *BlockChain) reportBlock(block *types.Block, receipts types.Receipts, err error) {
 	bc.addBadBlock(block)
 
