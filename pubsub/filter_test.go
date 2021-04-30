@@ -33,7 +33,7 @@ func hex2Short(v string) (ids.ShortID, error) {
 	return idsid, nil
 }
 
-func TestCommandMessage_TransposeAddress(t *testing.T) {
+func TestCommandMessage_ParseAddresses(t *testing.T) {
 	hrp := constants.GetHRP(5)
 	cmdMsg := &CommandMessage{}
 	cmdMsg.addressIds = make([][]byte, 0, 1)
@@ -43,7 +43,7 @@ func TestCommandMessage_TransposeAddress(t *testing.T) {
 		t.Fatalf("address transpose failed")
 	}
 	cmdMsg.Addresses = append(cmdMsg.Addresses, "Z-"+b32addr)
-	cmdMsg.TransposeAddress()
+	cmdMsg.ParseAddresses()
 	if !bytes.Equal(cmdMsg.addressIds[0], idsid1[:]) {
 		t.Fatalf("address transpose failed")
 	}

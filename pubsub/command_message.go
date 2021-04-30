@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
@@ -34,7 +33,7 @@ func NewCommandMessage(r io.Reader) (*CommandMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	c.TransposeAddress()
+	c.ParseAddresses()
 	return &c, nil
 }
 
@@ -51,7 +50,7 @@ func (c *CommandMessage) FilterOrDefault() {
 }
 
 // TransposeAddress converts any b32 address to their byte equiv ids.ShortID.
-func (c *CommandMessage) TransposeAddress() {
+func (c *CommandMessage) ParseAddresses() {
 	if c.addressIds == nil {
 		c.addressIds = make([][]byte, 0, len(c.Addresses))
 	}
@@ -66,34 +65,4 @@ func (c *CommandMessage) TransposeAddress() {
 
 func (c *CommandMessage) Load(r io.Reader) error {
 	return json.NewDecoder(r).Decode(c)
-}
-
-func (c *CommandMessage) ParseQuery(q map[string][]string) {
-	if len(q) == 0 {
-		return
-	}
-	if c.addressIds == nil {
-		c.addressIds = make([][]byte, 0, 10)
-	}
-	for valuesk, valuesv := range q {
-		switch valuesk {
-		case ParamAddress:
-			for _, value := range valuesv {
-				sid, err := addressToID(value)
-				if err != nil {
-					continue
-				}
-				c.addressIds = append(c.addressIds, sid[:])
-			}
-		default:
-		}
-	}
-}
-
-func addressToID(address string) (ids.ShortID, error) {
-	addressBytes, err := formatting.Decode(formatting.Hex, address)
-	if err != nil {
-		return ids.ShortEmpty, err
-	}
-	return ids.ToShortID(addressBytes)
 }
