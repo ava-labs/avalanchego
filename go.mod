@@ -18,6 +18,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-plugin v1.3.0
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/holiman/bloomfilter/v2 v2.0.3
 	github.com/holiman/uint256 v1.1.1
 	github.com/mattn/go-colorable v0.1.7
 	github.com/mattn/go-isatty v0.0.12
