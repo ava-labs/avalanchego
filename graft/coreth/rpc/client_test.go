@@ -496,7 +496,7 @@ func TestClientNotificationStorm(t *testing.T) {
 	doTest := func(count int, wantError bool) {
 		client := DialInProc(server)
 		defer client.Close()
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 		defer cancel()
 
 		// Subscribe on the server. It will start sending many notifications
@@ -538,7 +538,7 @@ func TestClientNotificationStorm(t *testing.T) {
 	}
 
 	doTest(8000, false)
-	doTest(24000, true)
+	doTest(100000, true)
 }
 
 func TestClientSetHeader(t *testing.T) {
