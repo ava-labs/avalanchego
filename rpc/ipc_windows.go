@@ -32,8 +32,6 @@ import (
 	"context"
 	"net"
 	"time"
-
-	"gopkg.in/natefinch/npipe.v2"
 )
 
 // This is used if the dialing context has no deadline. It is much smaller than the
