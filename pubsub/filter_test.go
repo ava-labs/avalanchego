@@ -79,10 +79,6 @@ func TestFilterParam(t *testing.T) {
 	fp := NewFilterParam()
 	fp.filter = mockFilter
 
-	if !fp.HasFilter() {
-		t.Fatalf("has filter failed")
-	}
-
 	idsv := ids.GenerateTestShortID()
 	fp.address[idsv] = struct{}{}
 	if !fp.CheckAddress(idsv[:]) {
@@ -90,8 +86,8 @@ func TestFilterParam(t *testing.T) {
 	}
 	delete(fp.address, idsv)
 
-	mockFilter.Add([]byte("hello"))
-	if !fp.CheckAddress([]byte("hello")) {
+	mockFilter.Add(idsv[:])
+	if !fp.CheckAddress(idsv[:]) {
 		t.Fatalf("check address failed")
 	}
 	if fp.CheckAddress([]byte("bye")) {
@@ -101,18 +97,8 @@ func TestFilterParam(t *testing.T) {
 
 func TestNewBloom(t *testing.T) {
 	cm := &NewBloom{}
-	if cm.IsNewFilter() {
+	if cm.IsParamsValid() {
 		t.Fatalf("new filter check failed")
-	}
-	cm.FilterOrDefault()
-	if cm.FilterMax != DefaultFilterMax && cm.FilterError != DefaultFilterError {
-		t.Fatalf("default filter check failed")
-	}
-	cm.FilterMax = 1
-	cm.FilterError = .1
-	cm.FilterOrDefault()
-	if cm.FilterMax != 1 && cm.FilterError != .1 {
-		t.Fatalf("default filter check failed")
 	}
 }
 

@@ -9,10 +9,10 @@ import (
 
 // NewBloom command for a new bloom filter
 type NewBloom struct {
-	// FilterMax size of bloom filter
-	FilterMax uint64 `json:"filterMax"`
-	// FilterError expected error rate of filter
-	FilterError float64 `json:"filterError"`
+	// MaxElements size of bloom filter
+	MaxElements uint64 `json:"maxElements"`
+	// CollisionProb expected error rate of filter
+	CollisionProb float64 `json:"collisionProb"`
 }
 
 // NewSet command for a new map set
@@ -46,16 +46,8 @@ func (c *Command) String() string {
 	return "unknown"
 }
 
-func (c *NewBloom) IsNewFilter() bool {
-	return c.FilterMax > 0 && c.FilterError > 0
-}
-
-func (c *NewBloom) FilterOrDefault() {
-	if c.IsNewFilter() {
-		return
-	}
-	c.FilterMax = DefaultFilterMax
-	c.FilterError = DefaultFilterError
+func (c *NewBloom) IsParamsValid() bool {
+	return c.MaxElements > 0 && c.CollisionProb > 0
 }
 
 // ParseAddresses converts the bech32 addresses to their byte equiv ids.ShortID.

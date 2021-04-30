@@ -59,12 +59,6 @@ func (f *FilterParam) CheckAddress(addr2check []byte) bool {
 	return ok
 }
 
-func (f *FilterParam) HasFilter() bool {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	return f.filter != nil || len(f.address) > 0
-}
-
 func (f *FilterParam) AddAddresses(bl ...[]byte) error {
 	for _, b := range bl {
 		addr, err := ids.ToShortID(b)

@@ -18,6 +18,7 @@ import (
 var (
 	ErrFilterNotInitialized = fmt.Errorf("filter not initialized")
 	ErrAddressLimit         = fmt.Errorf("address limit exceeded")
+	ErrInvalidFilterParam   = fmt.Errorf("invalid filter params")
 )
 
 type FilterInterface interface {
@@ -157,6 +158,9 @@ func (c *connection) readMessage() error {
 
 	switch {
 	case cmd.NewBloom != nil:
+		if !cmd.NewBloom.IsParamsValid() {
+			return ErrInvalidFilterParam
+		}
 		c.fp.address = nil
 		err = c.handleNewBloom(cmd.NewBloom)
 		if err != nil {
@@ -193,8 +197,7 @@ func (c *connection) readMessage() error {
 
 func (c *connection) handleNewBloom(cmdMsg *NewBloom) error {
 	// no filter exists..  Or they provided filter params
-	cmdMsg.FilterOrDefault()
-	bfilter, err := bloom.New(cmdMsg.FilterMax, cmdMsg.FilterError, MaxBytes)
+	bfilter, err := bloom.New(cmdMsg.MaxElements, cmdMsg.CollisionProb, MaxBytes)
 	if err != nil {
 		return err
 	}

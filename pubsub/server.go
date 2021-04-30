@@ -40,14 +40,6 @@ const (
 
 	// MaxAddresses the max number of addresses allowed
 	MaxAddresses = 10000
-
-	CommandFilters   = "filters"
-	CommandAddresses = "addresses"
-
-	ParamAddress = "address"
-
-	DefaultFilterMax   = 1000
-	DefaultFilterError = .1
 )
 
 type errorMsg struct {
