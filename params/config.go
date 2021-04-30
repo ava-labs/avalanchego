@@ -117,7 +117,9 @@ type ChainConfig struct {
 
 	// Avalanche Network Upgrades
 	ApricotPhase1BlockTimestamp *big.Int `json:"apricotPhase1BlockTimestamp,omitempty"` // Apricot Phase 1 Block Timestamp (nil = no fork, 0 = already activated)
-	ApricotPhase2BlockTimestamp *big.Int `json:"apricotPhase2BlockTimestamp,omitempty"` // Apricot Phase 2 Block Timestamp (nil = no fork, 0 = already activated)
+	// Apricot Phase 2 Block Timestamp (nil = no fork, 0 = already activated)
+	// Apricot Phase 2 includes a modified version of the Berlin Hard Fork from Ethereum
+	ApricotPhase2BlockTimestamp *big.Int `json:"apricotPhase2BlockTimestamp,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
