@@ -4,10 +4,8 @@
 package pubsub
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"io"
-	"strings"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -81,22 +79,10 @@ func (c *CommandMessage) ParseQuery(q map[string][]string) {
 		switch valuesk {
 		case ParamAddress:
 			for _, value := range valuesv {
-				// 0x or 0X followed by enough bytes for a ids.ShortID
-				if (strings.HasPrefix(value, "0x") || strings.HasPrefix(value, "0X")) &&
-					len(value) == (len(ids.ShortEmpty)+1)*2 {
-					sid, err := AddressToID(value[2:])
-					if err == nil {
-						c.AddressIds = append(c.AddressIds, sid[:])
-						continue
-					}
-				}
-				//  enough bytes for a ids.ShortID
-				if len(value) == len(ids.ShortEmpty)*2 {
-					sid, err := AddressToID(value)
-					if err == nil {
-						c.AddressIds = append(c.AddressIds, sid[:])
-						continue
-					}
+				sid, err := addressToID(value)
+				if err == nil {
+					c.AddressIds = append(c.AddressIds, sid[:])
+					continue
 				}
 				c.AddressIds = append(c.AddressIds, []byte(value))
 			}
@@ -105,10 +91,10 @@ func (c *CommandMessage) ParseQuery(q map[string][]string) {
 	}
 }
 
-func AddressToID(address string) (ids.ShortID, error) {
-	addrBytes, err := hex.DecodeString(address)
+func addressToID(address string) (ids.ShortID, error) {
+	addressBytes, err := formatting.Decode(formatting.Hex, address)
 	if err != nil {
 		return ids.ShortEmpty, err
 	}
-	return ByteToID(addrBytes), nil
+	return ids.ToShortID(addressBytes)
 }
