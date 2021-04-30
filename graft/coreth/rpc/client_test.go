@@ -164,8 +164,22 @@ func TestClientNotify(t *testing.T) {
 }
 
 // func TestClientCancelInproc(t *testing.T) { testClientCancel("inproc", t) }
-// func TestClientCancelWebsocket(t *testing.T) { testClientCancel("ws", t) }
-// func TestClientCancelHTTP(t *testing.T)      { testClientCancel("http", t) }
+func TestClientCancelWebsocket(t *testing.T) { testClientCancel("ws", t) }
+func TestClientCancelHTTP(t *testing.T)      { testClientCancel("http", t) }
+
+// func TestClientCancelIPC(t *testing.T)       { testClientCancel("ipc", t) }
+
+// This test checks that requests made through CallContext can be canceled by canceling
+// the context.
+func testClientCancel(transport string, t *testing.T) {
+	// These tests take a lot of time, run them all at once.
+	// You probably want to run with -parallel 1 or comment out
+	// the call to t.Parallel if you enable the logging.
+	t.Parallel()
+
+	server := newTestServer()
+	defer server.Stop()
+}
 
 // func TestClientCancelIPC(t *testing.T)       { testClientCancel("ipc", t) }
 
