@@ -72,11 +72,6 @@ func (s *PublicEthereumAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) 
 	return (*hexutil.Big)(price), err
 }
 
-// // ProtocolVersion returns the current Ethereum protocol version this node supports
-// func (s *PublicEthereumAPI) ProtocolVersion() hexutil.Uint {
-// 	return hexutil.Uint(s.b.ProtocolVersion())
-// }
-
 // Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not
 // yet received the latest block headers from its pears. In case it is synchronizing:
 // - startingBlock: block number this node started to synchronise from
@@ -569,7 +564,7 @@ func (s *PublicBlockChainAPI) GetBalance(ctx context.Context, address common.Add
 	return (*hexutil.Big)(state.GetBalance(address)), state.Error()
 }
 
-// GetAssetBalance returns the amount of wei for the given address in the state of the
+// GetAssetBalance returns the amount of [assetID] for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber, rpc.PendingBlockNumber, and
 // rpc.AcceptedBlockNumber meta block numbers are also allowed.
 func (s *PublicBlockChainAPI) GetAssetBalance(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash, assetID ids.ID) (*hexutil.Big, error) {
@@ -1760,7 +1755,8 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 		return common.Hash{}, err
 	}
 	// Print a log with full tx details for manual investigations and interventions
-	signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number(), big.NewInt(time.Now().Unix()))
+	currentBlock := b.CurrentBlock()
+	signer := types.MakeSigner(b.ChainConfig(), currentBlock.Number(), new(big.Int).SetUint64(currentBlock.Time()))
 	from, err := types.Sender(signer, tx)
 	if err != nil {
 		return common.Hash{}, err
@@ -1994,46 +1990,6 @@ func (api *PublicDebugAPI) GetBlockRlp(ctx context.Context, number uint64) (stri
 	}
 	return fmt.Sprintf("%x", encoded), nil
 }
-
-// Original code:
-// // TestSignCliqueBlock fetches the given block number, and attempts to sign it as a clique header with the
-// // given address, returning the address of the recovered signature
-// //
-// // This is a temporary method to debug the externalsigner integration,
-// // TODO: Remove this method when the integration is mature
-// func (api *PublicDebugAPI) TestSignCliqueBlock(ctx context.Context, address common.Address, number uint64) (common.Address, error) {
-// 	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
-// 	if block == nil {
-// 		return common.Address{}, fmt.Errorf("block #%d not found", number)
-// 	}
-// 	header := block.Header()
-// 	header.Extra = make([]byte, 32+65)
-// 	encoded := clique.CliqueRLP(header)
-//
-// 	// Look up the wallet containing the requested signer
-// 	account := accounts.Account{Address: address}
-// 	wallet, err := api.b.AccountManager().Find(account)
-// 	if err != nil {
-// 		return common.Address{}, err
-// 	}
-//
-// 	signature, err := wallet.SignData(account, accounts.MimetypeClique, encoded)
-// 	if err != nil {
-// 		return common.Address{}, err
-// 	}
-// 	sealHash := clique.SealHash(header).Bytes()
-// 	log.Info("test signing of clique block",
-// 		"Sealhash", fmt.Sprintf("%x", sealHash),
-// 		"signature", fmt.Sprintf("%x", signature))
-// 	pubkey, err := crypto.Ecrecover(sealHash, signature)
-// 	if err != nil {
-// 		return common.Address{}, err
-// 	}
-// 	var signer common.Address
-// 	copy(signer[:], crypto.Keccak256(pubkey[1:])[12:])
-//
-// 	return signer, nil
-// }
 
 // PrintBlock retrieves a block and returns its pretty printed form.
 func (api *PublicDebugAPI) PrintBlock(ctx context.Context, number uint64) (string, error) {
