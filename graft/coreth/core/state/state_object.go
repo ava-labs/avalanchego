@@ -76,6 +76,9 @@ func (s Storage) Copy() Storage {
 type stateObject struct {
 	address  common.Address
 	addrHash common.Hash // hash of ethereum address of the account
+	// dataLock protects the [data] field to prevent a race condition
+	// in the transaction pool tests. TODO remove after re-implementing
+	// tx pool to be synchronous.
 	dataLock sync.RWMutex
 	data     Account
 	db       *StateDB
