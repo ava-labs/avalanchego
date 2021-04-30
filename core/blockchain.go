@@ -394,53 +394,43 @@ func NewBlockChain(
 		}
 	}
 
-	// Wait until we're done repairing canonical chain indexes.
-	bc.indexLock.Add(1)
-	bc.wg.Add(1)
-	go func() {
-		bc.indexLock.Wait()
-		log.Debug("indexing unlocked")
+	// Original code:
+	// // Load any existing snapshot, regenerating it if loading failed
+	// if bc.cacheConfig.SnapshotLimit > 0 {
+	// 	// If the chain was rewound past the snapshot persistent layer (causing
+	// 	// a recovery block number to be persisted to disk), check if we're still
+	// 	// in recovery mode and in that case, don't invalidate the snapshot on a
+	// 	// head mismatch.
+	// 	var recover bool
 
-		// Always disable snapshots (experimental feature)
-		//
-		// Original code:
-		// Load any existing snapshot, regenerating it if loading failed
-		// if bc.cacheConfig.SnapshotLimit > 0 {
-		// 	// If the chain was rewound past the snapshot persistent layer (causing
-		// 	// a recovery block number to be persisted to disk), check if we're still
-		// 	// in recovery mode and in that case, don't invalidate the snapshot on a
-		// 	// head mismatch.
-		// 	var recover bool
+	// 	head := bc.CurrentBlock()
+	// 	if layer := rawdb.ReadSnapshotRecoveryNumber(bc.db); layer != nil && *layer > head.NumberU64() {
+	// 		log.Warn("Enabling snapshot recovery", "chainhead", head.NumberU64(), "diskbase", *layer)
+	// 		recover = true
+	// 	}
+	// 	bc.snaps, _ = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Root(), !bc.cacheConfig.SnapshotWait, true, recover)
+	// }
+	// Take ownership of this particular state
+	// go bc.update()
+	if txLookupLimit != nil {
+		bc.txLookupLimit = *txLookupLimit
 
-		// 	head := bc.CurrentBlock()
-		// 	if layer := rawdb.ReadSnapshotRecoveryNumber(bc.db); layer != nil && *layer > head.NumberU64() {
-		// 		log.Warn("Enabling snapshot recovery", "chainhead", head.NumberU64(), "diskbase", *layer)
-		// 		recover = true
-		// 	}
-		// 	bc.snaps, _ = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Root(), !bc.cacheConfig.SnapshotWait, true, recover)
-		// }
-
-		// Take ownership of this particular state
-		// go bc.update()
-		if txLookupLimit != nil {
-			bc.txLookupLimit = *txLookupLimit
-
-			bc.wg.Add(1)
-			go bc.maintainTxIndex()
+		bc.wg.Add(1)
+		go bc.maintainTxIndex()
+	}
+	// If periodic cache journal is required, spin it up.
+	if bc.cacheConfig.TrieCleanRejournal > 0 {
+		if bc.cacheConfig.TrieCleanRejournal < time.Minute {
+			log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
+			bc.cacheConfig.TrieCleanRejournal = time.Minute
 		}
-		// If periodic cache journal is required, spin it up.
-		if bc.cacheConfig.TrieCleanRejournal > 0 {
-			if bc.cacheConfig.TrieCleanRejournal < time.Minute {
-				log.Warn("Sanitizing invalid trie cache journal time", "provided", bc.cacheConfig.TrieCleanRejournal, "updated", time.Minute)
-				bc.cacheConfig.TrieCleanRejournal = time.Minute
-			}
-			triedb := bc.stateCache.TrieDB()
-			go func() {
-				defer bc.wg.Done()
-				triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
-			}()
-		}
-	}()
+		triedb := bc.stateCache.TrieDB()
+		bc.wg.Add(1)
+		go func() {
+			defer bc.wg.Done()
+			triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
+		}()
+	}
 
 	return bc, nil
 }
@@ -2906,8 +2896,4 @@ func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscr
 // SubscribeAcceptedTransactionEvent registers a subscription of accepted transactions
 func (bc *BlockChain) SubscribeAcceptedTransactionEvent(ch chan<- NewTxsEvent) event.Subscription {
 	return bc.scope.Track(bc.txAcceptedFeed.Subscribe(ch))
-}
-
-func (bc *BlockChain) UnlockIndexing() {
-	bc.indexLock.Done()
 }

@@ -96,7 +96,6 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan *types.Block, chan core.NewT
 	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 
-	chain.BlockChain().UnlockIndexing()
 	txSubmitCh := chain.GetTxSubmitCh()
 	return chain, newBlockChan, newTxPoolHeadChan, txSubmitCh
 }

@@ -101,7 +101,6 @@ func newTestChain(name string, config *eth.Config,
 
 func (tc *testChain) start() {
 	tc.chain.Start()
-	tc.chain.BlockChain().UnlockIndexing()
 }
 
 func (tc *testChain) stop() {
