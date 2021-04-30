@@ -1196,6 +1196,9 @@ func (vm *VM) currentRules() params.Rules {
 // follows the ruleset defined by [rules]
 func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
 	switch {
+	case rules.IsApricotPhase2:
+		// Note: the phase1BlockValidator is used in both apricot phase1 and phase2
+		return phase1BlockValidator
 	case rules.IsApricotPhase1:
 		return phase1BlockValidator
 	default:
