@@ -86,14 +86,14 @@ func wsHandshakeValidator(allowedOrigins []string) func(*http.Request) bool {
 			allowAllOrigins = true
 		}
 		if origin != "" {
-			origins.Add(strings.ToLower(origin))
+			origins.Add(origin)
 		}
 	}
 	// allow localhost if no allowedOrigins are specified.
 	if len(origins.ToSlice()) == 0 {
 		origins.Add("http://localhost")
 		if hostname, err := os.Hostname(); err == nil {
-			origins.Add("http://" + strings.ToLower(hostname))
+			origins.Add("http://" + hostname)
 		}
 	}
 	log.Debug(fmt.Sprintf("Allowed origin(s) for WS RPC interface %v", origins.ToSlice()))
