@@ -140,6 +140,10 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 	return nil
 }
 
+func NewKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
+	return newKeyFromECDSA(privateKeyECDSA)
+}
+
 func newKeyFromECDSA(privateKeyECDSA *ecdsa.PrivateKey) *Key {
 	id, err := uuid.NewRandom()
 	if err != nil {
@@ -174,7 +178,7 @@ func NewKeyForDirectICAP(rand io.Reader) *Key {
 	return key
 }
 
-func newKey(rand io.Reader) (*Key, error) {
+func NewKey(rand io.Reader) (*Key, error) {
 	privateKeyECDSA, err := ecdsa.GenerateKey(crypto.S256(), rand)
 	if err != nil {
 		return nil, err
@@ -183,7 +187,7 @@ func newKey(rand io.Reader) (*Key, error) {
 }
 
 func storeNewKey(ks keyStore, rand io.Reader, auth string) (*Key, accounts.Account, error) {
-	key, err := newKey(rand)
+	key, err := NewKey(rand)
 	if err != nil {
 		return nil, accounts.Account{}, err
 	}
