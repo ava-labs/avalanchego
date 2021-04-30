@@ -4,6 +4,7 @@
 package node
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -64,14 +65,16 @@ import (
 // Networking constants
 const (
 	TCP = "tcp"
+
+	beaconConnectionTimeout = 1 * time.Minute
 )
 
 var (
-	genesisHashKey                  = []byte("genesisID")
-	indexerDBPrefix                 = []byte{0x00}
-	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	genesisHashKey  = []byte("genesisID")
+	indexerDBPrefix = []byte{0x00}
 
-	beaconConnectionTimeout = 1 * time.Minute
+	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	errInvalidTLSKey                = errors.New("invalid TLS key")
 )
 
 // Node is an instance of an Avalanche node.
@@ -161,31 +164,25 @@ func (n *Node) initNetworking() error {
 	dialer := network.NewDialer(TCP)
 
 	var serverUpgrader, clientUpgrader network.Upgrader
-	if n.Config.EnableP2PTLS {
-		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
-		if err != nil {
-			return err
-		}
-
-		// #nosec G402
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			ClientAuth:   tls.RequireAnyClientCert,
-			// We do not use the TLS CA functionality to authenticate a
-			// hostname. We only require an authenticated channel based on the
-			// peer's public key. Therefore, we can safely skip CA verification.
-			//
-			// During our security audit by Quantstamp, this was investigated
-			// and confirmed to be safe and correct.
-			InsecureSkipVerify: true,
-		}
-
-		serverUpgrader = network.NewTLSServerUpgrader(tlsConfig)
-		clientUpgrader = network.NewTLSClientUpgrader(tlsConfig)
-	} else {
-		serverUpgrader = network.NewIPUpgrader()
-		clientUpgrader = network.NewIPUpgrader()
+	cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
+	if err != nil {
+		return err
 	}
+
+	tlsKey, ok := cert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return errInvalidTLSKey
+	}
+
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return err
+	}
+
+	tlsConfig := network.TLSConfig(cert)
+
+	serverUpgrader = network.NewTLSServerUpgrader(tlsConfig)
+	clientUpgrader = network.NewTLSClientUpgrader(tlsConfig)
 
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
@@ -271,6 +268,7 @@ func (n *Node) initNetworking() error {
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
+		tlsKey,
 	)
 
 	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
@@ -366,7 +364,7 @@ func (n *Node) Dispatch() error {
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP.IP()) {
-			n.Net.Track(peer.IP)
+			n.Net.Track(peer.IP, peer.ID)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
 		}
@@ -425,12 +423,6 @@ func (n *Node) initDatabase(dbManager manager.Manager) error {
 // Otherwise, it is a hash of the TLS certificate that this node
 // uses for P2P communication
 func (n *Node) initNodeID() error {
-	if !n.Config.EnableP2PTLS {
-		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
-		n.Log.Info("Set the node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
-		return nil
-	}
-
 	stakeCert, err := ioutil.ReadFile(n.Config.StakingCertFile)
 	if err != nil {
 		return fmt.Errorf("problem reading staking certificate: %w", err)

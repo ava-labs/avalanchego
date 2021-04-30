@@ -51,7 +51,6 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
-	EnableP2PTLS          bool
 	EnableStaking         bool
 	StakingKeyFile        string
 	StakingCertFile       string

@@ -44,7 +44,7 @@ func (s *weightedUniform) Initialize(weights []uint64) error {
 	}
 	size := int(totalWeight)
 
-	if size > len(s.indices) {
+	if size > cap(s.indices) {
 		s.indices = make([]int, size)
 	} else {
 		s.indices = s.indices[:size]

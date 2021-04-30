@@ -4,6 +4,7 @@
 package network
 
 import (
+	"crypto"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -11,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	cryptorand "crypto/rand"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -75,10 +78,10 @@ type Network interface {
 	// or the network is closed. Returns a non-nil error.
 	Dispatch() error
 
-	// Attempt to connect to this IP. Thread safety must be managed internally
+	// Attempt to connect to this node ID at IP. Thread safety must be managed internally
 	// to the network. The network will never stop attempting to connect to this
 	// IP.
-	Track(ip utils.IPDesc)
+	Track(ip utils.IPDesc, nodeID ids.ShortID)
 
 	// Returns the description of the specified [nodeIDs] this network is currently
 	// connected to externally or all nodes this network is connected to if [nodeIDs]
@@ -201,6 +204,28 @@ type network struct {
 	maskedValidators ids.ShortSet
 
 	benchlistManager benchlist.Manager
+
+	// this node's TLS key
+	tlsKey crypto.Signer
+
+	// [lastTimestampLock] should be held when touching  [lastSignedVersionIP],
+	// [lastSignedVersionTimestamp], and [lastSignedVersionSignature]
+	timeForIPLock sync.Mutex
+	// The IP for ourself that we included in the most recent SignedVersion
+	// message we sent.
+	lastSignedVersionIP utils.IPDesc
+	// The timestamp we included in the most recent SignedVersion message we
+	// sent.
+	lastSignedVersionTimestamp uint64
+	// The signature we included in the most recent SignedVersion message we
+	// sent.
+	lastSignedVersionSignature []byte
+
+	// Node ID --> Latest IP/timestamp of this node from a SignedVersion or SignedPeerList message
+	// The values in this map all have [signature] == nil
+	// A peer is removed from this map when [connected] is called with the peer as the argument
+	// TODO also remove from this map when the peer leaves the validator set
+	latestPeerIP map[ids.ShortID]signedPeerIP
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -230,6 +255,7 @@ func NewDefaultNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
+	tlsKey crypto.Signer,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -273,6 +299,7 @@ func NewDefaultNetwork(
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
+		tlsKey,
 	)
 }
 
@@ -319,6 +346,7 @@ func NewNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
+	tlsKey crypto.Signer,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -372,6 +400,8 @@ func NewNetwork(
 		restarter:                          restarter,
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
+		tlsKey:                             tlsKey,
+		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
 	}
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
@@ -957,11 +987,11 @@ func (n *network) close() {
 
 // Track implements the Network interface
 // assumes the stateLock is not held.
-func (n *network) Track(ip utils.IPDesc) {
+func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
 
-	n.track(ip)
+	n.track(ip, nodeID)
 }
 
 func (n *network) IP() utils.IPDesc {
@@ -1006,7 +1036,8 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 }
 
 // assumes the stateLock is held.
-func (n *network) track(ip utils.IPDesc) {
+// Try to connect to [nodeID] at [ip].
+func (n *network) track(ip utils.IPDesc, nodeID ids.ShortID) {
 	if n.closed.GetValue() {
 		return
 	}
@@ -1024,9 +1055,16 @@ func (n *network) track(ip utils.IPDesc) {
 	if _, ok := n.myIPs[str]; ok {
 		return
 	}
+	// If we saw an IP gossiped for this node ID
+	// with a later timestamp, don't track this old IP
+	if latestIP, ok := n.latestPeerIP[nodeID]; ok {
+		if !latestIP.ip.Equal(ip) {
+			return
+		}
+	}
 	n.disconnectedIPs[str] = struct{}{}
 
-	go n.connectTo(ip)
+	go n.connectTo(ip, nodeID)
 }
 
 // assumes the stateLock is not held. Only returns after the network is closed.
@@ -1127,7 +1165,7 @@ func (n *network) gossip() {
 
 // assumes the stateLock is not held. Only returns if the ip is connected to or
 // the network is closed
-func (n *network) connectTo(ip utils.IPDesc) {
+func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	str := ip.String()
 	n.stateLock.RLock()
 	delay := n.retryDelay[str]
@@ -1153,11 +1191,20 @@ func (n *network) connectTo(ip utils.IPDesc) {
 		_, isDisconnected := n.disconnectedIPs[str]
 		_, isConnected := n.connectedIPs[str]
 		_, isMyself := n.myIPs[str]
+		// If we saw an IP gossiped for this node ID
+		// with a later timestamp, don't track this old IP
+		isLatestIP := true
+		if latestIP, ok := n.latestPeerIP[nodeID]; ok {
+			isLatestIP = latestIP.ip.Equal(ip)
+		}
 		closed := n.closed
 
-		if !isDisconnected || isConnected || isMyself || closed.GetValue() {
+		if !isDisconnected || !isLatestIP || isConnected || isMyself || closed.GetValue() {
 			// If the IP was discovered by the peer connecting to us, we don't
 			// need to attempt to connect anymore
+
+			// If we've seen an IP gossiped for this peer with a later timestamp,
+			// don't try to connect to the old IP anymore
 
 			// If the IP was discovered to be our IP address, we don't need to
 			// attempt to connect anymore
@@ -1209,7 +1256,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 		return err
 	}
 
-	id, conn, err := upgrader.Upgrade(p.conn)
+	id, conn, cert, err := upgrader.Upgrade(p.conn)
 	if err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to upgrade connection with %s", err)
@@ -1222,6 +1269,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 		return err
 	}
 
+	p.cert = cert
 	p.sender = make(chan []byte, n.sendQueueSize)
 	p.id = id
 	p.conn = conn
@@ -1283,23 +1331,46 @@ func (n *network) tryAddPeer(p *peer) error {
 	return nil
 }
 
-// assumes the stateLock is not held. Returns the ips of connections that have
-// valid IPs that are marked as validators.
-func (n *network) validatorIPs() []utils.IPDesc {
+// assumes the stateLock is not held. Returns:
+// 1) The IPs, certs and signatures of all validators we're connected
+//    to that provided a SignedVersion when we connected to them.
+// 2) The IPs of all validators we're connected to (superset of the above.)
+// TODO: Remove the 2nd return value when we replace Version / PeerList with
+//       their signed counterparts
+func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	ips := make([]utils.IPDesc, 0, len(n.peers))
+	unsignedPeers := make([]utils.IPDesc, 0, len(n.peers))
+	signedPeers := make([]utils.IPCertDesc, 0, len(n.peers))
 	for _, peer := range n.peers {
-		ip := peer.getIP()
-		if peer.connected.GetValue() && !ip.IsZero() && n.vdrs.Contains(peer.id) {
-			peerVersion := peer.versionStruct.GetValue().(version.Application)
-			if n.versionCompatibility.Unmaskable(peerVersion) == nil {
-				ips = append(ips, ip)
+		peerIP := peer.getIP()
+		switch {
+		case !peer.connected.GetValue():
+			continue
+		case peerIP.IsZero():
+			continue
+		case !n.vdrs.Contains(peer.id):
+			continue
+		}
+
+		peerVersion := peer.versionStruct.GetValue().(version.Application)
+		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
+			continue
+		}
+		if signedIP, ok := peer.sigAndTime.GetValue().(signedPeerIP); ok {
+			if signedIP.ip.Equal(peerIP) {
+				signedPeers = append(signedPeers, utils.IPCertDesc{
+					IPDesc:    peerIP,
+					Signature: signedIP.signature,
+					Cert:      peer.cert,
+					Time:      signedIP.time,
+				})
 			}
 		}
+		unsignedPeers = append(unsignedPeers, peerIP)
 	}
-	return ips
+	return signedPeers, unsignedPeers
 }
 
 // should only be called after the peer is marked as connected. Should not be
@@ -1331,6 +1402,9 @@ func (n *network) connected(p *peer) {
 			n.maskedValidators.Remove(p.id)
 		}
 	}
+
+	// TODO also delete an entry from this map when they leave the validator set
+	delete(n.latestPeerIP, p.id)
 
 	ip := p.getIP()
 	n.log.Debug("connected to %s at %s", p.id, ip)
@@ -1372,7 +1446,7 @@ func (n *network) disconnected(p *peer) {
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		n.track(ip)
+		n.track(ip, p.id)
 	}
 
 	if p.compatible.GetValue() {
@@ -1532,4 +1606,27 @@ func (n *network) HealthCheck() (interface{}, error) {
 		return details, errNetworkLayerUnhealthy
 	}
 	return details, nil
+}
+
+// assume [n.stateLock] is held. Returns the timestamp and signature that should
+// be sent in a SignedVersion message. We only update these values when our IP
+// has changed.
+func (n *network) getSignedVersion(ip utils.IPDesc) (uint64, []byte, error) {
+	n.timeForIPLock.Lock()
+	defer n.timeForIPLock.Unlock()
+
+	if !ip.Equal(n.lastSignedVersionIP) {
+		newTimestamp := n.clock.Unix()
+		msgHash := ipAndTimeHash(ip, newTimestamp)
+		sig, err := n.tlsKey.Sign(cryptorand.Reader, msgHash, crypto.SHA256)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		n.lastSignedVersionIP = ip
+		n.lastSignedVersionTimestamp = newTimestamp
+		n.lastSignedVersionSignature = sig
+	}
+
+	return n.lastSignedVersionTimestamp, n.lastSignedVersionSignature, nil
 }
