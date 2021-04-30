@@ -396,7 +396,6 @@ func NewBlockChain(
 
 	// Wait until we're done repairing canonical chain indexes.
 	bc.indexLock.Add(1)
-	bc.wg.Add(1)
 	go func() {
 		bc.indexLock.Wait()
 		log.Debug("indexing unlocked")
@@ -436,6 +435,7 @@ func NewBlockChain(
 			}
 			triedb := bc.stateCache.TrieDB()
 			go func() {
+				bc.wg.Add(1)
 				defer bc.wg.Done()
 				triedb.SaveCachePeriodically(bc.cacheConfig.TrieCleanJournal, bc.cacheConfig.TrieCleanRejournal, bc.quit)
 			}()
