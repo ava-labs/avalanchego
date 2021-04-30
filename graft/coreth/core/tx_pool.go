@@ -231,7 +231,6 @@ func (config *TxPoolConfig) sanitize() TxPoolConfig {
 type TxPool struct {
 	config      TxPoolConfig
 	chainconfig *params.ChainConfig
-	chainLock   sync.RWMutex
 	chain       blockChain
 	gasPrice    *big.Int
 	txFeed      event.Feed
@@ -340,9 +339,7 @@ func (pool *TxPool) loop() {
 		journal = time.NewTicker(pool.config.Rejournal)
 		// Track the previous head headers for transaction reorgs
 	)
-	pool.chainLock.RLock()
 	head := pool.chain.CurrentBlock()
-	pool.chainLock.RUnlock()
 	defer report.Stop()
 	defer evict.Stop()
 	defer journal.Stop()
