@@ -59,14 +59,14 @@ type Server struct {
 	// conns a list of all our connections
 	conns map[*connection]struct{}
 	// subscribedConnections the connections that have activated subscriptions
-	subscribedConnections *connContainer
+	subscribedConnections *connections
 }
 
 func New(networkID uint32, log logging.Logger) *Server {
 	return &Server{
 		log:                   log,
 		conns:                 make(map[*connection]struct{}),
-		subscribedConnections: newConnContainer(),
+		subscribedConnections: newConnections(),
 	}
 }
 

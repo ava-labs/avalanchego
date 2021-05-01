@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,26 +38,24 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 
 func TestFilterParamUpdateMulti(t *testing.T) {
 	fp := NewFilterParam()
-	bl := make([][]byte, 0, 10)
 
-	addr1 := byteToID(hashing.ComputeHash160([]byte("abc")))
-	addr2 := byteToID(hashing.ComputeHash160([]byte("def")))
-	addr3 := byteToID(hashing.ComputeHash160([]byte("xyz")))
+	addr1 := []byte("abc")
+	addr2 := []byte("def")
+	addr3 := []byte("xyz")
 
-	bl = append(bl, addr1[:])
-	bl = append(bl, addr2[:])
-	bl = append(bl, addr3[:])
-	_ = fp.Add(bl...)
-	if len(fp.address) != 3 {
+	if err := fp.Add(addr1, addr2, addr3); err != nil {
+		t.Fatal(err)
+	}
+	if len(fp.set) != 3 {
 		t.Fatalf("update multi failed")
 	}
-	if _, exists := fp.address[addr1]; !exists {
+	if _, exists := fp.set[string(addr1)]; !exists {
 		t.Fatalf("update multi failed")
 	}
-	if _, exists := fp.address[addr2]; !exists {
+	if _, exists := fp.set[string(addr2)]; !exists {
 		t.Fatalf("update multi failed")
 	}
-	if _, exists := fp.address[addr3]; !exists {
+	if _, exists := fp.set[string(addr3)]; !exists {
 		t.Fatalf("update multi failed")
 	}
 }
@@ -67,17 +64,19 @@ func TestFilterParam(t *testing.T) {
 	mapFilter := bloom.NewMap()
 
 	fp := NewFilterParam()
-	fp.filter = mapFilter
+	fp.SetFilter(mapFilter)
 
-	idsv := ids.GenerateTestShortID()
-	fp.address[idsv] = struct{}{}
-	if !fp.Check(idsv[:]) {
+	addr := ids.GenerateTestShortID()
+	if err := fp.Add(addr[:]); err != nil {
+		t.Fatal(err)
+	}
+	if !fp.Check(addr[:]) {
 		t.Fatalf("check address failed")
 	}
-	delete(fp.address, idsv)
+	delete(fp.set, string(addr[:]))
 
-	mapFilter.Add(idsv[:])
-	if !fp.Check(idsv[:]) {
+	mapFilter.Add(addr[:])
+	if !fp.Check(addr[:]) {
 		t.Fatalf("check address failed")
 	}
 	if fp.Check([]byte("bye")) {
@@ -90,12 +89,4 @@ func TestNewBloom(t *testing.T) {
 	if cm.IsParamsValid() {
 		t.Fatalf("new filter check failed")
 	}
-}
-
-func byteToID(address []byte) ids.ShortID {
-	sid, err := ids.ToShortID(address)
-	if err != nil {
-		return ids.ShortEmpty
-	}
-	return sid
 }
