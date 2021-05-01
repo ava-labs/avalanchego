@@ -348,7 +348,7 @@ func (snaptest *setHeadSnapshotTest) test(t *testing.T) {
 	chain, blocks := snaptest.prepare(t)
 
 	// Rewind the chain if setHead operation is required.
-	chain.SetHead(snaptest.setHead)
+	chain.setHead(snaptest.setHead)
 	chain.Stop()
 
 	newchain, err := NewBlockChain(snaptest.db, nil, protoParams, snaptest.engine, vm.Config{}, nil, nil, true)
