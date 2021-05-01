@@ -535,7 +535,7 @@ func (bc *BlockChain) loadLastState(initGenesis bool) error {
 // // was fast synced or full synced and in which state, the method will try to
 // // delete minimal data from disk whilst retaining chain consistency.
 // func (bc *BlockChain) SetHead(head uint64) error {
-// 	_, err := bc.setHeadBeyondRoot(head, common.Hash{})
+// 	_, err := bc.SetHeadBeyondRoot(head, common.Hash{})
 // 	return err
 // }
 //
@@ -677,9 +677,9 @@ func (bc *BlockChain) loadLastState(initGenesis bool) error {
 // 	bc.receiptsCache.Purge()
 // 	bc.blockCache.Purge()
 // 	bc.txLookupCache.Purge()
-// 	// bc.futureBlocks.Purge()
+// 	bc.futureBlocks.Purge()
 //
-// 	return rootNumber, bc.loadLastState(false)
+// 	return rootNumber, bc.loadLastState()
 // }
 //
 // // FastSyncCommitHead sets the current head block to the one defined by the hash
