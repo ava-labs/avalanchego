@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -24,11 +25,11 @@ func TestAddAddressesParseAddresses(t *testing.T) {
 	addrStr, err := formatting.FormatAddress(chainAlias, hrp, addrID[:])
 	assert.NoError(err)
 
-	msg := &AddAddresses{
+	msg := &AddAddresses{JSONAddresses: api.JSONAddresses{
 		Addresses: []string{
 			addrStr,
 		},
-	}
+	}}
 
 	err = msg.parseAddresses()
 	assert.NoError(err)

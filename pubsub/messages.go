@@ -4,6 +4,7 @@
 package pubsub
 
 import (
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 )
@@ -21,8 +22,7 @@ type NewSet struct{}
 
 // AddAddresses command to add addresses
 type AddAddresses struct {
-	// Addresses bech 32 addresses toa add
-	Addresses []string `json:"addresses"`
+	api.JSONAddresses
 
 	// addressIds array of addresses, kept as a [][]byte for use in the bloom filter
 	addressIds [][]byte
