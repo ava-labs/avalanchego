@@ -85,7 +85,7 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 	}
 	// Initialize a fresh chain
 	var (
-		genesis = new(Genesis).MustCommit(db)
+		genesis = (&Genesis{Config: protoParams}).MustCommit(db)
 		engine  = dummy.NewDummyEngine(new(dummy.ConsensusCallbacks))
 		gendb   = rawdb.NewMemoryDatabase()
 
