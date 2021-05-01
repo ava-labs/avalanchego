@@ -159,7 +159,7 @@ func (tx *UniqueTx) Accept() error {
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
-	tx.vm.pubsub.Publish(txID, NewPubSubParser(tx.Tx))
+	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak

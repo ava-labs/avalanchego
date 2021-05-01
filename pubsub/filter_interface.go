@@ -3,6 +3,6 @@
 
 package pubsub
 
-type Parser interface {
-	Filter(connections []FilterInterface) ([]FilterInterface, interface{})
+type Filterer interface {
+	Filter(connections []FilterInterface) ([]bool, interface{})
 }

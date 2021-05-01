@@ -86,11 +86,13 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.addConnection(conn)
 }
 
-// Publish ...
-func (s *Server) Publish(msg interface{}, parser Parser) {
-	pubconns, msg := parser.Filter(s.subscribedConnections.Conns())
-	for _, c := range pubconns {
-		s.publishMsg(c.(*connection), msg)
+func (s *Server) Publish(msg interface{}, parser Filterer) {
+	conns := s.subscribedConnections.Conns()
+	toNotify, msg := parser.Filter(conns)
+	for i, shouldNotify := range toNotify {
+		if shouldNotify {
+			s.publishMsg(conns[i].(*connection), msg)
+		}
 	}
 }
 

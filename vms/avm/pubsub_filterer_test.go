@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
@@ -32,6 +33,8 @@ func (f *MockFilterInterface) CheckAddress(addr ids.ShortID) bool {
 }
 
 func TestFilter(t *testing.T) {
+	assert := assert.New(t)
+
 	idsid, _ := hex2Short("0000000000000000000000000000000000000001")
 
 	tx := Tx{}
@@ -39,11 +42,9 @@ func TestFilter(t *testing.T) {
 	to1 := &avax.TransferableOutput{Out: &secp256k1fx.TransferOutput{OutputOwners: secp256k1fx.OutputOwners{Addrs: []ids.ShortID{idsid}}}}
 	baseTx.Outs = append(baseTx.Outs, to1)
 	tx.UnsignedTx = &baseTx
-	parser := NewPubSubParser(&tx)
+	parser := NewPubSubFilterer(&tx)
 	fp := pubsub.NewFilterParam()
 	fp.AddAddresses([][]byte{idsid[:]}...)
 	fr, _ := parser.Filter([]pubsub.FilterInterface{&MockFilterInterface{ids: idsid}})
-	if len(fr) != 1 {
-		t.Fatalf("filter failed")
-	}
+	assert.Equal([]bool{true}, fr)
 }
