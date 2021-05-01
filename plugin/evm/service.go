@@ -422,7 +422,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem initializing transaction: %w", err)
 	}
 
-	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, service.vm.useApricotPhase1()); err != nil {
+	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, service.vm.currentRules()); err != nil {
 		return err
 	}
 
