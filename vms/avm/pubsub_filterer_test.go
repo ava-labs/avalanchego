@@ -1,7 +1,7 @@
 package avm
 
 import (
-	"encoding/hex"
+	"bytes"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/pubsub"
@@ -12,39 +12,36 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func hex2Short(v string) (ids.ShortID, error) {
-	bytes, err := hex.DecodeString(v)
-	if err != nil {
-		return ids.ShortEmpty, err
-	}
-	idsid, err := ids.ToShortID(bytes)
-	if err != nil {
-		return ids.ShortEmpty, err
-	}
-	return idsid, nil
+type mockFilter struct {
+	addr []byte
 }
 
-type MockFilterInterface struct {
-	ids ids.ShortID
-}
-
-func (f *MockFilterInterface) CheckAddress(addr ids.ShortID) bool {
-	return addr == f.ids
+func (f *mockFilter) Check(addr []byte) bool {
+	return bytes.Equal(addr, f.addr)
 }
 
 func TestFilter(t *testing.T) {
 	assert := assert.New(t)
 
-	idsid, _ := hex2Short("0000000000000000000000000000000000000001")
+	addrID := ids.ShortID{1}
+	tx := Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		Outs: []*avax.TransferableOutput{
+			{
+				Out: &secp256k1fx.TransferOutput{
+					OutputOwners: secp256k1fx.OutputOwners{
+						Addrs: []ids.ShortID{addrID},
+					},
+				},
+			},
+		},
+	}}}
+	addrBytes := addrID[:]
 
-	tx := Tx{}
-	baseTx := BaseTx{}
-	to1 := &avax.TransferableOutput{Out: &secp256k1fx.TransferOutput{OutputOwners: secp256k1fx.OutputOwners{Addrs: []ids.ShortID{idsid}}}}
-	baseTx.Outs = append(baseTx.Outs, to1)
-	tx.UnsignedTx = &baseTx
-	parser := NewPubSubFilterer(&tx)
 	fp := pubsub.NewFilterParam()
-	_ = fp.AddAddresses([][]byte{idsid[:]}...)
-	fr, _ := parser.Filter([]pubsub.FilterInterface{&MockFilterInterface{ids: idsid}})
+	err := fp.Add(addrBytes)
+	assert.NoError(err)
+
+	parser := NewPubSubFilterer(&tx)
+	fr, _ := parser.Filter([]pubsub.Filter{&mockFilter{addr: addrBytes}})
 	assert.Equal([]bool{true}, fr)
 }

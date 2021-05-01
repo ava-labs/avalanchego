@@ -9,8 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/gorilla/websocket"
 )
@@ -21,8 +19,8 @@ var (
 	ErrInvalidFilterParam   = fmt.Errorf("invalid filter params")
 )
 
-type FilterInterface interface {
-	CheckAddress(addr ids.ShortID) bool
+type Filter interface {
+	Check(addr []byte) bool
 }
 
 // connection is a representation of the websocket connection.
@@ -40,8 +38,8 @@ type connection struct {
 	active uint32
 }
 
-func (c *connection) CheckAddress(addr ids.ShortID) bool {
-	return c.fp.CheckAddressID(addr)
+func (c *connection) Check(addr []byte) bool {
+	return c.fp.Check(addr)
 }
 
 func (c *connection) isActive() bool {
@@ -171,12 +169,12 @@ func (c *connection) readMessage() error {
 	case cmd.NewSet != nil:
 		c.fp.NewAddresses()
 	case cmd.AddAddresses != nil:
-		err = cmd.AddAddresses.ParseAddresses()
+		err = cmd.AddAddresses.parseAddresses()
 		if err != nil {
 			c.Send(&errorMsg{Error: fmt.Sprintf("address parse failed %s", err)})
 			return err
 		}
-		err = c.fp.AddAddresses(cmd.AddAddresses.addressIds...)
+		err = c.fp.Add(cmd.AddAddresses.addressIds...)
 		if err != nil {
 			c.Send(&errorMsg{Error: fmt.Sprintf("address append failed %s", err)})
 			return err

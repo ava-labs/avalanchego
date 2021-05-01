@@ -4,5 +4,5 @@
 package pubsub
 
 type Filterer interface {
-	Filter(connections []FilterInterface) ([]bool, interface{})
+	Filter(connections []Filter) ([]bool, interface{})
 }

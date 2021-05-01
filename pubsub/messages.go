@@ -23,6 +23,7 @@ type NewSet struct {
 type AddAddresses struct {
 	// Addresses bech 32 addresses toa add
 	Addresses []string `json:"addresses"`
+
 	// addressIds array of addresses, kept as a [][]byte for use in the bloom filter
 	addressIds [][]byte
 }
@@ -42,25 +43,27 @@ func (c *Command) String() string {
 		return "newSet"
 	case c.AddAddresses != nil:
 		return "addAddresses"
+	default:
+		return "unknown"
 	}
-	return "unknown"
 }
 
 func (c *NewBloom) IsParamsValid() bool {
-	return c.MaxElements > 0 && c.CollisionProb > 0
+	return c.MaxElements > 0 &&
+		0 < c.CollisionProb && c.CollisionProb <= 1
 }
 
-// ParseAddresses converts the bech32 addresses to their byte equiv ids.ShortID.
-func (c *AddAddresses) ParseAddresses() error {
+// parseAddresses converts the bech32 addresses to their byte format.
+func (c *AddAddresses) parseAddresses() error {
 	if c.addressIds == nil {
-		c.addressIds = make([][]byte, 0, len(c.Addresses))
+		c.addressIds = make([][]byte, len(c.Addresses))
 	}
-	for _, astr := range c.Addresses {
-		_, _, abytes, err := formatting.ParseAddress(astr)
+	for i, addrStr := range c.Addresses {
+		_, _, addrBytes, err := formatting.ParseAddress(addrStr)
 		if err != nil {
 			return err
 		}
-		c.addressIds = append(c.addressIds, abytes)
+		c.addressIds[i] = addrBytes
 	}
 	return nil
 }

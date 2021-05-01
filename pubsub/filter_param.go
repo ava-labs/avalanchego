@@ -37,17 +37,7 @@ func (f *FilterParam) SetFilter(filter bloom.Filter) bloom.Filter {
 	return f.filter
 }
 
-func (f *FilterParam) CheckAddressID(addr2check ids.ShortID) bool {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	if f.filter != nil && f.filter.Check(addr2check[:]) {
-		return true
-	}
-	_, ok := f.address[addr2check]
-	return ok
-}
-
-func (f *FilterParam) CheckAddress(addr2check []byte) bool {
+func (f *FilterParam) Check(addr2check []byte) bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 	if f.filter != nil && f.filter.Check(addr2check) {
@@ -61,7 +51,7 @@ func (f *FilterParam) CheckAddress(addr2check []byte) bool {
 	return ok
 }
 
-func (f *FilterParam) AddAddresses(bl ...[]byte) error {
+func (f *FilterParam) Add(bl ...[]byte) error {
 	filter := f.Filter()
 	if filter != nil {
 		filter.Add(bl...)
