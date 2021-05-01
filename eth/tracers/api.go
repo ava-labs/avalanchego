@@ -438,26 +438,27 @@ func (api *API) TraceBlock(ctx context.Context, blob []byte, config *TraceConfig
 	return api.traceBlock(ctx, block, config)
 }
 
-// TraceBlockFromFile returns the structured logs created during the execution of
-// EVM and returns them as a JSON object.
-func (api *API) TraceBlockFromFile(ctx context.Context, file string, config *TraceConfig) ([]*txTraceResult, error) {
-	blob, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, fmt.Errorf("could not read file: %v", err)
-	}
-	return api.TraceBlock(ctx, blob, config)
-}
+// Original code:
+// // TraceBlockFromFile returns the structured logs created during the execution of
+// // EVM and returns them as a JSON object.
+// func (api *API) TraceBlockFromFile(ctx context.Context, file string, config *TraceConfig) ([]*txTraceResult, error) {
+// 	blob, err := ioutil.ReadFile(file)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("could not read file: %v", err)
+// 	}
+// 	return api.TraceBlock(ctx, blob, config)
+// }
 
-// StandardTraceBlockToFile dumps the structured logs created during the
-// execution of EVM to the local file system and returns a list of files
-// to the caller.
-func (api *API) StandardTraceBlockToFile(ctx context.Context, hash common.Hash, config *StdTraceConfig) ([]string, error) {
-	block, err := api.blockByHash(ctx, hash)
-	if err != nil {
-		return nil, err
-	}
-	return api.standardTraceBlockToFile(ctx, block, config)
-}
+// // StandardTraceBlockToFile dumps the structured logs created during the
+// // execution of EVM to the local file system and returns a list of files
+// // to the caller.
+// func (api *API) StandardTraceBlockToFile(ctx context.Context, hash common.Hash, config *StdTraceConfig) ([]string, error) {
+// 	block, err := api.blockByHash(ctx, hash)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return api.standardTraceBlockToFile(ctx, block, config)
+// }
 
 // traceBlock configures a new tracer according to the provided configuration, and
 // executes all the transactions contained within. The return value will be one item
