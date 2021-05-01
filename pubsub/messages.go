@@ -16,8 +16,7 @@ type NewBloom struct {
 }
 
 // NewSet command for a new map set
-type NewSet struct {
-}
+type NewSet struct{}
 
 // AddAddresses command to add addresses
 type AddAddresses struct {

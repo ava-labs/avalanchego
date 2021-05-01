@@ -54,8 +54,8 @@ var upgrader = websocket.Upgrader{
 
 // Server maintains the set of active clients and sends messages to the clients.
 type Server struct {
-	lock sync.RWMutex
 	log  logging.Logger
+	lock sync.RWMutex
 	// conns a list of all our connections
 	conns map[*connection]struct{}
 	// subscribedConnections the connections that have activated subscriptions
