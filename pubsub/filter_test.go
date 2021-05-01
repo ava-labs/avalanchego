@@ -6,11 +6,12 @@ package pubsub
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestAddAddressesParseAddresses(t *testing.T) {

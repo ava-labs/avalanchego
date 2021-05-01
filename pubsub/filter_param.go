@@ -21,9 +21,10 @@ func NewFilterParam() *FilterParam {
 	}
 }
 
-func (f *FilterParam) NewAddresses() {
+func (f *FilterParam) NewSet() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
 	f.set = make(map[string]struct{})
 	f.filter = nil
 }
@@ -31,12 +32,14 @@ func (f *FilterParam) NewAddresses() {
 func (f *FilterParam) Filter() bloom.Filter {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+
 	return f.filter
 }
 
 func (f *FilterParam) SetFilter(filter bloom.Filter) bloom.Filter {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
 	f.filter = filter
 	f.set = nil
 	return f.filter
@@ -45,6 +48,7 @@ func (f *FilterParam) SetFilter(filter bloom.Filter) bloom.Filter {
 func (f *FilterParam) Check(addr []byte) bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+
 	if f.filter != nil && f.filter.Check(addr) {
 		return true
 	}
@@ -61,6 +65,7 @@ func (f *FilterParam) Add(bl ...[]byte) error {
 
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
 	if f.set == nil {
 		return ErrFilterNotInitialized
 	}
@@ -77,5 +82,6 @@ func (f *FilterParam) Add(bl ...[]byte) error {
 func (f *FilterParam) Len() int {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+
 	return len(f.set)
 }

@@ -10,8 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/gorilla/websocket"
+
+	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
 var (
@@ -187,7 +188,7 @@ func (c *connection) handleNewBloom(cmd *NewBloom) error {
 }
 
 func (c *connection) handleNewSet(cmd *NewSet) error {
-	c.fp.NewAddresses()
+	c.fp.NewSet()
 	return nil
 }
 

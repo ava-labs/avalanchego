@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-
 	"github.com/gorilla/websocket"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -90,22 +90,21 @@ func (s *Server) Publish(msg interface{}, parser Filterer) {
 	conns := s.subscribedConnections.Conns()
 	toNotify, msg := parser.Filter(conns)
 	for i, shouldNotify := range toNotify {
-		if shouldNotify {
-			s.publishMsg(conns[i].(*connection), msg)
+		if !shouldNotify {
+			continue
 		}
-	}
-}
-
-func (s *Server) publishMsg(conn *connection, msg interface{}) {
-	if !conn.Send(msg) {
-		s.log.Verbo("dropping message to subscribed connection due to too many pending messages")
+		conn := conns[i].(*connection)
+		if !conn.Send(msg) {
+			s.log.Verbo("dropping message to subscribed connection due to too many pending messages")
+		}
 	}
 }
 
 func (s *Server) addConnection(conn *connection) {
 	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.conns[conn] = struct{}{}
-	s.lock.Unlock()
 
 	go conn.writePump()
 	go conn.readPump()
@@ -113,7 +112,9 @@ func (s *Server) addConnection(conn *connection) {
 
 func (s *Server) removeConnection(conn *connection) {
 	s.subscribedConnections.Remove(conn)
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
 	delete(s.conns, conn)
 }
