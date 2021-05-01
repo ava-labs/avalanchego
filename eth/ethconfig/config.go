@@ -68,7 +68,7 @@ func NewDefaultConfig() Config {
 		TrieCleanCacheRejournal: 60 * time.Minute,
 		TrieDirtyCache:          256,
 		TrieTimeout:             60 * time.Minute,
-		// SnapshotCache:           102,
+		SnapshotCache:           102,
 		Miner: miner.Config{
 			GasFloor:              8000000,
 			GasCeil:               8000000,
@@ -151,7 +151,8 @@ type Config struct {
 	TrieCleanCacheRejournal time.Duration `toml:",omitempty"` // Time interval to regenerate the journal for clean cache
 	TrieDirtyCache          int
 	TrieTimeout             time.Duration
-	// SnapshotCache           int
+	SnapshotCache           int
+	Preimages               bool
 
 	// Mining options
 	Miner miner.Config
