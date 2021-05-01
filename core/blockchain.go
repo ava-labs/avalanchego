@@ -2107,8 +2107,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 
 	for ; block != nil && err == nil || err == ErrKnownBlock; block, err = it.next() {
 		// Original code:
-		// We remove this early termination case because it could cause
-		// a block to be incorrectly marked as accepted.
+		// This early termination case has been removed because it could cause
+		// a block to be incorrectly marked as passing verification after Stop()
+		// has been called. If the chain is terminating, this should not be an
+		// issue, but is still an unnecessary optimization for coreth.
 		// // If the chain is terminating, stop processing blocks
 		// if bc.insertStopped() {
 		// 	log.Debug("Abort during block processing")
