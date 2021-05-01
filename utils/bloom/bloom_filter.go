@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"sync"
 
-	streakKnife "github.com/holiman/bloomfilter/v2"
 	"github.com/spaolacci/murmur3"
+
+	streakKnife "github.com/holiman/bloomfilter/v2"
 )
 
 var (
@@ -15,16 +16,17 @@ var (
 type Filter interface {
 	// Add adds to filter, assumed thread safe
 	Add(...[]byte)
+
 	// Check checks filter, assumed thread safe
 	Check([]byte) bool
 }
 
 func New(maxN uint64, p float64, maxBytes uint64) (Filter, error) {
-	neededBytes := BytesSteakKnifeFilter(maxN, p)
+	neededBytes := bytesSteakKnifeFilter(maxN, p)
 	if neededBytes > maxBytes {
 		return nil, ErrMaxBytes
 	}
-	return NewSteakKnifeFilter(maxN, p)
+	return newSteakKnifeFilter(maxN, p)
 }
 
 type steakKnifeFilter struct {
@@ -32,7 +34,7 @@ type steakKnifeFilter struct {
 	bfilter *streakKnife.Filter
 }
 
-func BytesSteakKnifeFilter(maxN uint64, p float64) uint64 {
+func bytesSteakKnifeFilter(maxN uint64, p float64) uint64 {
 	m := streakKnife.OptimalM(maxN, p)
 	k := streakKnife.OptimalK(m, maxN)
 
@@ -46,7 +48,7 @@ func BytesSteakKnifeFilter(maxN uint64, p float64) uint64 {
 	return msize * 8
 }
 
-func NewSteakKnifeFilter(maxN uint64, p float64) (Filter, error) {
+func newSteakKnifeFilter(maxN uint64, p float64) (Filter, error) {
 	m := streakKnife.OptimalM(maxN, p)
 	k := streakKnife.OptimalK(m, maxN)
 
@@ -78,12 +80,4 @@ func (f *steakKnifeFilter) Check(b []byte) bool {
 		return false
 	}
 	return f.bfilter.Contains(h)
-}
-
-type SteakKnifeJSON struct {
-	K    uint64   `json:"k"`
-	N    uint64   `json:"n"`
-	M    uint64   `json:"m"`
-	Keys []uint64 `json:"keys"`
-	Bits []uint64 `json:"bits"`
 }

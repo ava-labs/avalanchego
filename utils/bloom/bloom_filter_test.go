@@ -2,20 +2,26 @@ package bloom
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-const MaxBytes = 1 * 1024 * 1024
-
-func TestSteakKnifeFilterSize(t *testing.T) {
-	var maxN uint64 = 10000
-	var p = 0.1
-	f, _ := NewSteakKnifeFilter(maxN, p)
+func TestNew(t *testing.T) {
+	var (
+		assert          = assert.New(t)
+		maxN     uint64 = 10000
+		p               = 0.1
+		maxBytes uint64 = 1024 * 1024 // 1 MiB
+	)
+	f, err := New(maxN, p, maxBytes)
+	assert.NoError(err)
+	assert.NotNil(f)
 
 	f.Add([]byte("hello"))
-	if !f.Check([]byte("hello")) {
-		t.Fatal("check failed")
-	}
-	if f.Check([]byte("bye")) {
-		t.Fatal("check failed")
-	}
+
+	checked := f.Check([]byte("hello"))
+	assert.True(checked, "should have contained the key")
+
+	checked = f.Check([]byte("bye"))
+	assert.False(checked, "shouldn't have contained the key")
 }

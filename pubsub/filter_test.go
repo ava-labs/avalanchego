@@ -74,10 +74,10 @@ func TestFilterParamUpdateMulti(t *testing.T) {
 }
 
 func TestFilterParam(t *testing.T) {
-	mockFilter := bloom.NewMock()
+	mapFilter := bloom.NewMap()
 
 	fp := NewFilterParam()
-	fp.filter = mockFilter
+	fp.filter = mapFilter
 
 	idsv := ids.GenerateTestShortID()
 	fp.address[idsv] = struct{}{}
@@ -86,7 +86,7 @@ func TestFilterParam(t *testing.T) {
 	}
 	delete(fp.address, idsv)
 
-	mockFilter.Add(idsv[:])
+	mapFilter.Add(idsv[:])
 	if !fp.CheckAddress(idsv[:]) {
 		t.Fatalf("check address failed")
 	}
