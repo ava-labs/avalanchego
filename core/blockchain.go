@@ -212,10 +212,15 @@ type BlockChain struct {
 	blockCache    *lru.Cache     // Cache for the most recent entire blocks
 	txLookupCache *lru.Cache     // Cache for the most recent transaction lookup data.
 
-	quit          chan struct{}  // blockchain quit channel
-	wg            sync.WaitGroup // chain processing wait group for shutting down
-	running       int32          // 0 if chain is running, 1 when stopped
-	procInterrupt int32          // interrupt signaler for block processing
+	quit    chan struct{}  // blockchain quit channel
+	wg      sync.WaitGroup // chain processing wait group for shutting down
+	running int32          // 0 if chain is running, 1 when stopped
+
+	// procInterrupt has been removed to prevent an early termination case
+	// in block insertion from returning a nil error when an invalid block
+	// is attempted to be inserted.
+	// Original code:
+	// procInterrupt int32          // interrupt signaler for block processing
 
 	engine     consensus.Engine
 	validator  Validator  // Block and state validator interface
@@ -277,7 +282,7 @@ func NewBlockChain(
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
 	var err error
-	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.insertStopped)
+	bc.hc, err = NewHeaderChain(db, chainConfig, engine)
 	if err != nil {
 		return nil, err
 	}
@@ -1200,7 +1205,7 @@ func (bc *BlockChain) Stop() {
 	// Unsubscribe all subscriptions registered from blockchain
 	bc.scope.Close()
 	close(bc.quit)
-	bc.StopInsert()
+	// bc.StopInsert()
 	bc.wg.Wait()
 
 	// Ensure that the entirety of the state snapshot is journalled to disk.
@@ -1251,17 +1256,18 @@ func (bc *BlockChain) Stop() {
 	log.Info("Blockchain stopped")
 }
 
-// StopInsert interrupts all insertion methods, causing them to return
-// errInsertionInterrupted as soon as possible. Insertion is permanently disabled after
-// calling this method.
-func (bc *BlockChain) StopInsert() {
-	atomic.StoreInt32(&bc.procInterrupt, 1)
-}
+// Original code:
+// // StopInsert interrupts all insertion methods, causing them to return
+// // errInsertionInterrupted as soon as possible. Insertion is permanently disabled after
+// // calling this method.
+// func (bc *BlockChain) StopInsert() {
+// 	atomic.StoreInt32(&bc.procInterrupt, 1)
+// }
 
-// insertStopped returns true after StopInsert has been called.
-func (bc *BlockChain) insertStopped() bool {
-	return atomic.LoadInt32(&bc.procInterrupt) == 1
-}
+// // insertStopped returns true after StopInsert has been called.
+// func (bc *BlockChain) insertStopped() bool {
+// 	return atomic.LoadInt32(&bc.procInterrupt) == 1
+// }
 
 // WriteStatus status of write
 type WriteStatus byte
@@ -1960,10 +1966,10 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 // is imported, but then new canon-head is added before the actual sidechain
 // completes, then the historic state could be pruned again
 func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, error) {
-	// If the chain is terminating, don't even bother starting up
-	if atomic.LoadInt32(&bc.procInterrupt) == 1 {
-		return 0, nil
-	}
+	// // If the chain is terminating, don't even bother starting up
+	// if atomic.LoadInt32(&bc.procInterrupt) == 1 {
+	// 	return 0, nil
+	// }
 	// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
 	senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig, chain[0].Number(), new(big.Int).SetUint64(chain[0].Time())), chain)
 
@@ -2100,11 +2106,14 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 	}()
 
 	for ; block != nil && err == nil || err == ErrKnownBlock; block, err = it.next() {
-		// If the chain is terminating, stop processing blocks
-		if bc.insertStopped() {
-			log.Debug("Abort during block processing")
-			break
-		}
+		// Original code:
+		// We remove this early termination case because it could cause
+		// a block to be incorrectly marked as accepted.
+		// // If the chain is terminating, stop processing blocks
+		// if bc.insertStopped() {
+		// 	log.Debug("Abort during block processing")
+		// 	break
+		// }
 		// If the header is a banned one, straight out abort
 		if BadHashes[block.Hash()] {
 			bc.reportBlock(block, nil, ErrBlacklistedHash)
