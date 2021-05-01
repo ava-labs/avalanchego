@@ -203,7 +203,7 @@ func New(stack *node.Node, config *Config,
 			TrieDirtyLimit:      config.TrieDirtyCache,
 			TrieDirtyDisabled:   config.NoPruning,
 			TrieTimeLimit:       config.TrieTimeout,
-			// TODO: re-enable (when 0 always disabled)
+			// TODO: Enable snapshots once stable (when 0 they are disabled)
 			// SnapshotLimit: config.SnapshotCache,
 			Preimages: config.Preimages,
 		}
