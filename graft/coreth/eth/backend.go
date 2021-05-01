@@ -134,13 +134,12 @@ func New(stack *node.Node, config *Config,
 		config.Miner.GasPrice = new(big.Int).Set(ethconfig.DefaultConfig.Miner.GasPrice)
 	}
 	if config.NoPruning && config.TrieDirtyCache > 0 {
-		// Original code:
-		// if config.SnapshotCache > 0 {
-		// 	config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
-		// 	config.SnapshotCache += config.TrieDirtyCache * 2 / 5
-		// } else {
-		// 	config.TrieCleanCache += config.TrieDirtyCache
-		// }
+		if config.SnapshotCache > 0 {
+			config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
+			config.SnapshotCache += config.TrieDirtyCache * 2 / 5
+		} else {
+			config.TrieCleanCache += config.TrieDirtyCache
+		}
 		config.TrieCleanCache += config.TrieDirtyCache
 		config.TrieDirtyCache = 0
 	}
@@ -204,10 +203,9 @@ func New(stack *node.Node, config *Config,
 			TrieDirtyLimit:      config.TrieDirtyCache,
 			TrieDirtyDisabled:   config.NoPruning,
 			TrieTimeLimit:       config.TrieTimeout,
-			// FIXME re-enable snapshots and add preimages
-			// TODO: aren't preimages enabled by default?
-			// SnapshotLimit:       config.SnapshotCache,
-			// Preimages: config.Preimages,
+			// TODO: re-enable (when 0 always disabled)
+			// SnapshotLimit: config.SnapshotCache,
+			Preimages: config.Preimages,
 		}
 	)
 	var err error
