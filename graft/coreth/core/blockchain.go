@@ -140,10 +140,10 @@ type CacheConfig struct {
 	TrieDirtyLimit      int           // Memory limit (MB) at which to start flushing dirty trie nodes to disk
 	TrieDirtyDisabled   bool          // Whether to disable trie write caching and GC altogether (archive node)
 	TrieTimeLimit       time.Duration // Time limit after which to flush the current in-memory trie to disk
-	// SnapshotLimit       int           // Memory allowance (MB) to use for caching snapshot entries in memory
-	Preimages bool // Whether to store preimage of trie key to the disk
+	SnapshotLimit       int           // Memory allowance (MB) to use for caching snapshot entries in memory
+	Preimages           bool          // Whether to store preimage of trie key to the disk
 
-	// SnapshotWait bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
+	SnapshotWait bool // Wait for snapshot construction on startup. TODO(karalabe): This is a dirty hack for testing, nuke it
 }
 
 // defaultCacheConfig are the default caching values if none are specified by the
@@ -152,8 +152,8 @@ var defaultCacheConfig = &CacheConfig{
 	TrieCleanLimit: 256,
 	TrieDirtyLimit: 256,
 	TrieTimeLimit:  5 * time.Minute,
-	// SnapshotLimit:  256,
-	// SnapshotWait:   true,
+	SnapshotLimit:  256,
+	SnapshotWait:   true,
 }
 
 // BlockChain represents the canonical chain given a database with a genesis
@@ -176,9 +176,10 @@ type BlockChain struct {
 
 	db ethdb.Database // Low level persistent database to store final content in
 
-	snaps  *snapshot.Tree // Snapshot tree for fast trie leaf access
-	triegc *prque.Prque   // Priority queue mapping block numbers to tries to gc
-	gcproc time.Duration  // Accumulates canonical block processing for trie dumping
+	snaps     *snapshot.Tree // Snapshot tree for fast trie leaf access
+	snapsLock sync.Mutex     // Lock protecting modification of snaps pointer
+	triegc    *prque.Prque   // Priority queue mapping block numbers to tries to gc
+	gcproc    time.Duration  // Accumulates canonical block processing for trie dumping
 
 	// txLookupLimit is the maximum number of blocks from head whose tx indices
 	// are reserved:
@@ -399,22 +400,27 @@ func NewBlockChain(
 		}
 	}
 
-	// Original code:
-	// // Load any existing snapshot, regenerating it if loading failed
-	// if bc.cacheConfig.SnapshotLimit > 0 {
-	// 	// If the chain was rewound past the snapshot persistent layer (causing
-	// 	// a recovery block number to be persisted to disk), check if we're still
-	// 	// in recovery mode and in that case, don't invalidate the snapshot on a
-	// 	// head mismatch.
-	// 	var recover bool
+	// Load any existing snapshot, regenerating it if loading failed
+	if bc.cacheConfig.SnapshotLimit > 0 {
+		// If the chain was rewound past the snapshot persistent layer (causing
+		// a recovery block number to be persisted to disk), check if we're still
+		// in recovery mode and in that case, don't invalidate the snapshot on a
+		// head mismatch.
+		var recover bool
 
-	// 	head := bc.CurrentBlock()
-	// 	if layer := rawdb.ReadSnapshotRecoveryNumber(bc.db); layer != nil && *layer > head.NumberU64() {
-	// 		log.Warn("Enabling snapshot recovery", "chainhead", head.NumberU64(), "diskbase", *layer)
-	// 		recover = true
-	// 	}
-	// 	bc.snaps, _ = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Root(), !bc.cacheConfig.SnapshotWait, true, recover)
-	// }
+		head := bc.CurrentBlock()
+		if layer := rawdb.ReadSnapshotRecoveryNumber(bc.db); layer != nil && *layer > head.NumberU64() {
+			log.Warn("Enabling snapshot recovery", "chainhead", head.NumberU64(), "diskbase", *layer)
+			recover = true
+		}
+		bc.snapsLock.Lock()
+		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Root(), !bc.cacheConfig.SnapshotWait, true, recover)
+		if err != nil {
+			log.Error("unable to initialize snapshots", "error", err)
+		}
+		bc.snapsLock.Unlock()
+	}
+
 	// Take ownership of this particular state
 	// go bc.update()
 	if txLookupLimit != nil {
@@ -735,6 +741,8 @@ func (bc *BlockChain) Processor() Processor {
 
 // State returns a new mutable state based on the current HEAD block.
 func (bc *BlockChain) State() (*state.StateDB, error) {
+	bc.snapsLock.Lock()
+	defer bc.snapsLock.Unlock()
 	return bc.StateAt(bc.CurrentBlock().Root())
 }
 
@@ -2170,10 +2178,14 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, er
 		if parent == nil {
 			parent = bc.GetHeader(block.ParentHash(), block.NumberU64()-1)
 		}
+		bc.snapsLock.Lock()
 		statedb, err := state.New(parent.Root, bc.stateCache, bc.snaps)
 		if err != nil {
+			bc.snapsLock.Unlock()
 			return it.index, err
 		}
+		bc.snapsLock.Unlock()
+
 		// Enable prefetching to pull in trie node paths while processing transactions
 		statedb.StartPrefetcher("chain")
 		activeState = statedb
