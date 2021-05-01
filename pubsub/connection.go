@@ -5,6 +5,7 @@ package pubsub
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -14,9 +15,10 @@ import (
 )
 
 var (
-	ErrFilterNotInitialized = fmt.Errorf("filter not initialized")
-	ErrAddressLimit         = fmt.Errorf("address limit exceeded")
-	ErrInvalidFilterParam   = fmt.Errorf("invalid filter params")
+	ErrFilterNotInitialized = errors.New("filter not initialized")
+	ErrAddressLimit         = errors.New("address limit exceeded")
+	ErrInvalidFilterParam   = errors.New("invalid bloom filter params")
+	ErrInvalidCommand       = errors.New("invalid command")
 )
 
 type Filter interface {
@@ -156,34 +158,47 @@ func (c *connection) readMessage() error {
 
 	switch {
 	case cmd.NewBloom != nil:
-		if !cmd.NewBloom.IsParamsValid() {
-			c.Send(&errorMsg{Error: "bloom filter params invalid"})
-			return ErrInvalidFilterParam
-		}
-		bfilter, err := bloom.New(cmd.NewBloom.MaxElements, cmd.NewBloom.CollisionProb, MaxBytes)
-		if err != nil {
-			c.Send(&errorMsg{Error: fmt.Sprintf("bloom filter creation failed %s", err)})
-			return err
-		}
-		c.fp.SetFilter(bfilter)
+		err = c.handleNewBloom(cmd.NewBloom)
 	case cmd.NewSet != nil:
-		c.fp.NewAddresses()
+		err = c.handleNewSet(cmd.NewSet)
 	case cmd.AddAddresses != nil:
-		err = cmd.AddAddresses.parseAddresses()
-		if err != nil {
-			c.Send(&errorMsg{Error: fmt.Sprintf("address parse failed %s", err)})
-			return err
-		}
-		err = c.fp.Add(cmd.AddAddresses.addressIds...)
-		if err != nil {
-			c.Send(&errorMsg{Error: fmt.Sprintf("address append failed %s", err)})
-			return err
-		}
-		c.s.subscribedConnections.Add(c)
+		err = c.handleAddAddresses(cmd.AddAddresses)
 	default:
-		errmsg := &errorMsg{Error: fmt.Sprintf("command '%s' invalid", cmd)}
-		c.Send(errmsg)
-		return fmt.Errorf(errmsg.Error)
+		err = ErrInvalidCommand
 	}
+	if err != nil {
+		c.Send(&errorMsg{
+			Error: err.Error(),
+		})
+	}
+	return err
+}
+
+func (c *connection) handleNewBloom(cmd *NewBloom) error {
+	if !cmd.IsParamsValid() {
+		return ErrInvalidFilterParam
+	}
+	filter, err := bloom.New(cmd.MaxElements, cmd.CollisionProb, MaxBytes)
+	if err != nil {
+		return fmt.Errorf("bloom filter creation failed %w", err)
+	}
+	c.fp.SetFilter(filter)
+	return nil
+}
+
+func (c *connection) handleNewSet(cmd *NewSet) error {
+	c.fp.NewAddresses()
+	return nil
+}
+
+func (c *connection) handleAddAddresses(cmd *AddAddresses) error {
+	if err := cmd.parseAddresses(); err != nil {
+		return fmt.Errorf("address parse failed %w", err)
+	}
+	err := c.fp.Add(cmd.addressIds...)
+	if err != nil {
+		return fmt.Errorf("address append failed %w", err)
+	}
+	c.s.subscribedConnections.Add(c)
 	return nil
 }
