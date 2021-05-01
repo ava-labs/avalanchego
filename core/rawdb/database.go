@@ -28,9 +28,9 @@ package rawdb
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
-	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -41,47 +41,54 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-// freezerdb is a database wrapper that enabled freezer data retrievals.
-type freezerdb struct {
-	ethdb.KeyValueStore
-	ethdb.AncientStore
-}
+var (
+	// errNotSupported is returned if the database doesn't support the required operation.
+	errNotSupported = errors.New("this operation is not supported")
+)
 
-// Close implements io.Closer, closing both the fast key-value store as well as
-// the slow ancient tables.
-func (frdb *freezerdb) Close() error {
-	var errs []error
-	if err := frdb.AncientStore.Close(); err != nil {
-		errs = append(errs, err)
-	}
-	if err := frdb.KeyValueStore.Close(); err != nil {
-		errs = append(errs, err)
-	}
-	if len(errs) != 0 {
-		return fmt.Errorf("%v", errs)
-	}
-	return nil
-}
+// Original code:
+// // freezerdb is a database wrapper that enabled freezer data retrievals.
+// type freezerdb struct {
+// 	ethdb.KeyValueStore
+// 	ethdb.AncientStore
+// }
+//
+// // Close implements io.Closer, closing both the fast key-value store as well as
+// // the slow ancient tables.
+// func (frdb *freezerdb) Close() error {
+// 	var errs []error
+// 	if err := frdb.AncientStore.Close(); err != nil {
+// 		errs = append(errs, err)
+// 	}
+// 	if err := frdb.KeyValueStore.Close(); err != nil {
+// 		errs = append(errs, err)
+// 	}
+// 	if len(errs) != 0 {
+// 		return fmt.Errorf("%v", errs)
+// 	}
+// 	return nil
+// }
 
-// Freeze is a helper method used for external testing to trigger and block until
-// a freeze cycle completes, without having to sleep for a minute to trigger the
-// automatic background run.
-func (frdb *freezerdb) Freeze(threshold uint64) error {
-	if frdb.AncientStore.(*freezer).readonly {
-		return errReadOnly
-	}
-	// Set the freezer threshold to a temporary value
-	defer func(old uint64) {
-		atomic.StoreUint64(&frdb.AncientStore.(*freezer).threshold, old)
-	}(atomic.LoadUint64(&frdb.AncientStore.(*freezer).threshold))
-	atomic.StoreUint64(&frdb.AncientStore.(*freezer).threshold, threshold)
-
-	// Trigger a freeze cycle and block until it's done
-	trigger := make(chan struct{}, 1)
-	frdb.AncientStore.(*freezer).trigger <- trigger
-	<-trigger
-	return nil
-}
+// Original code:
+// // Freeze is a helper method used for external testing to trigger and block until
+// // a freeze cycle completes, without having to sleep for a minute to trigger the
+// // automatic background run.
+// func (frdb *freezerdb) Freeze(threshold uint64) error {
+// 	if frdb.AncientStore.(*freezer).readonly {
+// 		return errReadOnly
+// 	}
+// 	// Set the freezer threshold to a temporary value
+// 	defer func(old uint64) {
+// 		atomic.StoreUint64(&frdb.AncientStore.(*freezer).threshold, old)
+// 	}(atomic.LoadUint64(&frdb.AncientStore.(*freezer).threshold))
+// 	atomic.StoreUint64(&frdb.AncientStore.(*freezer).threshold, threshold)
+//
+// 	// Trigger a freeze cycle and block until it's done
+// 	trigger := make(chan struct{}, 1)
+// 	frdb.AncientStore.(*freezer).trigger <- trigger
+// 	<-trigger
+// 	return nil
+// }
 
 // nofreezedb is a database wrapper that disables freezer data retrievals.
 type nofreezedb struct {
