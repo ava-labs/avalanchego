@@ -5,38 +5,43 @@ package pubsub
 
 import "sync"
 
-type connContainer struct {
+type connections struct {
 	lock      sync.RWMutex
 	conns     map[*connection]struct{}
-	connsList []FilterInterface
+	connsList []Filter
 }
 
-func newConnContainer() *connContainer {
-	return &connContainer{conns: make(map[*connection]struct{})}
+func newConnections() *connections {
+	return &connections{
+		conns: make(map[*connection]struct{}),
+	}
 }
 
-func (c *connContainer) Conns() []FilterInterface {
+func (c *connections) Conns() []Filter {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return append([]FilterInterface{}, c.connsList...)
+
+	return append([]Filter{}, c.connsList...)
 }
 
-func (c *connContainer) Remove(conn *connection) {
+func (c *connections) Remove(conn *connection) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	delete(c.conns, conn)
 	c.createConnsList()
 }
 
-func (c *connContainer) Add(conn *connection) {
+func (c *connections) Add(conn *connection) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	c.conns[conn] = struct{}{}
 	c.createConnsList()
 }
 
-func (c *connContainer) createConnsList() {
-	resp := make([]FilterInterface, 0, len(c.conns))
+func (c *connections) createConnsList() {
+	resp := make([]Filter, 0, len(c.conns))
 	for c := range c.conns {
 		resp = append(resp, c)
 	}

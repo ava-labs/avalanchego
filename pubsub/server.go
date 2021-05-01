@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-
 	"github.com/gorilla/websocket"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
@@ -54,19 +54,19 @@ var upgrader = websocket.Upgrader{
 
 // Server maintains the set of active clients and sends messages to the clients.
 type Server struct {
-	lock sync.RWMutex
 	log  logging.Logger
+	lock sync.RWMutex
 	// conns a list of all our connections
 	conns map[*connection]struct{}
 	// subscribedConnections the connections that have activated subscriptions
-	subscribedConnections *connContainer
+	subscribedConnections *connections
 }
 
 func New(networkID uint32, log logging.Logger) *Server {
 	return &Server{
 		log:                   log,
 		conns:                 make(map[*connection]struct{}),
-		subscribedConnections: newConnContainer(),
+		subscribedConnections: newConnections(),
 	}
 }
 
@@ -86,24 +86,25 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.addConnection(conn)
 }
 
-// Publish ...
-func (s *Server) Publish(msg interface{}, parser Parser) {
-	pubconns, msg := parser.Filter(s.subscribedConnections.Conns())
-	for _, c := range pubconns {
-		s.publishMsg(c.(*connection), msg)
-	}
-}
-
-func (s *Server) publishMsg(conn *connection, msg interface{}) {
-	if !conn.Send(msg) {
-		s.log.Verbo("dropping message to subscribed connection due to too many pending messages")
+func (s *Server) Publish(msg interface{}, parser Filterer) {
+	conns := s.subscribedConnections.Conns()
+	toNotify, msg := parser.Filter(conns)
+	for i, shouldNotify := range toNotify {
+		if !shouldNotify {
+			continue
+		}
+		conn := conns[i].(*connection)
+		if !conn.Send(msg) {
+			s.log.Verbo("dropping message to subscribed connection due to too many pending messages")
+		}
 	}
 }
 
 func (s *Server) addConnection(conn *connection) {
 	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	s.conns[conn] = struct{}{}
-	s.lock.Unlock()
 
 	go conn.writePump()
 	go conn.readPump()
@@ -111,7 +112,9 @@ func (s *Server) addConnection(conn *connection) {
 
 func (s *Server) removeConnection(conn *connection) {
 	s.subscribedConnections.Remove(conn)
+
 	s.lock.Lock()
 	defer s.lock.Unlock()
+
 	delete(s.conns, conn)
 }

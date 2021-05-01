@@ -6,81 +6,75 @@ package pubsub
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
 type FilterParam struct {
-	lock    sync.RWMutex
-	address map[ids.ShortID]struct{}
-	filter  bloom.Filter
+	lock   sync.RWMutex
+	set    map[string]struct{}
+	filter bloom.Filter
 }
 
-func (f *FilterParam) NewAddresses() {
+func NewFilterParam() *FilterParam {
+	return &FilterParam{
+		set: make(map[string]struct{}),
+	}
+}
+
+func (f *FilterParam) NewSet() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	f.address = make(map[ids.ShortID]struct{})
+
+	f.set = make(map[string]struct{})
 	f.filter = nil
 }
 
 func (f *FilterParam) Filter() bloom.Filter {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+
 	return f.filter
 }
 
 func (f *FilterParam) SetFilter(filter bloom.Filter) bloom.Filter {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
 	f.filter = filter
-	f.address = nil
+	f.set = nil
 	return f.filter
 }
 
-func (f *FilterParam) CheckAddressID(addr2check ids.ShortID) bool {
+func (f *FilterParam) Check(addr []byte) bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	if f.filter != nil && f.filter.Check(addr2check[:]) {
+
+	if f.filter != nil && f.filter.Check(addr) {
 		return true
 	}
-	_, ok := f.address[addr2check]
+	_, ok := f.set[string(addr)]
 	return ok
 }
 
-func (f *FilterParam) CheckAddress(addr2check []byte) bool {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
-	if f.filter != nil && f.filter.Check(addr2check) {
-		return true
-	}
-	addr, err := ids.ToShortID(addr2check)
-	if err != nil {
-		return false
-	}
-	_, ok := f.address[addr]
-	return ok
-}
-
-func (f *FilterParam) AddAddresses(bl ...[]byte) error {
+func (f *FilterParam) Add(bl ...[]byte) error {
 	filter := f.Filter()
 	if filter != nil {
 		filter.Add(bl...)
 		return nil
 	}
+
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	if f.address == nil {
+
+	if f.set == nil {
 		return ErrFilterNotInitialized
 	}
-	if len(f.address)+len(bl) > MaxAddresses {
+
+	if len(f.set)+len(bl) > MaxAddresses {
 		return ErrAddressLimit
 	}
 	for _, b := range bl {
-		addr, err := ids.ToShortID(b)
-		if err != nil {
-			return err
-		}
-		f.address[addr] = struct{}{}
+		f.set[string(b)] = struct{}{}
 	}
 	return nil
 }
@@ -88,9 +82,6 @@ func (f *FilterParam) AddAddresses(bl ...[]byte) error {
 func (f *FilterParam) Len() int {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
-	return len(f.address)
-}
 
-func NewFilterParam() *FilterParam {
-	return &FilterParam{address: make(map[ids.ShortID]struct{})}
+	return len(f.set)
 }
