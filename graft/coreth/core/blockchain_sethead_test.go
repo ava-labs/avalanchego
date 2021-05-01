@@ -2043,7 +2043,7 @@ func testSetHead(t *testing.T, tt *rewindTest, snapshots bool) {
 		rawdb.WriteLastPivotNumber(db, *tt.pivotBlock)
 	}
 	// Set the head of the chain back to the requested number
-	chain.SetHead(tt.setheadBlock)
+	chain.setHead(tt.setheadBlock)
 
 	// Iterate over all the remaining blocks and ensure there are no gaps
 	verifyNoGaps(t, chain, true, canonblocks)
