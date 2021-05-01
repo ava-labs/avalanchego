@@ -58,7 +58,7 @@ func TestFilterParamUpdateMulti(t *testing.T) {
 	bl = append(bl, addr1[:])
 	bl = append(bl, addr2[:])
 	bl = append(bl, addr3[:])
-	fp.AddAddresses(bl...)
+	_ = fp.AddAddresses(bl...)
 	if len(fp.address) != 3 {
 		t.Fatalf("update multi failed")
 	}

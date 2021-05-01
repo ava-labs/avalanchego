@@ -44,7 +44,7 @@ func TestFilter(t *testing.T) {
 	tx.UnsignedTx = &baseTx
 	parser := NewPubSubFilterer(&tx)
 	fp := pubsub.NewFilterParam()
-	fp.AddAddresses([][]byte{idsid[:]}...)
+	_ = fp.AddAddresses([][]byte{idsid[:]}...)
 	fr, _ := parser.Filter([]pubsub.FilterInterface{&MockFilterInterface{ids: idsid}})
 	assert.Equal([]bool{true}, fr)
 }
