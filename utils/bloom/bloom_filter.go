@@ -30,54 +30,47 @@ func New(maxN uint64, p float64, maxBytes uint64) (Filter, error) {
 }
 
 type steakKnifeFilter struct {
-	lock    sync.RWMutex
-	bfilter *streakKnife.Filter
+	lock   sync.RWMutex
+	filter *streakKnife.Filter
 }
 
 func bytesSteakKnifeFilter(maxN uint64, p float64) uint64 {
 	m := streakKnife.OptimalM(maxN, p)
 	k := streakKnife.OptimalK(m, maxN)
 
-	// this is pulled from bloomFilter.newBits and bloomfilter.newRandKeys
-	// the calculation is the size of the bitset which would be created from this filter.
-	// to ensure we don't crash memory, we would ensure the size
-	msize := (m + 63) / 64
-	msize += k
+	// This is pulled from bloomFilter.newBits and bloomfilter.newRandKeys. The
+	// calculation is the size of the bitset which would be created from this
+	// filter.
+	mSize := (m + 63) / 64
+	totalSize := mSize + k
 
-	// 8 == sizeof(uint64))
-	return msize * 8
+	return totalSize * 8 // 8 == sizeof(uint64))
 }
 
 func newSteakKnifeFilter(maxN uint64, p float64) (Filter, error) {
 	m := streakKnife.OptimalM(maxN, p)
 	k := streakKnife.OptimalK(m, maxN)
 
-	bfilter, err := streakKnife.New(m, k)
-	return &steakKnifeFilter{bfilter: bfilter}, err
+	filter, err := streakKnife.New(m, k)
+	return &steakKnifeFilter{filter: filter}, err
 }
 
 func (f *steakKnifeFilter) Add(bl ...[]byte) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
+
 	for _, b := range bl {
 		h := murmur3.New64()
-		_, errf := h.Write(b)
-
-		// this shouldnt happen
-		if errf != nil {
-			continue
-		}
-		f.bfilter.Add(h)
+		_, _ = h.Write(b)
+		f.filter.Add(h)
 	}
 }
 
 func (f *steakKnifeFilter) Check(b []byte) bool {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
+
 	h := murmur3.New64()
-	_, err := h.Write(b)
-	if err != nil {
-		return false
-	}
-	return f.bfilter.Contains(h)
+	_, _ = h.Write(b)
+	return f.filter.Contains(h)
 }
