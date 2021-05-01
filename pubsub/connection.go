@@ -159,32 +159,27 @@ func (c *connection) readMessage() error {
 	switch {
 	case cmd.NewBloom != nil:
 		if !cmd.NewBloom.IsParamsValid() {
+			c.Send(&errorMsg{Error: "bloom filter params invalid"})
 			return ErrInvalidFilterParam
 		}
-		c.fp.address = nil
-		err = c.handleNewBloom(cmd.NewBloom)
+		bfilter, err := bloom.New(cmd.NewBloom.MaxElements, cmd.NewBloom.CollisionProb, MaxBytes)
 		if err != nil {
+			c.Send(&errorMsg{Error: fmt.Sprintf("bloom filter creation failed %s", err)})
 			return err
 		}
+		c.fp.SetFilter(bfilter)
 	case cmd.NewSet != nil:
-		c.fp.ClearFilter()
-		c.fp.address = make(map[ids.ShortID]struct{})
+		c.fp.NewAddresses()
 	case cmd.AddAddresses != nil:
 		err = cmd.AddAddresses.ParseAddresses()
 		if err != nil {
+			c.Send(&errorMsg{Error: fmt.Sprintf("address parse failed %s", err)})
 			return err
 		}
-		switch {
-		case c.fp.Filter() != nil:
-			filter := c.fp.Filter()
-			filter.Add(cmd.AddAddresses.addressIds...)
-		case c.fp.address != nil:
-			err = c.handleAddAddress(cmd.AddAddresses)
-			if err != nil {
-				return err
-			}
-		default:
-			return ErrFilterNotInitialized
+		err = c.fp.AddAddresses(cmd.AddAddresses.addressIds...)
+		if err != nil {
+			c.Send(&errorMsg{Error: fmt.Sprintf("address append failed %s", err)})
+			return err
 		}
 		c.s.subscribedConnections.Add(c)
 	default:
@@ -193,22 +188,4 @@ func (c *connection) readMessage() error {
 		return fmt.Errorf(errmsg.Error)
 	}
 	return nil
-}
-
-func (c *connection) handleNewBloom(cmdMsg *NewBloom) error {
-	// no filter exists..  Or they provided filter params
-	bfilter, err := bloom.New(cmdMsg.MaxElements, cmdMsg.CollisionProb, MaxBytes)
-	if err != nil {
-		return err
-	}
-	c.fp.SetFilter(bfilter)
-	return nil
-}
-
-func (c *connection) handleAddAddress(cmdMsg *AddAddresses) error {
-	if c.fp.Len()+len(cmdMsg.addressIds) > MaxAddresses {
-		c.Send(&errorMsg{Error: "address limit reached"})
-		return ErrAddressLimit
-	}
-	return c.fp.AddAddresses(cmdMsg.addressIds...)
 }

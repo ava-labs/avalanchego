@@ -22,6 +22,13 @@ func (f *FilterParam) ClearFilter() {
 	f.filter = nil
 }
 
+func (f *FilterParam) NewAddresses() {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	f.address = make(map[ids.ShortID]struct{})
+	f.filter = nil
+}
+
 func (f *FilterParam) Filter() bloom.Filter {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
@@ -32,6 +39,7 @@ func (f *FilterParam) SetFilter(filter bloom.Filter) bloom.Filter {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.filter = filter
+	f.address = nil
 	return f.filter
 }
 
@@ -60,14 +68,26 @@ func (f *FilterParam) CheckAddress(addr2check []byte) bool {
 }
 
 func (f *FilterParam) AddAddresses(bl ...[]byte) error {
+	filter := f.Filter()
+	if filter != nil {
+		filter := f.Filter()
+		filter.Add(bl...)
+		return nil
+	}
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	if f.address == nil {
+		return ErrFilterNotInitialized
+	}
+	if len(f.address)+len(bl) > MaxAddresses {
+		return ErrAddressLimit
+	}
 	for _, b := range bl {
 		addr, err := ids.ToShortID(b)
 		if err != nil {
 			return err
 		}
-		f.lock.Lock()
 		f.address[addr] = struct{}{}
-		f.lock.Unlock()
 	}
 	return nil
 }
