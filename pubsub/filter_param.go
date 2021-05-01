@@ -16,12 +16,6 @@ type FilterParam struct {
 	filter  bloom.Filter
 }
 
-func (f *FilterParam) ClearFilter() {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.filter = nil
-}
-
 func (f *FilterParam) NewAddresses() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -70,7 +64,6 @@ func (f *FilterParam) CheckAddress(addr2check []byte) bool {
 func (f *FilterParam) AddAddresses(bl ...[]byte) error {
 	filter := f.Filter()
 	if filter != nil {
-		filter := f.Filter()
 		filter.Add(bl...)
 		return nil
 	}
