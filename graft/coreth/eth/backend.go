@@ -205,6 +205,7 @@ func New(stack *node.Node, config *Config,
 			TrieDirtyDisabled:   config.NoPruning,
 			TrieTimeLimit:       config.TrieTimeout,
 			// FIXME re-enable snapshots and add preimages
+			// TODO: aren't preimages enabled by default?
 			// SnapshotLimit:       config.SnapshotCache,
 			// Preimages: config.Preimages,
 		}
