@@ -5,14 +5,15 @@ package pubsub
 
 import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/json"
 )
 
 // NewBloom command for a new bloom filter
 type NewBloom struct {
 	// MaxElements size of bloom filter
-	MaxElements uint64 `json:"maxElements"`
+	MaxElements json.Uint64 `json:"maxElements"`
 	// CollisionProb expected error rate of filter
-	CollisionProb float64 `json:"collisionProb"`
+	CollisionProb json.Float64 `json:"collisionProb"`
 }
 
 // NewSet command for a new map set
@@ -48,8 +49,8 @@ func (c *Command) String() string {
 }
 
 func (c *NewBloom) IsParamsValid() bool {
-	return c.MaxElements > 0 &&
-		0 < c.CollisionProb && c.CollisionProb <= 1
+	p := float64(c.CollisionProb)
+	return c.MaxElements > 0 && 0 < p && p <= 1
 }
 
 // parseAddresses converts the bech32 addresses to their byte format.
