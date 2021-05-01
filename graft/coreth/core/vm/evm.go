@@ -264,6 +264,11 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		// stateful precompiled contracts to handle a value transfer explicitly. For example,
 		// wrapped precompiled contracts transfer prior to execution as normal, whereas native
 		// asset balance can prevent an accidental transfer to the precompiled contract address.
+		// This does change the call pattern for the Tracer where before CaptureStart was
+		// called after Transfer. Currently, none of the Tracers invoke the database during
+		// CaptureStart, but instead check on it within CaptureState, which is called step by
+		// step within the interpreter, such that this move should not impact the behavior
+		// of the current Tracers.
 		evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value)
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
