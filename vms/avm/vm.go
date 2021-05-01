@@ -293,7 +293,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
 		"/wallet": {Handler: walletServer},
-		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
+		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}, err
 }
 
