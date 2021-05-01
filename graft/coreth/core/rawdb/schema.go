@@ -107,6 +107,8 @@ var (
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 )
 
+// We don't remove these constants to minimize the amount of changes that need
+// to be made to other files.
 const (
 	// freezerHeaderTable indicates the name of the freezer header table.
 	freezerHeaderTable = "headers"
@@ -124,15 +126,16 @@ const (
 	freezerDifficultyTable = "diffs"
 )
 
-// freezerNoSnappy configures whether compression is disabled for the ancient-tables.
-// Hashes and difficulties don't compress well.
-var freezerNoSnappy = map[string]bool{
-	freezerHeaderTable:     false,
-	freezerHashTable:       true,
-	freezerBodiesTable:     false,
-	freezerReceiptTable:    false,
-	freezerDifficultyTable: true,
-}
+// Original code:
+// // freezerNoSnappy configures whether compression is disabled for the ancient-tables.
+// // Hashes and difficulties don't compress well.
+// var freezerNoSnappy = map[string]bool{
+// 	freezerHeaderTable:     false,
+// 	freezerHashTable:       true,
+// 	freezerBodiesTable:     false,
+// 	freezerReceiptTable:    false,
+// 	freezerDifficultyTable: true,
+// }
 
 // LegacyTxLookupEntry is the legacy TxLookupEntry definition with some unnecessary
 // fields.
