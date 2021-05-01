@@ -1,6 +1,7 @@
 package avm
 
 import (
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
@@ -31,5 +32,7 @@ func (f *filterer) Filter(filters []pubsub.Filter) ([]bool, interface{}) {
 			}
 		}
 	}
-	return resp, f.tx.ID()
+	return resp, api.JSONTxID{
+		TxID: f.tx.ID(),
+	}
 }
