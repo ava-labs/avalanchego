@@ -6,11 +6,9 @@ package leveldb
 import (
 	"bytes"
 
+	"github.com/linxGnu/grocksdb"
 	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/errors"
-	"github.com/syndtr/goleveldb/leveldb/filter"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/opt"
 	"github.com/syndtr/goleveldb/leveldb/util"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -19,77 +17,63 @@ import (
 )
 
 const (
-	// minBlockCacheSize is the minimum number of bytes to use for block caching
-	// in leveldb.
-	minBlockCacheSize = 12 * opt.MiB
-
-	// minWriteBufferSize is the minimum number of bytes to use for buffers in
-	// leveldb.
-	minWriteBufferSize = 12 * opt.MiB
-
-	// minHandleCap is the minimum number of files descriptors to cap levelDB to
-	// use
-	minHandleCap = 64
-
-	// levelDBByteOverhead is the number of bytes of constant overhead that
-	// should be added to a batch size per operation.
-	levelDBByteOverhead = 8
+	MemoryBudget   = 512 * 1024 * 1024 // 512 MiB
+	BitsPerKey     = 10                // 10 bits
+	BlockCacheSize = 8 * 1024 * 1024   // 8 MiB
+	BlockSize      = 4 * 1024          // 4 KiB
 )
 
 // Database is a persistent key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace
 // in binary-alphabetical order.
 type Database struct {
-	*leveldb.DB
+	db *grocksdb.DB
+
 	log logging.Logger
 
 	// True if there was previously an error other than "not found" or "closed"
 	// while performing a db operation. If [errored] == true, Has, Get, Put,
 	// Delete and batch writes fail with ErrAvoidCorruption.
 	// The node should shut down.
-	errored uint64
+	errored bool
 }
 
-// New returns a wrapped LevelDB object.
-func New(file string, log logging.Logger, blockCacheSize, writeBufferSize, handleCap int) (*Database, error) {
-	// Enforce minimums
-	if blockCacheSize < minBlockCacheSize {
-		blockCacheSize = minBlockCacheSize
-	}
-	if writeBufferSize < minWriteBufferSize {
-		writeBufferSize = minWriteBufferSize
-	}
-	if handleCap < minHandleCap {
-		handleCap = minHandleCap
-	}
+// New returns a wrapped RocksDB object.
+func New(file string, log logging.Logger) (*Database, error) {
+	filter := grocksdb.NewBloomFilter(BitsPerKey)
 
-	// Open the db and recover any potential corruptions
-	db, err := leveldb.OpenFile(file, &opt.Options{
-		OpenFilesCacheCapacity: handleCap,
-		BlockCacheCapacity:     blockCacheSize,
-		// There are two buffers of size WriteBuffer used.
-		WriteBuffer: writeBufferSize / 2,
-		Filter:      filter.NewBloomFilter(10),
-	})
-	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
-		db, err = leveldb.RecoverFile(file, nil)
-	}
+	blockOptions := grocksdb.NewDefaultBlockBasedTableOptions()
+	blockOptions.SetBlockCache(grocksdb.NewLRUCache(BlockCacheSize))
+	blockOptions.SetBlockSize(BlockSize)
+	blockOptions.SetFilterPolicy(filter)
+
+	options := grocksdb.NewDefaultOptions()
+	options.SetCreateIfMissing(true)
+	options.OptimizeUniversalStyleCompaction(MemoryBudget)
+	options.SetBlockBasedTableFactory(blockOptions)
+
+	db, err := grocksdb.OpenDb(options, file)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Database{
-		DB:  db,
+		db:  db,
 		log: log,
 	}, nil
 }
 
 // Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
-	if db.errored {
-		return false, database.ErrAvoidCorruption
+	_, err := db.Get(key)
+	switch err {
+	case nil:
+		return true, nil
+	case database.ErrNotFound:
+		return false, nil
+	default:
+		return false, err
 	}
-	has, err := db.DB.Has(key, nil)
-	return has, db.handleError(err)
 }
 
 // Get returns the value the key maps to in the database
