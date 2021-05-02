@@ -72,19 +72,23 @@ func (evm *EVM) precompile(addr common.Address) (StatefulPrecompiledContract, bo
 
 // run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
 func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
-	for _, interpreter := range evm.interpreters {
-		if interpreter.CanRun(contract.Code) {
-			if evm.interpreter != interpreter {
-				// Ensure that the interpreter pointer is set back
-				// to its current value upon return.
-				defer func(i Interpreter) {
-					evm.interpreter = i
-				}(evm.interpreter)
-				evm.interpreter = interpreter
-			}
-			return interpreter.Run(contract, input, readOnly)
-		}
+	if evm.interpreter.CanRun(contract.Code) {
+		return evm.interpreter.Run(contract, input, readOnly)
 	}
+	// Original code:
+	// for _, interpreter := range evm.interpreters {
+	// 	if interpreter.CanRun(contract.Code) {
+	// 		if evm.interpreter != interpreter {
+	// 			// Ensure that the interpreter pointer is set back
+	// 			// to its current value upon return.
+	// 			defer func(i Interpreter) {
+	// 				evm.interpreter = i
+	// 			}(evm.interpreter)
+	// 			evm.interpreter = interpreter
+	// 		}
+	// 		return interpreter.Run(contract, input, readOnly)
+	// 	}
+	// }
 	return nil, errors.New("no compatible interpreter")
 }
 
@@ -147,8 +151,8 @@ type EVM struct {
 	vmConfig Config
 	// global (to this context) ethereum virtual machine
 	// used throughout the execution of the tx.
-	interpreters []Interpreter
-	interpreter  Interpreter
+	// interpreters []Interpreter
+	interpreter *EVMInterpreter
 	// abort is used to abort the EVM calling operations
 	// NOTE: must be set atomically
 	abort int32
@@ -162,35 +166,35 @@ type EVM struct {
 // only ever be used *once*.
 func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig *params.ChainConfig, vmConfig Config) *EVM {
 	evm := &EVM{
-		Context:      blockCtx,
-		TxContext:    txCtx,
-		StateDB:      statedb,
-		vmConfig:     vmConfig,
-		chainConfig:  chainConfig,
-		chainRules:   chainConfig.AvalancheRules(blockCtx.BlockNumber, blockCtx.Time),
-		interpreters: make([]Interpreter, 0, 1),
+		Context:     blockCtx,
+		TxContext:   txCtx,
+		StateDB:     statedb,
+		vmConfig:    vmConfig,
+		chainConfig: chainConfig,
+		chainRules:  chainConfig.AvalancheRules(blockCtx.BlockNumber, blockCtx.Time),
+		// interpreters: make([]Interpreter, 0, 1),
 	}
 
-	if chainConfig.IsEWASM(blockCtx.BlockNumber) {
-		// to be implemented by EVM-C and Wagon PRs.
-		// if vmConfig.EWASMInterpreter != "" {
-		//  extIntOpts := strings.Split(vmConfig.EWASMInterpreter, ":")
-		//  path := extIntOpts[0]
-		//  options := []string{}
-		//  if len(extIntOpts) > 1 {
-		//    options = extIntOpts[1..]
-		//  }
-		//  evm.interpreters = append(evm.interpreters, NewEVMVCInterpreter(evm, vmConfig, options))
-		// } else {
-		// 	evm.interpreters = append(evm.interpreters, NewEWASMInterpreter(evm, vmConfig))
-		// }
-		panic("No supported ewasm interpreter yet.")
-	}
+	// if chainConfig.IsEWASM(blockCtx.BlockNumber) {
+	// 	// to be implemented by EVM-C and Wagon PRs.
+	// 	// if vmConfig.EWASMInterpreter != "" {
+	// 	//  extIntOpts := strings.Split(vmConfig.EWASMInterpreter, ":")
+	// 	//  path := extIntOpts[0]
+	// 	//  options := []string{}
+	// 	//  if len(extIntOpts) > 1 {
+	// 	//    options = extIntOpts[1..]
+	// 	//  }
+	// 	//  evm.interpreters = append(evm.interpreters, NewEVMVCInterpreter(evm, vmConfig, options))
+	// 	// } else {
+	// 	// 	evm.interpreters = append(evm.interpreters, NewEWASMInterpreter(evm, vmConfig))
+	// 	// }
+	// 	panic("No supported ewasm interpreter yet.")
+	// }
 
 	// vmConfig.EVMInterpreter will be used by EVM-C, it won't be checked here
 	// as we always want to have the built-in EVM as the failover option.
-	evm.interpreters = append(evm.interpreters, NewEVMInterpreter(evm, vmConfig))
-	evm.interpreter = evm.interpreters[0]
+	// evm.interpreters = append(evm.interpreters, NewEVMInterpreter(evm, vmConfig))
+	evm.interpreter = NewEVMInterpreter(evm, vmConfig)
 
 	return evm
 }
@@ -258,7 +262,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, value, input, gas, false)
+		ret, gas, err = p.Run(evm, caller, addr, value, input, gas, evm.interpreter.readOnly)
 	} else {
 		// Note: Transfer has been moved from above into the else branch in order to allow
 		// stateful precompiled contracts to handle a value transfer explicitly. For example,
@@ -403,7 +407,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, big0, input, gas, false)
+		ret, gas, err = p.Run(evm, caller, addr, big0, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -439,7 +443,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, big0, input, gas, false)
+		ret, gas, err = p.Run(evm, caller, addr, big0, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
