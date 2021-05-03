@@ -18,6 +18,16 @@ import (
 	"github.com/hashicorp/go-plugin"
 )
 
+const (
+	header = "" +
+		`     _____               .__                       .__` + "\n" +
+		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
+		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
+		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
+		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
+		`          \/           \/          \/     \/     \/     \/     \/`
+)
+
 // main is the primary entry point to Avalanche.
 func main() {
 	// parse config using viper
@@ -56,6 +66,8 @@ func main() {
 		})
 		return
 	}
+
+	fmt.Println(header)
 
 	// If we get a a SIGINT or SIGTERM, tell the node to stop.
 	// If [app.Start()] has been called, it will return.
