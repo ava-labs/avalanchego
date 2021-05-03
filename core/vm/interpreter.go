@@ -82,13 +82,12 @@ type Interpreter interface {
 	CanRun([]byte) bool
 }
 
-// callCtx contains the things that are per-call, such as stack and memory,
+// ScopeContext contains the things that are per-call, such as stack and memory,
 // but not transients like pc and gas
-type callCtx struct {
-	memory   *Memory
-	stack    *Stack
-	rstack   *ReturnStack
-	contract *Contract
+type ScopeContext struct {
+	Memory   *Memory
+	Stack    *Stack
+	Contract *Contract
 }
 
 // keccakState wraps sha3.state. In addition to the usual hash methods, it also supports
@@ -119,10 +118,10 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	if cfg.JumpTable[STOP] == nil {
 		var jt JumpTable
 		switch {
+		case evm.chainRules.IsApricotPhase2:
+			jt = apricotPhase2InstructionSet
 		case evm.chainRules.IsApricotPhase1:
 			jt = apricotPhase1InstructionSet
-		case evm.chainRules.IsYoloV1:
-			jt = yoloV1InstructionSet
 		case evm.chainRules.IsIstanbul:
 			jt = istanbulInstructionSet
 		case evm.chainRules.IsConstantinople:
@@ -184,16 +183,21 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 	// as every returning call will return new data anyway.
 	in.returnData = nil
 
+	// Don't bother with the execution if there's no code.
+	// Note: this avoids invoking the tracer in any way for simple value
+	// transfers to EOA accounts.
+	if len(contract.Code) == 0 {
+		return nil, nil
+	}
+
 	var (
-		op          OpCode             // current opcode
-		mem         = NewMemory()      // bound memory
-		stack       = newstack()       // local stack
-		returns     = newReturnStack() // local returns stack
-		callContext = &callCtx{
-			memory:   mem,
-			stack:    stack,
-			rstack:   returns,
-			contract: contract,
+		op          OpCode        // current opcode
+		mem         = NewMemory() // bound memory
+		stack       = newstack()  // local stack
+		callContext = &ScopeContext{
+			Memory:   mem,
+			Stack:    stack,
+			Contract: contract,
 		}
 		// For optimisation reason we're using uint64 as the program counter.
 		// It's theoretically possible to go above 2^64. The YP defines the PC
@@ -207,25 +211,11 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		res     []byte // result of the opcode execution function
 	)
 
-	// Don't bother with the execution if there's no code.
-	if len(contract.Code) == 0 {
-		if in.cfg.Debug {
-			// Even if there's nothing to execute, we need to invoke CaptureState here because the
-			// tracer assumes StateDB is populated when GetResult is invoked.
-			//
-			// If a transaction only contains an contract deployment with no code and we don't set CaptureState here, the
-			// tracer will panic if any db-related methods are invoked.
-			in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, mem, stack, returns, in.returnData, contract, in.evm.depth, nil)
-		}
-		return nil, nil
-	}
-
 	// Don't move this deferrred function, it's placed before the capturestate-deferred method,
 	// so that it get's executed _after_: the capturestate needs the stacks before
 	// they are returned to the pools
 	defer func() {
 		returnStack(stack)
-		returnRStack(returns)
 	}()
 	contract.Input = input
 
@@ -233,9 +223,9 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		defer func() {
 			if err != nil {
 				if !logged {
-					in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, mem, stack, returns, in.returnData, contract, in.evm.depth, err)
+					in.cfg.Tracer.CaptureState(in.evm, pcCopy, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
 				} else {
-					in.cfg.Tracer.CaptureFault(in.evm, pcCopy, op, gasCopy, cost, mem, stack, returns, contract, in.evm.depth, err)
+					in.cfg.Tracer.CaptureFault(in.evm, pcCopy, op, gasCopy, cost, callContext, in.evm.depth, err)
 				}
 			}
 		}()
@@ -317,7 +307,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte, readOnly bool) (
 		}
 
 		if in.cfg.Debug {
-			in.cfg.Tracer.CaptureState(in.evm, pc, op, gasCopy, cost, mem, stack, returns, in.returnData, contract, in.evm.depth, err)
+			in.cfg.Tracer.CaptureState(in.evm, pc, op, gasCopy, cost, callContext, in.returnData, in.evm.depth, err)
 			logged = true
 		}
 
