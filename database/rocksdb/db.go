@@ -6,6 +6,7 @@ package rocksdb
 import (
 	"bytes"
 	"errors"
+	"os"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -16,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
 const (
@@ -63,6 +65,10 @@ func New(file string, log logging.Logger) (*Database, error) {
 	options.SetCreateIfMissing(true)
 	options.OptimizeUniversalStyleCompaction(MemoryBudget)
 	options.SetBlockBasedTableFactory(blockOptions)
+
+	if err := os.MkdirAll(file, perms.ReadWriteExecute); err != nil {
+		return nil, err
+	}
 
 	db, err := grocksdb.OpenDb(options, file)
 	if err != nil {
