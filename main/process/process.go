@@ -5,6 +5,7 @@ package process
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -25,33 +26,44 @@ var (
 
 // App is a wrapper around a node
 type App struct {
-	config node.Config
-	node   *node.Node
-	// log is set in Start()
-	log logging.Logger
+	lock             sync.Mutex
+	started, stopped bool
+	config           node.Config
+	node             *node.Node
+	logFactory       logging.Factory
+	log              logging.Logger
 }
 
-func NewApp(config node.Config) *App {
+func NewApp(config node.Config, logFactory logging.Factory, log logging.Logger) *App {
 	return &App{
-		config: config,
-		node:   &node.Node{},
+		config:     config,
+		node:       &node.Node{},
+		log:        log,
+		logFactory: logFactory,
 	}
 }
 
+// Start the node. Returns the node's exit code when the node is done running.
+// If Start() or Stop() have been called before, does nothing and returns 1.
 func (a *App) Start() int {
-	// Create the logger
-	logFactory := logging.NewFactory(a.config.LoggingConfig)
-	defer logFactory.Close()
-
-	var err error
-	a.log, err = logFactory.Make()
-	if err != nil {
-		fmt.Printf("starting logger failed with: %s\n", err)
+	a.lock.Lock()
+	if a.started {
+		a.log.Error("can't start already started node")
+		a.lock.Unlock()
+		return 1
+	} else if a.stopped {
+		a.log.Error("can't start node that was previously stopped")
+		a.lock.Unlock()
 		return 1
 	}
+	a.started = true
+	a.lock.Unlock()
 
 	// start the db
-	var db database.Database
+	var (
+		db  database.Database
+		err error
+	)
 	if a.config.DBEnabled {
 		db, err = leveldb.New(a.config.DBPath, a.log, 0, 0, 0)
 		if err != nil {
@@ -148,7 +160,7 @@ func (a *App) Start() int {
 		node:          a.node,
 		shouldRestart: &utils.AtomicBool{},
 	}
-	if err := a.node.Initialize(&a.config, db, a.log, logFactory, restarter); err != nil {
+	if err := a.node.Initialize(&a.config, db, a.log, a.logFactory, restarter); err != nil {
 		a.log.Error("error initializing node: %s", err)
 		return 1
 	}
@@ -159,9 +171,19 @@ func (a *App) Start() int {
 }
 
 // Assumes [a.node] is not nil
-func (a *App) Stop() int {
+func (a *App) Stop() {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	if a.stopped {
+		a.log.Error("can't stop already stopped node")
+		return
+	}
+	a.stopped = true
+	if !a.started {
+		// The node hasn't started yet. There's nothing to do.
+		return
+	}
 	a.node.Shutdown()
-	return 0
 }
 
 // restarter implements utils.Restarter

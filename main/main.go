@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"syscall"
@@ -11,24 +12,17 @@ import (
 	appPlugin "github.com/ava-labs/avalanchego/main/plugin"
 	"github.com/ava-labs/avalanchego/main/process"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
 
-var (
-	exitCode = 0
-)
-
 // main is the primary entry point to Avalanche.
 func main() {
-	defer func() {
-		os.Exit(exitCode)
-	}()
-
 	// parse config using viper
 	if err := parseViper(); err != nil {
-		// Returns error code 1
+		// Returns exit code 1
 		log.Fatalf("parsing parameters returned with error %s", err)
 	}
 
@@ -38,8 +32,16 @@ func main() {
 	}
 
 	c := Config
+	// Create the logger
+	logFactory := logging.NewFactory(c.LoggingConfig)
+	defer logFactory.Close()
 
-	app := process.NewApp(c)
+	log, err := logFactory.Make()
+	if err != nil {
+		fmt.Printf("starting logger failed with: %s\n", err)
+		os.Exit(1)
+	}
+	app := process.NewApp(c, logFactory, log)
 	if c.PluginMode {
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
@@ -55,13 +57,16 @@ func main() {
 		return
 	}
 
+	// If we get a a SIGINT or SIGTERM, tell the node to stop.
+	// If [app.Start()] has been called, it will return.
+	// If not, then when [app.Start()] is called below, it will immediately return 1.
 	_ = utils.HandleSignals(
 		func(os.Signal) {
 			app.Stop()
-			os.Exit(exitCode)
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 	// Start the node
-	exitCode = app.Start()
+	exitCode := app.Start()
+	os.Exit(exitCode)
 }
