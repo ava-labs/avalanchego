@@ -52,10 +52,9 @@ git_commit_id=$( git rev-list -1 HEAD )
 "$AVALANCHE_PATH"/scripts/build_image.sh
 
 # Target built version to use in avalanche-testing
-avalanche_image="avaplatform/avalanchego:$current_branch"
+avalanche_image="avaplatform/avalanchego:$build_image_id"
 
 echo "Running Avalanche Image: ${avalanche_image}"
-echo "Running Avalanche Image Tag: $current_branch"
 echo "Running Avalanche Testing Image: ${avalanche_testing_image}"
 echo "Git Commit ID : ${git_commit_id}"
 
