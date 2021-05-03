@@ -1,41 +1,53 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package leveldb
+package rocksdb
 
 import (
 	"bytes"
+	"errors"
+	"runtime"
+	"sync"
+	"sync/atomic"
 
 	"github.com/linxGnu/grocksdb"
-	"github.com/syndtr/goleveldb/leveldb"
-	"github.com/syndtr/goleveldb/leveldb/iterator"
-	"github.com/syndtr/goleveldb/leveldb/util"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/nodb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const (
+	// Name is the name of this database for database switches
+	Name = "rocks"
+
 	MemoryBudget   = 512 * 1024 * 1024 // 512 MiB
 	BitsPerKey     = 10                // 10 bits
-	BlockCacheSize = 8 * 1024 * 1024   // 8 MiB
-	BlockSize      = 4 * 1024          // 4 KiB
+	BlockCacheSize = 12 * 1024 * 1024  // 12 MiB
+	BlockSize      = 8 * 1024          // 8 KiB
+
+	// rocksDBByteOverhead is the number of bytes of constant overhead that
+	// should be added to a batch size per operation.
+	rocksDBByteOverhead = 8
 )
 
 // Database is a persistent key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace
 // in binary-alphabetical order.
 type Database struct {
-	db *grocksdb.DB
+	lock            sync.RWMutex
+	db              *grocksdb.DB
+	readOptions     *grocksdb.ReadOptions
+	iteratorOptions *grocksdb.ReadOptions
+	writeOptions    *grocksdb.WriteOptions
 
 	log logging.Logger
 
-	// True if there was previously an error other than "not found" or "closed"
-	// while performing a db operation. If [errored] == true, Has, Get, Put,
+	// 1 if there was previously an error other than "not found" or "closed"
+	// while performing a db operation. If [errored] == 1, Has, Get, Put,
 	// Delete and batch writes fail with ErrAvoidCorruption.
-	// The node should shut down.
-	errored bool
+	errored uint64
 }
 
 // New returns a wrapped RocksDB object.
@@ -57,9 +69,15 @@ func New(file string, log logging.Logger) (*Database, error) {
 		return nil, err
 	}
 
+	iteratorOptions := grocksdb.NewDefaultReadOptions()
+	iteratorOptions.SetFillCache(false)
+
 	return &Database{
-		db:  db,
-		log: log,
+		db:              db,
+		readOptions:     grocksdb.NewDefaultReadOptions(),
+		iteratorOptions: iteratorOptions,
+		writeOptions:    grocksdb.NewDefaultWriteOptions(),
+		log:             log,
 	}, nil
 }
 
@@ -78,68 +96,193 @@ func (db *Database) Has(key []byte) (bool, error) {
 
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if db.errored {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return nil, database.ErrClosed
+	case db.corrupted():
 		return nil, database.ErrAvoidCorruption
 	}
-	value, err := db.DB.Get(key, nil)
-	return value, db.handleError(err)
+
+	value, err := db.db.GetBytes(db.readOptions, key)
+	if err != nil {
+		atomic.StoreUint64(&db.errored, 1)
+		return nil, err
+	}
+	if value != nil {
+		return value, nil
+	}
+	return nil, database.ErrNotFound
 }
 
 // Put sets the value of the provided key to the provided value
 func (db *Database) Put(key []byte, value []byte) error {
-	if db.errored {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return database.ErrClosed
+	case db.corrupted():
 		return database.ErrAvoidCorruption
 	}
-	return db.handleError(db.DB.Put(key, value, nil))
+
+	err := db.db.Put(db.writeOptions, key, value)
+	if err != nil {
+		atomic.StoreUint64(&db.errored, 1)
+	}
+	return err
 }
 
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
-	if db.errored {
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return database.ErrClosed
+	case db.corrupted():
 		return database.ErrAvoidCorruption
 	}
-	return db.handleError(db.DB.Delete(key, nil))
+
+	err := db.db.Delete(db.writeOptions, key)
+	if err != nil {
+		atomic.StoreUint64(&db.errored, 1)
+	}
+	return err
 }
 
 // NewBatch creates a write/delete-only buffer that is atomically committed to
 // the database when write is called
-func (db *Database) NewBatch() database.Batch { return &batch{db: db} }
+func (db *Database) NewBatch() database.Batch {
+	b := grocksdb.NewWriteBatch()
+	runtime.SetFinalizer(b, func(b *grocksdb.WriteBatch) {
+		b.Destroy()
+	})
+	return &batch{
+		batch: b,
+		db:    db,
+	}
+}
+
+// Inner returns itself
+func (b *batch) Inner() database.Batch { return b }
+
+var (
+	errFailedToCreateIterator = errors.New("failed to create iterator")
+)
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
-	return &iter{db.DB.NewIterator(new(util.Range), nil)}
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return &nodb.Iterator{Err: database.ErrClosed}
+	case db.corrupted():
+		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
+	}
+
+	it := db.db.NewIterator(db.iteratorOptions)
+	if it == nil {
+		return &nodb.Iterator{Err: errFailedToCreateIterator}
+	}
+	it.Seek(nil)
+	return &iter{
+		it: it,
+		db: db,
+	}
 }
 
 // NewIteratorWithStart creates a lexicographically ordered iterator over the
 // database starting at the provided key
 func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
-	return &iter{db.DB.NewIterator(&util.Range{Start: start}, nil)}
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return &nodb.Iterator{Err: database.ErrClosed}
+	case db.corrupted():
+		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
+	}
+
+	it := db.db.NewIterator(db.iteratorOptions)
+	if it == nil {
+		return &nodb.Iterator{Err: errFailedToCreateIterator}
+	}
+	it.Seek(start)
+	return &iter{
+		it: it,
+		db: db,
+	}
 }
 
 // NewIteratorWithPrefix creates a lexicographically ordered iterator over the
 // database ignoring keys that do not start with the provided prefix
 func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
-	return &iter{db.DB.NewIterator(util.BytesPrefix(prefix), nil)}
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return &nodb.Iterator{Err: database.ErrClosed}
+	case db.corrupted():
+		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
+	}
+
+	it := db.db.NewIterator(db.iteratorOptions)
+	if it == nil {
+		return &nodb.Iterator{Err: errFailedToCreateIterator}
+	}
+	it.Seek(prefix)
+	return &iter{
+		it:            it,
+		db:            db,
+		expectsPrefix: true,
+		prefix:        prefix,
+	}
 }
 
 // NewIteratorWithStartAndPrefix creates a lexicographically ordered iterator
 // over the database starting at start and ignoring keys that do not start with
 // the provided prefix
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
-	iterRange := util.BytesPrefix(prefix)
-	if bytes.Compare(start, prefix) == 1 {
-		iterRange.Start = start
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return &nodb.Iterator{Err: database.ErrClosed}
+	case db.corrupted():
+		return &nodb.Iterator{Err: database.ErrAvoidCorruption}
 	}
-	return &iter{db.DB.NewIterator(iterRange, nil)}
+
+	it := db.db.NewIterator(db.iteratorOptions)
+	if it == nil {
+		return &nodb.Iterator{Err: errFailedToCreateIterator}
+	}
+	if bytes.Compare(start, prefix) == 1 {
+		it.Seek(start)
+	} else {
+		it.Seek(prefix)
+	}
+	return &iter{
+		it:            it,
+		db:            db,
+		expectsPrefix: true,
+		prefix:        prefix,
+	}
 }
 
 // Stat returns a particular internal stat of the database.
 func (db *Database) Stat(property string) (string, error) {
-	stat, err := db.DB.GetProperty(property)
-	return stat, db.handleError(err)
+	return "", database.ErrNotFound
 }
-
-// This comment is basically copy pasted from the underlying levelDB library:
 
 // Compact the underlying DB for the given key range.
 // Specifically, deleted and overwritten versions are discarded,
@@ -151,41 +294,60 @@ func (db *Database) Stat(property string) (string, error) {
 // And a nil limit is treated as a key after all keys in the DB.
 // Therefore if both are nil then it will compact entire DB.
 func (db *Database) Compact(start []byte, limit []byte) error {
-	return db.handleError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
+	db.lock.RLock()
+	defer db.lock.RUnlock()
+
+	switch {
+	case db.db == nil:
+		return database.ErrClosed
+	case db.corrupted():
+		return database.ErrAvoidCorruption
+	}
+
+	db.db.CompactRange(grocksdb.Range{Start: start, Limit: limit})
+	return nil
 }
 
 // Close implements the Database interface
-func (db *Database) Close() error { return db.handleError(db.DB.Close()) }
+func (db *Database) Close() error {
+	db.lock.Lock()
+	defer db.lock.Unlock()
 
-func (db *Database) handleError(err error) error {
-	err = updateError(err)
-	// If we get an error other than "not found" or "closed", disallow future
-	// database operations to avoid possible corruption
-	if err != nil && err != database.ErrNotFound && err != database.ErrClosed {
-		db.log.Fatal("leveldb error: %w", err)
-		db.errored = true
+	if db.db == nil {
+		return database.ErrClosed
 	}
-	return err
+
+	db.readOptions.Destroy()
+	db.iteratorOptions.Destroy()
+	db.writeOptions.Destroy()
+	db.db.Close()
+
+	db.db = nil
+	return nil
+}
+
+func (db *Database) corrupted() bool {
+	return atomic.LoadUint64(&db.errored) == 1
 }
 
 // batch is a wrapper around a levelDB batch to contain sizes.
 type batch struct {
-	leveldb.Batch
-	db   *Database
-	size int
+	batch *grocksdb.WriteBatch
+	db    *Database
+	size  int
 }
 
 // Put the value into the batch for later writing
 func (b *batch) Put(key, value []byte) error {
-	b.Batch.Put(key, value)
-	b.size += len(key) + len(value) + levelDBByteOverhead
+	b.batch.Put(key, value)
+	b.size += len(key) + len(value) + rocksDBByteOverhead
 	return nil
 }
 
 // Delete the key during writing
 func (b *batch) Delete(key []byte) error {
-	b.Batch.Delete(key)
-	b.size += len(key) + levelDBByteOverhead
+	b.batch.Delete(key)
+	b.size += len(key) + rocksDBByteOverhead
 	return nil
 }
 
@@ -194,68 +356,94 @@ func (b *batch) Size() int { return b.size }
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
-	if b.db.errored {
+	b.db.lock.RLock()
+	defer b.db.lock.RUnlock()
+
+	switch {
+	case b.db.db == nil:
+		return database.ErrClosed
+	case b.db.corrupted():
 		return database.ErrAvoidCorruption
 	}
-	return b.db.handleError(b.db.DB.Write(&b.Batch, nil))
+	return b.db.db.Write(b.db.writeOptions, b.batch)
 }
 
 // Reset resets the batch for reuse.
 func (b *batch) Reset() {
-	b.Batch.Reset()
+	b.batch.Clear()
 	b.size = 0
 }
 
 // Replay the batch contents.
 func (b *batch) Replay(w database.KeyValueWriter) error {
-	replay := &replayer{writer: w}
-	if err := b.Batch.Replay(replay); err != nil {
-		// Never actually returns an error, because Replay just returns nil
-		return b.db.handleError(err)
+	it := b.batch.NewIterator()
+	for it.Next() {
+		rec := it.Record()
+		switch rec.Type {
+		case
+			grocksdb.WriteBatchDeletionRecord,
+			grocksdb.WriteBatchSingleDeletionRecord:
+			if err := w.Delete(rec.Key); err != nil {
+				return err
+			}
+		case grocksdb.WriteBatchValueRecord:
+			if err := w.Put(rec.Key, rec.Value); err != nil {
+				return err
+			}
+		}
 	}
-	return b.db.handleError(replay.err)
+	return nil
 }
 
-// Inner returns itself
-func (b *batch) Inner() database.Batch { return b }
-
-type replayer struct {
-	writer database.KeyValueWriter
-	err    error
+type iter struct {
+	it            *grocksdb.Iterator
+	db            *Database
+	expectsPrefix bool
+	prefix        []byte
+	started       bool
+	key           []byte
+	value         []byte
 }
-
-func (r *replayer) Put(key, value []byte) {
-	if r.err != nil {
-		return
-	}
-	r.err = r.writer.Put(key, value)
-}
-
-func (r *replayer) Delete(key []byte) {
-	if r.err != nil {
-		return
-	}
-	r.err = r.writer.Delete(key)
-}
-
-type iter struct{ iterator.Iterator }
 
 // Error implements the Iterator interface
-func (it *iter) Error() error { return updateError(it.Iterator.Error()) }
+func (it *iter) Error() error { return it.it.Err() }
 
 // Key implements the Iterator interface
-func (it *iter) Key() []byte { return utils.CopyBytes(it.Iterator.Key()) }
+func (it *iter) Key() []byte {
+	return utils.CopyBytes(it.key)
+}
 
 // Value implements the Iterator interface
-func (it *iter) Value() []byte { return utils.CopyBytes(it.Iterator.Value()) }
+func (it *iter) Value() []byte {
+	return utils.CopyBytes(it.value)
+}
 
-func updateError(err error) error {
-	switch err {
-	case leveldb.ErrClosed:
-		return database.ErrClosed
-	case leveldb.ErrNotFound:
-		return database.ErrNotFound
-	default:
-		return err
+func (it *iter) Release() {
+	it.db.lock.RLock()
+	defer it.db.lock.RUnlock()
+
+	if it.db.db != nil {
+		it.it.Close()
 	}
+}
+
+func (it *iter) Next() bool {
+	if it.started {
+		it.it.Next()
+	}
+	it.started = true
+	valid := it.it.Valid()
+	if !valid {
+		it.key = nil
+		it.value = nil
+	} else {
+		it.key = it.it.Key().Data()
+		it.value = it.it.Value().Data()
+		if it.expectsPrefix && !bytes.HasPrefix(it.key, it.prefix) {
+			valid = false
+			it.key = nil
+			it.value = nil
+		}
+	}
+	return valid
 }

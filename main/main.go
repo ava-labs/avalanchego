@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils"
@@ -59,14 +60,24 @@ func main() {
 	fmt.Println(header)
 
 	var db database.Database
-	if Config.DBEnabled {
-		db, err = leveldb.New(Config.DBPath, log, 0, 0, 0)
+	switch Config.DBName {
+	case leveldb.Name:
+		db, err = leveldb.New(Config.DBPath, log)
 		if err != nil {
-			log.Error("couldn't open database at %s: %s", Config.DBPath, err)
+			log.Error("couldn't open leveldb at %s: %s", Config.DBPath, err)
 			return
 		}
-	} else {
+	case rocksdb.Name:
+		db, err = rocksdb.New(Config.DBPath, log)
+		if err != nil {
+			log.Error("couldn't open rocksdb at %s: %s", Config.DBPath, err)
+			return
+		}
+	case memdb.Name:
 		db = memdb.New()
+	default:
+		log.Error("unknown database type %s", Config.DBName)
+		return
 	}
 
 	defer func() {

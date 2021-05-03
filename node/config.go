@@ -45,8 +45,8 @@ type Config struct {
 	// Path to database
 	DBPath string
 
-	// If false, uses an in memory database
-	DBEnabled bool
+	// Name of the database type to use
+	DBName string
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc

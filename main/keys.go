@@ -21,7 +21,7 @@ const (
 	stakeMintingPeriodKey                   = "stake-minting-period"
 	assertionsEnabledKey                    = "assertions-enabled"
 	signatureVerificationEnabledKey         = "signature-verification-enabled"
-	dbEnabledKey                            = "db-enabled"
+	dbTypeKey                               = "db-type"
 	dbPathKey                               = "db-dir"
 	publicIPKey                             = "public-ip"
 	dynamicUpdateDurationKey                = "dynamic-update-duration"

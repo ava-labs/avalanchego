@@ -14,6 +14,9 @@ import (
 )
 
 const (
+	// Name is the name of this database for database switches
+	Name = "mem"
+
 	// DefaultSize is the default initial size of the memory database
 	DefaultSize = 1 << 10
 )

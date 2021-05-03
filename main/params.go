@@ -21,6 +21,7 @@ import (
 
 	"github.com/kardianos/osext"
 
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -96,7 +97,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint64(txFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
 	fs.Uint64(creationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 	// Database
-	fs.Bool(dbEnabledKey, true, "Turn on persistent storage")
+	fs.String(dbTypeKey, leveldb.Name, "Database type to use. Should be one of {level, rocks, mem}")
 	fs.String(dbPathKey, defaultDbDir, "Path to database directory")
 	// Coreth Config
 	fs.String(corethConfigKey, defaultString, "Specifies config to pass into coreth")
@@ -320,12 +321,12 @@ func setNodeConfig(v *viper.Viper) error {
 	Config.NetworkID = networkID
 
 	// DB:
-	Config.DBEnabled = v.GetBool(dbEnabledKey)
+	Config.DBName = v.GetString(dbTypeKey)
 	Config.DBPath = os.ExpandEnv(v.GetString(dbPathKey))
 	if Config.DBPath == defaultString {
 		Config.DBPath = defaultDbDir
 	}
-	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID), dbVersion)
+	Config.DBPath = path.Join(Config.DBPath, constants.NetworkName(Config.NetworkID), dbVersion, Config.DBName)
 
 	// IP Configuration
 	// Resolves our public IP, or does nothing
