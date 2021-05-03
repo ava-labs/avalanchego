@@ -386,17 +386,6 @@ func GenesisBlockForTesting(db ethdb.Database, addr common.Address, balance *big
 // 	}
 // }
 
-// func DefaultYoloV1GenesisBlock() *Genesis {
-// 	return &Genesis{
-// 		Config:     params.YoloV1ChainConfig,
-// 		Timestamp:  0x5ed754f1,
-// 		ExtraData:  hexutil.MustDecode("0x00000000000000000000000000000000000000000000000000000000000000008a37866fd3627c9205a37c8685666f32ec07bb1b0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-// 		GasLimit:   0x47b760,
-// 		Difficulty: big.NewInt(1),
-// 		Alloc:      decodePrealloc(yoloV1AllocData),
-// 	}
-// }
-
 // // DeveloperGenesisBlock returns the 'geth --dev' genesis block.
 // func DeveloperGenesisBlock(period uint64, faucet common.Address) *Genesis {
 // 	// Override the default period to the user requested one

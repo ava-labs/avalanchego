@@ -56,7 +56,7 @@ func ExampleGenerateChain() {
 	}
 	genesis := gspec.MustCommit(db)
 
-	// This call generates a chain of 5 blocks. The function runs for
+	// This call generates a chain of 3 blocks. The function runs for
 	// each block and adds different features to gen based on the
 	// block index.
 	signer := types.HomesteadSigner{}

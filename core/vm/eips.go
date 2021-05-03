@@ -165,8 +165,6 @@ func enableAP1(jt *JumpTable) {
 }
 
 func enableAP2(jt *JumpTable) {
-	enable2929(jt)
-
 	jt[BALANCEMC] = nil
 	jt[CALLEX] = nil
 }
