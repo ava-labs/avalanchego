@@ -158,14 +158,9 @@ func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address,
 	// when we're in homestead this also counts for code storage gas errors.
 	if err != nil {
 		evm.StateDB.RevertToSnapshot(snapshot)
-		// If there is an error, it has already been logged,
-		// so we convert it to [ErrExecutionReverted] here
-		// to prevent consuming all of the gas. This is the
-		// equivalent of adding a conditional revert.
-		err = ErrExecutionReverted
-		// if err != ErrExecutionReverted {
-		// 	remainingGas = 0
-		// }
+		if err != ErrExecutionReverted {
+			remainingGas = 0
+		}
 		// TODO: consider clearing up unused snapshots:
 		//} else {
 		//	evm.StateDB.DiscardSnapshot(snapshot)
