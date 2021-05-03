@@ -264,14 +264,16 @@ func TestStatefulPrecompile(t *testing.T) {
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
 			expectedResult:       nil,
-			name:                 "native asset call: normal transfer + multicoin",
+			name:                 "native asset call: multicoin transfer",
 			stateDBCheck: func(t *testing.T, stateDB StateDB) {
 				user1Balance := stateDB.GetBalance(userAddr1)
+				user2Balance := stateDB.GetBalance(userAddr2)
 				user1AssetBalance := stateDB.GetBalanceMultiCoin(userAddr1, assetID)
 				user2AssetBalance := stateDB.GetBalanceMultiCoin(userAddr2, assetID)
-
 				expectedBalance := big.NewInt(50)
+
 				assert.Equal(t, bigHundred, user1Balance, "user 1 balance")
+				assert.Equal(t, big0, user2Balance, "user 2 balance")
 				assert.Equal(t, expectedBalance, user1AssetBalance, "user 1 asset balance")
 				assert.Equal(t, expectedBalance, user2AssetBalance, "user 2 asset balance")
 			},
