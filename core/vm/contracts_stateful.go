@@ -4,13 +4,11 @@
 package vm
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/holiman/uint256"
 )
 
@@ -21,9 +19,9 @@ import (
 // BLS12-381 Curve Operations added to the set of precompiled contracts
 
 var (
-	genesisMulticoinContractAddr = common.HexToAddress("0x0100000000000000000000000000000000000000")
-	nativeAssetBalanceAddr       = common.HexToAddress("0x0100000000000000000000000000000000000001")
-	nativeAssetCallAddr          = common.HexToAddress("0x0100000000000000000000000000000000000002")
+	genesisContractAddr    = common.HexToAddress("0x0100000000000000000000000000000000000000")
+	nativeAssetBalanceAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
+	nativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
 )
 
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
@@ -33,7 +31,7 @@ type StatefulPrecompiledContract interface {
 	// Run executes a precompiled contract in the current state
 	// assumes that it has already been verified that [caller] can
 	// transfer [value].
-	Run(evm *EVM, caller ContractRef, addr common.Address, value *big.Int, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
+	Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
 }
 
 // wrappedPrecompiledContract implements StatefulPrecompiledContract by wrapping stateless native precompiled contracts
@@ -47,11 +45,7 @@ func newWrappedPrecompiledContract(p PrecompiledContract) StatefulPrecompiledCon
 }
 
 // Run implements the StatefulPrecompiledContract interface
-func (w *wrappedPrecompiledContract) Run(evm *EVM, caller ContractRef, addr common.Address, value *big.Int, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	// [caller.Address()] has already been verified
-	// as having a sufficient balance before the
-	// precompiled contract runs.
-	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value)
+func (w *wrappedPrecompiledContract) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	return RunPrecompiledContract(w.p, input, suppliedGas)
 }
 
@@ -78,16 +72,12 @@ func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, e
 }
 
 // Run implements StatefulPrecompiledContract
-func (b *nativeAssetBalance) Run(evm *EVM, caller ContractRef, addr common.Address, value *big.Int, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (b *nativeAssetBalance) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// input: encodePacked(address 20 bytes, assetID 32 bytes)
 	if suppliedGas < b.gasCost {
 		return nil, 0, ErrOutOfGas
 	}
 	remainingGas = suppliedGas - b.gasCost
-
-	if value.Sign() != 0 {
-		return nil, remainingGas, ErrExecutionReverted
-	}
 
 	address, assetID, err := UnpackNativeAssetBalanceInput(input)
 	if err != nil {
@@ -129,7 +119,7 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, *common.Hash, *bi
 }
 
 // Run implements StatefulPrecompiledContract
-func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address, value *big.Int, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	// input: encodePacked(address 20 bytes, assetID 32 bytes, assetAmount 32 bytes, callData variable length bytes)
 	if suppliedGas < c.gasCost {
 		return nil, 0, ErrOutOfGas
@@ -159,8 +149,7 @@ func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address,
 		evm.StateDB.CreateAccount(to)
 	}
 
-	// Send [value] to [to] address
-	evm.Context.Transfer(evm.StateDB, caller.Address(), to, value)
+	// Send [assetAmount] of [assetID] to [to] address
 	evm.Context.TransferMultiCoin(evm.StateDB, caller.Address(), to, assetID, assetAmount)
 	ret, remainingGas, err = evm.Call(caller, to, callData, remainingGas, big.NewInt(0))
 
@@ -184,59 +173,8 @@ func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address,
 	return ret, remainingGas, err
 }
 
-var (
-	transferSignature   = EncodeSignatureHash("transfer(address,uint256,uint256,uint256)")
-	getBalanceSignature = EncodeSignatureHash("getBalance(uint256)")
-)
+type deprecatedContract struct{}
 
-func EncodeSignatureHash(functionSignature string) []byte {
-	hash := crypto.Keccak256([]byte(functionSignature))
-	return hash[:4]
-}
-
-// genesisContract mimics the genesis contract Multicoin.sol in the original
-// coreth release. It does this by mapping function identifiers to their new
-// implementations via the native asset precompiled contracts.
-type genesisContract struct{}
-
-func (g *genesisContract) Run(evm *EVM, caller ContractRef, addr common.Address, value *big.Int, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if len(input) < 4 {
-		return nil, suppliedGas, ErrExecutionReverted
-	}
-
-	if value.Sign() != 0 {
-		return nil, suppliedGas, ErrExecutionReverted
-	}
-
-	functionSignature := input[:4]
-	switch {
-	case bytes.Equal(functionSignature, transferSignature):
-		if len(input) != 132 {
-			return nil, suppliedGas, ErrExecutionReverted
-		}
-
-		// address / value1 / assetID / assetAmount
-		args := input[4:]
-		// Require that the left padded bytes are all zeroes
-		if !bytes.Equal(args[0:12], make([]byte, 12)) {
-			return nil, suppliedGas, ErrExecutionReverted
-		}
-		addressBytes := args[12:32]
-		callAssetArgs := make([]byte, 84)
-		copy(callAssetArgs[:20], addressBytes)
-		newValue := new(big.Int).SetBytes(args[32:64])
-		copy(callAssetArgs[20:52], args[64:96])  // Copy the assetID bytes
-		copy(callAssetArgs[52:84], args[96:128]) // Copy the assetAmount to be transferred
-		return evm.Call(caller, nativeAssetCallAddr, callAssetArgs, suppliedGas, newValue)
-	case bytes.Equal(functionSignature, getBalanceSignature):
-		if len(input) != 36 {
-			return nil, suppliedGas, ErrExecutionReverted
-		}
-		balanceArgs := make([]byte, 52)
-		copy(balanceArgs[:20], caller.Address().Bytes())
-		copy(balanceArgs[20:52], input[4:36])
-		return evm.Call(caller, nativeAssetBalanceAddr, balanceArgs, suppliedGas, value)
-	default:
-		return nil, suppliedGas, ErrExecutionReverted
-	}
+func (_ *deprecatedContract) Run(evm *EVM, caller ContractRef, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+	return nil, suppliedGas, ErrExecutionReverted
 }
