@@ -11,3 +11,4 @@ dockerhub_repo="avaplatform/avalanchego"
 
 # Current branch
 current_branch=${CURRENT_BRANCH:-$(git branch --show-current)}
+echo "Using branch: ${current_branch}"
