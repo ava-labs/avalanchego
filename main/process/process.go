@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
@@ -156,11 +155,8 @@ func (a *App) Start() int {
 
 	a.log.Info("this node's IP is set to: %s", a.config.StakingIP.IP())
 	a.node = &node.Node{}
-	restarter := &restarter{
-		node:          a.node,
-		shouldRestart: &utils.AtomicBool{},
-	}
-	if err := a.node.Initialize(&a.config, db, a.log, a.logFactory, restarter); err != nil {
+
+	if err := a.node.Initialize(&a.config, db, a.log, a.logFactory); err != nil {
 		a.log.Error("error initializing node: %s", err)
 		return 1
 	}
@@ -184,19 +180,4 @@ func (a *App) Stop() {
 		return
 	}
 	a.node.Shutdown()
-}
-
-// restarter implements utils.Restarter
-type restarter struct {
-	node *node.Node
-	// If true, node should restart after shutting down
-	shouldRestart *utils.AtomicBool
-}
-
-// Restarter shuts down the node and marks that it should restart
-// It is safe to call Restart multiple times
-func (r *restarter) Restart() {
-	r.shouldRestart.SetValue(true)
-	// Shutdown is safe to call multiple times because it uses sync.Once
-	r.node.Shutdown()
 }

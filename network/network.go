@@ -179,27 +179,6 @@ type network struct {
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
 
-	// True if the node should restart if it detects it's disconnected from all peers
-	restartOnDisconnected bool
-
-	// Signals the connection checker to close when Network is shutdown.
-	// See restartOnDisconnect()
-	connectedCheckerCloser chan struct{}
-
-	// Used to monitor whether the node is connected to peers. If the node has
-	// been connected to at least one peer in the last [disconnectedRestartTimeout]
-	// then connectedMeter.Ticks() is non-zero.
-	connectedMeter timer.TimedMeter
-
-	// How often we check that we're connected to at least one peer.
-	// Used to update [connectedMeter].
-	// If 0, node will not restart even if it has no peers.
-	disconnectedCheckFreq time.Duration
-
-	// restarter can shutdown and restart the node.
-	// If nil, node will not restart even if it has no peers.
-	restarter utils.Restarter
-
 	hasMasked        bool
 	maskedValidators ids.ShortSet
 
@@ -247,10 +226,6 @@ func NewDefaultNetwork(
 	router router.Router,
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
-	restarter utils.Restarter,
-	restartOnDisconnected bool,
-	disconnectedCheckFreq time.Duration,
-	disconnectedRestartTimeout time.Duration,
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
@@ -292,10 +267,6 @@ func NewDefaultNetwork(
 		connMeterResetDuration,
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
-		restarter,
-		restartOnDisconnected,
-		disconnectedCheckFreq,
-		disconnectedRestartTimeout,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -339,10 +310,6 @@ func NewNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterCacheSize int,
 	connMeterMaxConns int,
-	restarter utils.Restarter,
-	restartOnDisconnected bool,
-	disconnectedCheckFreq time.Duration,
-	disconnectedRestartTimeout time.Duration,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -393,11 +360,6 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
-		restartOnDisconnected:              restartOnDisconnected,
-		connectedCheckerCloser:             make(chan struct{}),
-		disconnectedCheckFreq:              disconnectedCheckFreq,
-		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
-		restarter:                          restarter,
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
@@ -407,12 +369,6 @@ func NewNetwork(
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
-	}
-	if restartOnDisconnected && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
-		log.Info("node will restart if not connected to any peers")
-		// pre-queue one tick to avoid immediate shutdown.
-		netw.connectedMeter.Tick()
-		go netw.restartOnDisconnect()
 	}
 	return netw
 }
@@ -953,8 +909,6 @@ func (n *network) Close() error {
 
 func (n *network) close() {
 	n.log.Info("shutting down network")
-	// Stop checking whether we're connected to peers.
-	close(n.connectedCheckerCloser)
 
 	if err := n.listener.Close(); err != nil {
 		n.log.Debug("closing network listener failed with: %s", err)
@@ -1517,38 +1471,6 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 		return nil
 	}
 	return n.peers[validatorID]
-}
-
-// restartOnDisconnect checks every [n.disconnectedCheckFreq] whether this node is connected
-// to any peers. If the node is not connected to any peers for [disconnectedRestartTimeout],
-// restarts the node.
-func (n *network) restartOnDisconnect() {
-	ticker := time.NewTicker(n.disconnectedCheckFreq)
-	for {
-		select {
-		case <-ticker.C:
-			if n.closed.GetValue() {
-				return
-			}
-			n.stateLock.RLock()
-			for _, peer := range n.peers {
-				if peer != nil && peer.connected.GetValue() {
-					n.connectedMeter.Tick()
-					break
-				}
-			}
-			n.stateLock.RUnlock()
-			if n.connectedMeter.Ticks() != 0 {
-				continue
-			}
-			ticker.Stop()
-			n.log.Info("restarting node due to no peers")
-			go n.restarter.Restart()
-		case <-n.connectedCheckerCloser:
-			ticker.Stop()
-			return
-		}
-	}
 }
 
 // HealthCheck returns information about several network layer health checks.

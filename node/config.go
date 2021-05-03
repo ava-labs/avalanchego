@@ -130,11 +130,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Restart on disconnect settings
-	RestartOnDisconnected      bool
-	DisconnectedCheckFreq      time.Duration
-	DisconnectedRestartTimeout time.Duration
-
 	// Coreth
 	CorethConfig string
 
