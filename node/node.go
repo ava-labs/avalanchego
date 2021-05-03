@@ -12,10 +12,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/admin"
@@ -58,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/timestampvm"
+	"github.com/hashicorp/go-plugin"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
@@ -132,9 +131,6 @@ type Node struct {
 	// This node's configuration
 	Config *Config
 
-	// channel for closing the node
-	nodeCloser chan<- os.Signal
-
 	// ensures that we only close the node once.
 	shutdownOnce sync.Once
 
@@ -144,9 +140,6 @@ type Node struct {
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
 	doneShuttingDown sync.WaitGroup
-
-	// Restarter can shutdown and restart the node
-	restarter utils.Restarter
 }
 
 /*
@@ -259,21 +252,12 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
-		n.restarter,
-		n.Config.RestartOnDisconnected,
-		n.Config.DisconnectedCheckFreq,
-		n.Config.DisconnectedRestartTimeout,
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
 		tlsKey,
 	)
-
-	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		// errors are already logged internally if they are meaningful
-		n.Shutdown()
-	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }
@@ -892,12 +876,10 @@ func (n *Node) Initialize(
 	db database.Database,
 	logger logging.Logger,
 	logFactory logging.Factory,
-	restarter utils.Restarter,
 ) error {
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = config
-	n.restarter = restarter
 	n.doneShuttingDown.Add(1)
 	n.Log.Info("Node version is: %s", Version)
 
@@ -997,7 +979,7 @@ func (n *Node) shutdown() {
 	if err := n.indexer.Close(); err != nil {
 		n.Log.Debug("error closing tx indexer: %w", err)
 	}
-	utils.ClearSignals(n.nodeCloser)
+	plugin.CleanupClients()
 	n.doneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }
