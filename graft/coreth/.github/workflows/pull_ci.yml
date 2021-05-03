@@ -14,28 +14,11 @@ jobs:
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
-    - run: .ci/lint.sh
-      shell: bash
-  test:
-    name: Golang v${{ matrix.go }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        go: ['1.15']
-        os: [macos-10.15, ubuntu-18.04, ubuntu-20.04, windows-latest]
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v1
-      with:
-        go-version: ${{ matrix.go }}
-    - run: go mod download
-      shell: bash
-    - run: ./scripts/build.sh evm
-      shell: bash
-    - run: ./scripts/build_test.sh
+    - run: .github/workflows/lint.sh
       shell: bash
   e2e:
     name: Golang E2E Tests v${{ matrix.go }} (${{ matrix.os }})
+    needs: lint
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -46,8 +29,10 @@ jobs:
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
-    - run: ./.ci/run_e2e_tests.sh
+    - run: .github/workflows/run_e2e_tests.sh --parallelism 3 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
       shell: bash
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
+        KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
