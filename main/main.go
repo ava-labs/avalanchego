@@ -44,13 +44,14 @@ func main() {
 	c := Config
 	// Create the logger
 	logFactory := logging.NewFactory(c.LoggingConfig)
-	defer logFactory.Close()
 
 	log, err := logFactory.Make()
 	if err != nil {
+		logFactory.Close()
 		fmt.Printf("starting logger failed with: %s\n", err)
 		os.Exit(1)
 	}
+
 	app := process.NewApp(c, logFactory, log)
 	if c.PluginMode {
 		plugin.Serve(&plugin.ServeConfig{
@@ -80,5 +81,7 @@ func main() {
 	)
 	// Start the node
 	exitCode := app.Start()
+
+	logFactory.Close()
 	os.Exit(exitCode)
 }
