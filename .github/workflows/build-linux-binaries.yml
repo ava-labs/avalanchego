@@ -48,6 +48,7 @@ jobs:
         RELEASE: "focal"
 
   build-arm64-binaries-tarball:
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
     runs-on: [self-hosted, linux, ARM64, bionic]
 
     steps:
