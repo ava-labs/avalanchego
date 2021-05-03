@@ -75,22 +75,23 @@ type JumpTable [256]*operation
 
 // newApricotPhase1InstructionSet returns the frontier,
 // homestead, byzantium, contantinople petersburg,
-// and istanbul instructions.
-func newApricotPhase1InstructionSet() JumpTable {
-	instructionSet := newIstanbulInstructionSet()
+// istanbul, and apricotPhase1 instructions.
+func newApricotPhase2InstructionSet() JumpTable {
+	instructionSet := newApricotPhase1InstructionSet()
 
-	enableAP1(&instructionSet)
+	enable2929(&instructionSet)
+	enableAP2(&instructionSet)
 
 	return instructionSet
 }
 
 // newApricotPhase1InstructionSet returns the frontier,
 // homestead, byzantium, contantinople petersburg,
-// istanbul, and apricotPhase1 instructions.
-func newApricotPhase2InstructionSet() JumpTable {
-	instructionSet := newApricotPhase1InstructionSet()
+// and istanbul instructions.
+func newApricotPhase1InstructionSet() JumpTable {
+	instructionSet := newIstanbulInstructionSet()
 
-	enableAP2(&instructionSet)
+	enableAP1(&instructionSet)
 
 	return instructionSet
 }

@@ -187,7 +187,6 @@ func (n *Node) Config() *Config {
 //
 // // InstanceDir retrieves the instance directory used by the protocol stack.
 // func (n *Node) InstanceDir() string {
-// 	// TODO: remove?
 // 	// Original code:
 // 	// return n.config.instanceDir()
 // 	return ""
