@@ -293,6 +293,13 @@ type InternalHandler interface {
 	// Gossip to the network a container on the accepted frontier
 	Gossip() error
 
+	// Halt this engine.
+	//
+	// This function will be called before the environment starts exiting. This
+	// function is slightly special, in that it does not expect the chain's
+	// context lock to be held before calling this function.
+	Halt()
+
 	// Shutdown this engine.
 	//
 	// This function will be called when the environment is exiting.

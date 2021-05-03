@@ -19,6 +19,7 @@ type EngineTest struct {
 	CantIsBootstrapped,
 	CantStartup,
 	CantGossip,
+	CantHalt,
 	CantShutdown,
 
 	CantContext,
@@ -54,6 +55,7 @@ type EngineTest struct {
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
+	HaltF                                              func()
 	StartupF, GossipF, ShutdownF                       func() error
 	NotifyF                                            func(Message) error
 	GetF, GetAncestorsF, PullQueryF                    func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
@@ -76,6 +78,7 @@ func (e *EngineTest) Default(cant bool) {
 
 	e.CantStartup = cant
 	e.CantGossip = cant
+	e.CantHalt = cant
 	e.CantShutdown = cant
 
 	e.CantContext = cant
@@ -145,6 +148,14 @@ func (e *EngineTest) Gossip() error {
 		e.T.Fatalf("Unexpectedly called Gossip")
 	}
 	return errors.New("unexpectedly called Gossip")
+}
+
+func (e *EngineTest) Halt() {
+	if e.HaltF != nil {
+		e.HaltF()
+	} else if e.CantHalt && e.T != nil {
+		e.T.Fatalf("Unexpectedly called Halt")
+	}
 }
 
 func (e *EngineTest) Shutdown() error {
