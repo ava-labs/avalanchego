@@ -252,6 +252,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 		}
 		evm.StateDB.CreateAccount(addr)
 	}
+	evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value)
 
 	// Capture the tracer start/end events in debug mode
 	if evm.vmConfig.Debug && evm.depth == 0 {
@@ -262,18 +263,8 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 	}
 
 	if isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, value, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
 	} else {
-		// Note: Transfer has been moved from above into the else branch in order to allow
-		// stateful precompiled contracts to handle a value transfer explicitly. For example,
-		// wrapped precompiled contracts transfer prior to execution as normal, whereas native
-		// asset balance can prevent an accidental transfer to the precompiled contract address.
-		// This does change the call pattern for the Tracer where before CaptureStart was
-		// called after Transfer. Currently, none of the Tracers invoke the database during
-		// CaptureStart, but instead check on it within CaptureState, which is called step by
-		// step within the interpreter, such that this move should not impact the behavior
-		// of the current Tracers.
-		evm.Context.Transfer(evm.StateDB, caller.Address(), addr, value)
 		// Initialise a new contract and set the code that is to be used by the EVM.
 		// The contract is a scoped environment for this execution context only.
 		code := evm.StateDB.GetCode(addr)
@@ -407,7 +398,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, big0, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and set the code that is to be used by the EVM.
@@ -443,7 +434,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 
 	// It is allowed to call precompiles, even via delegatecall
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, big0, input, gas, evm.interpreter.readOnly)
+		ret, gas, err = p.Run(evm, caller, addr, input, gas, evm.interpreter.readOnly)
 	} else {
 		addrCopy := addr
 		// Initialise a new contract and make initialise the delegate values
@@ -487,7 +478,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 	evm.StateDB.AddBalance(addr, big0)
 
 	if p, isPrecompile := evm.precompile(addr); isPrecompile {
-		ret, gas, err = p.Run(evm, caller, addr, big0, input, gas, true)
+		ret, gas, err = p.Run(evm, caller, addr, input, gas, true)
 	} else {
 		// At this point, we use a copy of address. If we don't, the go compiler will
 		// leak the 'contract' to the outer scope, and make allocation for 'contract'

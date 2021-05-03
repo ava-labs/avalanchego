@@ -115,81 +115,7 @@ func TestStatefulPrecompile(t *testing.T) {
 	bigFifty.FillBytes(fiftyBytes)
 	bigHundred.FillBytes(oneHundredBytes)
 
-	genesisContractBalanceInput := make([]byte, 36)
-	copy(genesisContractBalanceInput[0:4], getBalanceSignature)
-	copy(genesisContractBalanceInput[4:36], assetID.Bytes())
-
-	genesisContractTransferInput := make([]byte, 132)
-	copy(genesisContractTransferInput[0:4], transferSignature)
-	// This might be incorrect copy
-	copy(genesisContractTransferInput[16:36], userAddr2.Bytes()) // to
-	copy(genesisContractTransferInput[36:68], fiftyBytes)        // value
-	copy(genesisContractTransferInput[68:100], assetID.Bytes())  // assetID
-	copy(genesisContractTransferInput[100:132], fiftyBytes)      // assetAmount
-
 	tests := []statefulContractTest{
-		{
-			setupStateDB: func() StateDB {
-				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				// Create account
-				statedb.CreateAccount(userAddr1)
-				// Set balance to pay for gas fee
-				statedb.SetBalance(userAddr1, bigHundred)
-				// Set MultiCoin balance
-				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
-				statedb.Finalise(true)
-				return statedb
-			},
-			from:                 userAddr1,
-			precompileAddr:       genesisMulticoinContractAddr,
-			input:                genesisContractBalanceInput,
-			value:                big0,
-			gasInput:             params.AssetBalanceApricot,
-			expectedGasRemaining: 0,
-			expectedErr:          nil,
-			expectedResult:       oneHundredBytes,
-			name:                 "genesis contract native asset balance",
-		},
-		{
-			setupStateDB: func() StateDB {
-				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				// Create account
-				statedb.CreateAccount(userAddr1)
-				// Set balance to pay for gas fee
-				statedb.SetBalance(userAddr1, bigHundred)
-				// Set MultiCoin balance
-				statedb.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
-				statedb.Finalise(true)
-				return statedb
-			},
-			from:                 userAddr1,
-			precompileAddr:       genesisMulticoinContractAddr,
-			input:                genesisContractTransferInput,
-			value:                big0,
-			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
-			expectedGasRemaining: 0,
-			expectedErr:          nil,
-			expectedResult:       nil,
-			name:                 "genesis contract native asset call",
-			stateDBCheck: func(t *testing.T, stateDB StateDB) {
-				user1Balance := stateDB.GetBalance(userAddr1)
-				user2Balance := stateDB.GetBalance(userAddr2)
-				user1AssetBalance := stateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := stateDB.GetBalanceMultiCoin(userAddr2, assetID)
-
-				expectedBalance := big.NewInt(50)
-				assert.Equal(t, expectedBalance, user1Balance, "user 1 balance")
-				assert.Equal(t, expectedBalance, user2Balance, "user 2 balance")
-				assert.Equal(t, expectedBalance, user1AssetBalance, "user 1 asset balance")
-				assert.Equal(t, expectedBalance, user2AssetBalance, "user 2 asset balance")
-			},
-		},
 		{
 			setupStateDB: func() StateDB {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
@@ -326,25 +252,6 @@ func TestStatefulPrecompile(t *testing.T) {
 					t.Fatal(err)
 				}
 				statedb.SetBalance(userAddr1, bigHundred)
-				return statedb
-			},
-			from:                 userAddr1,
-			precompileAddr:       nativeAssetBalanceAddr,
-			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
-			value:                bigHundred,
-			gasInput:             params.AssetBalanceApricot,
-			expectedGasRemaining: 0,
-			expectedErr:          ErrExecutionReverted,
-			expectedResult:       nil,
-			name:                 "native asset balance: non-zero value with sufficient funds reverts",
-		},
-		{
-			setupStateDB: func() StateDB {
-				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				statedb.SetBalance(userAddr1, bigHundred)
 				statedb.SetBalanceMultiCoin(userAddr1, assetID, bigHundred)
 				statedb.Finalise(true)
 				return statedb
@@ -352,7 +259,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       nativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
-			value:                big.NewInt(50),
+			value:                big0,
 			gasInput:             params.AssetCallApricot + params.CallNewAccountGas,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
@@ -360,13 +267,11 @@ func TestStatefulPrecompile(t *testing.T) {
 			name:                 "native asset call: normal transfer + multicoin",
 			stateDBCheck: func(t *testing.T, stateDB StateDB) {
 				user1Balance := stateDB.GetBalance(userAddr1)
-				user2Balance := stateDB.GetBalance(userAddr2)
 				user1AssetBalance := stateDB.GetBalanceMultiCoin(userAddr1, assetID)
 				user2AssetBalance := stateDB.GetBalanceMultiCoin(userAddr2, assetID)
 
 				expectedBalance := big.NewInt(50)
-				assert.Equal(t, expectedBalance, user1Balance, "user 1 balance")
-				assert.Equal(t, expectedBalance, user2Balance, "user 2 balance")
+				assert.Equal(t, bigHundred, user1Balance, "user 1 balance")
 				assert.Equal(t, expectedBalance, user1AssetBalance, "user 1 asset balance")
 				assert.Equal(t, expectedBalance, user2AssetBalance, "user 2 asset balance")
 			},
