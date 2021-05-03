@@ -1,5 +1,4 @@
 .ci
-.git
 .github
 .gitignore
 .golangci.yml
