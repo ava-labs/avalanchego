@@ -4,9 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Skip if this is not on the main public repo or
-# if this is not a trusted build (Docker Credentials are not set)
-if [[ $TRAVIS_REPO_SLUG != "ava-labs/avalanchego" || -z "$DOCKER_USERNAME"  ]]; then
+# If this is not a trusted build (Docker Credentials are not set)
+if [[ -z "$DOCKER_USERNAME"  ]]; then
   exit 0;
 fi
 

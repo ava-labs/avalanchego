@@ -29,7 +29,10 @@ jobs:
         run: .github/workflows/run_e2e_tests.sh --parallelism 7 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
 
       - name: Publish image to DockerHub
+        # only publish images from ava-labs/avalanchego
+        if: github.repository == 'ava-labs/avalanchego'
         env:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
+
         run: .github/workflows/publish_image.sh
