@@ -38,7 +38,6 @@ import (
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 func tmpKeyStoreIface(t *testing.T, encrypted bool) (dir string, ks keyStore) {
@@ -193,27 +192,29 @@ func TestV3_Scrypt_2(t *testing.T) {
 	testDecryptV3(tests["test2"], t)
 }
 
-func TestV1_1(t *testing.T) {
-	t.Parallel()
-	tests := loadKeyStoreTestV1("testdata/v1_test_vector.json", t)
-	testDecryptV1(tests["test1"], t)
-}
+// ORIGINAL CODE - this tests eats up GB's of memory
+// func TestV1_1(t *testing.T) {
+// 	t.Parallel()
+// 	tests := loadKeyStoreTestV1("testdata/v1_test_vector.json", t)
+// 	testDecryptV1(tests["test1"], t)
+// }
 
-func TestV1_2(t *testing.T) {
-	t.Parallel()
-	ks := &keyStorePassphrase{"testdata/v1", LightScryptN, LightScryptP, true}
-	addr := common.HexToAddress("cb61d5a9c4896fb9658090b597ef0e7be6f7b67e")
-	file := "testdata/v1/cb61d5a9c4896fb9658090b597ef0e7be6f7b67e/cb61d5a9c4896fb9658090b597ef0e7be6f7b67e"
-	k, err := ks.GetKey(addr, file, "g")
-	if err != nil {
-		t.Fatal(err)
-	}
-	privHex := hex.EncodeToString(crypto.FromECDSA(k.PrivateKey))
-	expectedHex := "d1b1178d3529626a1a93e073f65028370d14c7eb0936eb42abef05db6f37ad7d"
-	if privHex != expectedHex {
-		t.Fatal(fmt.Errorf("Unexpected privkey: %v, expected %v", privHex, expectedHex))
-	}
-}
+// ORIGINAL CODE - this tests eats up GB's of memory
+// func TestV1_2(t *testing.T) {
+// 	t.Parallel()
+// 	ks := &keyStorePassphrase{"testdata/v1", LightScryptN, LightScryptP, true}
+// 	addr := common.HexToAddress("cb61d5a9c4896fb9658090b597ef0e7be6f7b67e")
+// 	file := "testdata/v1/cb61d5a9c4896fb9658090b597ef0e7be6f7b67e/cb61d5a9c4896fb9658090b597ef0e7be6f7b67e"
+// 	k, err := ks.GetKey(addr, file, "g")
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	privHex := hex.EncodeToString(crypto.FromECDSA(k.PrivateKey))
+// 	expectedHex := "d1b1178d3529626a1a93e073f65028370d14c7eb0936eb42abef05db6f37ad7d"
+// 	if privHex != expectedHex {
+// 		t.Fatal(fmt.Errorf("Unexpected privkey: %v, expected %v", privHex, expectedHex))
+// 	}
+// }
 
 func testDecryptV3(test KeyStoreTestV3, t *testing.T) {
 	privBytes, _, err := decryptKeyV3(&test.Json, test.Password)
