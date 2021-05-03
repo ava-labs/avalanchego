@@ -40,7 +40,7 @@ func main() {
 	c := Config
 
 	app := process.NewApp(c)
-	if c.PluginMode { // Defaults to run as an standalone
+	if c.PluginMode {
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{

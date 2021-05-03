@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
@@ -72,7 +71,6 @@ func init() {
 
 var (
 	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errStakingRequiresTLS   = errors.New("if staking is enabled, network TLS must also be enabled")
 	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
@@ -192,7 +190,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Staking
 	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
-	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
 	fs.String(stakingKeyPathKey, defaultString, "Path to the TLS private key for staking")
 	fs.String(stakingCertPathKey, defaultString, "Path to the TLS certificate for staking")
 	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
@@ -378,7 +375,6 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Staking:
 	Config.EnableStaking = v.GetBool(stakingEnabledKey)
-	Config.EnableP2PTLS = v.GetBool(p2pTLSEnabledKey)
 	Config.StakingKeyFile = v.GetString(stakingKeyPathKey)
 	Config.StakingCertFile = v.GetString(stakingCertPathKey)
 	Config.DisabledStakingWeight = v.GetUint64(stakingDisabledWeightKey)
@@ -445,36 +441,26 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 
-	if Config.EnableStaking && !Config.EnableP2PTLS {
-		return errStakingRequiresTLS
-	}
-
 	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
 		return errInvalidStakerWeights
 	}
 
-	if Config.EnableP2PTLS {
-		i := 0
-		for _, id := range strings.Split(bootstrapIDs, ",") {
-			if id != "" {
-				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
-				if err != nil {
-					return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
-				}
-				if len(Config.BootstrapPeers) <= i {
-					return errBootstrapMismatch
-				}
-				Config.BootstrapPeers[i].ID = peerID
-				i++
+	i := 0
+	for _, id := range strings.Split(bootstrapIDs, ",") {
+		if id != "" {
+			peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+			if err != nil {
+				return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 			}
+			if len(Config.BootstrapPeers) <= i {
+				return errBootstrapMismatch
+			}
+			Config.BootstrapPeers[i].ID = peerID
+			i++
 		}
-		if len(Config.BootstrapPeers) != i {
-			return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
-		}
-	} else {
-		for _, peer := range Config.BootstrapPeers {
-			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
-		}
+	}
+	if len(Config.BootstrapPeers) != i {
+		return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
 	}
 
 	Config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)

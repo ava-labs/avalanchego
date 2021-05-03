@@ -77,11 +77,8 @@ func (a *App) Start() int {
 	}()
 
 	// Track if sybil control is enforced
-	if !a.config.EnableStaking && a.config.EnableP2PTLS {
+	if !a.config.EnableStaking {
 		a.log.Warn("Staking is disabled. Sybil control is not enforced.")
-	}
-	if !a.config.EnableStaking && !a.config.EnableP2PTLS {
-		a.log.Warn("Staking and p2p encryption are disabled. Packet spoofing is possible.")
 	}
 
 	// Check if transaction signatures should be checked

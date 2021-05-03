@@ -35,6 +35,7 @@ const (
 // Bootstrapper implements the Engine interface.
 type Bootstrapper struct {
 	Config
+	Halter
 
 	RequestID uint32
 
