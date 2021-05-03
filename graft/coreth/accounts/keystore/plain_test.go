@@ -227,16 +227,16 @@ func testDecryptV3(test KeyStoreTestV3, t *testing.T) {
 	}
 }
 
-func testDecryptV1(test KeyStoreTestV1, t *testing.T) {
-	privBytes, _, err := decryptKeyV1(&test.Json, test.Password)
-	if err != nil {
-		t.Fatal(err)
-	}
-	privHex := hex.EncodeToString(privBytes)
-	if test.Priv != privHex {
-		t.Fatal(fmt.Errorf("Decrypted bytes not equal to test, expected %v have %v", test.Priv, privHex))
-	}
-}
+// func testDecryptV1(test KeyStoreTestV1, t *testing.T) {
+// 	privBytes, _, err := decryptKeyV1(&test.Json, test.Password)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	privHex := hex.EncodeToString(privBytes)
+// 	if test.Priv != privHex {
+// 		t.Fatal(fmt.Errorf("Decrypted bytes not equal to test, expected %v have %v", test.Priv, privHex))
+// 	}
+// }
 
 func loadKeyStoreTestV3(file string, t *testing.T) map[string]KeyStoreTestV3 {
 	tests := make(map[string]KeyStoreTestV3)
@@ -247,14 +247,14 @@ func loadKeyStoreTestV3(file string, t *testing.T) map[string]KeyStoreTestV3 {
 	return tests
 }
 
-func loadKeyStoreTestV1(file string, t *testing.T) map[string]KeyStoreTestV1 {
-	tests := make(map[string]KeyStoreTestV1)
-	err := common.LoadJSON(file, &tests)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return tests
-}
+// func loadKeyStoreTestV1(file string, t *testing.T) map[string]KeyStoreTestV1 {
+// 	tests := make(map[string]KeyStoreTestV1)
+// 	err := common.LoadJSON(file, &tests)
+// 	if err != nil {
+// 		t.Fatal(err)
+// 	}
+// 	return tests
+// }
 
 func TestKeyForDirectICAP(t *testing.T) {
 	t.Parallel()
