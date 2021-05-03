@@ -2,18 +2,16 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Testing specific variables
-avalanche_testing_repo="avaplatform/avalanche-testing"
-
-# Define avalanche testing version to use
-avalanche_testing_image="avaplatform/avalanche-testing:master"
-
-# Fetch the images
 # If Docker Credentials are not available fail
 if [[ -z ${DOCKER_USERNAME} ]]; then
     echo "Skipping Tests because Docker Credentials were not present."
     exit 1
 fi
+
+# Testing specific variables
+avalanche_testing_repo="avaplatform/avalanche-testing"
+# Define default avalanche testing version to use
+avalanche_testing_image="${avalanche_testing_repo}:master"
 
 # Avalanche root directory
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
