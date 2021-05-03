@@ -285,14 +285,15 @@ func (vm *VM) newImportTx(
 // accounts accordingly with the imported EVMOutputs
 func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	for _, to := range tx.Outs {
-		log.Info("crosschain X->C", "addr", to.Address, "amount", to.Amount)
 		if to.AssetID == vm.ctx.AVAXAssetID {
+			log.Debug("crosschain X->C", "addr", to.Address, "amount", to.Amount, "assetID", "AVAX")
 			// If the asset is AVAX, convert the input amount in nAVAX to gWei by
 			// multiplying by the x2c rate.
 			amount := new(big.Int).Mul(
 				new(big.Int).SetUint64(to.Amount), x2cRate)
 			state.AddBalance(to.Address, amount)
 		} else {
+			log.Debug("crosschain X->C", "addr", to.Address, "amount", to.Amount, "assetID", to.AssetID)
 			amount := new(big.Int).SetUint64(to.Amount)
 			state.AddBalanceMultiCoin(to.Address, common.Hash(to.AssetID), amount)
 		}
