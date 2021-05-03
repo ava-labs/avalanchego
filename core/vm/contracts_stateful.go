@@ -149,6 +149,10 @@ func (c *nativeAssetCall) Run(evm *EVM, caller ContractRef, addr common.Address,
 		evm.StateDB.CreateAccount(to)
 	}
 
+	// Increment the call depth which is restricted to 1024
+	evm.depth++
+	defer func() { evm.depth-- }()
+
 	// Send [assetAmount] of [assetID] to [to] address
 	evm.Context.TransferMultiCoin(evm.StateDB, caller.Address(), to, assetID, assetAmount)
 	ret, remainingGas, err = evm.Call(caller, to, callData, remainingGas, big.NewInt(0))
