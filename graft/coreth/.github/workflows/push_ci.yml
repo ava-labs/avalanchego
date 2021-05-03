@@ -25,14 +25,14 @@ jobs:
         go: [ '1.15' ]
         os: [ ubuntu-20.04 ]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v1
-        with:
-          go-version: ${{ matrix.go }}
-      - run: .github/workflows/run_e2e_tests.sh --parallelism 3 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
-        shell: bash
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-          KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
-          KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go }}
+    - run: .github/workflows/run_e2e_tests.sh --parallelism 3 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+      shell: bash
+      env:
+        DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
+        KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
