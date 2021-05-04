@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -87,7 +88,7 @@ func (j *Jobs) Push(job Job) (bool, error) {
 	return true, nil
 }
 
-func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.EventDispatcher) (int, error) {
+func (j *Jobs) ExecuteAll(ctx *snow.Context, halter common.Haltable, restarted bool, events ...snow.EventDispatcher) (int, error) {
 	numExecuted := 0
 
 	// Disable and clear state caches to prevent us from attempting to execute
@@ -99,6 +100,10 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, restarted bool, events ...snow.Even
 	// blocks.
 	j.state.DisableCaching()
 	for {
+		if halter.Halted() {
+			return numExecuted, nil
+		}
+
 		job, err := j.state.RemoveRunnableJob()
 		if err == database.ErrNotFound {
 			break

@@ -261,6 +261,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		b.tipHeight = blkHeight
 	}
 	for status == choices.Processing {
+		if b.Halted() {
+			return nil
+		}
+
 		b.Blocked.RemoveMissingID(blkID)
 
 		pushed, err := b.Blocked.Push(&blockJob{
@@ -328,8 +332,8 @@ func (b *Bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
 	}
 
-	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b.Restarted, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
-	if err != nil {
+	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
+	if err != nil || b.Halted() {
 		return err
 	}
 

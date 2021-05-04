@@ -131,11 +131,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Restart on disconnect settings
-	RestartOnDisconnected      bool
-	DisconnectedCheckFreq      time.Duration
-	DisconnectedRestartTimeout time.Duration
-
 	// Coreth
 	CorethConfig string
 
@@ -149,6 +144,10 @@ type Config struct {
 
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
+
 	// ChainConfigs
 	ChainConfigs map[ids.ID]chains.ChainConfig
+
+	// runs as plugin
+	PluginMode bool
 }
