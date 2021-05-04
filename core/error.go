@@ -26,7 +26,11 @@
 
 package core
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/ava-labs/coreth/core/types"
+)
 
 var (
 	// ErrKnownBlock is returned when a block to import is already known locally.
@@ -73,4 +77,8 @@ var (
 	// ErrIntrinsicGas is returned if the transaction is specified to use less gas
 	// than required to start the invocation.
 	ErrIntrinsicGas = errors.New("intrinsic gas too low")
+
+	// ErrTxTypeNotSupported is returned if a transaction is not supported in the
+	// current network configuration.
+	ErrTxTypeNotSupported = types.ErrTxTypeNotSupported
 )

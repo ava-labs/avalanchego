@@ -59,14 +59,94 @@ type Config struct {
 }
 
 type Miner struct {
+	// Original code:
+	// mux      *event.TypeMux
+	// coinbase common.Address
+	// eth      Backend
+	// engine   consensus.Engine
+	// exitCh   chan struct{}
+	// startCh  chan common.Address
+	// stopCh   chan struct{}
 	worker *worker
 }
 
 func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, mcb *MinerCallbacks) *Miner {
 	return &Miner{
+		// Original code:
+		// eth:     eth,
+		// mux:     mux,
+		// engine:  engine,
+		// exitCh:  make(chan struct{}),
+		// startCh: make(chan common.Address),
+		// stopCh:  make(chan struct{}),
 		worker: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true, mcb),
 	}
 }
+
+// Original code:
+// // update keeps track of the downloader events. Please be aware that this is a one shot type of update loop.
+// // It's entered once and as soon as `Done` or `Failed` has been broadcasted the events are unregistered and
+// // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
+// // and halt your mining operation for as long as the DOS continues.
+// func (miner *Miner) update() {
+// 	events := miner.mux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
+// 	defer func() {
+// 		if !events.Closed() {
+// 			events.Unsubscribe()
+// 		}
+// 	}()
+//
+// 	shouldStart := false
+// 	canStart := true
+// 	dlEventCh := events.Chan()
+// 	for {
+// 		select {
+// 		case ev := <-dlEventCh:
+// 			if ev == nil {
+// 				// Unsubscription done, stop listening
+// 				dlEventCh = nil
+// 				continue
+// 			}
+// 			switch ev.Data.(type) {
+// 			case downloader.StartEvent:
+// 				wasMining := miner.Mining()
+// 				miner.worker.stop()
+// 				canStart = false
+// 				if wasMining {
+// 					// Resume mining after sync was finished
+// 					shouldStart = true
+// 					log.Info("Mining aborted due to sync")
+// 				}
+// 			case downloader.FailedEvent:
+// 				canStart = true
+// 				if shouldStart {
+// 					miner.SetEtherbase(miner.coinbase)
+// 					miner.worker.start()
+// 				}
+// 			case downloader.DoneEvent:
+// 				canStart = true
+// 				if shouldStart {
+// 					miner.SetEtherbase(miner.coinbase)
+// 					miner.worker.start()
+// 				}
+// 				// Stop reacting to downloader events
+// 				events.Unsubscribe()
+// 			}
+// 		case addr := <-miner.startCh:
+// 			miner.SetEtherbase(addr)
+// 			if canStart {
+// 				miner.worker.start()
+// 			}
+// 			shouldStart = true
+// 		case <-miner.stopCh:
+// 			shouldStart = false
+// 			miner.worker.stop()
+// 		case <-miner.exitCh:
+// 			miner.worker.close()
+// 			return
+// 		}
+// 	}
+// }
 
 func (miner *Miner) Start(coinbase common.Address) {
 	miner.worker.start()
@@ -77,10 +157,14 @@ func (miner *Miner) Stop() {
 }
 
 func (miner *Miner) Mining() bool {
-	return false
+	return miner.worker.isRunning()
 }
 
 func (miner *Miner) HashRate() uint64 {
+	// Original code:
+	// if pow, ok := miner.engine.(consensus.PoW); ok {
+	// 	return uint64(pow.Hashrate())
+	// }
 	return 0
 }
 
@@ -114,6 +198,8 @@ func (miner *Miner) SetRecommitInterval(interval time.Duration) {
 // }
 
 func (miner *Miner) SetEtherbase(addr common.Address) {
+	// Original code:
+	// miner.coinbase = addr
 	miner.worker.setEtherbase(addr)
 }
 

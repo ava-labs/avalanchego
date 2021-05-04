@@ -48,9 +48,9 @@ type Node struct {
 	// startStopLock sync.Mutex // Start/Stop are protected by an additional lock
 	// state int // Tracks state of node lifecycle
 
-	lock          sync.Mutex
-	rpcAPIs       []rpc.API   // List of APIs currently provided by the node
-	inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
+	lock    sync.Mutex
+	rpcAPIs []rpc.API // List of APIs currently provided by the node
+	// inprocHandler *rpc.Server // In-process RPC request handler to process the API requests
 
 	// databases map[*closeTrackingDB]struct{} // All open databases
 
@@ -113,9 +113,9 @@ func New(conf *Config) (*Node, error) {
 	// }
 
 	node := &Node{
-		config:        conf,
-		inprocHandler: rpc.NewServer(0),
-		eventmux:      new(event.TypeMux),
+		config:   conf,
+		eventmux: new(event.TypeMux),
+		// inprocHandler: rpc.NewServer(0),
 		// log:           conf.Logger,
 		// stop: make(chan struct{}),
 		// server:        &p2p.Server{Config: conf.P2P},
@@ -187,7 +187,6 @@ func (n *Node) Config() *Config {
 //
 // // InstanceDir retrieves the instance directory used by the protocol stack.
 // func (n *Node) InstanceDir() string {
-// 	// TODO: remove?
 // 	// Original code:
 // 	// return n.config.instanceDir()
 // 	return ""
@@ -208,7 +207,7 @@ func (n *Node) EventMux() *event.TypeMux {
 // // OpenDatabase opens an existing database with the given name (or creates one if no
 // // previous can be found) from within the node's instance directory. If the node is
 // // ephemeral, a memory database is returned.
-// func (n *Node) OpenDatabase(name string, cache, handles int, namespace string) (ethdb.Database, error) {
+// func (n *Node) OpenDatabase(name string, cache, handles int, namespace string, readonly bool) (ethdb.Database, error) {
 // 	n.lock.Lock()
 // 	defer n.lock.Unlock()
 // 	if n.state == closedState {
@@ -220,7 +219,7 @@ func (n *Node) EventMux() *event.TypeMux {
 // 	if n.config.DataDir == "" {
 // 		db = rawdb.NewMemoryDatabase()
 // 	} else {
-// 		db, err = rawdb.NewLevelDBDatabase(n.ResolvePath(name), cache, handles, namespace)
+// 		db, err = rawdb.NewLevelDBDatabase(n.ResolvePath(name), cache, handles, namespace, readonly)
 // 	}
 //
 // 	if err == nil {
@@ -234,7 +233,7 @@ func (n *Node) EventMux() *event.TypeMux {
 // // also attaching a chain freezer to it that moves ancient chain data from the
 // // database to immutable append-only files. If the node is an ephemeral one, a
 // // memory database is returned.
-// func (n *Node) OpenDatabaseWithFreezer(name string, cache, handles int, freezer, namespace string) (ethdb.Database, error) {
+// func (n *Node) OpenDatabaseWithFreezer(name string, cache, handles int, freezer, namespace string, readonly bool) (ethdb.Database, error) {
 // 	n.lock.Lock()
 // 	defer n.lock.Unlock()
 // 	if n.state == closedState {
@@ -253,7 +252,7 @@ func (n *Node) EventMux() *event.TypeMux {
 // 		case !filepath.IsAbs(freezer):
 // 			freezer = n.ResolvePath(freezer)
 // 		}
-// 		db, err = rawdb.NewLevelDBDatabaseWithFreezer(root, cache, handles, freezer, namespace)
+// 		db, err = rawdb.NewLevelDBDatabaseWithFreezer(root, cache, handles, freezer, namespace, readonly)
 // 	}
 //
 // 	if err == nil {
