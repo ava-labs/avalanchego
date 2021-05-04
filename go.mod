@@ -32,3 +32,5 @@ require (
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20200619000410-60c24ae608a6
 	gopkg.in/urfave/cli.v1 v1.20.0
 )
+
+replace github.com/ava-labs/avalanchego => ../avalanchego
