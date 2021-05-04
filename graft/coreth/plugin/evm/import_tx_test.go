@@ -609,10 +609,18 @@ func TestNewImportTx(t *testing.T) {
 				t.Fatal("newImportTx created an invalid transaction")
 			}
 
-			if err := importTx.Accept(vm.ctx, nil); err != nil {
+			vm.db.StartCommit()
+			defer vm.db.AbortCommit()
+
+			batch, err := vm.db.CommitBatch()
+			if err != nil {
+				t.Fatalf("Failed to creaet commit batch due to %s", err)
+			}
+			defer vm.db.EndBatch()
+
+			if err := importTx.Accept(vm.ctx, batch); err != nil {
 				t.Fatalf("Failed to accept import transaction due to: %s", err)
 			}
 		})
 	}
-	vm.db.EndBatch()
 }
