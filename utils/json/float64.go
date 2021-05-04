@@ -4,16 +4,16 @@ import (
 	"strconv"
 )
 
-// Float32 ...
-type Float32 float32
+// Float64 ...
+type Float64 float64
 
 // MarshalJSON ...
-func (f Float32) MarshalJSON() ([]byte, error) {
-	return []byte("\"" + strconv.FormatFloat(float64(f), byte('f'), 4, 32) + "\""), nil
+func (f Float64) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + strconv.FormatFloat(float64(f), byte('f'), 4, 64) + "\""), nil
 }
 
 // UnmarshalJSON ...
-func (f *Float32) UnmarshalJSON(b []byte) error {
+func (f *Float64) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == Null {
 		return nil
@@ -23,7 +23,7 @@ func (f *Float32) UnmarshalJSON(b []byte) error {
 			str = str[1:lastIndex]
 		}
 	}
-	val, err := strconv.ParseFloat(str, 32)
-	*f = Float32(val)
+	val, err := strconv.ParseFloat(str, 64)
+	*f = Float64(val)
 	return err
 }
