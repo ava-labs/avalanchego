@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/coreth"
+	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/eth"
+	"github.com/ava-labs/coreth/eth/ethconfig"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
@@ -112,6 +112,7 @@ var (
 	errInsufficientFunds          = errors.New("insufficient funds")
 	errNoExportOutputs            = errors.New("tx has no export outputs")
 	errOutputsNotSorted           = errors.New("tx outputs not sorted")
+	errOutputsNotSortedUnique     = errors.New("outputs not sorted and unique")
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
@@ -125,6 +126,8 @@ var (
 	errInvalidMixDigest           = errors.New("invalid mix digest")
 	errInvalidExtDataHash         = errors.New("invalid extra data hash")
 	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
+	errInsufficientFundsForFee    = errors.New("insufficient AVAX funds to pay transaction fee")
+	errNoEVMOutputs               = errors.New("tx has no EVM outputs")
 )
 
 // buildingBlkStatus denotes the current status of the VM in block production.
@@ -286,10 +289,10 @@ func (vm *VM) Initialize(
 	// Set the ApricotPhase1BlockTimestamp for mainnet/fuji
 	switch {
 	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
-		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotMainnetChainConfig.ApricotPhase1BlockTimestamp
+		g.Config = params.AvalancheMainnetChainConfig
 		phase0BlockValidator.extDataHashes = mainnetExtDataHashes
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
-		g.Config.ApricotPhase1BlockTimestamp = params.AvalancheApricotFujiChainConfig.ApricotPhase1BlockTimestamp
+		g.Config = params.AvalancheFujiChainConfig
 		phase0BlockValidator.extDataHashes = fujiExtDataHashes
 	}
 
@@ -301,7 +304,7 @@ func (vm *VM) Initialize(
 	vm.chainID = g.Config.ChainID
 	vm.txFee = txFee
 
-	config := eth.NewDefaultConfig()
+	config := ethconfig.NewDefaultConfig()
 	config.Genesis = g
 
 	// Set minimum gas price and launch goroutine to sleep until
@@ -580,7 +583,7 @@ func (vm *VM) parseBlock(b []byte) (snowman.Block, error) {
 	}
 	// Performing syntactic verification in ParseBlock allows for
 	// short-circuiting bad blocks before they are processed by the VM.
-	if err := block.syntacticVerify(); err != nil {
+	if _, err := block.syntacticVerify(); err != nil {
 		return nil, fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 	return block, nil
@@ -1062,18 +1065,22 @@ func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
 	return state.GetNonce(address), nil
 }
 
-func (vm *VM) IsApricotPhase1(timestamp uint64) bool {
-	return vm.chainConfig.IsApricotPhase1(new(big.Int).SetUint64(timestamp))
+// currentRules returns the chain rules for the current block.
+func (vm *VM) currentRules() params.Rules {
+	header := vm.chain.APIBackend().CurrentHeader()
+	return vm.chainConfig.AvalancheRules(header.Number, big.NewInt(int64(header.Time)))
 }
 
-func (vm *VM) useApricotPhase1() bool {
-	return vm.IsApricotPhase1(vm.chain.BlockChain().CurrentHeader().Time)
-}
-
-func (vm *VM) getBlockValidator(timestamp uint64) BlockValidator {
-	if vm.IsApricotPhase1(timestamp) {
+// getBlockValidator returns the block validator that should be used for a block that
+// follows the ruleset defined by [rules]
+func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
+	switch {
+	case rules.IsApricotPhase2:
+		// Note: the phase1BlockValidator is used in both apricot phase1 and phase2
 		return phase1BlockValidator
-	} else {
+	case rules.IsApricotPhase1:
+		return phase1BlockValidator
+	default:
 		return phase0BlockValidator
 	}
 }

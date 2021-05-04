@@ -17,8 +17,7 @@ AVALANCHE_IMAGE="$AVALANCHE_IMAGE_REPO:$AVALANCHE_IMAGE_TAG"
 echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
-BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:v0.2.0-rc.1"
-TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.11.1-rc.1"
+TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:apricot-phase2" # FIXME update
 
 # Kurtosis Environment Parameters
 KURTOSIS_CORE_CHANNEL="1.0.3"
@@ -26,14 +25,13 @@ INITIALIZER_IMAGE="kurtosistech/kurtosis-core_initializer:${KURTOSIS_CORE_CHANNE
 API_IMAGE="kurtosistech/kurtosis-core_api:${KURTOSIS_CORE_CHANNEL}"
 PARALLELISM=4
 
-docker pull "${BYZANTINE_IMAGE}"
 docker pull "$TEST_SUITE_IMAGE"
 
 SUITE_EXECUTION_VOLUME="avalanche-test-suite_${AVALANCHE_IMAGE_TAG}_$(date +%s)"
 docker volume create "${SUITE_EXECUTION_VOLUME}"
 
 # Docker only allows you to have spaces in the variable if you escape them or use a Docker env file
-CUSTOM_ENV_VARS_JSON="CUSTOM_ENV_VARS_JSON={\"AVALANCHE_IMAGE\":\"${AVALANCHE_IMAGE}\",\"BYZANTINE_IMAGE\":\"${BYZANTINE_IMAGE}\"}"
+CUSTOM_ENV_VARS_JSON="CUSTOM_ENV_VARS_JSON={\"AVALANCHE_IMAGE\":\"${AVALANCHE_IMAGE}\",\"BYZANTINE_IMAGE\":\"\"}"
 
 echo "${CUSTOM_ENV_VARS_JSON}"
 echo "${KURTOSIS_API_IMAGE}"
