@@ -94,6 +94,7 @@ const (
 	xputServerEnabledKey                    = "xput-server-enabled"
 	ipcsChainIDsKey                         = "ipcs-chain-ids"
 	ipcsPathKey                             = "ipcs-path"
+	meterVMsEnabledKey                      = "meter-vm-enabled"
 	consensusGossipFrequencyKey             = "consensus-gossip-frequency"
 	consensusShutdownTimeoutKey             = "consensus-shutdown-timeout"
 	fdLimitKey                              = "fd-limit"

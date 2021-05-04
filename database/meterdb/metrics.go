@@ -9,17 +9,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils"
+	metricsHelper "github.com/ava-labs/avalanchego/utils/metrics"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func newLatencyMetric(namespace, name string) prometheus.Histogram {
-	return prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_latency", name),
-		Help:      fmt.Sprintf("Latency of a %s call in nanoseconds", name),
-		Buckets:   utils.NanosecondsBuckets,
-	})
-}
 func newSizeMetric(namespace, name string) prometheus.Histogram {
 	return prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
@@ -28,6 +21,8 @@ func newSizeMetric(namespace, name string) prometheus.Histogram {
 		Buckets:   utils.BytesBuckets,
 	})
 }
+
+
 
 type metrics struct {
 	readSize,
@@ -67,37 +62,26 @@ func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
-	m.readSize = newSizeMetric(namespace, "read")
-	m.writeSize = newSizeMetric(namespace, "write")
-	m.has = newLatencyMetric(namespace, "has")
-	m.hasSize = newSizeMetric(namespace, "has")
-	m.get = newLatencyMetric(namespace, "get")
-	m.getSize = newSizeMetric(namespace, "get")
-	m.put = newLatencyMetric(namespace, "put")
-	m.putSize = newSizeMetric(namespace, "put")
-	m.delete = newLatencyMetric(namespace, "delete")
-	m.deleteSize = newSizeMetric(namespace, "delete")
-	m.newBatch = newLatencyMetric(namespace, "new_batch")
-	m.newIterator = newLatencyMetric(namespace, "new_iterator")
-	m.stat = newLatencyMetric(namespace, "stat")
-	m.compact = newLatencyMetric(namespace, "compact")
-	m.close = newLatencyMetric(namespace, "close")
-	m.bPut = newLatencyMetric(namespace, "batch_put")
-	m.bPutSize = newSizeMetric(namespace, "batch_put")
-	m.bDelete = newLatencyMetric(namespace, "batch_delete")
-	m.bDeleteSize = newSizeMetric(namespace, "batch_delete")
-	m.bSize = newLatencyMetric(namespace, "batch_size")
-	m.bWrite = newLatencyMetric(namespace, "batch_write")
-	m.bWriteSize = newSizeMetric(namespace, "batch_write")
-	m.bReset = newLatencyMetric(namespace, "batch_reset")
-	m.bReplay = newLatencyMetric(namespace, "batch_replay")
-	m.bInner = newLatencyMetric(namespace, "batch_inner")
-	m.iNext = newLatencyMetric(namespace, "iterator_next")
-	m.iNextSize = newSizeMetric(namespace, "iterator_next")
-	m.iError = newLatencyMetric(namespace, "iterator_error")
-	m.iKey = newLatencyMetric(namespace, "iterator_key")
-	m.iValue = newLatencyMetric(namespace, "iterator_value")
-	m.iRelease = newLatencyMetric(namespace, "iterator_release")
+	m.has = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "has")
+	m.get = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "get")
+	m.put = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "put")
+	m.delete = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "delete")
+	m.newBatch = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "new_batch")
+	m.newIterator = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "new_iterator")
+	m.stat = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "stat")
+	m.compact = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "compact")
+	m.close = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "close")
+	m.bPut = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_put")
+	m.bDelete = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_delete")
+	m.bWrite = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_write")
+	m.bReset = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_reset")
+	m.bReplay = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_replay")
+	m.bInner = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_inner")
+	m.iNext = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_next")
+	m.iError = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_error")
+	m.iKey = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_key")
+	m.iValue = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_value")
+	m.iRelease = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_release")
 
 	errs := wrappers.Errs{}
 	errs.Add(

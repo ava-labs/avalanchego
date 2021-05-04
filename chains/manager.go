@@ -150,6 +150,7 @@ type ManagerConfig struct {
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
 	ChainConfigs              map[ids.ID]ChainConfig
+	MeterVMEnabled            bool // Should each VM be wrapped with a MeterVM
 }
 
 type manager struct {
@@ -435,6 +436,8 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
+	vm = vertex.NewMeterVM(vm)
+
 	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -565,6 +568,8 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+
+	vm = block.NewMeterVM(vm)
 
 	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
