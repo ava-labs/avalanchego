@@ -18,7 +18,7 @@ echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
 BYZANTINE_IMAGE="$DOCKER_REPO/avalanche-byzantine:apricot-phase2"
-TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:v0.11.0-rc.2"
+TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:apricot-phase2-local-genesis"
 
 # Kurtosis Environment Parameters
 KURTOSIS_CORE_CHANNEL="1.0.3"
