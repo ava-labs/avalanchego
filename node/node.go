@@ -228,7 +228,7 @@ func (n *Node) initNetworking() error {
 	versionManager := version.NewCompatibility(
 		Version,
 		MinimumCompatibleVersion,
-		GetApricotPhase1Time(n.Config.NetworkID),
+		GetApricotPhase2Time(n.Config.NetworkID),
 		PrevMinimumCompatibleVersion,
 		MinimumUnmaskedVersion,
 		GetApricotPhase0Time(n.Config.NetworkID),
