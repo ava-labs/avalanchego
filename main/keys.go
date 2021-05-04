@@ -95,9 +95,6 @@ const (
 	consensusShutdownTimeoutKey             = "consensus-shutdown-timeout"
 	fdLimitKey                              = "fd-limit"
 	corethConfigKey                         = "coreth-config"
-	disconnectedCheckFreqKey                = "disconnected-check-frequency"
-	disconnectedRestartTimeoutKey           = "disconnected-restart-timeout"
-	restartOnDisconnectedKey                = "restart-on-disconnected"
 	indexEnabledKey                         = "index-enabled"
 	indexAllowIncompleteKey                 = "index-allow-incomplete"
 	routerHealthMaxDropRateKey              = "router-health-max-drop-rate"
@@ -107,4 +104,5 @@ const (
 	retryBootstrap                          = "bootstrap-retry-enabled"
 	retryBootstrapMaxAttempts               = "bootstrap-retry-max-attempts"
 	peerAliasTimeoutKey                     = "peer-alias-timeout"
+	pluginMode                              = "plugin-mode-enabled"
 )

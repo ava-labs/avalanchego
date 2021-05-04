@@ -527,6 +527,7 @@ func (h *Handler) Notify(msg common.Message) {
 // Shutdown.
 func (h *Handler) Shutdown() {
 	h.closing.SetValue(true)
+	h.engine.Halt()
 	h.serviceQueue.Shutdown()
 }
 
