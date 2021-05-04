@@ -649,7 +649,7 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := vm.chain.NewRPCHandler(time.Duration(vm.CLIConfig.APIMaxDuration))
 	enabledAPIs := vm.CLIConfig.EthAPIs()
-	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
+	vm.chain.AttachEthService(handler, enabledAPIs)
 
 	errs := wrappers.Errs{}
 	if vm.CLIConfig.SnowmanAPIEnabled {
