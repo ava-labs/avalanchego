@@ -152,8 +152,6 @@ func (vm *VM) Initialize(
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.metrics.Initialize(ctx.Namespace, ctx.Metrics),
-
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
 		c.RegisterType(&OperationTx{}),
