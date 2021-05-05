@@ -239,6 +239,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		b.tipHeight = blkHeight
 	}
 	for status == choices.Processing {
+		if b.Halted() {
+			return nil
+		}
+
 		if err := b.Blocked.Push(&blockJob{
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
@@ -294,7 +298,7 @@ func (b *Bootstrapper) checkFinish() error {
 	}
 
 	executedBlocks, err := b.executeAll(b.Blocked)
-	if err != nil {
+	if err != nil || b.Halted() {
 		return err
 	}
 
@@ -383,6 +387,9 @@ func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
 			}
 		}
 
+		if b.Halted() {
+			break
+		}
 	}
 	if !b.Restarted {
 		b.Ctx.Log.Info("executed %d blocks", numExecuted)
