@@ -63,7 +63,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.4.2"
+	Version = "coreth-v0.5.0"
 
 	_ block.ChainVM = &VM{}
 )
