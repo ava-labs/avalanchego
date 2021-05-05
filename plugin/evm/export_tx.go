@@ -8,6 +8,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -45,7 +46,7 @@ func (tx *UnsignedExportTx) Verify(
 	ctx *snow.Context,
 	feeAmount uint64,
 	feeAssetID ids.ID,
-	ap1 bool,
+	rules params.Rules,
 ) error {
 	switch {
 	case tx == nil:
@@ -74,7 +75,7 @@ func (tx *UnsignedExportTx) Verify(
 	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
 		return errOutputsNotSorted
 	}
-	if ap1 && !IsSortedAndUniqueEVMInputs(tx.Ins) {
+	if rules.IsApricotPhase1 && !IsSortedAndUniqueEVMInputs(tx.Ins) {
 		return errInputsNotSortedUnique
 	}
 
@@ -85,9 +86,9 @@ func (tx *UnsignedExportTx) Verify(
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
-	ap1 bool,
+	rules params.Rules,
 ) TxError {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, ap1); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {
 		return permError{err}
 	}
 
@@ -238,15 +239,15 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.useApricotPhase1())
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.currentRules())
 }
 
 // EVMStateTransfer executes the state update from the atomic export transaction
 func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
 	addrs := map[[20]byte]uint64{}
 	for _, from := range tx.Ins {
-		log.Info("crosschain C->X", "addr", from.Address, "amount", from.Amount)
 		if from.AssetID == vm.ctx.AVAXAssetID {
+			log.Debug("crosschain C->X", "addr", from.Address, "amount", from.Amount, "assetID", "AVAX")
 			// We multiply the input amount by x2cRate to convert AVAX back to the appropriate
 			// denomination before export.
 			amount := new(big.Int).Mul(
@@ -256,6 +257,7 @@ func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error
 			}
 			state.SubBalance(from.Address, amount)
 		} else {
+			log.Debug("crosschain C->X", "addr", from.Address, "amount", from.Amount, "assetID", from.AssetID)
 			amount := new(big.Int).SetUint64(from.Amount)
 			if state.GetBalanceMultiCoin(from.Address, common.Hash(from.AssetID)).Cmp(amount) < 0 {
 				return errInsufficientFunds

@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -90,7 +91,7 @@ type UnsignedAtomicTx interface {
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, stx *Tx, ap1 bool) TxError
+	SemanticVerify(vm *VM, stx *Tx, rules params.Rules) TxError
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
@@ -201,4 +202,10 @@ func SortEVMOutputs(outputs []EVMOutput) {
 // based on the account addresses and assetIDs
 func IsSortedEVMOutputs(outputs []EVMOutput) bool {
 	return sort.IsSorted(&innerSortEVMOutputs{outputs: outputs})
+}
+
+// IsSortedAndUniqueEVMOutputs returns true if the EVMOutputs are sorted
+// and unique based on the account addresses and assetIDs
+func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
+	return utils.IsSortedAndUnique(&innerSortEVMOutputs{outputs: outputs})
 }
