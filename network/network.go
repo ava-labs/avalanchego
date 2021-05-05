@@ -1099,7 +1099,7 @@ func (n *network) gossip() {
 			if err != nil {
 				n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
 					err,
-					len(ips))
+					len(ipCerts))
 			} else {
 				for _, index := range stakerIndices {
 					stakers[int(index)].Send(msg)
@@ -1109,7 +1109,7 @@ func (n *network) gossip() {
 				}
 			}
 		} else {
-			n.log.Debug("skipping validator IP gossiping as no IPs are connected")
+			n.log.Debug("skipping signed validator IP gossiping as no signed IPs are connected")
 		}
 
 		if len(ips) > 0 {
