@@ -11,13 +11,13 @@ import (
 )
 
 var (
-	_ Block    = &Commit{}
-	_ decision = &Commit{}
+	_ Block    = &CommitBlock{}
+	_ decision = &CommitBlock{}
 )
 
-// Commit being accepted results in the proposal of its parent (which must be a proposal block)
-// being enacted.
-type Commit struct {
+// CommitBlock being accepted results in the proposal of its parent (which must
+// be a proposal block) being enacted.
+type CommitBlock struct {
 	DoubleDecisionBlock `serialize:"true"`
 }
 
@@ -26,7 +26,7 @@ type Commit struct {
 // The parent block must be a proposal
 //
 // This function also sets onAcceptState if the verification passes.
-func (c *Commit) Verify() error {
+func (c *CommitBlock) Verify() error {
 	blkID := c.ID()
 
 	if err := c.DoubleDecisionBlock.Verify(); err != nil {
@@ -59,8 +59,8 @@ func (c *Commit) Verify() error {
 
 // newCommitBlock returns a new *Commit block where the block's parent, a
 // proposal block, has ID [parentID].
-func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*Commit, error) {
-	commit := &Commit{
+func (vm *VM) newCommitBlock(parentID ids.ID, height uint64) (*CommitBlock, error) {
+	commit := &CommitBlock{
 		DoubleDecisionBlock: DoubleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
 				CommonBlock: CommonBlock{
