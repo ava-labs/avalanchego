@@ -43,13 +43,14 @@ const (
 	defaultMaxNetworkPendingSendBytes                = 1 << 29 // 512MB
 	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
 	defaultMaxClockDifference                        = time.Minute
+	defaultPeerListSize                              = 50
 	defaultPeerListGossipSpacing                     = time.Minute
 	defaultPeerListGossipSize                        = 100
 	defaultPeerListStakerGossipFraction              = 2
 	defaultGetVersionTimeout                         = 2 * time.Second
 	defaultAllowPrivateIPs                           = true
 	defaultGossipSize                                = 50
-	defaultPingPongTimeout                           = time.Minute
+	defaultPingPongTimeout                           = 30 * time.Second
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024
 	defaultReadHandshakeTimeout                      = 15 * time.Second
@@ -136,6 +137,7 @@ type network struct {
 	maxNetworkPendingSendBytes         int64
 	networkPendingSendBytesToRateLimit int64
 	maxClockDifference                 time.Duration
+	peerListSize                       int
 	peerListGossipSpacing              time.Duration
 	peerListGossipSize                 int
 	peerListStakerGossipFraction       int
@@ -254,6 +256,7 @@ func NewDefaultNetwork(
 		defaultMaxNetworkPendingSendBytes,
 		defaultNetworkPendingSendBytesToRateLimit,
 		defaultMaxClockDifference,
+		defaultPeerListSize,
 		defaultPeerListGossipSpacing,
 		defaultPeerListGossipSize,
 		defaultPeerListStakerGossipFraction,
@@ -297,6 +300,7 @@ func NewNetwork(
 	maxNetworkPendingSendBytes int,
 	networkPendingSendBytesToRateLimit int,
 	maxClockDifference time.Duration,
+	peerListSize int,
 	peerListGossipSpacing time.Duration,
 	peerListGossipSize int,
 	peerListStakerGossipFraction int,
@@ -341,6 +345,7 @@ func NewNetwork(
 		maxNetworkPendingSendBytes:         int64(maxNetworkPendingSendBytes),
 		networkPendingSendBytesToRateLimit: int64(networkPendingSendBytesToRateLimit),
 		maxClockDifference:                 maxClockDifference,
+		peerListSize:                       peerListSize,
 		peerListGossipSpacing:              peerListGossipSpacing,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
@@ -1036,31 +1041,6 @@ func (n *network) gossip() {
 			continue
 		}
 
-		ips := make([]utils.IPDesc, 0, len(allPeers))
-		for _, peer := range allPeers {
-			ip := peer.getIP()
-			if peer.connected.GetValue() &&
-				!ip.IsZero() &&
-				n.vdrs.Contains(peer.id) {
-				peerVersion := peer.versionStruct.GetValue().(version.Version)
-				if n.versionCompatibility.Unmaskable(peerVersion) == nil {
-					ips = append(ips, ip)
-				}
-			}
-		}
-
-		if len(ips) == 0 {
-			n.log.Debug("skipping validator gossiping as no public validators are connected")
-			continue
-		}
-		msg, err := n.b.PeerList(ips)
-		if err != nil {
-			n.log.Error("failed to build peer list to gossip: %s. len(ips): %d",
-				err,
-				len(ips))
-			continue
-		}
-
 		stakers := make([]*peer, 0, len(allPeers))
 		nonStakers := make([]*peer, 0, len(allPeers))
 		for _, peer := range allPeers {
@@ -1094,9 +1074,6 @@ func (n *network) gossip() {
 				len(stakers))
 			continue
 		}
-		for _, index := range stakerIndices {
-			stakers[int(index)].Send(msg)
-		}
 
 		if err := s.Initialize(uint64(len(nonStakers))); err != nil {
 			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
@@ -1111,8 +1088,46 @@ func (n *network) gossip() {
 				len(nonStakers))
 			continue
 		}
-		for _, index := range nonStakerIndices {
-			nonStakers[int(index)].Send(msg)
+
+		ipCerts, ips, err := n.validatorIPs()
+		if err != nil {
+			n.log.Error("failed to fetch validator IPs: %s", err)
+			continue
+		}
+		if len(ipCerts) > 0 {
+			msg, err := n.b.SignedPeerList(ipCerts)
+			if err != nil {
+				n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
+					err,
+					len(ipCerts))
+			} else {
+				for _, index := range stakerIndices {
+					stakers[int(index)].Send(msg)
+				}
+				for _, index := range nonStakerIndices {
+					nonStakers[int(index)].Send(msg)
+				}
+			}
+		} else {
+			n.log.Debug("skipping signed validator IP gossiping as no signed IPs are connected")
+		}
+
+		if len(ips) > 0 {
+			msg, err := n.b.PeerList(ips)
+			if err != nil {
+				n.log.Error("failed to build peerlist to gossip: %s. len(ips): %d",
+					err,
+					len(ips))
+			} else {
+				for _, index := range stakerIndices {
+					stakers[int(index)].Send(msg)
+				}
+				for _, index := range nonStakerIndices {
+					nonStakers[int(index)].Send(msg)
+				}
+			}
+		} else {
+			n.log.Debug("skipping validator IP gossiping as no IPs are connected")
 		}
 	}
 }
@@ -1291,7 +1306,7 @@ func (n *network) tryAddPeer(p *peer) error {
 // 2) The IPs of all validators we're connected to (superset of the above.)
 // TODO: Remove the 2nd return value when we replace Version / PeerList with
 //       their signed counterparts
-func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc) {
+func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1324,7 +1339,40 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc) {
 		}
 		unsignedPeers = append(unsignedPeers, peerIP)
 	}
-	return signedPeers, unsignedPeers
+
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(unsignedPeers))); err != nil {
+		return nil, nil, err
+	}
+	numUnsignedToSend := n.peerListSize
+	if len(unsignedPeers) < numUnsignedToSend {
+		numUnsignedToSend = len(unsignedPeers)
+	}
+	unsignedIndices, err := s.Sample(numUnsignedToSend)
+	if err != nil {
+		return nil, nil, err
+	}
+	sampledUnsignedPeers := make([]utils.IPDesc, numUnsignedToSend)
+	for i, index := range unsignedIndices {
+		sampledUnsignedPeers[i] = unsignedPeers[index]
+	}
+
+	if err := s.Initialize(uint64(len(signedPeers))); err != nil {
+		return nil, nil, err
+	}
+	numSignedToSend := n.peerListSize
+	if len(signedPeers) < numSignedToSend {
+		numSignedToSend = len(signedPeers)
+	}
+	signedIndices, err := s.Sample(numSignedToSend)
+	if err != nil {
+		return nil, nil, err
+	}
+	sampledSignedPeers := make([]utils.IPCertDesc, numSignedToSend)
+	for i, index := range signedIndices {
+		sampledSignedPeers[i] = signedPeers[index]
+	}
+	return sampledSignedPeers, sampledUnsignedPeers, nil
 }
 
 // should only be called after the peer is marked as connected. Should not be

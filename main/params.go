@@ -209,6 +209,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(bootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
 	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
+	fs.Duration(bootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
 
 	// Consensus
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -701,6 +702,7 @@ func setNodeConfig(v *viper.Viper) error {
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)
 	Config.RetryBootstrapMaxAttempts = v.GetInt(retryBootstrapMaxAttempts)
+	Config.BootstrapBeaconConnectionTimeout = v.GetDuration(bootstrapBeaconConnectionTimeoutKey)
 
 	// Peer alias
 	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
