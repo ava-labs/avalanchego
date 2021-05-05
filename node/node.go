@@ -4,6 +4,7 @@
 package node
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -11,10 +12,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/admin"
@@ -57,6 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/timestampvm"
+	"github.com/hashicorp/go-plugin"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
@@ -64,14 +64,16 @@ import (
 // Networking constants
 const (
 	TCP = "tcp"
+
+	beaconConnectionTimeout = 1 * time.Minute
 )
 
 var (
-	genesisHashKey                  = []byte("genesisID")
-	indexerDBPrefix                 = []byte{0x00}
-	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	genesisHashKey  = []byte("genesisID")
+	indexerDBPrefix = []byte{0x00}
 
-	beaconConnectionTimeout = 1 * time.Minute
+	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	errInvalidTLSKey                = errors.New("invalid TLS key")
 )
 
 // Node is an instance of an Avalanche node.
@@ -129,9 +131,6 @@ type Node struct {
 	// This node's configuration
 	Config *Config
 
-	// channel for closing the node
-	nodeCloser chan<- os.Signal
-
 	// ensures that we only close the node once.
 	shutdownOnce sync.Once
 
@@ -141,9 +140,6 @@ type Node struct {
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
 	doneShuttingDown sync.WaitGroup
-
-	// Restarter can shutdown and restart the node
-	restarter utils.Restarter
 }
 
 /*
@@ -160,31 +156,25 @@ func (n *Node) initNetworking() error {
 	dialer := network.NewDialer(TCP)
 
 	var serverUpgrader, clientUpgrader network.Upgrader
-	if n.Config.EnableP2PTLS {
-		cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
-		if err != nil {
-			return err
-		}
-
-		// #nosec G402
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			ClientAuth:   tls.RequireAnyClientCert,
-			// We do not use the TLS CA functionality to authenticate a
-			// hostname. We only require an authenticated channel based on the
-			// peer's public key. Therefore, we can safely skip CA verification.
-			//
-			// During our security audit by Quantstamp, this was investigated
-			// and confirmed to be safe and correct.
-			InsecureSkipVerify: true,
-		}
-
-		serverUpgrader = network.NewTLSServerUpgrader(tlsConfig)
-		clientUpgrader = network.NewTLSClientUpgrader(tlsConfig)
-	} else {
-		serverUpgrader = network.NewIPUpgrader()
-		clientUpgrader = network.NewIPUpgrader()
+	cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
+	if err != nil {
+		return err
 	}
+
+	tlsKey, ok := cert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return errInvalidTLSKey
+	}
+
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return err
+	}
+
+	tlsConfig := network.TLSConfig(cert)
+
+	serverUpgrader = network.NewTLSServerUpgrader(tlsConfig)
+	clientUpgrader = network.NewTLSClientUpgrader(tlsConfig)
 
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
@@ -238,7 +228,7 @@ func (n *Node) initNetworking() error {
 	versionManager := version.NewCompatibility(
 		Version,
 		MinimumCompatibleVersion,
-		GetApricotPhase1Time(n.Config.NetworkID),
+		GetApricotPhase2Time(n.Config.NetworkID),
 		PrevMinimumCompatibleVersion,
 		MinimumUnmaskedVersion,
 		GetApricotPhase0Time(n.Config.NetworkID),
@@ -262,20 +252,12 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
-		n.restarter,
-		n.Config.RestartOnDisconnected,
-		n.Config.DisconnectedCheckFreq,
-		n.Config.DisconnectedRestartTimeout,
 		n.Config.SendQueueSize,
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
+		tlsKey,
 	)
-
-	n.nodeCloser = utils.HandleSignals(func(os.Signal) {
-		// errors are already logged internally if they are meaningful
-		n.Shutdown()
-	}, syscall.SIGINT, syscall.SIGTERM)
 
 	return nil
 }
@@ -365,7 +347,7 @@ func (n *Node) Dispatch() error {
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP.IP()) {
-			n.Net.Track(peer.IP)
+			n.Net.Track(peer.IP, peer.ID)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
 		}
@@ -423,12 +405,6 @@ func (n *Node) initDatabase(db database.Database) error {
 // Otherwise, it is a hash of the TLS certificate that this node
 // uses for P2P communication
 func (n *Node) initNodeID() error {
-	if !n.Config.EnableP2PTLS {
-		n.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(n.Config.StakingIP.IP().String())))
-		n.Log.Info("Set the node's ID to %s", n.ID.PrefixedString(constants.NodeIDPrefix))
-		return nil
-	}
-
 	stakeCert, err := ioutil.ReadFile(n.Config.StakingCertFile)
 	if err != nil {
 		return fmt.Errorf("problem reading staking certificate: %w", err)
@@ -900,12 +876,10 @@ func (n *Node) Initialize(
 	db database.Database,
 	logger logging.Logger,
 	logFactory logging.Factory,
-	restarter utils.Restarter,
 ) error {
 	n.Log = logger
 	n.LogFactory = logFactory
 	n.Config = config
-	n.restarter = restarter
 	n.doneShuttingDown.Add(1)
 	n.Log.Info("Node version is: %s", Version)
 
@@ -1005,7 +979,7 @@ func (n *Node) shutdown() {
 	if err := n.indexer.Close(); err != nil {
 		n.Log.Debug("error closing tx indexer: %w", err)
 	}
-	utils.ClearSignals(n.nodeCloser)
+	plugin.CleanupClients()
 	n.doneShuttingDown.Done()
 	n.Log.Info("finished node shutdown")
 }

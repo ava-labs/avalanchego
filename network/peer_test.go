@@ -1,6 +1,7 @@
 package network
 
 import (
+	"crypto"
 	"net"
 	"testing"
 	"time"
@@ -61,8 +62,8 @@ func TestPeer_Close(t *testing.T) {
 		},
 		outbounds: make(map[string]*testListener),
 	}
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
 
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
@@ -87,21 +88,18 @@ func TestPeer_Close(t *testing.T) {
 		versionParser,
 		listener,
 		caller,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, netwrk)
 

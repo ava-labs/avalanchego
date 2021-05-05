@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
@@ -72,7 +71,6 @@ func init() {
 
 var (
 	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errStakingRequiresTLS   = errors.New("if staking is enabled, network TLS must also be enabled")
 	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
@@ -134,12 +132,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(networkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(networkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
 	fs.Uint(sendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
-	// Restart on Disconnect
-	fs.Duration(disconnectedCheckFreqKey, 10*time.Second, "How often the node checks if it is connected to any peers. "+
-		"See [restart-on-disconnected]. If 0, node will not restart due to disconnection.")
-	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
-		"If 0, node will not restart due to disconnection.")
-	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
 	// Peer alias configuration
 	fs.Duration(peerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
@@ -192,7 +184,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Staking
 	fs.Uint(stakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(stakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
-	fs.Bool(p2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
 	fs.String(stakingKeyPathKey, defaultString, "Path to the TLS private key for staking")
 	fs.String(stakingCertPathKey, defaultString, "Path to the TLS certificate for staking")
 	fs.Uint64(stakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
@@ -241,6 +232,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	// TODO handle the below line better
 	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(indexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
+
+	// Plugin
+	fs.Bool(pluginMode, false, "Whether the app should run as a plugin. Defaults to false")
 
 	return fs
 }
@@ -375,7 +369,6 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Staking:
 	Config.EnableStaking = v.GetBool(stakingEnabledKey)
-	Config.EnableP2PTLS = v.GetBool(p2pTLSEnabledKey)
 	Config.StakingKeyFile = v.GetString(stakingKeyPathKey)
 	Config.StakingCertFile = v.GetString(stakingCertPathKey)
 	Config.DisabledStakingWeight = v.GetUint64(stakingDisabledWeightKey)
@@ -442,36 +435,26 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 
-	if Config.EnableStaking && !Config.EnableP2PTLS {
-		return errStakingRequiresTLS
-	}
-
 	if !Config.EnableStaking && Config.DisabledStakingWeight == 0 {
 		return errInvalidStakerWeights
 	}
 
-	if Config.EnableP2PTLS {
-		i := 0
-		for _, id := range strings.Split(bootstrapIDs, ",") {
-			if id != "" {
-				peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
-				if err != nil {
-					return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
-				}
-				if len(Config.BootstrapPeers) <= i {
-					return errBootstrapMismatch
-				}
-				Config.BootstrapPeers[i].ID = peerID
-				i++
+	i := 0
+	for _, id := range strings.Split(bootstrapIDs, ",") {
+		if id != "" {
+			peerID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+			if err != nil {
+				return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 			}
+			if len(Config.BootstrapPeers) <= i {
+				return errBootstrapMismatch
+			}
+			Config.BootstrapPeers[i].ID = peerID
+			i++
 		}
-		if len(Config.BootstrapPeers) != i {
-			return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
-		}
-	} else {
-		for _, peer := range Config.BootstrapPeers {
-			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
-		}
+	}
+	if len(Config.BootstrapPeers) != i {
+		return fmt.Errorf("more bootstrap IPs, %d, provided than bootstrap IDs, %d", len(Config.BootstrapPeers), i)
 	}
 
 	Config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
@@ -621,14 +604,6 @@ func setNodeConfig(v *viper.Viper) error {
 		return errors.New("network timeout coefficient must be >= 1")
 	}
 
-	// Restart:
-	Config.RestartOnDisconnected = v.GetBool(restartOnDisconnectedKey)
-	Config.DisconnectedCheckFreq = v.GetDuration(disconnectedCheckFreqKey)
-	Config.DisconnectedRestartTimeout = v.GetDuration(disconnectedRestartTimeoutKey)
-	if Config.DisconnectedCheckFreq > Config.DisconnectedRestartTimeout {
-		return fmt.Errorf("[%s] can't be greater than [%s]", disconnectedCheckFreqKey, disconnectedRestartTimeoutKey)
-	}
-
 	// Benchlist
 	Config.BenchlistConfig.Threshold = v.GetInt(benchlistFailThresholdKey)
 	Config.BenchlistConfig.PeerSummaryEnabled = v.GetBool(benchlistPeerSummaryEnabledKey)
@@ -729,6 +704,9 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Peer alias
 	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
+
+	// Plugin config
+	Config.PluginMode = v.GetBool(pluginMode)
 
 	return nil
 }

@@ -4,12 +4,17 @@
 package network
 
 import (
+	"crypto"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
+	"math"
 	"net"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/assert"
@@ -204,15 +209,16 @@ type testUpgrader struct {
 	// ids is a mapping of IP addresses
 	// to id
 	ids     map[string]ids.ShortID
+	certs   map[string]*x509.Certificate
 	idsLock sync.Mutex
 }
 
-func (u *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
+func (u *testUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, *x509.Certificate, error) {
 	u.idsLock.Lock()
 	defer u.idsLock.Unlock()
 	addr := conn.RemoteAddr()
 	str := addr.String()
-	return u.ids[str], conn, nil
+	return u.ids[str], conn, u.certs[str], nil
 }
 
 func (u *testUpgrader) Update(ip utils.DynamicIPDesc, id ids.ShortID) {
@@ -222,7 +228,35 @@ func (u *testUpgrader) Update(ip utils.DynamicIPDesc, id ids.ShortID) {
 	u.ids[ip.String()] = id
 }
 
+var certLock sync.Mutex
+var cert0 *tls.Certificate
+var tlsConfig0 *tls.Config
+var cert1 *tls.Certificate
+var tlsConfig1 *tls.Config
+var cert2 *tls.Certificate
+var tlsConfig2 *tls.Config
+
+func initCerts(t *testing.T) {
+	certLock.Lock()
+	defer certLock.Unlock()
+	if cert0 != nil {
+		return
+	}
+	var err error
+	cert0, err = staking.NewTLSCert()
+	assert.NoError(t, err)
+	tlsConfig0 = TLSConfig(*cert0)
+	cert1, err = staking.NewTLSCert()
+	assert.NoError(t, err)
+	tlsConfig1 = TLSConfig(*cert1)
+	cert2, err = staking.NewTLSCert()
+	assert.NoError(t, err)
+	tlsConfig2 = TLSConfig(*cert2)
+}
+
 func TestNewDefaultNetwork(t *testing.T) {
+	initCerts(t)
+
 	log := logging.NoLog{}
 	ip := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -248,8 +282,8 @@ func TestNewDefaultNetwork(t *testing.T) {
 		},
 		outbounds: make(map[string]*testListener),
 	}
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader := NewTLSClientUpgrader(tlsConfig0)
 
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
@@ -281,14 +315,11 @@ func TestNewDefaultNetwork(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net)
 
@@ -302,6 +333,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 }
 
 func TestEstablishConnection(t *testing.T) {
+	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -352,8 +384,11 @@ func TestEstablishConnection(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
 	vdrs := validators.NewSet()
 
@@ -400,21 +435,18 @@ func TestEstablishConnection(t *testing.T) {
 		versionParser,
 		listener0,
 		caller0,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler0,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net0)
 
@@ -428,21 +460,18 @@ func TestEstablishConnection(t *testing.T) {
 		versionParser,
 		listener1,
 		caller1,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader1,
+		clientUpgrader1,
 		vdrs,
 		vdrs,
 		handler1,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net1)
 
@@ -455,7 +484,7 @@ func TestEstablishConnection(t *testing.T) {
 		assert.Error(t, err)
 	}()
 
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
 
 	wg0.Wait()
 	wg1.Wait()
@@ -468,6 +497,7 @@ func TestEstablishConnection(t *testing.T) {
 }
 
 func TestDoubleTrack(t *testing.T) {
+	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -518,8 +548,10 @@ func TestDoubleTrack(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
 	vdrs := validators.NewSet()
 
@@ -566,21 +598,18 @@ func TestDoubleTrack(t *testing.T) {
 		versionParser,
 		listener0,
 		caller0,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler0,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net0)
 
@@ -594,26 +623,23 @@ func TestDoubleTrack(t *testing.T) {
 		versionParser,
 		listener1,
 		caller1,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader1,
+		clientUpgrader1,
 		vdrs,
 		vdrs,
 		handler1,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net1)
 
-	net0.Track(ip1.IP())
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
+	net0.Track(ip1.IP(), id1)
 
 	go func() {
 		err := net0.Dispatch()
@@ -635,6 +661,7 @@ func TestDoubleTrack(t *testing.T) {
 }
 
 func TestDoubleClose(t *testing.T) {
+	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -685,8 +712,10 @@ func TestDoubleClose(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
 	vdrs := validators.NewSet()
 
@@ -733,21 +762,18 @@ func TestDoubleClose(t *testing.T) {
 		versionParser,
 		listener0,
 		caller0,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler0,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net0)
 
@@ -761,25 +787,22 @@ func TestDoubleClose(t *testing.T) {
 		versionParser,
 		listener1,
 		caller1,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader1,
+		clientUpgrader1,
 		vdrs,
 		vdrs,
 		handler1,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net1)
 
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
 
 	go func() {
 		err := net0.Dispatch()
@@ -807,6 +830,7 @@ func TestDoubleClose(t *testing.T) {
 }
 
 func TestTrackConnected(t *testing.T) {
+	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -857,8 +881,10 @@ func TestTrackConnected(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
 	vdrs := validators.NewSet()
 
@@ -905,21 +931,18 @@ func TestTrackConnected(t *testing.T) {
 		versionParser,
 		listener0,
 		caller0,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler0,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net0)
 
@@ -933,25 +956,22 @@ func TestTrackConnected(t *testing.T) {
 		versionParser,
 		listener1,
 		caller1,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader1,
+		clientUpgrader1,
 		vdrs,
 		vdrs,
 		handler1,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net1)
 
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
 
 	go func() {
 		err := net0.Dispatch()
@@ -965,7 +985,7 @@ func TestTrackConnected(t *testing.T) {
 	wg0.Wait()
 	wg1.Wait()
 
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
 
 	err := net0.Close()
 	assert.NoError(t, err)
@@ -975,6 +995,7 @@ func TestTrackConnected(t *testing.T) {
 }
 
 func TestTrackConnectedRace(t *testing.T) {
+	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -1025,8 +1046,10 @@ func TestTrackConnectedRace(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
@@ -1051,21 +1074,18 @@ func TestTrackConnectedRace(t *testing.T) {
 		versionParser,
 		listener0,
 		caller0,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net0)
 
@@ -1079,25 +1099,22 @@ func TestTrackConnectedRace(t *testing.T) {
 		versionParser,
 		listener1,
 		caller1,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader1,
+		clientUpgrader1,
 		vdrs,
 		vdrs,
 		handler,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net1)
 
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
 
 	go func() {
 		err := net0.Dispatch()
@@ -1125,6 +1142,7 @@ func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []Pe
 }
 
 func TestPeerAliasesTicker(t *testing.T) {
+	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -1134,17 +1152,17 @@ func TestPeerAliasesTicker(t *testing.T) {
 		net.IPv6loopback,
 		0,
 	)
-	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	id0 := certToID(cert0.Leaf)
 	ip1 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		1,
 	)
-	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+	id1 := certToID(cert1.Leaf)
 	ip2 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		2,
 	)
-	id2 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip2.IP().String())))
+	id2 := certToID(cert2.Leaf)
 
 	listener0 := &testListener{
 		addr: &net.TCPAddr{
@@ -1218,6 +1236,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 			ip0.IP().String(): id0,
 			ip1.IP().String(): id1,
 			ip2.IP().String(): id1,
+		},
+		certs: map[string]*x509.Certificate{
+			ip0.IP().String(): cert0.Leaf,
+			ip1.IP().String(): cert1.Leaf,
+			ip2.IP().String(): cert2.Leaf,
 		},
 	}
 	serverUpgrader := upgrader
@@ -1332,14 +1355,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net0)
 
@@ -1360,14 +1380,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net1)
 
@@ -1388,14 +1405,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler2,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert2.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net2)
 
@@ -1416,14 +1430,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler3,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert2.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net3)
 
@@ -1445,7 +1456,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	}()
 
 	// Connect to peer with id1
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
 
 	// Confirm peers correct
 	wg0.Wait()
@@ -1459,7 +1470,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
 
 	// Attempt to connect to ip2 (same id as ip1)
-	net0.Track(ip2.IP())
+	net0.Track(ip2.IP(), id2)
 
 	// Confirm that ip2 was not added to net0 peers
 	wg1.Wait()
@@ -1475,7 +1486,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 
 	// Subsequent track call returns immediately with no connection attempts
 	// (would cause fatal error from unauthorized connection if allowed)
-	net0.Track(ip2.IP())
+	net0.Track(ip2.IP(), id2)
 
 	// Wait for aliases to be removed by peer
 	time.Sleep(3 * time.Second)
@@ -1483,7 +1494,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	// Track ip2 on net3
 	upgrader.Update(ip2, id2)
 	caller0.Update(ip2, listener3)
-	net0.Track(ip2.IP())
+	net0.Track(ip2.IP(), id2)
 
 	// Confirm that id2 was added as peer
 	wg2.Wait()
@@ -1515,6 +1526,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 }
 
 func TestPeerAliasesDisconnect(t *testing.T) {
+	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
@@ -1608,6 +1620,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 			ip0.IP().String(): id0,
 			ip1.IP().String(): id1,
 			ip2.IP().String(): id1,
+		},
+		certs: map[string]*x509.Certificate{
+			ip0.IP().String(): cert0.Leaf,
+			ip1.IP().String(): cert1.Leaf,
+			ip2.IP().String(): cert2.Leaf,
 		},
 	}
 	serverUpgrader := upgrader
@@ -1744,14 +1761,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net0)
 
@@ -1772,14 +1786,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net1)
 
@@ -1800,14 +1811,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler2,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert2.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net2)
 
@@ -1828,14 +1836,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler3,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert2.PrivateKey.(crypto.Signer),
 	)
 	assert.NotNil(t, net3)
 
@@ -1857,7 +1862,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}()
 
 	// Connect to peer with id1
-	net0.Track(ip1.IP())
+	net0.Track(ip1.IP(), id1)
 
 	// Confirm peers correct
 	wg0.Wait()
@@ -1871,7 +1876,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
 
 	// Attempt to connect to ip2 (same id as ip1)
-	net0.Track(ip2.IP())
+	net0.Track(ip2.IP(), id2)
 
 	// Confirm that ip2 was not added to net0 peers
 	wg1.Wait()
@@ -1886,7 +1891,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
 
 	// Disconnect original peer
-	caller0.clients[ip1.String()].Close()
+	_ = caller0.clients[ip1.String()].Close()
 
 	// Track ip2 on net3
 	wg2.Wait()
@@ -1899,7 +1904,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.Len(t, net3.Peers([]ids.ShortID{}), 0)
 	upgrader.Update(ip2, id2)
 	caller0.Update(ip2, listener3)
-	net0.Track(ip2.IP())
+	net0.Track(ip2.IP(), id2)
 
 	// Confirm that id2 was added as peer
 	wg3.Wait()
@@ -1926,5 +1931,292 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = net3.Close()
+	assert.NoError(t, err)
+}
+
+func TestPeerSignature(t *testing.T) {
+	initCerts(t)
+
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
+	versionParser := version.NewDefaultParser()
+
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
+
+	serverUpgrader2 := NewTLSServerUpgrader(tlsConfig2)
+	clientUpgrader2 := NewTLSClientUpgrader(tlsConfig2)
+
+	ip0 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		0,
+	)
+	ip1 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		1,
+	)
+	ip2 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		2,
+	)
+
+	id0 := certToID(cert0.Leaf)
+	id1 := certToID(cert1.Leaf)
+	id2 := certToID(cert2.Leaf)
+
+	listener0 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller0 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener1 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller1 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener2 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller2 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+
+	caller0.outbounds[ip1.IP().String()] = listener1
+	caller1.outbounds[ip0.IP().String()] = listener0
+	caller0.outbounds[ip2.IP().String()] = listener2
+	caller1.outbounds[ip2.IP().String()] = listener2
+
+	vdrs := validators.NewSet()
+	// id2 is a validator
+	_ = vdrs.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
+
+	allPeers := ids.ShortSet{}
+	allPeers[id0] = true
+	allPeers[id1] = true
+	allPeers[id2] = true
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+		wg2 sync.WaitGroup
+	)
+	wg0.Add(2)
+	wg1.Add(2)
+	wg2.Add(2)
+
+	handledLock := sync.RWMutex{}
+	handled := make(map[string]struct{})
+
+	handler0 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if id != id0 {
+				handledLock.Lock()
+				handled[id0.String()+":"+id.String()] = struct{}{}
+				handledLock.Unlock()
+				wg0.Done()
+			}
+		},
+	}
+
+	handler1 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if id != id1 {
+				handledLock.Lock()
+				handled[id1.String()+":"+id.String()] = struct{}{}
+				handledLock.Unlock()
+				wg1.Done()
+			}
+		},
+	}
+
+	handler2 := &testHandler{
+		connected: func(id ids.ShortID) {
+			if id != id2 {
+				handledLock.Lock()
+				handled[id2.String()+":"+id.String()] = struct{}{}
+				handledLock.Unlock()
+				wg2.Done()
+			}
+		},
+	}
+
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
+	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id0,
+		ip0,
+		networkID,
+		versionManager,
+		versionParser,
+		listener0,
+		caller0,
+		serverUpgrader0,
+		clientUpgrader0,
+		vdrs,
+		vdrs,
+		handler0,
+		time.Duration(0),
+		0,
+		defaultSendQueueSize,
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
+	)
+	assert.NotNil(t, net0)
+
+	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id1,
+		ip1,
+		networkID,
+		versionManager,
+		versionParser,
+		listener1,
+		caller1,
+		serverUpgrader1,
+		clientUpgrader1,
+		vdrs,
+		vdrs,
+		handler1,
+		time.Duration(0),
+		0,
+		defaultSendQueueSize,
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
+	)
+	assert.NotNil(t, net1)
+
+	net2 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id2,
+		ip2,
+		networkID,
+		versionManager,
+		versionParser,
+		listener2,
+		caller2,
+		serverUpgrader2,
+		clientUpgrader2,
+		vdrs,
+		vdrs,
+		handler2,
+		time.Duration(0),
+		0,
+		defaultSendQueueSize,
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert2.PrivateKey.(crypto.Signer),
+	)
+	assert.NotNil(t, net2)
+
+	go func() {
+		err := net0.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net1.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net2.Dispatch()
+		assert.Error(t, err)
+	}()
+
+	// ip0 -> ip2 and ip0 -> ip1 connect
+	net0.Track(ip2.IP(), id2)
+	net0.Track(ip1.IP(), id1)
+
+	// now we force send peer message from ip0
+	// this should cause a peer ip1 -> ip2 (ip2 is a validator)
+	for {
+		handledLock.RLock()
+		lenhan := len(handled)
+		handledLock.RUnlock()
+		if lenhan == 6 {
+			break
+		}
+		peers := net0.(*network).getPeers(allPeers)
+		for _, p := range peers {
+			if p.peer == nil {
+				continue
+			}
+			p.peer.sendPeerList()
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	wg0.Wait()
+	wg1.Wait()
+	wg2.Wait()
+
+	_, ok := handled[id0.String()+":"+id1.String()]
+	assert.True(t, ok)
+	_, ok = handled[id0.String()+":"+id2.String()]
+	assert.True(t, ok)
+	_, ok = handled[id1.String()+":"+id0.String()]
+	assert.True(t, ok)
+	_, ok = handled[id1.String()+":"+id2.String()]
+	assert.True(t, ok)
+	_, ok = handled[id2.String()+":"+id0.String()]
+	assert.True(t, ok)
+	_, ok = handled[id2.String()+":"+id1.String()]
+	assert.True(t, ok)
+
+	err := net0.Close()
+	assert.NoError(t, err)
+
+	err = net1.Close()
+	assert.NoError(t, err)
+
+	err = net2.Close()
 	assert.NoError(t, err)
 }

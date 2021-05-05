@@ -5,9 +5,15 @@ package wrappers
 
 import (
 	"bytes"
+	"crypto/x509"
 	"math"
+	"net"
 	"reflect"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/staking"
+
+	"github.com/ava-labs/avalanchego/utils"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -610,4 +616,68 @@ func TestUnpackLong(t *testing.T) {
 	n, err := UnpackLong(bytes)
 	assert.NoError(t, err)
 	assert.EqualValues(t, 0, n)
+}
+
+func TestPackX509Certificate(t *testing.T) {
+	cert, err := staking.NewTLSCert()
+	assert.NoError(t, err)
+
+	p := Packer{MaxSize: 10000}
+	TryPackX509Certificate(&p, cert.Leaf)
+	assert.NoError(t, p.Err)
+
+	p.Offset = 0
+	unpackedCert := TryUnpackX509Certificate(&p)
+
+	x509unpackedCert := unpackedCert.(*x509.Certificate)
+
+	assert.Equal(t, cert.Leaf.Raw, x509unpackedCert.Raw)
+}
+
+func TestPackIPCert(t *testing.T) {
+	cert, err := staking.NewTLSCert()
+	assert.NoError(t, err)
+
+	ipCert := utils.IPCertDesc{
+		IPDesc:    utils.IPDesc{IP: net.IPv4(1, 2, 3, 4), Port: 5},
+		Cert:      cert.Leaf,
+		Signature: []byte("signature"),
+	}
+
+	p := Packer{MaxSize: 10000}
+	TryPackIPCert(&p, ipCert)
+	assert.NoError(t, p.Err)
+
+	p.Offset = 0
+	unpackedIPCert := TryUnpackIPCert(&p)
+	resolvedUnpackedIPCert := unpackedIPCert.(utils.IPCertDesc)
+
+	assert.Equal(t, ipCert.IPDesc, resolvedUnpackedIPCert.IPDesc)
+	assert.Equal(t, ipCert.Cert.Raw, resolvedUnpackedIPCert.Cert.Raw)
+	assert.Equal(t, ipCert.Signature, resolvedUnpackedIPCert.Signature)
+}
+
+func TestPackIPCertList(t *testing.T) {
+	cert, err := staking.NewTLSCert()
+	assert.NoError(t, err)
+
+	ipCert := utils.IPCertDesc{
+		IPDesc:    utils.IPDesc{IP: net.IPv4(1, 2, 3, 4), Port: 5},
+		Cert:      cert.Leaf,
+		Signature: []byte("signature"),
+		Time:      2,
+	}
+
+	p := Packer{MaxSize: 10000}
+	TryPackIPCertList(&p, []utils.IPCertDesc{ipCert})
+	assert.NoError(t, p.Err)
+
+	p.Offset = 0
+	unpackedIPCertList := TryUnpackIPCertList(&p)
+	resolvedUnpackedIPCertList := unpackedIPCertList.([]utils.IPCertDesc)
+	assert.NotEmpty(t, resolvedUnpackedIPCertList)
+	assert.Equal(t, ipCert.IPDesc, resolvedUnpackedIPCertList[0].IPDesc)
+	assert.Equal(t, ipCert.Cert.Raw, resolvedUnpackedIPCertList[0].Cert.Raw)
+	assert.Equal(t, ipCert.Signature, resolvedUnpackedIPCertList[0].Signature)
+	assert.Equal(t, ipCert.Time, resolvedUnpackedIPCertList[0].Time)
 }

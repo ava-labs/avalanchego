@@ -50,7 +50,6 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
-	EnableP2PTLS          bool
 	EnableStaking         bool
 	StakingKeyFile        string
 	StakingCertFile       string
@@ -131,11 +130,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Restart on disconnect settings
-	RestartOnDisconnected      bool
-	DisconnectedCheckFreq      time.Duration
-	DisconnectedRestartTimeout time.Duration
-
 	// Coreth
 	CorethConfig string
 
@@ -149,4 +143,7 @@ type Config struct {
 
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
+
+	// runs as plugin
+	PluginMode bool
 }
