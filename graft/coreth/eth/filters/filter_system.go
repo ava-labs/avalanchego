@@ -37,8 +37,8 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
-	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
@@ -62,6 +62,8 @@ const (
 	// PendingTransactionsSubscription queries tx hashes for pending
 	// transactions entering the pending state
 	PendingTransactionsSubscription
+	// AcceptedTransactionsSubscription queries tx hashes for accepted transactions
+	AcceptedTransactionsSubscription
 	// BlocksSubscription queries hashes for blocks that are imported
 	BlocksSubscription
 	// AcceptedBlocksSubscription queries hashes for blocks that are accepted
@@ -86,7 +88,7 @@ type subscription struct {
 	id        rpc.ID
 	typ       Type
 	created   time.Time
-	logsCrit  ethereum.FilterQuery
+	logsCrit  interfaces.FilterQuery
 	logs      chan []*types.Log
 	hashes    chan []common.Hash
 	headers   chan *types.Header
@@ -109,6 +111,7 @@ type EventSystem struct {
 	pendingLogsSub   event.Subscription // Subscription for pending log event
 	chainSub         event.Subscription // Subscription for new chain event
 	chainAcceptedSub event.Subscription // Subscription for new chain accepted event
+	txsAcceptedSub   event.Subscription // Subscription for new accepted txs
 
 	// Channels
 	install         chan *subscription         // install filter for event notification
@@ -120,6 +123,7 @@ type EventSystem struct {
 	rmLogsCh        chan core.RemovedLogsEvent // Channel to receive removed log event
 	chainCh         chan core.ChainEvent       // Channel to receive new chain event
 	chainAcceptedCh chan core.ChainEvent       // Channel to receive new chain accepted event
+	txsAcceptedCh   chan core.NewTxsEvent      // Channel to receive new accepted txs
 }
 
 // NewEventSystem creates a new manager that listens for event on the given mux,
@@ -141,6 +145,7 @@ func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 		pendingLogsCh:   make(chan []*types.Log, logsChanSize),
 		chainCh:         make(chan core.ChainEvent, chainEvChanSize),
 		chainAcceptedCh: make(chan core.ChainEvent, chainEvChanSize),
+		txsAcceptedCh:   make(chan core.NewTxsEvent, txChanSize),
 	}
 
 	// Subscribe events
@@ -151,9 +156,10 @@ func NewEventSystem(backend Backend, lightMode bool) *EventSystem {
 	m.chainSub = m.backend.SubscribeChainEvent(m.chainCh)
 	m.chainAcceptedSub = m.backend.SubscribeChainAcceptedEvent(m.chainAcceptedCh)
 	m.pendingLogsSub = m.backend.SubscribePendingLogsEvent(m.pendingLogsCh)
+	m.txsAcceptedSub = m.backend.SubscribeAcceptedTransactionEvent(m.txsAcceptedCh)
 
 	// Make sure none of the subscriptions are empty
-	if m.txsSub == nil || m.logsSub == nil || m.logsAcceptedSub == nil || m.rmLogsSub == nil || m.chainSub == nil || m.chainAcceptedSub == nil || m.pendingLogsSub == nil {
+	if m.txsSub == nil || m.logsSub == nil || m.logsAcceptedSub == nil || m.rmLogsSub == nil || m.chainSub == nil || m.chainAcceptedSub == nil || m.pendingLogsSub == nil || m.txsAcceptedSub == nil {
 		log.Crit("Subscribe for event system failed")
 	}
 
@@ -209,7 +215,7 @@ func (es *EventSystem) subscribe(sub *subscription) *Subscription {
 // SubscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel. Default value for the from and to
 // block is "latest". If the fromBlock > toBlock an error is returned.
-func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) (*Subscription, error) {
+func (es *EventSystem) SubscribeLogs(crit interfaces.FilterQuery, logs chan []*types.Log) (*Subscription, error) {
 	var from, to rpc.BlockNumber
 	if crit.FromBlock == nil {
 		from = rpc.LatestBlockNumber
@@ -245,7 +251,7 @@ func (es *EventSystem) SubscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 	return nil, fmt.Errorf("invalid from and to block combination: from > to")
 }
 
-func (es *EventSystem) SubscribeAcceptedLogs(crit ethereum.FilterQuery, logs chan []*types.Log) (*Subscription, error) {
+func (es *EventSystem) SubscribeAcceptedLogs(crit interfaces.FilterQuery, logs chan []*types.Log) (*Subscription, error) {
 	var from, to rpc.BlockNumber
 	if crit.FromBlock == nil {
 		from = rpc.LatestBlockNumber
@@ -270,7 +276,7 @@ func (es *EventSystem) SubscribeAcceptedLogs(crit ethereum.FilterQuery, logs cha
 	return nil, fmt.Errorf("invalid from and to block combination: from > to")
 }
 
-func (es *EventSystem) subscribeAcceptedLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribeAcceptedLogs(crit interfaces.FilterQuery, logs chan []*types.Log) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       AcceptedLogsSubscription,
@@ -287,7 +293,7 @@ func (es *EventSystem) subscribeAcceptedLogs(crit ethereum.FilterQuery, logs cha
 
 // subscribeMinedPendingLogs creates a subscription that returned mined and
 // pending logs that match the given criteria.
-func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribeMinedPendingLogs(crit interfaces.FilterQuery, logs chan []*types.Log) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       MinedAndPendingLogsSubscription,
@@ -304,7 +310,7 @@ func (es *EventSystem) subscribeMinedPendingLogs(crit ethereum.FilterQuery, logs
 
 // subscribeLogs creates a subscription that will write all logs matching the
 // given criteria to the given logs channel.
-func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribeLogs(crit interfaces.FilterQuery, logs chan []*types.Log) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       LogsSubscription,
@@ -321,7 +327,7 @@ func (es *EventSystem) subscribeLogs(crit ethereum.FilterQuery, logs chan []*typ
 
 // subscribePendingLogs creates a subscription that writes transaction hashes for
 // transactions that enter the transaction pool.
-func (es *EventSystem) subscribePendingLogs(crit ethereum.FilterQuery, logs chan []*types.Log) *Subscription {
+func (es *EventSystem) subscribePendingLogs(crit interfaces.FilterQuery, logs chan []*types.Log) *Subscription {
 	sub := &subscription{
 		id:        rpc.NewID(),
 		typ:       PendingLogsSubscription,
@@ -384,6 +390,22 @@ func (es *EventSystem) SubscribePendingTxs(hashes chan []common.Hash) *Subscript
 	return es.subscribe(sub)
 }
 
+// SubscribeAcceptedTxs creates a subscription that writes transaction hashes for
+// transactions have been accepted.
+func (es *EventSystem) SubscribeAcceptedTxs(hashes chan []common.Hash) *Subscription {
+	sub := &subscription{
+		id:        rpc.NewID(),
+		typ:       AcceptedTransactionsSubscription,
+		created:   time.Now(),
+		logs:      make(chan []*types.Log),
+		hashes:    hashes,
+		headers:   make(chan *types.Header),
+		installed: make(chan struct{}),
+		err:       make(chan error),
+	}
+	return es.subscribe(sub)
+}
+
 type filterIndex map[Type]map[rpc.ID]*subscription
 
 func (es *EventSystem) handleLogs(filters filterIndex, ev []*types.Log) {
@@ -431,13 +453,18 @@ func (es *EventSystem) handleRemovedLogs(filters filterIndex, ev core.RemovedLog
 	}
 }
 
-func (es *EventSystem) handleTxsEvent(filters filterIndex, ev core.NewTxsEvent) {
+func (es *EventSystem) handleTxsEvent(filters filterIndex, ev core.NewTxsEvent, accepted bool) {
 	hashes := make([]common.Hash, 0, len(ev.Txs))
 	for _, tx := range ev.Txs {
 		hashes = append(hashes, tx.Hash())
 	}
 	for _, f := range filters[PendingTransactionsSubscription] {
 		f.hashes <- hashes
+	}
+	if accepted {
+		for _, f := range filters[AcceptedTransactionsSubscription] {
+			f.hashes <- hashes
+		}
 	}
 }
 
@@ -555,6 +582,7 @@ func (es *EventSystem) eventLoop() {
 		es.pendingLogsSub.Unsubscribe()
 		es.chainSub.Unsubscribe()
 		es.chainAcceptedSub.Unsubscribe()
+		es.txsAcceptedSub.Unsubscribe()
 	}()
 
 	index := make(filterIndex)
@@ -565,7 +593,7 @@ func (es *EventSystem) eventLoop() {
 	for {
 		select {
 		case ev := <-es.txsCh:
-			es.handleTxsEvent(index, ev)
+			es.handleTxsEvent(index, ev, false)
 		case ev := <-es.logsCh:
 			es.handleLogs(index, ev)
 		case ev := <-es.logsAcceptedCh:
@@ -578,6 +606,8 @@ func (es *EventSystem) eventLoop() {
 			es.handleChainEvent(index, ev)
 		case ev := <-es.chainAcceptedCh:
 			es.handleChainAcceptedEvent(index, ev)
+		case ev := <-es.txsAcceptedCh:
+			es.handleTxsEvent(index, ev, true)
 
 		case f := <-es.install:
 			if f.typ == MinedAndPendingLogsSubscription {
@@ -611,6 +641,8 @@ func (es *EventSystem) eventLoop() {
 		case <-es.chainSub.Err():
 			return
 		case <-es.chainAcceptedSub.Err():
+			return
+		case <-es.txsAcceptedSub.Err():
 			return
 		}
 	}
