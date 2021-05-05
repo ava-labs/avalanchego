@@ -117,21 +117,18 @@ const (
 
 // 0x50 range - 'storage' and execution.
 const (
-	POP       OpCode = 0x50
-	MLOAD     OpCode = 0x51
-	MSTORE    OpCode = 0x52
-	MSTORE8   OpCode = 0x53
-	SLOAD     OpCode = 0x54
-	SSTORE    OpCode = 0x55
-	JUMP      OpCode = 0x56
-	JUMPI     OpCode = 0x57
-	PC        OpCode = 0x58
-	MSIZE     OpCode = 0x59
-	GAS       OpCode = 0x5a
-	JUMPDEST  OpCode = 0x5b
-	BEGINSUB  OpCode = 0x5c
-	RETURNSUB OpCode = 0x5d
-	JUMPSUB   OpCode = 0x5e
+	POP      OpCode = 0x50
+	MLOAD    OpCode = 0x51
+	MSTORE   OpCode = 0x52
+	MSTORE8  OpCode = 0x53
+	SLOAD    OpCode = 0x54
+	SSTORE   OpCode = 0x55
+	JUMP     OpCode = 0x56
+	JUMPI    OpCode = 0x57
+	PC       OpCode = 0x58
+	MSIZE    OpCode = 0x59
+	GAS      OpCode = 0x5a
+	JUMPDEST OpCode = 0x5b
 )
 
 // 0x60 range.
@@ -220,8 +217,7 @@ const (
 
 const (
 	BALANCEMC = 0xcd
-	//EMC       = 0xce
-	CALLEX = 0xcf
+	CALLEX    = 0xcf
 )
 
 // 0xf0 range - closures.
@@ -317,10 +313,6 @@ var opCodeToString = map[OpCode]string{
 	GAS:      "GAS",
 	JUMPDEST: "JUMPDEST",
 
-	BEGINSUB:  "BEGINSUB",
-	JUMPSUB:   "JUMPSUB",
-	RETURNSUB: "RETURNSUB",
-
 	// 0x60 range - push.
 	PUSH1:  "PUSH1",
 	PUSH2:  "PUSH2",
@@ -395,9 +387,8 @@ var opCodeToString = map[OpCode]string{
 	LOG4:   "LOG4",
 
 	// 0xf0 range.
-	CREATE: "CREATE",
-	CALL:   "CALL",
-	//EMC:          "EMC",
+	CREATE:       "CREATE",
+	CALL:         "CALL",
 	CALLEX:       "CALLEX",
 	RETURN:       "RETURN",
 	CALLCODE:     "CALLCODE",
@@ -488,9 +479,6 @@ var stringToOp = map[string]OpCode{
 	"MSIZE":          MSIZE,
 	"GAS":            GAS,
 	"JUMPDEST":       JUMPDEST,
-	"BEGINSUB":       BEGINSUB,
-	"RETURNSUB":      RETURNSUB,
-	"JUMPSUB":        JUMPSUB,
 	"PUSH1":          PUSH1,
 	"PUSH2":          PUSH2,
 	"PUSH3":          PUSH3,
@@ -563,12 +551,11 @@ var stringToOp = map[string]OpCode{
 	"CREATE":         CREATE,
 	"CREATE2":        CREATE2,
 	"CALL":           CALL,
-	//"EMC":            EMC,
-	"CALLEX":       CALLEX,
-	"RETURN":       RETURN,
-	"CALLCODE":     CALLCODE,
-	"REVERT":       REVERT,
-	"SELFDESTRUCT": SELFDESTRUCT,
+	"CALLEX":         CALLEX,
+	"RETURN":         RETURN,
+	"CALLCODE":       CALLCODE,
+	"REVERT":         REVERT,
+	"SELFDESTRUCT":   SELFDESTRUCT,
 }
 
 // StringToOp finds the opcode whose name is stored in `str`.

@@ -32,8 +32,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
-	ethereum "github.com/ethereum/go-ethereum"
-	gethaccounts "github.com/ethereum/go-ethereum/accounts"
+	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/event"
 	"golang.org/x/crypto/sha3"
@@ -99,7 +98,7 @@ type Wallet interface {
 	// to discover non zero accounts and automatically add them to list of tracked
 	// accounts.
 	//
-	// Note, self derivaton will increment the last component of the specified path
+	// Note, self derivation will increment the last component of the specified path
 	// opposed to decending into a child path to allow discovering accounts starting
 	// from non zero components.
 	//
@@ -109,7 +108,7 @@ type Wallet interface {
 	//
 	// You can disable automatic account discovery by calling SelfDerive with a nil
 	// chain state reader.
-	SelfDerive(bases []DerivationPath, chain ethereum.ChainStateReader)
+	SelfDerive(bases []DerivationPath, chain interfaces.ChainStateReader)
 
 	// SignData requests the wallet to sign the hash of the given data
 	// It looks up the account specified either solely via its address contained within,
@@ -212,7 +211,7 @@ func TextAndHash(data []byte) ([]byte, string) {
 
 // WalletEventType represents the different event types that can be fired by
 // the wallet subscription subsystem.
-type WalletEventType = gethaccounts.WalletEventType
+type WalletEventType int
 
 const (
 	// WalletArrived is fired when a new wallet is detected either via USB or via

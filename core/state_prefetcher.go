@@ -27,6 +27,7 @@
 package core
 
 import (
+	"math/big"
 	"sync/atomic"
 
 	"github.com/ava-labs/coreth/consensus"
@@ -34,7 +35,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 // statePrefetcher is a basic Prefetcher, which blindly executes a block on top
@@ -60,8 +60,11 @@ func newStatePrefetcher(config *params.ChainConfig, bc *BlockChain, engine conse
 // only goal is to pre-cache transaction signatures and state trie nodes.
 func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, cfg vm.Config, interrupt *uint32) {
 	var (
-		header  = block.Header()
-		gaspool = new(GasPool).AddGas(block.GasLimit())
+		header       = block.Header()
+		gaspool      = new(GasPool).AddGas(block.GasLimit())
+		blockContext = NewEVMBlockContext(header, p.bc, nil)
+		evm          = vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
+		signer       = types.MakeSigner(p.config, header.Number, new(big.Int).SetUint64(header.Time))
 	)
 	// Iterate over and process the individual transactions
 	byzantium := p.config.IsByzantium(block.Number())
@@ -70,9 +73,14 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 		if interrupt != nil && atomic.LoadUint32(interrupt) == 1 {
 			return
 		}
-		// Block precaching permitted to continue, execute the transaction
+		// Convert the transaction into an executable message and pre-cache its sender
+		msg, err := tx.AsMessage(signer)
+		if err != nil {
+			return // Also invalid block, bail out
+		}
+
 		statedb.Prepare(tx.Hash(), block.Hash(), i)
-		if err := precacheTransaction(p.config, p.bc, nil, gaspool, statedb, header, tx, cfg); err != nil {
+		if err := precacheTransaction(msg, p.config, gaspool, statedb, header, evm); err != nil {
 			return // Ugh, something went horribly wrong, bail out
 		}
 		// If we're pre-byzantium, pre-load trie nodes for the intermediate root
@@ -89,16 +97,10 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 // precacheTransaction attempts to apply a transaction to the given state database
 // and uses the input parameters for its environment. The goal is not to execute
 // the transaction successfully, rather to warm up touched data slots.
-func precacheTransaction(config *params.ChainConfig, bc ChainContext, author *common.Address, gaspool *GasPool, statedb *state.StateDB, header *types.Header, tx *types.Transaction, cfg vm.Config) error {
-	// Convert the transaction into an executable message and pre-cache its sender
-	msg, err := tx.AsMessage(types.MakeSigner(config, header.Number))
-	if err != nil {
-		return err
-	}
-	// Create the EVM and execute the transaction
-	context := NewEVMContext(msg, header, bc, author)
-	vm := vm.NewEVM(context, statedb, config, cfg)
-
-	_, err = ApplyMessage(vm, msg, gaspool)
+func precacheTransaction(msg types.Message, config *params.ChainConfig, gaspool *GasPool, statedb *state.StateDB, header *types.Header, evm *vm.EVM) error {
+	// Update the evm with the new transaction context.
+	evm.Reset(NewEVMTxContext(msg), statedb)
+	// Add addresses to access list if applicable
+	_, err := ApplyMessage(evm, msg, gaspool)
 	return err
 }

@@ -5,8 +5,10 @@ package evm
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -158,17 +160,20 @@ func (b *Block) Height() uint64 {
 }
 
 // syntacticVerify verifies that a *Block is well-formed.
-func (b *Block) syntacticVerify() error {
+func (b *Block) syntacticVerify() (params.Rules, error) {
 	if b == nil || b.ethBlock == nil {
-		return errInvalidBlock
+		return params.Rules{}, errInvalidBlock
 	}
 
-	return b.vm.getBlockValidator(b.ethBlock.Header().Time).SyntacticVerify(b)
+	header := b.ethBlock.Header()
+	rules := b.vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
+	return rules, b.vm.getBlockValidator(rules).SyntacticVerify(b)
 }
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
-	if err := b.syntacticVerify(); err != nil {
+	rules, err := b.syntacticVerify()
+	if err != nil {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
@@ -255,7 +260,7 @@ func (b *Block) Verify() error {
 			// the atomic transaction, so now we must ensure that the transaction is
 			// valid and doesn't have any accepted conflicts.
 			utx := atomicTx.UnsignedAtomicTx
-			if err := utx.SemanticVerify(vm, atomicTx, b.vm.IsApricotPhase1(b.ethBlock.Time())); err != nil {
+			if err := utx.SemanticVerify(vm, atomicTx, rules); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 			}
 		}

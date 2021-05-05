@@ -59,6 +59,8 @@ type Backend interface {
 
 	SubscribePendingLogsEvent(ch chan<- []*types.Log) event.Subscription
 
+	SubscribeAcceptedTransactionEvent(ch chan<- core.NewTxsEvent) event.Subscription
+
 	BloomStatus() (uint64, uint64)
 	ServiceFilter(ctx context.Context, session *bloombits.MatcherSession)
 
