@@ -345,6 +345,7 @@ func NewNetwork(
 		maxNetworkPendingSendBytes:         int64(maxNetworkPendingSendBytes),
 		networkPendingSendBytesToRateLimit: int64(networkPendingSendBytesToRateLimit),
 		maxClockDifference:                 maxClockDifference,
+		peerListSize:                       peerListSize,
 		peerListGossipSpacing:              peerListGossipSpacing,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
@@ -1344,7 +1345,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 		return nil, nil, err
 	}
 	numUnsignedToSend := n.peerListSize
-	if len(unsignedPeers) > numUnsignedToSend {
+	if len(unsignedPeers) < numUnsignedToSend {
 		numUnsignedToSend = len(unsignedPeers)
 	}
 	unsignedIndices, err := s.Sample(numUnsignedToSend)
@@ -1360,7 +1361,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 		return nil, nil, err
 	}
 	numSignedToSend := n.peerListSize
-	if len(signedPeers) > numSignedToSend {
+	if len(signedPeers) < numSignedToSend {
 		numSignedToSend = len(signedPeers)
 	}
 	signedIndices, err := s.Sample(numSignedToSend)
