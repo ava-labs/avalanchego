@@ -18,14 +18,16 @@ RUN go mod download
 # Copy the code into the container
 COPY . .
 
+# Run the unit tests
+RUN go test ./...
+
 # Pass in CORETH_COMMIT as an arg to allow the build script to set this externally
 ARG CORETH_COMMIT
 RUN export CORETH_COMMIT=$CORETH_COMMIT
 ARG CURRENT_BRANCH
 RUN export CURRENT_BRANCH=$CURRENT_BRANCH
 
-RUN ./scripts/build.sh
-RUN cp -R $GOPATH/src/github.com/ava-labs/avalanchego/build/plugins/evm /build/evm
+RUN ./scripts/build.sh /build/evm
 
 # ============= Cleanup Stage ================
 FROM alpine:3.13 AS execution
