@@ -18,9 +18,6 @@ RUN go mod download
 # Copy the code into the container
 COPY . .
 
-# Run the unit tests
-RUN go test ./...
-
 # Pass in CORETH_COMMIT as an arg to allow the build script to set this externally
 ARG CORETH_COMMIT
 RUN export CORETH_COMMIT=$CORETH_COMMIT
