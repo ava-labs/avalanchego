@@ -583,7 +583,11 @@ func (p *peer) sendGetPeerList() {
 
 // assumes the stateLock is not held
 func (p *peer) sendPeerList() {
-	validatorIPs, ips := p.net.validatorIPs()
+	validatorIPs, ips, err := p.net.validatorIPs()
+	if err != nil {
+		return
+	}
+
 	p.sendSignedPeerList(validatorIPs)
 	p.sendUnsignedPeerList(ips)
 }

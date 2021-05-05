@@ -14,7 +14,6 @@ import (
 	"net"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -64,8 +63,6 @@ import (
 // Networking constants
 const (
 	TCP = "tcp"
-
-	beaconConnectionTimeout = 1 * time.Minute
 )
 
 var (
@@ -216,7 +213,7 @@ func (n *Node) initNetworking() error {
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(beaconConnectionTimeout)
+		timer.SetTimeoutIn(n.Config.BootstrapBeaconConnectionTimeout)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
@@ -229,7 +226,7 @@ func (n *Node) initNetworking() error {
 	versionManager := version.NewCompatibility(
 		Version,
 		MinimumCompatibleVersion,
-		GetApricotPhase1Time(n.Config.NetworkID),
+		GetApricotPhase2Time(n.Config.NetworkID),
 		PrevMinimumCompatibleVersion,
 		MinimumUnmaskedVersion,
 		GetApricotPhase0Time(n.Config.NetworkID),

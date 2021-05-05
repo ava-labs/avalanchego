@@ -142,6 +142,9 @@ type Config struct {
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
 
+	// Timeout when connecting to bootstrapping beacons
+	BootstrapBeaconConnectionTimeout time.Duration
+
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
 
