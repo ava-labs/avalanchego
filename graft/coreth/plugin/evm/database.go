@@ -47,7 +47,18 @@ func (db Database) Sync() error { return errOpNotSupported }
 func (db Database) NewBatch() ethdb.Batch { return Batch{db.Database.NewBatch()} }
 
 // NewIterator implements ethdb.Database
+//
+// Note: This method assumes that the prefix is NOT part of the start, so there's
+// no need for the caller to prepend the prefix to the start.
 func (db Database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+	// avalanchego's database implementation assumes that the prefix is part of the
+	// start, so it is added here (if it is provided).
+	if len(prefix) > 0 {
+		newStart := make([]byte, len(prefix)+len(start))
+		copy(newStart, prefix)
+		copy(newStart[len(prefix):], start)
+		start = newStart
+	}
 	return db.Database.NewIteratorWithStartAndPrefix(start, prefix)
 }
 

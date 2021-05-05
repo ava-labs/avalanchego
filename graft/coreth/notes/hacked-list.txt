@@ -1,7 +1,5 @@
 ./consensus/dummy/consensus.go
-./consensus/clique/clique.go
 ./consensus/consensus.go
-./consensus/ethash/consensus.go
 ./core/blockchain.go
 ./core/events.go
 ./core/evm.go
@@ -29,7 +27,6 @@
 ./eth/backend.go
 ./eth/config.go
 ./eth/gasprice/gasprice.go
-./eth/gen_config.go
 ./eth/tracers/internal/tracers/assets.go
 ./ethclient/ethclient.go
 ./ethclient/signer.go
@@ -41,8 +38,9 @@
 ./node/config.go
 ./node/node.go
 ./node/service.go
+./params/config.go
 ./params/protocol_params.go
 ./rpc/client.go
 ./rpc/types.go
-./interfaces.go
+./interfaces.go (moved to interfaces/interfaces.go)
 ./accounts/keystore/account_cache.go (minor formatting change to pass linting)

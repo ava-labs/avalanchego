@@ -35,6 +35,7 @@ import (
 type NewTxsEvent struct{ Txs []*types.Transaction }
 
 // NewTxPoolHeadEvent is posted when the pool head is updated.
+// TODO: remove unnecessary event
 type NewTxPoolHeadEvent struct{ Block *types.Block }
 
 // NewMinedBlockEvent is posted when a block has been imported.
