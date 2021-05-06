@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -280,6 +280,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	rpcServer.RegisterInterceptFunc(vm.InterceptRequestFunc)
+	rpcServer.RegisterAfterFunc(vm.AfterRequestFunc)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
@@ -304,6 +306,9 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	newServer.RegisterInterceptFunc(vm.InterceptRequestFunc)
+	newServer.RegisterAfterFunc(vm.AfterRequestFunc)
+
 	// name this service "avm"
 	staticService := CreateStaticService()
 	return map[string]*common.HTTPHandler{

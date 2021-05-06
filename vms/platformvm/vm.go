@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -408,6 +408,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterInterceptFunc(vm.metrics.InterceptRequestFunc)
+	server.RegisterAfterFunc(vm.metrics.AfterRequestFunc)
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}
@@ -426,6 +428,8 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterInterceptFunc(vm.metrics.InterceptRequestFunc)
+	server.RegisterAfterFunc(vm.metrics.AfterRequestFunc)
 	if err := server.RegisterService(&StaticService{}, "platform"); err != nil {
 		return nil, err
 	}

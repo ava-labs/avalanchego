@@ -1,21 +1,29 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
 
 import (
+	"context"
 	"errors"
 	"fmt"
-
-	"github.com/prometheus/client_golang/prometheus"
+	"net/http"
+	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/gorilla/rpc/v2"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
 	errUnknownBlockType = errors.New("unknown block type")
 )
+
+type contextKey int
+
+const requestTimestampKey contextKey = iota
 
 type metrics struct {
 	percentConnected prometheus.Gauge
@@ -36,6 +44,9 @@ type metrics struct {
 	numExportTxs,
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
+
+	requestErrors   *prometheus.CounterVec
+	requestDuration *prometheus.HistogramVec
 }
 
 func newBlockMetrics(namespace string, name string) prometheus.Counter {
@@ -86,6 +97,17 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
+	m.requestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Namespace: namespace,
+		Name:      "request_duration_ms",
+		Buckets:   utils.MillisecondsBuckets,
+	}, []string{"method"})
+
+	m.requestErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "request_error_count",
+	}, []string{"method"})
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(m.percentConnected),
@@ -106,6 +128,9 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numExportTxs),
 		registerer.Register(m.numImportTxs),
 		registerer.Register(m.numRewardValidatorTxs),
+
+		registerer.Register(m.requestDuration),
+		registerer.Register(m.requestErrors),
 	)
 	return errs.Err
 }
@@ -159,4 +184,22 @@ func (m *metrics) AcceptTx(tx *Tx) error {
 		return errUnknownTxType
 	}
 	return nil
+}
+
+func (m *metrics) InterceptRequestFunc(i *rpc.RequestInfo) *http.Request {
+	return i.Request.WithContext(context.WithValue(i.Request.Context(), requestTimestampKey, time.Now()))
+}
+
+func (m *metrics) AfterRequestFunc(i *rpc.RequestInfo) {
+	timestamp := i.Request.Context().Value(requestTimestampKey)
+	timeCast, ok := timestamp.(time.Time)
+	if !ok {
+		return
+	}
+	totalTime := time.Since(timeCast)
+	m.requestDuration.With(prometheus.Labels{"method": i.Method}).Observe(float64(totalTime.Milliseconds()))
+
+	if i.Error != nil {
+		m.requestErrors.With(prometheus.Labels{"method": i.Method}).Inc()
+	}
 }
