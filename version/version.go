@@ -14,8 +14,9 @@ const (
 )
 
 var (
+	DefaultVersion1_0_0 = NewDefaultVersion(1, 0, 0)
+
 	errDifferentMajor = errors.New("different major version")
-	DefaultVersion1   = NewDefaultVersion(1, 0, 0)
 )
 
 type Version interface {

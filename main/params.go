@@ -35,11 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/version"
-)
-
-var (
-	dbVersion = version.NewDefaultVersion(1, 2, 5)
 )
 
 // Results of parsing the CLI
@@ -738,7 +733,7 @@ func parseViper() error {
 		args = append(args, networkGeneration)
 
 		format += ", database=%s"
-		args = append(args, dbVersion)
+		args = append(args, node.DatabaseVersion)
 
 		if GitCommit != "" {
 			format += ", commit=%s"

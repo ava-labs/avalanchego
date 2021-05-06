@@ -15,25 +15,25 @@ type Parser interface {
 }
 
 type parser struct {
-	versionPrefix    string
-	versionSeparator string
+	prefix    string
+	separator string
 }
 
 func NewDefaultParser() Parser { return NewParser(defaultVersionPrefix, defaultVersionSeparator) }
 
 func NewParser(prefix, separator string) Parser {
 	return &parser{
-		versionPrefix:    prefix,
-		versionSeparator: separator,
+		prefix:    prefix,
+		separator: separator,
 	}
 }
 
 func (p *parser) Parse(s string) (Version, error) {
-	if !strings.HasPrefix(s, p.versionPrefix) {
-		return nil, fmt.Errorf("version string: %s missing required prefix: %s", s, p.versionPrefix)
+	if !strings.HasPrefix(s, p.prefix) {
+		return nil, fmt.Errorf("version string: %s missing required prefix: %s", s, p.prefix)
 	}
 
-	splitVersion := strings.SplitN(strings.TrimPrefix(s, p.versionPrefix), p.versionSeparator, 3)
+	splitVersion := strings.SplitN(strings.TrimPrefix(s, p.prefix), p.separator, 3)
 	if len(splitVersion) != 3 {
 		return nil, fmt.Errorf("failed to parse %s as a version", s)
 	}
@@ -57,8 +57,8 @@ func (p *parser) Parse(s string) (Version, error) {
 		major,
 		minor,
 		patch,
-		p.versionPrefix,
-		p.versionSeparator,
+		p.prefix,
+		p.separator,
 	), nil
 }
 
@@ -82,8 +82,8 @@ func NewApplicationParser(appSeparator string, versionSeparator string) Applicat
 	return &applicationParser{
 		appSeparator: appSeparator,
 		versionParser: &parser{
-			versionPrefix:    "",
-			versionSeparator: versionSeparator,
+			prefix:    "",
+			separator: versionSeparator,
 		},
 	}
 }
@@ -102,7 +102,7 @@ func (p *applicationParser) Parse(s string) (Application, error) {
 	return NewApplication(
 		splitApp[0],
 		p.appSeparator,
-		p.versionParser.versionSeparator,
+		p.versionParser.separator,
 		version.Major(),
 		version.Minor(),
 		version.Patch(),
