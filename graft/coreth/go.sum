@@ -58,9 +58,8 @@ github.com/aristanetworks/goarista v0.0.0-20170210015632-ea17b1a17847/go.mod h1:
 github.com/armon/circbuf v0.0.0-20150827004946-bbbad097214e/go.mod h1:3U/XgcO3hCbHZ8TKRvWD2dDTCfh9M9ya+I9JpbB7O8o=
 github.com/armon/go-metrics v0.0.0-20180917152333-f0300d1749da/go.mod h1:Q73ZrmVTwzkszR9V5SSuryQ31EELlFMUz1kKyl939pY=
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
-github.com/ava-labs/avalanchego v1.3.2 h1:J+U5ssWfCYE40LeLP6JMzGwtklm1wuDUSCJfFO5dwUA=
-github.com/ava-labs/avalanchego v1.3.3-0.20210504165449-9d4329b2c788 h1:YMcI9kwW7SdIESjd1i7RD5cl7XodKm0Jxm/I8VSAuqg=
-github.com/ava-labs/avalanchego v1.3.3-0.20210504165449-9d4329b2c788/go.mod h1:3N/qMvcbrG+X1rAOYzHATt3sQmgzEXmOn4HsxsV1VM0=
+github.com/ava-labs/avalanchego v1.4.2-0.20210506001617-3ccf9ef37a01 h1:hmmTMW23w0JybdnA3Y/6pInr1p0V3rx1dCG/GXxLf3c=
+github.com/ava-labs/avalanchego v1.4.2-0.20210506001617-3ccf9ef37a01/go.mod h1:tpxS2ZJO0h2IJbUWKWUJhMuiBkMk4p0P22c315ftz4E=
 github.com/aws/aws-sdk-go v1.25.48/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aws/aws-sdk-go-v2 v1.2.0/go.mod h1:zEQs02YRBw1DjK0PoJv3ygDYOFTre1ejlJWl8FwAuQo=
 github.com/aws/aws-sdk-go-v2/config v1.1.1/go.mod h1:0XsVy9lBI/BCXm+2Tuvt39YmdHwS5unDQmxZOYe8F5Y=
