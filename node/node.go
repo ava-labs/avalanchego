@@ -255,6 +255,9 @@ func (n *Node) initNetworking() error {
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
 		tlsKey,
+		int(n.Config.PeerListSize),
+		int(n.Config.PeerListGossipSize),
+		n.Config.PeerListGossipFreq,
 	)
 
 	return nil
