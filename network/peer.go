@@ -51,8 +51,8 @@ type peer struct {
 	// modified on the connection's reader routine.
 	gotPeerList utils.AtomicBool
 
-	// if the peer list has already been sent to the peer, to avoid sending
-	// it repeatedly.
+	// only send the peerlist to this peer on handling a getPeerlist message if
+	// a peerlist hasn't already been sent.
 	peerListSent utils.AtomicBool
 
 	// if the version message has been received and is valid and the peerlist
@@ -363,7 +363,7 @@ func (p *peer) Send(msg Msg) bool {
 	default:
 		// we never sent the message, remove from pending totals
 		pb := atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
-		p.net.log.Warn("dropping message to %s due to a full send queue", p.id, pb)
+		p.net.log.Debug("dropping message to %s due to a full send queue", p.id, pb)
 		return false
 	}
 }
@@ -603,6 +603,7 @@ func (p *peer) sendPeerList() {
 }
 
 // assumes the [stateLock] is not held
+// returns true if an unsigned peer list was sent to [p]
 func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) bool {
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
@@ -622,6 +623,7 @@ func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) bool {
 }
 
 // assumes the [stateLock] is not held
+// returns true if a signed peer list was sent to [p]
 func (p *peer) sendSignedPeerList(peers []utils.IPCertDesc) bool {
 	msg, err := p.net.b.SignedPeerList(peers)
 	if err != nil {
