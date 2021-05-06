@@ -27,7 +27,7 @@ require (
 	github.com/mattn/go-colorable v0.1.7 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mr-tron/base58 v1.2.0
-	github.com/nbutton23/zxcvbn-go v0.0.0-201809121ko7be4eisooW85939-ae427f1e4c1d
+	github.com/nbutton23/zxcvbn-go v0.0.0-20180912185939-ae427f1e4c1d
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/cors v1.7.0
@@ -43,7 +43,7 @@ require (
 	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c // indirect
 	golang.org/x/text v0.3.4 // indirect
 	google.golang.org/genproto v0.0.0-20200218151345-dad8c97a84f5 // indirect
-	google.golang.org/grpc v1.37.0
-	google.golang.org/protobuf v1.25.0
+	google.golang.org/grpc v1.29.1
+	google.golang.org/protobuf v1.23.0
 	gotest.tools v2.2.0+incompatible
 )
