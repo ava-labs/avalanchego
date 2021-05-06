@@ -31,9 +31,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
+
+	"github.com/ava-labs/coreth/core/rawdb"
 )
 
 // Iterator is an iterator to step over all the accounts or the specific
@@ -143,7 +144,7 @@ func (it *diffAccountIterator) Hash() common.Hash {
 
 // Account returns the RLP encoded slim account the iterator is currently at.
 // This method may _fail_, if the underlying layer has been flattened between
-// the call to Next and Acccount. That type of error will set it.Err.
+// the call to Next and Account. That type of error will set it.Err.
 // This method assumes that flattening does not delete elements from
 // the accountdata mapping (writing nil into it is fine though), and will panic
 // if elements have been deleted.
@@ -253,7 +254,7 @@ type diffStorageIterator struct {
 }
 
 // StorageIterator creates a storage iterator over a single diff layer.
-// Execept the storage iterator is returned, there is an additional flag
+// Except the storage iterator is returned, there is an additional flag
 // "destructed" returned. If it's true then it means the whole storage is
 // destructed in this layer(maybe recreated too), don't bother deeper layer
 // for storage retrieval.

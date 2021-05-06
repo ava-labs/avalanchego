@@ -604,12 +604,16 @@ func ReadReceipts(db ethdb.Reader, hash common.Hash, number uint64, config *para
 	if receipts == nil {
 		return nil
 	}
+	header := ReadHeader(db, hash, number)
+	if header == nil {
+		return nil
+	}
 	body := ReadBody(db, hash, number)
 	if body == nil {
 		log.Error("Missing body but have receipt", "hash", hash, "number", number)
 		return nil
 	}
-	if err := receipts.DeriveFields(config, hash, number, body.Transactions); err != nil {
+	if err := receipts.DeriveFields(config, hash, number, header.Time, body.Transactions); err != nil {
 		log.Error("Failed to derive block receipts fields", "hash", hash, "number", number, "err", err)
 		return nil
 	}
@@ -737,4 +741,17 @@ func FindCommonAncestor(db ethdb.Reader, a, b *types.Header) *types.Header {
 		}
 	}
 	return a
+}
+
+// ReadHeadBlock returns the current canonical head block.
+func ReadHeadBlock(db ethdb.Reader) *types.Block {
+	headBlockHash := ReadHeadBlockHash(db)
+	if headBlockHash == (common.Hash{}) {
+		return nil
+	}
+	headBlockNumber := ReadHeaderNumber(db, headBlockHash)
+	if headBlockNumber == nil {
+		return nil
+	}
+	return ReadBlock(db, headBlockHash, *headBlockNumber)
 }
