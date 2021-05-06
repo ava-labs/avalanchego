@@ -133,7 +133,7 @@ func TestPeer_Close(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	peer.close()
+	peer.Close()
 
 	// The network pending bytes should be reduced back to zero on close.
 	if basenetwork.pendingBytes != int64(0) {
