@@ -100,6 +100,9 @@ func TestPeer_Close(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, netwrk)
 

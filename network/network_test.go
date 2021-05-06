@@ -31,8 +31,11 @@ import (
 )
 
 const (
-	defaultSendQueueSize = 1 << 10
-	defaultAliasTimeout  = 2 * time.Second
+	defaultSendQueueSize      = 1 << 10
+	defaultAliasTimeout       = 2 * time.Second
+	defaultGossipPeerListFreq = time.Minute
+	defaultPeerListSize       = 50
+	defaultGossipPeerListTo   = 100
 )
 
 var (
@@ -320,6 +323,9 @@ func TestNewDefaultNetwork(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net)
 
@@ -447,6 +453,9 @@ func TestEstablishConnection(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -472,6 +481,9 @@ func TestEstablishConnection(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -610,6 +622,9 @@ func TestDoubleTrack(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -635,6 +650,9 @@ func TestDoubleTrack(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -774,6 +792,9 @@ func TestDoubleClose(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -799,6 +820,9 @@ func TestDoubleClose(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -943,6 +967,9 @@ func TestTrackConnected(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -968,6 +995,9 @@ func TestTrackConnected(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -1086,6 +1116,9 @@ func TestTrackConnectedRace(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -1111,6 +1144,9 @@ func TestTrackConnectedRace(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -1360,6 +1396,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -1385,6 +1424,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -1410,6 +1452,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert2.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net2)
 
@@ -1435,6 +1480,9 @@ func TestPeerAliasesTicker(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert2.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net3)
 
@@ -1766,6 +1814,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -1791,6 +1842,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -1816,6 +1870,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert2.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net2)
 
@@ -1841,6 +1898,9 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert2.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net3)
 
@@ -2105,6 +2165,9 @@ func TestPeerSignature(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net0)
 
@@ -2130,6 +2193,9 @@ func TestPeerSignature(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net1)
 
@@ -2155,6 +2221,9 @@ func TestPeerSignature(t *testing.T) {
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert2.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, net2)
 
