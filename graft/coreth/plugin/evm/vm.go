@@ -66,7 +66,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.4.3"
+	Version = "coreth-v0.5.0"
 
 	_ block.ChainVM = &VM{}
 )
@@ -658,7 +658,7 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	handler := vm.chain.NewRPCHandler(time.Duration(vm.CLIConfig.APIMaxDuration))
 	enabledAPIs := vm.CLIConfig.EthAPIs()
-	vm.chain.AttachEthService(handler, vm.CLIConfig.EthAPIs())
+	vm.chain.AttachEthService(handler, enabledAPIs)
 
 	errs := wrappers.Errs{}
 	if vm.CLIConfig.SnowmanAPIEnabled {
