@@ -444,7 +444,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 	versionedDBs := []*manager.VersionedDatabase{
 		{
 			Database: memdb.New(),
-			Version:  version.DefaultVersion1,
+			Version:  version.DefaultVersion1_0_0,
 		},
 	}
 

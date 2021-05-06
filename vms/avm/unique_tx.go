@@ -78,7 +78,6 @@ func (tx *UniqueTx) refresh() {
 	}
 
 	if prevTx == nil {
-		// TODO: register hits/misses for this
 		if innerTx, err := tx.vm.state.GetTx(tx.ID()); err == nil {
 			tx.Tx = innerTx
 		}

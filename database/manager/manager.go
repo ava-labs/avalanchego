@@ -107,7 +107,7 @@ func NewDefaultMemDBManager() Manager {
 		databases: []*VersionedDatabase{
 			{
 				Database: memdb.New(),
-				Version:  version.DefaultVersion1,
+				Version:  version.DefaultVersion1_0_0,
 			},
 		},
 	}
