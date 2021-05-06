@@ -47,7 +47,7 @@ const (
 	defaultPeerListGossipSpacing                     = time.Minute
 	defaultPeerListGossipSize                        = 100
 	defaultPeerListStakerGossipFraction              = 2
-	defaultGetVersionTimeout                         = 2 * time.Second
+	defaultGetVersionTimeout                         = 10 * time.Second
 	defaultAllowPrivateIPs                           = true
 	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = 30 * time.Second
@@ -949,7 +949,6 @@ func (n *network) close() {
 func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
-
 	n.track(ip, nodeID)
 }
 
@@ -1534,7 +1533,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 			connectedTo++
 		}
 	}
-	pendingSendBytes := n.pendingBytes
+	pendingSendBytes := atomic.LoadInt64(&n.pendingBytes)
 	sendFailRate := n.sendFailRateCalculator.Read()
 	n.stateLock.RUnlock()
 
