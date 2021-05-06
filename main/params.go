@@ -114,13 +114,13 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] peers to [%s] peers every [%s]",
-		networkGossipPeerListSizeKey,
-		networkGossipPeerListToKey,
-		networkGossipPeerListFreqKey,
+		networkPeerListSizeKey,
+		networkPeerListGossipSizeKey,
+		networkPeerListGossipFreqKey,
 	)
-	fs.Uint(networkGossipPeerListSizeKey, 20, gossipHelpMsg)
-	fs.Uint(networkGossipPeerListToKey, 50, gossipHelpMsg)
-	fs.Duration(networkGossipPeerListFreqKey, time.Minute, gossipHelpMsg)
+	fs.Uint(networkPeerListSizeKey, 20, gossipHelpMsg)
+	fs.Uint(networkPeerListGossipSizeKey, 50, gossipHelpMsg)
+	fs.Duration(networkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 	// Public IP Resolution
 	fs.String(publicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 	fs.Duration(dynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
@@ -615,11 +615,11 @@ func setNodeConfig(v *viper.Viper) error {
 		return errors.New("network timeout coefficient must be >= 1")
 	}
 
-	// Node will gossip [GossipPeerListSize] peers to [GossipPeerListTo]
-	// every [GossipPeerListFreq]
-	Config.GossipPeerListSize = v.GetUint32(networkGossipPeerListSizeKey)
-	Config.GossipPeerListFreq = v.GetDuration(networkGossipPeerListFreqKey)
-	Config.GossipPeerListTo = v.GetUint32(networkGossipPeerListToKey)
+	// Node will gossip [PeerListSize] peers to [PeerListGossipSize]
+	// every [PeerListGossipFreq]
+	Config.PeerListSize = v.GetUint32(networkPeerListSizeKey)
+	Config.PeerListGossipFreq = v.GetDuration(networkPeerListGossipFreqKey)
+	Config.PeerListGossipSize = v.GetUint32(networkPeerListGossipSizeKey)
 
 	// Benchlist
 	Config.BenchlistConfig.Threshold = v.GetInt(benchlistFailThresholdKey)

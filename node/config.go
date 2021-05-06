@@ -68,9 +68,9 @@ type Config struct {
 	// Network configuration
 	NetworkConfig       timer.AdaptiveTimeoutConfig
 	NetworkHealthConfig network.HealthConfig
-	GossipPeerListSize  uint32
-	GossipPeerListTo    uint32
-	GossipPeerListFreq  time.Duration
+	PeerListSize        uint32
+	PeerListGossipSize  uint32
+	PeerListGossipFreq  time.Duration
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
