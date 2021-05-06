@@ -637,7 +637,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*AbortBlock)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -783,7 +783,7 @@ func TestAddValidatorReject(t *testing.T) {
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*AbortBlock); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
