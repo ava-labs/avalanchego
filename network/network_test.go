@@ -228,13 +228,15 @@ func (u *testUpgrader) Update(ip utils.DynamicIPDesc, id ids.ShortID) {
 	u.ids[ip.String()] = id
 }
 
-var certLock sync.Mutex
-var cert0 *tls.Certificate
-var tlsConfig0 *tls.Config
-var cert1 *tls.Certificate
-var tlsConfig1 *tls.Config
-var cert2 *tls.Certificate
-var tlsConfig2 *tls.Config
+var (
+	certLock   sync.Mutex
+	cert0      *tls.Certificate
+	tlsConfig0 *tls.Config
+	cert1      *tls.Certificate
+	tlsConfig1 *tls.Config
+	cert2      *tls.Certificate
+	tlsConfig2 *tls.Config
+)
 
 func initCerts(t *testing.T) {
 	certLock.Lock()
