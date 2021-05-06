@@ -362,7 +362,7 @@ func (p *peer) Send(msg Msg) bool {
 		return true
 	default:
 		// we never sent the message, remove from pending totals
-		pb := atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
+		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
 		return false
 	}
