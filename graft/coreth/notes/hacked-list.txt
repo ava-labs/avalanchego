@@ -42,5 +42,5 @@
 ./params/protocol_params.go
 ./rpc/client.go
 ./rpc/types.go
-./interfaces.go
+./interfaces.go (moved to interfaces/interfaces.go)
 ./accounts/keystore/account_cache.go (minor formatting change to pass linting)
