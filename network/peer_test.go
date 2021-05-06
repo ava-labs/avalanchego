@@ -117,6 +117,7 @@ func TestPeer_Close(t *testing.T) {
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sender = make(chan []byte, 10)
+	peer.Start()
 	testMsg := newTestMsg(GetVersion, newmsgbytes)
 	peer.Send(testMsg)
 
@@ -133,13 +134,14 @@ func TestPeer_Close(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	peer.close()
+	peer.Close()
+	time.Sleep(1 * time.Second) // give time for goroutines to exit
 
 	// The network pending bytes should be reduced back to zero on close.
 	if basenetwork.pendingBytes != int64(0) {
 		t.Fatalf("pending bytes invalid")
 	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
+	if peer.pendingBytes != int64(0) {
 		t.Fatalf("pending bytes invalid")
 	}
 }
