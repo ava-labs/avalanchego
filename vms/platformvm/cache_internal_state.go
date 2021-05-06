@@ -749,6 +749,7 @@ func (st *internalStateImpl) Close() error {
 		st.validatorsDB.Close(),
 		st.blockDB.Close(),
 		st.txDB.Close(),
+		st.rewardUTXODB.Close(),
 		st.utxoDB.Close(),
 		st.subnetBaseDB.Close(),
 		st.chainDB.Close(),
