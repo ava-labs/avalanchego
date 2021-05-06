@@ -925,3 +925,26 @@ func TestStateDBAccessList(t *testing.T) {
 		t.Fatalf("expected empty, got %d", got)
 	}
 }
+
+func TestMultiCoinOperations(t *testing.T) {
+	s := newStateTest()
+	s.state.GetOrNewStateObject(common.Address{})
+	root, _ := s.state.Commit(false)
+	s.state, _ = New(root, s.state.db, s.state.snaps)
+
+	s.state.AddBalance(common.Address{}, new(big.Int))
+
+	balance := s.state.GetBalanceMultiCoin(common.Address{}, common.Hash{1})
+	if balance.Cmp(big.NewInt(0)) != 0 {
+		t.Fatal("expected zero multicoin balance")
+	}
+
+	s.state.SetBalanceMultiCoin(common.Address{}, common.Hash{1}, big.NewInt(10))
+	s.state.SubBalanceMultiCoin(common.Address{}, common.Hash{1}, big.NewInt(5))
+	s.state.AddBalanceMultiCoin(common.Address{}, common.Hash{1}, big.NewInt(3))
+
+	balance = s.state.GetBalanceMultiCoin(common.Address{}, common.Hash{1})
+	if balance.Cmp(big.NewInt(8)) != 0 {
+		t.Fatal("expected multicoin balance to be 8")
+	}
+}
