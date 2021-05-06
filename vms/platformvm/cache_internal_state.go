@@ -35,6 +35,7 @@ var (
 	subnetValidatorPrefix = []byte("subnetValidator")
 	blockPrefix           = []byte("block")
 	txPrefix              = []byte("tx")
+	rewardUTXOsPrefix     = []byte("rewardUTXOs")
 	utxoPrefix            = []byte("utxo")
 	subnetPrefix          = []byte("subnet")
 	chainPrefix           = []byte("chain")
@@ -58,10 +59,11 @@ const (
 	mediumPriority
 	topPriority
 
-	blockCacheSize   = 2048
-	txCacheSize      = 2048
-	chainCacheSize   = 2048
-	chainDBCacheSize = 2048
+	blockCacheSize       = 2048
+	txCacheSize          = 2048
+	rewardUTXOsCacheSize = 2048
+	chainCacheSize       = 2048
+	chainDBCacheSize     = 2048
 )
 
 type InternalState interface {
@@ -172,6 +174,10 @@ type internalStateImpl struct {
 	txCache  cache.Cacher             // cache of txID -> {*Tx, Status} if the entry is nil, it is not in the database
 	txDB     database.Database
 
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher            // cache of txID -> []*UTXO
+	rewardUTXODB     database.Database
+
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
@@ -217,6 +223,7 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 	pendingDelegatorBaseDB := prefixdb.New(delegatorPrefix, pendingValidatorsDB)
 	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
 
+	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
 	return &internalStateImpl{
@@ -249,6 +256,9 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 		addedTxs: make(map[ids.ID]*txStatusImpl),
 		txDB:     prefixdb.New(txPrefix, baseDB),
 
+		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
+		rewardUTXODB:     rewardUTXODB,
+
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoDB:        utxoDB,
 
@@ -265,6 +275,7 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 func (st *internalStateImpl) initCaches() {
 	st.blockCache = &cache.LRU{Size: blockCacheSize}
 	st.txCache = &cache.LRU{Size: txCacheSize}
+	st.rewardUTXOsCache = &cache.LRU{Size: rewardUTXOsCacheSize}
 	st.utxoState = avax.NewUTXOState(st.utxoDB, GenesisCodec)
 	st.chainCache = &cache.LRU{Size: chainCacheSize}
 	st.chainDBCache = &cache.LRU{Size: chainDBCacheSize}
@@ -284,6 +295,15 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 		fmt.Sprintf("%s_tx_cache", namespace),
 		metrics,
 		&cache.LRU{Size: txCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+
+	rewardUTXOsCache, err := metercacher.New(
+		fmt.Sprintf("%s_reward_utxos_cache", namespace),
+		metrics,
+		&cache.LRU{Size: rewardUTXOsCacheSize},
 	)
 	if err != nil {
 		return err
@@ -310,6 +330,7 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 	)
 	st.blockCache = blockCache
 	st.txCache = txCache
+	st.rewardUTXOsCache = rewardUTXOsCache
 	st.utxoState = utxoState
 	st.chainCache = chainCache
 	st.chainDBCache = chainDBCache
@@ -518,6 +539,39 @@ func (st *internalStateImpl) AddTx(tx *Tx, status Status) {
 	}
 }
 
+func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
+	if utxos, exists := st.addedRewardUTXOs[txID]; exists {
+		return utxos, nil
+	}
+	if utxos, exists := st.rewardUTXOsCache.Get(txID); exists {
+		return utxos.([]*avax.UTXO), nil
+	}
+
+	rawTxDB := prefixdb.New(txID[:], st.rewardUTXODB)
+	txDB := linkeddb.NewDefault(rawTxDB)
+	it := txDB.NewIterator()
+	defer it.Release()
+
+	utxos := []*avax.UTXO(nil)
+	for it.Next() {
+		utxo := &avax.UTXO{}
+		if _, err := Codec.Unmarshal(it.Value(), utxo); err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+
+	st.rewardUTXOsCache.Put(txID, utxos)
+	return utxos, nil
+}
+
+func (st *internalStateImpl) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
+	st.addedRewardUTXOs[txID] = append(st.addedRewardUTXOs[txID], utxo)
+}
+
 func (st *internalStateImpl) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	if utxo, exists := st.modifiedUTXOs[utxoID]; exists {
 		if utxo == nil {
@@ -663,6 +717,9 @@ func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	if err := st.writeTXs(); err != nil {
 		return nil, err
 	}
+	if err := st.writeRewardUTXOs(); err != nil {
+		return nil, err
+	}
 	if err := st.writeUTXOs(); err != nil {
 		return nil, err
 	}
@@ -693,7 +750,6 @@ func (st *internalStateImpl) Close() error {
 		st.blockDB.Close(),
 		st.txDB.Close(),
 		st.utxoDB.Close(),
-		// st.addressDB.Close(),
 		st.subnetBaseDB.Close(),
 		st.chainDB.Close(),
 		st.singletonDB.Close(),
@@ -876,6 +932,29 @@ func (st *internalStateImpl) writeTXs() error {
 		st.txCache.Put(txID, txStatus)
 		if err := st.txDB.Put(txID[:], txBytes); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (st *internalStateImpl) writeRewardUTXOs() error {
+	for txID, utxos := range st.addedRewardUTXOs {
+		delete(st.addedRewardUTXOs, txID)
+
+		st.rewardUTXOsCache.Put(txID, utxos)
+
+		rawTxDB := prefixdb.New(txID[:], st.rewardUTXODB)
+		txDB := linkeddb.NewDefault(rawTxDB)
+
+		for _, utxo := range utxos {
+			utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+			if err != nil {
+				return err
+			}
+			utxoID := utxo.InputID()
+			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
