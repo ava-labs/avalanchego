@@ -43,16 +43,13 @@ const (
 	defaultMaxNetworkPendingSendBytes                = 1 << 29 // 512MB
 	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
 	defaultMaxClockDifference                        = time.Minute
-	defaultPeerListSize                              = 50
-	defaultPeerListGossipSpacing                     = time.Minute
-	defaultPeerListGossipSize                        = 100
 	defaultPeerListStakerGossipFraction              = 2
 	defaultGetVersionTimeout                         = 10 * time.Second
 	defaultAllowPrivateIPs                           = true
 	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = 30 * time.Second
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
-	defaultReadBufferSize                            = 16 * 1024
+	defaultReadBufferSize                            = 16 * 1024 // 16 KB
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultConnMeterCacheSize                        = 10000
 )
@@ -137,9 +134,9 @@ type network struct {
 	maxNetworkPendingSendBytes         int64
 	networkPendingSendBytesToRateLimit int64
 	maxClockDifference                 time.Duration
-	peerListSize                       int
-	peerListGossipSpacing              time.Duration
-	peerListGossipSize                 int
+	gossipPeerListSize                 int
+	gossipPeerListFreq                 time.Duration
+	gossipPeerListTo                   int
 	peerListStakerGossipFraction       int
 	getVersionTimeout                  time.Duration
 	allowPrivateIPs                    bool
@@ -233,6 +230,10 @@ func NewDefaultNetwork(
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
+	gossipPeerListSize int,
+	gossipPeerListTo int,
+	gossipPeerListFreq time.Duration,
+
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -256,9 +257,9 @@ func NewDefaultNetwork(
 		defaultMaxNetworkPendingSendBytes,
 		defaultNetworkPendingSendBytesToRateLimit,
 		defaultMaxClockDifference,
-		defaultPeerListSize,
-		defaultPeerListGossipSpacing,
-		defaultPeerListGossipSize,
+		gossipPeerListSize,
+		gossipPeerListFreq,
+		gossipPeerListTo,
 		defaultPeerListStakerGossipFraction,
 		defaultGetVersionTimeout,
 		defaultAllowPrivateIPs,
@@ -300,9 +301,9 @@ func NewNetwork(
 	maxNetworkPendingSendBytes int,
 	networkPendingSendBytesToRateLimit int,
 	maxClockDifference time.Duration,
-	peerListSize int,
-	peerListGossipSpacing time.Duration,
-	peerListGossipSize int,
+	gossipPeerListSize int,
+	gossipPeerListFreq time.Duration,
+	gossipPeerListTo int,
 	peerListStakerGossipFraction int,
 	getVersionTimeout time.Duration,
 	allowPrivateIPs bool,
@@ -345,9 +346,9 @@ func NewNetwork(
 		maxNetworkPendingSendBytes:         int64(maxNetworkPendingSendBytes),
 		networkPendingSendBytesToRateLimit: int64(networkPendingSendBytesToRateLimit),
 		maxClockDifference:                 maxClockDifference,
-		peerListSize:                       peerListSize,
-		peerListGossipSpacing:              peerListGossipSpacing,
-		peerListGossipSize:                 peerListGossipSize,
+		gossipPeerListSize:                 gossipPeerListSize,
+		gossipPeerListFreq:                 gossipPeerListFreq,
+		gossipPeerListTo:                   gossipPeerListTo,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
@@ -780,7 +781,7 @@ func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
 // to this node.
 // assumes the stateLock is not held.
 func (n *network) Dispatch() error {
-	go n.gossip() // Periodically gossip peers
+	go n.gossipPeerList() // Periodically gossip peers
 	go func() {
 		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
@@ -1026,8 +1027,8 @@ func (n *network) track(ip utils.IPDesc, nodeID ids.ShortID) {
 }
 
 // assumes the stateLock is not held. Only returns after the network is closed.
-func (n *network) gossip() {
-	t := time.NewTicker(n.peerListGossipSpacing)
+func (n *network) gossipPeerList() {
+	t := time.NewTicker(n.gossipPeerListFreq)
 	defer t.Stop()
 
 	for range t.C {
@@ -1050,11 +1051,11 @@ func (n *network) gossip() {
 			}
 		}
 
-		numStakersToSend := (n.peerListGossipSize + n.peerListStakerGossipFraction - 1) / n.peerListStakerGossipFraction
+		numStakersToSend := (n.gossipPeerListTo + n.peerListStakerGossipFraction - 1) / n.peerListStakerGossipFraction
 		if len(stakers) < numStakersToSend {
 			numStakersToSend = len(stakers)
 		}
-		numNonStakersToSend := n.peerListGossipSize - numStakersToSend
+		numNonStakersToSend := n.gossipPeerListTo - numStakersToSend
 		if len(nonStakers) < numNonStakersToSend {
 			numNonStakersToSend = len(nonStakers)
 		}
@@ -1343,7 +1344,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 	if err := s.Initialize(uint64(len(unsignedPeers))); err != nil {
 		return nil, nil, err
 	}
-	numUnsignedToSend := n.peerListSize
+	numUnsignedToSend := n.gossipPeerListSize
 	if len(unsignedPeers) < numUnsignedToSend {
 		numUnsignedToSend = len(unsignedPeers)
 	}
@@ -1359,7 +1360,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 	if err := s.Initialize(uint64(len(signedPeers))); err != nil {
 		return nil, nil, err
 	}
-	numSignedToSend := n.peerListSize
+	numSignedToSend := n.gossipPeerListSize
 	if len(signedPeers) < numSignedToSend {
 		numSignedToSend = len(signedPeers)
 	}
