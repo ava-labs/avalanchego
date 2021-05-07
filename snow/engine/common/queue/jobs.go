@@ -101,6 +101,7 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, halter common.Haltable, restarted b
 	j.state.DisableCaching()
 	for {
 		if halter.Halted() {
+			ctx.Log.Info("Interrupted execution after executing %d operations", numExecuted)
 			return numExecuted, nil
 		}
 
