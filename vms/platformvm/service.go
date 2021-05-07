@@ -2276,3 +2276,41 @@ func (service *Service) GetMaxStakeAmount(_ *http.Request, args *GetMaxStakeAmou
 	reply.Amount = json.Uint64(maxStakeAmount)
 	return err
 }
+
+// GetRewardUTXOsReply defines the GetRewardUTXOs replies returned from the API
+type GetRewardUTXOsReply struct {
+	// Number of UTXOs returned
+	NumFetched json.Uint64 `json:"numFetched"`
+	// The UTXOs
+	UTXOs []string `json:"utxos"`
+	// Encoding specifies the encoding format the UTXOs are returned in
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
+// GetRewardUTXOs returns the UTXOs that were rewarded after the provided
+// transaction's staking period ended.
+func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *GetRewardUTXOsReply) error {
+	service.vm.ctx.Log.Info("Platform: GetRewardUTXOs called")
+
+	utxos, err := service.vm.internalState.GetRewardUTXOs(args.TxID)
+	if err != nil {
+		return fmt.Errorf("couldn't get reward UTXOs: %w", err)
+	}
+
+	reply.NumFetched = json.Uint64(len(utxos))
+	reply.UTXOs = make([]string, len(utxos))
+	for i, utxo := range utxos {
+		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+		if err != nil {
+			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
+		}
+
+		utxoStr, err := formatting.Encode(args.Encoding, utxoBytes)
+		if err != nil {
+			return fmt.Errorf("couldn't encode utxo as a string: %s", err)
+		}
+		reply.UTXOs[i] = utxoStr
+	}
+	reply.Encoding = args.Encoding
+	return nil
+}
