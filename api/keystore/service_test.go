@@ -440,12 +440,6 @@ func TestServiceDeleteUser(t *testing.T) {
 // 1st part -> insert data into 1.0.0
 // 2nd part -> migrate data from 1.0.0 to 1.3.3
 // 3rd part -> check if data from 1.0.0 exists in 1.3.3
-
-// second test ? - in the future ?
-// 1st part -> insert data into 1.2.0
-// 2nd part -> migrate data from 1.3.3 to 1.?.?
-// 3rd part -> check if data from 1.3.3 exists in 1.?.?
-// we have not defined yet a 1.3.3 -> 1.?.? migration
 func TestMigrateKeystoreUser(t *testing.T) {
 	testUser := "testUser"
 	password := "passwTest@fake01ord"

@@ -21,8 +21,8 @@ type Subnet interface {
 }
 
 type subnet struct {
-	lock sync.RWMutex
-	sync.Once
+	lock          sync.RWMutex
+	once          sync.Once
 	bootstrapping ids.Set
 	// If not nil, called when IsBootstrapped returns true for the first time
 	onFinish func()
@@ -34,7 +34,7 @@ func (s *subnet) IsBootstrapped() bool {
 
 	done := s.bootstrapping.Len() == 0
 	if done && s.onFinish != nil {
-		s.Once.Do(s.onFinish)
+		s.once.Do(s.onFinish)
 	}
 	return done
 }

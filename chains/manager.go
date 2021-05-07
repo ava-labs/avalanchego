@@ -233,8 +233,9 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb = &subnet{
-			onFinish: func() {
+		sb = &subnet{}
+		if chainParams.SubnetID == constants.PrimaryNetworkID {
+			sb.(*subnet).onFinish = func() {
 				// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
 				// If running in fetch only mode, shut down node since fetching is complete.
 				m.Log.AssertNoError(m.DBManager.MarkCurrentDBBootstrapped())
@@ -242,7 +243,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 					m.Log.Info("done with fetch only mode. Starting node shutdown")
 					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
 				}
-			},
+			}
 		}
 	}
 	sb.addChain(chainParams.ID)
