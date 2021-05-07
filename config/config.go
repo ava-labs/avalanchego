@@ -363,14 +363,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("invalid IP Address %s", publicIP)
 	}
 
-	pf := portFinder{}
 	stakingPort := uint16(v.GetUint(StakingPortKey))
-	if stakingPort == 0 {
-		stakingPort, err = pf.getNewPort()
-		if err != nil {
-			return node.Config{}, fmt.Errorf("unable to fetch a random staking port %v", err)
-		}
-	}
 
 	config.StakingIP = utils.NewDynamicIPDesc(ip, stakingPort)
 
@@ -541,15 +534,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// HTTP:
 	config.HTTPHost = v.GetString(HTTPHostKey)
-	httpPort := uint16(v.GetUint(HTTPPortKey))
-	if httpPort == 0 {
-		httpPort, err = pf.getNewPort()
-		if err != nil {
-			return node.Config{}, fmt.Errorf("unable to fetch a random http port %v", err)
-		}
-	}
-
-	config.HTTPPort = httpPort
+	config.HTTPPort = uint16(v.GetUint(HTTPPortKey))
 	config.HTTPSEnabled = v.GetBool(HTTPSEnabledKey)
 	config.HTTPSKeyFile = v.GetString(HTTPSKeyFileKey)
 	config.HTTPSCertFile = v.GetString(HTTPSCertFileKey)
@@ -868,27 +853,4 @@ func GetConfig(commit string) (node.Config, string, bool, error) {
 	}
 	config, err := getConfigFromViper(v)
 	return config, "", false, err
-}
-
-// portFinder ensures the same port is not given twice
-type portFinder struct {
-	usedPort uint16
-}
-
-// getNewPort returns a new unused port to be bounded to that interface
-func (p *portFinder) getNewPort() (uint16, error) {
-	listener, err := net.Listen("tcp", ":0") // #nosec G102
-	if err != nil {
-		return 0, fmt.Errorf("unable to open a new port %v", err)
-	}
-	port := uint16(listener.Addr().(*net.TCPAddr).Port)
-	if port == p.usedPort {
-		return p.getNewPort()
-	}
-	err = listener.Close()
-	if err != nil {
-		return 0, fmt.Errorf("unable to use the new port %v", err)
-	}
-	p.usedPort = port
-	return port, nil
 }

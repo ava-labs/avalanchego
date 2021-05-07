@@ -201,8 +201,8 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*node
 		fmt.Sprintf("--%s=127.0.0.1:%d", config.BootstrapIPsKey, int(rootConfig.StakingIP.Port)),
 		fmt.Sprintf("--%s=%s%s", config.BootstrapIDsKey, constants.NodeIDPrefix, rootConfig.NodeID),
 		fmt.Sprintf("--%s=%s", config.FetchOnlyKey, "true"),
-		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0),
-		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),
+		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0), // use any open port for staking port
+		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),    // use any open port for HTTP port
 		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
 		fmt.Sprintf("--%s=%s", config.LogsDirKey, filepath.Join(rootConfig.LoggingConfig.Directory, "fetch-only")),
 		fmt.Sprintf("--%s=%s", config.RetryBootstrapKey, "true"),
