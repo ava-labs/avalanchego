@@ -120,6 +120,10 @@ type InternalState interface {
  * | '-- blockID -> block bytes
  * |-. txs
  * | '-- txID -> tx bytes + tx status
+ * |- rewardUTXOs
+ * | '-. txID
+ * |   '-. list
+ * |     '-- utxoID -> utxo bytes
  * |- utxos
  * | '-- utxoDB
  * |-. subnets

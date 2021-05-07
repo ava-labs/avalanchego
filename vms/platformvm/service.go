@@ -2288,7 +2288,7 @@ type GetRewardUTXOsReply struct {
 }
 
 // GetRewardUTXOs returns the UTXOs that were rewarded after the provided
-// transactions staking period ended.
+// transaction's staking period ended.
 func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *GetRewardUTXOsReply) error {
 	service.vm.ctx.Log.Info("Platform: GetRewardUTXOs called")
 
