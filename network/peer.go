@@ -51,6 +51,10 @@ type peer struct {
 	// modified on the connection's reader routine.
 	gotPeerList utils.AtomicBool
 
+	// only send the peerlist to this peer on handling a getPeerlist message if
+	// a peerlist hasn't already been sent.
+	peerListSent utils.AtomicBool
+
 	// if the version message has been received and is valid and the peerlist
 	// has been returned. is only modified on the connection's reader routine.
 	connected utils.AtomicBool
@@ -173,8 +177,6 @@ func (p *peer) requestFinishHandshake() {
 	for {
 		select {
 		case <-finishHandshakeTicker.C:
-			gotVersion := p.gotVersion.GetValue()
-			gotPeerList := p.gotPeerList.GetValue()
 			connected := p.connected.GetValue()
 			closed := p.closed.GetValue()
 
@@ -182,10 +184,10 @@ func (p *peer) requestFinishHandshake() {
 				return
 			}
 
-			if !gotVersion {
+			if !p.gotVersion.GetValue() {
 				p.sendGetVersion()
 			}
-			if !gotPeerList {
+			if !p.gotPeerList.GetValue() {
 				p.sendGetPeerList()
 			}
 		case <-p.tickerCloser:
@@ -292,13 +294,15 @@ func (p *peer) WriteMessages() {
 			p.id,
 			formatting.DumpBytes{Bytes: msg})
 
-		atomic.AddInt64(&p.pendingBytes, -int64(len(msg)))
-		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
-
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
 			for len(byteSlice) > 0 {
+				if err := p.conn.SetWriteDeadline(time.Now().Add(p.net.pingPongTimeout)); err != nil {
+					p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.id, p.getIP(), err)
+					return
+				}
+
 				written, err := p.conn.Write(byteSlice)
 				if err != nil {
 					p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
@@ -308,6 +312,12 @@ func (p *peer) WriteMessages() {
 				byteSlice = byteSlice[written:]
 			}
 		}
+
+		p.senderLock.Lock()
+		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
+		p.pendingBytes -= int64(len(msg))
+		p.senderLock.Unlock()
+
 		now := p.net.clock.Time().Unix()
 		atomic.StoreInt64(&p.lastSent, now)
 		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
@@ -335,11 +345,10 @@ func (p *peer) Send(msg Msg) bool {
 	msgBytes := msg.Bytes()
 	msgBytesLen := int64(len(msgBytes))
 
-	// lets assume send will be successful, we add to the network pending bytes
-	// if we determine that we are being a bit restrictive, we could increase the global bandwidth?
+	// lets assume send will be successful, we add to the network pending bytes.
 	newPendingBytes := atomic.AddInt64(&p.net.pendingBytes, msgBytesLen)
+	newConnPendingBytes := p.pendingBytes + msgBytesLen
 
-	newConnPendingBytes := atomic.LoadInt64(&p.pendingBytes) + msgBytesLen
 	if dropMsg := p.dropMessage(newConnPendingBytes, newPendingBytes); dropMsg {
 		// we never sent the message, remove from pending totals
 		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
@@ -349,7 +358,7 @@ func (p *peer) Send(msg Msg) bool {
 
 	select {
 	case p.sender <- msgBytes:
-		atomic.AddInt64(&p.pendingBytes, msgBytesLen)
+		p.pendingBytes = newConnPendingBytes
 		return true
 	default:
 		// we never sent the message, remove from pending totals
@@ -463,10 +472,12 @@ func (p *peer) handle(msg Msg) {
 	}
 }
 
+// Assumes the peer's mutex is held
 func (p *peer) dropMessagePeer() bool {
-	return atomic.LoadInt64(&p.pendingBytes) > p.net.maxMessageSize
+	return p.pendingBytes > p.net.maxMessageSize
 }
 
+// Assumes the peer's mutex is held
 func (p *peer) dropMessage(connPendingLen, networkPendingLen int64) bool {
 	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
 		p.dropMessagePeer() && // this connection should have a minimum allowed bandwidth
@@ -493,11 +504,8 @@ func (p *peer) close() {
 	// The locks guarantee here that the sender routine will read that the peer
 	// has been closed and will therefore not attempt to write on this channel.
 	close(p.sender)
+	atomic.AddInt64(&p.net.pendingBytes, -p.pendingBytes)
 	p.senderLock.Unlock()
-
-	peerPending := atomic.LoadInt64(&p.pendingBytes)
-	atomic.AddInt64(&p.net.pendingBytes, -peerPending)
-
 	p.net.disconnected(p)
 }
 
@@ -587,19 +595,23 @@ func (p *peer) sendPeerList() {
 	if err != nil {
 		return
 	}
-
-	p.sendSignedPeerList(validatorIPs)
-	p.sendUnsignedPeerList(ips)
+	sentSigned := p.sendSignedPeerList(validatorIPs)
+	sentUnsigned := p.sendUnsignedPeerList(ips)
+	if sentSigned && sentUnsigned {
+		p.peerListSent.SetValue(true)
+	}
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) {
+// returns true if an unsigned peer list was sent to [p]
+func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) bool {
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
-		return
+		return false
 	}
-	if p.Send(msg) {
+	sent := p.Send(msg)
+	if sent {
 		p.net.peerlist.numSent.Inc()
 		p.net.peerlist.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -607,16 +619,20 @@ func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) {
 		p.net.peerlist.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
+	return sent
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) sendSignedPeerList(peers []utils.IPCertDesc) {
+// returns true if a signed peer list was sent to [p]
+func (p *peer) sendSignedPeerList(peers []utils.IPCertDesc) bool {
 	msg, err := p.net.b.SignedPeerList(peers)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
-		return
+		return false
 	}
-	if p.Send(msg) {
+
+	sent := p.Send(msg)
+	if sent {
 		p.net.signedPeerList.numSent.Inc()
 		p.net.signedPeerList.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -624,6 +640,7 @@ func (p *peer) sendSignedPeerList(peers []utils.IPCertDesc) {
 		p.net.signedPeerList.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
+	return sent
 }
 
 // assumes the [stateLock] is not held
@@ -805,7 +822,7 @@ func (p *peer) handleSignedVersion(msg Msg) {
 
 // assumes the [stateLock] is not held
 func (p *peer) handleGetPeerList(msg Msg) {
-	if p.gotVersion.GetValue() {
+	if p.gotVersion.GetValue() && !p.peerListSent.GetValue() {
 		p.sendPeerList()
 	}
 }
