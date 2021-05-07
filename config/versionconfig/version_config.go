@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	NodeVersion = version.NewDefaultApplication(constants.PlatformName, 1, 3, 3)
+	NodeVersion = version.NewDefaultApplication(constants.PlatformName, 1, 4, 3)
 
-	CurrentDBVersion = version.NewDefaultVersion(1, 3, 3)
+	CurrentDBVersion = version.NewDefaultVersion(1, 4, 3)
 	PrevDBVersion    = version.NewDefaultVersion(1, 0, 0)
 )
