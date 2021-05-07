@@ -459,3 +459,10 @@ func (c *Client) GetMaxStakeAmount(subnetID ids.ID, nodeID string, startTime, en
 	}, res)
 	return uint64(res.Amount), err
 }
+
+// GetRewardUTXOs returns reward UTXOs for a transaction
+func (c *Client) GetRewardUTXOs(args *api.GetTxArgs) (*GetRewardUTXOsReply, error) {
+	res := &GetRewardUTXOsReply{}
+	err := c.requester.SendRequest("getRewardUTXOs", args, res)
+	return res, err
+}
