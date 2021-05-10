@@ -423,6 +423,21 @@ func (vm *VM) Initialize(
 
 		return nil, nil
 	})
+	vm.chain.SetOnBuild(func(block *types.Block) error {
+		log.Trace("EVM built a block")
+
+		blk := &Block{
+			id:       ids.ID(block.Hash()),
+			ethBlock: block,
+			vm:       vm,
+		}
+		if err := blk.VerifyWithoutWrites(); err != nil {
+			verificationError := fmt.Errorf("block failed verify: %w", err)
+			vm.newBlockChan <- blockErrorTuple{nil, verificationError}
+			return verificationError
+		}
+		return nil
+	})
 	vm.chain.SetOnSealFinish(func(block *types.Block) error {
 		log.Trace("EVM sealed a block")
 
