@@ -5,8 +5,6 @@ package node
 
 import (
 	"crypto"
-	"crypto/tls"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
@@ -36,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -154,7 +153,7 @@ func (n *Node) initNetworking() error {
 	}
 	dialer := network.NewDialer(TCP)
 
-	cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
+	cert, err := staking.LoadTLSCert(n.Config.StakingKeyFile, n.Config.StakingCertFile)
 	if err != nil {
 		return err
 	}
@@ -164,12 +163,7 @@ func (n *Node) initNetworking() error {
 		return errInvalidTLSKey
 	}
 
-	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return err
-	}
-
-	tlsConfig := network.TLSConfig(cert)
+	tlsConfig := network.TLSConfig(*cert)
 
 	serverUpgrader := network.NewTLSServerUpgrader(tlsConfig)
 	clientUpgrader := network.NewTLSClientUpgrader(tlsConfig)
