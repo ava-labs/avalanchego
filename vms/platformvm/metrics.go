@@ -4,16 +4,11 @@
 package platformvm
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"net/http"
-	"time"
-
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/metricutils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -45,8 +40,7 @@ type metrics struct {
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
 
-	requestErrors   *prometheus.CounterVec
-	requestDuration *prometheus.HistogramVec
+	apiRequestMetrics metricutils.APIRequestMetrics
 }
 
 func newBlockMetrics(namespace string, name string) prometheus.Counter {
@@ -97,16 +91,7 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
-	m.requestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "request_duration_ms",
-		Buckets:   utils.MillisecondsBuckets,
-	}, []string{"method"})
-
-	m.requestErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "request_error_count",
-	}, []string{"method"})
+	m.apiRequestMetrics = metricutils.NewAPIMetrics(namespace)
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -129,8 +114,7 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numImportTxs),
 		registerer.Register(m.numRewardValidatorTxs),
 
-		registerer.Register(m.requestDuration),
-		registerer.Register(m.requestErrors),
+		m.apiRequestMetrics.Register(registerer),
 	)
 	return errs.Err
 }
@@ -184,22 +168,4 @@ func (m *metrics) AcceptTx(tx *Tx) error {
 		return errUnknownTxType
 	}
 	return nil
-}
-
-func (m *metrics) InterceptRequestFunc(i *rpc.RequestInfo) *http.Request {
-	return i.Request.WithContext(context.WithValue(i.Request.Context(), requestTimestampKey, time.Now()))
-}
-
-func (m *metrics) AfterRequestFunc(i *rpc.RequestInfo) {
-	timestamp := i.Request.Context().Value(requestTimestampKey)
-	timeCast, ok := timestamp.(time.Time)
-	if !ok {
-		return
-	}
-	totalTime := time.Since(timeCast)
-	m.requestDuration.With(prometheus.Labels{"method": i.Method}).Observe(float64(totalTime.Milliseconds()))
-
-	if i.Error != nil {
-		m.requestErrors.With(prometheus.Labels{"method": i.Method}).Inc()
-	}
 }

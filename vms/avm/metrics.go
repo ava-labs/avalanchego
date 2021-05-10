@@ -4,20 +4,12 @@
 package avm
 
 import (
-	"context"
 	"fmt"
-	"net/http"
-	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/metricutils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-type contextKey int
-
-const requestTimestampKey contextKey = iota
 
 func newCallsMetric(namespace, name string) prometheus.Counter {
 	return prometheus.NewCounter(prometheus.CounterOpts{
@@ -33,8 +25,7 @@ type metrics struct {
 
 	numTxRefreshes, numTxRefreshHits, numTxRefreshMisses prometheus.Counter
 
-	requestErrors   *prometheus.CounterVec
-	requestDuration *prometheus.HistogramVec
+	apiRequestMetric metricutils.APIRequestMetrics
 }
 
 func (m *metrics) Initialize(
@@ -64,17 +55,7 @@ func (m *metrics) Initialize(
 		Help:      "Number of times unique txs have not been unique and weren't cached",
 	})
 
-	m.requestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "request_duration_ms",
-		Buckets:   utils.MillisecondsBuckets,
-	}, []string{"method"})
-
-	m.requestErrors = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "request_error_count",
-	}, []string{"method"})
-
+	m.apiRequestMetric = metricutils.NewAPIMetrics(namespace)
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(m.numBootstrappingCalls),
@@ -87,26 +68,7 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numTxRefreshHits),
 		registerer.Register(m.numTxRefreshMisses),
 
-		registerer.Register(m.requestDuration),
-		registerer.Register(m.requestErrors),
+		m.apiRequestMetric.Register(registerer),
 	)
 	return errs.Err
-}
-
-func (m *metrics) InterceptRequestFunc(i *rpc.RequestInfo) *http.Request {
-	return i.Request.WithContext(context.WithValue(i.Request.Context(), requestTimestampKey, time.Now()))
-}
-
-func (m *metrics) AfterRequestFunc(i *rpc.RequestInfo) {
-	timestamp := i.Request.Context().Value(requestTimestampKey)
-	timeCast, ok := timestamp.(time.Time)
-	if !ok {
-		return
-	}
-	totalTime := time.Since(timeCast)
-	m.requestDuration.With(prometheus.Labels{"method": i.Method}).Observe(float64(totalTime.Milliseconds()))
-
-	if i.Error != nil {
-		m.requestErrors.With(prometheus.Labels{"method": i.Method}).Inc()
-	}
 }
