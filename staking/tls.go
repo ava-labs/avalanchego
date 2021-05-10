@@ -71,6 +71,18 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	return nil
 }
 
+func LoadTLSCert(keyPath, certPath string) (*tls.Certificate, error) {
+	cert, err := tls.LoadX509KeyPair(certPath, keyPath)
+	if err != nil {
+		return nil, err
+	}
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
+	return &cert, nil
+}
+
 func NewTLSCert() (*tls.Certificate, error) {
 	certBytes, keyBytes, err := newStakerKeys()
 	if err != nil {

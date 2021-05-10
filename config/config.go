@@ -4,10 +4,7 @@
 package config
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
@@ -224,6 +221,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(BootstrapIDsKey, DefaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
 	fs.Int(RetryBootstrapMaxAttemptsKey, 50, "Specifies how many times bootstrap should be retried")
+	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -421,39 +419,25 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		}
 	}
 
-	// Parse staking certificate from file
-	certBytes, err := ioutil.ReadFile(config.StakingCertFile)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
-	}
-	config.StakingTLSCert, err = tls.LoadX509KeyPair(config.StakingCertFile, config.StakingKeyFile)
-	if err != nil {
-		return node.Config{}, err
-	}
-	block, _ := pem.Decode(certBytes)
-	x509Cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("problem parsing staking certificate: %w", err)
-	}
-	nodeIDFromFile, err := ids.ToShortID(hashing.PubkeyBytesToAddress(x509Cert.Raw))
-	if err != nil {
-		return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
-	}
-	switch {
-	case config.FetchOnly:
-		// If I'm in fetch only mode, my node ID is derived from a new, ephemeral staking key/cert
+	if config.FetchOnly {
+		// If I'm in fetch only mode, I should use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
-			return node.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %s", err)
+			return node.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %w", err)
 		}
 		config.StakingTLSCert = *cert
-		config.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(cert.Leaf.Raw))
+	} else {
+		// If I'm not in fetch only mode, I should use the real staking key/cert
+		cert, err := staking.LoadTLSCert(config.StakingKeyFile, config.StakingCertFile)
 		if err != nil {
-			return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
+			return node.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
 		}
-	case !config.FetchOnly:
-		// If TLS is enabled and I'm not in fetch only mode, my node ID is derived from my staking key/cert
-		config.NodeID = nodeIDFromFile
+		config.StakingTLSCert = *cert
+	}
+
+	config.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(config.StakingTLSCert.Leaf.Raw))
+	if err != nil {
+		return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
 	}
 
 	if err := initBootstrapPeers(v, &config); err != nil {
@@ -643,6 +627,12 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
 
+	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
+	// [PeerListGossipFreq]
+	config.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
+	config.PeerListGossipFreq = v.GetDuration(NetworkPeerListGossipFreqKey)
+	config.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
+
 	// Benchlist
 	config.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
 	config.BenchlistConfig.PeerSummaryEnabled = v.GetBool(BenchlistPeerSummaryEnabledKey)
@@ -740,6 +730,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// Bootstrap Configs
 	config.RetryBootstrap = v.GetBool(RetryBootstrapKey)
 	config.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
+	config.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
 
 	// Peer alias
 	config.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)

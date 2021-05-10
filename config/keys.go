@@ -111,4 +111,5 @@ const (
 	RetryBootstrapMaxAttemptsKey            = "bootstrap-retry-max-attempts"
 	PeerAliasTimeoutKey                     = "peer-alias-timeout"
 	PluginModeKey                           = "plugin-mode-enabled"
+	BootstrapBeaconConnectionTimeoutKey     = "bootstrap-beacon-connection-timeout"
 )
