@@ -111,6 +111,16 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(signatureVerificationEnabledKey, true, "Turn on signature verification")
 
 	// Networking
+	// Peer List Gossip
+	gossipHelpMsg := fmt.Sprintf(
+		"Gossip [%s] peers to [%s] peers every [%s]",
+		networkPeerListSizeKey,
+		networkPeerListGossipSizeKey,
+		networkPeerListGossipFreqKey,
+	)
+	fs.Uint(networkPeerListSizeKey, 20, gossipHelpMsg)
+	fs.Uint(networkPeerListGossipSizeKey, 50, gossipHelpMsg)
+	fs.Duration(networkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 	// Public IP Resolution
 	fs.String(publicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 	fs.Duration(dynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
@@ -132,12 +142,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(networkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(networkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
 	fs.Uint(sendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
-	// Restart on Disconnect
-	fs.Duration(disconnectedCheckFreqKey, 10*time.Second, "How often the node checks if it is connected to any peers. "+
-		"See [restart-on-disconnected]. If 0, node will not restart due to disconnection.")
-	fs.Duration(disconnectedRestartTimeoutKey, 1*time.Minute, "If [restart-on-disconnected], node restarts if not connected to any peers for this amount of time. "+
-		"If 0, node will not restart due to disconnection.")
-	fs.Bool(restartOnDisconnectedKey, false, "If true, this node will restart if it is not connected to any peers for [disconnected-restart-timeout].")
 	// Peer alias configuration
 	fs.Duration(peerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
@@ -215,6 +219,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(bootstrapIDsKey, defaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(retryBootstrap, true, "Specifies whether bootstrap should be retried")
 	fs.Int(retryBootstrapMaxAttempts, 50, "Specifies how many times bootstrap should be retried")
+	fs.Duration(bootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
 
 	// Consensus
 	fs.Int(snowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -238,6 +243,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	// TODO handle the below line better
 	fs.Bool(indexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(indexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
+
+	// Plugin
+	fs.Bool(pluginMode, false, "Whether the app should run as a plugin. Defaults to false")
 
 	return fs
 }
@@ -607,13 +615,11 @@ func setNodeConfig(v *viper.Viper) error {
 		return errors.New("network timeout coefficient must be >= 1")
 	}
 
-	// Restart:
-	Config.RestartOnDisconnected = v.GetBool(restartOnDisconnectedKey)
-	Config.DisconnectedCheckFreq = v.GetDuration(disconnectedCheckFreqKey)
-	Config.DisconnectedRestartTimeout = v.GetDuration(disconnectedRestartTimeoutKey)
-	if Config.DisconnectedCheckFreq > Config.DisconnectedRestartTimeout {
-		return fmt.Errorf("[%s] can't be greater than [%s]", disconnectedCheckFreqKey, disconnectedRestartTimeoutKey)
-	}
+	// Node will gossip [PeerListSize] peers to [PeerListGossipSize]
+	// every [PeerListGossipFreq]
+	Config.PeerListSize = v.GetUint32(networkPeerListSizeKey)
+	Config.PeerListGossipFreq = v.GetDuration(networkPeerListGossipFreqKey)
+	Config.PeerListGossipSize = v.GetUint32(networkPeerListGossipSizeKey)
 
 	// Benchlist
 	Config.BenchlistConfig.Threshold = v.GetInt(benchlistFailThresholdKey)
@@ -712,9 +718,13 @@ func setNodeConfig(v *viper.Viper) error {
 	// Bootstrap Configs
 	Config.RetryBootstrap = v.GetBool(retryBootstrap)
 	Config.RetryBootstrapMaxAttempts = v.GetInt(retryBootstrapMaxAttempts)
+	Config.BootstrapBeaconConnectionTimeout = v.GetDuration(bootstrapBeaconConnectionTimeoutKey)
 
 	// Peer alias
 	Config.PeerAliasTimeout = v.GetDuration(peerAliasTimeoutKey)
+
+	// Plugin config
+	Config.PluginMode = v.GetBool(pluginMode)
 
 	return nil
 }

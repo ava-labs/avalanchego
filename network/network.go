@@ -43,17 +43,15 @@ const (
 	defaultMaxNetworkPendingSendBytes                = 1 << 29 // 512MB
 	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
 	defaultMaxClockDifference                        = time.Minute
-	defaultPeerListGossipSpacing                     = time.Minute
-	defaultPeerListGossipSize                        = 100
 	defaultPeerListStakerGossipFraction              = 2
-	defaultGetVersionTimeout                         = 2 * time.Second
+	defaultGetVersionTimeout                         = 10 * time.Second
 	defaultAllowPrivateIPs                           = true
 	defaultGossipSize                                = 50
-	defaultPingPongTimeout                           = time.Minute
+	defaultPingPongTimeout                           = 30 * time.Second
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
-	defaultReadBufferSize                            = 16 * 1024
+	defaultReadBufferSize                            = 16 * 1024 // 16 KB
 	defaultReadHandshakeTimeout                      = 15 * time.Second
-	defaultConnMeterCacheSize                        = 10000
+	defaultConnMeterCacheSize                        = 1000
 )
 
 var (
@@ -136,19 +134,23 @@ type network struct {
 	maxNetworkPendingSendBytes         int64
 	networkPendingSendBytesToRateLimit int64
 	maxClockDifference                 time.Duration
-	peerListGossipSpacing              time.Duration
-	peerListGossipSize                 int
-	peerListStakerGossipFraction       int
-	getVersionTimeout                  time.Duration
-	allowPrivateIPs                    bool
-	gossipSize                         int
-	pingPongTimeout                    time.Duration
-	pingFrequency                      time.Duration
-	readBufferSize                     uint32
-	readHandshakeTimeout               time.Duration
-	connMeterMaxConns                  int
-	connMeter                          ConnMeter
-	b                                  Builder
+	// Size of a peer list sent to peers
+	peerListSize int
+	// Gossip a peer list to peers with this frequency
+	peerListGossipFreq time.Duration
+	// Gossip a peer list to this many peers when gossiping
+	peerListGossipSize           int
+	peerListStakerGossipFraction int
+	getVersionTimeout            time.Duration
+	allowPrivateIPs              bool
+	gossipSize                   int
+	pingPongTimeout              time.Duration
+	pingFrequency                time.Duration
+	readBufferSize               uint32
+	readHandshakeTimeout         time.Duration
+	connMeterMaxConns            int
+	connMeter                    ConnMeter
+	b                            Builder
 
 	// stateLock should never be held when grabbing a peer senderLock
 	stateLock    sync.RWMutex
@@ -178,27 +180,6 @@ type network struct {
 
 	// ensures the close of the network only happens once.
 	closeOnce sync.Once
-
-	// True if the node should restart if it detects it's disconnected from all peers
-	restartOnDisconnected bool
-
-	// Signals the connection checker to close when Network is shutdown.
-	// See restartOnDisconnect()
-	connectedCheckerCloser chan struct{}
-
-	// Used to monitor whether the node is connected to peers. If the node has
-	// been connected to at least one peer in the last [disconnectedRestartTimeout]
-	// then connectedMeter.Ticks() is non-zero.
-	connectedMeter timer.TimedMeter
-
-	// How often we check that we're connected to at least one peer.
-	// Used to update [connectedMeter].
-	// If 0, node will not restart even if it has no peers.
-	disconnectedCheckFreq time.Duration
-
-	// restarter can shutdown and restart the node.
-	// If nil, node will not restart even if it has no peers.
-	restarter utils.Restarter
 
 	hasMasked        bool
 	maskedValidators ids.ShortSet
@@ -247,15 +228,15 @@ func NewDefaultNetwork(
 	router router.Router,
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
-	restarter utils.Restarter,
-	restartOnDisconnected bool,
-	disconnectedCheckFreq time.Duration,
-	disconnectedRestartTimeout time.Duration,
 	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
+	peerListSize int,
+	peerListGossipSize int,
+	peerListGossipFreq time.Duration,
+
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -279,8 +260,9 @@ func NewDefaultNetwork(
 		defaultMaxNetworkPendingSendBytes,
 		defaultNetworkPendingSendBytesToRateLimit,
 		defaultMaxClockDifference,
-		defaultPeerListGossipSpacing,
-		defaultPeerListGossipSize,
+		peerListSize,
+		peerListGossipFreq,
+		peerListGossipSize,
 		defaultPeerListStakerGossipFraction,
 		defaultGetVersionTimeout,
 		defaultAllowPrivateIPs,
@@ -292,10 +274,6 @@ func NewDefaultNetwork(
 		connMeterResetDuration,
 		defaultConnMeterCacheSize,
 		connMeterMaxConns,
-		restarter,
-		restartOnDisconnected,
-		disconnectedCheckFreq,
-		disconnectedRestartTimeout,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -326,7 +304,8 @@ func NewNetwork(
 	maxNetworkPendingSendBytes int,
 	networkPendingSendBytesToRateLimit int,
 	maxClockDifference time.Duration,
-	peerListGossipSpacing time.Duration,
+	peerListSize int,
+	peerListGossipFreq time.Duration,
 	peerListGossipSize int,
 	peerListStakerGossipFraction int,
 	getVersionTimeout time.Duration,
@@ -339,10 +318,6 @@ func NewNetwork(
 	connMeterResetDuration time.Duration,
 	connMeterCacheSize int,
 	connMeterMaxConns int,
-	restarter utils.Restarter,
-	restartOnDisconnected bool,
-	disconnectedCheckFreq time.Duration,
-	disconnectedRestartTimeout time.Duration,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -374,7 +349,8 @@ func NewNetwork(
 		maxNetworkPendingSendBytes:         int64(maxNetworkPendingSendBytes),
 		networkPendingSendBytesToRateLimit: int64(networkPendingSendBytesToRateLimit),
 		maxClockDifference:                 maxClockDifference,
-		peerListGossipSpacing:              peerListGossipSpacing,
+		peerListSize:                       peerListSize,
+		peerListGossipFreq:                 peerListGossipFreq,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
 		getVersionTimeout:                  getVersionTimeout,
@@ -393,11 +369,6 @@ func NewNetwork(
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
 		connMeterMaxConns:                  connMeterMaxConns,
-		restartOnDisconnected:              restartOnDisconnected,
-		connectedCheckerCloser:             make(chan struct{}),
-		disconnectedCheckFreq:              disconnectedCheckFreq,
-		connectedMeter:                     timer.TimedMeter{Duration: disconnectedRestartTimeout},
-		restarter:                          restarter,
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
@@ -407,12 +378,6 @@ func NewNetwork(
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
-	}
-	if restartOnDisconnected && disconnectedCheckFreq != 0 && disconnectedRestartTimeout != 0 {
-		log.Info("node will restart if not connected to any peers")
-		// pre-queue one tick to avoid immediate shutdown.
-		netw.connectedMeter.Tick()
-		go netw.restartOnDisconnect()
 	}
 	return netw
 }
@@ -819,7 +784,7 @@ func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
 // to this node.
 // assumes the stateLock is not held.
 func (n *network) Dispatch() error {
-	go n.gossip() // Periodically gossip peers
+	go n.gossipPeerList() // Periodically gossip peers
 	go func() {
 		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
@@ -953,8 +918,6 @@ func (n *network) Close() error {
 
 func (n *network) close() {
 	n.log.Info("shutting down network")
-	// Stop checking whether we're connected to peers.
-	close(n.connectedCheckerCloser)
 
 	if err := n.listener.Close(); err != nil {
 		n.log.Debug("closing network listener failed with: %s", err)
@@ -990,7 +953,6 @@ func (n *network) close() {
 func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
-
 	n.track(ip, nodeID)
 }
 
@@ -1068,8 +1030,8 @@ func (n *network) track(ip utils.IPDesc, nodeID ids.ShortID) {
 }
 
 // assumes the stateLock is not held. Only returns after the network is closed.
-func (n *network) gossip() {
-	t := time.NewTicker(n.peerListGossipSpacing)
+func (n *network) gossipPeerList() {
+	t := time.NewTicker(n.peerListGossipFreq)
 	defer t.Stop()
 
 	for range t.C {
@@ -1079,31 +1041,6 @@ func (n *network) gossip() {
 
 		allPeers := n.getAllPeers()
 		if len(allPeers) == 0 {
-			continue
-		}
-
-		ips := make([]utils.IPDesc, 0, len(allPeers))
-		for _, peer := range allPeers {
-			ip := peer.getIP()
-			if peer.connected.GetValue() &&
-				!ip.IsZero() &&
-				n.vdrs.Contains(peer.id) {
-				peerVersion := peer.versionStruct.GetValue().(version.Version)
-				if n.versionCompatibility.Unmaskable(peerVersion) == nil {
-					ips = append(ips, ip)
-				}
-			}
-		}
-
-		if len(ips) == 0 {
-			n.log.Debug("skipping validator gossiping as no public validators are connected")
-			continue
-		}
-		msg, err := n.b.PeerList(ips)
-		if err != nil {
-			n.log.Error("failed to build peer list to gossip: %s. len(ips): %d",
-				err,
-				len(ips))
 			continue
 		}
 
@@ -1140,9 +1077,6 @@ func (n *network) gossip() {
 				len(stakers))
 			continue
 		}
-		for _, index := range stakerIndices {
-			stakers[int(index)].Send(msg)
-		}
 
 		if err := s.Initialize(uint64(len(nonStakers))); err != nil {
 			n.log.Error("failed to select non-stakers to sample: %s. len(nonStakers): %d",
@@ -1157,8 +1091,46 @@ func (n *network) gossip() {
 				len(nonStakers))
 			continue
 		}
-		for _, index := range nonStakerIndices {
-			nonStakers[int(index)].Send(msg)
+
+		ipCerts, ips, err := n.validatorIPs()
+		if err != nil {
+			n.log.Error("failed to fetch validator IPs: %s", err)
+			continue
+		}
+		if len(ipCerts) > 0 {
+			msg, err := n.b.SignedPeerList(ipCerts)
+			if err != nil {
+				n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
+					err,
+					len(ipCerts))
+			} else {
+				for _, index := range stakerIndices {
+					stakers[int(index)].Send(msg)
+				}
+				for _, index := range nonStakerIndices {
+					nonStakers[int(index)].Send(msg)
+				}
+			}
+		} else {
+			n.log.Debug("skipping signed validator IP gossiping as no signed IPs are connected")
+		}
+
+		if len(ips) > 0 {
+			msg, err := n.b.PeerList(ips)
+			if err != nil {
+				n.log.Error("failed to build peerlist to gossip: %s. len(ips): %d",
+					err,
+					len(ips))
+			} else {
+				for _, index := range stakerIndices {
+					stakers[int(index)].Send(msg)
+				}
+				for _, index := range nonStakerIndices {
+					nonStakers[int(index)].Send(msg)
+				}
+			}
+		} else {
+			n.log.Debug("skipping validator IP gossiping as no IPs are connected")
 		}
 	}
 }
@@ -1337,7 +1309,7 @@ func (n *network) tryAddPeer(p *peer) error {
 // 2) The IPs of all validators we're connected to (superset of the above.)
 // TODO: Remove the 2nd return value when we replace Version / PeerList with
 //       their signed counterparts
-func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc) {
+func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1370,7 +1342,40 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc) {
 		}
 		unsignedPeers = append(unsignedPeers, peerIP)
 	}
-	return signedPeers, unsignedPeers
+
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(unsignedPeers))); err != nil {
+		return nil, nil, err
+	}
+	numUnsignedToSend := n.peerListSize
+	if len(unsignedPeers) < numUnsignedToSend {
+		numUnsignedToSend = len(unsignedPeers)
+	}
+	unsignedIndices, err := s.Sample(numUnsignedToSend)
+	if err != nil {
+		return nil, nil, err
+	}
+	sampledUnsignedPeers := make([]utils.IPDesc, numUnsignedToSend)
+	for i, index := range unsignedIndices {
+		sampledUnsignedPeers[i] = unsignedPeers[index]
+	}
+
+	if err := s.Initialize(uint64(len(signedPeers))); err != nil {
+		return nil, nil, err
+	}
+	numSignedToSend := n.peerListSize
+	if len(signedPeers) < numSignedToSend {
+		numSignedToSend = len(signedPeers)
+	}
+	signedIndices, err := s.Sample(numSignedToSend)
+	if err != nil {
+		return nil, nil, err
+	}
+	sampledSignedPeers := make([]utils.IPCertDesc, numSignedToSend)
+	for i, index := range signedIndices {
+		sampledSignedPeers[i] = signedPeers[index]
+	}
+	return sampledSignedPeers, sampledUnsignedPeers, nil
 }
 
 // should only be called after the peer is marked as connected. Should not be
@@ -1519,38 +1524,6 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 	return n.peers[validatorID]
 }
 
-// restartOnDisconnect checks every [n.disconnectedCheckFreq] whether this node is connected
-// to any peers. If the node is not connected to any peers for [disconnectedRestartTimeout],
-// restarts the node.
-func (n *network) restartOnDisconnect() {
-	ticker := time.NewTicker(n.disconnectedCheckFreq)
-	for {
-		select {
-		case <-ticker.C:
-			if n.closed.GetValue() {
-				return
-			}
-			n.stateLock.RLock()
-			for _, peer := range n.peers {
-				if peer != nil && peer.connected.GetValue() {
-					n.connectedMeter.Tick()
-					break
-				}
-			}
-			n.stateLock.RUnlock()
-			if n.connectedMeter.Ticks() != 0 {
-				continue
-			}
-			ticker.Stop()
-			n.log.Info("restarting node due to no peers")
-			go n.restarter.Restart()
-		case <-n.connectedCheckerCloser:
-			ticker.Stop()
-			return
-		}
-	}
-}
-
 // HealthCheck returns information about several network layer health checks.
 // 1) Information about health check results
 // 2) An error if the health check reports unhealthy
@@ -1564,7 +1537,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 			connectedTo++
 		}
 	}
-	pendingSendBytes := n.pendingBytes
+	pendingSendBytes := atomic.LoadInt64(&n.pendingBytes)
 	sendFailRate := n.sendFailRateCalculator.Read()
 	n.stateLock.RUnlock()
 

@@ -68,6 +68,9 @@ type Config struct {
 	// Network configuration
 	NetworkConfig       timer.AdaptiveTimeoutConfig
 	NetworkHealthConfig network.HealthConfig
+	PeerListSize        uint32
+	PeerListGossipSize  uint32
+	PeerListGossipFreq  time.Duration
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
@@ -130,11 +133,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Restart on disconnect settings
-	RestartOnDisconnected      bool
-	DisconnectedCheckFreq      time.Duration
-	DisconnectedRestartTimeout time.Duration
-
 	// Coreth
 	CorethConfig string
 
@@ -146,6 +144,12 @@ type Config struct {
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
 
+	// Timeout when connecting to bootstrapping beacons
+	BootstrapBeaconConnectionTimeout time.Duration
+
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
+
+	// runs as plugin
+	PluginMode bool
 }

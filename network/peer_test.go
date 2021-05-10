@@ -95,15 +95,14 @@ func TestPeer_Close(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
 	)
 	assert.NotNil(t, netwrk)
 
@@ -137,7 +136,7 @@ func TestPeer_Close(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	peer.close()
+	peer.Close()
 
 	// The network pending bytes should be reduced back to zero on close.
 	if basenetwork.pendingBytes != int64(0) {
