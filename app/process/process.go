@@ -14,6 +14,14 @@ import (
 )
 
 const (
+	Header = "" +
+		`     _____               .__                       .__` + "\n" +
+		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
+		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
+		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
+		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
+		`          \/           \/          \/     \/     \/     \/     \/`
+
 	mustUpgradeMsg = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
 		"To do the database upgrade, restart this node with argument --fetch-only.\n" +
 		"This will start the node in fetch only mode. It will bootstrap a new database version and then stop.\n" +

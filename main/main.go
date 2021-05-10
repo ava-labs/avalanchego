@@ -9,19 +9,10 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-)
-
-const (
-	header = "" +
-		`     _____               .__                       .__` + "\n" +
-		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
-		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
-		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
-		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
-		`          \/           \/          \/     \/     \/     \/     \/`
 )
 
 var (
@@ -31,7 +22,7 @@ var (
 
 // main is the entry point to AvalancheGo.
 func main() {
-	fmt.Println(header)
+	fmt.Println(process.Header)
 
 	// Get the config
 	rootConfig, version, displayVersion, err := config.GetConfig(GitCommit)

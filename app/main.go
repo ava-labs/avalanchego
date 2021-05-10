@@ -23,8 +23,8 @@ var (
 )
 
 // main runs an AvalancheGo node.
-// If specified in the config, serves a hashicorp plugin that can be consumed by the daemon
-// (see avalanchego/main).
+// If specified in the config, serves a hashicorp plugin that can be consumed by
+// the daemon (see avalanchego/main).
 func main() {
 	c, version, displayVersion, err := config.GetConfig(GitCommit)
 	if err != nil {
@@ -62,6 +62,8 @@ func main() {
 		})
 		return // TODO what should get returned here?
 	}
+
+	fmt.Println(process.Header)
 
 	_ = utils.HandleSignals(
 		func(os.Signal) {
