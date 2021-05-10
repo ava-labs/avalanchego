@@ -3,7 +3,7 @@
 GOPATH="$(go env GOPATH)"
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
 CORETH_VER="v0.5.1-rc.1" # Current version of Coreth to use
-PREUPGRADE_AVALANCHEGO_VER="plugin_mode" # Release of AvalancheGo compatible with previous database version
+PREUPGRADE_AVALANCHEGO_VER="v1.4.2" # Release of AvalancheGo compatible with previous database version
 CORETH_PATH="$GOPATH/pkg/mod/github.com/ava-labs/coreth@$CORETH_VER"
 
 BUILD_DIR="$AVALANCHE_PATH/build/avalanchego-latest" # Where AvalancheGo binary goes
