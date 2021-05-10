@@ -28,7 +28,7 @@ var (
 
 // Server is an http.ResponseWriter that is managed over RPC.
 type Server struct {
-	gwriterproto.UnimplementedWriterServer
+	gresponsewriterproto.UnimplementedWriterServer
 	writer http.ResponseWriter
 	broker *plugin.GRPCBroker
 }
