@@ -238,7 +238,9 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			sb.(*subnet).onFinish = func() {
 				// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
 				// If running in fetch only mode, shut down node since fetching is complete.
-				m.Log.AssertNoError(m.DBManager.MarkCurrentDBBootstrapped())
+				if err := m.DBManager.MarkCurrentDBBootstrapped(); err != nil {
+					m.Log.Error("couldn't mark database as bootstrapped: %s", err)
+				}
 				if m.ManagerConfig.FetchOnly {
 					m.Log.Info("done with fetch only mode. Starting node shutdown")
 					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)

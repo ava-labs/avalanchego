@@ -58,7 +58,7 @@ func TestMigration100_to_133(t *testing.T) {
 
 	currentDB := &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 3, 3),
+		Version:  version.NewDefaultVersion(1, 4, 3),
 	}
 	dbManager.On("Current").Return(currentDB)
 

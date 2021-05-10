@@ -163,17 +163,19 @@ func (a *App) Start() int {
 	// Open staking port we want for NAT Traversal to have the external port
 	// (config.StakingIP.Port) to connect to our internal listening port
 	// (config.InternalStakingPort) which should be the same in most cases.
-	mapper.Map(
-		"TCP",
-		a.config.StakingIP.IP().Port,
-		a.config.StakingIP.IP().Port,
-		stakingPortName,
-		&a.config.StakingIP,
-		a.config.DynamicUpdateDuration,
-	)
+	if a.config.StakingIP.IP().Port != 0 {
+		mapper.Map(
+			"TCP",
+			a.config.StakingIP.IP().Port,
+			a.config.StakingIP.IP().Port,
+			stakingPortName,
+			&a.config.StakingIP,
+			a.config.DynamicUpdateDuration,
+		)
+	}
 
 	// Open the HTTP port iff the HTTP server is not listening on localhost
-	if a.config.HTTPHost != "127.0.0.1" && a.config.HTTPHost != "localhost" {
+	if a.config.HTTPHost != "127.0.0.1" && a.config.HTTPHost != "localhost" && a.config.HTTPPort != 0 {
 		// For NAT Traversal we want to route from the external port
 		// (config.ExternalHTTPPort) to our internal port (config.HTTPPort)
 		mapper.Map(

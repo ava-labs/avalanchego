@@ -31,31 +31,31 @@ func (vm *VM) migrateUptimes() error {
 	currentDB := vm.dbManager.Current()
 	currentDBVersion := currentDB.Version
 
-	// Only valid migration is from database version 1.0.0 to 1.3.3
+	// Only valid migration is from database version 1.0.0 to 1.4.3
 	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
-		currentDBVersion.Compare(version.NewDefaultVersion(1, 3, 3)) == 0 {
-		migrater := uptimeMigrater133{vm: vm}
+		currentDBVersion.Compare(version.NewDefaultVersion(1, 4, 3)) == 0 {
+		migrater := uptimeMigrater143{vm: vm}
 		return migrater.migrate(prevDB)
 	}
 	return nil
 }
 
-type uptimeMigrater133 struct {
+type uptimeMigrater143 struct {
 	vm *VM
 }
 
-// migrate validator uptimes from database version 1.0.0 to database version 1.3.3.
-func (um *uptimeMigrater133) migrate(dbV100 *manager.VersionedDatabase) error {
+// migrate validator uptimes from database version 1.0.0 to database version 1.4.3.
+func (um *uptimeMigrater143) migrate(dbV100 *manager.VersionedDatabase) error {
 	migrated, err := um.vm.internalState.IsMigrated()
 	if err != nil {
-		return fmt.Errorf("couldn't get whether the v1.0.0 --> v1.3.3 database migration has occurred: %s", err)
+		return fmt.Errorf("couldn't get whether the v1.0.0 --> v1.4.3 database migration has occurred: %s", err)
 	} else if migrated { // already did migration
 		um.vm.ctx.Log.Info("not doing uptime migration")
 		return nil
 	}
 	now := um.vm.clock.Time()
 
-	um.vm.ctx.Log.Info("migrating validator uptimes from database v1.0.0 to v1.3.3")
+	um.vm.ctx.Log.Info("migrating validator uptimes from database v1.0.0 to v1.4.3")
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, dbV100)
 	defer stopDB.Close()
@@ -98,7 +98,7 @@ func (um *uptimeMigrater133) migrate(dbV100 *manager.VersionedDatabase) error {
 			continue
 		}
 
-		// In v1.0.0, up duration is stored in seconds. In v1.3.3, it is stored in nanoseconds.
+		// In v1.0.0, up duration is stored in seconds. In v1.4.3, it is stored in nanoseconds.
 		// Convert from seconds to nanoseconds by multiplying by uint64(time.Second)
 		upDuration := uptimeV100.UpDuration * uint64(time.Second)
 		// Update the validator's uptime
@@ -110,7 +110,7 @@ func (um *uptimeMigrater133) migrate(dbV100 *manager.VersionedDatabase) error {
 		}
 
 		um.vm.ctx.Log.Debug(
-			"migrating uptime for node %s (tx %s) from database v1.0.0 to v1.3.3. Uptime: %s. Last updated: %s",
+			"migrating uptime for node %s (tx %s) from database v1.0.0 to v1.4.3. Uptime: %s. Last updated: %s",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			addVdrTx.ID(),
 			time.Duration(upDuration),
@@ -130,11 +130,11 @@ func (um *uptimeMigrater133) migrate(dbV100 *manager.VersionedDatabase) error {
 	if err := um.vm.internalState.Commit(); err != nil {
 		return fmt.Errorf("couldn't commit state: %s", err)
 	}
-	um.vm.ctx.Log.Info("finished migrating platformvm from database v1.0.0 to v1.3.3")
+	um.vm.ctx.Log.Info("finished migrating platformvm from database v1.0.0 to v1.4.3")
 	return nil
 }
 
-func (um *uptimeMigrater133) previousVersionGetUptime(db database.Database, nodeID ids.ShortID) (*uptimeV100, error) {
+func (um *uptimeMigrater143) previousVersionGetUptime(db database.Database, nodeID ids.ShortID) (*uptimeV100, error) {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
 	defer uptimeDB.Close()
 
@@ -151,7 +151,7 @@ func (um *uptimeMigrater133) previousVersionGetUptime(db database.Database, node
 }
 
 // Only used in testing. TODO move this to the test package.
-func (um *uptimeMigrater133) prevVersionSetUptime(prevDB database.Database, validatorID ids.ShortID, uptime *uptimeV100) error {
+func (um *uptimeMigrater143) prevVersionSetUptime(prevDB database.Database, validatorID ids.ShortID, uptime *uptimeV100) error {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), prevDB)
 	defer uptimeDB.Close()
 
@@ -166,7 +166,7 @@ func (um *uptimeMigrater133) prevVersionSetUptime(prevDB database.Database, vali
 // Only used in testing. TODO move to test package.
 // Add a staker to subnet [subnetID]
 // A staker may be a validator or a delegator
-func (um *uptimeMigrater133) prevVersionAddStaker(db database.Database, subnetID ids.ID, tx *rewardTxV100) error {
+func (um *uptimeMigrater143) prevVersionAddStaker(db database.Database, subnetID ids.ID, tx *rewardTxV100) error {
 	var (
 		staker   TimedTx
 		priority byte
@@ -214,7 +214,7 @@ func (um *uptimeMigrater133) prevVersionAddStaker(db database.Database, subnetID
 }
 
 // timedTxKey constructs the key to use for [txID] in stop and start prefix DBs
-func (um *uptimeMigrater133) prevVersionTimedTxKey(time time.Time, priority byte, txID ids.ID) ([]byte, error) {
+func (um *uptimeMigrater143) prevVersionTimedTxKey(time time.Time, priority byte, txID ids.ID) ([]byte, error) {
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(time.Unix()))
 	p.PackByte(priority)
@@ -226,7 +226,7 @@ func (um *uptimeMigrater133) prevVersionTimedTxKey(time time.Time, priority byte
 }
 
 // only migrate if the id of the old tx is the same as the current tx
-func (um *uptimeMigrater133) shouldMigrate(previousNodeID ids.ShortID, previousTxID ids.ID, currentStakersTxs []*Tx) (bool, error) {
+func (um *uptimeMigrater143) shouldMigrate(previousNodeID ids.ShortID, previousTxID ids.ID, currentStakersTxs []*Tx) (bool, error) {
 	_, _, err := um.vm.internalState.GetUptime(previousNodeID)
 	switch {
 	case err != nil && err == database.ErrNotFound:
