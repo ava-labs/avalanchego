@@ -139,6 +139,7 @@ type InternalState interface {
  * |     '-- txID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
+ *   |-- migratedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
  *   '-- lastAcceptedKey -> lastAccepted
