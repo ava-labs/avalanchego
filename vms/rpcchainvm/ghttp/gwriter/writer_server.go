@@ -15,7 +15,10 @@ var (
 )
 
 // Server is an http.Handler that is managed over RPC.
-type Server struct{ writer io.Writer }
+type Server struct {
+	gwriterproto.UnimplementedWriterServer
+	writer io.Writer
+}
 
 // NewServer returns an http.Handler instance managed remotely
 func NewServer(writer io.Writer) *Server {

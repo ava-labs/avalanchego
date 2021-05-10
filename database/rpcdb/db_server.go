@@ -19,6 +19,7 @@ var (
 
 // DatabaseServer is a database that is managed over RPC.
 type DatabaseServer struct {
+	rpcdbproto.UnimplementedDatabaseServer
 	lock    sync.Mutex
 	db      database.Database
 	batches map[int64]database.Batch

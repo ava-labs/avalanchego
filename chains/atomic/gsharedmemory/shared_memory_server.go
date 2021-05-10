@@ -19,6 +19,7 @@ var (
 
 // Server is shared memory that is managed over RPC.
 type Server struct {
+	gsharedmemoryproto.UnimplementedSharedMemoryServer
 	sm atomic.SharedMemory
 	db database.Database
 

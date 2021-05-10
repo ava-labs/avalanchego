@@ -45,6 +45,7 @@ var (
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
+	vmproto.UnimplementedVMServer
 	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 

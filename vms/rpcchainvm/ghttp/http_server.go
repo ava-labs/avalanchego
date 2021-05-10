@@ -26,6 +26,7 @@ var (
 
 // Server is an http.Handler that is managed over RPC.
 type Server struct {
+	ghttpproto.UnimplementedHTTPServer
 	handler http.Handler
 	broker  *plugin.GRPCBroker
 }

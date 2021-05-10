@@ -15,7 +15,10 @@ var (
 )
 
 // Server is an io.Reader that is managed over RPC.
-type Server struct{ reader io.Reader }
+type Server struct {
+	greaderproto.UnimplementedReaderServer
+	reader io.Reader
+}
 
 // NewServer returns an io.Reader instance managed remotely
 func NewServer(reader io.Reader) *Server {

@@ -42,8 +42,7 @@ require (
 	golang.org/x/net v0.0.0-20210220033124-5f55cee0dc0d
 	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c // indirect
 	golang.org/x/text v0.3.4 // indirect
-	google.golang.org/genproto v0.0.0-20200218151345-dad8c97a84f5 // indirect
-	google.golang.org/grpc v1.32.0
-	google.golang.org/protobuf v1.23.0
+	google.golang.org/grpc v1.37.0
+	google.golang.org/protobuf v1.25.0
 	gotest.tools v2.2.0+incompatible
 )
