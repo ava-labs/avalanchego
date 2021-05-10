@@ -298,7 +298,7 @@ func defaultVM() (*VM, database.Database) {
 	}}
 
 	baseDBManager := manager.NewDefaultMemDBManager()
-	chainDBManager := baseDBManager.AddPrefix([]byte{0})
+	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.clock.Set(defaultGenesisTime)
@@ -368,7 +368,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}}
 
 	baseDBManager := manager.NewDefaultMemDBManager()
-	chainDBManager := baseDBManager.AddPrefix([]byte{0})
+	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.clock.Set(defaultGenesisTime)
@@ -1721,7 +1721,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 	db := manager.NewDefaultMemDBManager()
 
-	firstDB := db.AddPrefix([]byte{})
+	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
@@ -1821,7 +1821,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := db.AddPrefix([]byte{})
+	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1842,7 +1842,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	db := manager.NewDefaultMemDBManager()
 
-	firstDB := db.AddPrefix([]byte{})
+	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
@@ -1954,7 +1954,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := db.AddPrefix([]byte{})
+	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1974,7 +1974,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	baseDBManager := manager.NewDefaultMemDBManager()
 
-	vmDBManager := baseDBManager.AddPrefix([]byte("vm"))
+	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current())
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())

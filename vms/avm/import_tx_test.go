@@ -239,7 +239,7 @@ func TestIssueImportTx(t *testing.T) {
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
-		baseDBManager.AddPrefix([]byte{1}),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
 		nil,
@@ -389,7 +389,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	err = vm.Initialize(
 		ctx,
-		baseDBManager.AddPrefix([]byte{1}),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
 		nil,

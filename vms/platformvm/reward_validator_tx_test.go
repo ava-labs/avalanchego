@@ -377,7 +377,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 	db := manager.NewDefaultMemDBManager()
 
-	firstDB := db.AddPrefix([]byte{})
+	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		UptimePercentage:   .2,
@@ -412,7 +412,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	}
 	firstCtx.Lock.Unlock()
 
-	secondDB := db.AddPrefix([]byte{})
+	secondDB := db.NewPrefixDBManager([]byte{})
 	secondVM := &VM{Factory: Factory{
 		Chains:           chains.MockManager{},
 		UptimePercentage: .21,
