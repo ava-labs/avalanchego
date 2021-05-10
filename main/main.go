@@ -50,11 +50,11 @@ func main() {
 	logConfigCopy := rootConfig.LoggingConfig
 	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
 	logFactory := logging.NewFactory(logConfigCopy)
-	defer logFactory.Close()
 
 	log, err := logFactory.Make()
 	if err != nil {
 		logFactory.Close()
+
 		fmt.Printf("starting logger failed with: %s\n", err)
 		os.Exit(1)
 	}
@@ -85,5 +85,7 @@ func main() {
 	exitCode, err := nodeManager.runNormal()
 	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
 	nodeManager.shutdown() // make sure all the nodes are stopped
+
+	logFactory.Close()
 	os.Exit(exitCode)
 }
