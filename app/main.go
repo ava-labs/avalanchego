@@ -8,13 +8,15 @@ import (
 	"os"
 	"syscall"
 
-	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
+	"github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-plugin"
+
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/perms"
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
+
+	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
 )
 
 var (
