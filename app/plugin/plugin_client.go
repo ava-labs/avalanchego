@@ -27,7 +27,7 @@ func (c *Client) Start() (int, error) {
 	if err != nil {
 		return 1, err
 	}
-	return int(resp.ExitCode), err
+	return int(resp.ExitCode), nil
 }
 
 // Blocks until the node is done shutting down.

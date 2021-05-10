@@ -421,7 +421,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	// verify the commit block
-	commit := options[0].(*Commit)
+	commit := options[0].(*CommitBlock)
 	if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	// verify the commit block
-	commit = options[0].(*Commit)
+	commit = options[0].(*CommitBlock)
 	if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	}
@@ -506,7 +506,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	// verify the commit block
-	commit = options[0].(*Commit)
+	commit = options[0].(*CommitBlock)
 	if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	}
@@ -539,7 +539,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	// verify the commit block
-	commit = options[0].(*Commit)
+	commit = options[0].(*CommitBlock)
 	if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	}
@@ -593,7 +593,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	}
 
 	// verify the commit block
-	commit = options[0].(*Commit)
+	commit = options[0].(*CommitBlock)
 	if err := commit.Verify(); err != nil {
 		t.Fatal(err)
 	}

@@ -4,7 +4,12 @@
 package avax
 
 import (
+	"fmt"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -39,6 +44,18 @@ func NewStatusState(db database.Database) StatusState {
 		statusCache: &cache.LRU{Size: statusCacheSize},
 		statusDB:    db,
 	}
+}
+
+func NewMeteredStatusState(db database.Database, namespace string, metrics prometheus.Registerer) (StatusState, error) {
+	cache, err := metercacher.New(
+		fmt.Sprintf("%s_status_cache", namespace),
+		metrics,
+		&cache.LRU{Size: statusCacheSize},
+	)
+	return &statusState{
+		statusCache: cache,
+		statusDB:    db,
+	}, err
 }
 
 func (s *statusState) GetStatus(id ids.ID) (choices.Status, error) {

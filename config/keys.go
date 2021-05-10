@@ -41,7 +41,6 @@ const (
 	BootstrapIDsKey                         = "bootstrap-ids"
 	StakingPortKey                          = "staking-port"
 	stakingEnabledKey                       = "staking-enabled"
-	p2pTLSEnabledKey                        = "p2p-tls-enabled"
 	stakingKeyPathKey                       = "staking-tls-key-file"
 	stakingCertPathKey                      = "staking-tls-cert-file"
 	stakingDisabledWeightKey                = "staking-disabled-weight"
@@ -60,6 +59,9 @@ const (
 	networkHealthMaxPortionSendQueueFillKey = "network-health-max-portion-send-queue-full"
 	networkHealthMaxSendFailRateKey         = "network-health-max-send-fail-rate"
 	networkHealthMaxOutstandingDurationKey  = "network-health-max-outstanding-request-duration"
+	networkPeerListSizeKey                  = "network-peer-list-size"
+	networkPeerListGossipSizeKey            = "network-peer-list-gossip-size"
+	networkPeerListGossipFreqKey            = "network-peer-list-gossip-frequency"
 	sendQueueSizeKey                        = "send-queue-size"
 	benchlistFailThresholdKey               = "benchlist-fail-threshold"
 	benchlistPeerSummaryEnabledKey          = "benchlist-peer-summary-enabled"
@@ -108,4 +110,5 @@ const (
 	RetryBootstrapMaxAttemptsKey            = "bootstrap-retry-max-attempts"
 	peerAliasTimeoutKey                     = "peer-alias-timeout"
 	PluginModeKey                           = "plugin-mode-enabled"
+	bootstrapBeaconConnectionTimeoutKey     = "bootstrap-beacon-connection-timeout"
 )

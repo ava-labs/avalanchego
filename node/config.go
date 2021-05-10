@@ -57,7 +57,6 @@ type Config struct {
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
-	EnableP2PTLS          bool
 	EnableStaking         bool
 	StakingCertFile       string
 	StakingKeyFile        string
@@ -77,6 +76,9 @@ type Config struct {
 	// Network configuration
 	NetworkConfig       timer.AdaptiveTimeoutConfig
 	NetworkHealthConfig network.HealthConfig
+	PeerListSize        uint32
+	PeerListGossipSize  uint32
+	PeerListGossipFreq  time.Duration
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
@@ -152,6 +154,9 @@ type Config struct {
 
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
+
+	// Timeout when connecting to bootstrapping beacons
+	BootstrapBeaconConnectionTimeout time.Duration
 
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration

@@ -14,7 +14,6 @@ import (
 
 	"github.com/gorilla/rpc/v2"
 
-	"github.com/ava-labs/avalanchego/api/pubsub"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -141,7 +141,7 @@ func (vm *VM) Initialize(
 	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
-	vm.pubsub = pubsub.NewServer(ctx)
+	vm.pubsub = pubsub.New(ctx.NetworkID, ctx.Log)
 
 	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	c := linearcodec.NewDefault()
@@ -152,10 +152,6 @@ func (vm *VM) Initialize(
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.pubsub.Register("accepted"),
-		vm.pubsub.Register("rejected"),
-		vm.pubsub.Register("verified"),
-
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
 		c.RegisterType(&OperationTx{}),
@@ -197,7 +193,11 @@ func (vm *VM) Initialize(
 		}
 	}
 
-	vm.state = NewState(vm.db, vm.genesisCodec, vm.codec)
+	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, ctx.Namespace, ctx.Metrics)
+	if err != nil {
+		return err
+	}
+	vm.state = state
 
 	if err := vm.initAliases(genesisBytes); err != nil {
 		return err
@@ -294,7 +294,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
 		"/wallet": {Handler: walletServer},
-		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
+		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
 	}, err
 }
 

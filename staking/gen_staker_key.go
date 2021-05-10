@@ -1,8 +1,10 @@
 package staking
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -14,57 +16,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-// Return the PEM-encoded staking key and cert
-func GenerateStakingCert() ([]byte, []byte, error) {
-	keyBytes, certBytes, err := generateStakingCert()
-	if err != nil {
-		return nil, nil, err
-	}
-	certPemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
-	keyPemBytes := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
-	return keyPemBytes, certPemBytes, err
-}
-
-// Returns the byte repr. of the staking key and certificate. Not PEM encoded.
-func generateStakingCert() ([]byte, []byte, error) {
-	// Create key to sign cert with
-	key, err := rsa.GenerateKey(rand.Reader, 4096)
-	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't generate rsa key: %w", err)
-	}
-	keyBytes, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't marshal private key: %w", err)
-	}
-
-	// Create self-signed staking cert
-	certTemplate := &x509.Certificate{
-		SerialNumber:          big.NewInt(0),
-		NotBefore:             time.Date(2000, time.January, 0, 0, 0, 0, 0, time.UTC),
-		NotAfter:              time.Now().AddDate(100, 0, 0),
-		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageDataEncipherment,
-		BasicConstraintsValid: true,
-	}
-	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, &key.PublicKey, key)
-	if err != nil {
-		return nil, nil, fmt.Errorf("couldn't create certificate: %w", err)
-	}
-	return keyBytes, certBytes, nil
-
-}
-
-// InitNodeStakingKeyPair generates a self-signed TLS key/cert pair to use in staking
-// The key and files will be placed at [keyPath] and [certPath], respectively
-// If there is already a file at [keyPath], returns nil
+// InitNodeStakingKeyPair generates a self-signed TLS key/cert pair to use in
+// staking. The key and files will be placed at [keyPath] and [certPath],
+// respectively. If there is already a file at [keyPath], returns nil.
 func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	// If there is already a file at [keyPath], do nothing
 	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
 		return nil
 	}
 
-	keyBytes, certBytes, err := generateStakingCert()
+	certBytes, keyBytes, err := newStakerKeys()
 	if err != nil {
-		return fmt.Errorf("couldn't create staking key/cert: %w", err)
+		return err
 	}
 
 	// Ensure directory where key/cert will live exist
@@ -80,7 +43,7 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't create cert file: %w", err)
 	}
-	if err := pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes}); err != nil {
+	if _, err := certFile.Write(certBytes); err != nil {
 		return fmt.Errorf("couldn't write cert file: %w", err)
 	}
 	if err := certFile.Close(); err != nil {
@@ -95,7 +58,7 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	if err != nil {
 		return fmt.Errorf("couldn't create key file: %w", err)
 	}
-	if err := pem.Encode(keyOut, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes}); err != nil {
+	if _, err := keyOut.Write(keyBytes); err != nil {
 		return fmt.Errorf("couldn't write private key: %w", err)
 	}
 	if err := keyOut.Close(); err != nil {
@@ -106,4 +69,57 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	}
 
 	return nil
+}
+
+func NewTLSCert() (*tls.Certificate, error) {
+	certBytes, keyBytes, err := newStakerKeys()
+	if err != nil {
+		return nil, err
+	}
+	cert, err := tls.X509KeyPair(certBytes, keyBytes)
+	if err != nil {
+		return nil, err
+	}
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return nil, err
+	}
+	return &cert, nil
+}
+
+func newStakerKeys() ([]byte, []byte, error) {
+	// Create key to sign cert with
+	key, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't generate rsa key: %w", err)
+	}
+
+	// Create self-signed staking cert
+	certTemplate := &x509.Certificate{
+		SerialNumber:          big.NewInt(0),
+		NotBefore:             time.Date(2000, time.January, 0, 0, 0, 0, 0, time.UTC),
+		NotAfter:              time.Now().AddDate(100, 0, 0),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageDataEncipherment,
+		BasicConstraintsValid: true,
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, certTemplate, certTemplate, &key.PublicKey, key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't create certificate: %w", err)
+	}
+	var certBuff bytes.Buffer
+	if err := pem.Encode(&certBuff, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes}); err != nil {
+		return nil, nil, fmt.Errorf("couldn't write cert file: %w", err)
+	}
+
+	privBytes, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't marshal private key: %w", err)
+	}
+
+	var keyBuff bytes.Buffer
+	if err := pem.Encode(&keyBuff, &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}); err != nil {
+		return nil, nil, fmt.Errorf("couldn't write private key: %w", err)
+	}
+
+	return certBuff.Bytes(), keyBuff.Bytes(), nil
 }

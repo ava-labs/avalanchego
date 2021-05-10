@@ -4,13 +4,14 @@
 package node
 
 import (
+	"crypto"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"net"
 	"path/filepath"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -21,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -64,11 +64,11 @@ const (
 )
 
 var (
-	genesisHashKey                  = []byte("genesisID")
-	indexerDBPrefix                 = []byte{0x00}
-	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	genesisHashKey  = []byte("genesisID")
+	indexerDBPrefix = []byte{0x00}
 
-	beaconConnectionTimeout = 1 * time.Minute
+	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
+	errInvalidTLSKey                = errors.New("invalid TLS key")
 )
 
 // Node is an instance of an Avalanche node.
@@ -154,27 +154,25 @@ func (n *Node) initNetworking() error {
 	}
 	dialer := network.NewDialer(TCP)
 
-	var serverUpgrader, clientUpgrader network.Upgrader
-	if n.Config.EnableP2PTLS {
-		// #nosec G402
-		tlsConfig := &tls.Config{
-			Certificates: []tls.Certificate{n.Config.StakingTLSCert},
-			ClientAuth:   tls.RequireAnyClientCert,
-			// We do not use the TLS CA functionality to authenticate a
-			// hostname. We only require an authenticated channel based on the
-			// peer's public key. Therefore, we can safely skip CA verification.
-			//
-			// During our security audit by Quantstamp, this was investigated
-			// and confirmed to be safe and correct.
-			InsecureSkipVerify: true,
-		}
-
-		serverUpgrader = network.NewTLSServerUpgrader(tlsConfig)
-		clientUpgrader = network.NewTLSClientUpgrader(tlsConfig)
-	} else {
-		serverUpgrader = network.NewIPUpgrader()
-		clientUpgrader = network.NewIPUpgrader()
+	cert, err := tls.LoadX509KeyPair(n.Config.StakingCertFile, n.Config.StakingKeyFile)
+	if err != nil {
+		return err
 	}
+
+	tlsKey, ok := cert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return errInvalidTLSKey
+	}
+
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		return err
+	}
+
+	tlsConfig := network.TLSConfig(cert)
+
+	serverUpgrader := network.NewTLSServerUpgrader(tlsConfig)
+	clientUpgrader := network.NewTLSClientUpgrader(tlsConfig)
 
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
@@ -215,7 +213,7 @@ func (n *Node) initNetworking() error {
 		})
 
 		go timer.Dispatch()
-		timer.SetTimeoutIn(beaconConnectionTimeout)
+		timer.SetTimeoutIn(n.Config.BootstrapBeaconConnectionTimeout)
 
 		consensusRouter = &beaconManager{
 			Router:         consensusRouter,
@@ -228,7 +226,7 @@ func (n *Node) initNetworking() error {
 	versionManager := version.NewCompatibility(
 		Version,
 		MinimumCompatibleVersion,
-		GetApricotPhase1Time(n.Config.NetworkID),
+		GetApricotPhase2Time(n.Config.NetworkID),
 		PrevMinimumCompatibleVersion,
 		MinimumUnmaskedVersion,
 		GetApricotPhase0Time(n.Config.NetworkID),
@@ -256,6 +254,10 @@ func (n *Node) initNetworking() error {
 		n.Config.NetworkHealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
+		tlsKey,
+		int(n.Config.PeerListSize),
+		int(n.Config.PeerListGossipSize),
+		n.Config.PeerListGossipFreq,
 	)
 
 	return nil
@@ -346,7 +348,7 @@ func (n *Node) Dispatch() error {
 	// Add bootstrap nodes to the peer network
 	for _, peer := range n.Config.BootstrapPeers {
 		if !peer.IP.Equal(n.Config.StakingIP.IP()) {
-			n.Net.Track(peer.IP)
+			n.Net.Track(peer.IP, peer.ID)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
 		}
@@ -675,7 +677,7 @@ func (n *Node) initSharedMemory() error {
 // Assumes n.APIServer is already set
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
-	keystoreDB := n.DBManager.AddPrefix([]byte("keystore"))
+	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
 	ks, err := keystore.New(n.Log, keystoreDB)
 	if err != nil {
 		return err
@@ -715,7 +717,7 @@ func (n *Node) initMetricsAPI() error {
 	n.Log.Info("initializing metrics API")
 
 	dbNamespace := fmt.Sprintf("%s_db", constants.PlatformName)
-	meterDBManager, err := n.DBManager.AddMeter(dbNamespace, registry)
+	meterDBManager, err := n.DBManager.NewMeterDBManager(dbNamespace, registry)
 	if err != nil {
 		return err
 	}
@@ -747,7 +749,7 @@ func (n *Node) initInfoAPI() error {
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
 		n.Log,
-		versionconfig.NodeVersion,
+		Version,
 		n.ID,
 		n.Config.NetworkID,
 		n.chainManager,
@@ -873,7 +875,7 @@ func (n *Node) Initialize(
 	n.LogFactory = logFactory
 	n.Config = config
 	n.DoneShuttingDown.Add(1)
-	n.Log.Info("node version is: %s", versionconfig.NodeVersion)
+	n.Log.Info("node version is: %s", Version)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 

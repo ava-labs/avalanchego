@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
@@ -95,7 +96,7 @@ func TestPushAndExecute(t *testing.T) {
 		return job, nil
 	}
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), false)
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
 	assert.NoError(err)
 	assert.Equal(1, count)
 
@@ -184,7 +185,7 @@ func TestRemoveDependency(t *testing.T) {
 		}
 	}
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), false)
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
 	assert.NoError(err)
 	assert.Equal(2, count)
 	assert.True(executed0)
@@ -404,7 +405,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 		}
 	}
 
-	_, err = jobs.ExecuteAll(snow.DefaultContextTest(), false)
+	_, err = jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
 	// Assert that the database closed error on job1 causes ExecuteAll
 	// to fail in the middle of execution.
 	assert.Error(err)
@@ -437,7 +438,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	assert.NoError(err)
 	assert.True(hasNext)
 
-	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), false)
+	count, err := jobs.ExecuteAll(snow.DefaultContextTest(), &common.Halter{}, false)
 	assert.NoError(err)
 	assert.Equal(2, count)
 	assert.True(executed1)

@@ -78,7 +78,6 @@ func (tx *UniqueTx) refresh() {
 	}
 
 	if prevTx == nil {
-		// TODO: register hits/misses for this
 		if innerTx, err := tx.vm.state.GetTx(tx.ID()); err == nil {
 			tx.Tx = innerTx
 		}
@@ -158,8 +157,7 @@ func (tx *UniqueTx) Accept() error {
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
-	tx.vm.pubsub.Publish("accepted", txID)
-
+	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
@@ -184,7 +182,6 @@ func (tx *UniqueTx) Reject() error {
 		return err
 	}
 
-	tx.vm.pubsub.Publish("rejected", txID)
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
@@ -295,7 +292,6 @@ func (tx *UniqueTx) Verify() error {
 	}
 
 	tx.verifiedState = true
-	tx.vm.pubsub.Publish("verified", tx.ID())
 	return nil
 }
 

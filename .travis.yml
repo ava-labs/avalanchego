@@ -27,12 +27,14 @@ jobs:
     - ".ci/after_success.sh"
 
   - stage: build
+    if: repo = "ava-labs/avalanchego"
     os: osx
     osx_image: xcode11.4
     script:
     - ".ci/build_and_test.sh"
 
   - stage: build
+    if: repo = "ava-labs/avalanchego"
     os: windows
     script:
     - ".ci/build_and_test.sh"

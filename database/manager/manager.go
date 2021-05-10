@@ -9,9 +9,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
+	"strings"
 
-	"github.com/ava-labs/avalanchego/config/versionconfig"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -21,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -32,22 +32,42 @@ var (
 )
 
 type Manager interface {
-	// Current returns the database with the current database version
+	// Current returns the database with the current database version.
 	Current() *VersionedDatabase
-	// Previous returns the database prior to the current database and true if a previous database exists.
+
+	// Previous returns the database prior to the current database and true if a
+	// previous database exists.
 	Previous() (*VersionedDatabase, bool)
-	// GetDatabases returns all the managed databases in order from current to the oldest version
+
+	// GetDatabases returns all the managed databases in order from current to
+	// the oldest version.
 	GetDatabases() []*VersionedDatabase
-	// Close all of the databases controlled by the manager
+
+	// Close all of the databases controlled by the manager.
 	Close() error
+
+	// NewPrefixDBManager returns a new database manager with each of its
+	// databases prefixed with [prefix].
+	NewPrefixDBManager(prefix []byte) Manager
+
+	// NewNestedPrefixDBManager returns a new database manager where each of its
+	// databases has the nested prefix [prefix] applied to it.
+	NewNestedPrefixDBManager(prefix []byte) Manager
+
+	// NewMeterDBManager returns a new database manager with each of its
+	// databases wrapped with a meterdb instance to support metrics on database
+	// performance.
+	NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error)
+
+	// NewCompleteMeterDBManager wraps each database instance with a meterdb
+	// instance. The namespace is concatenated with the version of the database.
+	// Note: calling this more than once with the same [namespace] will cause a
+	// conflict error for the [registerer].
+	NewCompleteMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error)
+
+	// TODO: delete these.
 	MarkCurrentDBBootstrapped() error
 	CurrentDBBootstrapped() (bool, error)
-	// AddPrefix returns a new database manager with each of its databases
-	// prefixed with [prefix]
-	AddPrefix(prefix []byte) Manager
-	// AddMeter returns a new database manager with each of its databases
-	// wrapped with a meterdb instance to support metrics on database performance.
-	AddMeter(namespace string, registerer prometheus.Registerer) (Manager, error)
 }
 
 type manager struct {
@@ -57,71 +77,6 @@ type manager struct {
 	databases []*VersionedDatabase
 	// [rawCurrentDB] has a flag that specifies whether this database version has been bootstrapped
 	rawCurrentDB database.Database
-}
-
-func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
-
-func (m *manager) Previous() (*VersionedDatabase, bool) {
-	if len(m.databases) < 2 {
-		return nil, false
-	}
-	return m.databases[1], true
-}
-
-func (m *manager) GetDatabases() []*VersionedDatabase { return m.databases }
-
-func (m *manager) Close() error {
-	errs := wrappers.Errs{}
-	for _, db := range m.databases {
-		errs.Add(db.Close())
-	}
-	return errs.Err
-}
-
-func (m *manager) MarkCurrentDBBootstrapped() error {
-	return prefixdb.New(dbPrefix, m.rawCurrentDB).Put(bootstrappedKey, nil)
-}
-
-func (m *manager) CurrentDBBootstrapped() (bool, error) {
-	return prefixdb.New(dbPrefix, m.rawCurrentDB).Has(bootstrappedKey)
-}
-
-// wrapManager returns a new database manager with each managed database wrapped by
-// the [wrap] function. If an error is returned by wrap, the error is returned
-// immediately. If [wrap] never returns an error, then wrapManager is guaranteed to
-// never return an error.
-// the function wrap must return a database that can be closed without closing the
-// underlying database.
-func (m *manager) wrapManager(wrap func(db *VersionedDatabase) (*VersionedDatabase, error)) (*manager, error) {
-	newManager := &manager{
-		databases:    make([]*VersionedDatabase, 0, len(m.databases)),
-		rawCurrentDB: m.rawCurrentDB,
-	}
-
-	for _, db := range m.databases {
-		wrappedDB, err := wrap(db)
-		if err != nil {
-			// ignore additional errors in favor of returning the original error
-			_ = newManager.Close()
-			return nil, err
-		}
-		newManager.databases = append(newManager.databases, wrappedDB)
-	}
-	return newManager, nil
-}
-
-// NewDefaultMemDBManager returns a database manager with a single memdb instance
-// with the current database version
-func NewDefaultMemDBManager() Manager {
-	return &manager{
-		databases: []*VersionedDatabase{
-			{
-				Database: memdb.New(),
-				Version:  versionconfig.CurrentDBVersion,
-			},
-		},
-		rawCurrentDB: memdb.New(),
-	}
 }
 
 // New creates a database manager at [filePath] by creating a database instance from each directory
@@ -210,37 +165,18 @@ func New(
 	return manager, nil
 }
 
-// AddPrefix creates a new manager with each database instance prefixed
-// by [prefix]
-func (m *manager) AddPrefix(prefix []byte) Manager {
-	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
-		return &VersionedDatabase{
-			Database: prefixdb.New(prefix, vdb.Database),
-			Version:  vdb.Version,
-		}, nil
-	})
-	return m
-}
-
-// AddMeter wraps the current database instance with a meterdb instance.
-// Note: calling this more than once with the same [namespace] will cause a conflict error for the [registerer]
-func (m *manager) AddMeter(namespace string, registerer prometheus.Registerer) (Manager, error) {
-	currentDB := m.Current()
-	currentMeterDB, err := meterdb.New(namespace, registerer, currentDB.Database)
-	if err != nil {
-		return nil, err
+// NewDefaultMemDBManager returns a database manager with a single memdb instance
+// with the current database version
+func NewDefaultMemDBManager() Manager {
+	return &manager{
+		databases: []*VersionedDatabase{
+			{
+				Database: memdb.New(),
+				Version:  version.DefaultVersion1_0_0,
+			},
+		},
+		rawCurrentDB: memdb.New(),
 	}
-	newManager := &manager{
-		databases:    make([]*VersionedDatabase, len(m.databases)),
-		rawCurrentDB: m.rawCurrentDB,
-	}
-	copy(newManager.databases[1:], m.databases[1:])
-	// Overwrite the current database with the meter DB
-	newManager.databases[0] = &VersionedDatabase{
-		Database: currentMeterDB,
-		Version:  currentDB.Version,
-	}
-	return newManager, nil
 }
 
 // NewManagerFromDBs
@@ -259,25 +195,112 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 	}, nil
 }
 
-type VersionedDatabase struct {
-	database.Database
-	version.Version
+func (m *manager) Current() *VersionedDatabase { return m.databases[0] }
+
+func (m *manager) Previous() (*VersionedDatabase, bool) {
+	if len(m.databases) < 2 {
+		return nil, false
+	}
+	return m.databases[1], true
 }
 
-// Close the underlying database
-func (db *VersionedDatabase) Close() error {
-	return db.Database.Close()
+func (m *manager) GetDatabases() []*VersionedDatabase { return m.databases }
+
+func (m *manager) Close() error {
+	errs := wrappers.Errs{}
+	for _, db := range m.databases {
+		errs.Add(db.Close())
+	}
+	return errs.Err
 }
 
-type innerSortDescendingVersionedDBs []*VersionedDatabase
-
-// Less returns true if the version at index i is greater than the version at index j
-// such that it will sort in descending order (newest version --> oldest version)
-func (dbs innerSortDescendingVersionedDBs) Less(i, j int) bool {
-	return dbs[i].Version.Compare(dbs[j].Version) > 0
+func (m *manager) MarkCurrentDBBootstrapped() error {
+	return prefixdb.New(dbPrefix, m.rawCurrentDB).Put(bootstrappedKey, nil)
 }
 
-func (dbs innerSortDescendingVersionedDBs) Len() int      { return len(dbs) }
-func (dbs innerSortDescendingVersionedDBs) Swap(i, j int) { dbs[j], dbs[i] = dbs[i], dbs[j] }
+func (m *manager) CurrentDBBootstrapped() (bool, error) {
+	return prefixdb.New(dbPrefix, m.rawCurrentDB).Has(bootstrappedKey)
+}
 
-func SortDescending(dbs []*VersionedDatabase) { sort.Sort(innerSortDescendingVersionedDBs(dbs)) }
+// NewPrefixDBManager creates a new manager with each database instance prefixed
+// by [prefix]
+func (m *manager) NewPrefixDBManager(prefix []byte) Manager {
+	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
+		return &VersionedDatabase{
+			Database: prefixdb.New(prefix, vdb.Database),
+			Version:  vdb.Version,
+		}, nil
+	})
+	return m
+}
+
+// NewNestedPrefixDBManager creates a new manager with each database instance
+// wrapped with a nested prfix of [prefix]
+func (m *manager) NewNestedPrefixDBManager(prefix []byte) Manager {
+	m, _ = m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
+		return &VersionedDatabase{
+			Database: prefixdb.NewNested(prefix, vdb.Database),
+			Version:  vdb.Version,
+		}, nil
+	})
+	return m
+}
+
+// NewMeterDBManager wraps the current database instance with a meterdb instance.
+// Note: calling this more than once with the same [namespace] will cause a conflict error for the [registerer]
+func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
+	currentDB := m.Current()
+	currentMeterDB, err := meterdb.New(namespace, registerer, currentDB.Database)
+	if err != nil {
+		return nil, err
+	}
+	newManager := &manager{
+		databases: make([]*VersionedDatabase, len(m.databases)),
+	}
+	copy(newManager.databases[1:], m.databases[1:])
+	// Overwrite the current database with the meter DB
+	newManager.databases[0] = &VersionedDatabase{
+		Database: currentMeterDB,
+		Version:  currentDB.Version,
+	}
+	return newManager, nil
+}
+
+// NewCompleteMeterDBManager wraps each database instance with a meterdb instance. The namespace
+// is concatenated with the version of the database. Note: calling this more than once
+// with the same [namespace] will cause a conflict error for the [registerer]
+func (m *manager) NewCompleteMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error) {
+	return m.wrapManager(func(vdb *VersionedDatabase) (*VersionedDatabase, error) {
+		mdb, err := meterdb.New(fmt.Sprintf("%s_%s", namespace, strings.ReplaceAll(vdb.Version.String(), ".", "_")), registerer, vdb.Database)
+		if err != nil {
+			return nil, err
+		}
+		return &VersionedDatabase{
+			Database: mdb,
+			Version:  vdb.Version,
+		}, nil
+	})
+}
+
+// wrapManager returns a new database manager with each managed database wrapped
+// by the [wrap] function. If an error is returned by wrap, the error is
+// returned immediately. If [wrap] never returns an error, then wrapManager is
+// guaranteed to never return an error. The function wrap must return a database
+// that can be closed without closing the underlying database.
+func (m *manager) wrapManager(wrap func(db *VersionedDatabase) (*VersionedDatabase, error)) (*manager, error) {
+	newManager := &manager{
+		databases:    make([]*VersionedDatabase, 0, len(m.databases)),
+		rawCurrentDB: m.rawCurrentDB,
+	}
+
+	for _, db := range m.databases {
+		wrappedDB, err := wrap(db)
+		if err != nil {
+			// ignore additional errors in favor of returning the original error
+			_ = newManager.Close()
+			return nil, err
+		}
+		newManager.databases = append(newManager.databases, wrappedDB)
+	}
+	return newManager, nil
+}

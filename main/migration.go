@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -44,7 +43,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	if !m.rootConfig.DBEnabled {
 		return false, nil
 	}
-	dbManager, err := manager.New(m.rootConfig.DBPath, logging.NoLog{}, versionconfig.CurrentDBVersion, true)
+	dbManager, err := manager.New(m.rootConfig.DBPath, logging.NoLog{}, node.DatabaseVersion, true)
 	if err != nil {
 		return false, fmt.Errorf("couldn't create db manager at %s: %w", m.rootConfig.DBPath, err)
 	}
@@ -55,7 +54,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	}()
 	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
 	if err != nil {
-		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", versionconfig.CurrentDBVersion, err)
+		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", node.DatabaseVersion, err)
 	}
 	if currentDBBootstrapped {
 		return false, nil

@@ -636,11 +636,11 @@ func TestAddValidatorCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
-	_, ok = options[1].(*Abort)
+	_, ok = options[1].(*AbortBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
@@ -782,9 +782,9 @@ func TestAddValidatorReject(t *testing.T) {
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -858,10 +858,10 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -941,10 +941,10 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1003,10 +1003,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1044,10 +1044,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*Commit)
+	commit, ok = options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1100,9 +1100,9 @@ func TestRewardValidatorReject(t *testing.T) {
 	block := blk.(*ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1133,9 +1133,9 @@ func TestRewardValidatorReject(t *testing.T) {
 	block = blk.(*ProposalBlock)
 	if options, err := block.Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1186,9 +1186,9 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	block := blk.(*ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1219,9 +1219,9 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	block = blk.(*ProposalBlock)
 	if options, err := blk.(*ProposalBlock).Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1404,10 +1404,10 @@ func TestCreateSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil { // Accept the block
 		t.Fatal(err)
@@ -1452,10 +1452,10 @@ func TestCreateSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*Commit)
+	commit, ok = options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1508,10 +1508,10 @@ func TestCreateSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*Commit)
+	commit, ok = options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)

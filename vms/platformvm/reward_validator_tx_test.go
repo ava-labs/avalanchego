@@ -461,12 +461,12 @@ func TestUptimeDisallowed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
 
-	abort, ok := options[1].(*Abort)
+	abort, ok := options[1].(*AbortBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
@@ -522,12 +522,12 @@ func TestUptimeDisallowed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	commit, ok = options[1].(*Commit)
+	commit, ok = options[1].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefAbort)
 	}
 
-	abort, ok = options[0].(*Abort)
+	abort, ok = options[0].(*AbortBlock)
 	if !ok {
 		t.Fatal(errShouldPrefAbort)
 	}

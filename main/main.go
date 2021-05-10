@@ -54,6 +54,7 @@ func main() {
 
 	log, err := logFactory.Make()
 	if err != nil {
+		logFactory.Close()
 		fmt.Printf("starting logger failed with: %s\n", err)
 		os.Exit(1)
 	}
