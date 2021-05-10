@@ -116,6 +116,16 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(SignatureVerificationEnabledKey, true, "Turn on signature verification")
 
 	// Networking
+	// Peer List Gossip
+	gossipHelpMsg := fmt.Sprintf(
+		"Gossip [%s] peers to [%s] peers every [%s]",
+		NetworkPeerListSizeKey,
+		NetworkPeerListGossipSizeKey,
+		NetworkPeerListGossipFreqKey,
+	)
+	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
+	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
+	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
