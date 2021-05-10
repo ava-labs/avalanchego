@@ -255,7 +255,8 @@ func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Regi
 		return nil, err
 	}
 	newManager := &manager{
-		databases: make([]*VersionedDatabase, len(m.databases)),
+		databases:    make([]*VersionedDatabase, len(m.databases)),
+		rawCurrentDB: m.rawCurrentDB,
 	}
 	copy(newManager.databases[1:], m.databases[1:])
 	// Overwrite the current database with the meter DB
