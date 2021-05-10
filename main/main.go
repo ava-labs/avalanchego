@@ -22,8 +22,6 @@ var (
 
 // main is the entry point to AvalancheGo.
 func main() {
-	fmt.Println(process.Header)
-
 	// Get the config
 	rootConfig, version, displayVersion, err := config.GetConfig(GitCommit)
 	if err != nil {
@@ -35,6 +33,8 @@ func main() {
 		fmt.Print(version)
 		os.Exit(0)
 	}
+
+	fmt.Println(process.Header)
 
 	// Set the log directory for this process by adding a subdirectory
 	// "daemon" to the log directory given in the config
@@ -49,6 +49,7 @@ func main() {
 		fmt.Printf("starting logger failed with: %s\n", err)
 		os.Exit(1)
 	}
+
 	log.Info("using build directory at path '%s'", rootConfig.BuildDir)
 
 	nodeManager := newNodeManager(rootConfig.BuildDir, log)
