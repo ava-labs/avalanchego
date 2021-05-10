@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/metricutils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -15,10 +16,6 @@ import (
 var (
 	errUnknownBlockType = errors.New("unknown block type")
 )
-
-type contextKey int
-
-const requestTimestampKey contextKey = iota
 
 type metrics struct {
 	percentConnected prometheus.Gauge
