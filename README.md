@@ -1,4 +1,4 @@
-<div align="center">
+https://www.quantamagazine.org/how-mathematicians-use-homology-to-make-sense-of-topology-20210511/<div align="center">
   <img src="resources/AvalancheLogoRed.png?raw=true">
 </div>
 
@@ -8,7 +8,7 @@ Official node implementation of the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
 
 ## Installation
-
+https://www.quantamagazine.org/how-mathematicians-use-homology-to-make-sense-of-topology-20210511/
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 
 - Hardware: 2 GHz or faster CPU, 4 GB RAM, 20 GB hard disk.
@@ -92,9 +92,13 @@ This launches an Avalanche network with one node.
 
 ### Running protobuf codegen
 To regenerate the protobuf go code, run scripts/protobuf_codegen.sh from the root of the repo
+
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files
+
 To use this script, you must have protoc and protoc-gen-go and have protoc on your $PATH 
+
 https://grpc.io/docs/protoc-installation/
+
 If you extract protoc to ~/software/protobuf/, the following should work:
 ```sh
 $ export PATH=$PATH:~/software/protobuf/bin/:~/go/bin
