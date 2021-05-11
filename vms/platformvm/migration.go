@@ -83,14 +83,18 @@ func (um *uptimeMigrater143) migrate(dbV100 *manager.VersionedDatabase) error {
 
 		nodeID := addVdrTx.Validator.ID()
 		uptimeV100, err := um.previousVersionGetUptime(dbV100, nodeID)
-		if err != nil {
+		if err == database.ErrNotFound {
+			continue
+		} else if err != nil {
 			return fmt.Errorf("couldn't get uptime for node %s from database v1.0.0: %s", nodeID.PrefixedString(constants.NodeIDPrefix), err)
 		}
 
 		// only migrate a validator's uptime if the validator is still in the validator set.
-		if _, _, err := cs.GetStaker(addVdrTx.ID()); err != nil {
+		if _, _, err := cs.GetStaker(addVdrTx.ID()); err == database.ErrNotFound {
 			// This validator isn't in the current validator set. They must have left the validator set. Ignore.
 			continue
+		} else if err != nil {
+			return fmt.Errorf("couldn't get add validator tx %s for %s: %s", addVdrTx.ID(), nodeID.PrefixedString(constants.NodeIDPrefix), err)
 		}
 
 		// In v1.0.0, up duration is stored in seconds. In v1.4.3, it is stored in nanoseconds.
