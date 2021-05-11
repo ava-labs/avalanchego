@@ -52,7 +52,8 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 			m.log.Error("error closing db manager: %s", err)
 		}
 	}()
-	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
+
+	currentDBBootstrapped, err := dbManager.Current().Has(manager.BootstrappedKey)
 	if err != nil {
 		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", node.DatabaseVersion, err)
 	}

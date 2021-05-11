@@ -13,7 +13,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
@@ -26,7 +25,7 @@ import (
 
 var (
 	errNonSortedAndUniqueDBs = errors.New("managed databases were not sorted and unique")
-	bootstrappedKey          = []byte{0x00}
+	BootstrappedKey          = []byte{0x00}
 	dbPrefix                 = []byte{0x01}
 	errNoDBs                 = errors.New("no dbs given")
 )
@@ -64,10 +63,6 @@ type Manager interface {
 	// Note: calling this more than once with the same [namespace] will cause a
 	// conflict error for the [registerer].
 	NewCompleteMeterDBManager(namespace string, registerer prometheus.Registerer) (Manager, error)
-
-	// TODO: delete these.
-	MarkCurrentDBBootstrapped() error
-	CurrentDBBootstrapped() (bool, error)
 }
 
 type manager struct {
@@ -75,8 +70,6 @@ type manager struct {
 	// descending order
 	// invariant: len(databases) > 0
 	databases []*VersionedDatabase
-	// [rawCurrentDB] has a flag that specifies whether this database version has been bootstrapped
-	rawCurrentDB database.Database
 }
 
 // New creates a database manager at [filePath] by creating a database instance from each directory
@@ -102,7 +95,6 @@ func New(
 				Version:  currentVersion,
 			},
 		},
-		rawCurrentDB: currentDB,
 	}
 
 	// Conditionally ignore old databases
@@ -175,7 +167,6 @@ func NewDefaultMemDBManager() Manager {
 				Version:  version.DefaultVersion1_0_0,
 			},
 		},
-		rawCurrentDB: memdb.New(),
 	}
 }
 
@@ -190,8 +181,7 @@ func NewManagerFromDBs(dbs []*VersionedDatabase) (Manager, error) {
 		return nil, errNonSortedAndUniqueDBs
 	}
 	return &manager{
-		databases:    dbs,
-		rawCurrentDB: dbs[0].Database,
+		databases: dbs,
 	}, nil
 }
 
@@ -212,14 +202,6 @@ func (m *manager) Close() error {
 		errs.Add(db.Close())
 	}
 	return errs.Err
-}
-
-func (m *manager) MarkCurrentDBBootstrapped() error {
-	return prefixdb.New(dbPrefix, m.rawCurrentDB).Put(bootstrappedKey, nil)
-}
-
-func (m *manager) CurrentDBBootstrapped() (bool, error) {
-	return prefixdb.New(dbPrefix, m.rawCurrentDB).Has(bootstrappedKey)
 }
 
 // NewPrefixDBManager creates a new manager with each database instance prefixed
@@ -255,8 +237,7 @@ func (m *manager) NewMeterDBManager(namespace string, registerer prometheus.Regi
 		return nil, err
 	}
 	newManager := &manager{
-		databases:    make([]*VersionedDatabase, len(m.databases)),
-		rawCurrentDB: m.rawCurrentDB,
+		databases: make([]*VersionedDatabase, len(m.databases)),
 	}
 	copy(newManager.databases[1:], m.databases[1:])
 	// Overwrite the current database with the meter DB
@@ -290,10 +271,8 @@ func (m *manager) NewCompleteMeterDBManager(namespace string, registerer prometh
 // that can be closed without closing the underlying database.
 func (m *manager) wrapManager(wrap func(db *VersionedDatabase) (*VersionedDatabase, error)) (*manager, error) {
 	newManager := &manager{
-		databases:    make([]*VersionedDatabase, 0, len(m.databases)),
-		rawCurrentDB: m.rawCurrentDB,
+		databases: make([]*VersionedDatabase, 0, len(m.databases)),
 	}
-
 	for _, db := range m.databases {
 		wrappedDB, err := wrap(db)
 		if err != nil {
