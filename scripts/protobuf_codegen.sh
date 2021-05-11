@@ -1,3 +1,4 @@
+#!/bin/bash
 for PBF in $(find . -type f | grep proto$)
 do
   PFILE=$(basename $PBF)
