@@ -224,7 +224,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
 		sb.removeChain(chainParams.ID)
-
 		m.Log.Error("Error while creating new chain: %s", err)
 		return
 	}
