@@ -51,6 +51,10 @@ type peer struct {
 	// modified on the connection's reader routine.
 	gotPeerList utils.AtomicBool
 
+	// only send the version to this peer on handling a getVersion message if
+	// a version hasn't already been sent.
+	versionSent utils.AtomicBool
+
 	// only send the peerlist to this peer on handling a getPeerlist message if
 	// a peerlist hasn't already been sent.
 	peerListSent utils.AtomicBool
@@ -286,7 +290,6 @@ func (p *peer) ReadMessages() {
 func (p *peer) WriteMessages() {
 	defer p.Close()
 
-	p.sendSignedVersion()
 	p.sendVersion()
 
 	for msg := range p.sender {
@@ -525,6 +528,16 @@ func (p *peer) sendGetVersion() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendVersion() {
+	sentSigned := p.sendSignedVersion()
+	sentUnsigned := p.sendUnsignedVersion()
+	if sentSigned && sentUnsigned {
+		p.versionSent.SetValue(true)
+	}
+}
+
+// assumes the [stateLock] is not held
+// returns true if an unsigned version was sent to [p]
+func (p *peer) sendUnsignedVersion() bool {
 	p.net.stateLock.RLock()
 	msg, err := p.net.b.Version(
 		p.net.networkID,
@@ -535,7 +548,9 @@ func (p *peer) sendVersion() {
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
+
+	sent := p.Send(msg)
+	if sent {
 		p.net.metrics.version.numSent.Inc()
 		p.net.metrics.version.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -543,16 +558,18 @@ func (p *peer) sendVersion() {
 		p.net.metrics.version.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
+	return sent
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) sendSignedVersion() {
+// returns true if a signed version was sent to [p]
+func (p *peer) sendSignedVersion() bool {
 	p.net.stateLock.RLock()
 	myIP := p.net.ip.IP()
 	myVersionTime, myVersionSig, err := p.net.getSignedVersion(myIP)
 	if err != nil {
 		p.net.stateLock.RUnlock()
-		return
+		return false
 	}
 	msg, err := p.net.b.SignedVersion(
 		p.net.networkID,
@@ -565,7 +582,9 @@ func (p *peer) sendSignedVersion() {
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
+
+	sent := p.Send(msg)
+	if sent {
 		p.net.metrics.signedVersion.numSent.Inc()
 		p.net.metrics.signedVersion.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -573,6 +592,7 @@ func (p *peer) sendSignedVersion() {
 		p.net.metrics.signedVersion.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
+	return sent
 }
 
 // assumes the [stateLock] is not held
@@ -603,7 +623,7 @@ func (p *peer) sendPeerList() {
 }
 
 // assumes the [stateLock] is not held
-// returns true if an unsigned peer list was sent to [p]
+// returns true if an unsigned peerlist was sent to [p]
 func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) bool {
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
@@ -623,7 +643,7 @@ func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) bool {
 }
 
 // assumes the [stateLock] is not held
-// returns true if a signed peer list was sent to [p]
+// returns true if a signed peerlist was sent to [p]
 func (p *peer) sendSignedPeerList(peers []utils.IPCertDesc) bool {
 	msg, err := p.net.b.SignedPeerList(peers)
 	if err != nil {
@@ -673,8 +693,9 @@ func (p *peer) sendPong() {
 
 // assumes the [stateLock] is not held
 func (p *peer) handleGetVersion(msg Msg) {
-	p.sendSignedVersion()
-	p.sendVersion()
+	if !p.versionSent.GetValue() {
+		p.sendVersion()
+	}
 }
 
 // If [isSignedVersion], [msg] is a SignedVersion message.
