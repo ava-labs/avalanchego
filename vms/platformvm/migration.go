@@ -11,8 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -73,12 +71,10 @@ func (um *uptimeMigrater143) migrate(dbV100 *manager.VersionedDatabase) error {
 		tx := rewardTxV100{}
 
 		if _, err := um.vm.codec.Unmarshal(txBytes, &tx); err != nil {
-			um.vm.ctx.Log.Warn("couldn't unmarshal validator tx from database v1.0.0: %s", err)
-			continue
+			return fmt.Errorf("couldn't unmarshal validator tx from database v1.0.0: %s", err)
 		}
 		if err := tx.Tx.Sign(um.vm.codec, nil); err != nil {
-			um.vm.ctx.Log.Warn("couldn't initialize validator tx from database v1.0.0: %s", err)
-			continue
+			return fmt.Errorf("couldn't initialize validator tx from database v1.0.0: %s", err)
 		}
 		addVdrTx, ok := tx.Tx.UnsignedTx.(*UnsignedAddValidatorTx)
 		if !ok {
@@ -88,8 +84,7 @@ func (um *uptimeMigrater143) migrate(dbV100 *manager.VersionedDatabase) error {
 		nodeID := addVdrTx.Validator.ID()
 		uptimeV100, err := um.previousVersionGetUptime(dbV100, nodeID)
 		if err != nil {
-			um.vm.ctx.Log.Warn("couldn't get uptime for node %s from database v1.0.0: %s", nodeID.PrefixedString(constants.NodeIDPrefix), err)
-			continue
+			return fmt.Errorf("couldn't get uptime for node %s from database v1.0.0: %s", nodeID.PrefixedString(constants.NodeIDPrefix), err)
 		}
 
 		// only migrate a validator's uptime if the validator is still in the validator set.
@@ -117,8 +112,7 @@ func (um *uptimeMigrater143) migrate(dbV100 *manager.VersionedDatabase) error {
 			lastUpdated,
 		)
 		if err := um.vm.internalState.SetUptime(nodeID, time.Duration(upDuration), lastUpdated); err != nil {
-			um.vm.ctx.Log.Warn("couldn't migrate uptime for node %s: %s", nodeID.PrefixedString(constants.NodeIDPrefix), err)
-			continue
+			return fmt.Errorf("couldn't migrate uptime for node %s: %s", nodeID.PrefixedString(constants.NodeIDPrefix), err)
 		}
 	}
 	if err = stopDBIter.Error(); err != nil {
@@ -148,105 +142,6 @@ func (um *uptimeMigrater143) previousVersionGetUptime(db database.Database, node
 		return nil, err
 	}
 	return &uptime, uptimeDB.Close()
-}
-
-// Only used in testing. TODO move this to the test package.
-func (um *uptimeMigrater143) prevVersionSetUptime(prevDB database.Database, validatorID ids.ShortID, uptime *uptimeV100) error {
-	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), prevDB)
-	defer uptimeDB.Close()
-
-	uptimeBytes, err := Codec.Marshal(codecVersion, uptime)
-	if err != nil {
-		return err
-	}
-
-	return uptimeDB.Put(validatorID.Bytes(), uptimeBytes)
-}
-
-// Only used in testing. TODO move to test package.
-// Add a staker to subnet [subnetID]
-// A staker may be a validator or a delegator
-func (um *uptimeMigrater143) prevVersionAddStaker(db database.Database, subnetID ids.ID, tx *rewardTxV100) error {
-	var (
-		staker   TimedTx
-		priority byte
-	)
-	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
-	case *UnsignedAddDelegatorTx:
-		staker = unsignedTx
-		priority = lowPriority
-	case *UnsignedAddSubnetValidatorTx:
-		staker = unsignedTx
-		priority = mediumPriority
-	case *UnsignedAddValidatorTx:
-		staker = unsignedTx
-		priority = topPriority
-	default:
-		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
-	}
-
-	txBytes, err := Codec.Marshal(codecVersion, tx)
-	if err != nil {
-		return err
-	}
-
-	txID := tx.Tx.ID() // Tx ID of this tx
-
-	// Sorted by subnet ID then stop time then tx ID
-	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
-	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-
-	stopKey, err := um.prevVersionTimedTxKey(staker.EndTime(), priority, txID)
-	if err != nil {
-		// Close the DB, but ignore the error, as the parent error needs to be
-		// returned.
-		_ = prefixStopDB.Close()
-		return fmt.Errorf("couldn't serialize validator key: %w", err)
-	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		prefixStopDB.Put(stopKey, txBytes),
-		prefixStopDB.Close(),
-	)
-
-	return errs.Err
-}
-
-// timedTxKey constructs the key to use for [txID] in stop and start prefix DBs
-func (um *uptimeMigrater143) prevVersionTimedTxKey(time time.Time, priority byte, txID ids.ID) ([]byte, error) {
-	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
-	p.PackLong(uint64(time.Unix()))
-	p.PackByte(priority)
-	p.PackFixedBytes(txID[:])
-	if p.Err != nil {
-		return nil, fmt.Errorf("couldn't serialize validator key: %w", p.Err)
-	}
-	return p.Bytes, nil
-}
-
-// only migrate if the id of the old tx is the same as the current tx
-func (um *uptimeMigrater143) shouldMigrate(previousNodeID ids.ShortID, previousTxID ids.ID, currentStakersTxs []*Tx) (bool, error) {
-	_, _, err := um.vm.internalState.GetUptime(previousNodeID)
-	switch {
-	case err != nil && err == database.ErrNotFound:
-		return false, nil
-	case err != nil:
-		return false, err
-	}
-
-	// find staking tx that exists on both dbs
-	for _, tx := range currentStakersTxs {
-		currentStakerTx, ok := tx.UnsignedTx.(*UnsignedAddValidatorTx)
-		if !ok {
-			continue
-		}
-		if currentStakerTx.Validator.NodeID == previousNodeID {
-			return true, nil
-		}
-	}
-
-	return false, nil
 }
 
 type uptimeV100 struct {

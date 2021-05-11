@@ -70,7 +70,6 @@ func main() {
 	_ = utils.HandleSignals(
 		func(os.Signal) {
 			app.Stop()
-			os.Exit(0) // TODO what should get returned here?
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)

@@ -34,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -153,17 +152,12 @@ func (n *Node) initNetworking() error {
 	}
 	dialer := network.NewDialer(TCP)
 
-	cert, err := staking.LoadTLSCert(n.Config.StakingKeyFile, n.Config.StakingCertFile)
-	if err != nil {
-		return err
-	}
-
-	tlsKey, ok := cert.PrivateKey.(crypto.Signer)
+	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
 		return errInvalidTLSKey
 	}
 
-	tlsConfig := network.TLSConfig(*cert)
+	tlsConfig := network.TLSConfig(n.Config.StakingTLSCert)
 
 	serverUpgrader := network.NewTLSServerUpgrader(tlsConfig)
 	clientUpgrader := network.NewTLSClientUpgrader(tlsConfig)
