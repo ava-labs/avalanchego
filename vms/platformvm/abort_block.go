@@ -11,13 +11,13 @@ import (
 )
 
 var (
-	_ Block    = &Abort{}
-	_ decision = &Abort{}
+	_ Block    = &AbortBlock{}
+	_ decision = &AbortBlock{}
 )
 
-// Abort being accepted results in the proposal of its parent (which must be a
-// proposal block) being rejected.
-type Abort struct {
+// AbortBlock being accepted results in the proposal of its parent (which must
+// be a proposal block) being rejected.
+type AbortBlock struct {
 	DoubleDecisionBlock `serialize:"true"`
 }
 
@@ -26,7 +26,7 @@ type Abort struct {
 // The parent block must be a proposal
 //
 // This function also sets onAcceptState if the verification passes.
-func (a *Abort) Verify() error {
+func (a *AbortBlock) Verify() error {
 	blkID := a.ID()
 
 	if err := a.DoubleDecisionBlock.Verify(); err != nil {
@@ -59,8 +59,8 @@ func (a *Abort) Verify() error {
 
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
 // block, has ID [parentID].
-func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*Abort, error) {
-	abort := &Abort{
+func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
+	abort := &AbortBlock{
 		DoubleDecisionBlock: DoubleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
 				CommonBlock: CommonBlock{

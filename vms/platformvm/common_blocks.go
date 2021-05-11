@@ -233,7 +233,7 @@ func (b *CommonBlock) Accept() error {
 	b.vm.internalState.AddBlock(b.self)
 	b.vm.internalState.SetLastAccepted(blkID)
 	b.vm.lastAcceptedID = blkID
-	return nil
+	return b.vm.metrics.AcceptBlock(b.self)
 }
 
 // CommonDecisionBlock contains the fields and methods common to all decision blocks

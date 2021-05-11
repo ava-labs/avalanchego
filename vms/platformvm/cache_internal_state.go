@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -32,6 +35,7 @@ var (
 	subnetValidatorPrefix = []byte("subnetValidator")
 	blockPrefix           = []byte("block")
 	txPrefix              = []byte("tx")
+	rewardUTXOsPrefix     = []byte("rewardUTXOs")
 	utxoPrefix            = []byte("utxo")
 	subnetPrefix          = []byte("subnet")
 	chainPrefix           = []byte("chain")
@@ -56,10 +60,11 @@ const (
 	mediumPriority
 	topPriority
 
-	blockCacheSize   = 2048
-	txCacheSize      = 2048
-	chainCacheSize   = 2048
-	chainDBCacheSize = 2048
+	blockCacheSize       = 2048
+	txCacheSize          = 2048
+	rewardUTXOsCacheSize = 2048
+	chainCacheSize       = 2048
+	chainDBCacheSize     = 2048
 )
 
 type InternalState interface {
@@ -119,6 +124,10 @@ type InternalState interface {
  * | '-- blockID -> block bytes
  * |-. txs
  * | '-- txID -> tx bytes + tx status
+ * |- rewardUTXOs
+ * | '-. txID
+ * |   '-. list
+ * |     '-- utxoID -> utxo bytes
  * |- utxos
  * | '-- utxoDB
  * |-. subnets
@@ -130,6 +139,7 @@ type InternalState interface {
  * |     '-- txID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
+ *   |-- migratedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
  *   '-- lastAcceptedKey -> lastAccepted
@@ -173,6 +183,10 @@ type internalStateImpl struct {
 	txCache  cache.Cacher             // cache of txID -> {*Tx, Status} if the entry is nil, it is not in the database
 	txDB     database.Database
 
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
+	rewardUTXOsCache cache.Cacher            // cache of txID -> []*UTXO
+	rewardUTXODB     database.Database
+
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
@@ -203,7 +217,7 @@ type stateBlk struct {
 	Status choices.Status `serialize:"true"`
 }
 
-func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalState, error) {
+func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl {
 	baseDB := versiondb.New(db)
 
 	validatorsDB := prefixdb.New(validatorsPrefix, baseDB)
@@ -218,9 +232,10 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalSta
 	pendingDelegatorBaseDB := prefixdb.New(delegatorPrefix, pendingValidatorsDB)
 	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
 
+	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
 	subnetBaseDB := prefixdb.New(subnetPrefix, baseDB)
-	is := &internalStateImpl{
+	return &internalStateImpl{
 		vm: vm,
 
 		baseDB: baseDB,
@@ -245,34 +260,96 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalSta
 		pendingSubnetValidatorList:   linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
 
 		addedBlocks: make(map[ids.ID]Block),
-		blockCache:  &cache.LRU{Size: blockCacheSize},
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
 
 		addedTxs: make(map[ids.ID]*txStatusImpl),
-		txCache:  &cache.LRU{Size: txCacheSize},
 		txDB:     prefixdb.New(txPrefix, baseDB),
+
+		addedRewardUTXOs: make(map[ids.ID][]*avax.UTXO),
+		rewardUTXODB:     rewardUTXODB,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
 		utxoDB:        utxoDB,
-		utxoState:     avax.NewUTXOState(utxoDB, GenesisCodec),
 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		addedChains:  make(map[ids.ID][]*Tx),
-		chainCache:   &cache.LRU{Size: chainCacheSize},
-		chainDBCache: &cache.LRU{Size: chainDBCacheSize},
-		chainDB:      prefixdb.New(chainPrefix, baseDB),
+		addedChains: make(map[ids.ID][]*Tx),
+		chainDB:     prefixdb.New(chainPrefix, baseDB),
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
 	}
+}
 
-	shouldInit, err := is.shouldInit()
+func (st *internalStateImpl) initCaches() {
+	st.blockCache = &cache.LRU{Size: blockCacheSize}
+	st.txCache = &cache.LRU{Size: txCacheSize}
+	st.rewardUTXOsCache = &cache.LRU{Size: rewardUTXOsCacheSize}
+	st.utxoState = avax.NewUTXOState(st.utxoDB, GenesisCodec)
+	st.chainCache = &cache.LRU{Size: chainCacheSize}
+	st.chainDBCache = &cache.LRU{Size: chainDBCacheSize}
+}
+
+func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometheus.Registerer) error {
+	blockCache, err := metercacher.New(
+		fmt.Sprintf("%s_block_cache", namespace),
+		metrics,
+		&cache.LRU{Size: blockCacheSize},
+	)
 	if err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
+		return err
+	}
 
-		return nil, fmt.Errorf(
+	txCache, err := metercacher.New(
+		fmt.Sprintf("%s_tx_cache", namespace),
+		metrics,
+		&cache.LRU{Size: txCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+
+	rewardUTXOsCache, err := metercacher.New(
+		fmt.Sprintf("%s_reward_utxos_cache", namespace),
+		metrics,
+		&cache.LRU{Size: rewardUTXOsCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+
+	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, GenesisCodec, namespace, metrics)
+	if err != nil {
+		return err
+	}
+
+	chainCache, err := metercacher.New(
+		fmt.Sprintf("%s_chain_cache", namespace),
+		metrics,
+		&cache.LRU{Size: chainCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+
+	chainDBCache, err := metercacher.New(
+		fmt.Sprintf("%s_chaindb_cache", namespace),
+		metrics,
+		&cache.LRU{Size: chainDBCacheSize},
+	)
+	st.blockCache = blockCache
+	st.txCache = txCache
+	st.rewardUTXOsCache = rewardUTXOsCache
+	st.utxoState = utxoState
+	st.chainCache = chainCache
+	st.chainDBCache = chainDBCache
+	return err
+}
+
+func (st *internalStateImpl) sync(genesis []byte) error {
+	shouldInit, err := st.shouldInit()
+	if err != nil {
+		return fmt.Errorf(
 			"failed to check if the database is initialized: %w",
 			err,
 		)
@@ -281,25 +358,50 @@ func newInternalState(vm *VM, db database.Database, genesis []byte) (InternalSta
 	// If the database is empty, create the platform chain anew using the
 	// provided genesis state
 	if shouldInit {
-		if err := is.init(genesis); err != nil {
-			// Drop any errors on close to return the first error
-			_ = is.Close()
-
-			return nil, fmt.Errorf(
+		if err := st.init(genesis); err != nil {
+			return fmt.Errorf(
 				"failed to initialize the database: %w",
 				err,
 			)
 		}
 	}
 
-	if err := is.load(); err != nil {
-		// Drop any errors on close to return the first error
-		_ = is.Close()
-
-		return nil, fmt.Errorf(
+	if err := st.load(); err != nil {
+		return fmt.Errorf(
 			"failed to load the database state: %w",
 			err,
 		)
+	}
+	return nil
+}
+
+func NewInternalState(vm *VM, db database.Database, genesis []byte) (InternalState, error) {
+	is := newInternalStateDatabases(vm, db)
+	is.initCaches()
+
+	if err := is.sync(genesis); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, err
+	}
+	return is, nil
+}
+
+func NewMeteredInternalState(vm *VM, db database.Database, genesis []byte, namespace string, metrics prometheus.Registerer) (InternalState, error) {
+	is := newInternalStateDatabases(vm, db)
+	if err := is.initMeteredCaches(namespace, metrics); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, err
+	}
+
+	if err := is.sync(genesis); err != nil {
+		// Drop any errors on close to return the first error
+		_ = is.Close()
+
+		return nil, err
 	}
 	return is, nil
 }
@@ -444,6 +546,39 @@ func (st *internalStateImpl) AddTx(tx *Tx, status Status) {
 		tx:     tx,
 		status: status,
 	}
+}
+
+func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
+	if utxos, exists := st.addedRewardUTXOs[txID]; exists {
+		return utxos, nil
+	}
+	if utxos, exists := st.rewardUTXOsCache.Get(txID); exists {
+		return utxos.([]*avax.UTXO), nil
+	}
+
+	rawTxDB := prefixdb.New(txID[:], st.rewardUTXODB)
+	txDB := linkeddb.NewDefault(rawTxDB)
+	it := txDB.NewIterator()
+	defer it.Release()
+
+	utxos := []*avax.UTXO(nil)
+	for it.Next() {
+		utxo := &avax.UTXO{}
+		if _, err := Codec.Unmarshal(it.Value(), utxo); err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, utxo)
+	}
+	if err := it.Error(); err != nil {
+		return nil, err
+	}
+
+	st.rewardUTXOsCache.Put(txID, utxos)
+	return utxos, nil
+}
+
+func (st *internalStateImpl) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
+	st.addedRewardUTXOs[txID] = append(st.addedRewardUTXOs[txID], utxo)
 }
 
 func (st *internalStateImpl) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
@@ -591,6 +726,9 @@ func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	if err := st.writeTXs(); err != nil {
 		return nil, err
 	}
+	if err := st.writeRewardUTXOs(); err != nil {
+		return nil, err
+	}
 	if err := st.writeUTXOs(); err != nil {
 		return nil, err
 	}
@@ -620,8 +758,8 @@ func (st *internalStateImpl) Close() error {
 		st.validatorsDB.Close(),
 		st.blockDB.Close(),
 		st.txDB.Close(),
+		st.rewardUTXODB.Close(),
 		st.utxoDB.Close(),
-		// st.addressDB.Close(),
 		st.subnetBaseDB.Close(),
 		st.chainDB.Close(),
 		st.singletonDB.Close(),
@@ -804,6 +942,29 @@ func (st *internalStateImpl) writeTXs() error {
 		st.txCache.Put(txID, txStatus)
 		if err := st.txDB.Put(txID[:], txBytes); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func (st *internalStateImpl) writeRewardUTXOs() error {
+	for txID, utxos := range st.addedRewardUTXOs {
+		delete(st.addedRewardUTXOs, txID)
+
+		st.rewardUTXOsCache.Put(txID, utxos)
+
+		rawTxDB := prefixdb.New(txID[:], st.rewardUTXODB)
+		txDB := linkeddb.NewDefault(rawTxDB)
+
+		for _, utxo := range utxos {
+			utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+			if err != nil {
+				return err
+			}
+			utxoID := utxo.InputID()
+			if err := txDB.Put(utxoID[:], utxoBytes); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

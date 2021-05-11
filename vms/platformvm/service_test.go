@@ -406,7 +406,7 @@ func TestGetTx(t *testing.T) {
 		} else if blk, ok := block.(*ProposalBlock); ok { // For proposal blocks, commit them
 			if options, err := blk.Options(); err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)
-			} else if commit, ok := options[0].(*Commit); !ok {
+			} else if commit, ok := options[0].(*CommitBlock); !ok {
 				t.Fatalf("failed test '%s': should prefer to commit", test.description)
 			} else if err := commit.Verify(); err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)

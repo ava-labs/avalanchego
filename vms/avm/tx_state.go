@@ -4,7 +4,12 @@
 package avm
 
 import (
+	"fmt"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -45,6 +50,20 @@ func NewTxState(db database.Database, codec codec.Manager) TxState {
 		},
 		txDB: db,
 	}
+}
+
+func NewMeteredTxState(db database.Database, codec codec.Manager, namespace string, metrics prometheus.Registerer) (TxState, error) {
+	cache, err := metercacher.New(
+		fmt.Sprintf("%s_tx_cache", namespace),
+		metrics,
+		&cache.LRU{Size: txCacheSize},
+	)
+	return &txState{
+		codec: codec,
+
+		txCache: cache,
+		txDB:    db,
+	}, err
 }
 
 func (s *txState) GetTx(txID ids.ID) (*Tx, error) {

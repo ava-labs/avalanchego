@@ -156,14 +156,18 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			if !ok {
 				return nil, nil, nil, nil, permError{errInvalidState}
 			}
-			onCommitState.AddUTXO(&avax.UTXO{
+
+			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out,
-			})
+			}
+
+			onCommitState.AddUTXO(utxo)
+			onCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
 
 		// Handle reward preferences
@@ -222,14 +226,17 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			if !ok {
 				return nil, nil, nil, nil, permError{errInvalidState}
 			}
-			onCommitState.AddUTXO(&avax.UTXO{
+			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake)),
 				},
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out,
-			})
+			}
+
+			onCommitState.AddUTXO(utxo)
+			onCommitState.AddRewardUTXO(tx.TxID, utxo)
 
 			offset++
 		}
@@ -246,14 +253,17 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			if !ok {
 				return nil, nil, nil, nil, permError{errInvalidState}
 			}
-			onCommitState.AddUTXO(&avax.UTXO{
+			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{
 					TxID:        tx.TxID,
 					OutputIndex: uint32(len(uStakerTx.Outs) + len(uStakerTx.Stake) + offset),
 				},
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out:   out,
-			})
+			}
+
+			onCommitState.AddUTXO(utxo)
+			onCommitState.AddRewardUTXO(tx.TxID, utxo)
 		}
 
 		nodeID = uStakerTx.Validator.ID()

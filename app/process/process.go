@@ -3,7 +3,6 @@ package process
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/nat"
@@ -15,6 +14,14 @@ import (
 )
 
 const (
+	Header = "" +
+		`     _____               .__                       .__` + "\n" +
+		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
+		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
+		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
+		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
+		`          \/           \/          \/     \/     \/     \/     \/`
+
 	mustUpgradeMsg = "\nThis version of AvalancheGo requires a database upgrade before running.\n" +
 		"To do the database upgrade, restart this node with argument --fetch-only.\n" +
 		"This will start the node in fetch only mode. It will bootstrap a new database version and then stop.\n" +
@@ -70,7 +77,7 @@ func (a *App) Start() int {
 	// start the db manager
 	var dbManager manager.Manager
 	if a.config.DBEnabled {
-		dbManager, err = manager.New(a.config.DBPath, a.log, versionconfig.CurrentDBVersion, !a.config.FetchOnly)
+		dbManager, err = manager.New(a.config.DBPath, a.log, node.DatabaseVersion, !a.config.FetchOnly)
 		if err != nil {
 			a.log.Error("couldn't create db manager at %s: %s", a.config.DBPath, err)
 			return 1
@@ -80,7 +87,7 @@ func (a *App) Start() int {
 			[]*manager.VersionedDatabase{
 				{
 					Database: memdb.New(),
-					Version:  versionconfig.CurrentDBVersion,
+					Version:  node.DatabaseVersion,
 				},
 			})
 		if err != nil {
@@ -92,7 +99,7 @@ func (a *App) Start() int {
 	// ensure migrations are done
 	currentDBBootstrapped, err := dbManager.CurrentDBBootstrapped()
 	if err != nil {
-		a.log.Error("couldn't get whether database version %s ever bootstrapped: %s", versionconfig.CurrentDBVersion, err)
+		a.log.Error("couldn't get whether database version %s ever bootstrapped: %s", node.DatabaseVersion, err)
 		return 1
 	}
 	a.log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
@@ -106,7 +113,7 @@ func (a *App) Start() int {
 		a.log.Info(upgradingMsg)
 	} else {
 		prevDB, exists := dbManager.Previous()
-		if !currentDBBootstrapped && exists && prevDB.Version.Compare(versionconfig.PrevDBVersion) == 0 {
+		if !currentDBBootstrapped && exists && prevDB.Version.Compare(node.PrevDatabaseVersion) == 0 {
 			// If we have the previous database version but not the current one then node
 			// must run in fetch only mode (--fetch-only). The default behavior for a node in
 			// fetch only mode is to bootstrap from a node on the same machine (127.0.0.1)
@@ -131,11 +138,8 @@ func (a *App) Start() int {
 	}()
 
 	// Track if sybil control is enforced
-	if !a.config.EnableStaking && a.config.EnableP2PTLS {
+	if !a.config.EnableStaking {
 		a.log.Warn("Staking is disabled. Sybil control is not enforced.")
-	}
-	if !a.config.EnableStaking && !a.config.EnableP2PTLS {
-		a.log.Warn("Staking and p2p encryption are disabled. Packet spoofing is possible.")
 	}
 
 	// Check if transaction signatures should be checked

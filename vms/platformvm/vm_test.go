@@ -298,7 +298,7 @@ func defaultVM() (*VM, database.Database) {
 	}}
 
 	baseDBManager := manager.NewDefaultMemDBManager()
-	chainDBManager := baseDBManager.AddPrefix([]byte{0})
+	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.clock.Set(defaultGenesisTime)
@@ -368,7 +368,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}}
 
 	baseDBManager := manager.NewDefaultMemDBManager()
-	chainDBManager := baseDBManager.AddPrefix([]byte{0})
+	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
 	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
 
 	vm.clock.Set(defaultGenesisTime)
@@ -636,11 +636,11 @@ func TestAddValidatorCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	}
-	_, ok = options[1].(*Abort)
+	_, ok = options[1].(*AbortBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
@@ -782,9 +782,9 @@ func TestAddValidatorReject(t *testing.T) {
 	options, err := block.Options()
 	if err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -858,10 +858,10 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -941,10 +941,10 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1003,10 +1003,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1044,10 +1044,10 @@ func TestRewardValidatorAccept(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*Commit)
+	commit, ok = options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1100,9 +1100,9 @@ func TestRewardValidatorReject(t *testing.T) {
 	block := blk.(*ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1133,9 +1133,9 @@ func TestRewardValidatorReject(t *testing.T) {
 	block = blk.(*ProposalBlock)
 	if options, err := block.Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1186,9 +1186,9 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	block := blk.(*ProposalBlock)
 	if options, err := block.Options(); err != nil {
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1219,9 +1219,9 @@ func TestRewardValidatorPreferred(t *testing.T) {
 	block = blk.(*ProposalBlock)
 	if options, err := blk.(*ProposalBlock).Options(); err != nil { // Assert preferences are correct
 		t.Fatal(err)
-	} else if commit, ok := options[0].(*Commit); !ok {
+	} else if commit, ok := options[0].(*CommitBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := blk.Accept(); err != nil {
 		t.Fatal(err)
@@ -1404,10 +1404,10 @@ func TestCreateSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok := options[0].(*Commit)
+	commit, ok := options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil { // Accept the block
 		t.Fatal(err)
@@ -1452,10 +1452,10 @@ func TestCreateSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*Commit)
+	commit, ok = options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1508,10 +1508,10 @@ func TestCreateSubnet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	commit, ok = options[0].(*Commit)
+	commit, ok = options[0].(*CommitBlock)
 	if !ok {
 		t.Fatal(errShouldPrefCommit)
-	} else if abort, ok := options[1].(*Abort); !ok {
+	} else if abort, ok := options[1].(*AbortBlock); !ok {
 		t.Fatal(errShouldPrefCommit)
 	} else if err := block.Accept(); err != nil {
 		t.Fatal(err)
@@ -1721,7 +1721,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 	db := manager.NewDefaultMemDBManager()
 
-	firstDB := db.AddPrefix([]byte{})
+	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
@@ -1821,7 +1821,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := db.AddPrefix([]byte{})
+	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1842,7 +1842,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	db := manager.NewDefaultMemDBManager()
 
-	firstDB := db.AddPrefix([]byte{})
+	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
@@ -1954,7 +1954,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		secondCtx.Lock.Unlock()
 	}()
 
-	secondDB := db.AddPrefix([]byte{})
+	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
 	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1974,7 +1974,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	baseDBManager := manager.NewDefaultMemDBManager()
 
-	vmDBManager := baseDBManager.AddPrefix([]byte("vm"))
+	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
 	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current())
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())

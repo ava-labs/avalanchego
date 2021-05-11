@@ -60,6 +60,9 @@ const (
 	NetworkHealthMaxPortionSendQueueFillKey = "network-health-max-portion-send-queue-full"
 	NetworkHealthMaxSendFailRateKey         = "network-health-max-send-fail-rate"
 	NetworkHealthMaxOutstandingDurationKey  = "network-health-max-outstanding-request-duration"
+	NetworkPeerListSizeKey                  = "network-peer-list-size"
+	NetworkPeerListGossipSizeKey            = "network-peer-list-gossip-size"
+	NetworkPeerListGossipFreqKey            = "network-peer-list-gossip-frequency"
 	SendQueueSizeKey                        = "send-queue-size"
 	BenchlistFailThresholdKey               = "benchlist-fail-threshold"
 	BenchlistPeerSummaryEnabledKey          = "benchlist-peer-summary-enabled"
@@ -108,4 +111,5 @@ const (
 	RetryBootstrapMaxAttemptsKey            = "bootstrap-retry-max-attempts"
 	PeerAliasTimeoutKey                     = "peer-alias-timeout"
 	PluginModeKey                           = "plugin-mode-enabled"
+	BootstrapBeaconConnectionTimeoutKey     = "bootstrap-beacon-connection-timeout"
 )

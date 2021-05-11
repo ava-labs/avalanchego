@@ -4,7 +4,12 @@
 package avax
 
 import (
+	"fmt"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/metercacher"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
@@ -62,6 +67,34 @@ func NewUTXOState(db database.Database, codec codec.Manager) UTXOState {
 		indexDB:    prefixdb.New(indexPrefix, db),
 		indexCache: &cache.LRU{Size: indexCacheSize},
 	}
+}
+
+func NewMeteredUTXOState(db database.Database, codec codec.Manager, namespace string, metrics prometheus.Registerer) (UTXOState, error) {
+	utxoCache, err := metercacher.New(
+		fmt.Sprintf("%s_utxo_cache", namespace),
+		metrics,
+		&cache.LRU{Size: utxoCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	indexCache, err := metercacher.New(
+		fmt.Sprintf("%s_index_cache", namespace),
+		metrics,
+		&cache.LRU{
+			Size: indexCacheSize,
+		},
+	)
+	return &utxoState{
+		codec: codec,
+
+		utxoCache: utxoCache,
+		utxoDB:    prefixdb.New(utxoPrefix, db),
+
+		indexDB:    prefixdb.New(indexPrefix, db),
+		indexCache: indexCache,
+	}, err
 }
 
 func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {

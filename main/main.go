@@ -9,19 +9,10 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-)
-
-const (
-	header = "" +
-		`     _____               .__                       .__` + "\n" +
-		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
-		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
-		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
-		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
-		`          \/           \/          \/     \/     \/     \/     \/`
 )
 
 var (
@@ -31,8 +22,6 @@ var (
 
 // main is the entry point to AvalancheGo.
 func main() {
-	fmt.Println(header)
-
 	// Get the config
 	rootConfig, version, displayVersion, err := config.GetConfig(GitCommit)
 	if err != nil {
@@ -45,18 +34,22 @@ func main() {
 		os.Exit(0)
 	}
 
+	fmt.Println(process.Header)
+
 	// Set the log directory for this process by adding a subdirectory
 	// "daemon" to the log directory given in the config
 	logConfigCopy := rootConfig.LoggingConfig
 	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
 	logFactory := logging.NewFactory(logConfigCopy)
-	defer logFactory.Close()
 
 	log, err := logFactory.Make()
 	if err != nil {
+		logFactory.Close()
+
 		fmt.Printf("starting logger failed with: %s\n", err)
 		os.Exit(1)
 	}
+
 	log.Info("using build directory at path '%s'", rootConfig.BuildDir)
 
 	nodeManager := newNodeManager(rootConfig.BuildDir, log)
@@ -84,5 +77,7 @@ func main() {
 	exitCode, err := nodeManager.runNormal()
 	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
 	nodeManager.shutdown() // make sure all the nodes are stopped
+
+	logFactory.Close()
 	os.Exit(exitCode)
 }

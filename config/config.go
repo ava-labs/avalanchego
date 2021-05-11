@@ -4,10 +4,7 @@
 package config
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
@@ -19,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/avalanchego/config/versionconfig"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -74,7 +70,6 @@ func init() {
 
 var (
 	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errStakingRequiresTLS   = errors.New("if staking is enabled, network TLS must also be enabled")
 	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
@@ -118,6 +113,16 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(SignatureVerificationEnabledKey, true, "Turn on signature verification")
 
 	// Networking
+	// Peer List Gossip
+	gossipHelpMsg := fmt.Sprintf(
+		"Gossip [%s] peers to [%s] peers every [%s]",
+		NetworkPeerListSizeKey,
+		NetworkPeerListGossipSizeKey,
+		NetworkPeerListGossipFreqKey,
+	)
+	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
+	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
+	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
@@ -191,7 +196,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Staking
 	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
-	fs.Bool(P2pTLSEnabledKey, true, "Require TLS to authenticate network communication")
 	fs.String(StakingKeyPathKey, DefaultString, "Path to the TLS private key for staking")
 	fs.String(StakingCertPathKey, DefaultString, "Path to the TLS certificate for staking")
 	fs.Uint64(StakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
@@ -217,6 +221,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(BootstrapIDsKey, DefaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
 	fs.Int(RetryBootstrapMaxAttemptsKey, 50, "Specifies how many times bootstrap should be retried")
+	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -373,16 +378,12 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// Staking:
 	config.EnableStaking = v.GetBool(StakingEnabledKey)
-	config.EnableP2PTLS = v.GetBool(P2pTLSEnabledKey)
 	config.StakingKeyFile = v.GetString(StakingKeyPathKey)
 	config.StakingCertFile = v.GetString(StakingCertPathKey)
 	config.DisabledStakingWeight = v.GetUint64(StakingDisabledWeightKey)
 	config.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
 	config.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
 	config.StakeMintingPeriod = v.GetDuration(StakeMintingPeriodKey)
-	if config.EnableStaking && !config.EnableP2PTLS {
-		return node.Config{}, errStakingRequiresTLS
-	}
 	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
 		return node.Config{}, errInvalidStakerWeights
 	}
@@ -418,50 +419,25 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		}
 	}
 
-	// Parse staking certificate from file
-	certBytes, err := ioutil.ReadFile(config.StakingCertFile)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
+	if config.FetchOnly {
+		// If I'm in fetch only mode, I should use an ephemeral staking key/cert
+		cert, err := staking.NewTLSCert()
+		if err != nil {
+			return node.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %w", err)
+		}
+		config.StakingTLSCert = *cert
+	} else {
+		// If I'm not in fetch only mode, I should use the real staking key/cert
+		cert, err := staking.LoadTLSCert(config.StakingKeyFile, config.StakingCertFile)
+		if err != nil {
+			return node.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
+		}
+		config.StakingTLSCert = *cert
 	}
-	config.StakingTLSCert, err = tls.LoadX509KeyPair(config.StakingCertFile, config.StakingKeyFile)
-	if err != nil {
-		return node.Config{}, err
-	}
-	block, _ := pem.Decode(certBytes)
-	x509Cert, err := x509.ParseCertificate(block.Bytes)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("problem parsing staking certificate: %w", err)
-	}
-	nodeIDFromFile, err := ids.ToShortID(hashing.PubkeyBytesToAddress(x509Cert.Raw))
+
+	config.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(config.StakingTLSCert.Leaf.Raw))
 	if err != nil {
 		return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
-	}
-	switch {
-	case config.FetchOnly:
-		// If TLS is enabled and I'm in fetch only mode, my node ID is derived from a new, ephemeral staking key/cert
-		keyBytes, certBytes, err := staking.GenerateStakingCert()
-		if err != nil {
-			return node.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %s", err)
-		}
-		config.StakingTLSCert, err = tls.X509KeyPair(certBytes, keyBytes)
-		if err != nil {
-			return node.Config{}, fmt.Errorf("couldn't create TLS cert: %s", err)
-		}
-		block, _ := pem.Decode(certBytes)
-		x509Cert, err = x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			return node.Config{}, fmt.Errorf("problem parsing staking certificate: %w", err)
-		}
-		config.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(x509Cert.Raw))
-		if err != nil {
-			return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
-		}
-	case !config.EnableP2PTLS:
-		// If TLS is disabled, my node ID is the hash of my IP
-		config.NodeID = ids.ShortID(hashing.ComputeHash160Array([]byte(config.StakingIP.IP().String())))
-	case !config.FetchOnly:
-		// If TLS is enabled and I'm not in fetch only mode, my node ID is derived from my staking key/cert
-		config.NodeID = nodeIDFromFile
 	}
 
 	if err := initBootstrapPeers(v, &config); err != nil {
@@ -651,6 +627,12 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
 
+	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
+	// [PeerListGossipFreq]
+	config.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
+	config.PeerListGossipFreq = v.GetDuration(NetworkPeerListGossipFreqKey)
+	config.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
+
 	// Benchlist
 	config.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
 	config.BenchlistConfig.PeerSummaryEnabled = v.GetBool(BenchlistPeerSummaryEnabledKey)
@@ -748,6 +730,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// Bootstrap Configs
 	config.RetryBootstrap = v.GetBool(RetryBootstrapKey)
 	config.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
+	config.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
 
 	// Peer alias
 	config.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
@@ -788,29 +771,23 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 		})
 	}
 
-	if config.EnableP2PTLS {
-		i := 0
-		for _, id := range strings.Split(bootstrapIDs, ",") {
-			if id == "" {
-				continue
-			}
-			nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
-			if err != nil {
-				return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
-			}
-			if len(config.BootstrapPeers) <= i {
-				return errBootstrapMismatch
-			}
-			config.BootstrapPeers[i].ID = nodeID
-			i++
+	i := 0
+	for _, id := range strings.Split(bootstrapIDs, ",") {
+		if id == "" {
+			continue
 		}
-		if len(config.BootstrapPeers) != i {
-			return fmt.Errorf("got %d bootstrap IPs but %d bootstrap IDs", len(config.BootstrapPeers), i)
+		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+		if err != nil {
+			return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 		}
-	} else {
-		for _, peer := range config.BootstrapPeers {
-			peer.ID = ids.ShortID(hashing.ComputeHash160Array([]byte(peer.IP.String())))
+		if len(config.BootstrapPeers) <= i {
+			return errBootstrapMismatch
 		}
+		config.BootstrapPeers[i].ID = nodeID
+		i++
+	}
+	if len(config.BootstrapPeers) != i {
+		return fmt.Errorf("got %d bootstrap IPs but %d bootstrap IDs", len(config.BootstrapPeers), i)
 	}
 	return nil
 }
@@ -824,7 +801,7 @@ func GetConfig(commit string) (node.Config, string, bool, error) {
 	if v.GetBool(VersionKey) {
 		format := "%s ["
 		args := []interface{}{
-			versionconfig.NodeVersion,
+			node.Version,
 		}
 
 		networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
@@ -840,7 +817,7 @@ func GetConfig(commit string) (node.Config, string, bool, error) {
 		args = append(args, networkGeneration)
 
 		format += ", database=%s"
-		args = append(args, versionconfig.CurrentDBVersion)
+		args = append(args, node.DatabaseVersion)
 
 		if commit != "" {
 			format += ", commit=%s"

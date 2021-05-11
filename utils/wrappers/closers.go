@@ -27,10 +27,10 @@ func (c *Closer) Add(closer io.Closer) {
 //  that occurs or nil if no error occurs.
 func (c *Closer) Close() error {
 	c.lock.Lock()
-	defer c.lock.Unlock()
-
 	closers := c.closers
 	c.closers = nil
+	c.lock.Unlock()
+
 	errs := Errs{}
 	for _, closer := range closers {
 		errs.Add(closer.Close())

@@ -169,7 +169,7 @@ func (vm *VM) Initialize(
 
 	vm.mempool.Initialize(vm)
 
-	is, err := newInternalState(vm, vm.dbManager.Current().Database, genesisBytes)
+	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
 	if err != nil {
 		return err
 	}
@@ -465,6 +465,7 @@ func (vm *VM) updateValidators(force bool) error {
 	if err := vm.Validators.Set(constants.PrimaryNetworkID, primaryValidators); err != nil {
 		return err
 	}
+	vm.totalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
 		subnetValidators, err := currentValidators.ValidatorSet(subnetID)

@@ -28,10 +28,11 @@ type weightedLinear struct {
 }
 
 func (s *weightedLinear) Initialize(weights []uint64) error {
-	if len(weights) > len(s.arr) {
-		s.arr = make([]weightedLinearElement, len(weights))
+	numWeights := len(weights)
+	if numWeights <= cap(s.arr) {
+		s.arr = s.arr[:numWeights]
 	} else {
-		s.arr = s.arr[:len(weights)]
+		s.arr = make([]weightedLinearElement, numWeights)
 	}
 
 	for i, weight := range weights {

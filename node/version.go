@@ -11,12 +11,15 @@ import (
 )
 
 var (
-	Version                      = version.NewDefaultApplication(constants.PlatformName, 1, 3, 2)
-	MinimumCompatibleVersion     = version.NewDefaultApplication(constants.PlatformName, 1, 3, 0)
-	PrevMinimumCompatibleVersion = version.NewDefaultApplication(constants.PlatformName, 1, 2, 0)
+	Version                      = version.NewDefaultApplication(constants.PlatformName, 1, 4, 3)
+	MinimumCompatibleVersion     = version.NewDefaultApplication(constants.PlatformName, 1, 4, 0)
+	PrevMinimumCompatibleVersion = version.NewDefaultApplication(constants.PlatformName, 1, 3, 0)
 	MinimumUnmaskedVersion       = version.NewDefaultApplication(constants.PlatformName, 1, 1, 0)
 	PrevMinimumUnmaskedVersion   = version.NewDefaultApplication(constants.PlatformName, 1, 0, 0)
 	VersionParser                = version.NewDefaultApplicationParser()
+
+	DatabaseVersion     = version.NewDefaultVersion(1, 4, 3)
+	PrevDatabaseVersion = version.NewDefaultVersion(1, 0, 0)
 
 	ApricotPhase0Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2020, time.December, 8, 3, 0, 0, 0, time.UTC),
@@ -29,6 +32,12 @@ var (
 		constants.FujiID:    time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase1DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+
+	ApricotPhase2Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
+	}
+	ApricotPhase2DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
@@ -43,4 +52,11 @@ func GetApricotPhase1Time(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return ApricotPhase1DefaultTime
+}
+
+func GetApricotPhase2Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase2Times[networkID]; exists {
+		return upgradeTime
+	}
+	return ApricotPhase2DefaultTime
 }

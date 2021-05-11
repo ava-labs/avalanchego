@@ -36,6 +36,9 @@ type UTXOState interface {
 type MutableState interface {
 	UTXOState
 
+	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
+	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
+
 	GetTimestamp() time.Time
 	SetTimestamp(time.Time)
 
@@ -77,6 +80,9 @@ type versionedStateImpl struct {
 
 	addedChains  map[ids.ID][]*Tx
 	cachedChains map[ids.ID][]*Tx
+
+	// map of txID -> []*UTXO
+	addedRewardUTXOs map[ids.ID][]*avax.UTXO
 
 	// map of txID -> {*Tx, Status}
 	addedTxs map[ids.ID]*txStatusImpl
@@ -230,6 +236,20 @@ func (vs *versionedStateImpl) AddTx(tx *Tx, status Status) {
 	}
 }
 
+func (vs *versionedStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
+	if utxos, exists := vs.addedRewardUTXOs[txID]; exists {
+		return utxos, nil
+	}
+	return vs.parentState.GetRewardUTXOs(txID)
+}
+
+func (vs *versionedStateImpl) AddRewardUTXO(txID ids.ID, utxo *avax.UTXO) {
+	if vs.addedRewardUTXOs == nil {
+		vs.addedRewardUTXOs = make(map[ids.ID][]*avax.UTXO)
+	}
+	vs.addedRewardUTXOs[txID] = append(vs.addedRewardUTXOs[txID], utxo)
+}
+
 func (vs *versionedStateImpl) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
 	utxo, modified := vs.modifiedUTXOs[utxoID]
 	if !modified {
@@ -293,6 +313,11 @@ func (vs *versionedStateImpl) Apply(is InternalState) {
 	}
 	for _, tx := range vs.addedTxs {
 		is.AddTx(tx.tx, tx.status)
+	}
+	for txID, utxos := range vs.addedRewardUTXOs {
+		for _, utxo := range utxos {
+			is.AddRewardUTXO(txID, utxo)
+		}
 	}
 	for _, utxo := range vs.modifiedUTXOs {
 		if utxo.utxo != nil {

@@ -183,6 +183,10 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	prevHeight := uint64(0)
 
 	for toProcess.Len() > 0 { // While there are unprocessed vertices
+		if b.Halted() {
+			return nil
+		}
+
 		vtx := toProcess.Pop() // Get an unknown vertex or one furthest down the DAG
 		vtxID := vtx.ID()
 
@@ -413,8 +417,8 @@ func (b *Bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
 	}
 
-	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b.Restarted, b.Ctx.DecisionDispatcher)
-	if err != nil {
+	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.DecisionDispatcher)
+	if err != nil || b.Halted() {
 		return err
 	}
 
@@ -423,8 +427,8 @@ func (b *Bootstrapper) checkFinish() error {
 	} else {
 		b.Ctx.Log.Debug("executing vertex state transitions...")
 	}
-	executedVts, err := b.VtxBlocked.ExecuteAll(b.Ctx, b.Restarted, b.Ctx.ConsensusDispatcher)
-	if err != nil {
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.ConsensusDispatcher)
+	if err != nil || b.Halted() {
 		return err
 	}
 
