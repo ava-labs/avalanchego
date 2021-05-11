@@ -128,7 +128,7 @@ func TestExecute(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return id1 },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{id0: true}, nil },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{id0: struct{}{}}, nil },
 		ExecuteF:             func() error { *executed1 = true; return nil },
 		BytesF:               func() []byte { return []byte{1} },
 	}

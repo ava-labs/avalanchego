@@ -2086,9 +2086,9 @@ func TestPeerSignature(t *testing.T) {
 	_ = vdrs.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
 
 	allPeers := ids.ShortSet{}
-	allPeers[id0] = true
-	allPeers[id1] = true
-	allPeers[id2] = true
+	allPeers[id0] = struct{}{}
+	allPeers[id1] = struct{}{}
+	allPeers[id2] = struct{}{}
 
 	var (
 		wg0 sync.WaitGroup

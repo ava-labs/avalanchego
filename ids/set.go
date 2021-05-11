@@ -17,14 +17,14 @@ const (
 )
 
 // Set is a set of IDs
-type Set map[ID]bool
+type Set map[ID]struct{}
 
 func (ids *Set) init(size int) {
 	if *ids == nil {
 		if minSetSize > size {
 			size = minSetSize
 		}
-		*ids = make(map[ID]bool, size)
+		*ids = make(map[ID]struct{}, size)
 	}
 }
 
@@ -32,7 +32,7 @@ func (ids *Set) init(size int) {
 func (ids *Set) Add(idList ...ID) {
 	ids.init(2 * len(idList))
 	for _, id := range idList {
-		(*ids)[id] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
@@ -40,13 +40,14 @@ func (ids *Set) Add(idList ...ID) {
 func (ids *Set) Union(set Set) {
 	ids.init(2 * set.Len())
 	for id := range set {
-		(*ids)[id] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
 // Contains returns true if the set contains this id, false otherwise
 func (ids *Set) Contains(id ID) bool {
-	return (*ids)[id]
+	_, contains := (*ids)[id]
+	return contains
 }
 
 // Overlaps returns true if the intersection of the set is non-empty
@@ -124,7 +125,7 @@ func (ids Set) Equals(oIDs Set) bool {
 		return false
 	}
 	for key := range oIDs {
-		if !ids[key] {
+		if _, contains := ids[key]; !contains {
 			return false
 		}
 	}
