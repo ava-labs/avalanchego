@@ -290,11 +290,7 @@ func (p *peer) ReadMessages() {
 func (p *peer) WriteMessages() {
 	defer p.Close()
 
-	sentSigned := p.sendSignedVersion()
-	sentUnsigned := p.sendUnsignedVersion()
-	if sentSigned && sentUnsigned {
-		p.versionSent.SetValue(true)
-	}
+	p.sendVersion()
 
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
@@ -531,6 +527,15 @@ func (p *peer) sendGetVersion() {
 }
 
 // assumes the [stateLock] is not held
+func (p *peer) sendVersion() {
+	sentSigned := p.sendSignedVersion()
+	sentUnsigned := p.sendUnsignedVersion()
+	if sentSigned && sentUnsigned {
+		p.versionSent.SetValue(true)
+	}
+}
+
+// assumes the [stateLock] is not held
 // returns true if an unsigned version was sent to [p]
 func (p *peer) sendUnsignedVersion() bool {
 	p.net.stateLock.RLock()
@@ -689,13 +694,7 @@ func (p *peer) sendPong() {
 // assumes the [stateLock] is not held
 func (p *peer) handleGetVersion(msg Msg) {
 	if !p.versionSent.GetValue() {
-		p.sendPeerList()
-	}
-
-	sentSigned := p.sendSignedVersion()
-	sentUnsigned := p.sendUnsignedVersion()
-	if sentSigned && sentUnsigned {
-		p.versionSent.SetValue(true)
+		p.sendVersion()
 	}
 }
 
