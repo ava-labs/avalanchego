@@ -94,7 +94,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 			validatorIDs.Remove(validatorID)
 			s.timeouts.RegisterRequestToUnreachableValidator()
 			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			go s.router.GetAcceptedFrontierFailed(s.ctx.NodeID, s.ctx.ChainID, requestID)
+			go s.router.GetAcceptedFrontierFailed(validatorID, s.ctx.ChainID, requestID)
 		}
 	}
 
