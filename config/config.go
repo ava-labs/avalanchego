@@ -735,9 +735,6 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	// Peer alias
 	config.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
 
-	// Plugin config
-	config.PluginMode = v.GetBool(PluginModeKey)
-
 	return config, nil
 }
 
@@ -792,10 +789,15 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 	return nil
 }
 
-func GetConfig(commit string) (node.Config, string, bool, error) {
+// Returns:
+// 1) The config
+// 2) The string representation of version data
+// 3) True if we should print the version data then exit
+// 4) True if the node should run in plugin mode
+func GetConfig(commit string) (node.Config, string, bool, bool, error) {
 	v, err := getViper()
 	if err != nil {
-		return node.Config{}, "", false, err
+		return node.Config{}, "", false, false, err
 	}
 
 	if v.GetBool(VersionKey) {
@@ -806,7 +808,7 @@ func GetConfig(commit string) (node.Config, string, bool, error) {
 
 		networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
 		if err != nil {
-			return node.Config{}, "", false, err
+			return node.Config{}, "", false, false, err
 		}
 		networkGeneration := constants.NetworkName(networkID)
 		if networkID == constants.MainnetID {
@@ -826,8 +828,9 @@ func GetConfig(commit string) (node.Config, string, bool, error) {
 
 		format += "]\n"
 
-		return node.Config{}, fmt.Sprintf(format, args...), true, nil
+		return node.Config{}, fmt.Sprintf(format, args...), true, false, nil
 	}
 	config, err := getConfigFromViper(v)
-	return config, "", false, err
+	pluginMode := v.GetBool(PluginModeKey)
+	return config, "", false, pluginMode, err
 }

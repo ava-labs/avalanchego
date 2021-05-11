@@ -23,7 +23,7 @@ var (
 // main is the entry point to AvalancheGo.
 func main() {
 	// Get the config
-	rootConfig, version, displayVersion, err := config.GetConfig(GitCommit)
+	rootConfig, version, displayVersion, _, err := config.GetConfig(GitCommit)
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
 		os.Exit(1)

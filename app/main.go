@@ -28,7 +28,7 @@ var (
 // If specified in the config, serves a hashicorp plugin that can be consumed by
 // the daemon (see avalanchego/main).
 func main() {
-	c, version, displayVersion, err := config.GetConfig(GitCommit)
+	c, version, displayVersion, pluginMode, err := config.GetConfig(GitCommit)
 	if err != nil {
 		fmt.Printf("couldn't get node config: %s\n", err)
 		os.Exit(1)
@@ -51,7 +51,7 @@ func main() {
 
 	app := process.NewApp(c) // Create node wrapper
 
-	if c.PluginMode { // Serve as a plugin
+	if pluginMode { // Serve as a plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{

@@ -163,7 +163,4 @@ type Config struct {
 
 	// ChainConfigs
 	ChainConfigs map[ids.ID]chains.ChainConfig
-
-	// PluginMode decides whether to run the app as a plugin
-	PluginMode bool
 }
