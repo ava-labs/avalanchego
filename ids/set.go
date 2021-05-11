@@ -19,6 +19,17 @@ const (
 // Set is a set of IDs
 type Set map[ID]struct{}
 
+// Return a new set with initial capacity [size].
+// More or less than [size] elements can be added to this set.
+// Using NewSet() rather than ids.Set{} is just an optimization that can
+// be used if you know how many elements will be put in this set.
+func NewSet(size int) Set {
+	if size < 0 {
+		return Set{}
+	}
+	return make(map[ID]struct{}, size)
+}
+
 func (ids *Set) init(size int) {
 	if *ids == nil {
 		if minSetSize > size {

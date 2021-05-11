@@ -464,7 +464,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	if err != nil {
 		return err
 	}
-	txIDs := ids.Set{}
+	txIDs := ids.NewSet(len(txs))
 	for _, tx := range txs {
 		txIDs.Add(tx.ID())
 	}
