@@ -44,11 +44,16 @@ type requestEntry struct {
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	clock            timer.Clock
-	log              logging.Logger
-	lock             sync.Mutex
-	chains           map[ids.ID]*Handler
-	timeoutManager   *timeout.Manager
+	clock  timer.Clock
+	log    logging.Logger
+	lock   sync.Mutex
+	chains map[ids.ID]*Handler
+
+	// It is only safe to call [RegisterResponse] with the router lock held. Any
+	// other calls to the timeout manager with the router lock held could cause
+	// a deadlock because the timeout manager will call Benched and Unbenched.
+	timeoutManager *timeout.Manager
+
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
