@@ -45,7 +45,7 @@ func TestBenchlistAdd(t *testing.T) {
 	benchIntf, err := NewBenchlist(
 		ids.Empty,
 		logging.NoLog{},
-		NoBenchable{},
+		&TestBenchable{T: t},
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -182,7 +182,7 @@ func TestBenchlistMaxStake(t *testing.T) {
 	benchIntf, err := NewBenchlist(
 		ids.Empty,
 		logging.NoLog{},
-		NoBenchable{},
+		&TestBenchable{T: t},
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -314,7 +314,7 @@ func TestBenchlistRemove(t *testing.T) {
 	benchIntf, err := NewBenchlist(
 		ids.Empty,
 		logging.NoLog{},
-		NoBenchable{},
+		&TestBenchable{T: t},
 		vdrs,
 		threshold,
 		minimumFailingDuration,

@@ -11,8 +11,3 @@ type Benchable interface {
 	Benched(chainID ids.ID, validatorID ids.ShortID)
 	Unbenched(chainID ids.ID, validatorID ids.ShortID)
 }
-
-type NoBenchable struct{}
-
-func (NoBenchable) Benched(ids.ID, ids.ShortID)   {}
-func (NoBenchable) Unbenched(ids.ID, ids.ShortID) {}
