@@ -99,6 +99,7 @@ type benchlist struct {
 	vdrs validators.Set
 
 	// Validator ID --> Consecutive failure information
+	streaklock     sync.RWMutex
 	failureStreaks map[ids.ShortID]failureStreak
 
 	// IDs of validators that are currently benched
@@ -139,6 +140,7 @@ func NewBenchlist(
 		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
 	}
 	benchlist := &benchlist{
+		chainID:                chainID,
 		log:                    log,
 		failureStreaks:         make(map[ids.ShortID]failureStreak),
 		benchlistSet:           ids.ShortSet{},
@@ -241,8 +243,8 @@ func (b *benchlist) isBenched(validatorID ids.ShortID) bool {
 
 // RegisterResponse notes that we received a response from validator [validatorID]
 func (b *benchlist) RegisterResponse(validatorID ids.ShortID) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.streaklock.Lock()
+	defer b.streaklock.Unlock()
 	delete(b.failureStreaks, validatorID)
 }
 
@@ -256,6 +258,7 @@ func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 		return
 	}
 
+	b.streaklock.Lock()
 	failureStreak := b.failureStreaks[validatorID]
 	// Increment consecutive failures
 	failureStreak.consecutive++
@@ -266,6 +269,7 @@ func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 		failureStreak.firstFailure = now
 	}
 	b.failureStreaks[validatorID] = failureStreak
+	b.streaklock.Unlock()
 
 	if failureStreak.consecutive >= b.threshold && now.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
@@ -322,7 +326,10 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 	b.benchlistSet.Add(validatorID)
 	b.benchable.Benched(b.chainID, validatorID)
 
+	b.streaklock.Lock()
 	delete(b.failureStreaks, validatorID)
+	b.streaklock.Unlock()
+
 	heap.Push(
 		&b.benchedQueue,
 		&benchData{validatorID: validatorID, benchedUntil: benchedUntil},
