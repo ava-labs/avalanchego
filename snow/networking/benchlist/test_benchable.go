@@ -16,6 +16,12 @@ type TestBenchable struct {
 	BenchedF, UnbenchedF       func(chainID ids.ID, validatorID ids.ShortID)
 }
 
+// Default set the default callable value to [cant]
+func (b *TestBenchable) Default(cant bool) {
+	b.CantBenched = cant
+	b.CantUnbenched = cant
+}
+
 func (b *TestBenchable) Benched(chainID ids.ID, validatorID ids.ShortID) {
 	if b.BenchedF != nil {
 		b.BenchedF(chainID, validatorID)

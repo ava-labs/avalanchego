@@ -39,13 +39,16 @@ func TestBenchlistAdd(t *testing.T) {
 		t.Fatal(errs.Err)
 	}
 
+	benchable := &TestBenchable{T: t}
+	benchable.Default(true)
+
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
 		ids.Empty,
 		logging.NoLog{},
-		&TestBenchable{T: t},
+		benchable,
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -103,6 +106,11 @@ func TestBenchlistAdd(t *testing.T) {
 	now = now.Add(minimumFailingDuration).Add(time.Second)
 	b.lock.Lock()
 	b.clock.Set(now)
+
+	benched := false
+	benchable.BenchedF = func(ids.ID, ids.ShortID) {
+		benched = true
+	}
 	b.lock.Unlock()
 
 	// Register another failure
@@ -119,6 +127,8 @@ func TestBenchlistAdd(t *testing.T) {
 	assert.True(t, !next.benchedUntil.After(now.Add(duration)))
 	assert.True(t, !next.benchedUntil.Before(now.Add(duration/2)))
 	assert.Len(t, b.failureStreaks, 0)
+	assert.True(t, benched)
+	benchable.BenchedF = nil
 	b.lock.Unlock()
 
 	// Give another validator [threshold-1] failures
@@ -308,13 +318,22 @@ func TestBenchlistRemove(t *testing.T) {
 		t.Fatal(errs.Err)
 	}
 
+	count := 0
+	benchable := &TestBenchable{
+		T:             t,
+		CantUnbenched: true,
+		UnbenchedF: func(ids.ID, ids.ShortID) {
+			count++
+		},
+	}
+
 	threshold := 3
 	duration := 2 * time.Second
 	maxPortion := 0.76 // can bench 3 of the 5 validators
 	benchIntf, err := NewBenchlist(
 		ids.Empty,
 		logging.NoLog{},
-		&TestBenchable{T: t},
+		benchable,
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -400,4 +419,5 @@ func TestBenchlistRemove(t *testing.T) {
 		100*time.Millisecond,
 	)
 
+	assert.Equal(t, 3, count)
 }
