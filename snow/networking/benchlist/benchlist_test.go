@@ -4,12 +4,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -41,7 +43,9 @@ func TestBenchlistAdd(t *testing.T) {
 	duration := time.Minute
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
+		ids.Empty,
 		logging.NoLog{},
+		NoBenchable{},
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -176,7 +180,9 @@ func TestBenchlistMaxStake(t *testing.T) {
 	// Shouldn't bench more than 2550 (5100/2)
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
+		ids.Empty,
 		logging.NoLog{},
+		NoBenchable{},
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -306,7 +312,9 @@ func TestBenchlistRemove(t *testing.T) {
 	duration := 2 * time.Second
 	maxPortion := 0.76 // can bench 3 of the 5 validators
 	benchIntf, err := NewBenchlist(
+		ids.Empty,
 		logging.NoLog{},
+		NoBenchable{},
 		vdrs,
 		threshold,
 		minimumFailingDuration,

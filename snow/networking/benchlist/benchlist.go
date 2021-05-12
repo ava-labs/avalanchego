@@ -7,11 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/prometheus/client_golang/prometheus"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -80,6 +81,7 @@ type failureStreak struct {
 
 type benchlist struct {
 	lock    sync.RWMutex
+	chainID ids.ID
 	log     logging.Logger
 	metrics metrics
 
@@ -89,6 +91,9 @@ type benchlist struct {
 
 	// Tells the time. Can be faked for testing.
 	clock timer.Clock
+
+	// benchable notifier
+	benchable Benchable
 
 	// Validator set of the network
 	vdrs validators.Set
@@ -119,7 +124,9 @@ type benchlist struct {
 
 // NewBenchlist returns a new Benchlist
 func NewBenchlist(
+	chainID ids.ID,
 	log logging.Logger,
+	benchable Benchable,
 	validators validators.Set,
 	threshold int,
 	minimumFailingDuration,
@@ -135,6 +142,7 @@ func NewBenchlist(
 		log:                    log,
 		failureStreaks:         make(map[ids.ShortID]failureStreak),
 		benchlistSet:           ids.ShortSet{},
+		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,
 		minimumFailingDuration: minimumFailingDuration,
@@ -173,6 +181,7 @@ func (b *benchlist) remove(validator *benchData) {
 	b.log.Debug("removing validator %s from benchlist", id)
 	heap.Remove(&b.benchedQueue, validator.index)
 	b.benchlistSet.Remove(id)
+	b.benchable.Unbenched(b.chainID, id)
 
 	// Update metrics
 	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
@@ -311,6 +320,8 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 
 	// Add to benchlist times with randomized delay
 	b.benchlistSet.Add(validatorID)
+	b.benchable.Benched(b.chainID, validatorID)
+
 	delete(b.failureStreaks, validatorID)
 	heap.Push(
 		&b.benchedQueue,

@@ -53,6 +53,7 @@ type ChainRouter struct {
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
+	benched          map[ids.ShortID]ids.Set
 	criticalChains   ids.Set
 	onFatal          func()
 	metrics          *routerMetrics
@@ -92,6 +93,7 @@ func (cr *ChainRouter) Initialize(
 	cr.gossiper = timer.NewRepeater(cr.Gossip, gossipFrequency)
 	cr.intervalNotifier = timer.NewRepeater(cr.EndInterval, defaultCPUInterval)
 	cr.closeTimeout = closeTimeout
+	cr.benched = make(map[ids.ShortID]ids.Set)
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
@@ -206,7 +208,9 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 	cr.chains[chainID] = chain
 
 	for validatorID := range cr.peers {
-		chain.Connected(validatorID)
+		if _, benched := cr.benched[validatorID]; !benched {
+			chain.Connected(validatorID)
+		}
 	}
 }
 
@@ -733,6 +737,10 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 	defer cr.lock.Unlock()
 
 	cr.peers.Add(validatorID)
+	if _, benched := cr.benched[validatorID]; benched {
+		return
+	}
+
 	for _, chain := range cr.chains {
 		chain.Connected(validatorID)
 	}
@@ -744,8 +752,53 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 	defer cr.lock.Unlock()
 
 	cr.peers.Remove(validatorID)
+	if _, benched := cr.benched[validatorID]; benched {
+		return
+	}
+
 	for _, chain := range cr.chains {
 		chain.Disconnected(validatorID)
+	}
+}
+
+// Benched routes an incoming notification that a validator was benched
+func (cr *ChainRouter) Benched(chainID ids.ID, validatorID ids.ShortID) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	benchedChains, exists := cr.benched[validatorID]
+	benchedChains.Add(chainID)
+	cr.benched[validatorID] = benchedChains
+	if exists || !cr.peers.Contains(validatorID) {
+		// If the set already existed, then the node was previously benched.
+		return
+	}
+
+	for _, chain := range cr.chains {
+		chain.Disconnected(validatorID)
+	}
+}
+
+// Unbenched routes an incoming notification that a validator was just unbenched
+func (cr *ChainRouter) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	benchedChains := cr.benched[validatorID]
+	benchedChains.Remove(chainID)
+	if benchedChains.Len() == 0 {
+		delete(cr.benched, validatorID)
+	} else {
+		cr.benched[validatorID] = benchedChains
+		return // This node is still benched
+	}
+
+	if !cr.peers.Contains(validatorID) {
+		return
+	}
+
+	for _, chain := range cr.chains {
+		chain.Connected(validatorID)
 	}
 }
 
