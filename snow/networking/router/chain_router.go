@@ -44,15 +44,23 @@ type requestEntry struct {
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	clock            timer.Clock
-	log              logging.Logger
-	lock             sync.Mutex
-	chains           map[ids.ID]*Handler
-	timeoutManager   *timeout.Manager
+	clock  timer.Clock
+	log    logging.Logger
+	lock   sync.Mutex
+	chains map[ids.ID]*Handler
+
+	// It is only safe to call [RegisterResponse] with the router lock held. Any
+	// other calls to the timeout manager with the router lock held could cause
+	// a deadlock because the timeout manager will call Benched and Unbenched.
+	timeoutManager *timeout.Manager
+
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
+      // node ID --> chains that node is benched on
+      // invariant: if a node is benched on any chain, it is treated as disconnected on all chains
+	benched          map[ids.ShortID]ids.Set
 	criticalChains   ids.Set
 	onFatal          func()
 	metrics          *routerMetrics
@@ -92,6 +100,7 @@ func (cr *ChainRouter) Initialize(
 	cr.gossiper = timer.NewRepeater(cr.Gossip, gossipFrequency)
 	cr.intervalNotifier = timer.NewRepeater(cr.EndInterval, defaultCPUInterval)
 	cr.closeTimeout = closeTimeout
+	cr.benched = make(map[ids.ShortID]ids.Set)
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
@@ -206,7 +215,10 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 	cr.chains[chainID] = chain
 
 	for validatorID := range cr.peers {
-		chain.Connected(validatorID)
+              // If this validator is benched on any chain, treat them as disconnected on all chains
+		if _, benched := cr.benched[validatorID]; !benched {
+			chain.Connected(validatorID)
+		}
 	}
 }
 
@@ -733,6 +745,11 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 	defer cr.lock.Unlock()
 
 	cr.peers.Add(validatorID)
+      // If this validator is benched on any chain, treat them as disconnected on all chains
+	if _, benched := cr.benched[validatorID]; benched {
+		return
+	}
+
 	for _, chain := range cr.chains {
 		chain.Connected(validatorID)
 	}
@@ -744,8 +761,53 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 	defer cr.lock.Unlock()
 
 	cr.peers.Remove(validatorID)
+	if _, benched := cr.benched[validatorID]; benched {
+		return
+	}
+
 	for _, chain := range cr.chains {
 		chain.Disconnected(validatorID)
+	}
+}
+
+// Benched routes an incoming notification that a validator was benched
+func (cr *ChainRouter) Benched(chainID ids.ID, validatorID ids.ShortID) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	benchedChains, exists := cr.benched[validatorID]
+	benchedChains.Add(chainID)
+	cr.benched[validatorID] = benchedChains
+	if exists || !cr.peers.Contains(validatorID) {
+		// If the set already existed, then the node was previously benched.
+		return
+	}
+
+	for _, chain := range cr.chains {
+		chain.Disconnected(validatorID)
+	}
+}
+
+// Unbenched routes an incoming notification that a validator was just unbenched
+func (cr *ChainRouter) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	benchedChains := cr.benched[validatorID]
+	benchedChains.Remove(chainID)
+	if benchedChains.Len() == 0 {
+		delete(cr.benched, validatorID)
+	} else {
+		cr.benched[validatorID] = benchedChains
+		return // This node is still benched
+	}
+
+	if !cr.peers.Contains(validatorID) {
+		return
+	}
+
+	for _, chain := range cr.chains {
+		chain.Connected(validatorID)
 	}
 }
 

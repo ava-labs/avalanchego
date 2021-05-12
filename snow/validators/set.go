@@ -93,6 +93,7 @@ func NewBestSet(expectedSampleSize int) Set {
 // update a validators weight, one should ensure to call add with the updated
 // validator.
 type set struct {
+	initialized      bool
 	lock             sync.RWMutex
 	vdrMap           map[ids.ShortID]int
 	vdrSlice         []*validator
@@ -130,6 +131,7 @@ func (s *set) set(vdrs []Validator) error {
 	}
 	s.vdrMap = make(map[ids.ShortID]int, lenVdrs)
 	s.totalWeight = 0
+	s.initialized = false
 
 	for _, vdr := range vdrs {
 		vdrID := vdr.ID()
@@ -161,11 +163,14 @@ func (s *set) set(vdrs []Validator) error {
 		}
 		s.totalWeight = newTotalWeight
 	}
-	return s.sampler.Initialize(s.vdrMaskedWeights)
+	return nil
 }
 
 // Add implements the Set interface.
 func (s *set) AddWeight(vdrID ids.ShortID, weight uint64) error {
+	if weight == 0 {
+		return nil // This validator would never be sampled anyway
+	}
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -173,10 +178,6 @@ func (s *set) AddWeight(vdrID ids.ShortID, weight uint64) error {
 }
 
 func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
-	if weight == 0 {
-		return nil // This validator would never be sampled anyway
-	}
-
 	var vdr *validator
 	i, ok := s.vdrMap[vdrID]
 	if !ok {
@@ -205,8 +206,8 @@ func (s *set) addWeight(vdrID ids.ShortID, weight uint64) error {
 		return nil
 	}
 	s.totalWeight = newTotalWeight
-
-	return s.sampler.Initialize(s.vdrMaskedWeights)
+	s.initialized = false
+	return nil
 }
 
 // GetWeight implements the Set interface.
@@ -246,6 +247,9 @@ func (s *set) SubsetWeight(subset ids.ShortSet) (uint64, error) {
 
 // RemoveWeight implements the Set interface.
 func (s *set) RemoveWeight(vdrID ids.ShortID, weight uint64) error {
+	if weight == 0 {
+		return nil
+	}
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -253,10 +257,6 @@ func (s *set) RemoveWeight(vdrID ids.ShortID, weight uint64) error {
 }
 
 func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
-	if weight == 0 {
-		return nil
-	}
-
 	i, ok := s.vdrMap[vdrID]
 	if !ok {
 		return nil
@@ -278,7 +278,8 @@ func (s *set) removeWeight(vdrID ids.ShortID, weight uint64) error {
 			return err
 		}
 	}
-	return s.sampler.Initialize(s.vdrMaskedWeights)
+	s.initialized = false
+	return nil
 }
 
 // Get implements the Set interface.
@@ -328,8 +329,8 @@ func (s *set) remove(vdrID ids.ShortID) error {
 		}
 		s.totalWeight = newTotalWeight
 	}
-
-	return s.sampler.Initialize(s.vdrMaskedWeights)
+	s.initialized = false
+	return nil
 }
 
 // Contains implements the Set interface.
@@ -373,6 +374,9 @@ func (s *set) list() []Validator {
 
 // Sample implements the Group interface.
 func (s *set) Sample(size int) ([]Validator, error) {
+	if size == 0 {
+		return nil, nil
+	}
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -380,6 +384,12 @@ func (s *set) Sample(size int) ([]Validator, error) {
 }
 
 func (s *set) sample(size int) ([]Validator, error) {
+	if !s.initialized {
+		if err := s.sampler.Initialize(s.vdrMaskedWeights); err != nil {
+			return nil, err
+		}
+		s.initialized = true
+	}
 	indices, err := s.sampler.Sample(size)
 	if err != nil {
 		return nil, err
@@ -452,8 +462,9 @@ func (s *set) maskValidator(vdrID ids.ShortID) error {
 
 	s.vdrMaskedWeights[i] = 0
 	s.totalWeight -= s.vdrWeights[i]
+	s.initialized = false
 
-	return s.sampler.Initialize(s.vdrMaskedWeights)
+	return nil
 }
 
 func (s *set) RevealValidator(vdrID ids.ShortID) error {
@@ -483,6 +494,7 @@ func (s *set) revealValidator(vdrID ids.ShortID) error {
 		return err
 	}
 	s.totalWeight = newTotalWeight
+	s.initialized = false
 
-	return s.sampler.Initialize(s.vdrMaskedWeights)
+	return nil
 }
