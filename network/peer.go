@@ -275,7 +275,7 @@ func (p *peer) ReadMessages() {
 
 		msg, err := p.net.b.Parse(msgBytes)
 		if err != nil {
-			p.net.log.Debug("failed to parse new message from %s:\n%s\n%s",
+			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
 				p.id,
 				formatting.DumpBytes{Bytes: msgBytes},
 				err)
