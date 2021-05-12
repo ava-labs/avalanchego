@@ -58,12 +58,12 @@ type ChainRouter struct {
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
-      // node ID --> chains that node is benched on
-      // invariant: if a node is benched on any chain, it is treated as disconnected on all chains
-	benched          map[ids.ShortID]ids.Set
-	criticalChains   ids.Set
-	onFatal          func()
-	metrics          *routerMetrics
+	// node ID --> chains that node is benched on
+	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
+	benched        map[ids.ShortID]ids.Set
+	criticalChains ids.Set
+	onFatal        func()
+	metrics        *routerMetrics
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
@@ -215,7 +215,7 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 	cr.chains[chainID] = chain
 
 	for validatorID := range cr.peers {
-              // If this validator is benched on any chain, treat them as disconnected on all chains
+		// If this validator is benched on any chain, treat them as disconnected on all chains
 		if _, benched := cr.benched[validatorID]; !benched {
 			chain.Connected(validatorID)
 		}
@@ -745,7 +745,7 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 	defer cr.lock.Unlock()
 
 	cr.peers.Add(validatorID)
-      // If this validator is benched on any chain, treat them as disconnected on all chains
+	// If this validator is benched on any chain, treat them as disconnected on all chains
 	if _, benched := cr.benched[validatorID]; benched {
 		return
 	}

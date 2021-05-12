@@ -80,8 +80,8 @@ type failureStreak struct {
 }
 
 type benchlist struct {
-	lock    sync.RWMutex
-      // This is the benchlist for chain [chainID]
+	lock sync.RWMutex
+	// This is the benchlist for chain [chainID]
 	chainID ids.ID
 	log     logging.Logger
 	metrics metrics
@@ -100,7 +100,7 @@ type benchlist struct {
 	vdrs validators.Set
 
 	// Validator ID --> Consecutive failure information
-      // [streaklock] must be held when touching [failureStreaks] 
+	// [streaklock] must be held when touching [failureStreaks]
 	streaklock     sync.Mutex
 	failureStreaks map[ids.ShortID]failureStreak
 
