@@ -1413,7 +1413,9 @@ func (n *network) disconnected(p *peer) {
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		n.track(ip, p.id)
+		if !n.vdrs.Contains(p.id) {
+			n.track(ip, p.id)
+		}
 	}
 
 	if p.compatible.GetValue() {
