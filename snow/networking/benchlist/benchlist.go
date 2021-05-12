@@ -81,6 +81,7 @@ type failureStreak struct {
 
 type benchlist struct {
 	lock    sync.RWMutex
+      // This is the benchlist for chain [chainID]
 	chainID ids.ID
 	log     logging.Logger
 	metrics metrics
@@ -92,14 +93,15 @@ type benchlist struct {
 	// Tells the time. Can be faked for testing.
 	clock timer.Clock
 
-	// benchable notifier
+	// notified when a node is benched or unbenched
 	benchable Benchable
 
 	// Validator set of the network
 	vdrs validators.Set
 
 	// Validator ID --> Consecutive failure information
-	streaklock     sync.RWMutex
+      // [streaklock] must be held when touching [failureStreaks] 
+	streaklock     sync.Mutex
 	failureStreaks map[ids.ShortID]failureStreak
 
 	// IDs of validators that are currently benched
