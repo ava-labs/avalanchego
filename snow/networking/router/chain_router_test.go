@@ -64,6 +64,7 @@ func TestShutdown(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -139,6 +140,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -239,6 +241,7 @@ func TestRouterTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -307,6 +310,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 

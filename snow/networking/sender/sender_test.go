@@ -96,6 +96,7 @@ func TestTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&router.Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -172,6 +173,7 @@ func TestReliableMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&router.Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -257,6 +259,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&router.Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 

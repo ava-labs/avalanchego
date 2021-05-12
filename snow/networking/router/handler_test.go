@@ -50,6 +50,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -95,6 +96,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -133,6 +135,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 
@@ -179,6 +182,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 

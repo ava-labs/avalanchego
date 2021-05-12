@@ -116,7 +116,8 @@ type Handler struct {
 	toClose func()
 	closing utils.AtomicBool
 
-	delay *Delay
+	delay      *Delay
+	subnetSync <-chan struct{}
 }
 
 // Initialize this consensus handler
@@ -132,6 +133,7 @@ func (h *Handler) Initialize(
 	namespace string,
 	metrics prometheus.Registerer,
 	delay *Delay,
+	subnetSync <-chan struct{},
 ) error {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
@@ -189,6 +191,7 @@ func (h *Handler) Initialize(
 	h.engine = engine
 	h.validators = validators
 	h.delay = delay
+	h.subnetSync = subnetSync
 	return nil
 }
 
@@ -265,9 +268,16 @@ func (h *Handler) dispatchMsg(msg message) {
 			break
 		}
 		if until > maxSleepDuration {
-			time.Sleep(maxSleepDuration)
-		} else {
-			time.Sleep(until)
+			until = maxSleepDuration
+		}
+
+		if h.subnetSync != nil { //UTs may have this nil
+			select {
+			case <-time.After(until):
+				//sleep done, move to processing
+			case <-h.subnetSync:
+				//subnet boostrapped, just cut waiting and go ahead processing the message
+			}
 		}
 	}
 

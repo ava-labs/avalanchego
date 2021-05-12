@@ -62,6 +62,7 @@ type Bootstrapper struct {
 	executedStateTransitions int
 
 	delayAmount time.Duration
+	subnetSync  chan<- struct{}
 
 	parser *parser
 }
@@ -107,6 +108,9 @@ func (b *Bootstrapper) Initialize(
 	config.Bootstrapable = b
 	return b.Bootstrapper.Initialize(config.Config)
 }
+
+//Dirty, should be in initialize. TODO: fix
+func (b *Bootstrapper) SetupSubnetSync(subnetSync chan<- struct{}) { b.subnetSync = subnetSync }
 
 // CurrentAcceptedFrontier returns the last accepted block
 func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
@@ -340,9 +344,9 @@ func (b *Bootstrapper) checkFinish() error {
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedBlocks
 
-	// Note that executedVts < c*previouslyExecuted is enforced so that the
+	// Note that executedVts < c*previouslyExecuted ( 0 <= c < 1 ) is enforced so that the
 	// bootstrapping process will terminate even as new blocks are being issued.
-	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
+	if b.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
 		return b.RestartBootstrap(true)
 	}
 
@@ -372,6 +376,8 @@ func (b *Bootstrapper) checkFinish() error {
 		}
 
 		return b.RestartBootstrap(true)
+	} else if b.subnetSync != nil { //UTs may have this nil
+		b.subnetSync <- struct{}{}
 	}
 
 	return b.finish()

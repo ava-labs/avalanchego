@@ -2118,6 +2118,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		&router.Delay{},
+		nil,
 	)
 	assert.NoError(t, err)
 

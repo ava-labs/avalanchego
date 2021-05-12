@@ -529,6 +529,7 @@ func (m *manager) createAvalancheChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
+	subnetSync := make(chan struct{}) //should it be bounded?
 	err = handler.Initialize(
 		engine,
 		validators,
@@ -540,6 +541,7 @@ func (m *manager) createAvalancheChain(
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 		delay,
+		subnetSync,
 	)
 
 	return &chain{
@@ -611,6 +613,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	delay := &router.Delay{}
+	subnetSync := make(chan struct{}) //should it be bounded?
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
@@ -638,6 +641,7 @@ func (m *manager) createSnowmanChain(
 	}); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
+	engine.SetupSubnetSync(subnetSync)
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -652,6 +656,7 @@ func (m *manager) createSnowmanChain(
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 		delay,
+		subnetSync,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
