@@ -169,6 +169,8 @@ type VM struct {
 	bootstrappedTime time.Time
 
 	connections map[ids.ShortID]time.Time
+
+	lastVdrUpdate time.Time
 }
 
 // Initialize this blockchain.
@@ -952,9 +954,11 @@ currentStakerLoop:
 }
 
 func (vm *VM) updateVdrMgr(force bool) error {
-	if !force && !vm.bootstrapped {
+	now := vm.clock.Time()
+	if !force && !vm.bootstrapped && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
 		return nil
 	}
+	vm.lastVdrUpdate = now
 
 	subnets, err := vm.getSubnets(vm.DB)
 	if err != nil {
