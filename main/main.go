@@ -56,10 +56,8 @@ func main() {
 	_ = utils.HandleSignals(
 		func(os.Signal) {
 			// SIGINT and SIGTERM cause all running nodes
-			// to be ended and this program to exit with
-			// exit code 0
+			// to be ended
 			nodeManager.shutdown()
-			os.Exit(0)
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
@@ -73,9 +71,8 @@ func main() {
 	}
 
 	// Run normally
-	log.Info("starting to run node in normal execution mode")
 	exitCode, err := nodeManager.runNormal()
-	log.Debug("node manager returned exit code %s, error %v", exitCode, err)
+	log.Debug("node returned exit code %s, error %v", exitCode, err)
 	nodeManager.shutdown() // make sure all the nodes are stopped
 
 	logFactory.Close()

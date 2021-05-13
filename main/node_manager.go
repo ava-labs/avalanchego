@@ -68,8 +68,9 @@ type nodeManager struct {
 	log          logging.Logger
 	// nodeProcess binary path --> nodeProcess
 	// Must hold [lock] while touching this
-	nodes map[string]*nodeProcess
-	lock  sync.Mutex
+	nodes       map[string]*nodeProcess
+	lock        sync.Mutex
+	hasShutdown bool
 }
 
 func (nm *nodeManager) latestNodeVersionPath() string {
@@ -82,9 +83,14 @@ func (nm *nodeManager) preupgradeNodeVersionPath() string {
 
 // Close all running subprocesses
 // Blocks until all subprocesses are ended.
+// Invocations of this method after the first invocation do nothing.
 func (nm *nodeManager) shutdown() {
 	nm.lock.Lock()
 	defer nm.lock.Unlock()
+	if nm.hasShutdown {
+		return
+	}
+	nm.hasShutdown = true
 
 	for _, node := range nm.nodes {
 		nm.log.Info("stopping node at path '%s'", node.path)
@@ -125,8 +131,9 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 	}
 }
 
-// Return a wrapper around a node wunning the binary at [path] with args [args].
+// Return a wrapper around a node that will run the binary at [path] with args [args].
 // The returned nodeProcess must eventually have [nodeProcess.rawClient.Kill] called on it.
+// Assumes [nm.lock] is held
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
 	nm.log.Debug("creating new node from binary at '%s'", path)
 	clientConfig := &plugin.ClientConfig{
@@ -173,13 +180,12 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 	return np, nil
 }
 
-// Start a node compatible with the previous database version
-// Override the staking port, HTTP port and plugin directory of the node.
+// Return a node compatible with the previous database version.
 // Assumes the node binary path is [buildDir]/avalanchego-preupgrade/avalanchego-process
 // Assumes the node's plugin path is [buildDir]/avalanchego-preupgrade/plugins
-// Assumes the binary can be served as a plugin
+// Assumes the binary can be served as a plugin.
 func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
-	args := make([]string, len(os.Args)-1)
+	args := make([]string, len(os.Args)+1)
 	copy(args, os.Args[1:])
 	args = append(
 		args,
@@ -191,9 +197,9 @@ func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
 	return nm.newNode(binaryPath, args, true)
 }
 
-// Run the latest node version
+// Return the latest versioned node, configured to run in fetch-only mode.
 func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*nodeProcess, error) {
-	args := make([]string, len(os.Args)-1)
+	args := make([]string, len(os.Args)+9)
 	copy(args, os.Args[1:])
 	args = append(
 		args,
@@ -218,9 +224,14 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*node
 // Runs until the node exits.
 // Returns the node's exit code.
 func (nm *nodeManager) runNormal() (int, error) {
-	nm.log.Info("starting latest node version")
+	nm.log.Info("starting latest node version in normal execution mode")
+	nm.lock.Lock()
+	if nm.hasShutdown {
+		nm.lock.Unlock()
+		return 0, nil
+	}
 
-	args := make([]string, len(os.Args)-1)
+	args := make([]string, len(os.Args)+1)
 	copy(args, os.Args[1:])
 	args = append(
 		args,
@@ -231,8 +242,11 @@ func (nm *nodeManager) runNormal() (int, error) {
 	binaryPath := nm.latestNodeVersionPath()
 	node, err := nm.newNode(binaryPath, args, true)
 	if err != nil {
+		nm.lock.Unlock()
 		return 1, fmt.Errorf("couldn't create node: %w", err)
 	}
-	exitCode := <-node.start()
-	return exitCode, nil
+	exitCodeChan := node.start()
+	nm.lock.Unlock()
+
+	return <-exitCodeChan, nil
 }

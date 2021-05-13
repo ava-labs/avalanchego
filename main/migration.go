@@ -11,16 +11,16 @@ import (
 )
 
 type migrationManager struct {
-	binaryManager *nodeManager
-	rootConfig    node.Config
-	log           logging.Logger
+	nodeManager *nodeManager
+	rootConfig  node.Config
+	log         logging.Logger
 }
 
-func newMigrationManager(binaryManager *nodeManager, rootConfig node.Config, log logging.Logger) *migrationManager {
+func newMigrationManager(nodeManager *nodeManager, rootConfig node.Config, log logging.Logger) *migrationManager {
 	return &migrationManager{
-		binaryManager: binaryManager,
-		rootConfig:    rootConfig,
-		log:           log,
+		nodeManager: nodeManager,
+		rootConfig:  rootConfig,
+		log:         log,
 	}
 }
 
@@ -72,32 +72,42 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 // Some configuration flags are modified before being passed into the 2 nodes.
 func (m *migrationManager) runMigration() error {
 	m.log.Info("starting database migration")
-	preDBUpgradeNode, err := m.binaryManager.preDBUpgradeNode()
+	m.nodeManager.lock.Lock()
+	if m.nodeManager.hasShutdown {
+		m.nodeManager.lock.Unlock()
+		return nil
+	}
+
+	preDBUpgradeNode, err := m.nodeManager.preDBUpgradeNode()
 	if err != nil {
+		m.nodeManager.lock.Unlock()
 		return fmt.Errorf("couldn't create pre-upgrade node during migration: %w", err)
 	}
 	m.log.Info("starting pre-database upgrade node")
 	preDBUpgradeNodeExitCodeChan := preDBUpgradeNode.start()
 	defer func() {
-		if err := m.binaryManager.Stop(preDBUpgradeNode.path); err != nil {
+		if err := m.nodeManager.Stop(preDBUpgradeNode.path); err != nil {
 			m.log.Error(err.Error())
 		}
 	}()
 
 	m.log.Info("starting latest node version")
-	latestVersion, err := m.binaryManager.latestVersionNodeFetchOnly(m.rootConfig)
+	latestVersion, err := m.nodeManager.latestVersionNodeFetchOnly(m.rootConfig)
 	if err != nil {
+		m.nodeManager.lock.Unlock()
 		return fmt.Errorf("couldn't create latest version during migration: %w", err)
 	}
 	latestVersionExitCodeChan := latestVersion.start()
 	defer func() {
-		if err := m.binaryManager.Stop(latestVersion.path); err != nil {
+		if err := m.nodeManager.Stop(latestVersion.path); err != nil {
 			m.log.Error("error while stopping latest version node: %s", err)
 		}
 	}()
+	m.nodeManager.lock.Unlock()
 
-	// Wait until one of the nodes finishes. If the bootstrapping node finishes with
-	// an exit code other than the one indicating it is done bootstrapping, error.
+	// Wait until one of the nodes finishes.
+	// If the bootstrapping node finishes with an exit code other than
+	// the one indicating it is done bootstrapping, error.
 	select {
 	case exitCode := <-preDBUpgradeNodeExitCodeChan:
 		return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
