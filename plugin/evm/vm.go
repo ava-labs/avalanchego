@@ -63,7 +63,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.5.0"
+	Version = "coreth-v0.5.1"
 
 	_ block.ChainVM = &VM{}
 )
@@ -407,6 +407,20 @@ func (vm *VM) Initialize(
 			}
 		}
 		return nil, nil
+	})
+	chain.SetOnBuild(func(block *types.Block) error {
+		log.Trace("EVM built a block")
+
+		blk := &Block{
+			id:       ids.ID(block.Hash()),
+			ethBlock: block,
+			vm:       vm,
+		}
+		if err := blk.VerifyWithoutWrites(); err != nil {
+			vm.newBlockChan <- nil
+			return fmt.Errorf("block failed verify: %w", err)
+		}
+		return nil
 	})
 	chain.SetOnSealFinish(func(block *types.Block) error {
 		log.Trace("EVM sealed a block")
