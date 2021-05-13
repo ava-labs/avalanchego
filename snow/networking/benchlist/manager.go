@@ -39,6 +39,7 @@ type Manager interface {
 
 // Config defines the configuration for a benchlist
 type Config struct {
+	Benchable              Benchable
 	Validators             validators.Manager
 	Threshold              int
 	MinimumFailingDuration time.Duration
@@ -114,7 +115,9 @@ func (m *manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	}
 
 	benchlist, err := NewBenchlist(
+		ctx.ChainID,
 		ctx.Log,
+		m.config.Benchable,
 		vdrs,
 		m.config.Threshold,
 		m.config.MinimumFailingDuration,
