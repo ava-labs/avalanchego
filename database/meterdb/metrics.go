@@ -22,8 +22,6 @@ func newSizeMetric(namespace, name string) prometheus.Histogram {
 	})
 }
 
-
-
 type metrics struct {
 	readSize,
 	writeSize,
@@ -62,22 +60,33 @@ func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
+	m.readSize = newSizeMetric(namespace, "read")
+	m.writeSize = newSizeMetric(namespace, "write")
 	m.has = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "has")
+	m.hasSize = newSizeMetric(namespace, "has")
 	m.get = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "get")
+	m.getSize = newSizeMetric(namespace, "get")
 	m.put = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "put")
+	m.putSize = newSizeMetric(namespace, "put")
 	m.delete = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "delete")
+	m.deleteSize = newSizeMetric(namespace, "delete")
 	m.newBatch = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "new_batch")
 	m.newIterator = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "new_iterator")
 	m.stat = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "stat")
 	m.compact = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "compact")
 	m.close = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "close")
 	m.bPut = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_put")
+	m.bPutSize = newSizeMetric(namespace, "batch_put")
 	m.bDelete = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_delete")
+	m.bDeleteSize = newSizeMetric(namespace, "batch_delete")
+	m.bSize = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_size")
 	m.bWrite = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_write")
+	m.bWriteSize = newSizeMetric(namespace, "batch_write")
 	m.bReset = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_reset")
 	m.bReplay = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_replay")
 	m.bInner = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "batch_inner")
 	m.iNext = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_next")
+	m.iNextSize = newSizeMetric(namespace, "iterator_next")
 	m.iError = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_error")
 	m.iKey = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_key")
 	m.iValue = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "iterator_value")
