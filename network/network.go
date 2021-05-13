@@ -189,20 +189,18 @@ type network struct {
 	// this node's TLS key
 	tlsKey crypto.Signer
 
-	// [lastTimestampLock] should be held when touching  [lastSignedVersionIP],
-	// [lastSignedVersionTimestamp], and [lastSignedVersionSignature]
+	// [lastTimestampLock] should be held when touching  [lastVersionIP],
+	// [lastVersionTimestamp], and [lastVersionSignature]
 	timeForIPLock sync.Mutex
-	// The IP for ourself that we included in the most recent SignedVersion
-	// message we sent.
-	lastSignedVersionIP utils.IPDesc
-	// The timestamp we included in the most recent SignedVersion message we
+	// The IP for ourself that we included in the most recent Version message we
 	// sent.
-	lastSignedVersionTimestamp uint64
-	// The signature we included in the most recent SignedVersion message we
-	// sent.
-	lastSignedVersionSignature []byte
+	lastVersionIP utils.IPDesc
+	// The timestamp we included in the most recent Version message we sent.
+	lastVersionTimestamp uint64
+	// The signature we included in the most recent Version message we sent.
+	lastVersionSignature []byte
 
-	// Node ID --> Latest IP/timestamp of this node from a SignedVersion or SignedPeerList message
+	// Node ID --> Latest IP/timestamp of this node from a Version or PeerList message
 	// The values in this map all have [signature] == nil
 	// A peer is removed from this map when [connected] is called with the peer as the argument
 	// TODO also remove from this map when the peer leaves the validator set
@@ -1092,45 +1090,30 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		ipCerts, ips, err := n.validatorIPs()
+		ipCerts, err := n.validatorIPs()
 		if err != nil {
 			n.log.Error("failed to fetch validator IPs: %s", err)
 			continue
 		}
-		if len(ipCerts) > 0 {
-			msg, err := n.b.SignedPeerList(ipCerts)
-			if err != nil {
-				n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
-					err,
-					len(ipCerts))
-			} else {
-				for _, index := range stakerIndices {
-					stakers[int(index)].Send(msg)
-				}
-				for _, index := range nonStakerIndices {
-					nonStakers[int(index)].Send(msg)
-				}
-			}
-		} else {
-			n.log.Debug("skipping signed validator IP gossiping as no signed IPs are connected")
+
+		if len(ipCerts) == 0 {
+			n.log.Debug("skipping validator IP gossiping as no IPs are connected")
+			continue
 		}
 
-		if len(ips) > 0 {
-			msg, err := n.b.PeerList(ips)
-			if err != nil {
-				n.log.Error("failed to build peerlist to gossip: %s. len(ips): %d",
-					err,
-					len(ips))
-			} else {
-				for _, index := range stakerIndices {
-					stakers[int(index)].Send(msg)
-				}
-				for _, index := range nonStakerIndices {
-					nonStakers[int(index)].Send(msg)
-				}
-			}
-		} else {
-			n.log.Debug("skipping validator IP gossiping as no IPs are connected")
+		msg, err := n.b.PeerList(ipCerts)
+		if err != nil {
+			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
+				err,
+				len(ipCerts))
+			continue
+		}
+
+		for _, index := range stakerIndices {
+			stakers[int(index)].Send(msg)
+		}
+		for _, index := range nonStakerIndices {
+			nonStakers[int(index)].Send(msg)
 		}
 	}
 }
@@ -1303,18 +1286,14 @@ func (n *network) tryAddPeer(p *peer) error {
 	return nil
 }
 
-// assumes the stateLock is not held. Returns:
-// 1) The IPs, certs and signatures of all validators we're connected
-//    to that provided a SignedVersion when we connected to them.
-// 2) The IPs of all validators we're connected to (superset of the above.)
-// TODO: Remove the 2nd return value when we replace Version / PeerList with
-//       their signed counterparts
-func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
+// assumes the stateLock is not held. Returns the IPs, certs and signatures of
+// all validators we're connected to that provided a Version when we connected
+// to them.
+func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	unsignedPeers := make([]utils.IPDesc, 0, len(n.peers))
-	signedPeers := make([]utils.IPCertDesc, 0, len(n.peers))
+	peers := make([]utils.IPCertDesc, 0, len(n.peers))
 	for _, peer := range n.peers {
 		peerIP := peer.getIP()
 		switch {
@@ -1332,7 +1311,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 		}
 		if signedIP, ok := peer.sigAndTime.GetValue().(signedPeerIP); ok {
 			if signedIP.ip.Equal(peerIP) {
-				signedPeers = append(signedPeers, utils.IPCertDesc{
+				peers = append(peers, utils.IPCertDesc{
 					IPDesc:    peerIP,
 					Signature: signedIP.signature,
 					Cert:      peer.cert,
@@ -1340,42 +1319,25 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, []utils.IPDesc, error) {
 				})
 			}
 		}
-		unsignedPeers = append(unsignedPeers, peerIP)
 	}
 
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(unsignedPeers))); err != nil {
-		return nil, nil, err
+	if err := s.Initialize(uint64(len(peers))); err != nil {
+		return nil, err
 	}
-	numUnsignedToSend := n.peerListSize
-	if len(unsignedPeers) < numUnsignedToSend {
-		numUnsignedToSend = len(unsignedPeers)
+	numToSend := n.peerListSize
+	if len(peers) < numToSend {
+		numToSend = len(peers)
 	}
-	unsignedIndices, err := s.Sample(numUnsignedToSend)
+	indices, err := s.Sample(numToSend)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	sampledUnsignedPeers := make([]utils.IPDesc, numUnsignedToSend)
-	for i, index := range unsignedIndices {
-		sampledUnsignedPeers[i] = unsignedPeers[index]
+	sampledPeers := make([]utils.IPCertDesc, numToSend)
+	for i, index := range indices {
+		sampledPeers[i] = peers[index]
 	}
-
-	if err := s.Initialize(uint64(len(signedPeers))); err != nil {
-		return nil, nil, err
-	}
-	numSignedToSend := n.peerListSize
-	if len(signedPeers) < numSignedToSend {
-		numSignedToSend = len(signedPeers)
-	}
-	signedIndices, err := s.Sample(numSignedToSend)
-	if err != nil {
-		return nil, nil, err
-	}
-	sampledSignedPeers := make([]utils.IPCertDesc, numSignedToSend)
-	for i, index := range signedIndices {
-		sampledSignedPeers[i] = signedPeers[index]
-	}
-	return sampledSignedPeers, sampledUnsignedPeers, nil
+	return sampledPeers, nil
 }
 
 // should only be called after the peer is marked as connected. Should not be
@@ -1451,7 +1413,9 @@ func (n *network) disconnected(p *peer) {
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		n.track(ip, p.id)
+		if n.vdrs.Contains(p.id) {
+			n.track(ip, p.id)
+		}
 	}
 
 	if p.compatible.GetValue() {
@@ -1582,13 +1546,13 @@ func (n *network) HealthCheck() (interface{}, error) {
 }
 
 // assume [n.stateLock] is held. Returns the timestamp and signature that should
-// be sent in a SignedVersion message. We only update these values when our IP
-// has changed.
-func (n *network) getSignedVersion(ip utils.IPDesc) (uint64, []byte, error) {
+// be sent in a Version message. We only update these values when our IP has
+// changed.
+func (n *network) getVersion(ip utils.IPDesc) (uint64, []byte, error) {
 	n.timeForIPLock.Lock()
 	defer n.timeForIPLock.Unlock()
 
-	if !ip.Equal(n.lastSignedVersionIP) {
+	if !ip.Equal(n.lastVersionIP) {
 		newTimestamp := n.clock.Unix()
 		msgHash := ipAndTimeHash(ip, newTimestamp)
 		sig, err := n.tlsKey.Sign(cryptorand.Reader, msgHash, crypto.SHA256)
@@ -1596,10 +1560,10 @@ func (n *network) getSignedVersion(ip utils.IPDesc) (uint64, []byte, error) {
 			return 0, nil, err
 		}
 
-		n.lastSignedVersionIP = ip
-		n.lastSignedVersionTimestamp = newTimestamp
-		n.lastSignedVersionSignature = sig
+		n.lastVersionIP = ip
+		n.lastVersionTimestamp = newTimestamp
+		n.lastVersionSignature = sig
 	}
 
-	return n.lastSignedVersionTimestamp, n.lastSignedVersionSignature, nil
+	return n.lastVersionTimestamp, n.lastVersionSignature, nil
 }

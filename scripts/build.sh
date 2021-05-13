@@ -24,6 +24,6 @@ if [[ -f "$BUILD_DIR/avalanchego" && -f "$PLUGIN_DIR/evm" ]]; then
         echo "Build Successful"
         exit 0
 else
-        echo "Build failure" 
+        echo "Build failure" >&2
         exit 1
 fi
