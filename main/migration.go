@@ -87,7 +87,7 @@ func (m *migrationManager) runMigration() error {
 	preDBUpgradeNodeExitCodeChan := preDBUpgradeNode.start()
 	defer func() {
 		if err := m.nodeManager.Stop(preDBUpgradeNode.path); err != nil {
-			m.log.Error(err.Error())
+			m.log.Error("%s", fmt.Errorf("error while stopping node at %s: %s", preDBUpgradeNode.path, err))
 		}
 	}()
 
