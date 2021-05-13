@@ -125,6 +125,8 @@ type VM struct {
 	// Key: block ID
 	// Value: the block
 	currentBlocks map[ids.ID]Block
+
+	lastVdrUpdate time.Time
 }
 
 // Initialize this blockchain.
@@ -454,9 +456,11 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 }
 
 func (vm *VM) updateValidators(force bool) error {
-	if !force && !vm.bootstrapped {
+	now := vm.clock.Time()
+	if !force && !vm.bootstrapped && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
 		return nil
 	}
+	vm.lastVdrUpdate = now
 
 	currentValidators := vm.internalState.CurrentStakerChainState()
 	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
