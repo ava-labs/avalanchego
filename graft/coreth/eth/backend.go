@@ -134,13 +134,13 @@ func New(stack *node.Node, config *Config,
 		config.Miner.GasPrice = new(big.Int).Set(ethconfig.DefaultConfig.Miner.GasPrice)
 	}
 	if config.NoPruning && config.TrieDirtyCache > 0 {
-		if config.SnapshotCache > 0 {
-			config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
-			config.SnapshotCache += config.TrieDirtyCache * 2 / 5
-		} else {
-			config.TrieCleanCache += config.TrieDirtyCache
-		}
-		config.TrieCleanCache += config.TrieDirtyCache
+		// TODO: uncomment when re-enabling snapshots
+		// if config.SnapshotCache > 0 {
+		// 	config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
+		// 	config.SnapshotCache += config.TrieDirtyCache * 2 / 5
+		// } else {
+		// 	config.TrieCleanCache += config.TrieDirtyCache
+		// }
 		config.TrieDirtyCache = 0
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
