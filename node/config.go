@@ -58,8 +58,6 @@ type Config struct {
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
 	EnableStaking         bool
-	StakingCertFile       string
-	StakingKeyFile        string
 	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 

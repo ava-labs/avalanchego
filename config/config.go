@@ -378,8 +378,6 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 
 	// Staking:
 	config.EnableStaking = v.GetBool(StakingEnabledKey)
-	config.StakingKeyFile = v.GetString(StakingKeyPathKey)
-	config.StakingCertFile = v.GetString(StakingCertPathKey)
 	config.DisabledStakingWeight = v.GetUint64(StakingDisabledWeightKey)
 	config.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
 	config.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
@@ -388,47 +386,45 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, errInvalidStakerWeights
 	}
 
-	stakingKeyPath := v.GetString(StakingKeyPathKey)
-	if stakingKeyPath == DefaultString {
-		config.StakingKeyFile = defaultStakingKeyPath
-	} else {
-		config.StakingKeyFile = stakingKeyPath
-	}
-	stakingCertPath := v.GetString(StakingCertPathKey)
-	if stakingCertPath == DefaultString {
-		config.StakingCertFile = defaultStakingCertPath
-	} else {
-		config.StakingCertFile = stakingCertPath
-	}
-
-	// parse any env variables
-	config.StakingCertFile = os.ExpandEnv(config.StakingCertFile)
-	config.StakingKeyFile = os.ExpandEnv(config.StakingKeyFile)
-	switch {
-	// If staking key/cert locations are specified but not found, error
-	case config.StakingKeyFile != defaultStakingKeyPath || config.StakingCertFile != defaultStakingCertPath:
-		if _, err := os.Stat(config.StakingKeyFile); os.IsNotExist(err) {
-			return node.Config{}, fmt.Errorf("couldn't find staking key at %s", config.StakingKeyFile)
-		} else if _, err := os.Stat(config.StakingCertFile); os.IsNotExist(err) {
-			return node.Config{}, fmt.Errorf("couldn't find staking certificate at %s", config.StakingCertFile)
-		}
-	default:
-		// Only creates staking key/cert if [stakingKeyPath] doesn't exist
-		if err := staking.InitNodeStakingKeyPair(config.StakingKeyFile, config.StakingCertFile); err != nil {
-			return node.Config{}, fmt.Errorf("couldn't generate staking key/cert: %w", err)
-		}
-	}
-
 	if config.FetchOnly {
-		// If I'm in fetch only mode, I should use an ephemeral staking key/cert
+		// In fetch only mode, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
 			return node.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %w", err)
 		}
 		config.StakingTLSCert = *cert
 	} else {
-		// If I'm not in fetch only mode, I should use the real staking key/cert
-		cert, err := staking.LoadTLSCert(config.StakingKeyFile, config.StakingCertFile)
+		// Parse the staking key/cert paths
+		stakingKeyPath := v.GetString(StakingKeyPathKey)
+		if stakingKeyPath == DefaultString {
+			stakingKeyPath = defaultStakingKeyPath
+		}
+		stakingCertPath := v.GetString(StakingCertPathKey)
+		if stakingCertPath == DefaultString {
+			stakingCertPath = defaultStakingCertPath
+		}
+
+		// parse any env variables in the paths
+		stakingKeyPath = os.ExpandEnv(stakingKeyPath)
+		stakingCertPath = os.ExpandEnv(stakingCertPath)
+
+		switch {
+		// If staking key/cert locations are specified but not found, error
+		case stakingKeyPath != defaultStakingKeyPath || stakingCertPath != defaultStakingCertPath:
+			if _, err := os.Stat(stakingKeyPath); os.IsNotExist(err) {
+				return node.Config{}, fmt.Errorf("couldn't find staking key at %s", stakingKeyPath)
+			} else if _, err := os.Stat(stakingCertPath); os.IsNotExist(err) {
+				return node.Config{}, fmt.Errorf("couldn't find staking certificate at %s", stakingCertPath)
+			}
+		default:
+			// Create the staking key/cert if [stakingKeyPath] doesn't exist
+			if err := staking.InitNodeStakingKeyPair(stakingKeyPath, stakingCertPath); err != nil {
+				return node.Config{}, fmt.Errorf("couldn't generate staking key/cert: %w", err)
+			}
+		}
+
+		// Load and parse the staking key/cert
+		cert, err := staking.LoadTLSCert(stakingKeyPath, stakingCertPath)
 		if err != nil {
 			return node.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
 		}
