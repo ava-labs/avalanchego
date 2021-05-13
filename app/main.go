@@ -28,30 +28,30 @@ var (
 // If specified in the config, serves a hashicorp plugin that can be consumed by
 // the daemon (see avalanchego/main).
 func main() {
-	c, version, displayVersion, pluginMode, err := config.GetConfig(GitCommit)
+	nodeConfig, processConfig, err := config.GetConfigs(GitCommit)
 	if err != nil {
 		fmt.Printf("couldn't get node config: %s\n", err)
 		os.Exit(1)
 	}
 
-	if displayVersion {
-		fmt.Print(version)
+	if processConfig.DisplayVersionAndExit {
+		fmt.Print(processConfig.VersionStr)
 		os.Exit(0)
 	}
 
 	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(c.DBPath, true, perms.ReadWriteExecute); err != nil {
+	if err := perms.ChmodR(nodeConfig.DBPath, true, perms.ReadWriteExecute); err != nil {
 		fmt.Printf("failed to restrict the permissions of the database directory with error %s\n", err)
 		os.Exit(1)
 	}
-	if err := perms.ChmodR(c.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
+	if err := perms.ChmodR(nodeConfig.LoggingConfig.Directory, true, perms.ReadWriteExecute); err != nil {
 		fmt.Printf("failed to restrict the permissions of the log directory with error %s\n", err)
 		os.Exit(1)
 	}
 
-	app := process.NewApp(c) // Create node wrapper
+	app := process.NewApp(nodeConfig) // Create node wrapper
 
-	if pluginMode { // Serve as a plugin
+	if processConfig.PluginMode { // Serve as a plugin
 		plugin.Serve(&plugin.ServeConfig{
 			HandshakeConfig: appPlugin.Handshake,
 			Plugins: map[string]plugin.Plugin{
@@ -62,7 +62,7 @@ func main() {
 				Level: hclog.Error,
 			}),
 		})
-		return // TODO what should get returned here?
+		return
 	}
 
 	fmt.Println(process.Header)

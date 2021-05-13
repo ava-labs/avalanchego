@@ -23,14 +23,14 @@ var (
 // main is the entry point to AvalancheGo.
 func main() {
 	// Get the config
-	rootConfig, version, displayVersion, _, err := config.GetConfig(GitCommit)
+	nodeConfig, processConfig, err := config.GetConfigs(GitCommit)
 	if err != nil {
 		fmt.Printf("couldn't get config: %s", err)
 		os.Exit(1)
 	}
 
-	if displayVersion {
-		fmt.Print(version)
+	if processConfig.DisplayVersionAndExit {
+		fmt.Print(processConfig.VersionStr)
 		os.Exit(0)
 	}
 
@@ -38,7 +38,7 @@ func main() {
 
 	// Set the log directory for this process by adding a subdirectory
 	// "daemon" to the log directory given in the config
-	logConfigCopy := rootConfig.LoggingConfig
+	logConfigCopy := nodeConfig.LoggingConfig
 	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
 	logFactory := logging.NewFactory(logConfigCopy)
 
@@ -50,9 +50,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info("using build directory at path '%s'", rootConfig.BuildDir)
+	log.Info("using build directory at path '%s'", processConfig.BuildDir)
 
-	nodeManager := newNodeManager(rootConfig.BuildDir, log)
+	nodeManager := newNodeManager(processConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
 			// SIGINT and SIGTERM cause all running nodes to stop
@@ -62,7 +62,7 @@ func main() {
 	)
 
 	// Migrate the database if necessary
-	migrationManager := newMigrationManager(nodeManager, rootConfig, log)
+	migrationManager := newMigrationManager(nodeManager, nodeConfig, log)
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
 		nodeManager.shutdown()

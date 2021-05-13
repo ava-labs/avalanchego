@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -271,29 +272,67 @@ func getViper() (*viper.Viper, error) {
 
 // getConfigFromViper sets attributes on [config] based on the values
 // defined in the [viper] environment
-func getConfigFromViper(v *viper.Viper) (node.Config, error) {
-	config := node.Config{}
+func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
+	// First, get the process config
+	processConfig := process.Config{}
+	processConfig.DisplayVersionAndExit = v.GetBool(VersionKey)
+	processConfig.PluginMode = v.GetBool(PluginModeKey)
+	buildDir := v.GetString(BuildDirKey)
+	if buildDir == DefaultString {
+		processConfig.BuildDir = defaultBuildDirs[0]
+	} else {
+		processConfig.BuildDir = buildDir
+	}
+	validBuildDir := func(dir string) bool {
+		info, err := os.Stat(dir)
+		if err != nil || !info.IsDir() {
+			return false
+		}
+		// make sure both expected subdirectories exist
+		if _, err := os.Stat(filepath.Join(dir, avalanchegoLatest)); err != nil {
+			return false
+		}
+		if _, err := os.Stat(filepath.Join(dir, avalanchegoPreupgrade)); err != nil {
+			return false
+		}
+		return true
+	}
+	if !validBuildDir(processConfig.BuildDir) {
+		foundBuildDir := false
+		for _, dir := range defaultBuildDirs {
+			if validBuildDir(dir) {
+				processConfig.BuildDir = dir
+				foundBuildDir = true
+				break
+			}
+		}
+		if !foundBuildDir {
+			return node.Config{}, process.Config{}, fmt.Errorf("couldn't find valid build directory in any of the default locations: %s", defaultBuildDirs)
+		}
+	}
 
-	config.FetchOnly = v.GetBool(FetchOnlyKey)
+	// Then, get the node config
+	nodeConfig := node.Config{}
+	nodeConfig.FetchOnly = v.GetBool(FetchOnlyKey)
 
 	// Consensus Parameters
-	config.ConsensusParams.K = v.GetInt(SnowSampleSizeKey)
-	config.ConsensusParams.Alpha = v.GetInt(SnowQuorumSizeKey)
-	config.ConsensusParams.BetaVirtuous = v.GetInt(SnowVirtuousCommitThresholdKey)
-	config.ConsensusParams.BetaRogue = v.GetInt(SnowRogueCommitThresholdKey)
-	config.ConsensusParams.Parents = v.GetInt(SnowAvalancheNumParentsKey)
-	config.ConsensusParams.BatchSize = v.GetInt(SnowAvalancheBatchSizeKey)
-	config.ConsensusParams.ConcurrentRepolls = v.GetInt(SnowConcurrentRepollsKey)
-	config.ConsensusParams.OptimalProcessing = v.GetInt(SnowOptimalProcessingKey)
-	config.ConsensusParams.MaxOutstandingItems = v.GetInt(SnowMaxProcessingKey)
-	config.ConsensusParams.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
-	config.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
-	config.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
+	nodeConfig.ConsensusParams.K = v.GetInt(SnowSampleSizeKey)
+	nodeConfig.ConsensusParams.Alpha = v.GetInt(SnowQuorumSizeKey)
+	nodeConfig.ConsensusParams.BetaVirtuous = v.GetInt(SnowVirtuousCommitThresholdKey)
+	nodeConfig.ConsensusParams.BetaRogue = v.GetInt(SnowRogueCommitThresholdKey)
+	nodeConfig.ConsensusParams.Parents = v.GetInt(SnowAvalancheNumParentsKey)
+	nodeConfig.ConsensusParams.BatchSize = v.GetInt(SnowAvalancheBatchSizeKey)
+	nodeConfig.ConsensusParams.ConcurrentRepolls = v.GetInt(SnowConcurrentRepollsKey)
+	nodeConfig.ConsensusParams.OptimalProcessing = v.GetInt(SnowOptimalProcessingKey)
+	nodeConfig.ConsensusParams.MaxOutstandingItems = v.GetInt(SnowMaxProcessingKey)
+	nodeConfig.ConsensusParams.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
+	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
+	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 
 	// Logging:
 	loggingconfig, err := logging.DefaultConfig()
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, process.Config{}, err
 	}
 	logsDir := v.GetString(LogsDirKey)
 	if logsDir != "" {
@@ -301,7 +340,7 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	}
 	loggingconfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, process.Config{}, err
 	}
 	logDisplayLevel := v.GetString(LogDisplayLevelKey)
 	if logDisplayLevel == "" {
@@ -309,90 +348,90 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	}
 	displayLevel, err := logging.ToLevel(logDisplayLevel)
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, process.Config{}, err
 	}
 	loggingconfig.DisplayLevel = displayLevel
 
 	loggingconfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, process.Config{}, err
 	}
 
-	config.LoggingConfig = loggingconfig
+	nodeConfig.LoggingConfig = loggingconfig
 
 	// NetworkID
 	networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
 	if err != nil {
-		return node.Config{}, err
+		return node.Config{}, process.Config{}, err
 	}
-	config.NetworkID = networkID
+	nodeConfig.NetworkID = networkID
 
 	// DB:
-	config.DBEnabled = v.GetBool(DbEnabledKey)
-	config.DBPath = os.ExpandEnv(v.GetString(DbPathKey))
-	if config.DBPath == DefaultString {
-		config.DBPath = defaultDbDir
+	nodeConfig.DBEnabled = v.GetBool(DbEnabledKey)
+	nodeConfig.DBPath = os.ExpandEnv(v.GetString(DbPathKey))
+	if nodeConfig.DBPath == DefaultString {
+		nodeConfig.DBPath = defaultDbDir
 	}
-	config.DBPath = path.Join(config.DBPath, constants.NetworkName(config.NetworkID))
+	nodeConfig.DBPath = path.Join(nodeConfig.DBPath, constants.NetworkName(nodeConfig.NetworkID))
 
 	// IP configuration
 	// Resolves our public IP, or does nothing
-	config.DynamicPublicIPResolver = dynamicip.NewResolver(v.GetString(DynamicPublicIPResolverKey))
+	nodeConfig.DynamicPublicIPResolver = dynamicip.NewResolver(v.GetString(DynamicPublicIPResolverKey))
 
 	var ip net.IP
 	publicIP := v.GetString(PublicIPKey)
 	switch {
-	case config.DynamicPublicIPResolver.IsResolver():
+	case nodeConfig.DynamicPublicIPResolver.IsResolver():
 		// User specified to use dynamic IP resolution; don't use NAT traversal
-		config.Nat = nat.NewNoRouter()
-		ip, err = dynamicip.FetchExternalIP(config.DynamicPublicIPResolver)
+		nodeConfig.Nat = nat.NewNoRouter()
+		ip, err = dynamicip.FetchExternalIP(nodeConfig.DynamicPublicIPResolver)
 		if err != nil {
-			return node.Config{}, fmt.Errorf("dynamic ip address fetch failed: %s", err)
+			return node.Config{}, process.Config{}, fmt.Errorf("dynamic ip address fetch failed: %s", err)
 		}
 
 	case publicIP == "":
 		// User didn't specify a public IP to use; try with NAT traversal
-		config.AttemptedNATTraversal = true
-		config.Nat = nat.GetRouter()
-		ip, err = config.Nat.ExternalIP()
+		nodeConfig.AttemptedNATTraversal = true
+		nodeConfig.Nat = nat.GetRouter()
+		ip, err = nodeConfig.Nat.ExternalIP()
 		if err != nil {
 			ip = net.IPv4zero // Couldn't get my IP...set to 0.0.0.0
 		}
 	default:
 		// User specified a public IP to use; don't use NAT
-		config.Nat = nat.NewNoRouter()
+		nodeConfig.Nat = nat.NewNoRouter()
 		ip = net.ParseIP(publicIP)
 	}
 
 	if ip == nil {
-		return node.Config{}, fmt.Errorf("invalid IP Address %s", publicIP)
+		return node.Config{}, process.Config{}, fmt.Errorf("invalid IP Address %s", publicIP)
 	}
 
 	stakingPort := uint16(v.GetUint(StakingPortKey))
 
-	config.StakingIP = utils.NewDynamicIPDesc(ip, stakingPort)
+	nodeConfig.StakingIP = utils.NewDynamicIPDesc(ip, stakingPort)
 
-	config.DynamicUpdateDuration = v.GetDuration(DynamicUpdateDurationKey)
-	config.ConnMeterResetDuration = v.GetDuration(ConnMeterResetDurationKey)
-	config.ConnMeterMaxConns = v.GetInt(ConnMeterMaxConnsKey)
+	nodeConfig.DynamicUpdateDuration = v.GetDuration(DynamicUpdateDurationKey)
+	nodeConfig.ConnMeterResetDuration = v.GetDuration(ConnMeterResetDurationKey)
+	nodeConfig.ConnMeterMaxConns = v.GetInt(ConnMeterMaxConnsKey)
 
 	// Staking:
-	config.EnableStaking = v.GetBool(StakingEnabledKey)
-	config.DisabledStakingWeight = v.GetUint64(StakingDisabledWeightKey)
-	config.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
-	config.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
-	config.StakeMintingPeriod = v.GetDuration(StakeMintingPeriodKey)
-	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
-		return node.Config{}, errInvalidStakerWeights
+	nodeConfig.EnableStaking = v.GetBool(StakingEnabledKey)
+	nodeConfig.DisabledStakingWeight = v.GetUint64(StakingDisabledWeightKey)
+	nodeConfig.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
+	nodeConfig.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
+	nodeConfig.StakeMintingPeriod = v.GetDuration(StakeMintingPeriodKey)
+	if !nodeConfig.EnableStaking && nodeConfig.DisabledStakingWeight == 0 {
+		return node.Config{}, process.Config{}, errInvalidStakerWeights
 	}
 
-	if config.FetchOnly {
+	if nodeConfig.FetchOnly {
 		// In fetch only mode, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
-			return node.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %w", err)
+			return node.Config{}, process.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %w", err)
 		}
-		config.StakingTLSCert = *cert
+		nodeConfig.StakingTLSCert = *cert
 	} else {
 		// Parse the staking key/cert paths
 		stakingKeyPath := v.GetString(StakingKeyPathKey)
@@ -412,42 +451,42 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		// If staking key/cert locations are specified but not found, error
 		case stakingKeyPath != defaultStakingKeyPath || stakingCertPath != defaultStakingCertPath:
 			if _, err := os.Stat(stakingKeyPath); os.IsNotExist(err) {
-				return node.Config{}, fmt.Errorf("couldn't find staking key at %s", stakingKeyPath)
+				return node.Config{}, process.Config{}, fmt.Errorf("couldn't find staking key at %s", stakingKeyPath)
 			} else if _, err := os.Stat(stakingCertPath); os.IsNotExist(err) {
-				return node.Config{}, fmt.Errorf("couldn't find staking certificate at %s", stakingCertPath)
+				return node.Config{}, process.Config{}, fmt.Errorf("couldn't find staking certificate at %s", stakingCertPath)
 			}
 		default:
 			// Create the staking key/cert if [stakingKeyPath] doesn't exist
 			if err := staking.InitNodeStakingKeyPair(stakingKeyPath, stakingCertPath); err != nil {
-				return node.Config{}, fmt.Errorf("couldn't generate staking key/cert: %w", err)
+				return node.Config{}, process.Config{}, fmt.Errorf("couldn't generate staking key/cert: %w", err)
 			}
 		}
 
 		// Load and parse the staking key/cert
 		cert, err := staking.LoadTLSCert(stakingKeyPath, stakingCertPath)
 		if err != nil {
-			return node.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
+			return node.Config{}, process.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
 		}
-		config.StakingTLSCert = *cert
+		nodeConfig.StakingTLSCert = *cert
 	}
 
-	config.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(config.StakingTLSCert.Leaf.Raw))
+	nodeConfig.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(nodeConfig.StakingTLSCert.Leaf.Raw))
 	if err != nil {
-		return node.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
+		return node.Config{}, process.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
 	}
 
-	if err := initBootstrapPeers(v, &config); err != nil {
-		return node.Config{}, err
+	if err := initBootstrapPeers(v, &nodeConfig); err != nil {
+		return node.Config{}, process.Config{}, err
 	}
 
-	config.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
+	nodeConfig.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
 		if subnet != "" {
 			subnetID, err := ids.FromString(subnet)
 			if err != nil {
-				return node.Config{}, fmt.Errorf("couldn't parse subnetID %s: %w", subnet, err)
+				return node.Config{}, process.Config{}, fmt.Errorf("couldn't parse subnetID %s: %w", subnet, err)
 			}
-			config.WhitelistedSubnets.Add(subnetID)
+			nodeConfig.WhitelistedSubnets.Add(subnetID)
 		}
 	}
 
@@ -462,191 +501,158 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 	//   |_avalanchego-process (the binary from compiling the app directory)
 	//   |_plugins
 	//     |_evm
-	buildDir := v.GetString(BuildDirKey)
-	if buildDir == DefaultString {
-		config.BuildDir = defaultBuildDirs[0]
-	} else {
-		config.BuildDir = buildDir
-	}
-	validBuildDir := func(dir string) bool {
-		info, err := os.Stat(dir)
-		if err != nil || !info.IsDir() {
-			return false
-		}
-		// make sure both expected subdirectories exist
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoLatest)); err != nil {
-			return false
-		}
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoPreupgrade)); err != nil {
-			return false
-		}
-		return true
-	}
-	if !validBuildDir(config.BuildDir) {
-		foundBuildDir := false
-		for _, dir := range defaultBuildDirs {
-			if validBuildDir(dir) {
-				config.BuildDir = dir
-				foundBuildDir = true
-				break
-			}
-		}
-		if !foundBuildDir {
-			return node.Config{}, fmt.Errorf("couldn't find valid build directory in any of the default locations: %s", defaultBuildDirs)
-		}
-	}
 
 	// Plugin directory. Defaults to [buildDirectory]/plugins
 	pluginDir := v.GetString(PluginDirKey)
 	if pluginDir == DefaultString {
-		config.PluginDir = filepath.Join(config.BuildDir, avalanchegoLatest, "plugins")
+		nodeConfig.PluginDir = filepath.Join(processConfig.BuildDir, avalanchegoLatest, "plugins")
 	} else {
-		config.PluginDir = pluginDir
+		nodeConfig.PluginDir = pluginDir
 	}
 
 	// HTTP:
-	config.HTTPHost = v.GetString(HTTPHostKey)
-	config.HTTPPort = uint16(v.GetUint(HTTPPortKey))
-	config.HTTPSEnabled = v.GetBool(HTTPSEnabledKey)
-	config.HTTPSKeyFile = v.GetString(HTTPSKeyFileKey)
-	config.HTTPSCertFile = v.GetString(HTTPSCertFileKey)
-	config.APIAllowedOrigins = v.GetStringSlice(HTTPAllowedOrigins)
+	nodeConfig.HTTPHost = v.GetString(HTTPHostKey)
+	nodeConfig.HTTPPort = uint16(v.GetUint(HTTPPortKey))
+	nodeConfig.HTTPSEnabled = v.GetBool(HTTPSEnabledKey)
+	nodeConfig.HTTPSKeyFile = v.GetString(HTTPSKeyFileKey)
+	nodeConfig.HTTPSCertFile = v.GetString(HTTPSCertFileKey)
+	nodeConfig.APIAllowedOrigins = v.GetStringSlice(HTTPAllowedOrigins)
 
 	// API Auth
-	config.APIRequireAuthToken = v.GetBool(APIAuthRequiredKey)
-	if config.APIRequireAuthToken {
+	nodeConfig.APIRequireAuthToken = v.GetBool(APIAuthRequiredKey)
+	if nodeConfig.APIRequireAuthToken {
 		passwordFile := v.GetString(APIAuthPasswordFileKey)
 		pwBytes, err := ioutil.ReadFile(passwordFile)
 		if err != nil {
-			return node.Config{}, fmt.Errorf("api-auth-password-file %q failed to be read with: %w", passwordFile, err)
+			return node.Config{}, process.Config{}, fmt.Errorf("api-auth-password-file %q failed to be read with: %w", passwordFile, err)
 		}
-		config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
-		if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
-			return node.Config{}, errors.New("api-auth-password is not strong enough")
+		nodeConfig.APIAuthPassword = strings.TrimSpace(string(pwBytes))
+		if !password.SufficientlyStrong(nodeConfig.APIAuthPassword, password.OK) {
+			return node.Config{}, process.Config{}, errors.New("api-auth-password is not strong enough")
 		}
 	}
 
 	// APIs
-	config.AdminAPIEnabled = v.GetBool(AdminAPIEnabledKey)
-	config.InfoAPIEnabled = v.GetBool(InfoAPIEnabledKey)
-	config.KeystoreAPIEnabled = v.GetBool(KeystoreAPIEnabledKey)
-	config.MetricsAPIEnabled = v.GetBool(MetricsAPIEnabledKey)
-	config.HealthAPIEnabled = v.GetBool(HealthAPIEnabledKey)
-	config.IPCAPIEnabled = v.GetBool(IpcAPIEnabledKey)
-	config.IndexAPIEnabled = v.GetBool(IndexEnabledKey)
+	nodeConfig.AdminAPIEnabled = v.GetBool(AdminAPIEnabledKey)
+	nodeConfig.InfoAPIEnabled = v.GetBool(InfoAPIEnabledKey)
+	nodeConfig.KeystoreAPIEnabled = v.GetBool(KeystoreAPIEnabledKey)
+	nodeConfig.MetricsAPIEnabled = v.GetBool(MetricsAPIEnabledKey)
+	nodeConfig.HealthAPIEnabled = v.GetBool(HealthAPIEnabledKey)
+	nodeConfig.IPCAPIEnabled = v.GetBool(IpcAPIEnabledKey)
+	nodeConfig.IndexAPIEnabled = v.GetBool(IndexEnabledKey)
 
 	// Throughput:
-	config.ThroughputServerEnabled = v.GetBool(XputServerEnabledKey)
-	config.ThroughputPort = uint16(v.GetUint(XputServerPortKey))
+	nodeConfig.ThroughputServerEnabled = v.GetBool(XputServerEnabledKey)
+	nodeConfig.ThroughputPort = uint16(v.GetUint(XputServerPortKey))
 
 	// Halflife of continuous averager used in health checks
 	healthCheckAveragerHalflife := v.GetDuration(HealthCheckAveragerHalflifeKey)
 	if healthCheckAveragerHalflife <= 0 {
-		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
+		return node.Config{}, process.Config{}, fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
 	}
 
 	// Router
-	config.ConsensusRouter = &router.ChainRouter{}
-	config.RouterHealthConfig.MaxDropRate = v.GetFloat64(RouterHealthMaxDropRateKey)
-	config.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(RouterHealthMaxOutstandingRequestsKey))
-	config.RouterHealthConfig.MaxOutstandingDuration = v.GetDuration(NetworkHealthMaxOutstandingDurationKey)
-	config.RouterHealthConfig.MaxRunTimeRequests = v.GetDuration(NetworkMaximumTimeoutKey)
-	config.RouterHealthConfig.MaxDropRateHalflife = healthCheckAveragerHalflife
+	nodeConfig.ConsensusRouter = &router.ChainRouter{}
+	nodeConfig.RouterHealthConfig.MaxDropRate = v.GetFloat64(RouterHealthMaxDropRateKey)
+	nodeConfig.RouterHealthConfig.MaxOutstandingRequests = int(v.GetUint(RouterHealthMaxOutstandingRequestsKey))
+	nodeConfig.RouterHealthConfig.MaxOutstandingDuration = v.GetDuration(NetworkHealthMaxOutstandingDurationKey)
+	nodeConfig.RouterHealthConfig.MaxRunTimeRequests = v.GetDuration(NetworkMaximumTimeoutKey)
+	nodeConfig.RouterHealthConfig.MaxDropRateHalflife = healthCheckAveragerHalflife
 	switch {
-	case config.RouterHealthConfig.MaxDropRate < 0 || config.RouterHealthConfig.MaxDropRate > 1:
-		return node.Config{}, fmt.Errorf("%s must be in [0,1]", RouterHealthMaxDropRateKey)
-	case config.RouterHealthConfig.MaxOutstandingDuration <= 0:
-		return node.Config{}, fmt.Errorf("%s must be positive", NetworkHealthMaxOutstandingDurationKey)
+	case nodeConfig.RouterHealthConfig.MaxDropRate < 0 || nodeConfig.RouterHealthConfig.MaxDropRate > 1:
+		return node.Config{}, process.Config{}, fmt.Errorf("%s must be in [0,1]", RouterHealthMaxDropRateKey)
+	case nodeConfig.RouterHealthConfig.MaxOutstandingDuration <= 0:
+		return node.Config{}, process.Config{}, fmt.Errorf("%s must be positive", NetworkHealthMaxOutstandingDurationKey)
 	}
 
 	// IPCs
 	ipcsChainIDs := v.GetString(IpcsChainIDsKey)
 	if ipcsChainIDs != "" {
-		config.IPCDefaultChainIDs = strings.Split(ipcsChainIDs, ",")
+		nodeConfig.IPCDefaultChainIDs = strings.Split(ipcsChainIDs, ",")
 	}
 
 	ipcsPath := v.GetString(IpcsPathKey)
 	if ipcsPath == DefaultString {
-		config.IPCPath = ipcs.DefaultBaseURL
+		nodeConfig.IPCPath = ipcs.DefaultBaseURL
 	} else {
-		config.IPCPath = ipcsPath
+		nodeConfig.IPCPath = ipcsPath
 	}
 
 	// Throttling
-	config.MaxNonStakerPendingMsgs = v.GetUint32(MaxNonStakerPendingMsgsKey)
-	config.StakerMSGPortion = v.GetFloat64(StakerMsgReservedKey)
-	config.StakerCPUPortion = v.GetFloat64(StakerCPUReservedKey)
-	config.SendQueueSize = v.GetUint32(SendQueueSizeKey)
-	config.MaxPendingMsgs = v.GetUint32(MaxPendingMsgsKey)
-	if config.MaxPendingMsgs < config.MaxNonStakerPendingMsgs {
-		return node.Config{}, errors.New("maximum pending messages must be >= maximum non-staker pending messages")
+	nodeConfig.MaxNonStakerPendingMsgs = v.GetUint32(MaxNonStakerPendingMsgsKey)
+	nodeConfig.StakerMSGPortion = v.GetFloat64(StakerMsgReservedKey)
+	nodeConfig.StakerCPUPortion = v.GetFloat64(StakerCPUReservedKey)
+	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
+	nodeConfig.MaxPendingMsgs = v.GetUint32(MaxPendingMsgsKey)
+	if nodeConfig.MaxPendingMsgs < nodeConfig.MaxNonStakerPendingMsgs {
+		return node.Config{}, process.Config{}, errors.New("maximum pending messages must be >= maximum non-staker pending messages")
 	}
 
 	// Health
-	config.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
+	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
 	// Network Health Check
-	config.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey)
-	config.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey)
-	config.NetworkHealthConfig.MaxPortionSendQueueBytesFull = v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey)
-	config.NetworkHealthConfig.MinConnectedPeers = v.GetUint(NetworkHealthMinPeersKey)
-	config.NetworkHealthConfig.MaxSendFailRate = v.GetFloat64(NetworkHealthMaxSendFailRateKey)
-	config.NetworkHealthConfig.MaxSendFailRateHalflife = healthCheckAveragerHalflife
+	nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey)
+	nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey)
+	nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull = v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey)
+	nodeConfig.NetworkHealthConfig.MinConnectedPeers = v.GetUint(NetworkHealthMinPeersKey)
+	nodeConfig.NetworkHealthConfig.MaxSendFailRate = v.GetFloat64(NetworkHealthMaxSendFailRateKey)
+	nodeConfig.NetworkHealthConfig.MaxSendFailRateHalflife = healthCheckAveragerHalflife
 	switch {
-	case config.NetworkHealthConfig.MaxTimeSinceMsgSent < 0:
-		return node.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)
-	case config.NetworkHealthConfig.MaxTimeSinceMsgReceived < 0:
-		return node.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
-	case config.NetworkHealthConfig.MaxSendFailRate < 0 || config.NetworkHealthConfig.MaxSendFailRate > 1:
-		return node.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxSendFailRateKey)
-	case config.NetworkHealthConfig.MaxPortionSendQueueBytesFull < 0 || config.NetworkHealthConfig.MaxPortionSendQueueBytesFull > 1:
-		return node.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
+	case nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgSent < 0:
+		return node.Config{}, process.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)
+	case nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgReceived < 0:
+		return node.Config{}, process.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
+	case nodeConfig.NetworkHealthConfig.MaxSendFailRate < 0 || nodeConfig.NetworkHealthConfig.MaxSendFailRate > 1:
+		return node.Config{}, process.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxSendFailRateKey)
+	case nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull < 0 || nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull > 1:
+		return node.Config{}, process.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	}
 
 	// Network Timeout
-	config.NetworkConfig.InitialTimeout = v.GetDuration(NetworkInitialTimeoutKey)
-	config.NetworkConfig.MinimumTimeout = v.GetDuration(NetworkMinimumTimeoutKey)
-	config.NetworkConfig.MaximumTimeout = v.GetDuration(NetworkMaximumTimeoutKey)
-	config.NetworkConfig.TimeoutHalflife = v.GetDuration(NetworkTimeoutHalflifeKey)
-	config.NetworkConfig.TimeoutCoefficient = v.GetFloat64(NetworkTimeoutCoefficientKey)
+	nodeConfig.NetworkConfig.InitialTimeout = v.GetDuration(NetworkInitialTimeoutKey)
+	nodeConfig.NetworkConfig.MinimumTimeout = v.GetDuration(NetworkMinimumTimeoutKey)
+	nodeConfig.NetworkConfig.MaximumTimeout = v.GetDuration(NetworkMaximumTimeoutKey)
+	nodeConfig.NetworkConfig.TimeoutHalflife = v.GetDuration(NetworkTimeoutHalflifeKey)
+	nodeConfig.NetworkConfig.TimeoutCoefficient = v.GetFloat64(NetworkTimeoutCoefficientKey)
 
 	switch {
-	case config.NetworkConfig.MinimumTimeout < 1:
-		return node.Config{}, errors.New("minimum timeout must be positive")
-	case config.NetworkConfig.MinimumTimeout > config.NetworkConfig.MaximumTimeout:
-		return node.Config{}, errors.New("maximum timeout can't be less than minimum timeout")
-	case config.NetworkConfig.InitialTimeout < config.NetworkConfig.MinimumTimeout ||
-		config.NetworkConfig.InitialTimeout > config.NetworkConfig.MaximumTimeout:
-		return node.Config{}, errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]")
-	case config.NetworkConfig.TimeoutHalflife <= 0:
-		return node.Config{}, errors.New("network timeout halflife must be positive")
-	case config.NetworkConfig.TimeoutCoefficient < 1:
-		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
+	case nodeConfig.NetworkConfig.MinimumTimeout < 1:
+		return node.Config{}, process.Config{}, errors.New("minimum timeout must be positive")
+	case nodeConfig.NetworkConfig.MinimumTimeout > nodeConfig.NetworkConfig.MaximumTimeout:
+		return node.Config{}, process.Config{}, errors.New("maximum timeout can't be less than minimum timeout")
+	case nodeConfig.NetworkConfig.InitialTimeout < nodeConfig.NetworkConfig.MinimumTimeout ||
+		nodeConfig.NetworkConfig.InitialTimeout > nodeConfig.NetworkConfig.MaximumTimeout:
+		return node.Config{}, process.Config{}, errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]")
+	case nodeConfig.NetworkConfig.TimeoutHalflife <= 0:
+		return node.Config{}, process.Config{}, errors.New("network timeout halflife must be positive")
+	case nodeConfig.NetworkConfig.TimeoutCoefficient < 1:
+		return node.Config{}, process.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
 
 	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
 	// [PeerListGossipFreq]
-	config.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
-	config.PeerListGossipFreq = v.GetDuration(NetworkPeerListGossipFreqKey)
-	config.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
+	nodeConfig.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
+	nodeConfig.PeerListGossipFreq = v.GetDuration(NetworkPeerListGossipFreqKey)
+	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Benchlist
-	config.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
-	config.BenchlistConfig.PeerSummaryEnabled = v.GetBool(BenchlistPeerSummaryEnabledKey)
-	config.BenchlistConfig.Duration = v.GetDuration(BenchlistDurationKey)
-	config.BenchlistConfig.MinimumFailingDuration = v.GetDuration(BenchlistMinFailingDurationKey)
-	config.BenchlistConfig.MaxPortion = (1.0 - (float64(config.ConsensusParams.Alpha) / float64(config.ConsensusParams.K))) / 3.0
+	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
+	nodeConfig.BenchlistConfig.PeerSummaryEnabled = v.GetBool(BenchlistPeerSummaryEnabledKey)
+	nodeConfig.BenchlistConfig.Duration = v.GetDuration(BenchlistDurationKey)
+	nodeConfig.BenchlistConfig.MinimumFailingDuration = v.GetDuration(BenchlistMinFailingDurationKey)
+	nodeConfig.BenchlistConfig.MaxPortion = (1.0 - (float64(nodeConfig.ConsensusParams.Alpha) / float64(nodeConfig.ConsensusParams.K))) / 3.0
 
-	if config.ConsensusGossipFrequency < 0 {
-		return node.Config{}, errors.New("gossip frequency can't be negative")
+	if nodeConfig.ConsensusGossipFrequency < 0 {
+		return node.Config{}, process.Config{}, errors.New("gossip frequency can't be negative")
 	}
-	if config.ConsensusShutdownTimeout < 0 {
-		return node.Config{}, errors.New("gossip frequency can't be negative")
+	if nodeConfig.ConsensusShutdownTimeout < 0 {
+		return node.Config{}, process.Config{}, errors.New("gossip frequency can't be negative")
 	}
 
 	// File Descriptor Limit
 	fdLimit := v.GetUint64(FdLimitKey)
 	if err := ulimit.Set(fdLimit); err != nil {
-		return node.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
+		return node.Config{}, process.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
 	}
 
 	// Network Parameters
@@ -654,54 +660,54 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		txFee := v.GetUint64(TxFeeKey)
 		creationTxFee := v.GetUint64(CreationTxFeeKey)
 		uptimeRequirement := v.GetFloat64(UptimeRequirementKey)
-		config.TxFee = txFee
-		config.CreationTxFee = creationTxFee
-		config.UptimeRequirement = uptimeRequirement
+		nodeConfig.TxFee = txFee
+		nodeConfig.CreationTxFee = creationTxFee
+		nodeConfig.UptimeRequirement = uptimeRequirement
 
 		minValidatorStake := v.GetUint64(MinValidatorStakeKey)
 		maxValidatorStake := v.GetUint64(MaxValidatorStakeKey)
 		minDelegatorStake := v.GetUint64(MinDelegatorStakeKey)
 		minDelegationFee := v.GetUint64(MinDelegatorFeeKey)
 		if minValidatorStake > maxValidatorStake {
-			return node.Config{}, errors.New("minimum validator stake can't be greater than maximum validator stake")
+			return node.Config{}, process.Config{}, errors.New("minimum validator stake can't be greater than maximum validator stake")
 		}
 
-		config.MinValidatorStake = minValidatorStake
-		config.MaxValidatorStake = maxValidatorStake
-		config.MinDelegatorStake = minDelegatorStake
+		nodeConfig.MinValidatorStake = minValidatorStake
+		nodeConfig.MaxValidatorStake = maxValidatorStake
+		nodeConfig.MinDelegatorStake = minDelegatorStake
 
 		if minDelegationFee > 1000000 {
-			return node.Config{}, errors.New("delegation fee must be in the range [0, 1000000]")
+			return node.Config{}, process.Config{}, errors.New("delegation fee must be in the range [0, 1000000]")
 		}
-		config.MinDelegationFee = uint32(minDelegationFee)
+		nodeConfig.MinDelegationFee = uint32(minDelegationFee)
 
-		if config.MinStakeDuration == 0 {
-			return node.Config{}, errors.New("min stake duration can't be zero")
+		if nodeConfig.MinStakeDuration == 0 {
+			return node.Config{}, process.Config{}, errors.New("min stake duration can't be zero")
 		}
-		if config.MaxStakeDuration < config.MinStakeDuration {
-			return node.Config{}, errors.New("max stake duration can't be less than min stake duration")
+		if nodeConfig.MaxStakeDuration < nodeConfig.MinStakeDuration {
+			return node.Config{}, process.Config{}, errors.New("max stake duration can't be less than min stake duration")
 		}
-		if config.StakeMintingPeriod < config.MaxStakeDuration {
-			return node.Config{}, errors.New("stake minting period can't be less than max stake duration")
+		if nodeConfig.StakeMintingPeriod < nodeConfig.MaxStakeDuration {
+			return node.Config{}, process.Config{}, errors.New("stake minting period can't be less than max stake duration")
 		}
 
-		config.EpochFirstTransition = time.Unix(v.GetInt64(SnowEpochFirstTransition), 0)
-		config.EpochDuration = v.GetDuration(SnowEpochDuration)
+		nodeConfig.EpochFirstTransition = time.Unix(v.GetInt64(SnowEpochFirstTransition), 0)
+		nodeConfig.EpochDuration = v.GetDuration(SnowEpochDuration)
 	} else {
-		config.Params = *genesis.GetParams(networkID)
+		nodeConfig.Params = *genesis.GetParams(networkID)
 	}
 
 	// Load genesis data
-	config.GenesisBytes, config.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(GenesisConfigFileKey))
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(GenesisConfigFileKey))
 	if err != nil {
-		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
+		return node.Config{}, process.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
 
 	// Assertions
-	config.EnableAssertions = v.GetBool(AssertionsEnabledKey)
+	nodeConfig.EnableAssertions = v.GetBool(AssertionsEnabledKey)
 
 	// Crypto
-	config.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
+	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
 
 	// Coreth Plugin
 	corethConfigString := v.GetString(CorethConfigKey)
@@ -713,25 +719,25 @@ func getConfigFromViper(v *viper.Viper) (node.Config, error) {
 		default:
 			corethConfigBytes, err := json.Marshal(value)
 			if err != nil {
-				return node.Config{}, fmt.Errorf("couldn't parse coreth config: %w", err)
+				return node.Config{}, process.Config{}, fmt.Errorf("couldn't parse coreth config: %w", err)
 			}
 			corethConfigString = string(corethConfigBytes)
 		}
 	}
-	config.CorethConfig = corethConfigString
+	nodeConfig.CorethConfig = corethConfigString
 
 	// Indexer
-	config.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
+	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
 
 	// Bootstrap Configs
-	config.RetryBootstrap = v.GetBool(RetryBootstrapKey)
-	config.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
-	config.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
+	nodeConfig.RetryBootstrap = v.GetBool(RetryBootstrapKey)
+	nodeConfig.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
+	nodeConfig.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
 
 	// Peer alias
-	config.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
+	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
 
-	return config, nil
+	return nodeConfig, processConfig, nil
 }
 
 // Initialize config.BootstrapPeers.
@@ -786,17 +792,16 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 }
 
 // Returns:
-// 1) The config
-// 2) The string representation of version data
-// 3) True if we should print the version data then exit
-// 4) True if the node should run in plugin mode
-func GetConfig(commit string) (node.Config, string, bool, bool, error) {
+// 1) The node config
+// 2) The process config
+func GetConfigs(commit string) (node.Config, process.Config, error) {
 	v, err := getViper()
 	if err != nil {
-		return node.Config{}, "", false, false, err
+		return node.Config{}, process.Config{}, err
 	}
 
-	if v.GetBool(VersionKey) {
+	nodeConfig, processConfig, err := getConfigsFromViper(v)
+	if processConfig.DisplayVersionAndExit {
 		format := "%s ["
 		args := []interface{}{
 			node.Version,
@@ -804,7 +809,7 @@ func GetConfig(commit string) (node.Config, string, bool, bool, error) {
 
 		networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
 		if err != nil {
-			return node.Config{}, "", false, false, err
+			return node.Config{}, process.Config{}, err
 		}
 		networkGeneration := constants.NetworkName(networkID)
 		if networkID == constants.MainnetID {
@@ -821,12 +826,10 @@ func GetConfig(commit string) (node.Config, string, bool, bool, error) {
 			format += ", commit=%s"
 			args = append(args, commit)
 		}
-
 		format += "]\n"
 
-		return node.Config{}, fmt.Sprintf(format, args...), true, false, nil
+		processConfig.VersionStr = fmt.Sprintf(format, args...)
 	}
-	config, err := getConfigFromViper(v)
-	pluginMode := v.GetBool(PluginModeKey)
-	return config, "", false, pluginMode, err
+
+	return nodeConfig, processConfig, err
 }
