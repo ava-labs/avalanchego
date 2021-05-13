@@ -29,7 +29,7 @@ func (ks *keystore) migrate(dbManager manager.Manager) error {
 }
 
 func (ks *keystore) migrate1_0_0To1_4_4(prevDB, currentDB *manager.VersionedDatabase) error {
-	migrated, err := currentDB.Has(migratedKey)
+	migrated, err := currentDB.Database.Has(migratedKey)
 	if err != nil {
 		return err
 	} else if migrated {
@@ -67,7 +67,7 @@ func (ks *keystore) migrate1_0_0To1_4_4(prevDB, currentDB *manager.VersionedData
 	if err := userIterator.Error(); err != nil {
 		return err
 	}
-	if err := currentDB.Put(migratedKey, []byte(prevDB.Version.String())); err != nil {
+	if err := currentDB.Database.Put(migratedKey, []byte(prevDB.Version.String())); err != nil {
 		return err
 	}
 	ks.log.Info("finished migrating keystore from database version %s to %s", prevDB.Version, currentDB.Version)
