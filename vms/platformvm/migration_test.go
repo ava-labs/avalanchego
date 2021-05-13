@@ -43,7 +43,7 @@ func TestMigrateUptime(t *testing.T) {
 	chainDBManager.On("Current").Return(
 		&manager.VersionedDatabase{
 			Database: currentDB,
-			Version:  version.NewDefaultVersion(1, 4, 3),
+			Version:  version.NewDefaultVersion(1, 4, 4),
 		},
 	)
 	chainDBManager.On("Close").Return(nil)
@@ -106,7 +106,7 @@ func TestMigrateUptime(t *testing.T) {
 	err = uptimeDB.Put(nodeID.Bytes(), uptimeBytes)
 	assert.NoError(t, err)
 
-	// Case 1: Validator is in database v1.0.0 but not v1.3.3
+	// Case 1: Validator is in database v1.0.0 but not v1.4.4
 	// Set up mocked VM state
 	mockCurrentStakerChainState := &mockCurrentStakerChainState{}
 	mockCurrentStakerChainState.Test(t)
@@ -128,7 +128,7 @@ func TestMigrateUptime(t *testing.T) {
 	mockInternalState.AssertNotCalled(t, "SetUptime")
 	mockCurrentStakerChainState.AssertNumberOfCalls(t, "GetStaker", 1)
 
-	// Case 2: Validator is in database v1.0.0 and v1.3.3,
+	// Case 2: Validator is in database v1.0.0 and v1.4.4,
 	// and the lastUpdated value in the database v1.0.0 <= now
 	// Should update lastUpdated and upDuration
 	// Add the node to the current validator set
@@ -152,7 +152,7 @@ func TestMigrateUptime(t *testing.T) {
 	mockCurrentStakerChainState.AssertNumberOfCalls(t, "GetStaker", 2)
 	mockInternalState.AssertNumberOfCalls(t, "SetUptime", 1)
 
-	// Case 3: Validator is in database v1.0.0 and v1.3.3,
+	// Case 3: Validator is in database v1.0.0 and v1.4.4,
 	// and the lastUpdated value in the database v1.0.0 > now
 	vm.clock.Set(time.Unix(int64(oldUptime.LastUpdated-1), 0)) // Set VM's clock to before lastUpdated in old database
 	mockInternalState.On("SetUptime", nodeID, mock.AnythingOfType("time.Duration"), mock.AnythingOfType("time.Time")).Run(
@@ -168,7 +168,7 @@ func TestMigrateUptime(t *testing.T) {
 	assert.NoError(t, vm.migrateUptimes())
 }
 
-func (um *uptimeMigrater143) prevVersionSetUptime(prevDB database.Database, validatorID ids.ShortID, uptime *uptimeV100) error {
+func (um *uptimeMigrater1_4_4) prevVersionSetUptime(prevDB database.Database, validatorID ids.ShortID, uptime *uptimeV100) error {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), prevDB)
 	defer uptimeDB.Close()
 
@@ -183,7 +183,7 @@ func (um *uptimeMigrater143) prevVersionSetUptime(prevDB database.Database, vali
 // Only used in testing. TODO move to test package.
 // Add a staker to subnet [subnetID]
 // A staker may be a validator or a delegator
-func (um *uptimeMigrater143) prevVersionAddStaker(db database.Database, subnetID ids.ID, tx *rewardTxV100) error {
+func (um *uptimeMigrater1_4_4) prevVersionAddStaker(db database.Database, subnetID ids.ID, tx *rewardTxV100) error {
 	var (
 		staker   TimedTx
 		priority byte
@@ -231,7 +231,7 @@ func (um *uptimeMigrater143) prevVersionAddStaker(db database.Database, subnetID
 }
 
 // timedTxKey constructs the key to use for [txID] in stop and start prefix DBs
-func (um *uptimeMigrater143) prevVersionTimedTxKey(time time.Time, priority byte, txID ids.ID) ([]byte, error) {
+func (um *uptimeMigrater1_4_4) prevVersionTimedTxKey(time time.Time, priority byte, txID ids.ID) ([]byte, error) {
 	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
 	p.PackLong(uint64(time.Unix()))
 	p.PackByte(priority)

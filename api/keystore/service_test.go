@@ -438,8 +438,8 @@ func TestServiceDeleteUser(t *testing.T) {
 }
 
 // 1st part -> insert data into 1.0.0
-// 2nd part -> migrate data from 1.0.0 to 1.3.3
-// 3rd part -> check if data from 1.0.0 exists in 1.3.3
+// 2nd part -> migrate data from 1.0.0 to 1.4.4
+// 3rd part -> check if data from 1.0.0 exists in 1.4.4
 func TestMigrateKeystoreUser(t *testing.T) {
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
@@ -481,7 +481,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 
 	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 4, 3),
+		Version:  version.NewDefaultVersion(1, 4, 4),
 	})
 	upgradedDBManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {

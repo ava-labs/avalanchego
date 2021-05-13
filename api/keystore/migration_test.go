@@ -23,8 +23,8 @@ func TestMigrationNoPrevDB(t *testing.T) {
 	assert.NoError(ks.(*keystore).migrate(dbManager))
 }
 
-// Test migration from database version 1.0.0 to 1.3.3
-// Recall that the structure of the 1.0.0 and 1.3.3 keystore databases is:
+// Test migration from database version 1.0.0 to 1.4.4
+// Recall that the structure of the 1.0.0 and 1.4.4 keystore databases is:
 //           BaseDB
 //          /      \
 //    UserDB        BlockchainDB
