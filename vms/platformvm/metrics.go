@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -7,10 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/metricutils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -36,6 +36,8 @@ type metrics struct {
 	numExportTxs,
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
+
+	apiRequestMetrics metricutils.APIRequestMetrics
 }
 
 func newBlockMetrics(namespace string, name string) prometheus.Counter {
@@ -86,6 +88,8 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
+	m.apiRequestMetrics = metricutils.NewAPIMetrics(namespace)
+
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(m.percentConnected),
@@ -106,6 +110,8 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numExportTxs),
 		registerer.Register(m.numImportTxs),
 		registerer.Register(m.numRewardValidatorTxs),
+
+		m.apiRequestMetrics.Register(registerer),
 	)
 	return errs.Err
 }

@@ -92,7 +92,7 @@ func (a *App) Start() int {
 	if a.config.DBEnabled {
 		dbManager, err = manager.New(a.config.DBPath, a.log, node.DatabaseVersion, !a.config.FetchOnly)
 		if err != nil {
-			a.log.Error("couldn't create db manager at %s: %s", a.config.DBPath, err)
+			a.log.Fatal("couldn't create db manager at %s: %s", a.config.DBPath, err)
 			return 1
 		}
 	} else {
@@ -104,7 +104,7 @@ func (a *App) Start() int {
 				},
 			})
 		if err != nil {
-			a.log.Error("couldn't create db manager from memory db: %s", err)
+			a.log.Fatal("couldn't create db manager from memory db: %s", err)
 			return 1
 		}
 	}
@@ -112,7 +112,7 @@ func (a *App) Start() int {
 	// ensure migrations are done
 	currentDBBootstrapped, err := dbManager.Current().Has(manager.BootstrappedKey)
 	if err != nil {
-		a.log.Error("couldn't get whether database version %s ever bootstrapped: %s", node.DatabaseVersion, err)
+		a.log.Fatal("couldn't get whether database version %s ever bootstrapped: %s", node.DatabaseVersion, err)
 		return 1
 	}
 	a.log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)

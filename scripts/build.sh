@@ -24,6 +24,6 @@ if [[ -f "$AVALANCHEGO_PROCESS_PATH" && -f "$EVM_PATH" ]]; then
         echo "Build Successful"
         exit 0
 else
-        echo "Build failure" 
+        echo "Build failure" >&2
         exit 1
 fi
