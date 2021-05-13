@@ -110,11 +110,20 @@ func (m *migrationManager) runMigration() error {
 	// the one indicating it is done bootstrapping, error.
 	select {
 	case exitCode := <-preDBUpgradeNodeExitCodeChan:
+		// If this node ended because the node manager shut down,
+		// don't return an error
+		m.nodeManager.lock.Lock()
+		hasShutdown := m.nodeManager.hasShutdown
+		m.nodeManager.lock.Unlock()
+		if hasShutdown {
+			return nil
+		}
 		return fmt.Errorf("previous version node stopped with exit code %d", exitCode)
 	case exitCode := <-latestVersionExitCodeChan:
 		if exitCode != constants.ExitCodeDoneMigrating {
 			return fmt.Errorf("latest version died with exit code %d", exitCode)
 		}
+
 		return nil
 	}
 }

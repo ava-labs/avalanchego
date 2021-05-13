@@ -55,8 +55,7 @@ func main() {
 	nodeManager := newNodeManager(rootConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
-			// SIGINT and SIGTERM cause all running nodes
-			// to be ended
+			// SIGINT and SIGTERM cause all running nodes to stop
 			nodeManager.shutdown()
 		},
 		syscall.SIGINT, syscall.SIGTERM,
@@ -67,7 +66,6 @@ func main() {
 	if err := migrationManager.migrate(); err != nil {
 		log.Error("error while running migration: %s", err)
 		nodeManager.shutdown()
-		os.Exit(1)
 	}
 
 	// Run normally

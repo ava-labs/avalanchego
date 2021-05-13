@@ -29,7 +29,7 @@ type nodeProcess struct {
 }
 
 // Returns a channel that the node's exit code is sent on when the node is done.
-// This method does not block.
+// This method blocks until the node starts.
 func (np *nodeProcess) start() chan int {
 	np.log.Info("starting node at %s", np.path)
 	exitCodeChan := make(chan int, 1)
@@ -224,12 +224,12 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*node
 // Runs until the node exits.
 // Returns the node's exit code.
 func (nm *nodeManager) runNormal() (int, error) {
-	nm.log.Info("starting latest node version in normal execution mode")
 	nm.lock.Lock()
 	if nm.hasShutdown {
 		nm.lock.Unlock()
 		return 0, nil
 	}
+	nm.log.Info("starting latest node version in normal execution mode")
 
 	args := make([]string, len(os.Args)+1)
 	copy(args, os.Args[1:])
