@@ -9,8 +9,10 @@ import (
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
@@ -199,13 +201,17 @@ func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
 
 // Return the latest versioned node, configured to run in fetch-only mode.
 func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*nodeProcess, error) {
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(rootConfig.StakingTLSCert.Leaf.Raw))
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse node ID: %w", err)
+	}
 	args := make([]string, len(os.Args)+9)
 	copy(args, os.Args[1:])
 	args = append(
 		args,
 		// Tell this node to run in fetch only mode and to bootstrap only from the local node
 		fmt.Sprintf("--%s=127.0.0.1:%d", config.BootstrapIPsKey, int(rootConfig.StakingIP.Port)),
-		fmt.Sprintf("--%s=%s%s", config.BootstrapIDsKey, constants.NodeIDPrefix, rootConfig.NodeID),
+		fmt.Sprintf("--%s=%s%s", config.BootstrapIDsKey, constants.NodeIDPrefix, nodeID),
 		fmt.Sprintf("--%s=%s", config.FetchOnlyKey, "true"),
 		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0), // use any open port for staking port
 		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),    // use any open port for HTTP port

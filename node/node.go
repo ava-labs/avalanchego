@@ -860,7 +860,11 @@ func (n *Node) Initialize(
 	logFactory logging.Factory,
 ) error {
 	n.Log = logger
-	n.ID = config.NodeID
+	var err error
+	n.ID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(n.Config.StakingTLSCert.Leaf.Raw))
+	if err != nil {
+		return fmt.Errorf("problem deriving node ID from certificate: %w", err)
+	}
 	n.LogFactory = logFactory
 	n.Config = config
 	n.DoneShuttingDown.Add(1)
