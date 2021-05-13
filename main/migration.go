@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"runtime"
+	"syscall"
 )
 
 type migrationManager struct {
@@ -34,7 +35,50 @@ func (m *migrationManager) migrate() error {
 	if !shouldMigrate {
 		return nil
 	}
+	vdErr := m.verifyDiskStorage()
+	if vdErr != nil {
+		return vdErr
+	}
+
 	return m.runMigration()
+}
+
+func windowsVerifyDiskStorage(path string) (uint64, uint64, error) {
+	return 0, 0, fmt.Errorf("storage space verification not yet implemented for windows")
+}
+func unixVerifyDiskStorage(storagePath string) (uint64, uint64, error) {
+	var stat syscall.Statfs_t
+	err := syscall.Statfs(storagePath, &stat)
+	if err != nil {
+		return 0, 0, err
+	}
+	size := stat.Blocks * uint64(stat.Bsize)
+	avail := stat.Bavail * uint64(stat.Bsize)
+	used := size - avail
+	twox := used + used
+	safty_buf := (twox * 15) / 100
+	return avail, used + safty_buf, nil
+}
+func (m *migrationManager) verifyDiskStorage() error {
+	storagePath := m.rootConfig.DBPath
+	if runtime.GOOS == "windows" {
+		avail, required, err := windowsVerifyDiskStorage(storagePath)
+		if err != nil {
+			return err
+		}
+		if avail < required {
+			return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
+		}
+	} else {
+		avail, required, err := unixVerifyDiskStorage(storagePath)
+		if err != nil {
+			return err
+		}
+		if avail < required {
+			return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
+		}
+	}
+	return nil
 }
 
 // Return true if the database should be migrated from the previous database version
