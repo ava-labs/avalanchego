@@ -61,8 +61,8 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount time.Duration
-	subnetSync  chan<- struct{}
+	delayAmount    time.Duration
+	subnetSyncSema chan<- struct{}
 
 	parser *parser
 }
@@ -110,7 +110,7 @@ func (b *Bootstrapper) Initialize(
 }
 
 //Dirty, should be in initialize. TODO: fix
-func (b *Bootstrapper) SetupSubnetSync(subnetSync chan<- struct{}) { b.subnetSync = subnetSync }
+func (b *Bootstrapper) SetSubnetSyncSema(subnetSync chan<- struct{}) { b.subnetSyncSema = subnetSync }
 
 // CurrentAcceptedFrontier returns the last accepted block
 func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
@@ -376,8 +376,8 @@ func (b *Bootstrapper) checkFinish() error {
 		}
 
 		return b.RestartBootstrap(true)
-	} else if b.subnetSync != nil { //UTs may have this nil
-		b.subnetSync <- struct{}{}
+	} else if b.subnetSyncSema != nil {
+		b.subnetSyncSema <- struct{}{}
 	}
 
 	return b.finish()

@@ -116,8 +116,8 @@ type Handler struct {
 	toClose func()
 	closing utils.AtomicBool
 
-	delay      *Delay
-	subnetSync <-chan struct{}
+	delay          *Delay
+	subnetSyncSema <-chan struct{}
 }
 
 // Initialize this consensus handler
@@ -191,7 +191,7 @@ func (h *Handler) Initialize(
 	h.engine = engine
 	h.validators = validators
 	h.delay = delay
-	h.subnetSync = subnetSync
+	h.subnetSyncSema = subnetSync
 	return nil
 }
 
@@ -219,7 +219,7 @@ func (h *Handler) Dispatch() {
 
 			msg, err := h.serviceQueue.PopMessage()
 			if err != nil {
-				h.ctx.Log.Warn("Could not pop messsage from service queue")
+				h.ctx.Log.Warn("Could not pop message from service queue")
 				continue
 			}
 			if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
@@ -271,12 +271,13 @@ func (h *Handler) dispatchMsg(msg message) {
 			until = maxSleepDuration
 		}
 
-		if h.subnetSync != nil { //UTs may have this nil
+		if h.subnetSyncSema != nil {
+			// sleep but break as soon as subnet is synced
 			select {
 			case <-time.After(until):
-				//sleep done, move to processing
-			case <-h.subnetSync:
-				//subnet boostrapped, just cut waiting and go ahead processing the message
+				// do nothing
+			case <-h.subnetSyncSema:
+				// do nothing
 			}
 		}
 	}

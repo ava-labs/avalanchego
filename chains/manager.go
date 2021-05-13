@@ -613,7 +613,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	delay := &router.Delay{}
-	subnetSync := make(chan struct{}) //should it be bounded?
+	subnetSyncSema := make(chan struct{}) //should it be bounded?
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
@@ -641,7 +641,7 @@ func (m *manager) createSnowmanChain(
 	}); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
-	engine.SetupSubnetSync(subnetSync)
+	engine.SetSubnetSyncSema(subnetSyncSema)
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -656,7 +656,7 @@ func (m *manager) createSnowmanChain(
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 		delay,
-		subnetSync,
+		subnetSyncSema,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
