@@ -25,8 +25,6 @@ import (
 
 var (
 	errNonSortedAndUniqueDBs = errors.New("managed databases were not sorted and unique")
-	BootstrappedKey          = []byte{0x00}
-	dbPrefix                 = []byte{0x01}
 	errNoDBs                 = errors.New("no dbs given")
 )
 

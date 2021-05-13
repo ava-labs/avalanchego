@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -53,7 +54,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 		}
 	}()
 
-	currentDBBootstrapped, err := dbManager.Current().Has(manager.BootstrappedKey)
+	currentDBBootstrapped, err := dbManager.Current().Has(chains.BootstrappedKey)
 	if err != nil {
 		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", node.DatabaseVersion, err)
 	}

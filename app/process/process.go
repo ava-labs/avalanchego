@@ -3,6 +3,7 @@ package process
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/nat"
@@ -110,7 +111,7 @@ func (a *App) Start() int {
 	}
 
 	// ensure migrations are done
-	currentDBBootstrapped, err := dbManager.Current().Has(manager.BootstrappedKey)
+	currentDBBootstrapped, err := dbManager.Current().Has(chains.BootstrappedKey)
 	if err != nil {
 		a.log.Fatal("couldn't get whether database version %s ever bootstrapped: %s", node.DatabaseVersion, err)
 		return 1
@@ -162,7 +163,7 @@ func (a *App) Start() int {
 	crypto.EnableCrypto = a.config.EnableCrypto
 
 	if err := a.config.ConsensusParams.Valid(); err != nil {
-		a.log.Error("consensus parameters are invalid: %s", err)
+		a.log.Fatal("consensus parameters are invalid: %s", err)
 		return 1
 	}
 
@@ -220,7 +221,7 @@ func (a *App) Start() int {
 
 	a.log.Info("this node's IP is set to: %s", a.config.StakingIP.IP())
 	if err := a.node.Initialize(&a.config, dbManager, a.log, logFactory); err != nil {
-		a.log.Error("error initializing node: %s", err)
+		a.log.Fatal("error initializing node: %s", err)
 		return 1
 	}
 

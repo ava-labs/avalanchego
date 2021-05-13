@@ -47,6 +47,10 @@ const (
 	defaultChannelSize = 1024
 )
 
+var (
+	BootstrappedKey = []byte{0x00}
+)
+
 // Manager manages the chains running on this node.
 // It can:
 //   * Create a chain
@@ -238,7 +242,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 				onFinish: func() {
 					// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
 					// If running in fetch only mode, shut down node since fetching is complete.
-					if err := m.DBManager.Current().Put(dbManager.BootstrappedKey, nil); err != nil {
+					if err := m.DBManager.Current().Put(BootstrappedKey, nil); err != nil {
 						m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
 						go m.ShutdownNodeFunc(1)
 					}
