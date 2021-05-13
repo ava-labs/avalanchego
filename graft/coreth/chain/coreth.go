@@ -116,6 +116,10 @@ func (self *ETHChain) SetOnSealHash(cb func(*types.Header)) {
 	self.cb.OnSealHash = cb
 }
 
+func (self *ETHChain) SetOnBuild(cb func(*types.Block) error) {
+	self.mcb.OnBuild = cb
+}
+
 func (self *ETHChain) SetOnSealFinish(cb func(*types.Block) error) {
 	self.mcb.OnSealFinish = cb
 }

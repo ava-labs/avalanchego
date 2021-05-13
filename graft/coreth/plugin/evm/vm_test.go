@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	accountKeystore "github.com/ava-labs/coreth/accounts/keystore"
@@ -3096,5 +3097,63 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 
 	if b := vm.chain.GetBlockByNumber(blkHeight); b.Hash() != blkHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkHeight, blkHash.Hex(), b.Hash().Hex())
+	}
+}
+
+func TestBuildInvalidBlockHead(t *testing.T) {
+	issuer, vm, _, _ := GenesisVM(t, true, genesisJSONApricotPhase0)
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key0 := testKeys[0]
+	addr0 := key0.PublicKey().Address()
+
+	// Create the transaction
+	utx := &UnsignedImportTx{
+		NetworkID:    vm.ctx.NetworkID,
+		BlockchainID: vm.ctx.ChainID,
+		Outs: []EVMOutput{{
+			Address: common.Address(addr0),
+			Amount:  1 * units.Avax,
+			AssetID: vm.ctx.AVAXAssetID,
+		}},
+		ImportedInputs: []*avax.TransferableInput{
+			{
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: 1 * units.Avax,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{0},
+					},
+				},
+			},
+		},
+		SourceChain: vm.ctx.XChainID,
+	}
+	tx := &Tx{UnsignedAtomicTx: utx}
+	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key0}}); err != nil {
+		t.Fatal(err)
+	}
+
+	currentBlock := vm.chain.BlockChain().CurrentBlock()
+
+	if err := vm.issueTx(tx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	if _, err := vm.BuildBlock(); err == nil {
+		t.Fatalf("Unexpectedly created a block")
+	}
+
+	newCurrentBlock := vm.chain.BlockChain().CurrentBlock()
+
+	if currentBlock.Hash() != newCurrentBlock.Hash() {
+		t.Fatal("current block changed")
 	}
 }
