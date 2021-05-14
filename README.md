@@ -95,7 +95,7 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files
 
-To use this script, you must have protoc and protoc-gen-go and have protoc on your $PATH 
+To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) and protoc-gen-go installed. protoc must be on your $PATH.
 
 https://grpc.io/docs/protoc-installation/
 
