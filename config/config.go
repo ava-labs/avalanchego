@@ -246,6 +246,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
+	// Build directory
+	fs.String(BuildDirKey, DefaultString, "path to the build directory")
 
 	return fs
 }
