@@ -1,4 +1,4 @@
-https://www.quantamagazine.org/how-mathematicians-use-homology-to-make-sense-of-topology-20210511/<div align="center">
+<div align="center">
   <img src="resources/AvalancheLogoRed.png?raw=true">
 </div>
 
@@ -8,7 +8,6 @@ Official node implementation of the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
 
 ## Installation
-https://www.quantamagazine.org/how-mathematicians-use-homology-to-make-sense-of-topology-20210511/
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
 
 - Hardware: 2 GHz or faster CPU, 4 GB RAM, 20 GB hard disk.
