@@ -3,9 +3,7 @@
 
 package platformvm
 
-var (
-	_ currentValidator = &currentValidatorImpl{}
-)
+var _ currentValidator = &currentValidatorImpl{}
 
 type currentValidator interface {
 	validator

@@ -200,6 +200,7 @@ func (h *testHandler) Connected(id ids.ShortID) {
 		h.connected(id)
 	}
 }
+
 func (h *testHandler) Disconnected(id ids.ShortID) {
 	if h.disconnected != nil {
 		h.disconnected(id)

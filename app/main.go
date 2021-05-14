@@ -19,10 +19,8 @@ import (
 	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
 )
 
-var (
-	// GitCommit should be optionally set at compile time.
-	GitCommit string
-)
+// GitCommit should be optionally set at compile time.
+var GitCommit string
 
 // main runs an AvalancheGo node.
 // If specified in the config, serves a hashicorp plugin that can be consumed by

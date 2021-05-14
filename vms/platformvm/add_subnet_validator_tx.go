@@ -149,9 +149,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			}
 		}
 
-		var (
-			vdrTx *UnsignedAddValidatorTx
-		)
+		var vdrTx *UnsignedAddValidatorTx
 		if err == nil {
 			// This validator is attempting to validate with a currently
 			// validing node.

@@ -2197,9 +2197,7 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	}
 
 	queried = false
-	var (
-		asked bool
-	)
+	var asked bool
 	sender.PushQueryF = func(_ ids.ShortSet, rID uint32, _ ids.ID, blkBytes []byte) {
 		queried = true
 	}

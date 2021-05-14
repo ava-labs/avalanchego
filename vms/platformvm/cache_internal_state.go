@@ -443,6 +443,7 @@ func (st *internalStateImpl) GetSubnets() ([]*Tx, error) {
 	st.cachedSubnets = txs
 	return txs, nil
 }
+
 func (st *internalStateImpl) AddSubnet(createSubnetTx *Tx) {
 	st.addedSubnets = append(st.addedSubnets, createSubnetTx)
 	if st.cachedSubnets != nil {

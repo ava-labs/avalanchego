@@ -19,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -94,7 +92,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 		if err := out.Verify(); err != nil {
 			return fmt.Errorf("output verification failed: %w", err)
 		}
-		newWeight, err := safemath.Add64(totalStakeWeight, out.Output().Amount())
+		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}
@@ -224,7 +222,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 			return nil, nil, nil, nil, permError{err}
 		}
 
-		maximumWeight, err := safemath.Mul64(MaxValidatorWeightFactor, vdrWeight)
+		maximumWeight, err := math.Mul64(MaxValidatorWeightFactor, vdrWeight)
 		if err != nil {
 			return nil, nil, nil, nil, permError{errStakeOverflow}
 		}
@@ -342,7 +340,7 @@ func CanDelegate(
 	if err != nil {
 		return false, err
 	}
-	newMaxStake, err := safemath.Add64(maxStake, new.Validator.Wght)
+	newMaxStake, err := math.Add64(maxStake, new.Validator.Wght)
 	if err != nil {
 		return false, err
 	}
@@ -394,7 +392,7 @@ func MaxStakeAmount(
 			toRemove := toRemoveHeap[0]
 			toRemoveHeap = toRemoveHeap[1:]
 
-			currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
+			currentStake, err = math.Sub64(currentStake, toRemove.Wght)
 			if err != nil {
 				return 0, err
 			}
@@ -426,7 +424,7 @@ func MaxStakeAmount(
 		toRemove := toRemoveHeap[0]
 		toRemoveHeap = toRemoveHeap[1:]
 
-		currentStake, err = safemath.Sub64(currentStake, toRemove.Wght)
+		currentStake, err = math.Sub64(currentStake, toRemove.Wght)
 		if err != nil {
 			return 0, err
 		}
@@ -519,7 +517,7 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 		}
 
 		currentWeight := vdrTx.Weight()
-		currentWeight, err = safemath.Add64(currentWeight, currentValidator.DelegatorWeight())
+		currentWeight, err = math.Add64(currentWeight, currentValidator.DelegatorWeight())
 		if err != nil {
 			return 0, err
 		}

@@ -161,7 +161,7 @@ func (c *connection) readMessage() error {
 	case cmd.NewBloom != nil:
 		err = c.handleNewBloom(cmd.NewBloom)
 	case cmd.NewSet != nil:
-		err = c.handleNewSet(cmd.NewSet)
+		c.handleNewSet(cmd.NewSet)
 	case cmd.AddAddresses != nil:
 		err = c.handleAddAddresses(cmd.AddAddresses)
 	default:
@@ -187,9 +187,8 @@ func (c *connection) handleNewBloom(cmd *NewBloom) error {
 	return nil
 }
 
-func (c *connection) handleNewSet(cmd *NewSet) error {
+func (c *connection) handleNewSet(_ *NewSet) {
 	c.fp.NewSet()
-	return nil
 }
 
 func (c *connection) handleAddAddresses(cmd *AddAddresses) error {

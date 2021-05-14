@@ -120,12 +120,15 @@ type innerSortWeightedArray []weightedArrayElement
 func (lst innerSortWeightedArray) Less(i, j int) bool {
 	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
 }
+
 func (lst innerSortWeightedArray) Len() int {
 	return len(lst)
 }
+
 func (lst innerSortWeightedArray) Swap(i, j int) {
 	lst[j], lst[i] = lst[i], lst[j]
 }
+
 func sortWeightedArray(lst []weightedArrayElement) {
 	sort.Sort(innerSortWeightedArray(lst))
 }

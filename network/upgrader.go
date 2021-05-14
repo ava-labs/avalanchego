@@ -13,9 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var (
-	errNoCert = errors.New("tls handshake finished with no peer certificate")
-)
+var errNoCert = errors.New("tls handshake finished with no peer certificate")
 
 // Upgrader ...
 type Upgrader interface {

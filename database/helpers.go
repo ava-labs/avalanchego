@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	errWrongSize = errors.New("value has unexpected size")
-)
+var errWrongSize = errors.New("value has unexpected size")
 
 const (
 	// kvPairOverhead is an estimated overhead for a kv pair in a database.

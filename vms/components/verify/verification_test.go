@@ -8,9 +8,7 @@ import (
 	"testing"
 )
 
-var (
-	errTest = errors.New("non-nil error")
-)
+var errTest = errors.New("non-nil error")
 
 type testVerifiable struct{ err error }
 

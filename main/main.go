@@ -15,10 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	// GitCommit should be optionally set at compile time.
-	GitCommit string
-)
+// GitCommit should be optionally set at compile time.
+var GitCommit string
 
 // main is the entry point to AvalancheGo.
 func main() {

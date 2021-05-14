@@ -36,10 +36,6 @@ func (s *testState) addNode(nodeID ids.ShortID, startTime time.Time) {
 	}
 }
 
-func (s *testState) deleteNode(nodeID ids.ShortID) {
-	delete(s.nodes, nodeID)
-}
-
 func (s *testState) GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error) {
 	up, exists := s.nodes[nodeID]
 	if !exists {

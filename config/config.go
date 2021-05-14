@@ -48,7 +48,7 @@ var (
 	homeDir                = os.ExpandEnv("$HOME")
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
-	defaultDbDir           = filepath.Join(defaultDataDir, "db")
+	defaultDBDir           = filepath.Join(defaultDataDir, "db")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	// Places to look for the build directory
@@ -98,8 +98,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint64(TxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
 	fs.Uint64(CreationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 	// Database
-	fs.Bool(DbEnabledKey, true, "Turn on persistent storage")
-	fs.String(DbPathKey, defaultDbDir, "Path to database directory")
+	fs.Bool(DBEnabledKey, true, "Turn on persistent storage")
+	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
 	// Coreth config
 	fs.String(CorethConfigKey, "", "Specifies config to pass into coreth")
 	// Logging
@@ -359,9 +359,9 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.NetworkID = networkID
 
 	// DB:
-	nodeConfig.DBEnabled = v.GetBool(DbEnabledKey)
+	nodeConfig.DBEnabled = v.GetBool(DBEnabledKey)
 	nodeConfig.DBPath = path.Join(
-		os.ExpandEnv(v.GetString(DbPathKey)),
+		os.ExpandEnv(v.GetString(DBPathKey)),
 		constants.NetworkName(nodeConfig.NetworkID),
 	)
 

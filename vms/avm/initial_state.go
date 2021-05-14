@@ -77,6 +77,7 @@ func (vers *innerSortState) Swap(i, j int) { v := vers.vers; v[j], v[i] = v[i], 
 func sortState(vers []verify.State, c codec.Manager) {
 	sort.Sort(&innerSortState{vers: vers, codec: c})
 }
+
 func isSortedState(vers []verify.State, c codec.Manager) bool {
 	return sort.IsSorted(&innerSortState{vers: vers, codec: c})
 }

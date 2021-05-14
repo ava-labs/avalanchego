@@ -19,32 +19,30 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var (
-	Tests = []func(*testing.T, Factory){
-		MetricsTest,
-		ParamsTest,
-		NumProcessingTest,
-		AddTest,
-		VertexIssuedTest,
-		TxIssuedTest,
-		VirtuousTest,
-		VirtuousSkippedUpdateTest,
-		VotingTest,
-		IgnoreInvalidVotingTest,
-		TransitiveVotingTest,
-		SplitVotingTest,
-		TransitiveRejectionTest,
-		IsVirtuousTest,
-		QuiesceTest,
-		OrphansTest,
-		ErrorOnVacuousAcceptTest,
-		ErrorOnTxAcceptTest,
-		ErrorOnVtxAcceptTest,
-		ErrorOnVtxRejectTest,
-		ErrorOnParentVtxRejectTest,
-		ErrorOnTransitiveVtxRejectTest,
-	}
-)
+var Tests = []func(*testing.T, Factory){
+	MetricsTest,
+	ParamsTest,
+	NumProcessingTest,
+	AddTest,
+	VertexIssuedTest,
+	TxIssuedTest,
+	VirtuousTest,
+	VirtuousSkippedUpdateTest,
+	VotingTest,
+	IgnoreInvalidVotingTest,
+	TransitiveVotingTest,
+	SplitVotingTest,
+	TransitiveRejectionTest,
+	IsVirtuousTest,
+	QuiesceTest,
+	OrphansTest,
+	ErrorOnVacuousAcceptTest,
+	ErrorOnTxAcceptTest,
+	ErrorOnVtxAcceptTest,
+	ErrorOnVtxRejectTest,
+	ErrorOnParentVtxRejectTest,
+	ErrorOnTransitiveVtxRejectTest,
+}
 
 func ConsensusTest(t *testing.T, factory Factory) {
 	for _, test := range Tests {

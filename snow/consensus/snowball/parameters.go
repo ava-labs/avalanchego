@@ -46,25 +46,25 @@ type Parameters struct {
 func (p Parameters) Verify() error {
 	switch {
 	case p.Alpha <= p.K/2:
-		return fmt.Errorf("K = %d, Alpha = %d: Fails the condition that: K/2 < Alpha", p.K, p.Alpha)
+		return fmt.Errorf("k = %d, alpha = %d: fails the condition that: k/2 < alpha", p.K, p.Alpha)
 	case p.K < p.Alpha:
-		return fmt.Errorf("K = %d, Alpha = %d: Fails the condition that: Alpha <= K", p.K, p.Alpha)
+		return fmt.Errorf("k = %d, alpha = %d: fails the condition that: alpha <= k", p.K, p.Alpha)
 	case p.BetaVirtuous <= 0:
-		return fmt.Errorf("BetaVirtuous = %d: Fails the condition that: 0 < BetaVirtuous", p.BetaVirtuous)
+		return fmt.Errorf("betaVirtuous = %d: fails the condition that: 0 < betaVirtuous", p.BetaVirtuous)
 	case p.BetaRogue == 3 && p.BetaVirtuous == 28:
-		return fmt.Errorf("BetaVirtuous = %d, BetaRogue = %d: Fails the condition that: BetaVirtuous <= BetaRogue\n%s", p.BetaVirtuous, p.BetaRogue, errMsg)
+		return fmt.Errorf("betaVirtuous = %d, betaRogue = %d: fails the condition that: betaVirtuous <= betaRogue\n%s", p.BetaVirtuous, p.BetaRogue, errMsg)
 	case p.BetaRogue < p.BetaVirtuous:
-		return fmt.Errorf("BetaVirtuous = %d, BetaRogue = %d: Fails the condition that: BetaVirtuous <= BetaRogue", p.BetaVirtuous, p.BetaRogue)
+		return fmt.Errorf("betaVirtuous = %d, betaRogue = %d: fails the condition that: betaVirtuous <= betaRogue", p.BetaVirtuous, p.BetaRogue)
 	case p.ConcurrentRepolls <= 0:
-		return fmt.Errorf("ConcurrentRepolls = %d: Fails the condition that: 0 < ConcurrentRepolls", p.ConcurrentRepolls)
+		return fmt.Errorf("concurrentRepolls = %d: fails the condition that: 0 < concurrentRepolls", p.ConcurrentRepolls)
 	case p.ConcurrentRepolls > p.BetaRogue:
-		return fmt.Errorf("ConcurrentRepolls = %d, BetaRogue = %d: Fails the condition that: ConcurrentRepolls <= BetaRogue", p.ConcurrentRepolls, p.BetaRogue)
+		return fmt.Errorf("concurrentRepolls = %d, betaRogue = %d: fails the condition that: concurrentRepolls <= betaRogue", p.ConcurrentRepolls, p.BetaRogue)
 	case p.OptimalProcessing <= 0:
-		return fmt.Errorf("OptimalProcessing = %d: Fails the condition that: 0 < OptimalProcessing", p.OptimalProcessing)
+		return fmt.Errorf("optimalProcessing = %d: fails the condition that: 0 < optimalProcessing", p.OptimalProcessing)
 	case p.MaxOutstandingItems <= 0:
-		return fmt.Errorf("MaxOutstandingItems = %d: Fails the condition that: 0 < MaxOutstandingItems", p.MaxOutstandingItems)
+		return fmt.Errorf("maxOutstandingItems = %d: fails the condition that: 0 < maxOutstandingItems", p.MaxOutstandingItems)
 	case p.MaxItemProcessingTime <= 0:
-		return fmt.Errorf("MaxItemProcessingTime = %d: Fails the condition that: 0 < MaxItemProcessingTime", p.MaxItemProcessingTime)
+		return fmt.Errorf("maxItemProcessingTime = %d: fails the condition that: 0 < maxItemProcessingTime", p.MaxItemProcessingTime)
 	default:
 		return nil
 	}

@@ -18,13 +18,11 @@ var addrStrArray = []string{
 	"Jz9ayEDt7dx9hDx45aXALujWmL9ZUuqe7",
 }
 
-var (
-	testHRP = constants.NetworkIDToHRP[networkID]
-)
+var testHRP = constants.NetworkIDToHRP[networkID]
 
 func TestBuildGenesis(t *testing.T) {
 	ss := CreateStaticService()
-	var addrMap = map[string]string{}
+	addrMap := map[string]string{}
 	for _, addrStr := range addrStrArray {
 		b, err := formatting.Decode(formatting.CB58, addrStr)
 		if err != nil {
@@ -98,7 +96,8 @@ func TestBuildGenesis(t *testing.T) {
 					},
 				},
 			},
-		}}
+		},
+	}
 	reply := BuildGenesisReply{}
 	err := ss.BuildGenesis(nil, &args, &reply)
 	if err != nil {
