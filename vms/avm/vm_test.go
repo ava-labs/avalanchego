@@ -36,14 +36,10 @@ var (
 	platformChainID        = ids.Empty.Prefix(0)
 	testTxFee              = uint64(1000)
 	startBalance           = uint64(50000)
-)
 
-var (
 	keys  []*crypto.PrivateKeySECP256K1R
 	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
-)
 
-var (
 	assetID  = ids.ID{1, 2, 3}
 	username = "bobby"
 	password = "StrnasfqewiurPasswdn56d" // #nosec G101
