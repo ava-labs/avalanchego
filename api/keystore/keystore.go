@@ -120,13 +120,6 @@ func New(log logging.Logger, dbManager manager.Manager) (Keystore, error) {
 		userDB:             prefixdb.New(usersPrefix, currentDB.Database),
 		bcDB:               prefixdb.New(bcsPrefix, currentDB.Database),
 	}
-
-	userIterator := keystore.userDB.NewIterator()
-	defer userIterator.Release()
-	for userIterator.Next() {
-		fmt.Printf("here: 0x%x\n", userIterator.Key())
-	}
-
 	return keystore, keystore.migrate(dbManager)
 }
 
