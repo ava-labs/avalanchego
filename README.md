@@ -90,13 +90,12 @@ This launches an Avalanche network with one node.
 
 
 ### Running protobuf codegen
-To regenerate the protobuf go code, run scripts/protobuf_codegen.sh from the root of the repo
+To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the root of the repo
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files
 
-To use this script, you must have protoc and protoc-gen-go and have protoc on your $PATH 
+To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) and protoc-gen-go installed. protoc must be on your $PATH.
 
-https://grpc.io/docs/protoc-installation/
 
 If you extract protoc to ~/software/protobuf/, the following should work:
 ```sh
@@ -104,4 +103,3 @@ $ export PATH=$PATH:~/software/protobuf/bin/:~/go/bin
 $ go get google.golang.org/protobuf/cmd/protoc-gen-go
 $ scripts/protobuf_codegen.sh
 ```
-
