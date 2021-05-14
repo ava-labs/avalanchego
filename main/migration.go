@@ -75,8 +75,8 @@ func unixVerifyDiskStorage(storagePath string) (uint64, uint64, error) {
 	}
 	avail := stat.Bavail * uint64(stat.Bsize)
 	twox := size + size
-	safty_buf := (twox * 15) / 100
-	return avail, size + safty_buf, nil
+	saftyBuf := (twox * 15) / 100
+	return avail, size + saftyBuf, nil
 }
 
 func (m *migrationManager) verifyDiskStorage() error {
