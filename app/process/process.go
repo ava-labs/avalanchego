@@ -114,7 +114,7 @@ func (a *App) Start() int {
 	}
 
 	// ensure migrations are done
-	currentDBBootstrapped, err := dbManager.Current().Has(chains.BootstrappedKey)
+	currentDBBootstrapped, err := dbManager.Current().Database.Has(chains.BootstrappedKey)
 	if err != nil {
 		a.log.Fatal("couldn't get whether database version %s ever bootstrapped: %s", node.DatabaseVersion, err)
 		return 1

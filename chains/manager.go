@@ -242,7 +242,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 				onFinish: func() {
 					// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
 					// If running in fetch only mode, shut down node since fetching is complete.
-					if err := m.DBManager.Current().Put(BootstrappedKey, nil); err != nil {
+					if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
 						m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
 						go m.ShutdownNodeFunc(1)
 					}
@@ -476,9 +476,9 @@ func (m *manager) createAvalancheChain(
 	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
 	db := dbManager.Current()
-	vertexDB := prefixdb.New([]byte("vertex"), db)
-	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
-	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
+	vertexDB := prefixdb.New([]byte("vertex"), db.Database)
+	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
+	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
 
 	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Metrics)
 	if err != nil {
@@ -607,7 +607,7 @@ func (m *manager) createSnowmanChain(
 	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
 	db := dbManager.Current()
-	bootstrappingDB := prefixdb.New([]byte("bs"), db)
+	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
 	if err != nil {
