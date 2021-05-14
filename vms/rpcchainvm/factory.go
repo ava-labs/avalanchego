@@ -29,11 +29,19 @@ type Factory struct {
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	// Ignore warning from launching an executable with a variable command
 	// because the command is a controlled and required input
-	// #nosec G204
+	var cmd *exec.Cmd
+	if len(f.Config) > 0 {
+		// #nosec G204
+		cmd = exec.Command(f.Path, fmt.Sprintf("--config=%s", f.Config))
+	} else {
+		// #nosec G204
+		cmd = exec.Command(f.Path)
+	}
+
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             exec.Command(f.Path, fmt.Sprintf("--config=%s", f.Config)),
+		Cmd:             cmd,
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,

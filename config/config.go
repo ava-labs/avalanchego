@@ -323,34 +323,33 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 
 	// Logging:
-	loggingconfig, err := logging.DefaultConfig()
+	loggingConfig, err := logging.DefaultConfig()
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
-	logsDir := v.GetString(LogsDirKey)
-	if logsDir != "" {
-		loggingconfig.Directory = logsDir
+	if v.IsSet(LogsDirKey) {
+		loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
 	}
-	loggingconfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
+	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
-	logDisplayLevel := v.GetString(LogDisplayLevelKey)
-	if logDisplayLevel == "" {
-		logDisplayLevel = v.GetString(LogLevelKey)
+	logDisplayLevel := v.GetString(LogLevelKey)
+	if v.IsSet(LogDisplayLevelKey) {
+		logDisplayLevel = v.GetString(LogDisplayLevelKey)
 	}
 	displayLevel, err := logging.ToLevel(logDisplayLevel)
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
-	loggingconfig.DisplayLevel = displayLevel
+	loggingConfig.DisplayLevel = displayLevel
 
-	loggingconfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
 
-	nodeConfig.LoggingConfig = loggingconfig
+	nodeConfig.LoggingConfig = loggingConfig
 
 	// NetworkID
 	networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
@@ -361,8 +360,10 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// DB:
 	nodeConfig.DBEnabled = v.GetBool(DbEnabledKey)
-	nodeConfig.DBPath = os.ExpandEnv(v.GetString(DbPathKey))
-	nodeConfig.DBPath = path.Join(nodeConfig.DBPath, constants.NetworkName(nodeConfig.NetworkID))
+	nodeConfig.DBPath = path.Join(
+		os.ExpandEnv(v.GetString(DbPathKey)),
+		constants.NetworkName(nodeConfig.NetworkID),
+	)
 
 	// IP configuration
 	// Resolves our public IP, or does nothing
@@ -488,8 +489,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.HTTPHost = v.GetString(HTTPHostKey)
 	nodeConfig.HTTPPort = uint16(v.GetUint(HTTPPortKey))
 	nodeConfig.HTTPSEnabled = v.GetBool(HTTPSEnabledKey)
-	nodeConfig.HTTPSKeyFile = v.GetString(HTTPSKeyFileKey)
-	nodeConfig.HTTPSCertFile = v.GetString(HTTPSCertFileKey)
+	nodeConfig.HTTPSKeyFile = os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
+	nodeConfig.HTTPSCertFile = os.ExpandEnv(v.GetString(HTTPSCertFileKey))
 	nodeConfig.APIAllowedOrigins = v.GetStringSlice(HTTPAllowedOrigins)
 
 	// API Auth
@@ -536,9 +537,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	}
 
 	// IPCs
-	ipcsChainIDs := v.GetString(IpcsChainIDsKey)
-	if ipcsChainIDs != "" {
-		nodeConfig.IPCDefaultChainIDs = strings.Split(ipcsChainIDs, ",")
+	if v.IsSet(IpcsChainIDsKey) {
+		nodeConfig.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
 	}
 
 	if v.IsSet(IpcsPathKey) {
@@ -667,7 +667,10 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	}
 
 	// Load genesis data
-	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(GenesisConfigFileKey))
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
+		networkID,
+		os.ExpandEnv(v.GetString(GenesisConfigFileKey)),
+	)
 	if err != nil {
 		return node.Config{}, process.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
