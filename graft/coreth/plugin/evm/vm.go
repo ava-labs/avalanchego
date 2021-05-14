@@ -267,8 +267,8 @@ func (vm *VM) Initialize(
 	fxs []*commonEng.Fx,
 ) error {
 	log.Info("Initializing Coreth VM", "Version", Version)
-	if vm.CLIConfig.ParsingError != nil {
-		return vm.CLIConfig.ParsingError
+	if vm.CLIConfig.FlagError != nil {
+		return vm.CLIConfig.FlagError
 	}
 
 	if len(fxs) > 0 {
