@@ -15,13 +15,14 @@ type Config struct {
 	Validators validators.Set
 	Beacons    validators.Set
 
-	SampleK       int
-	StartupAlpha  uint64
-	Alpha         uint64
-	Sender        Sender
-	Bootstrapable Bootstrapable
-	Subnet        Subnet
-	Delay         Delay
+	SampleK            int
+	StartupAlpha       uint64
+	Alpha              uint64
+	Sender             Sender
+	Bootstrapable      Bootstrapable
+	Subnet             Subnet
+	Delay              Delay
+	SignalSubnetSynced func()
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool

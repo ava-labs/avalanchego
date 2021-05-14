@@ -152,6 +152,25 @@ type ManagerConfig struct {
 	ChainConfigs              map[ids.ID]ChainConfig
 }
 
+type syncedSubnetSignal struct {
+	// channel allowing all listeners to wake up as soon as whole subnet gets synced.
+	// Closing it down signals to all handlers that subnet is synced.
+	mu                    sync.Mutex
+	subnetFullySyncedSema chan struct{}
+	subnetFullySyncedDone bool
+}
+
+func (sign *syncedSubnetSignal) SignalSubnetSynced() {
+	if sign != nil {
+		sign.mu.Lock()
+		defer sign.mu.Unlock()
+		if !sign.subnetFullySyncedDone {
+			close(sign.subnetFullySyncedSema)
+			sign.subnetFullySyncedDone = true
+		}
+	}
+}
+
 type manager struct {
 	// Note: The string representation of a chain's ID is also considered to be an alias of the chain
 	// That is, [chainID].String() is an alias for the chain, too
@@ -172,6 +191,8 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]*router.Handler
+
+	subnetSignal syncedSubnetSignal
 }
 
 // New returns a new Manager
@@ -182,6 +203,7 @@ func New(config *ManagerConfig) Manager {
 		chains:        make(map[ids.ID]*router.Handler),
 	}
 	m.Initialize()
+	m.subnetSignal.subnetFullySyncedSema = make(chan struct{})
 	return m
 }
 
@@ -498,6 +520,7 @@ func (m *manager) createAvalancheChain(
 				Sender:                    &sender,
 				Subnet:                    sb,
 				Delay:                     delay,
+				SignalSubnetSynced:        m.subnetSignal.SignalSubnetSynced,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -529,7 +552,6 @@ func (m *manager) createAvalancheChain(
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
-	subnetSync := make(chan struct{}) //should it be bounded?
 	err = handler.Initialize(
 		engine,
 		validators,
@@ -541,7 +563,7 @@ func (m *manager) createAvalancheChain(
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 		delay,
-		subnetSync,
+		m.subnetSignal.subnetFullySyncedSema,
 	)
 
 	return &chain{
@@ -613,7 +635,6 @@ func (m *manager) createSnowmanChain(
 	}
 
 	delay := &router.Delay{}
-	subnetSyncSema := make(chan struct{}) //should it be bounded?
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
@@ -629,6 +650,7 @@ func (m *manager) createSnowmanChain(
 				Sender:                    &sender,
 				Subnet:                    sb,
 				Delay:                     delay,
+				SignalSubnetSynced:        m.subnetSignal.SignalSubnetSynced,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -641,7 +663,6 @@ func (m *manager) createSnowmanChain(
 	}); err != nil {
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
-	engine.SetSubnetSyncSema(subnetSyncSema)
 
 	// Asynchronously passes messages from the network to the consensus engine
 	handler := &router.Handler{}
@@ -656,7 +677,7 @@ func (m *manager) createSnowmanChain(
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 		delay,
-		subnetSyncSema,
+		m.subnetSignal.subnetFullySyncedSema,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)
