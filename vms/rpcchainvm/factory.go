@@ -15,9 +15,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 )
 
-var (
-	errWrongVM = errors.New("wrong vm type")
-)
+var errWrongVM = errors.New("wrong vm type")
 
 // Factory ...
 type Factory struct {

@@ -17,9 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var (
-	filePrefix = fmt.Sprintf("%s/", constants.AppName)
-)
+var filePrefix = fmt.Sprintf("%s/", constants.AppName)
 
 // Log ...
 type Log struct {

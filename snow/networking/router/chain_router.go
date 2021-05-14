@@ -607,7 +607,6 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
-
 }
 
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]

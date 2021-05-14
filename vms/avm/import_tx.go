@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errNoImportInputs = errors.New("no import inputs")
-)
+var errNoImportInputs = errors.New("no import inputs")
 
 // ImportTx is a transaction that imports an asset from another blockchain.
 type ImportTx struct {

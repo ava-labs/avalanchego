@@ -52,6 +52,7 @@ func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	}
 	return missing, nil
 }
+
 func (b *blockJob) Execute() error {
 	deps, err := b.MissingDependencies()
 	if err != nil {

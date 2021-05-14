@@ -8,9 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
-	managermocks "github.com/ava-labs/avalanchego/database/manager/mocks"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,12 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+
+	managermocks "github.com/ava-labs/avalanchego/database/manager/mocks"
 )
 
 // // Test that the migrater migrates a validator's uptime
@@ -166,78 +166,4 @@ func TestMigrateUptime(t *testing.T) {
 	).Return(nil).Once()
 	// Do the migration
 	assert.NoError(t, vm.migrateUptimes())
-}
-
-func (um *uptimeMigrater1_4_4) prevVersionSetUptime(prevDB database.Database, validatorID ids.ShortID, uptime *uptimeV100) error {
-	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), prevDB)
-	defer uptimeDB.Close()
-
-	uptimeBytes, err := Codec.Marshal(codecVersion, uptime)
-	if err != nil {
-		return err
-	}
-
-	return uptimeDB.Put(validatorID.Bytes(), uptimeBytes)
-}
-
-// Only used in testing. TODO move to test package.
-// Add a staker to subnet [subnetID]
-// A staker may be a validator or a delegator
-func (um *uptimeMigrater1_4_4) prevVersionAddStaker(db database.Database, subnetID ids.ID, tx *rewardTxV100) error {
-	var (
-		staker   TimedTx
-		priority byte
-	)
-	switch unsignedTx := tx.Tx.UnsignedTx.(type) {
-	case *UnsignedAddDelegatorTx:
-		staker = unsignedTx
-		priority = lowPriority
-	case *UnsignedAddSubnetValidatorTx:
-		staker = unsignedTx
-		priority = mediumPriority
-	case *UnsignedAddValidatorTx:
-		staker = unsignedTx
-		priority = topPriority
-	default:
-		return fmt.Errorf("staker is unexpected type %T", tx.Tx.UnsignedTx)
-	}
-
-	txBytes, err := Codec.Marshal(codecVersion, tx)
-	if err != nil {
-		return err
-	}
-
-	txID := tx.Tx.ID() // Tx ID of this tx
-
-	// Sorted by subnet ID then stop time then tx ID
-	prefixStop := []byte(fmt.Sprintf("%s%s", subnetID, stopDBPrefix))
-	prefixStopDB := prefixdb.NewNested(prefixStop, db)
-
-	stopKey, err := um.prevVersionTimedTxKey(staker.EndTime(), priority, txID)
-	if err != nil {
-		// Close the DB, but ignore the error, as the parent error needs to be
-		// returned.
-		_ = prefixStopDB.Close()
-		return fmt.Errorf("couldn't serialize validator key: %w", err)
-	}
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		prefixStopDB.Put(stopKey, txBytes),
-		prefixStopDB.Close(),
-	)
-
-	return errs.Err
-}
-
-// timedTxKey constructs the key to use for [txID] in stop and start prefix DBs
-func (um *uptimeMigrater1_4_4) prevVersionTimedTxKey(time time.Time, priority byte, txID ids.ID) ([]byte, error) {
-	p := wrappers.Packer{MaxSize: wrappers.LongLen + wrappers.ByteLen + hashing.HashLen}
-	p.PackLong(uint64(time.Unix()))
-	p.PackByte(priority)
-	p.PackFixedBytes(txID[:])
-	if p.Err != nil {
-		return nil, fmt.Errorf("couldn't serialize validator key: %w", p.Err)
-	}
-	return p.Bytes, nil
 }

@@ -168,7 +168,6 @@ func (vm *VMClient) Initialize(
 		EpochFirstTransition: epochFirstTransitionBytes,
 		EpochDuration:        uint64(ctx.EpochDuration),
 	})
-
 	if err != nil {
 		return err
 	}

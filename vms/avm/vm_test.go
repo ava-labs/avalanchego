@@ -30,18 +30,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var networkID uint32 = 10
-var chainID = ids.ID{5, 4, 3, 2, 1}
-var platformChainID = ids.Empty.Prefix(0)
-var testTxFee = uint64(1000)
-var startBalance = uint64(50000)
+var (
+	networkID       uint32 = 10
+	chainID                = ids.ID{5, 4, 3, 2, 1}
+	platformChainID        = ids.Empty.Prefix(0)
+	testTxFee              = uint64(1000)
+	startBalance           = uint64(50000)
 
-var keys []*crypto.PrivateKeySECP256K1R
-var addrs []ids.ShortID // addrs[i] corresponds to keys[i]
+	keys  []*crypto.PrivateKeySECP256K1R
+	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
 
-var assetID = ids.ID{1, 2, 3}
-var username = "bobby"
-var password = "StrnasfqewiurPasswdn56d" // #nosec G101
+	assetID  = ids.ID{1, 2, 3}
+	username = "bobby"
+	password = "StrnasfqewiurPasswdn56d" // #nosec G101
+)
 
 func init() {
 	factory := crypto.FactorySECP256K1R{}
@@ -201,7 +203,8 @@ func BuildGenesisTest(tb testing.TB) []byte {
 					},
 				},
 			},
-		}}
+		},
+	}
 
 	return BuildGenesisTestWithArgs(tb, defaultArgs)
 }
@@ -687,7 +690,8 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 				Symbol:       "SYMB",
 				InitialState: holder,
 			},
-		}}
+		},
+	}
 	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
 	ctx := vm.ctx
 	defer func() {
@@ -1093,10 +1097,12 @@ func TestIssueProperty(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		}},
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{
+		Credential: secp256k1fx.Credential{
+			Sigs: [][crypto.SECP256K1RSigLen]byte{
+				fixedSig,
+			},
+		},
 	})
 
 	signedBytes, err := vm.codec.Marshal(codecVersion, mintPropertyTx)

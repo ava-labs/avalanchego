@@ -23,11 +23,9 @@ const (
 	DefaultMaxMessageSize = 1 << 21
 )
 
-var (
-	// ErrMessageTooLarge is returned when reading a message that is larger than
-	// our max size
-	ErrMessageTooLarge = errors.New("message to large")
-)
+// ErrMessageTooLarge is returned when reading a message that is larger than
+// our max size
+var ErrMessageTooLarge = errors.New("message to large")
 
 // Socket manages sending messages over a socket to many subscribed clients
 type Socket struct {

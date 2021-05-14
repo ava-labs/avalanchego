@@ -26,9 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testChangeAddr = ids.GenerateTestShortID()
-)
+var testChangeAddr = ids.GenerateTestShortID()
 
 // Returns:
 // 1) genesis bytes of vm
@@ -581,6 +579,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	// The balance should include the UTXO since it is partly owned by [addr]
 	assert.Len(t, reply.Balances, 0)
 }
+
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {

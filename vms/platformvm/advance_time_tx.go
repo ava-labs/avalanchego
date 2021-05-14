@@ -12,9 +12,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	_ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
-)
+var _ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
 
 // UnsignedAdvanceTimeTx is a transaction to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and

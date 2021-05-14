@@ -29,9 +29,11 @@ func newTestMsg(op Op, bits []byte) *TestMsg {
 func (m *TestMsg) Op() Op {
 	return m.op
 }
+
 func (*TestMsg) Get(Field) interface{} {
 	return nil
 }
+
 func (m *TestMsg) Bytes() []byte {
 	return m.bytes
 }

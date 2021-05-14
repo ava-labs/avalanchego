@@ -19,9 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/state"
 )
 
-var (
-	errBadData = errors.New("got unexpected value from database")
-)
+var errBadData = errors.New("got unexpected value from database")
 
 // If the status of this ID is not choices.Accepted,
 // the db has not yet been initialized

@@ -27,9 +27,7 @@ const (
 	stacktraceFile = "stacktrace.txt"
 )
 
-var (
-	errAliasTooLong = errors.New("alias length is too long")
-)
+var errAliasTooLong = errors.New("alias length is too long")
 
 // Admin is the API service for node admin management
 type Admin struct {

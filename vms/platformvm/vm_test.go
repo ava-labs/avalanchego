@@ -105,7 +105,6 @@ func init() {
 		"ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN",
 		"2RWLv6YVEXDiWLpaCbXhhqxtLbnFaKQsWPSSMSPhpWo47uJAeV",
 	} {
-
 		privKeyBytes, err := formatting.Decode(formatting.CB58, key)
 		ctx.Log.AssertNoError(err)
 		pk, err := factory.ToPrivateKey(privKeyBytes)
@@ -451,7 +450,7 @@ func TestGenesis(t *testing.T) {
 		}
 		addrs := ids.ShortSet{}
 		addrs.Add(addr)
-		utxos, _, _, err := vm.getAllUTXOs(addrs)
+		utxos, err := vm.getAllUTXOs(addrs)
 		if err != nil {
 			t.Fatal("couldn't find UTXO")
 		} else if len(utxos) != 1 {
@@ -573,7 +572,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 	}
 
 	// Fetch all UTXOs
-	notPaginatedUTXOs, _, _, err := vm.getAllUTXOs(addrsSet)
+	notPaginatedUTXOs, err := vm.getAllUTXOs(addrsSet)
 	if err != nil {
 		t.Fatal(err)
 	}

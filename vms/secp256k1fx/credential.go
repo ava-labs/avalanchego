@@ -12,9 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var (
-	errNilCredential = errors.New("nil credential")
-)
+var errNilCredential = errors.New("nil credential")
 
 const (
 	defaultEncoding = formatting.Hex

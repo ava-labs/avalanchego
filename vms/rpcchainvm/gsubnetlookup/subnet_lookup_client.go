@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 )
 
-var (
-	_ snow.SubnetLookup = &Client{}
-)
+var _ snow.SubnetLookup = &Client{}
 
 // Client is a subnet lookup that talks over RPC.
 type Client struct {

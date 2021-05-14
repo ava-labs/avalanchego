@@ -31,10 +31,8 @@ func init() {
 	}
 }
 
-var (
-	// Always returns 200 (http.StatusOK)
-	dummyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-)
+// Always returns 200 (http.StatusOK)
+var dummyHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
 
 func TestNewTokenWrongPassword(t *testing.T) {
 	auth := NewFromHash(logging.NoLog{}, "auth", hashedPassword)

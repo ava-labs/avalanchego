@@ -19,11 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var (
-	// strongPassword defines a password used for the following tests that
-	// scores high enough to pass the password strength scoring system
-	strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
-)
+// strongPassword defines a password used for the following tests that
+// scores high enough to pass the password strength scoring system
+var strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
 
 func TestServiceListNoUsers(t *testing.T) {
 	ks, err := CreateTestKeystore()

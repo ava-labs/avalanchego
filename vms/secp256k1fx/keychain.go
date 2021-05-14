@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errCantSpend = errors.New("unable to spend this UTXO")
-)
+var errCantSpend = errors.New("unable to spend this UTXO")
 
 // Keychain is a collection of keys that can be used to spend outputs
 type Keychain struct {

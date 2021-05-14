@@ -13,9 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	errUnknownBlockType = errors.New("unknown block type")
-)
+var errUnknownBlockType = errors.New("unknown block type")
 
 type metrics struct {
 	percentConnected prometheus.Gauge

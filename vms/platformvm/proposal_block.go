@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
-var (
-	_ Block = &ProposalBlock{}
-)
+var _ Block = &ProposalBlock{}
 
 // ProposalBlock is a proposal to change the chain's state.
 //

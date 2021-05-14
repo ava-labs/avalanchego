@@ -8,9 +8,7 @@ import (
 	"testing"
 )
 
-var (
-	errParse = errors.New("unexpectedly called Parse")
-)
+var errParse = errors.New("unexpectedly called Parse")
 
 // TestParser is a test Parser
 type TestParser struct {

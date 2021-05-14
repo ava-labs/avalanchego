@@ -14,9 +14,7 @@ const (
 	defaultCacheSize = 1024
 )
 
-var (
-	headKey = []byte{0x01}
-)
+var headKey = []byte{0x01}
 
 // LinkedDB provides a key value interface while allowing iteration.
 type LinkedDB interface {
@@ -338,6 +336,7 @@ func (ldb *linkedDB) resetBatch() {
 	}
 	ldb.batch.Reset()
 }
+
 func (ldb *linkedDB) writeBatch() error {
 	if err := ldb.batch.Write(); err != nil {
 		return err

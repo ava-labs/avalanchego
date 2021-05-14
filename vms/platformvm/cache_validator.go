@@ -7,9 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	_ validator = &validatorImpl{}
-)
+var _ validator = &validatorImpl{}
 
 type validator interface {
 	Delegators() []*UnsignedAddDelegatorTx
