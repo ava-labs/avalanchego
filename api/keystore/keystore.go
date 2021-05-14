@@ -113,21 +113,14 @@ type keystore struct {
 }
 
 func New(log logging.Logger, dbManager manager.Manager) (Keystore, error) {
+	currentDB := dbManager.Current()
 	keystore := &keystore{
 		log:                log,
 		usernameToPassword: make(map[string]*password.Hash),
+		userDB:             prefixdb.New(usersPrefix, currentDB.Database),
+		bcDB:               prefixdb.New(bcsPrefix, currentDB.Database),
 	}
-	if err := keystore.initializeDB(dbManager); err != nil {
-		return nil, err
-	}
-	return keystore, nil
-}
-
-func (ks *keystore) initializeDB(manager manager.Manager) error {
-	currentDB := manager.Current()
-	ks.userDB = prefixdb.New(usersPrefix, currentDB)
-	ks.bcDB = prefixdb.New(bcsPrefix, currentDB)
-	return ks.migrate(manager)
+	return keystore, keystore.migrate(dbManager)
 }
 
 func (ks *keystore) CreateHandler() (http.Handler, error) {

@@ -53,7 +53,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 		}
 	}()
 
-	currentDBBootstrapped, err := dbManager.Current().Has(chains.BootstrappedKey)
+	currentDBBootstrapped, err := dbManager.Current().Database.Has(chains.BootstrappedKey)
 	if err != nil {
 		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", node.DatabaseVersion, err)
 	}

@@ -133,7 +133,7 @@ func (vm *VM) Initialize(
 	vm.AddressManager = avax.NewAddressManager(ctx)
 	vm.Aliaser.Initialize()
 
-	db := dbManager.Current()
+	db := dbManager.Current().Database
 	vm.ctx = ctx
 	vm.toEngine = toEngine
 	vm.baseDB = db

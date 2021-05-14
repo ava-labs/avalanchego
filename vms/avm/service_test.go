@@ -37,7 +37,7 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore, _, err := keystore.CreateTestKeystore()
+	keystore, err := keystore.CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}

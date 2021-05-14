@@ -55,10 +55,10 @@ func (um *uptimeMigrater1_4_4) migrate(dbV100 *manager.VersionedDatabase) error 
 
 	um.vm.ctx.Log.Info("migrating validator uptimes from database v1.0.0 to v1.4.4")
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
-	stopDB := prefixdb.NewNested(stopPrefix, dbV100)
+	stopDB := prefixdb.NewNested(stopPrefix, dbV100.Database)
 	defer stopDB.Close()
 
-	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), dbV100)
+	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), dbV100.Database)
 	defer uptimeDB.Close()
 
 	stopDBIter := stopDB.NewIterator()
@@ -82,7 +82,7 @@ func (um *uptimeMigrater1_4_4) migrate(dbV100 *manager.VersionedDatabase) error 
 		}
 
 		nodeID := addVdrTx.Validator.ID()
-		uptimeV100, err := um.previousVersionGetUptime(dbV100, nodeID)
+		uptimeV100, err := um.previousVersionGetUptime(dbV100.Database, nodeID)
 		if err == database.ErrNotFound {
 			continue
 		} else if err != nil {
