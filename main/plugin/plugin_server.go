@@ -18,7 +18,6 @@ type Server struct {
 
 func NewServer(app *process.App) *Server {
 	return &Server{
-
 		app: app,
 	}
 }
