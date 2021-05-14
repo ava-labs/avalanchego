@@ -20,16 +20,13 @@ var (
 // Application.
 type Application interface {
 	Version
-
 	App() string
-
 	Compatible(Application) error
 	Before(Application) bool
 }
 
 type application struct {
 	Version
-
 	app string
 	str string
 }

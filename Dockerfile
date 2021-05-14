@@ -20,6 +20,7 @@ COPY . avalanchego
 
 WORKDIR $GOPATH/src/github.com/ava-labs/avalanchego
 RUN export AVALANCHEGO_COMMIT=$AVALANCHEGO_COMMIT
+RUN mkdir -p build/avalanchego-preupgrade
 RUN ./scripts/build.sh
 
 RUN ln -sv $GOPATH/src/github.com/ava-labs/avalanchego/ /avalanchego

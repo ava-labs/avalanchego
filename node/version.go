@@ -18,7 +18,8 @@ var (
 	PrevMinimumUnmaskedVersion   = version.NewDefaultApplication(constants.PlatformName, 1, 0, 0)
 	VersionParser                = version.NewDefaultApplicationParser()
 
-	DatabaseVersion = version.NewDefaultVersion(1, 4, 3)
+	DatabaseVersion     = version.NewDefaultVersion(1, 4, 4)
+	PrevDatabaseVersion = version.NewDefaultVersion(1, 0, 0)
 
 	ApricotPhase0Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2020, time.December, 8, 3, 0, 0, 0, time.UTC),

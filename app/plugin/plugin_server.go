@@ -6,8 +6,8 @@ package plugin
 import (
 	"context"
 
-	appproto "github.com/ava-labs/avalanchego/main/plugin/proto"
-	"github.com/ava-labs/avalanchego/main/process"
+	appproto "github.com/ava-labs/avalanchego/app/plugin/proto"
+	"github.com/ava-labs/avalanchego/app/process"
 )
 
 // Server wraps a node so it can be served with the hashicorp plugin harness
@@ -22,13 +22,13 @@ func NewServer(app *process.App) *Server {
 }
 
 // Blocks until the node returns
-func (s *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
-	exitCode := s.app.Start()
+func (ns *Server) Start(_ context.Context, req *appproto.StartRequest) (*appproto.StartResponse, error) {
+	exitCode := ns.app.Start()
 	return &appproto.StartResponse{ExitCode: int32(exitCode)}, nil
 }
 
 // Blocks until the node is done shutting down
-func (s *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
-	s.app.Stop()
+func (ns *Server) Stop(_ context.Context, req *appproto.StopRequest) (*appproto.StopResponse, error) {
+	ns.app.Stop()
 	return &appproto.StopResponse{}, nil
 }

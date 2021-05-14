@@ -36,13 +36,13 @@ func TestNewSingleDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := New(dir, logging.NoLog{}, v1)
+	manager, err := New(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	semDB := manager.Current()
-	cmp := semDB.Compare(v1)
+	cmp := semDB.Version.Compare(v1)
 	assert.Equal(t, 0, cmp, "incorrect version on current database")
 
 	_, exists := manager.Previous()
@@ -60,13 +60,13 @@ func TestNewCreatesSingleDB(t *testing.T) {
 
 	v1 := version.DefaultVersion1_0_0
 
-	manager, err := New(dir, logging.NoLog{}, v1)
+	manager, err := New(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	semDB := manager.Current()
-	cmp := semDB.Compare(v1)
+	cmp := semDB.Version.Compare(v1)
 	assert.Equal(t, 0, cmp, "incorrect version on current database")
 
 	_, exists := manager.Previous()
@@ -102,20 +102,16 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = New(dir, logging.NoLog{}, v2)
+	_, err = New(dir, logging.NoLog{}, v2, true)
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
 	_, err = os.Create(path.Join(dir, "dummy"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(t, err)
 
-	_, err = New(dir, logging.NoLog{}, v1)
+	_, err = New(dir, logging.NoLog{}, v1, true)
 	assert.Error(t, err, "expected to error due to non-directory file being present")
 }
 
@@ -143,7 +139,7 @@ func TestNewSortsDatabases(t *testing.T) {
 		}
 	}
 
-	manager, err := New(dir, logging.NoLog{}, vers[0])
+	manager, err := New(dir, logging.NoLog{}, vers[0], true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,14 +150,14 @@ func TestNewSortsDatabases(t *testing.T) {
 	}()
 
 	semDB := manager.Current()
-	cmp := semDB.Compare(vers[0])
+	cmp := semDB.Version.Compare(vers[0])
 	assert.Equal(t, 0, cmp, "incorrect version on current database")
 
 	prev, exists := manager.Previous()
 	if !exists {
 		t.Fatal("expected to find a previous database")
 	}
-	cmp = prev.Compare(vers[1])
+	cmp = prev.Version.Compare(vers[1])
 	assert.Equal(t, 0, cmp, "incorrect version on previous database")
 
 	dbs := manager.GetDatabases()
@@ -170,7 +166,7 @@ func TestNewSortsDatabases(t *testing.T) {
 	}
 
 	for i, db := range dbs {
-		cmp = db.Compare(vers[i])
+		cmp = db.Version.Compare(vers[i])
 		assert.Equal(t, 0, cmp, "expected to find database version %s, but found %s", vers[i], db.Version.String())
 	}
 }
@@ -204,11 +200,11 @@ func TestPrefixDBManager(t *testing.T) {
 	m0 := m.NewPrefixDBManager(prefix0)
 	m1 := m0.NewPrefixDBManager(prefix1)
 
-	val, err := m0.Current().Get(k0)
+	val, err := m0.Current().Database.Get(k0)
 	assert.NoError(t, err)
 	assert.Equal(t, v0, val)
 
-	val, err = m1.Current().Get(k1)
+	val, err = m1.Current().Database.Get(k1)
 	assert.NoError(t, err)
 	assert.Equal(t, v1, val)
 }
@@ -242,11 +238,11 @@ func TestNestedPrefixDBManager(t *testing.T) {
 	m0 := m.NewNestedPrefixDBManager(prefix0)
 	m1 := m0.NewNestedPrefixDBManager(prefix1)
 
-	val, err := m0.Current().Get(k0)
+	val, err := m0.Current().Database.Get(k0)
 	assert.NoError(t, err)
 	assert.Equal(t, v0, val)
 
-	val, err = m1.Current().Get(k1)
+	val, err = m1.Current().Database.Get(k1)
 	assert.NoError(t, err)
 	assert.Equal(t, v1, val)
 }
@@ -335,20 +331,21 @@ func TestNewManagerFromDBs(t *testing.T) {
 		version.NewDefaultVersion(1, 2, 0),
 		version.NewDefaultVersion(1, 1, 1),
 	}
-	m, err := NewManagerFromDBs([]*VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  versions[2],
-		},
-		{
-			Database: memdb.New(),
-			Version:  versions[1],
-		},
-		{
-			Database: memdb.New(),
-			Version:  versions[0],
-		},
-	})
+	m, err := NewManagerFromDBs(
+		[]*VersionedDatabase{
+			{
+				Database: memdb.New(),
+				Version:  versions[2],
+			},
+			{
+				Database: memdb.New(),
+				Version:  versions[1],
+			},
+			{
+				Database: memdb.New(),
+				Version:  versions[0],
+			},
+		})
 	assert.NoError(t, err)
 
 	dbs := m.GetDatabases()
@@ -356,23 +353,52 @@ func TestNewManagerFromDBs(t *testing.T) {
 	for i, db := range dbs {
 		assert.Equal(t, 0, db.Version.Compare(versions[i]))
 	}
+}
 
+func TestNewManagerFromNoDBs(t *testing.T) {
+	// Should error if no dbs are given
+	_, err := NewManagerFromDBs(nil)
+	assert.Error(t, err)
 }
 
 func TestNewManagerFromNonUniqueDBs(t *testing.T) {
-	_, err := NewManagerFromDBs([]*VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 1, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 1, 0),
-		},
-		{
-			Database: memdb.New(),
-			Version:  version.NewDefaultVersion(1, 2, 0),
-		},
-	})
+	_, err := NewManagerFromDBs(
+		[]*VersionedDatabase{
+			{
+				Database: memdb.New(),
+				Version:  version.NewDefaultVersion(1, 1, 0),
+			},
+			{
+				Database: memdb.New(),
+				Version:  version.NewDefaultVersion(1, 1, 0), // Duplicate
+			},
+			{
+				Database: memdb.New(),
+				Version:  version.NewDefaultVersion(1, 2, 0),
+			},
+		})
 	assert.Error(t, err)
+}
+
+func TestDoesNotIncludePreviousVersions(t *testing.T) {
+	dir := t.TempDir()
+	v1 := version.NewDefaultVersion(1, 1, 0)
+	v2 := version.NewDefaultVersion(1, 2, 0)
+	db1Path := path.Join(dir, v1.String())
+	db1, err := leveldb.New(db1Path, logging.NoLog{}, 0, 0, 0)
+	defer db1.Close()
+	assert.NoError(t, err)
+	db2Path := path.Join(dir, v2.String())
+	db2, err := leveldb.New(db2Path, logging.NoLog{}, 0, 0, 0)
+	assert.NoError(t, err)
+
+	err = db2.Close()
+	assert.NoError(t, err)
+
+	manager, err := New(dir, logging.NoLog{}, v2, false)
+	assert.NoError(t, err, "shouldn't error because shouldn't try to open previous database version")
+	assert.NoError(t, manager.Close())
+
+	_, err = New(dir, logging.NoLog{}, v2, true)
+	assert.Error(t, err, "should error because trying to open open database (1.1.0)")
 }

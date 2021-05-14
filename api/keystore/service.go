@@ -8,7 +8,11 @@ import (
 	"net/http"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 type service struct {
@@ -92,4 +96,18 @@ func (s *service) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Expor
 	}
 	reply.Encoding = args.Encoding
 	return nil
+}
+
+// CreateTestKeystore returns a new keystore that can be utilized for testing
+func CreateTestKeystore() (Keystore, error) {
+	dbManager, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
+		{
+			Database: memdb.New(),
+			Version:  version.DefaultVersion1_0_0,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return New(logging.NoLog{}, dbManager)
 }

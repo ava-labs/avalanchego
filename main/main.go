@@ -5,84 +5,73 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
+	"path/filepath"
 	"syscall"
 
-	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-plugin"
-
-	"github.com/ava-labs/avalanchego/main/process"
+	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/perms"
-
-	appPlugin "github.com/ava-labs/avalanchego/main/plugin"
 )
 
-const (
-	header = "" +
-		`     _____               .__                       .__` + "\n" +
-		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
-		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
-		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
-		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
-		`          \/           \/          \/     \/     \/     \/     \/`
+var (
+	// GitCommit should be optionally set at compile time.
+	GitCommit string
 )
 
-// main is the primary entry point to Avalanche.
+// main is the entry point to AvalancheGo.
 func main() {
-	// parse config using viper
-	if err := parseViper(); err != nil {
-		// Returns exit code 1
-		log.Fatalf("parsing parameters returned with error %s", err)
+	// Get the config
+	nodeConfig, processConfig, err := config.GetConfigs(GitCommit)
+	if err != nil {
+		fmt.Printf("couldn't get config: %s", err)
+		os.Exit(1)
 	}
 
-	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(defaultDataDir, true, perms.ReadWriteExecute); err != nil {
-		log.Fatalf("failed to restrict the permissions of the data directory with error %s", err)
+	if processConfig.DisplayVersionAndExit {
+		fmt.Print(processConfig.VersionStr)
+		os.Exit(0)
 	}
 
-	c := Config
-	// Create the logger
-	logFactory := logging.NewFactory(c.LoggingConfig)
+	fmt.Println(process.Header)
+
+	// Set the log directory for this process by adding a subdirectory
+	// "daemon" to the log directory given in the config
+	logConfigCopy := nodeConfig.LoggingConfig
+	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
+	logFactory := logging.NewFactory(logConfigCopy)
 
 	log, err := logFactory.Make()
 	if err != nil {
 		logFactory.Close()
+
 		fmt.Printf("starting logger failed with: %s\n", err)
 		os.Exit(1)
 	}
 
-	app := process.NewApp(c, logFactory, log)
-	if c.PluginMode {
-		plugin.Serve(&plugin.ServeConfig{
-			HandshakeConfig: appPlugin.Handshake,
-			Plugins: map[string]plugin.Plugin{
-				"nodeProcess": appPlugin.New(app),
-			},
-			// A non-nil value here enables gRPC serving for this plugin
-			GRPCServer: plugin.DefaultGRPCServer,
-			Logger: hclog.New(&hclog.LoggerOptions{
-				Level: hclog.Error,
-			}),
-		})
-		return
-	}
+	log.Info("using build directory at path '%s'", processConfig.BuildDir)
 
-	fmt.Println(header)
-
-	// If we get a a SIGINT or SIGTERM, tell the node to stop.
-	// If [app.Start()] has been called, it will return.
-	// If not, then when [app.Start()] is called below, it will immediately return 1.
+	nodeManager := newNodeManager(processConfig.BuildDir, log)
 	_ = utils.HandleSignals(
 		func(os.Signal) {
-			app.Stop()
+			// SIGINT and SIGTERM cause all running nodes to stop
+			nodeManager.shutdown()
 		},
 		syscall.SIGINT, syscall.SIGTERM,
 	)
-	// Start the node
-	exitCode := app.Start()
+
+	// Migrate the database if necessary
+	migrationManager := newMigrationManager(nodeManager, nodeConfig, log)
+	if err := migrationManager.migrate(); err != nil {
+		log.Error("error while running migration: %s", err)
+		nodeManager.shutdown()
+	}
+
+	// Run normally
+	exitCode, err := nodeManager.runNormal()
+	log.Debug("node returned exit code %s, error %v", exitCode, err)
+	nodeManager.shutdown() // make sure all the nodes are stopped
 
 	logFactory.Close()
 	os.Exit(exitCode)

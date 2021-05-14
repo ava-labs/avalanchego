@@ -1000,7 +1000,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1008,7 +1008,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	userKeystore, err := keystore.CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1182,7 +1182,7 @@ func TestIssueExportTx(t *testing.T) {
 	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1311,7 +1311,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}

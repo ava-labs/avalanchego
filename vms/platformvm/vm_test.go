@@ -299,7 +299,7 @@ func defaultVM() (*VM, database.Database) {
 
 	baseDBManager := manager.NewDefaultMemDBManager()
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vm.clock.Set(defaultGenesisTime)
 	msgChan := make(chan common.Message, 1)
@@ -310,7 +310,6 @@ func defaultVM() (*VM, database.Database) {
 	if err != nil {
 		panic(err)
 	}
-
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	ctx.Lock.Lock()
@@ -344,7 +343,7 @@ func defaultVM() (*VM, database.Database) {
 		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
 	}
 
-	return vm, baseDBManager.Current()
+	return vm, baseDBManager.Current().Database
 }
 
 func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
@@ -370,7 +369,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	baseDBManager := manager.NewDefaultMemDBManager()
 	chainDBManager := baseDBManager.NewPrefixDBManager([]byte{0})
-	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current())
+	atomicDB := prefixdb.New([]byte{1}, baseDBManager.Current().Database)
 
 	vm.clock.Set(defaultGenesisTime)
 	msgChan := make(chan common.Message, 1)
@@ -1976,7 +1975,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	baseDBManager := manager.NewDefaultMemDBManager()
 
 	vmDBManager := baseDBManager.NewPrefixDBManager([]byte("vm"))
-	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current())
+	bootstrappingDB := prefixdb.New([]byte("bootstrapping"), baseDBManager.Current().Database)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, "", prometheus.NewRegistry())
 	if err != nil {
@@ -2328,8 +2327,7 @@ func TestMaxStakeAmount(t *testing.T) {
 	}
 }
 
-// Test that calling Verify on a block with an unverified parent doesn't cause a
-// panic.
+// Test that calling Verify on a block with an unverified parent doesn't cause a panic.
 func TestUnverifiedParentPanic(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
 

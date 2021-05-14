@@ -5,9 +5,12 @@ package constants
 
 // Const variables to be exported
 const (
-	// Name of the platform
+	// PlatformName exports the name of the platform
 	PlatformName = "avalanche"
 
-	// Name of the avalanche application
+	// AppName exports the name of the avalanche application
 	AppName = "avalanchego"
+
+	// ExitCodeDoneMigrating explicitly sets the exit code returned when the migration is finished
+	ExitCodeDoneMigrating = 42
 )

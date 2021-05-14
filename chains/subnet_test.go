@@ -12,7 +12,9 @@ import (
 
 func TestSubnet(t *testing.T) {
 	assert := assert.New(t)
-	s := subnet{}
+	s := subnet{
+		onFinish: func() {},
+	}
 
 	chainID0 := ids.GenerateTestID()
 	chainID1 := ids.GenerateTestID()
