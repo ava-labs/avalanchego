@@ -87,11 +87,11 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
 	// config
-	fs.String(ConfigFileKey, DefaultString, "Specifies a config file")
+	fs.String(ConfigFileKey, "", "Specifies a config file")
 	// Genesis config File
 	fs.String(GenesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
 	// Plugins
-	fs.String(PluginDirKey, DefaultString, "Plugin directory for Avalanche VMs")
+	fs.String(PluginDirKey, "", "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
 	// AVAX fees
@@ -101,7 +101,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(DbEnabledKey, true, "Turn on persistent storage")
 	fs.String(DbPathKey, defaultDbDir, "Path to database directory")
 	// Coreth config
-	fs.String(CorethConfigKey, DefaultString, "Specifies config to pass into coreth")
+	fs.String(CorethConfigKey, "", "Specifies config to pass into coreth")
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
@@ -176,9 +176,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
-	// Throughput Server (deprecated)
-	fs.Uint(XputServerPortKey, 9652, "Port of the deprecated throughput test server")
-	fs.Bool(XputServerEnabledKey, false, "If true, throughput test server is created")
 	// Health
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")
 	fs.Duration(HealthCheckAveragerHalflifeKey, 10*time.Second, "Halflife of averager when calculating a running average in a health check")
@@ -196,8 +193,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Staking
 	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
-	fs.String(StakingKeyPathKey, DefaultString, "Path to the TLS private key for staking")
-	fs.String(StakingCertPathKey, DefaultString, "Path to the TLS certificate for staking")
+	fs.String(StakingKeyPathKey, defaultStakingKeyPath, "Path to the TLS private key for staking")
+	fs.String(StakingCertPathKey, defaultStakingCertPath, "Path to the TLS certificate for staking")
 	fs.Uint64(StakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
 	fs.Float64(UptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
@@ -217,8 +214,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Subnets
 	fs.String(WhitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 	// Bootstrapping
-	fs.String(BootstrapIPsKey, DefaultString, "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
-	fs.String(BootstrapIDsKey, DefaultString, "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
+	fs.String(BootstrapIPsKey, "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
+	fs.String(BootstrapIDsKey, "", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
 	fs.Int(RetryBootstrapMaxAttemptsKey, 50, "Specifies how many times bootstrap should be retried")
 	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
@@ -239,7 +236,7 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// IPC
 	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
-	fs.String(IpcsPathKey, DefaultString, "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
+	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
@@ -247,7 +244,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 	// Build directory
-	fs.String(BuildDirKey, DefaultString, "path to the build directory")
+	fs.String(BuildDirKey, defaultBuildDirs[0], "path to the build directory")
 
 	return fs
 }
@@ -262,8 +259,8 @@ func getViper() (*viper.Viper, error) {
 	if err := v.BindPFlags(pflag.CommandLine); err != nil {
 		return nil, err
 	}
-	if configFile := v.GetString(ConfigFileKey); configFile != DefaultString {
-		v.SetConfigFile(configFile)
+	if v.IsSet(ConfigFileKey) {
+		v.SetConfigFile(os.ExpandEnv(v.GetString(ConfigFileKey)))
 		if err := v.ReadInConfig(); err != nil {
 			return nil, err
 		}
@@ -278,12 +275,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	processConfig := process.Config{}
 	processConfig.DisplayVersionAndExit = v.GetBool(VersionKey)
 	processConfig.PluginMode = v.GetBool(PluginModeKey)
-	buildDir := v.GetString(BuildDirKey)
-	if buildDir == DefaultString {
-		processConfig.BuildDir = defaultBuildDirs[0]
-	} else {
-		processConfig.BuildDir = buildDir
-	}
+	processConfig.BuildDir = os.ExpandEnv(v.GetString(BuildDirKey))
 	validBuildDir := func(dir string) bool {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
@@ -331,34 +323,33 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 
 	// Logging:
-	loggingconfig, err := logging.DefaultConfig()
+	loggingConfig, err := logging.DefaultConfig()
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
-	logsDir := v.GetString(LogsDirKey)
-	if logsDir != "" {
-		loggingconfig.Directory = logsDir
+	if v.IsSet(LogsDirKey) {
+		loggingConfig.Directory = os.ExpandEnv(v.GetString(LogsDirKey))
 	}
-	loggingconfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
+	loggingConfig.LogLevel, err = logging.ToLevel(v.GetString(LogLevelKey))
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
-	logDisplayLevel := v.GetString(LogDisplayLevelKey)
-	if logDisplayLevel == "" {
-		logDisplayLevel = v.GetString(LogLevelKey)
+	logDisplayLevel := v.GetString(LogLevelKey)
+	if v.IsSet(LogDisplayLevelKey) {
+		logDisplayLevel = v.GetString(LogDisplayLevelKey)
 	}
 	displayLevel, err := logging.ToLevel(logDisplayLevel)
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
-	loggingconfig.DisplayLevel = displayLevel
+	loggingConfig.DisplayLevel = displayLevel
 
-	loggingconfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
+	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
 
-	nodeConfig.LoggingConfig = loggingconfig
+	nodeConfig.LoggingConfig = loggingConfig
 
 	// NetworkID
 	networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
@@ -369,11 +360,10 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// DB:
 	nodeConfig.DBEnabled = v.GetBool(DbEnabledKey)
-	nodeConfig.DBPath = os.ExpandEnv(v.GetString(DbPathKey))
-	if nodeConfig.DBPath == DefaultString {
-		nodeConfig.DBPath = defaultDbDir
-	}
-	nodeConfig.DBPath = path.Join(nodeConfig.DBPath, constants.NetworkName(nodeConfig.NetworkID))
+	nodeConfig.DBPath = path.Join(
+		os.ExpandEnv(v.GetString(DbPathKey)),
+		constants.NetworkName(nodeConfig.NetworkID),
+	)
 
 	// IP configuration
 	// Resolves our public IP, or does nothing
@@ -435,22 +425,12 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 		nodeConfig.StakingTLSCert = *cert
 	} else {
 		// Parse the staking key/cert paths
-		stakingKeyPath := v.GetString(StakingKeyPathKey)
-		if stakingKeyPath == DefaultString {
-			stakingKeyPath = defaultStakingKeyPath
-		}
-		stakingCertPath := v.GetString(StakingCertPathKey)
-		if stakingCertPath == DefaultString {
-			stakingCertPath = defaultStakingCertPath
-		}
-
-		// parse any env variables in the paths
-		stakingKeyPath = os.ExpandEnv(stakingKeyPath)
-		stakingCertPath = os.ExpandEnv(stakingCertPath)
+		stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
+		stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
 
 		switch {
 		// If staking key/cert locations are specified but not found, error
-		case stakingKeyPath != defaultStakingKeyPath || stakingCertPath != defaultStakingCertPath:
+		case v.IsSet(StakingKeyPathKey) || v.IsSet(StakingCertPathKey):
 			if _, err := os.Stat(stakingKeyPath); os.IsNotExist(err) {
 				return node.Config{}, process.Config{}, fmt.Errorf("couldn't find staking key at %s", stakingKeyPath)
 			} else if _, err := os.Stat(stakingCertPath); os.IsNotExist(err) {
@@ -499,19 +479,18 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	//     |_evm
 
 	// Plugin directory. Defaults to [buildDirectory]/plugins
-	pluginDir := v.GetString(PluginDirKey)
-	if pluginDir == DefaultString {
+	if !v.IsSet(PluginDirKey) {
 		nodeConfig.PluginDir = filepath.Join(processConfig.BuildDir, avalanchegoLatest, "plugins")
 	} else {
-		nodeConfig.PluginDir = pluginDir
+		nodeConfig.PluginDir = v.GetString(PluginDirKey)
 	}
 
 	// HTTP:
 	nodeConfig.HTTPHost = v.GetString(HTTPHostKey)
 	nodeConfig.HTTPPort = uint16(v.GetUint(HTTPPortKey))
 	nodeConfig.HTTPSEnabled = v.GetBool(HTTPSEnabledKey)
-	nodeConfig.HTTPSKeyFile = v.GetString(HTTPSKeyFileKey)
-	nodeConfig.HTTPSCertFile = v.GetString(HTTPSCertFileKey)
+	nodeConfig.HTTPSKeyFile = os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
+	nodeConfig.HTTPSCertFile = os.ExpandEnv(v.GetString(HTTPSCertFileKey))
 	nodeConfig.APIAllowedOrigins = v.GetStringSlice(HTTPAllowedOrigins)
 
 	// API Auth
@@ -537,10 +516,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.IPCAPIEnabled = v.GetBool(IpcAPIEnabledKey)
 	nodeConfig.IndexAPIEnabled = v.GetBool(IndexEnabledKey)
 
-	// Throughput:
-	nodeConfig.ThroughputServerEnabled = v.GetBool(XputServerEnabledKey)
-	nodeConfig.ThroughputPort = uint16(v.GetUint(XputServerPortKey))
-
 	// Halflife of continuous averager used in health checks
 	healthCheckAveragerHalflife := v.GetDuration(HealthCheckAveragerHalflifeKey)
 	if healthCheckAveragerHalflife <= 0 {
@@ -562,16 +537,14 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	}
 
 	// IPCs
-	ipcsChainIDs := v.GetString(IpcsChainIDsKey)
-	if ipcsChainIDs != "" {
-		nodeConfig.IPCDefaultChainIDs = strings.Split(ipcsChainIDs, ",")
+	if v.IsSet(IpcsChainIDsKey) {
+		nodeConfig.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
 	}
 
-	ipcsPath := v.GetString(IpcsPathKey)
-	if ipcsPath == DefaultString {
-		nodeConfig.IPCPath = ipcs.DefaultBaseURL
+	if v.IsSet(IpcsPathKey) {
+		nodeConfig.IPCPath = os.ExpandEnv(v.GetString(IpcsPathKey))
 	} else {
-		nodeConfig.IPCPath = ipcsPath
+		nodeConfig.IPCPath = ipcs.DefaultBaseURL
 	}
 
 	// Throttling
@@ -694,7 +667,10 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	}
 
 	// Load genesis data
-	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(networkID, v.GetString(GenesisConfigFileKey))
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
+		networkID,
+		os.ExpandEnv(v.GetString(GenesisConfigFileKey)),
+	)
 	if err != nil {
 		return node.Config{}, process.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
 	}
@@ -706,21 +682,19 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
 
 	// Coreth Plugin
-	corethConfigString := v.GetString(CorethConfigKey)
-	if corethConfigString != DefaultString {
+	if v.IsSet(CorethConfigKey) {
 		corethConfigValue := v.Get(CorethConfigKey)
 		switch value := corethConfigValue.(type) {
 		case string:
-			corethConfigString = value
+			nodeConfig.CorethConfig = value
 		default:
 			corethConfigBytes, err := json.Marshal(value)
 			if err != nil {
 				return node.Config{}, process.Config{}, fmt.Errorf("couldn't parse coreth config: %w", err)
 			}
-			corethConfigString = string(corethConfigBytes)
+			nodeConfig.CorethConfig = string(corethConfigBytes)
 		}
 	}
-	nodeConfig.CorethConfig = corethConfigString
 
 	// Indexer
 	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
@@ -738,22 +712,11 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 // Initialize config.BootstrapPeers.
 func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
-	bootstrapIPs := v.GetString(BootstrapIPsKey)
-	bootstrapIDs := v.GetString(BootstrapIDsKey)
-
-	defaultBootstrapIPs, defaultBootstrapIDs := genesis.SampleBeacons(config.NetworkID, 5)
-	if bootstrapIPs == DefaultString { // If no IPs specified, use default bootstrap node IPs
-		bootstrapIPs = strings.Join(defaultBootstrapIPs, ",")
+	bootstrapIPs, bootstrapIDs := genesis.SampleBeacons(config.NetworkID, 5)
+	if v.IsSet(BootstrapIPsKey) {
+		bootstrapIPs = strings.Split(v.GetString(BootstrapIPsKey), ",")
 	}
-	if bootstrapIDs == DefaultString { // If no node IDs given, use node IDs of nodes in [bootstrapIPs]
-		if bootstrapIPs == "" { // If user specified no bootstrap IPs, default to no bootstrap IDs either
-			bootstrapIDs = ""
-		} else {
-			bootstrapIDs = strings.Join(defaultBootstrapIDs, ",")
-		}
-	}
-
-	for _, ip := range strings.Split(bootstrapIPs, ",") {
+	for _, ip := range bootstrapIPs {
 		if ip == "" {
 			continue
 		}
@@ -766,8 +729,12 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 		})
 	}
 
+	if v.IsSet(BootstrapIDsKey) {
+		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
+	}
+
 	i := 0
-	for _, id := range strings.Split(bootstrapIDs, ",") {
+	for _, id := range bootstrapIDs {
 		if id == "" {
 			continue
 		}
