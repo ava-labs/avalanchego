@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"syscall"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"os"
-	"path/filepath"
-	"runtime"
-	"syscall"
 )
 
 type migrationManager struct {
@@ -81,7 +82,9 @@ func unixVerifyDiskStorage(storagePath string) (uint64, uint64, error) {
 
 func (m *migrationManager) verifyDiskStorage() error {
 	storagePath := m.rootConfig.DBPath
-	avail, required, err := uint64(0), uint64(0), error(nil)
+	var avail uint64
+	var required uint64
+	var err error
 	if runtime.GOOS == "windows" {
 		avail, required, err = windowsVerifyDiskStorage(storagePath)
 	} else {
