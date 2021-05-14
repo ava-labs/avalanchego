@@ -4,7 +4,6 @@
 package config
 
 const (
-	DefaultString                           = "default"
 	FetchOnlyKey                            = "fetch-only"
 	ConfigFileKey                           = "config-file"
 	VersionKey                              = "version"
@@ -93,8 +92,6 @@ const (
 	MetricsAPIEnabledKey                    = "api-metrics-enabled"
 	HealthAPIEnabledKey                     = "api-health-enabled"
 	IpcAPIEnabledKey                        = "api-ipcs-enabled"
-	XputServerPortKey                       = "xput-server-port"
-	XputServerEnabledKey                    = "xput-server-enabled"
 	IpcsChainIDsKey                         = "ipcs-chain-ids"
 	IpcsPathKey                             = "ipcs-path"
 	ConsensusGossipFrequencyKey             = "consensus-gossip-frequency"

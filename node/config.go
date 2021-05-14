@@ -110,10 +110,6 @@ type Config struct {
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters
 
-	// Throughput configuration
-	ThroughputPort          uint16
-	ThroughputServerEnabled bool
-
 	// IPC configuration
 	IPCAPIEnabled      bool
 	IPCPath            string
