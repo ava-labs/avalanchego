@@ -97,7 +97,6 @@ This should only be necessary when upgrading protobuf versions or modifying .pro
 
 To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) and protoc-gen-go installed. protoc must be on your $PATH.
 
-https://grpc.io/docs/protoc-installation/
 
 If you extract protoc to ~/software/protobuf/, the following should work:
 ```sh
