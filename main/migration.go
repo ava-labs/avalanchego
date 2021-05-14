@@ -27,8 +27,7 @@ func newMigrationManager(nodeManager *nodeManager, rootConfig node.Config, log l
 	}
 }
 
-// Migrate determines whether to do a database migration, and if so,
-// does it. See runMigration().
+// Runs migration if required. See runMigration().
 func (m *migrationManager) migrate() error {
 	shouldMigrate, err := m.shouldMigrate()
 	if err != nil {
@@ -70,9 +69,9 @@ func unixVerifyDiskStorage(storagePath string) (uint64, uint64, error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	size, ds_err := dirSize(storagePath)
-	if ds_err != nil {
-		return 0, 0, ds_err
+	size, dsErr := dirSize(storagePath)
+	if dsErr != nil {
+		return 0, 0, dsErr
 	}
 	avail := stat.Bavail * uint64(stat.Bsize)
 	twox := size + size
@@ -100,9 +99,9 @@ func (m *migrationManager) verifyDiskStorage() error {
 	return nil
 }
 
-// Return true if the database should be migrated from the previous database version
-// to the current one. We should migrate if we have not finished bootstrapping with the
-// current database version and the previous database version exists.
+// Returns true if the database should be migrated from the previous database version.
+// Should migrate if the previous database version exists and
+// if the latest database version has not finished bootstrapping.
 func (m *migrationManager) shouldMigrate() (bool, error) {
 	if !m.rootConfig.DBEnabled {
 		return false, nil
@@ -117,7 +116,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 		}
 	}()
 
-	currentDBBootstrapped, err := dbManager.Current().Has(chains.BootstrappedKey)
+	currentDBBootstrapped, err := dbManager.Current().Database.Has(chains.BootstrappedKey)
 	if err != nil {
 		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", node.DatabaseVersion, err)
 	}
@@ -128,7 +127,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	return exists, nil
 }
 
-// Run two nodes at once: one is a version before the database upgrade and the other after.
+// Run two nodes simultaneously: one is a version before the database upgrade and the other after.
 // The latter will bootstrap from the former.
 // When the new node version is done bootstrapping, both nodes are stopped.
 // Returns nil if the new node version successfully bootstrapped.

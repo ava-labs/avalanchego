@@ -25,8 +25,6 @@ import (
 type Config struct {
 	genesis.Params
 
-	NodeID ids.ShortID
-
 	// If true, bootstrap the current database version and then end the node.
 	FetchOnly bool
 

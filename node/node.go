@@ -363,7 +363,7 @@ func (n *Node) Dispatch() error {
 
 func (n *Node) initDatabase(dbManager manager.Manager) error {
 	n.DBManager = dbManager
-	n.DB = dbManager.Current()
+	n.DB = dbManager.Current().Database
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
 
@@ -860,9 +860,13 @@ func (n *Node) Initialize(
 	logFactory logging.Factory,
 ) error {
 	n.Log = logger
-	n.ID = config.NodeID
-	n.LogFactory = logFactory
 	n.Config = config
+	var err error
+	n.ID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(n.Config.StakingTLSCert.Leaf.Raw))
+	if err != nil {
+		return fmt.Errorf("problem deriving node ID from certificate: %w", err)
+	}
+	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
 	n.Log.Info("node version is: %s", Version)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))

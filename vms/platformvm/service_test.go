@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -20,12 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
+
+	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var (
@@ -191,7 +193,7 @@ func TestGetTxStatus(t *testing.T) {
 	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
 
 	m := &atomic.Memory{}
-	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{}, service.vm.dbManager.Current()))
+	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,11 +9,18 @@ import (
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
+)
+
+const (
+	latestVersionDir     = "avalanchego-latest"
+	preupgradeVersionDir = "avalanchego-preupgrade"
 )
 
 // nodeProcess wraps a node client
@@ -73,14 +80,6 @@ type nodeManager struct {
 	hasShutdown bool
 }
 
-func (nm *nodeManager) latestNodeVersionPath() string {
-	return filepath.Join(nm.buildDirPath, "avalanchego-latest", "avalanchego-process")
-}
-
-func (nm *nodeManager) preupgradeNodeVersionPath() string {
-	return filepath.Join(nm.buildDirPath, "avalanchego-preupgrade", "avalanchego-process")
-}
-
 // Close all running subprocesses
 // Blocks until all subprocesses are ended.
 // Invocations of this method after the first invocation do nothing.
@@ -101,7 +100,7 @@ func (nm *nodeManager) shutdown() {
 	}
 }
 
-// stop a node. Blocks until the node is done shutting down.
+// Stop a node. Blocks until the node is done shutting down.
 // Assumes [nm.lock] is not held
 func (nm *nodeManager) Stop(path string) error {
 	nm.lock.Lock()
@@ -137,14 +136,11 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
 	nm.log.Debug("creating new node from binary at '%s'", path)
 	clientConfig := &plugin.ClientConfig{
-		HandshakeConfig: appplugin.Handshake,
-		Plugins:         appplugin.PluginMap,
-		Cmd:             exec.Command(path, args...),
-		AllowedProtocols: []plugin.Protocol{
-			plugin.ProtocolNetRPC,
-			plugin.ProtocolGRPC,
-		},
-		Logger: hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
+		HandshakeConfig:  appplugin.Handshake,
+		Plugins:          appplugin.PluginMap,
+		Cmd:              exec.Command(path, args...),
+		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+		Logger:           hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}
 	if printToStdOut {
 		clientConfig.SyncStdout = os.Stdout
@@ -190,25 +186,29 @@ func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
 	args = append(
 		args,
 		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
-		fmt.Sprintf("--%s=%s", config.PluginDirKey, filepath.Join(nm.buildDirPath, "avalanchego-preupgrade", "plugins")),
+		fmt.Sprintf("--%s=%s", config.PluginDirKey, filepath.Join(nm.buildDirPath, preupgradeVersionDir, "plugins")),
 	)
 
-	binaryPath := nm.preupgradeNodeVersionPath()
+	binaryPath := filepath.Join(nm.buildDirPath, preupgradeVersionDir, "avalanchego-process")
 	return nm.newNode(binaryPath, args, true)
 }
 
-// Return the latest versioned node, configured to run in fetch-only mode.
+// Return the latest version node, override configs to run in fetch-only mode.
 func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*nodeProcess, error) {
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(rootConfig.StakingTLSCert.Leaf.Raw))
+	if err != nil {
+		return nil, fmt.Errorf("couldn't parse node ID: %w", err)
+	}
 	args := make([]string, len(os.Args)+9)
 	copy(args, os.Args[1:])
 	args = append(
 		args,
 		// Tell this node to run in fetch only mode and to bootstrap only from the local node
 		fmt.Sprintf("--%s=127.0.0.1:%d", config.BootstrapIPsKey, int(rootConfig.StakingIP.Port)),
-		fmt.Sprintf("--%s=%s%s", config.BootstrapIDsKey, constants.NodeIDPrefix, rootConfig.NodeID),
+		fmt.Sprintf("--%s=%s%s", config.BootstrapIDsKey, constants.NodeIDPrefix, nodeID),
 		fmt.Sprintf("--%s=%s", config.FetchOnlyKey, "true"),
-		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0), // use any open port for staking port
-		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),    // use any open port for HTTP port
+		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0), // use any available port for staking port
+		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),    // use any available port for HTTP port
 		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
 		fmt.Sprintf("--%s=%s", config.LogsDirKey, filepath.Join(rootConfig.LoggingConfig.Directory, "fetch-only")),
 		fmt.Sprintf("--%s=%s", config.RetryBootstrapKey, "true"),
@@ -216,11 +216,11 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*node
 		fmt.Sprintf("--%s=%s", config.BenchlistMinFailingDurationKey, "1000h"),
 	)
 
-	binaryPath := nm.latestNodeVersionPath()
+	binaryPath := filepath.Join(nm.buildDirPath, latestVersionDir, "avalanchego-process")
 	return nm.newNode(binaryPath, args, false)
 }
 
-// Run the latest node version with the config given by [v].
+// Run the latest node version in plugin-mode and with the supplied configurations.
 // Runs until the node exits.
 // Returns the node's exit code.
 func (nm *nodeManager) runNormal() (int, error) {
@@ -239,7 +239,7 @@ func (nm *nodeManager) runNormal() (int, error) {
 		fmt.Sprintf("--%s=true", config.PluginModeKey), // run as plugin
 	)
 
-	binaryPath := nm.latestNodeVersionPath()
+	binaryPath := filepath.Join(nm.buildDirPath, latestVersionDir, "avalanchego-process")
 	node, err := nm.newNode(binaryPath, args, true)
 	if err != nil {
 		nm.lock.Unlock()

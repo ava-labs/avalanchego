@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/manager/mocks"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/stretchr/testify/assert"
@@ -17,63 +17,73 @@ import (
 
 func TestMigrationNoPrevDB(t *testing.T) {
 	assert := assert.New(t)
-	ks, dbManager, err := CreateTestKeystore()
+
+	dbManager, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
+		{
+			Database: memdb.New(),
+			Version:  version.DefaultVersion1_0_0,
+		},
+	})
 	assert.NoError(err)
-	dbManager.On("Previous").Return(nil, false)
-	assert.NoError(ks.(*keystore).migrate(dbManager))
+
+	_, err = New(logging.NoLog{}, dbManager)
+	assert.NoError(err)
 }
 
 // Test migration from database version 1.0.0 to 1.4.4
-// Recall that the structure of the 1.0.0 and 1.4.4 keystore databases is:
-//           BaseDB
-//          /      \
-//    UserDB        BlockchainDB
-//                 /      |     \
-//               Usr     Usr    Usr
-//             /  |  \
-//          BID  BID  BID
-func TestMigration100_to_133(t *testing.T) {
+func TestMigration1_0_0To1_4_4(t *testing.T) {
 	assert := assert.New(t)
-	ks := &keystore{log: logging.NoLog{}}
-	dbManager := &mocks.Manager{}
 
-	// Put values in the user db and blockchain db
-	prevDB := memdb.New()
-	prevUserDB := prefixdb.New(usersPrefix, prevDB)
+	username := "bob"
 
-	username, userValue := []byte{'u', 's', 'e', 'r'}, []byte{1}
-	assert.NoError(prevUserDB.Put(username, userValue))
-	previousBCDB := prefixdb.New(bcsPrefix, prevDB)
-	userDataKey, userDataValue := []byte{2}, []byte{3}
-	userPrevBCDB := prefixdb.New(username, previousBCDB)
-	assert.NoError(userPrevBCDB.Put(userDataKey, userDataValue))
+	key := []byte{1}
+	value := []byte{2}
 
-	dbManager.On("Previous").Return(
-		&manager.VersionedDatabase{
-			Database: prevDB,
-			Version:  version.NewDefaultVersion(1, 0, 0),
+	dbV1_0_0 := memdb.New()
+
+	dbManagerV1_0_0, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
+		{
+			Database: prefixdb.New(nil, dbV1_0_0),
+			Version:  version.DefaultVersion1_0_0,
 		},
-		true,
-	)
-
-	currentDB := &manager.VersionedDatabase{
-		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 4, 3),
-	}
-	dbManager.On("Current").Return(currentDB)
-
-	// Do the migration
-	assert.NoError(ks.initializeDB(dbManager))
-
-	// Make sure the data was migrated
-	userDB := prefixdb.New(usersPrefix, currentDB.Database)
-	gotPrevUserDBVal, err := userDB.Get(username)
+	})
 	assert.NoError(err)
-	assert.EqualValues(userValue, gotPrevUserDBVal)
 
-	bcDB := prefixdb.New(bcsPrefix, currentDB.Database)
-	userBCDB := prefixdb.New(username, bcDB)
-	gotPrevBCDBVal, err := userBCDB.Get(userDataKey)
+	ksV1_0_0, err := New(&logging.NoLog{}, dbManagerV1_0_0)
 	assert.NoError(err)
-	assert.EqualValues(userDataValue, gotPrevBCDBVal)
+
+	err = ksV1_0_0.CreateUser(username, strongPassword)
+	assert.NoError(err)
+
+	userDBV1_0_0, err := ksV1_0_0.GetDatabase(ids.Empty, username, strongPassword)
+	assert.NoError(err)
+
+	err = userDBV1_0_0.Put(key, value)
+	assert.NoError(err)
+
+	dbV1_4_4 := memdb.New()
+
+	v1_4_4 := version.NewDefaultVersion(1, 4, 4)
+
+	dbManagerV1_4_4, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
+		{
+			Database: prefixdb.New(nil, dbV1_4_4),
+			Version:  v1_4_4,
+		},
+		{
+			Database: prefixdb.New(nil, dbV1_0_0),
+			Version:  version.DefaultVersion1_0_0,
+		},
+	})
+	assert.NoError(err)
+
+	ksV1_4_4, err := New(&logging.NoLog{}, dbManagerV1_4_4)
+	assert.NoError(err)
+
+	userDBV1_4_4, err := ksV1_4_4.GetDatabase(ids.Empty, username, strongPassword)
+	assert.NoError(err)
+
+	val, err := userDBV1_4_4.Get(key)
+	assert.NoError(err)
+	assert.Equal(value, val)
 }

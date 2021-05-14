@@ -11,8 +11,8 @@ import (
 )
 
 type VersionedDatabase struct {
-	database.Database
-	version.Version
+	Database database.Database
+	Version  version.Version
 }
 
 // Close the underlying database

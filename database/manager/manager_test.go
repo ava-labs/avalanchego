@@ -42,7 +42,7 @@ func TestNewSingleDB(t *testing.T) {
 	}
 
 	semDB := manager.Current()
-	cmp := semDB.Compare(v1)
+	cmp := semDB.Version.Compare(v1)
 	assert.Equal(t, 0, cmp, "incorrect version on current database")
 
 	_, exists := manager.Previous()
@@ -66,7 +66,7 @@ func TestNewCreatesSingleDB(t *testing.T) {
 	}
 
 	semDB := manager.Current()
-	cmp := semDB.Compare(v1)
+	cmp := semDB.Version.Compare(v1)
 	assert.Equal(t, 0, cmp, "incorrect version on current database")
 
 	_, exists := manager.Previous()
@@ -150,14 +150,14 @@ func TestNewSortsDatabases(t *testing.T) {
 	}()
 
 	semDB := manager.Current()
-	cmp := semDB.Compare(vers[0])
+	cmp := semDB.Version.Compare(vers[0])
 	assert.Equal(t, 0, cmp, "incorrect version on current database")
 
 	prev, exists := manager.Previous()
 	if !exists {
 		t.Fatal("expected to find a previous database")
 	}
-	cmp = prev.Compare(vers[1])
+	cmp = prev.Version.Compare(vers[1])
 	assert.Equal(t, 0, cmp, "incorrect version on previous database")
 
 	dbs := manager.GetDatabases()
@@ -166,7 +166,7 @@ func TestNewSortsDatabases(t *testing.T) {
 	}
 
 	for i, db := range dbs {
-		cmp = db.Compare(vers[i])
+		cmp = db.Version.Compare(vers[i])
 		assert.Equal(t, 0, cmp, "expected to find database version %s, but found %s", vers[i], db.Version.String())
 	}
 }
@@ -200,11 +200,11 @@ func TestPrefixDBManager(t *testing.T) {
 	m0 := m.NewPrefixDBManager(prefix0)
 	m1 := m0.NewPrefixDBManager(prefix1)
 
-	val, err := m0.Current().Get(k0)
+	val, err := m0.Current().Database.Get(k0)
 	assert.NoError(t, err)
 	assert.Equal(t, v0, val)
 
-	val, err = m1.Current().Get(k1)
+	val, err = m1.Current().Database.Get(k1)
 	assert.NoError(t, err)
 	assert.Equal(t, v1, val)
 }
@@ -238,11 +238,11 @@ func TestNestedPrefixDBManager(t *testing.T) {
 	m0 := m.NewNestedPrefixDBManager(prefix0)
 	m1 := m0.NewNestedPrefixDBManager(prefix1)
 
-	val, err := m0.Current().Get(k0)
+	val, err := m0.Current().Database.Get(k0)
 	assert.NoError(t, err)
 	assert.Equal(t, v0, val)
 
-	val, err = m1.Current().Get(k1)
+	val, err = m1.Current().Database.Get(k1)
 	assert.NoError(t, err)
 	assert.Equal(t, v1, val)
 }

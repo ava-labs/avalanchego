@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
@@ -247,6 +246,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
+	// Build directory
+	fs.String(BuildDirKey, DefaultString, "path to the build directory")
 
 	return fs
 }
@@ -468,11 +469,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 			return node.Config{}, process.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
 		}
 		nodeConfig.StakingTLSCert = *cert
-	}
-
-	nodeConfig.NodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(nodeConfig.StakingTLSCert.Leaf.Raw))
-	if err != nil {
-		return node.Config{}, process.Config{}, fmt.Errorf("problem deriving node ID from certificate: %w", err)
 	}
 
 	if err := initBootstrapPeers(v, &nodeConfig); err != nil {
