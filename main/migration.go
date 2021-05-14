@@ -7,6 +7,8 @@ import (
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"os"
+	"path/filepath"
 	"runtime"
 	"syscall"
 )
@@ -43,40 +45,57 @@ func (m *migrationManager) migrate() error {
 	return m.runMigration()
 }
 
+func dirSize(path string) (uint64, error) {
+	var size int64
+	err := filepath.Walk(path,
+		func(_ string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() {
+				size += info.Size()
+			}
+			return err
+		})
+	return uint64(size), err
+}
+
 func windowsVerifyDiskStorage(path string) (uint64, uint64, error) {
 	return 0, 0, fmt.Errorf("storage space verification not yet implemented for windows")
 }
+
 func unixVerifyDiskStorage(storagePath string) (uint64, uint64, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(storagePath, &stat)
 	if err != nil {
 		return 0, 0, err
 	}
-	size := stat.Blocks * uint64(stat.Bsize)
+	size, ds_err := dirSize(storagePath)
+	if ds_err != nil {
+		return 0, 0, ds_err
+	}
 	avail := stat.Bavail * uint64(stat.Bsize)
-	used := size - avail
-	twox := used + used
+	twox := size + size
 	safty_buf := (twox * 15) / 100
-	return avail, used + safty_buf, nil
+	return avail, size + safty_buf, nil
 }
+
 func (m *migrationManager) verifyDiskStorage() error {
 	storagePath := m.rootConfig.DBPath
+	avail, required, err := uint64(0), uint64(0), error(nil)
 	if runtime.GOOS == "windows" {
-		avail, required, err := windowsVerifyDiskStorage(storagePath)
-		if err != nil {
-			return err
-		}
-		if avail < required {
-			return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
-		}
+		avail, required, err = windowsVerifyDiskStorage(storagePath)
 	} else {
-		avail, required, err := unixVerifyDiskStorage(storagePath)
-		if err != nil {
-			return err
-		}
-		if avail < required {
-			return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
-		}
+		avail, required, err = unixVerifyDiskStorage(storagePath)
+	}
+	if err != nil {
+		return err
+	}
+	if avail < required {
+		return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
+	}
+	if avail < 214748364800 {
+		print("WARNING: 200G available is recommended")
 	}
 	return nil
 }
