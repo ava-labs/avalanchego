@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
