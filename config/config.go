@@ -14,9 +14,11 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -39,6 +41,9 @@ import (
 const (
 	avalanchegoLatest     = "avalanchego-latest"
 	avalanchegoPreupgrade = "avalanchego-preupgrade"
+	chainSettingsDir      = "settings"
+	chainUpgradesDir      = "upgrades"
+	chainsDir             = "chains"
 )
 
 // Results of parsing the CLI
@@ -51,6 +56,7 @@ var (
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
+	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs")
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
 )
@@ -245,6 +251,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 	// Build directory
 	fs.String(BuildDirKey, defaultBuildDirs[0], "path to the build directory")
+	// Chain Config Dir
+	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Plugin directory for Avalanche VMs")
 
 	return fs
 }
@@ -707,6 +715,14 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	// Peer alias
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
 
+	// Chain Configs
+	chainConfigDir := v.GetString(ChainConfigDirKey)
+	chainConfigs, err := readChainConfigs(filepath.Join(chainConfigDir, chainsDir))
+	if err != nil {
+		return node.Config{}, process.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
+	}
+	nodeConfig.ChainConfigs = chainConfigs
+	fmt.Println(nodeConfig.ChainConfigs)
 	return nodeConfig, processConfig, nil
 }
 
@@ -795,4 +811,86 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 	}
 
 	return nodeConfig, processConfig, err
+}
+
+// ReadsChainConfigs reads chain config files from static directories and returns map with contents,
+// if successful.
+func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
+	var wg sync.WaitGroup
+	var m sync.Mutex
+	files, err := filepath.Glob(root + "/" + chainSettingsDir + "/*")
+	if err != nil {
+		return nil, err
+	}
+	upgrades, err := filepath.Glob(root + "/" + chainUpgradesDir + "/*")
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, upgrades...)
+	filesLength := len(files)
+	contents := make(map[string]chains.ChainConfig, filesLength)
+	wg.Add(filesLength)
+
+	fatalErrors := make(chan error)
+	wgDone := make(chan bool)
+
+	for _, file := range files {
+		go func(filePath string) bool {
+			defer wg.Done()
+			cleanedPath := path.Clean(filePath)
+			fileInfo, err := os.Stat(cleanedPath)
+			if err != nil {
+				fatalErrors <- err
+				return false
+			}
+			if fileInfo.IsDir() {
+				return false
+			}
+			parts := strings.Split(cleanedPath, "/")
+			if len(parts) >= 2 {
+				parent := parts[len(parts)-2]
+				fileName := parts[len(parts)-1]
+
+				content, err := ioutil.ReadFile(cleanedPath)
+				if err != nil {
+					fatalErrors <- err
+					return false
+				}
+				trimmed := removeExtension(fileName)
+
+				m.Lock()
+				tmp := contents[trimmed]
+				switch parent {
+				case "upgrades":
+					tmp.Upgrades = content
+				case "settings":
+					tmp.Settings = content
+				default:
+				}
+				contents[trimmed] = tmp
+
+				m.Unlock()
+			}
+
+			return true
+		}(file)
+	}
+
+	wg.Wait()
+	close(wgDone)
+	select {
+	case <-wgDone:
+		// carry on
+		break
+	case err := <-fatalErrors:
+		close(fatalErrors)
+		return nil, err
+	}
+
+	return contents, nil
+}
+
+func removeExtension(filename string) string {
+	extension := filepath.Ext(filename)
+	return filename[0 : len(filename)-len(extension)]
 }

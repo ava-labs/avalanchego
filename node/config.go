@@ -151,5 +151,5 @@ type Config struct {
 	PeerAliasTimeout time.Duration
 
 	// ChainConfigs
-	ChainConfigs map[ids.ID]chains.ChainConfig
+	ChainConfigs map[string]chains.ChainConfig
 }
