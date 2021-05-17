@@ -224,8 +224,13 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
 		sb.removeChain(chainParams.ID)
-
-		m.Log.Error("Error while creating new chain: %s", err)
+		if m.CriticalChains.Contains(chainParams.ID) {
+			// Shut down if we fail to create a required chain (i.e. X, P or C)
+			m.Log.Fatal("error creating required chain %s: %s", chainParams.ID, err)
+			m.Shutdown()
+			return
+		}
+		m.Log.Error("error creating chain %s: %s", chainParams.ID, err)
 		return
 	}
 
