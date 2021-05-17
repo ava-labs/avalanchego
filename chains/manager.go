@@ -164,19 +164,15 @@ type ManagerConfig struct {
 type syncedSubnetSignal struct {
 	// channel allowing all listeners to wake up as soon as whole subnet gets synced.
 	// Closing it down signals to all handlers that subnet is synced.
-	mu                    sync.Mutex
-	subnetFullySyncedSema chan struct{}
-	subnetFullySyncedDone bool
+	broadcastSubnetSyncedOnce sync.Once
+	subnetFullySyncedSema     chan struct{}
 }
 
 func (sign *syncedSubnetSignal) SignalSubnetSynced() {
 	if sign != nil {
-		sign.mu.Lock()
-		defer sign.mu.Unlock()
-		if !sign.subnetFullySyncedDone {
+		sign.broadcastSubnetSyncedOnce.Do(func() {
 			close(sign.subnetFullySyncedSema)
-			sign.subnetFullySyncedDone = true
-		}
+		})
 	}
 }
 
