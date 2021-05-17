@@ -867,7 +867,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 
 	nodeID := certToID(peer.Cert)
 	if !p.net.vdrs.Contains(nodeID) {
-		p.net.log.Debug(
+		p.net.log.Verbo(
 			"not peering to %s at %s because they are not a validator",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			peer.IPDesc,
@@ -878,7 +878,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	// Am I already peered to them? (safe because [p.net.stateLock] is held)
 	foundPeer, ok := p.net.peers[nodeID]
 	if ok && !foundPeer.closed.GetValue() {
-		p.net.log.Debug(
+		p.net.log.Verbo(
 			"not peering to %s because we are already connected to %s",
 			peer.IPDesc,
 			nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -887,7 +887,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	if p.net.latestPeerIP[nodeID].time > peer.Time {
-		p.net.log.Debug(
+		p.net.log.Verbo(
 			"not peering to %s at %s: the given timestamp (%d) < latest (%d)",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			peer.IPDesc,
