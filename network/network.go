@@ -1293,8 +1293,41 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	peers := make([]utils.IPCertDesc, 0, len(n.peers))
-	for _, peer := range n.peers {
+	numToSend := n.peerListSize
+	if len(n.peers) < numToSend {
+		numToSend = len(n.peers)
+	}
+	res := make([]utils.IPCertDesc, 0, numToSend)
+
+	if numToSend == 0 {
+		return res, nil
+	}
+
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(n.peers))); err != nil {
+		return nil, err
+	}
+
+	// sampling len(n.peers) to handle possibly invalid IPs
+	indices, err := s.Sample(len(n.peers))
+	if err != nil {
+		return nil, err
+	}
+
+	// retrieve peerIds to slice for sampling. Todo: create it upon peers insertion?
+	peerIds := make([]ids.ShortID, len(n.peers))
+	i := 0
+	for k := range n.peers {
+		peerIds[i] = k
+		i++
+	}
+
+	for _, idx := range indices {
+		if len(res) == numToSend {
+			break
+		}
+		peer := n.peers[peerIds[idx]]
+
 		peerIP := peer.getIP()
 		switch {
 		case !peer.connected.GetValue():
@@ -1309,35 +1342,22 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
 			continue
 		}
-		if signedIP, ok := peer.sigAndTime.GetValue().(signedPeerIP); ok {
-			if signedIP.ip.Equal(peerIP) {
-				peers = append(peers, utils.IPCertDesc{
-					IPDesc:    peerIP,
-					Signature: signedIP.signature,
-					Cert:      peer.cert,
-					Time:      signedIP.time,
-				})
-			}
+
+		signedIP, ok := peer.sigAndTime.GetValue().(signedPeerIP)
+		if !ok || !signedIP.ip.Equal(peerIP) {
+			continue
 		}
+
+		item := utils.IPCertDesc{
+			IPDesc:    peerIP,
+			Signature: signedIP.signature,
+			Cert:      peer.cert,
+			Time:      signedIP.time,
+		}
+		res = append(res, item)
 	}
 
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(peers))); err != nil {
-		return nil, err
-	}
-	numToSend := n.peerListSize
-	if len(peers) < numToSend {
-		numToSend = len(peers)
-	}
-	indices, err := s.Sample(numToSend)
-	if err != nil {
-		return nil, err
-	}
-	sampledPeers := make([]utils.IPCertDesc, numToSend)
-	for i, index := range indices {
-		sampledPeers[i] = peers[index]
-	}
-	return sampledPeers, nil
+	return res, nil
 }
 
 // should only be called after the peer is marked as connected. Should not be
