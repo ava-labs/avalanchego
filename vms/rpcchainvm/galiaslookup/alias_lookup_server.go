@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 )
 
-var (
-	_ galiaslookupproto.AliasLookupServer = &Server{}
-)
+var _ galiaslookupproto.AliasLookupServer = &Server{}
 
 // Server enables alias lookups over RPC.
 type Server struct {

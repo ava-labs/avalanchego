@@ -15,9 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	_ UnsignedDecisionTx = &UnsignedCreateSubnetTx{}
-)
+var _ UnsignedDecisionTx = &UnsignedCreateSubnetTx{}
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {

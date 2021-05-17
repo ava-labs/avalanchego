@@ -14,23 +14,19 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testChangeAddr = ids.GenerateTestShortID()
-)
+var testChangeAddr = ids.GenerateTestShortID()
 
 // Returns:
 // 1) genesis bytes of vm
@@ -39,7 +35,7 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	keystore, err := keystore.CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -583,6 +579,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	// The balance should include the UTXO since it is partly owned by [addr]
 	assert.Len(t, reply.Balances, 0)
 }
+
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {

@@ -29,6 +29,7 @@ func (b *TestBenchable) Benched(chainID ids.ID, validatorID ids.ShortID) {
 		b.T.Fatalf("Unexpectedly called Benched")
 	}
 }
+
 func (b *TestBenchable) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
 	if b.UnbenchedF != nil {
 		b.UnbenchedF(chainID, validatorID)

@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	errOpenDNSNoIP = errors.New("opendns returned no ip")
-)
+var errOpenDNSNoIP = errors.New("opendns returned no ip")
 
 // Resolver resolves our public IP
 type Resolver interface {
@@ -149,7 +147,8 @@ func NewDynamicIPManager(resolver Resolver, updateTimeout time.Duration, log log
 			tickerCloser:  make(chan struct{}),
 			log:           log,
 			updateTimeout: updateTimeout,
-			resolver:      resolver}
+			resolver:      resolver,
+		}
 		go updater.UpdateExternalIP()
 		return updater
 	}

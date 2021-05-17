@@ -14,9 +14,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
-)
+var errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 

@@ -111,7 +111,7 @@ func (vm *VMClient) Initialize(
 	versionedDBServers := make([]*vmproto.VersionedDBServer, len(versionedDBs))
 	for i, semDB := range versionedDBs {
 		dbBrokerID := vm.broker.NextId()
-		db := rpcdb.NewServer(semDB)
+		db := rpcdb.NewServer(semDB.Database)
 		go vm.broker.AcceptAndServe(dbBrokerID, vm.startDBServerFunc(db))
 		versionedDBServers[i] = &vmproto.VersionedDBServer{
 			DbServer: dbBrokerID,
@@ -121,7 +121,7 @@ func (vm *VMClient) Initialize(
 
 	vm.messenger = messenger.NewServer(toEngine)
 	vm.keystore = gkeystore.NewServer(ctx.Keystore, vm.broker)
-	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current())
+	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current().Database)
 	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
 
@@ -168,7 +168,6 @@ func (vm *VMClient) Initialize(
 		EpochFirstTransition: epochFirstTransitionBytes,
 		EpochDuration:        uint64(ctx.EpochDuration),
 	})
-
 	if err != nil {
 		return err
 	}

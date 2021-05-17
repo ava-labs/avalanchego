@@ -20,9 +20,7 @@ const (
 	Null = "null"
 )
 
-var (
-	errUppercaseMethod = errors.New("method must start with a non-uppercase letter")
-)
+var errUppercaseMethod = errors.New("method must start with a non-uppercase letter")
 
 // NewCodec returns a new json codec that will convert the first character of
 // the method to uppercase

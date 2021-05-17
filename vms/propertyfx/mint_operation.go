@@ -7,9 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	errNilMintOperation = errors.New("nil mint operation")
-)
+var errNilMintOperation = errors.New("nil mint operation")
 
 // MintOperation ...
 type MintOperation struct {

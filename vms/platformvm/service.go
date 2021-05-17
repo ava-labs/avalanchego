@@ -138,7 +138,6 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
 	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
-
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -189,7 +188,7 @@ func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, respo
 
 	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, _, _, err := service.vm.getAllUTXOs(addrs)
+	utxos, err := service.vm.getAllUTXOs(addrs)
 	if err != nil {
 		addr, err2 := service.vm.FormatLocalAddress(addr)
 		if err2 != nil {
@@ -1936,7 +1935,6 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 				VMID:     chain.VMID,
 			})
 		}
-
 	}
 	return nil
 }
@@ -2165,13 +2163,14 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		addrs.Add(addr)
 	}
 
+	currentStakers := service.vm.internalState.CurrentStakerChainState()
+	stakers := currentStakers.Stakers()
+
 	var (
 		totalStake uint64
-		stakedOuts []avax.TransferableOutput
+		stakedOuts = make([]avax.TransferableOutput, 0, len(stakers))
 	)
-
-	currentStakers := service.vm.internalState.CurrentStakerChainState()
-	for _, tx := range currentStakers.Stakers() { // Iterates over current stakers
+	for _, tx := range stakers { // Iterates over current stakers
 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
 			return err

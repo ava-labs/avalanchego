@@ -83,10 +83,8 @@ func (vm *VM) getPaginatedUTXOs(
 
 func (vm *VM) getAllUTXOs(
 	addrs ids.ShortSet,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
+) ([]*avax.UTXO, error) {
 	var err error
-	lastAddr := ids.ShortEmpty
-	lastIndex := ids.Empty
 	seen := make(ids.Set, maxUTXOsToFetch) // IDs of UTXOs already in the list
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
@@ -96,16 +94,12 @@ func (vm *VM) getAllUTXOs(
 
 	// iterate over the addresses and get all the utxos
 	for _, addr := range addrsList {
-		lastIndex, err = vm.getAllUniqueAddressUTXOs(addr, &seen, &utxos)
+		_, err = vm.getAllUniqueAddressUTXOs(addr, &seen, &utxos)
 		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
-		}
-
-		if lastIndex != ids.Empty {
-			lastAddr = addr // The last address searched that has UTXOs (even duplicated) - not the last found
+			return nil, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
 	}
-	return utxos, lastAddr, lastIndex, nil
+	return utxos, nil
 }
 
 func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[]*avax.UTXO) (ids.ID, error) {
@@ -140,7 +134,7 @@ func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[
 
 // getBalance returns the current balance of [addrs]
 func (vm *VM) getBalance(addrs ids.ShortSet) (uint64, error) {
-	utxos, _, _, err := vm.getAllUTXOs(addrs)
+	utxos, err := vm.getAllUTXOs(addrs)
 	if err != nil {
 		return 0, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}

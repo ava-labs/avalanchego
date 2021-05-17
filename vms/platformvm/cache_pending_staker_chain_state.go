@@ -13,9 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	_ pendingStakerChainState = &pendingStakerChainStateImpl{}
-)
+var _ pendingStakerChainState = &pendingStakerChainStateImpl{}
 
 // pendingStakerChainState manages the set of stakers (both validators and
 // delegators) that are slated to start staking in the future.

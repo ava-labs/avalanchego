@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn/gconnproto"
 )
 
-var (
-	_ net.Conn = &Client{}
-)
+var _ net.Conn = &Client{}
 
 // Client is an implementation of a connection that talks over RPC.
 type Client struct {

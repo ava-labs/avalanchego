@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-var (
-	_ TestManager = &manager{}
-)
+var _ TestManager = &manager{}
 
 type State interface {
 	GetUptime(nodeID ids.ShortID) (upDuration time.Duration, lastUpdated time.Time, err error)

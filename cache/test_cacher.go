@@ -9,16 +9,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	// CacherTests is a list of all Cacher tests
-	CacherTests = []struct {
-		Size int
-		Func func(t *testing.T, c Cacher)
-	}{
-		{Size: 1, Func: TestBasic},
-		{Size: 2, Func: TestEviction},
-	}
-)
+// CacherTests is a list of all Cacher tests
+var CacherTests = []struct {
+	Size int
+	Func func(t *testing.T, c Cacher)
+}{
+	{Size: 1, Func: TestBasic},
+	{Size: 2, Func: TestEviction},
+}
 
 func TestBasic(t *testing.T, cache Cacher) {
 	id1 := ids.ID{1}

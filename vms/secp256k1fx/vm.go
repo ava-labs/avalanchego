@@ -16,9 +16,7 @@ type VM interface {
 	Logger() logging.Logger
 }
 
-var (
-	_ VM = &TestVM{}
-)
+var _ VM = &TestVM{}
 
 // TestVM is a minimal implementation of a VM
 type TestVM struct {
