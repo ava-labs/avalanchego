@@ -33,20 +33,26 @@ func (m *migrationManager) migrate() error {
 	if !shouldMigrate {
 		return nil
 	}
-	vdErr := m.verifyDiskStorage()
-	if vdErr != nil {
-		return vdErr
+	err = m.verifyDiskStorage()
+	if err != nil {
+		return err
 	}
-
 	return m.runMigration()
 }
 
 func (m *migrationManager) verifyDiskStorage() error {
 	storagePath := m.rootConfig.DBPath
-	avail, required, err := verifyDiskStorage(storagePath)
+	avail, err := osDiskStat(storagePath)
 	if err != nil {
 		return err
 	}
+	used, err := dirSize(storagePath)
+	if err != nil {
+		return err
+	}
+	twox := used + used
+	saftyBuf := (twox * 15) / 100
+	required := twox + saftyBuf
 	if avail < required {
 		return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
 	}
