@@ -1582,6 +1582,8 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
 	versionParser := version.NewDefaultParser()
 
+	vdrs := validators.NewSet()
+
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		0,
@@ -1597,6 +1599,21 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		2,
 	)
 	id2 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip2.IP().String())))
+
+	err := vdrs.AddWeight(id0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vdrs.AddWeight(id1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vdrs.AddWeight(id2, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	listener0 := &testListener{
 		addr: &net.TCPAddr{
@@ -1679,8 +1696,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}
 	serverUpgrader := upgrader
 	clientUpgrader := upgrader
-
-	vdrs := validators.NewSet()
 
 	var (
 		wg0     sync.WaitGroup
@@ -1983,7 +1998,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 
 	// Cleanup
 	cleanup = true
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
