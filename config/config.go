@@ -722,7 +722,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 		return node.Config{}, process.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 	nodeConfig.ChainConfigs = chainConfigs
-	fmt.Println(nodeConfig.ChainConfigs)
 	return nodeConfig, processConfig, nil
 }
 
@@ -835,6 +834,7 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 	wgDone := make(chan bool)
 
 	for _, file := range files {
+		// read all files concurrently
 		go func(filePath string) bool {
 			defer wg.Done()
 			cleanedPath := path.Clean(filePath)
@@ -848,7 +848,9 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 			}
 			parts := strings.Split(cleanedPath, "/")
 			if len(parts) >= 2 {
+				// "settings"/x.json
 				parent := parts[len(parts)-2]
+				// settings/"x.json"
 				fileName := parts[len(parts)-1]
 
 				content, err := ioutil.ReadFile(cleanedPath)
@@ -856,10 +858,12 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 					fatalErrors <- err
 					return false
 				}
+				// no need for file extensions in keys
 				trimmed := removeExtension(fileName)
 
 				m.Lock()
 				tmp := contents[trimmed]
+				// look parent path and decide the field name
 				switch parent {
 				case "upgrades":
 					tmp.Upgrades = content
@@ -890,6 +894,7 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 	return contents, nil
 }
 
+// removeExtension returns pure filename without any ".extension"
 func removeExtension(filename string) string {
 	extension := filepath.Ext(filename)
 	return filename[0 : len(filename)-len(extension)]
