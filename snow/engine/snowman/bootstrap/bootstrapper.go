@@ -62,7 +62,7 @@ type Bootstrapper struct {
 	executedStateTransitions int
 
 	delayAmount        time.Duration
-	SignalSubnetSynced func()
+	signalSubnetSynced func()
 
 	parser *parser
 }
@@ -77,7 +77,7 @@ func (b *Bootstrapper) Initialize(
 	b.Blocked = config.Blocked
 	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
-	b.SignalSubnetSynced = config.SignalSubnetSynced
+	b.signalSubnetSynced = config.SignalSubnetSynced
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
 	b.delayAmount = initialBootstrappingDelay
@@ -374,8 +374,8 @@ func (b *Bootstrapper) checkFinish() error {
 		}
 
 		return b.RestartBootstrap(true)
-	} else if b.SignalSubnetSynced != nil {
-		b.SignalSubnetSynced()
+	} else if b.signalSubnetSynced != nil {
+		b.signalSubnetSynced()
 	}
 
 	return b.finish()

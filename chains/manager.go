@@ -164,16 +164,15 @@ type ManagerConfig struct {
 type syncedSubnetSignal struct {
 	// channel allowing all listeners to wake up as soon as whole subnet gets synced.
 	// Closing it down signals to all handlers that subnet is synced.
-	broadcastSubnetSyncedOnce sync.Once
-	subnetFullySyncedSema     chan struct{}
+	once                  sync.Once
+	subnetFullySyncedSema chan struct{}
 }
 
-func (sign *syncedSubnetSignal) SignalSubnetSynced() {
-	if sign != nil {
-		sign.broadcastSubnetSyncedOnce.Do(func() {
-			close(sign.subnetFullySyncedSema)
-		})
-	}
+func (s *syncedSubnetSignal) signalSubnetSynced() {
+	// invariant: s should not be nil
+	s.once.Do(func() {
+		close(s.subnetFullySyncedSema)
+	})
 }
 
 type manager struct {
@@ -547,7 +546,7 @@ func (m *manager) createAvalancheChain(
 				Sender:                    &sender,
 				Subnet:                    sb,
 				Delay:                     delay,
-				SignalSubnetSynced:        m.subnetSignal.SignalSubnetSynced,
+				SignalSubnetSynced:        m.subnetSignal.signalSubnetSynced,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -677,7 +676,7 @@ func (m *manager) createSnowmanChain(
 				Sender:                    &sender,
 				Subnet:                    sb,
 				Delay:                     delay,
-				SignalSubnetSynced:        m.subnetSignal.SignalSubnetSynced,
+				SignalSubnetSynced:        m.subnetSignal.signalSubnetSynced,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
