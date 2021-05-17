@@ -99,7 +99,7 @@ func (a *App) Start() int {
 	crypto.EnableCrypto = a.config.EnableCrypto
 
 	if err := a.config.ConsensusParams.Valid(); err != nil {
-		a.log.Error("consensus parameters are invalid: %s", err)
+		a.log.Fatal("consensus parameters are invalid: %s", err)
 		return 1
 	}
 
@@ -111,7 +111,7 @@ func (a *App) Start() int {
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
 	if a.config.AttemptedNATTraversal && !a.config.Nat.SupportsNAT() {
-		a.log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
+		a.log.Warn("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
 			" please confirm the settings in your router")
 	}
 
