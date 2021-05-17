@@ -62,7 +62,7 @@ type Bootstrapper struct {
 	executedStateTransitions int
 
 	delayAmount        time.Duration
-	signalSubnetSynced func()
+	signalSubnetSynced func() // invariant: signalSubnetSynced should not be nil
 
 	parser *parser
 }
@@ -374,7 +374,7 @@ func (b *Bootstrapper) checkFinish() error {
 		}
 
 		return b.RestartBootstrap(true)
-	} else if b.signalSubnetSynced != nil {
+	} else {
 		b.signalSubnetSynced()
 	}
 

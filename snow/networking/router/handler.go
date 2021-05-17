@@ -117,7 +117,7 @@ type Handler struct {
 	closing utils.AtomicBool
 
 	delay          *Delay
-	subnetSyncSema <-chan struct{}
+	subnetSyncSema <-chan struct{} // invariant: subnetSyncSema should not be nil
 }
 
 // Initialize this consensus handler
@@ -271,14 +271,12 @@ func (h *Handler) dispatchMsg(msg message) {
 			until = maxSleepDuration
 		}
 
-		if h.subnetSyncSema != nil {
-			// sleep but break as soon as subnet is synced
-			select {
-			case <-time.After(until):
-				// do nothing
-			case <-h.subnetSyncSema:
-				// do nothing
-			}
+		// sleep but break as soon as subnet is synced
+		select {
+		case <-time.After(until):
+			// do nothing
+		case <-h.subnetSyncSema:
+			// do nothing
 		}
 	}
 

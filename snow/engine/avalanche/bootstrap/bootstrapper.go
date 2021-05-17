@@ -71,7 +71,7 @@ type Bootstrapper struct {
 	executedStateTransitions int
 
 	delayAmount        time.Duration
-	signalSubnetSynced func()
+	signalSubnetSynced func() // invariant: signalSubnetSynced should not be nil
 }
 
 // Initialize this engine.
@@ -464,7 +464,7 @@ func (b *Bootstrapper) checkFinish() error {
 			b.delayAmount = maxBootstrappingDelay
 		}
 		return b.RestartBootstrap(true)
-	} else if b.signalSubnetSynced != nil {
+	} else {
 		b.signalSubnetSynced()
 	}
 

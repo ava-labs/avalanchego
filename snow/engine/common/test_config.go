@@ -16,14 +16,16 @@ func DefaultConfigTest() Config {
 		IsBootstrappedF: func() bool { return isBootstrapped },
 		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
 	}
+	emptySignalSubnetSynced := func() {}
 
 	return Config{
-		Ctx:           snow.DefaultContextTest(),
-		Validators:    validators.NewSet(),
-		Beacons:       validators.NewSet(),
-		Sender:        &SenderTest{},
-		Bootstrapable: &BootstrapableTest{},
-		Subnet:        subnet,
-		Delay:         &DelayTest{},
+		Ctx:                snow.DefaultContextTest(),
+		Validators:         validators.NewSet(),
+		Beacons:            validators.NewSet(),
+		Sender:             &SenderTest{},
+		Bootstrapable:      &BootstrapableTest{},
+		Subnet:             subnet,
+		Delay:              &DelayTest{},
+		SignalSubnetSynced: emptySignalSubnetSynced,
 	}
 }
