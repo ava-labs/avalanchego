@@ -53,6 +53,8 @@ var (
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
+
+	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
 func init() {
@@ -67,11 +69,6 @@ func init() {
 		defaultDataDir,
 	)
 }
-
-var (
-	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errInvalidStakerWeights = errors.New("staking weights must be positive")
-)
 
 // avalancheFlagSet returns the complete set of flags for avalanchego
 func avalancheFlagSet() *flag.FlagSet {
@@ -724,16 +721,12 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 		if err != nil {
 			return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
 		}
-		config.BootstrapPeers = append(config.BootstrapPeers, &node.Peer{
-			IP: addr,
-		})
+		config.BootstrapIPs = append(config.BootstrapIPs, addr)
 	}
 
 	if v.IsSet(BootstrapIDsKey) {
 		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
 	}
-
-	i := 0
 	for _, id := range bootstrapIDs {
 		if id == "" {
 			continue
@@ -742,14 +735,7 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 		if err != nil {
 			return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 		}
-		if len(config.BootstrapPeers) <= i {
-			return errBootstrapMismatch
-		}
-		config.BootstrapPeers[i].ID = nodeID
-		i++
-	}
-	if len(config.BootstrapPeers) != i {
-		return fmt.Errorf("got %d bootstrap IPs but %d bootstrap IDs", len(config.BootstrapPeers), i)
+		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
 	}
 	return nil
 }
