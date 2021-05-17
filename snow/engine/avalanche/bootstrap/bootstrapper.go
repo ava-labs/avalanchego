@@ -325,11 +325,11 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	// All vertices added to [processVertices] have received transitive votes from the accepted frontier
 	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the valid vertices in this message
 	processVertices[0] = vtx
-	eligibleVertices := ids.Set{}
 	parents, err := vtx.Parents()
 	if err != nil {
 		return err
 	}
+	eligibleVertices := ids.NewSet(len(parents))
 	for _, parent := range parents {
 		eligibleVertices.Add(parent.ID())
 	}
