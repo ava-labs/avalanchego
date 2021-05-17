@@ -2,11 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
-	"syscall"
-
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/node"
@@ -45,59 +40,17 @@ func (m *migrationManager) migrate() error {
 	return m.runMigration()
 }
 
-func dirSize(path string) (uint64, error) {
-	var size int64
-	err := filepath.Walk(path,
-		func(_ string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !info.IsDir() {
-				size += info.Size()
-			}
-			return nil
-		})
-	return uint64(size), err
-}
-
-func windowsVerifyDiskStorage(path string) (uint64, uint64, error) {
-	return 0, 0, fmt.Errorf("storage space verification not yet implemented for windows")
-}
-
-func unixVerifyDiskStorage(storagePath string) (uint64, uint64, error) {
-	var stat syscall.Statfs_t
-	err := syscall.Statfs(storagePath, &stat)
-	if err != nil {
-		return 0, 0, err
-	}
-	size, dsErr := dirSize(storagePath)
-	if dsErr != nil {
-		return 0, 0, dsErr
-	}
-	avail := stat.Bavail * uint64(stat.Bsize)
-	twox := size + size
-	saftyBuf := (twox * 15) / 100
-	return avail, size + saftyBuf, nil
-}
-
 func (m *migrationManager) verifyDiskStorage() error {
 	storagePath := m.rootConfig.DBPath
-	var avail uint64
-	var required uint64
-	var err error
-	if runtime.GOOS == "windows" {
-		avail, required, err = windowsVerifyDiskStorage(storagePath)
-	} else {
-		avail, required, err = unixVerifyDiskStorage(storagePath)
-	}
+	avail, required, err := verifyDiskStorage(storagePath)
 	if err != nil {
 		return err
 	}
 	if avail < required {
 		return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
 	}
-	if avail < 214748364800 {
-		m.log.Error("WARNING: 200G available is recommended")
+	if avail < constants.TwoGigabytes {
+		m.log.Warn("at least 200GB of free disk space is recommended")
 	}
 	return nil
 }
