@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -218,10 +218,10 @@ func TestIssueImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDB := memdb.New()
+	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -239,8 +239,10 @@ func TestIssueImportTx(t *testing.T) {
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,
@@ -363,10 +365,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDB := memdb.New()
+	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,8 +389,10 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	err = vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,

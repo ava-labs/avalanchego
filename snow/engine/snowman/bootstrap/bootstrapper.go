@@ -31,7 +31,7 @@ type Config struct {
 	common.Config
 
 	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.Jobs
+	Blocked *queue.JobsWithMissing
 
 	VM block.ChainVM
 
@@ -52,18 +52,18 @@ type Bootstrapper struct {
 	startingAcceptedFrontier ids.Set
 
 	// Blocked tracks operations that are blocked on blocks
-	Blocked *queue.Jobs
+	Blocked *queue.JobsWithMissing
 
 	VM block.ChainVM
 
 	Bootstrapped func()
 
-	// true if all of the vertices in the original accepted frontier have been processed
-	processedStartingAcceptedFrontier bool
 	// number of state transitions executed
 	executedStateTransitions int
 
 	delayAmount time.Duration
+
+	parser *parser
 }
 
 // Initialize this engine.
@@ -94,12 +94,15 @@ func (b *Bootstrapper) Initialize(
 		return err
 	}
 
-	b.Blocked.SetParser(&parser{
+	b.parser = &parser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAccepted,
 		numDropped:  b.numDropped,
 		vm:          b.VM,
-	})
+	}
+	if err := b.Blocked.SetParser(b.parser); err != nil {
+		return err
+	}
 
 	config.Bootstrapable = b
 	return b.Bootstrapper.Initialize(config.Config)
@@ -130,22 +133,41 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	for _, blkID := range acceptedContainerIDs {
+
+	pendingContainerIDs := b.Blocked.MissingIDs()
+
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
+	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
+	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
 		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if height := blk.Height(); height > b.tipHeight {
 				b.tipHeight = height
 			}
-			if err := b.process(blk); err != nil {
+			if blk.Status() == choices.Accepted {
+				b.Blocked.RemoveMissingID(blkID)
+			} else {
+				toProcess = append(toProcess, blk)
+			}
+		} else {
+			b.Blocked.AddMissingID(blkID)
+			if err := b.fetch(blkID); err != nil {
 				return err
 			}
-		} else if err := b.fetch(blkID); err != nil {
+		}
+	}
+
+	// Process received blocks
+	for _, blk := range toProcess {
+		if err := b.process(blk); err != nil {
 			return err
 		}
 	}
 
-	b.processedStartingAcceptedFrontier = true
-	if numPending := b.OutstandingRequests.Len(); numPending == 0 {
+	if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 		return b.checkFinish()
 	}
 	return nil
@@ -160,7 +182,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 
 	// Make sure we don't already have this block
 	if _, err := b.VM.GetBlock(blkID); err == nil {
-		if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+		if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 			return b.checkFinish()
 		}
 		return nil
@@ -208,7 +230,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return b.fetch(wantedBlkID)
 	}
 
-	for _, blkBytes := range blks {
+	for _, blkBytes := range blks[1:] {
 		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
@@ -243,34 +265,43 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			return nil
 		}
 
-		if err := b.Blocked.Push(&blockJob{
+		b.Blocked.RemoveMissingID(blkID)
+
+		pushed, err := b.Blocked.Push(&blockJob{
+			parser:      b.parser,
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
-		}); err == nil {
-			b.numFetched.Inc()
-			b.NumFetched++                                      // Progress tracker
-			if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
-				if !b.Restarted {
-					b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
-				} else {
-					b.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
-				}
-			}
-		}
-
-		if err := b.Blocked.Commit(); err != nil {
+		})
+		if err != nil {
 			return err
 		}
 
-		// Process this block's parent
+		// Traverse to the next block regardless of if the block is pushed
 		blk = blk.Parent()
 		status = blk.Status()
 		blkID = blk.ID()
+
+		if !pushed {
+			// If this block is already on the queue, then we can stop
+			// traversing here.
+			break
+		}
+
+		b.numFetched.Inc()
+		b.NumFetched++                                      // Progress tracker
+		if b.NumFetched%common.StatusUpdateFrequency == 0 { // Periodically print progress
+			if !b.Restarted {
+				b.Ctx.Log.Info("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+			} else {
+				b.Ctx.Log.Debug("fetched %d of %d blocks", b.NumFetched, b.tipHeight-b.startingHeight)
+			}
+		}
 	}
 
-	switch status := blk.Status(); status {
+	switch status {
 	case choices.Unknown:
+		b.Blocked.AddMissingID(blkID)
 		if err := b.fetch(blkID); err != nil {
 			return err
 		}
@@ -278,7 +309,11 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		return fmt.Errorf("bootstrapping wants to accept %s, however it was previously rejected", blkID)
 	}
 
-	if numPending := b.OutstandingRequests.Len(); numPending == 0 && b.processedStartingAcceptedFrontier {
+	if err := b.Blocked.Commit(); err != nil {
+		return err
+	}
+
+	if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 		return b.checkFinish()
 	}
 	return nil
@@ -297,7 +332,7 @@ func (b *Bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d blocks. Executing state transitions...", b.NumFetched)
 	}
 
-	executedBlocks, err := b.executeAll(b.Blocked)
+	executedBlocks, err := b.Blocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.ConsensusDispatcher, b.Ctx.DecisionDispatcher)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -308,7 +343,6 @@ func (b *Bootstrapper) checkFinish() error {
 	// Note that executedVts < c*previouslyExecuted is enforced so that the
 	// bootstrapping process will terminate even as new blocks are being issued.
 	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
-		b.processedStartingAcceptedFrontier = false
 		return b.RestartBootstrap(true)
 	}
 
@@ -337,7 +371,6 @@ func (b *Bootstrapper) checkFinish() error {
 			b.delayAmount = maxBootstrappingDelay
 		}
 
-		b.processedStartingAcceptedFrontier = false
 		return b.RestartBootstrap(true)
 	}
 
@@ -358,51 +391,12 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs) (int, error) {
-	numExecuted := 0
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		jobID := job.ID()
-		jobBytes := job.Bytes()
-		// Note that ConsensusDispatcher.Accept / DecisionDispatcher.Accept must be
-		// called before job.Execute to honor EventDispatcher.Accept's invariant.
-		if err := b.Ctx.ConsensusDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
-			return numExecuted, err
-		}
-		if err := b.Ctx.DecisionDispatcher.Accept(b.Ctx, jobID, jobBytes); err != nil {
-			return numExecuted, err
-		}
-
-		if err := jobs.Execute(job); err != nil {
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			if !b.Restarted {
-				b.Ctx.Log.Info("executed %d of %d blocks", numExecuted, b.tipHeight-b.startingHeight)
-			} else {
-				b.Ctx.Log.Debug("executed %d of %d blocks", numExecuted, b.tipHeight-b.startingHeight)
-			}
-		}
-
-		if b.Halted() {
-			break
-		}
-	}
-	if !b.Restarted {
-		b.Ctx.Log.Info("executed %d blocks", numExecuted)
-	} else {
-		b.Ctx.Log.Debug("executed %d blocks", numExecuted)
-	}
-	return numExecuted, nil
-}
-
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Connected(validatorID)
+		if err := connector.Connected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Connected(validatorID)
 }
@@ -410,7 +404,9 @@ func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Disconnected(validatorID)
+		if err := connector.Disconnected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Disconnected(validatorID)
 }

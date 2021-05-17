@@ -117,7 +117,7 @@ type network struct {
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
 	versionCompatibility               version.Compatibility
-	parser                             version.Parser
+	parser                             version.ApplicationParser
 	listener                           net.Listener
 	dialer                             Dialer
 	serverUpgrader                     Upgrader
@@ -216,7 +216,7 @@ func NewDefaultNetwork(
 	ip utils.DynamicIPDesc,
 	networkID uint32,
 	versionCompatibility version.Compatibility,
-	parser version.Parser,
+	parser version.ApplicationParser,
 	listener net.Listener,
 	dialer Dialer,
 	serverUpgrader,
@@ -287,7 +287,7 @@ func NewNetwork(
 	ip utils.DynamicIPDesc,
 	networkID uint32,
 	versionCompatibility version.Compatibility,
-	parser version.Parser,
+	parser version.ApplicationParser,
 	listener net.Listener,
 	dialer Dialer,
 	serverUpgrader,
@@ -1305,7 +1305,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			continue
 		}
 
-		peerVersion := peer.versionStruct.GetValue().(version.Version)
+		peerVersion := peer.versionStruct.GetValue().(version.Application)
 		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
 			continue
 		}
@@ -1349,7 +1349,7 @@ func (n *network) connected(p *peer) {
 
 	p.connected.SetValue(true)
 
-	peerVersion := p.versionStruct.GetValue().(version.Version)
+	peerVersion := p.versionStruct.GetValue().(version.Application)
 
 	if n.hasMasked {
 		if n.versionCompatibility.Unmaskable(peerVersion) != nil {

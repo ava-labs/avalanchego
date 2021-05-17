@@ -2694,7 +2694,6 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	requested := new(bool)
 	requestID := new(uint32)
 	sender.GetAcceptedFrontierF = func(vdrs ids.ShortSet, reqID uint32) {
-
 		// instead of triggering the timeout here, we'll just invoke the GetAcceptedFrontierFailed func
 		//
 		// s.router.GetAcceptedFrontierFailed(vID, s.ctx.ChainID, requestID)

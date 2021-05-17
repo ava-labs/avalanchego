@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -24,7 +23,6 @@ var (
 
 // stake the provided amount while deducting the provided fee.
 // Arguments:
-// - [db] is the database that is used to attempt to fetch the funds from.
 // - [keys] are the owners of the funds
 // - [amount] is the amount of funds that are trying to be staked
 // - [fee] is the amount of AVAX that should be burned
@@ -37,7 +35,6 @@ var (
 //                   staking period
 // - [signers] the proof of ownership of the funds being moved
 func (vm *VM) stake(
-	db database.Database,
 	keys []*crypto.PrivateKeySECP256K1R,
 	amount uint64,
 	fee uint64,
@@ -53,7 +50,7 @@ func (vm *VM) stake(
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}
-	utxos, _, _, err := vm.GetUTXOs(db, addrs, ids.ShortEmpty, ids.Empty, -1, false) // The UTXOs controlled by [keys]
+	utxos, err := vm.getAllUTXOs(addrs) // The UTXOs controlled by [keys]
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("couldn't get UTXOs: %w", err)
 	}
@@ -82,7 +79,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); assetID != vm.Ctx.AVAXAssetID {
+		if assetID := utxo.AssetID(); assetID != vm.ctx.AVAXAssetID {
 			continue // We only care about staking AVAX, so ignore other assets
 		}
 
@@ -111,7 +108,7 @@ func (vm *VM) stake(
 		}
 		in, ok := inIntf.(avax.TransferableIn)
 		if !ok { // should never happen
-			vm.Ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
+			vm.ctx.Log.Warn("expected input to be avax.TransferableIn but is %T", inIntf)
 			continue
 		}
 
@@ -129,7 +126,7 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 			In: &StakeableLockIn{
 				Locktime:       out.Locktime,
 				TransferableIn: in,
@@ -138,7 +135,7 @@ func (vm *VM) stake(
 
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 			Out: &StakeableLockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
@@ -152,7 +149,7 @@ func (vm *VM) stake(
 			// This input provided more value than was needed to be locked.
 			// Some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out: &StakeableLockOut{
 					Locktime: out.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
@@ -178,7 +175,7 @@ func (vm *VM) stake(
 			break
 		}
 
-		if assetID := utxo.AssetID(); assetID != vm.Ctx.AVAXAssetID {
+		if assetID := utxo.AssetID(); assetID != vm.ctx.AVAXAssetID {
 			continue // We only care about burning AVAX, so ignore other assets
 		}
 
@@ -228,14 +225,14 @@ func (vm *VM) stake(
 		// Add the input to the consumed inputs
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
-			Asset:  avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
 			In:     in,
 		})
 
 		if amountToStake > 0 {
 			// Some of this input was put for staking
 			stakedOuts = append(stakedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: amountToStake,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -250,7 +247,7 @@ func (vm *VM) stake(
 		if remainingValue > 0 {
 			// This input had extra value, so some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
-				Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: remainingValue,
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -281,7 +278,7 @@ func (vm *VM) stake(
 
 // authorize an operation on behalf of the named subnet with the provided keys.
 func (vm *VM) authorize(
-	db database.Database,
+	vs MutableState,
 	subnetID ids.ID,
 	keys []*crypto.PrivateKeySECP256K1R,
 ) (
@@ -289,14 +286,21 @@ func (vm *VM) authorize(
 	[]*crypto.PrivateKeySECP256K1R, // Keys that prove ownership
 	error,
 ) {
-	// Get information about the subnet we're authorizing the operation for
-	subnet, err := vm.getSubnet(db, subnetID)
+	subnetTx, _, err := vs.GetTx(subnetID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("subnet %s doesn't exist", subnetID)
+		return nil, nil, fmt.Errorf(
+			"failed to fetch subnet %s: %w",
+			subnetID,
+			err,
+		)
+	}
+	subnet, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+	if !ok {
+		return nil, nil, errWrongTxType
 	}
 
 	// Make sure the owners of the subnet match the provided keys
-	owner, ok := subnet.UnsignedTx.(*UnsignedCreateSubnetTx).Owner.(*secp256k1fx.OutputOwners)
+	owner, ok := subnet.Owner.(*secp256k1fx.OutputOwners)
 	if !ok {
 		return nil, nil, errUnknownOwners
 	}
@@ -325,7 +329,7 @@ func (vm *VM) authorize(
 // [creds] are the credentials of [tx], which allow [ins] to be spent.
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
-	db database.Database,
+	utxoDB UTXOGetter,
 	tx UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -335,10 +339,15 @@ func (vm *VM) semanticVerifySpend(
 ) TxError {
 	utxos := make([]*avax.UTXO, len(ins))
 	for index, input := range ins {
-		utxoID := input.UTXOID.InputID()
-		utxo, err := vm.getUTXO(db, utxoID)
+		utxo, err := utxoDB.GetUTXO(input.InputID())
 		if err != nil {
-			return tempError{fmt.Errorf("failed to read consumed UTXO %s due to: %w", utxoID, err)}
+			return tempError{
+				fmt.Errorf(
+					"failed to read consumed UTXO %s due to: %w",
+					&input.UTXOID,
+					err,
+				),
+			}
 		}
 		utxos[index] = utxo
 	}
@@ -428,31 +437,13 @@ func (vm *VM) semanticVerifySpendUTXOs(
 
 		amount := in.Amount()
 
-		// Rule change for Apricot phase 0 hardfork
-		chainTime, err := vm.getTimestamp(vm.DB)
-		if err != nil {
-			return tempError{fmt.Errorf("couldn't get chain timestamp: %w", err)}
-		}
-		if chainTime.Before(vm.apricotPhase0Time) {
-			// Old rule
-			if locktime == 0 {
-				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
-				if err != nil {
-					return permError{err}
-				}
-				unlockedConsumed = newUnlockedConsumed
-				continue
+		if now >= locktime {
+			newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
+			if err != nil {
+				return permError{err}
 			}
-		} else {
-			// New rule
-			if now >= locktime {
-				newUnlockedConsumed, err := safemath.Add64(unlockedConsumed, amount)
-				if err != nil {
-					return permError{err}
-				}
-				unlockedConsumed = newUnlockedConsumed
-				continue
-			}
+			unlockedConsumed = newUnlockedConsumed
+			continue
 		}
 
 		owned, ok := out.(Owned)
@@ -552,39 +543,31 @@ func (vm *VM) semanticVerifySpendUTXOs(
 }
 
 // Removes the UTXOs consumed by [ins] from the UTXO set
-func (vm *VM) consumeInputs(
-	db database.Database,
+func consumeInputs(
+	utxoDB UTXODeleter,
 	ins []*avax.TransferableInput,
-) error {
+) {
 	for _, input := range ins {
-		utxoID := input.UTXOID.InputID()
-		if err := vm.removeUTXO(db, utxoID); err != nil {
-			return tempError{
-				fmt.Errorf("failed to remove UTXO %s: %w", utxoID, err),
-			}
-		}
+		utxoDB.DeleteUTXO(input.InputID())
 	}
-	return nil
 }
 
 // Adds the UTXOs created by [outs] to the UTXO set.
 // [txID] is the ID of the tx that created [outs].
-func (vm *VM) produceOutputs(
-	db database.Database,
+func produceOutputs(
+	utxoDB UTXOAdder,
 	txID ids.ID,
+	assetID ids.ID,
 	outs []*avax.TransferableOutput,
-) error {
+) {
 	for index, out := range outs {
-		if err := vm.putUTXO(db, &avax.UTXO{
+		utxoDB.AddUTXO(&avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
 				OutputIndex: uint32(index),
 			},
-			Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: assetID},
 			Out:   out.Output(),
-		}); err != nil {
-			return fmt.Errorf("failed to put UTXO %w", err)
-		}
+		})
 	}
-	return nil
 }

@@ -425,7 +425,7 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 
-	peerVersion := p.versionStruct.GetValue().(version.Version)
+	peerVersion := p.versionStruct.GetValue().(version.Application)
 	if p.net.versionCompatibility.Compatible(peerVersion) != nil {
 		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
 
@@ -621,7 +621,7 @@ func (p *peer) sendPong() {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetVersion(msg Msg) {
+func (p *peer) handleGetVersion(_ Msg) {
 	if !p.versionSent.GetValue() {
 		p.sendVersion()
 	}
@@ -758,7 +758,7 @@ func (p *peer) handleVersion(msg Msg) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetPeerList(msg Msg) {
+func (p *peer) handleGetPeerList(_ Msg) {
 	if p.gotVersion.GetValue() && !p.peerListSent.GetValue() {
 		p.sendPeerList()
 	}

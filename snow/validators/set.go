@@ -447,6 +447,7 @@ func (s *set) MaskValidator(vdrID ids.ShortID) error {
 
 	return s.maskValidator(vdrID)
 }
+
 func (s *set) maskValidator(vdrID ids.ShortID) error {
 	if s.maskedVdrs.Contains(vdrID) {
 		return nil

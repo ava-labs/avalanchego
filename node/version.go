@@ -11,12 +11,15 @@ import (
 )
 
 var (
-	Version                      = version.NewDefaultVersion(constants.PlatformName, 1, 4, 3)
-	MinimumCompatibleVersion     = version.NewDefaultVersion(constants.PlatformName, 1, 4, 0)
-	PrevMinimumCompatibleVersion = version.NewDefaultVersion(constants.PlatformName, 1, 3, 0)
-	MinimumUnmaskedVersion       = version.NewDefaultVersion(constants.PlatformName, 1, 1, 0)
-	PrevMinimumUnmaskedVersion   = version.NewDefaultVersion(constants.PlatformName, 1, 0, 0)
-	VersionParser                = version.NewDefaultParser()
+	Version                      = version.NewDefaultApplication(constants.PlatformName, 1, 4, 4)
+	MinimumCompatibleVersion     = version.NewDefaultApplication(constants.PlatformName, 1, 4, 0)
+	PrevMinimumCompatibleVersion = version.NewDefaultApplication(constants.PlatformName, 1, 3, 0)
+	MinimumUnmaskedVersion       = version.NewDefaultApplication(constants.PlatformName, 1, 1, 0)
+	PrevMinimumUnmaskedVersion   = version.NewDefaultApplication(constants.PlatformName, 1, 0, 0)
+	VersionParser                = version.NewDefaultApplicationParser()
+
+	DatabaseVersion     = version.NewDefaultVersion(1, 4, 4)
+	PrevDatabaseVersion = version.NewDefaultVersion(1, 0, 0)
 
 	ApricotPhase0Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2020, time.December, 8, 3, 0, 0, 0, time.UTC),

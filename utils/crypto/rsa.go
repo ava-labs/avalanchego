@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var (
-	errWrongKeyType = errors.New("wrong key type")
-)
+var errWrongKeyType = errors.New("wrong key type")
 
 const rsaSize = 3072
 

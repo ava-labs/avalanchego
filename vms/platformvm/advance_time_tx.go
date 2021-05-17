@@ -7,21 +7,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	_ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
-)
+var _ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
 
 // UnsignedAdvanceTimeTx is a transaction to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
 // followed by a commit block) the staker set is also updated accordingly.
 // It must be that:
 //   * proposed timestamp > [current chain time]
-//   * proposed timestamp <= [time for next staker to be removed]
+//   * proposed timestamp <= [time for next staker set change]
 type UnsignedAdvanceTimeTx struct {
 	avax.Metadata
 
@@ -37,11 +35,11 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState MutableState,
 	stx *Tx,
 ) (
-	*versiondb.Database,
-	*versiondb.Database,
+	VersionedState,
+	VersionedState,
 	func() error,
 	func() error,
 	TxError,
@@ -49,49 +47,171 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	switch {
 	case tx == nil:
 		return nil, nil, nil, nil, tempError{errNilTx}
-	case vm.clock.Time().Add(syncBound).Before(tx.Timestamp()):
-		return nil, nil, nil, nil, tempError{fmt.Errorf("proposed time, %s, is too far in the future relative to local time (%s)",
-			tx.Timestamp(), vm.clock.Time())}
 	case len(stx.Creds) != 0:
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
-	if currentTimestamp, err := vm.getTimestamp(db); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	} else if tx.Time <= uint64(currentTimestamp.Unix()) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s), not after current timestamp (%s)",
-			tx.Timestamp(), currentTimestamp)}
+	timestamp := tx.Timestamp()
+	localTimestamp := vm.clock.Time()
+	if localTimestamp.Add(syncBound).Before(timestamp) {
+		return nil, nil, nil, nil, tempError{
+			fmt.Errorf(
+				"proposed time (%s) is too far in the future relative to local time (%s)",
+				timestamp,
+				localTimestamp,
+			),
+		}
 	}
 
-	// Only allow timestamp to move forward as far as the time of next staker set change time
-	nextStakerChangeTime, err := vm.nextStakerChangeTime(db)
+	if currentTimestamp := parentState.GetTimestamp(); !timestamp.After(currentTimestamp) {
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"proposed timestamp (%s), not after current timestamp (%s)",
+				timestamp,
+				currentTimestamp,
+			),
+		}
+	}
+
+	// Only allow timestamp to move forward as far as the time of next staker
+	// set change time
+	nextStakerChangeTime, err := vm.nextStakerChangeTime(parentState)
 	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
-	} else if tx.Time > uint64(nextStakerChangeTime.Unix()) {
-		return nil, nil, nil, nil, permError{fmt.Errorf("proposed timestamp (%s) later than next staker change time (%s)",
-			tx.Timestamp(), nextStakerChangeTime)}
 	}
 
-	// Specify what the state of the chain will be if this proposal is committed
-	onCommitDB := versiondb.New(db)
-	if err := vm.putTimestamp(onCommitDB, tx.Timestamp()); err != nil {
+	if timestamp.After(nextStakerChangeTime) {
+		return nil, nil, nil, nil, permError{
+			fmt.Errorf(
+				"proposed timestamp (%s) later than next staker change time (%s)",
+				timestamp,
+				nextStakerChangeTime,
+			),
+		}
+	}
+
+	currentSupply := parentState.GetCurrentSupply()
+
+	pendingStakers := parentState.PendingStakerChainState()
+	toAddValidatorsWithRewardToCurrent := []*validatorReward(nil)
+	toAddDelegatorsWithRewardToCurrent := []*validatorReward(nil)
+	toAddWithoutRewardToCurrent := []*Tx(nil)
+	numToRemoveFromPending := 0
+
+	// Add to the staker set any pending stakers whose start time is at or
+	// before the new timestamp. [pendingStakers.Stakers()] is sorted in order
+	// of increasing startTime
+pendingStakerLoop:
+	for _, tx := range pendingStakers.Stakers() {
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddDelegatorTx:
+			if staker.StartTime().After(timestamp) {
+				break pendingStakerLoop
+			}
+
+			r := reward(
+				staker.Validator.Duration(),
+				staker.Validator.Wght,
+				currentSupply,
+				vm.StakeMintingPeriod,
+			)
+			currentSupply, err = safemath.Add64(currentSupply, r)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+
+			toAddDelegatorsWithRewardToCurrent = append(toAddDelegatorsWithRewardToCurrent, &validatorReward{
+				addStakerTx:     tx,
+				potentialReward: r,
+			})
+			numToRemoveFromPending++
+		case *UnsignedAddValidatorTx:
+			if staker.StartTime().After(timestamp) {
+				break pendingStakerLoop
+			}
+
+			r := reward(
+				staker.Validator.Duration(),
+				staker.Validator.Wght,
+				currentSupply,
+				vm.StakeMintingPeriod,
+			)
+			currentSupply, err = safemath.Add64(currentSupply, r)
+			if err != nil {
+				return nil, nil, nil, nil, permError{err}
+			}
+
+			toAddValidatorsWithRewardToCurrent = append(toAddValidatorsWithRewardToCurrent, &validatorReward{
+				addStakerTx:     tx,
+				potentialReward: r,
+			})
+			numToRemoveFromPending++
+		case *UnsignedAddSubnetValidatorTx:
+			if staker.StartTime().After(timestamp) {
+				break pendingStakerLoop
+			}
+
+			// If this staker should already be removed, then we should just
+			// never add them.
+			if staker.EndTime().After(timestamp) {
+				toAddWithoutRewardToCurrent = append(toAddWithoutRewardToCurrent, tx)
+			}
+			numToRemoveFromPending++
+		default:
+			return nil, nil, nil, nil, permError{
+				fmt.Errorf("expected validator but got %T", tx.UnsignedTx),
+			}
+		}
+	}
+	newlyPendingStakers := pendingStakers.DeleteStakers(numToRemoveFromPending)
+
+	currentStakers := parentState.CurrentStakerChainState()
+	numToRemoveFromCurrent := 0
+
+	// Remove from the staker set any subnet validators whose endTime is at or
+	// before the new timestamp
+currentStakerLoop:
+	for _, tx := range currentStakers.Stakers() {
+		switch staker := tx.UnsignedTx.(type) {
+		case *UnsignedAddSubnetValidatorTx:
+			if staker.EndTime().After(timestamp) {
+				break currentStakerLoop
+			}
+
+			numToRemoveFromCurrent++
+		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
+			// We shouldn't be removing any primary network validators here
+			break currentStakerLoop
+		default:
+			return nil, nil, nil, nil, permError{errWrongTxType}
+		}
+	}
+	newlyCurrentStakers, err := currentStakers.UpdateStakers(
+		toAddValidatorsWithRewardToCurrent,
+		toAddDelegatorsWithRewardToCurrent,
+		toAddWithoutRewardToCurrent,
+		numToRemoveFromCurrent,
+	)
+	if err != nil {
 		return nil, nil, nil, nil, tempError{err}
 	}
-	if err := vm.updateValidators(onCommitDB); err != nil {
-		return nil, nil, nil, nil, tempError{err}
-	}
+
+	onCommitState := newVersionedState(parentState, newlyCurrentStakers, newlyPendingStakers)
+	onCommitState.SetTimestamp(timestamp)
+	onCommitState.SetCurrentSupply(currentSupply)
+
+	// State doesn't change if this proposal is aborted
+	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 
 	// If this block is committed, update the validator sets.
 	// onCommitDB will be committed to vm.DB before this is called.
 	onCommitFunc := func() error {
 		// For each Subnet, update the node's validator manager to reflect
 		// current Subnet membership
-		return vm.updateVdrMgr(false)
+		return vm.updateValidators(false)
 	}
 
-	// State doesn't change if this proposal is aborted
-	onAbortDB := versiondb.New(db)
-	return onCommitDB, onAbortDB, onCommitFunc, nil, nil
+	return onCommitState, onAbortState, onCommitFunc, nil, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed time is at

@@ -22,9 +22,7 @@ const (
 	baseElementSize = 8 // bytes
 )
 
-var (
-	_ atomic.SharedMemory = &Client{}
-)
+var _ atomic.SharedMemory = &Client{}
 
 // Client is atomic.SharedMemory that talks over RPC.
 type Client struct {
