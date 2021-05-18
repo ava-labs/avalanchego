@@ -112,11 +112,11 @@ type chain struct {
 }
 
 // ChainConfig is configuration settings for the current execution.
-// [Settings] is the user-provided settings blob for the chain.
-// [Upgrades] is a chain-specific blob for coordinating upgrades.
+// [Config] is the user-provided config blob for the chain.
+// [Upgrade] is a chain-specific blob for coordinating upgrades.
 type ChainConfig struct {
-	Settings []byte
-	Upgrades []byte
+	Config  []byte
+	Upgrade []byte
 }
 
 // ManagerConfig ...
@@ -225,7 +225,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			alias)
 		return
 	}
-
 	m.Log.Info("creating chain:\n"+
 		"    ID: %s\n"+
 		"    VMID:%s",
@@ -491,8 +490,8 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	chainConfig, _ := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
+	chainConfig := m.getChainConfig(ctx.ChainID)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -596,7 +595,6 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-
 	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -617,8 +615,8 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	chainConfig, _ := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
+	chainConfig := m.getChainConfig(ctx.ChainID)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
@@ -763,16 +761,16 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 	return "", false
 }
 
-func (m *manager) getChainConfig(id ids.ID) (ChainConfig, bool) {
+func (m *manager) getChainConfig(id ids.ID) ChainConfig {
 	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
-		return val, true
+		return val
 	}
 	alias, err := m.PrimaryAlias(id)
 	if err != nil {
-		return ChainConfig{}, false
+		return ChainConfig{}
 	}
 	if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
-		return val, true
+		return val
 	}
-	return ChainConfig{}, false
+	return ChainConfig{}
 }

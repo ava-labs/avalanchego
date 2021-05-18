@@ -41,8 +41,8 @@ import (
 const (
 	avalanchegoLatest     = "avalanchego-latest"
 	avalanchegoPreupgrade = "avalanchego-preupgrade"
-	chainSettingsDir      = "settings"
-	chainUpgradesDir      = "upgrades"
+	chainConfigDir        = "configs"
+	chainUpgradeDir       = "upgrades"
 	chainsDir             = "chains"
 )
 
@@ -817,11 +817,11 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 	var wg sync.WaitGroup
 	var m sync.Mutex
-	files, err := filepath.Glob(root + "/" + chainSettingsDir + "/*")
+	files, err := filepath.Glob(root + "/" + chainConfigDir + "/*")
 	if err != nil {
 		return nil, err
 	}
-	upgrades, err := filepath.Glob(root + "/" + chainUpgradesDir + "/*")
+	upgrades, err := filepath.Glob(root + "/" + chainUpgradeDir + "/*")
 	if err != nil {
 		return nil, err
 	}
@@ -848,9 +848,9 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 			}
 			parts := strings.Split(cleanedPath, "/")
 			if len(parts) >= 2 {
-				// "settings"/x.json
+				// "configs"/x.json
 				parent := parts[len(parts)-2]
-				// settings/"x.json"
+				// configs/"x.json"
 				fileName := parts[len(parts)-1]
 
 				content, err := ioutil.ReadFile(cleanedPath)
@@ -863,16 +863,16 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 
 				m.Lock()
 				tmp := contents[trimmed]
+
 				// look parent path and decide the field name
 				switch parent {
-				case chainUpgradesDir:
-					tmp.Upgrades = content
-				case chainSettingsDir:
-					tmp.Settings = content
+				case chainUpgradeDir:
+					tmp.Upgrade = content
+				case chainConfigDir:
+					tmp.Config = content
 				default:
 				}
 				contents[trimmed] = tmp
-
 				m.Unlock()
 			}
 
