@@ -258,53 +258,8 @@ func (b *Block) VerifyWithoutWrites() error {
 	if bonusBlocks.Contains(b.id) {
 		log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 	} else {
-		switch atx := atomicTx.UnsignedAtomicTx.(type) {
-		case *UnsignedImportTx:
-			// If an import tx is seen, we must ensure that none of the
-			// processing ancestors consume the same UTXO.
-			inputs := atx.InputUTXOs()
-			for ancestor.Status() != choices.Accepted {
-				atx, err := vm.extractAtomicTx(ancestor.ethBlock)
-				if err != nil {
-					return fmt.Errorf("block %s failed verification while parsing atomic tx from ancestor %s", b.ethBlock.Hash().Hex(), ancestor.ethBlock.Hash().Hex())
-				}
-				// If the ancestor isn't an atomic block, it can't conflict with
-				// the import tx.
-				if atx != nil {
-					ancestorInputs := atx.UnsignedAtomicTx.InputUTXOs()
-					if inputs.Overlaps(ancestorInputs) {
-						return errConflictingAtomicInputs
-					}
-				}
-
-				// Move up the chain.
-				ancestorIntf := ancestor.Parent()
-				// If the ancestor is unknown, then the parent failed
-				// verification when it was called.
-				// If the ancestor is rejected, then this block shouldn't be
-				// inserted into the canonical chain because the parent is
-				// will be missing.
-				// If the ancestor is processing, then the block may have
-				// been verified.
-				if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
-					return errRejectedParent
-				}
-				ancestor, ok = ancestorIntf.(*Block)
-				if !ok {
-					return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
-				}
-			}
-		case *UnsignedExportTx:
-			// Export txs are validated by the processor's nonce management.
-		default:
-			return errUnknownAtomicTx
-		}
-
-		// We have verified that none of the processing ancestors conflict with
-		// the atomic transaction, so now we must ensure that the transaction is
-		// valid and doesn't have any accepted conflicts.
 		utx := atomicTx.UnsignedAtomicTx
-		if err := utx.SemanticVerify(vm, atomicTx, rules); err != nil {
+		if err := utx.SemanticVerify(vm, atomicTx, ancestor, rules); err != nil {
 			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 		}
 	}

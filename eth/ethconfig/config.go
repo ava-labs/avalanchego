@@ -74,7 +74,6 @@ func NewDefaultConfig() Config {
 			GasCeil:               8000000,
 			ApricotPhase1GasLimit: params.ApricotPhase1GasLimit,
 			GasPrice:              big.NewInt(params.GWei),
-			Recommit:              3 * time.Second,
 		},
 		TxPool:      core.DefaultTxPoolConfig,
 		RPCGasCap:   25000000,

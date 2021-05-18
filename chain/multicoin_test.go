@@ -62,8 +62,6 @@ func TestMulticoin(t *testing.T) {
 
 	config.Genesis = genesisBlock
 
-	newBlockChan := make(chan *types.Block)
-
 	// NOTE: use precompiled `mc_test.sol` for portability, do not remove the
 	// following code (for debug purpose)
 	//
@@ -110,15 +108,16 @@ func TestMulticoin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	chain.SetOnSealFinish(func(block *types.Block) error {
+	chain.SetOnSealFinish(func(block *types.Block) {
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatal(err)
+		}
 		if err := chain.SetPreference(block); err != nil {
 			t.Fatal(err)
 		}
 		if err := chain.Accept(block); err != nil {
 			t.Fatal(err)
 		}
-		newBlockChan <- block
-		return nil
 	})
 
 	// start the chain
@@ -139,9 +138,11 @@ func TestMulticoin(t *testing.T) {
 	}
 	<-txSubmitCh
 	nonce++
-	chain.GenBlock()
+	block, err := chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	block := <-newBlockChan
 	<-newTxPoolHeadChan
 	log.Info("Generated block with new counter contract creation", "blkNumber", block.NumberU64())
 
@@ -163,10 +164,12 @@ func TestMulticoin(t *testing.T) {
 	chain.AddRemoteTxs([]*types.Transaction{signedTx})
 	nonce++
 	<-txSubmitCh
-	chain.GenBlock()
+	block, err = chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Await block generation
-	block = <-newBlockChan
 	<-newTxPoolHeadChan
 	if txs := block.Transactions(); len(txs) != 1 {
 		t.Fatalf("Expected new block to contain 1 transaction, but found %d", len(txs))
@@ -207,9 +210,11 @@ func TestMulticoin(t *testing.T) {
 		}
 
 		<-txSubmitCh
-		chain.GenBlock()
+		block, err := chain.GenerateBlock()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-		block = <-newBlockChan
 		<-newTxPoolHeadChan
 		if txs := block.Transactions(); len(txs) != 2 {
 			t.Fatalf("Expected block to contain 2 transactions, but found %d", len(txs))
@@ -241,9 +246,11 @@ func TestMulticoin(t *testing.T) {
 	chain.AddRemoteTxs([]*types.Transaction{signedWithdrawTx, signedUpdateBalanceTx})
 
 	<-txSubmitCh
-	chain.GenBlock()
+	block, err = chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	block = <-newBlockChan
 	<-newTxPoolHeadChan
 
 	if txs := block.Transactions(); len(txs) != 2 {

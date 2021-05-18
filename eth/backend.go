@@ -374,62 +374,6 @@ func (s *Ethereum) SetEtherbase(etherbase common.Address) {
 	s.miner.SetEtherbase(etherbase)
 }
 
-// StartMining starts the miner with the given number of CPU threads. If mining
-// is already running, this method adjust the number of threads allowed to use
-// and updates the minimum price required by the transaction pool.
-func (s *Ethereum) StartMining() error {
-	// Original code:
-	// // Update the thread count within the consensus engine
-	// type threaded interface {
-	// 	SetThreads(threads int)
-	// }
-	// if th, ok := s.engine.(threaded); ok {
-	// 	log.Info("Updated mining threads", "threads", threads)
-	// 	if threads == 0 {
-	// 		threads = -1 // Disable the miner from within
-	// 	}
-	// 	th.SetThreads(threads)
-	// }
-	// If the miner was not running, initialize it
-	if !s.IsMining() {
-		// Propagate the initial price point to the transaction pool
-		s.lock.RLock()
-		price := s.gasPrice
-		s.lock.RUnlock()
-		s.txPool.SetGasPrice(price)
-
-		// Configure the local mining address
-		eb, err := s.Etherbase()
-		if err != nil {
-			log.Error("Cannot start mining without etherbase", "err", err)
-			return fmt.Errorf("etherbase missing: %v", err)
-		}
-		//// If mining is started, we can disable the transaction rejection mechanism
-		//// introduced to speed sync times.
-		//atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
-
-		//go s.miner.Start(eb)
-		s.miner.Start(eb)
-	}
-	return nil
-}
-
-// StopMining terminates the miner, both at the consensus engine level as well as
-// at the block creation level.
-func (s *Ethereum) StopMining() {
-	// Original code:
-	// // Update the thread count within the consensus engine
-	// type threaded interface {
-	// 	SetThreads(threads int)
-	// }
-	// if th, ok := s.engine.(threaded); ok {
-	// 	th.SetThreads(-1)
-	// }
-	// Stop the block creating itself
-	s.miner.Stop()
-}
-
-func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 
 func (s *Ethereum) AccountManager() *accounts.Manager { return s.accountManager }
@@ -461,7 +405,6 @@ func (s *Ethereum) Stop() error {
 	s.bloomIndexer.Close()
 	close(s.closeBloomHandler)
 	s.txPool.Stop()
-	s.miner.Stop()
 	s.blockchain.Stop()
 	s.engine.Close()
 	// Original code:
