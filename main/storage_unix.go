@@ -4,7 +4,7 @@ package main
 
 import "syscall"
 
-func verifyDiskStorage(storagePath string) (uint64, error) {
+func osDiskStat(storagePath string) (uint64, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(storagePath, &stat)
 	if err != nil {
