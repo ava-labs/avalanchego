@@ -8,7 +8,7 @@ import (
 	"unsafe"
 )
 
-func osDiskStat(path string) (uint64, error) {
+func OsDiskStat(path string) (uint64, error) {
 	h := syscall.MustLoadDLL("kernel32.dll")
 	c := h.MustFindProc("GetDiskFreeSpaceExW")
 	lpFreeBytesAvailable := int64(0)
