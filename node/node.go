@@ -150,6 +150,18 @@ func (n *Node) initNetworking() error {
 	if err != nil {
 		return err
 	}
+
+	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	if err != nil {
+		n.Log.Info("this node's IP is set to: %q", n.Config.StakingIP.IP())
+	} else {
+		ipDesc = utils.IPDesc{
+			IP:   n.Config.StakingIP.IP().IP,
+			Port: ipDesc.Port,
+		}
+		n.Log.Info("this node's IP is set to: %q", ipDesc)
+	}
+
 	dialer := network.NewDialer(TCP)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
