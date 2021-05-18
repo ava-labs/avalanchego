@@ -3,7 +3,6 @@
 package storage
 
 import (
-	"errors"
 	"syscall"
 	"unsafe"
 )
@@ -20,8 +19,6 @@ func OsDiskStat(path string) (uint64, error) {
 		lpFreeBytesAvailable     int64
 		lpTotalNumberOfBytes     int64
 		lpTotalNumberOfFreeBytes int64
-	)
-	var (
 		errNonzeroErrorCode = errors.new("nonzero return from win32 call for disk space")
 	)
 	u16p, err := syscall.UTF16PtrFromString(path)
