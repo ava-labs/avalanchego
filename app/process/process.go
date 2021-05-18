@@ -222,7 +222,6 @@ func (a *App) Start() int {
 	)
 	defer externalIPUpdater.Stop()
 
-	a.log.Info("this node's IP is set to: %s", a.config.StakingIP.IP())
 	if err := a.node.Initialize(&a.config, dbManager, a.log, logFactory); err != nil {
 		a.log.Fatal("error initializing node: %s", err)
 		return 1

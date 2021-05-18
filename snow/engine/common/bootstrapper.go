@@ -109,7 +109,7 @@ func (b *Bootstrapper) Startup() error {
 	}
 
 	// Ask each of the bootstrap validators to send their accepted frontier
-	vdrs := ids.ShortSet{}
+	vdrs := ids.NewShortSet(b.pendingAcceptedFrontier.Len())
 	vdrs.Union(b.pendingAcceptedFrontier)
 
 	b.RequestID++
@@ -200,7 +200,7 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 	}
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.NewShortSet(b.pendingAccepted.Len())
 	vdrs.Union(b.pendingAccepted)
 
 	b.RequestID++

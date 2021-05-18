@@ -46,7 +46,7 @@ func (vm *VM) stake(
 	[][]*crypto.PrivateKeySECP256K1R, // signers
 	error,
 ) {
-	addrs := ids.ShortSet{} // The addresses controlled by [keys]
+	addrs := ids.NewShortSet(len(keys)) // The addresses controlled by [keys]
 	for _, key := range keys {
 		addrs.Add(key.PublicKey().Address())
 	}

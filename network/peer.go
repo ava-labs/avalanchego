@@ -872,7 +872,7 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -899,7 +899,7 @@ func (p *peer) handleGetAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -925,7 +925,7 @@ func (p *peer) handleAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -1021,7 +1021,7 @@ func (p *peer) handleChits(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {

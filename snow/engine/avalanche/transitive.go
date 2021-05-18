@@ -464,7 +464,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	if err != nil {
 		return err
 	}
-	txIDs := ids.Set{}
+	txIDs := ids.NewSet(len(txs))
 	for _, tx := range txs {
 		txIDs.Add(tx.ID())
 	}
@@ -574,8 +574,9 @@ func (t *Transitive) issueRepoll() {
 		vdrBag.Add(vdr.ID())
 	}
 
-	vdrSet := ids.ShortSet{}
-	vdrSet.Add(vdrBag.List()...)
+	vdrList := vdrBag.List()
+	vdrSet := ids.NewShortSet(len(vdrList))
+	vdrSet.Add(vdrList...)
 
 	// Poll the network
 	t.RequestID++
