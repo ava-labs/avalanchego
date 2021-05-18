@@ -123,7 +123,7 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string) (chan
 	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
+	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
 
 	// NB: this lock is intentionally left locked when this function returns.
