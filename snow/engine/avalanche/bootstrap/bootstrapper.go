@@ -464,10 +464,9 @@ func (b *Bootstrapper) checkFinish() error {
 			b.delayAmount = maxBootstrappingDelay
 		}
 		return b.RestartBootstrap(true)
-	} else {
-		b.signalSubnetSynced()
 	}
 
+	b.signalSubnetSynced()
 	return b.finish()
 }
 

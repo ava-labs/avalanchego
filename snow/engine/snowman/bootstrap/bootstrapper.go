@@ -374,10 +374,9 @@ func (b *Bootstrapper) checkFinish() error {
 		}
 
 		return b.RestartBootstrap(true)
-	} else {
-		b.signalSubnetSynced()
 	}
 
+	b.signalSubnetSynced()
 	return b.finish()
 }
 
