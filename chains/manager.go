@@ -149,9 +149,9 @@ type ManagerConfig struct {
 	WhitelistedSubnets        ids.Set          // Subnets to validate
 	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService             health.Service
-	RetryBootstrap            bool // Should Bootstrap be retried
-	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
-	ChainConfigs              map[ids.ID]ChainConfig
+	RetryBootstrap            bool                   // Should Bootstrap be retried
+	RetryBootstrapMaxAttempts int                    // Max number of times to retry bootstrap
+	ChainConfigs              map[string]ChainConfig // alias || chainId -> ChainConfig
 	// If true, shut down the node after the Primary Network has bootstrapped
 	// and use [FetchOnlyFrom] as beacons
 	FetchOnly bool
@@ -491,7 +491,7 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	chainConfig := m.ChainConfigs[ctx.ChainID]
+	chainConfig, _ := m.getChainConfig(ctx.ChainID)
 	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
@@ -617,7 +617,7 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	chainConfig := m.ChainConfigs[ctx.ChainID]
+	chainConfig, _ := m.getChainConfig(ctx.ChainID)
 	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, err
 	}
@@ -761,4 +761,18 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func (m *manager) getChainConfig(id ids.ID) (ChainConfig, bool) {
+	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
+		return val, true
+	}
+	alias, err := m.PrimaryAlias(id)
+	if err != nil {
+		return ChainConfig{}, false
+	}
+	if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
+		return val, true
+	}
+	return ChainConfig{}, false
 }

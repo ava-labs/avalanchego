@@ -865,9 +865,9 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 				tmp := contents[trimmed]
 				// look parent path and decide the field name
 				switch parent {
-				case "upgrades":
+				case chainUpgradesDir:
 					tmp.Upgrades = content
-				case "settings":
+				case chainSettingsDir:
 					tmp.Settings = content
 				default:
 				}
