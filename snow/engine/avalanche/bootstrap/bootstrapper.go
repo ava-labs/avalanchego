@@ -31,8 +31,7 @@ const (
 	cacheSize      = 100000
 
 	// Parameters for delaying bootstrapping to avoid potential CPU burns
-	initialBootstrappingDelay = 500 * time.Millisecond
-	maxBootstrappingDelay     = time.Minute
+	bootstrappingDelay = 10 * time.Second
 )
 
 var errUnexpectedTimeout = errors.New("unexpected timeout fired")
@@ -73,8 +72,6 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount time.Duration
-
 	awaitingTimeout bool
 }
 
@@ -92,7 +89,6 @@ func (b *Bootstrapper) Initialize(
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
-	b.delayAmount = initialBootstrappingDelay
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -468,13 +464,9 @@ func (b *Bootstrapper) checkFinish() error {
 		} else {
 			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
-		// Restart bootstrapping after [b.delayAmount] to keep up to date on the
-		// latest tip.
-		b.Timer.RegisterTimeout(b.delayAmount)
-		b.delayAmount *= 2
-		if b.delayAmount > maxBootstrappingDelay {
-			b.delayAmount = maxBootstrappingDelay
-		}
+		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
+		// on the latest tip.
+		b.Timer.RegisterTimeout(bootstrappingDelay)
 		b.awaitingTimeout = true
 		return nil
 	}
