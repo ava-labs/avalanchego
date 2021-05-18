@@ -123,7 +123,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
+	fromAddrs := ids.NewShortSet(len(args.From))
 	for _, addrStr := range args.From {
 		addr, err := w.vm.ParseLocalAddress(addrStr)
 		if err != nil {

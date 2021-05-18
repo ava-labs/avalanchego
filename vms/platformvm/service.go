@@ -142,8 +142,7 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
 
-	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(privKeyBytes)
+	skIntf, err := service.vm.factory.ToPrivateKey(privKeyBytes)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -285,8 +284,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
 	}
 
-	factory := crypto.FactorySECP256K1R{}
-	key, err := factory.NewPrivateKey()
+	key, err := service.vm.factory.NewPrivateKey()
 	if err != nil {
 		return fmt.Errorf("couldn't create key: %w", err)
 	}
@@ -536,7 +534,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		return nil
 	}
 
-	subnetSet := ids.Set{}
+	subnetSet := ids.NewSet(len(args.IDs))
 	for _, subnetID := range args.IDs {
 		if subnetSet.Contains(subnetID) {
 			continue

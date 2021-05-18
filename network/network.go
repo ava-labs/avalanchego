@@ -76,9 +76,13 @@ type Network interface {
 	// or the network is closed. Returns a non-nil error.
 	Dispatch() error
 
-	// Attempt to connect to this node ID at IP. Thread safety must be managed internally
+	// Attempt to connect to this IP. Thread safety must be managed internally
 	// to the network. The network will never stop attempting to connect to this
 	// IP.
+	TrackIP(ip utils.IPDesc)
+
+	// Attempt to connect to this node ID at IP. Thread safety must be managed
+	// internally to the network.
 	Track(ip utils.IPDesc, nodeID ids.ShortID)
 
 	// Returns the description of the specified [nodeIDs] this network is currently
@@ -946,11 +950,18 @@ func (n *network) close() {
 	}
 }
 
+// TrackIP implements the Network interface
+// assumes the stateLock is not held.
+func (n *network) TrackIP(ip utils.IPDesc) {
+	n.Track(ip, ids.ShortEmpty)
+}
+
 // Track implements the Network interface
 // assumes the stateLock is not held.
 func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
+
 	n.track(ip, nodeID)
 }
 
