@@ -196,8 +196,8 @@ func New(stack *node.Node, config *Config,
 			TrieDirtyDisabled:   config.NoPruning,
 			TrieTimeLimit:       config.TrieTimeout,
 			// TODO: Enable snapshots once stable (when 0 they are disabled)
-			// SnapshotLimit: config.SnapshotCache,
-			Preimages: config.Preimages,
+			SnapshotLimit: 128, //config.SnapshotCache,
+			Preimages:     config.Preimages,
 		}
 	)
 	var err error
