@@ -257,6 +257,8 @@ func (h *Handler) Dispatch() {
 func (h *Handler) dispatchMsg(msg message) {
 	// If messages should be delayed to this chain, hold the messages, but check
 	// to see if the chain should be closed at least every [maxSleepDuration].
+
+sleepLoop:
 	for {
 		if h.closing.GetValue() {
 			h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
@@ -274,9 +276,8 @@ func (h *Handler) dispatchMsg(msg message) {
 		// sleep but break as soon as subnet is synced
 		select {
 		case <-time.After(until):
-			// do nothing
 		case <-h.subnetSyncSema:
-			// do nothing
+			break sleepLoop
 		}
 	}
 

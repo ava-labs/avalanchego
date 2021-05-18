@@ -67,17 +67,15 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		t.Fatal(err)
 	}
 
-	emptySignalSubnetSynced := func() {}
 	commonConfig := common.Config{
-		Ctx:                ctx,
-		Validators:         peers,
-		Beacons:            peers,
-		SampleK:            peers.Len(),
-		Alpha:              peers.Weight()/2 + 1,
-		Sender:             sender,
-		Subnet:             subnet,
-		Delay:              &common.DelayTest{},
-		SignalSubnetSynced: emptySignalSubnetSynced,
+		Ctx:        ctx,
+		Validators: peers,
+		Beacons:    peers,
+		SampleK:    peers.Len(),
+		Alpha:      peers.Weight()/2 + 1,
+		Sender:     sender,
+		Subnet:     subnet,
+		Delay:      &common.DelayTest{},
 	}
 	return Config{
 		Config:     commonConfig,

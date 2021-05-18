@@ -61,8 +61,7 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount        time.Duration
-	signalSubnetSynced func() // invariant: signalSubnetSynced should not be nil
+	delayAmount time.Duration
 
 	parser *parser
 }
@@ -77,7 +76,6 @@ func (b *Bootstrapper) Initialize(
 	b.Blocked = config.Blocked
 	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
-	b.signalSubnetSynced = config.SignalSubnetSynced
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
 	b.delayAmount = initialBootstrappingDelay
@@ -348,14 +346,14 @@ func (b *Bootstrapper) checkFinish() error {
 		return b.RestartBootstrap(true)
 	}
 
-	// Notify the subnet that this chain is synced
-	b.Subnet.Bootstrapped(b.Ctx.ChainID)
-
 	// If there is an additional callback, notify them that this chain has been
 	// synced.
 	if b.Bootstrapped != nil {
 		b.Bootstrapped()
 	}
+
+	// Notify the subnet that this chain is synced
+	b.Subnet.Bootstrapped(b.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
@@ -376,7 +374,6 @@ func (b *Bootstrapper) checkFinish() error {
 		return b.RestartBootstrap(true)
 	}
 
-	b.signalSubnetSynced()
 	return b.finish()
 }
 

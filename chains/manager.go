@@ -161,20 +161,6 @@ type ManagerConfig struct {
 	ShutdownNodeFunc func(exitCode int)
 }
 
-type syncedSubnetSignal struct {
-	// channel allowing all listeners to wake up as soon as whole subnet gets synced.
-	// Closing it down signals to all handlers that subnet is synced.
-	once                  sync.Once
-	subnetFullySyncedSema chan struct{}
-}
-
-func (s *syncedSubnetSignal) signalSubnetSynced() {
-	// invariant: s should not be nil
-	s.once.Do(func() {
-		close(s.subnetFullySyncedSema)
-	})
-}
-
 type manager struct {
 	// Note: The string representation of a chain's ID is also considered to be an alias of the chain
 	// That is, [chainID].String() is an alias for the chain, too
@@ -195,8 +181,6 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]*router.Handler
-
-	subnetSignal syncedSubnetSignal
 }
 
 // New returns a new Manager
@@ -207,7 +191,6 @@ func New(config *ManagerConfig) Manager {
 		chains:        make(map[ids.ID]*router.Handler),
 	}
 	m.Initialize()
-	m.subnetSignal.subnetFullySyncedSema = make(chan struct{})
 	return m
 }
 
@@ -236,7 +219,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		return
 	}
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
-	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
+	// (Recall that the string representation of a chain's ID is also an alias
+	//  for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
 		m.Log.Debug("there is already a chain with alias '%s'. Chain not created.",
 			alias)
@@ -252,26 +236,26 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
+		var onBootstrapped func()
 		if chainParams.SubnetID == constants.PrimaryNetworkID {
-			sb = &subnet{
-				onFinish: func() {
-					// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
-					// If running in fetch only mode, shut down node since fetching is complete.
-					if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
-						m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
-						go m.ShutdownNodeFunc(1)
-					}
-					if m.ManagerConfig.FetchOnly {
-						m.Log.Info("done with fetch only mode. Starting node shutdown")
-						go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
-					}
-				},
+			onBootstrapped = func() {
+				// When this subnet is done bootstrapping, mark that we have
+				// bootstrapped this database version. If running in fetch only
+				// mode, shut down node since fetching is complete.
+				if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
+					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
+					go m.ShutdownNodeFunc(1)
+				}
+				if m.ManagerConfig.FetchOnly {
+					m.Log.Info("done with fetch only mode. Starting node shutdown")
+					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
+				}
 			}
-		} else {
-			sb = &subnet{}
 		}
+		sb = newSubnet(onBootstrapped, chainParams.ID)
+	} else {
+		sb.addChain(chainParams.ID)
 	}
-	sb.addChain(chainParams.ID)
 
 	// In fetch-only mode, use custom bootstrap beacons
 	if m.FetchOnly {
@@ -545,7 +529,6 @@ func (m *manager) createAvalancheChain(
 				Sender:                    &sender,
 				Subnet:                    sb,
 				Delay:                     delay,
-				SignalSubnetSynced:        m.subnetSignal.signalSubnetSynced,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -588,7 +571,7 @@ func (m *manager) createAvalancheChain(
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 		delay,
-		m.subnetSignal.subnetFullySyncedSema,
+		sb.afterBootstrapped(),
 	)
 
 	return &chain{
@@ -675,7 +658,6 @@ func (m *manager) createSnowmanChain(
 				Sender:                    &sender,
 				Subnet:                    sb,
 				Delay:                     delay,
-				SignalSubnetSynced:        m.subnetSignal.signalSubnetSynced,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -702,7 +684,7 @@ func (m *manager) createSnowmanChain(
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 		delay,
-		m.subnetSignal.subnetFullySyncedSema,
+		sb.afterBootstrapped(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)

@@ -2063,7 +2063,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return ids.List()
 	}
 
-	emptySignalSubnetSynced := func() {}
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
 		T:               t,
@@ -2076,14 +2075,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Ctx:                ctx,
-				Validators:         vdrs,
-				Beacons:            beacons,
-				SampleK:            beacons.Len(),
-				Alpha:              beacons.Weight()/2 + 1,
-				Sender:             &sender,
-				Subnet:             subnet,
-				SignalSubnetSynced: emptySignalSubnetSynced,
+				Ctx:        ctx,
+				Validators: vdrs,
+				Beacons:    beacons,
+				SampleK:    beacons.Len(),
+				Alpha:      beacons.Weight()/2 + 1,
+				Sender:     &sender,
+				Subnet:     subnet,
 			},
 			Blocked: blocked,
 			VM:      vm,
