@@ -14,7 +14,7 @@ type TimerTest struct {
 
 	CantRegisterTimout bool
 
-	RegisterTimeoutF func(time.Duration, chan struct{})
+	RegisterTimeoutF func(time.Duration)
 }
 
 // Default set the default callable value to [cant]
@@ -22,9 +22,9 @@ func (t *TimerTest) Default(cant bool) {
 	t.CantRegisterTimout = cant
 }
 
-func (t *TimerTest) RegisterTimeout(delay time.Duration, preempt chan struct{}) {
+func (t *TimerTest) RegisterTimeout(delay time.Duration) {
 	if t.RegisterTimeoutF != nil {
-		t.RegisterTimeoutF(delay, preempt)
+		t.RegisterTimeoutF(delay)
 	} else if t.CantRegisterTimout && t.T != nil {
 		t.T.Fatalf("Unexpectedly called RegisterTimeout")
 	}

@@ -45,6 +45,7 @@ type handlerMetrics struct {
 	connected, disconnected,
 	notify,
 	gossip,
+	timeout,
 	cpu,
 	shutdown prometheus.Histogram
 }
@@ -103,6 +104,7 @@ func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Regi
 	m.disconnected = initHistogram(namespace, "disconnected", registerer, &errs)
 	m.notify = initHistogram(namespace, "notify", registerer, &errs)
 	m.gossip = initHistogram(namespace, "gossip", registerer, &errs)
+	m.timeout = initHistogram(namespace, "timeout", registerer, &errs)
 
 	m.cpu = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
@@ -170,6 +172,8 @@ func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) prometheus.Histo
 		return m.getAncestorsFailed
 	case constants.MultiPutMsg:
 		return m.multiPut
+	case constants.TimeoutMsg:
+		return m.timeout
 	case constants.GetMsg:
 		return m.get
 	case constants.GetFailedMsg:

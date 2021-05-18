@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -33,6 +34,8 @@ const (
 	initialBootstrappingDelay = 500 * time.Millisecond
 	maxBootstrappingDelay     = time.Minute
 )
+
+var errUnexpectedTimeout = errors.New("unexpected timeout fired")
 
 // Config ...
 type Config struct {
@@ -71,6 +74,8 @@ type Bootstrapper struct {
 	executedStateTransitions int
 
 	delayAmount time.Duration
+
+	awaitingTimeout bool
 }
 
 // Initialize this engine.
@@ -372,6 +377,15 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(vtxID)
 }
 
+func (b *Bootstrapper) Timeout() error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+	b.awaitingTimeout = false
+
+	return b.RestartBootstrap(true)
+}
+
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {
@@ -407,7 +421,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 {
+	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -454,14 +468,15 @@ func (b *Bootstrapper) checkFinish() error {
 		} else {
 			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
-		// Delay new incoming messages to avoid consuming unnecessary resources
-		// while keeping up to date on the latest tip.
-		b.Config.Delay.Delay(b.delayAmount)
+		// Restart bootstrapping after [b.delayAmount] to keep up to date on the
+		// latest tip.
+		b.Timer.RegisterTimeout(b.delayAmount)
 		b.delayAmount *= 2
 		if b.delayAmount > maxBootstrappingDelay {
 			b.delayAmount = maxBootstrappingDelay
 		}
-		return b.RestartBootstrap(true)
+		b.awaitingTimeout = true
+		return nil
 	}
 
 	return b.finish()

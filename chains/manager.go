@@ -513,7 +513,13 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	delay := &router.Delay{}
+	// Asynchronously passes messages from the network to the consensus engine
+	handler := &router.Handler{}
+
+	timer := &router.Timer{
+		Handler: handler,
+		Preempt: sb.afterBootstrapped(),
+	}
 
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
@@ -528,7 +534,7 @@ func (m *manager) createAvalancheChain(
 				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
 				Sender:                    &sender,
 				Subnet:                    sb,
-				Delay:                     delay,
+				Timer:                     timer,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -558,8 +564,6 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
-	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
 	err = handler.Initialize(
 		engine,
 		validators,
@@ -570,8 +574,6 @@ func (m *manager) createAvalancheChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
-		delay,
-		sb.afterBootstrapped(),
 	)
 
 	return &chain{
@@ -642,7 +644,13 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	delay := &router.Delay{}
+	// Asynchronously passes messages from the network to the consensus engine
+	handler := &router.Handler{}
+
+	timer := &router.Timer{
+		Handler: handler,
+		Preempt: sb.afterBootstrapped(),
+	}
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
@@ -657,7 +665,7 @@ func (m *manager) createSnowmanChain(
 				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
 				Sender:                    &sender,
 				Subnet:                    sb,
-				Delay:                     delay,
+				Timer:                     timer,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -671,8 +679,6 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
-	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
 	err = handler.Initialize(
 		engine,
 		validators,
@@ -683,8 +689,6 @@ func (m *manager) createSnowmanChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
-		delay,
-		sb.afterBootstrapped(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)

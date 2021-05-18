@@ -261,6 +261,7 @@ func (b *Bootstrapper) Timeout() error {
 	if !b.awaitingTimeout {
 		return errUnexpectedTimeout
 	}
+	b.awaitingTimeout = false
 
 	return b.RestartBootstrap(true)
 }
@@ -376,15 +377,15 @@ func (b *Bootstrapper) checkFinish() error {
 		} else {
 			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
-		// Delay new incoming messages to avoid consuming unnecessary resources
-		// while keeping up to date on the latest tip.
-		b.Config.Delay.Delay(b.delayAmount)
+		// Restart bootstrapping after [b.delayAmount] to keep up to date on the
+		// latest tip.
+		b.Timer.RegisterTimeout(b.delayAmount)
 		b.delayAmount *= 2
 		if b.delayAmount > maxBootstrappingDelay {
 			b.delayAmount = maxBootstrappingDelay
 		}
-
-		return b.RestartBootstrap(true)
+		b.awaitingTimeout = true
+		return nil
 	}
 
 	return b.finish()

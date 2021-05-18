@@ -10,7 +10,7 @@ import (
 // Timer describes the standard interface for specifying a timeout
 type Timer interface {
 	// RegisterTimeout specifies how much time to delay the next timeout message
-	// by. If the passed in channel is closed, the timeout will fire
+	// by. If the subnet has been bootstrapped, the timeout will fire
 	// immediately.
-	RegisterTimeout(time.Duration, chan struct{})
+	RegisterTimeout(time.Duration)
 }

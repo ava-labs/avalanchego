@@ -30,6 +30,7 @@ const (
 	GetAncestorsMsg
 	MultiPutMsg
 	GetAncestorsFailedMsg
+	TimeoutMsg
 )
 
 func (t MsgType) String() string {
@@ -76,6 +77,8 @@ func (t MsgType) String() string {
 		return "Notify"
 	case GossipMsg:
 		return "Gossip"
+	case TimeoutMsg:
+		return "Timeout"
 	default:
 		return fmt.Sprintf("Unknown Message Type: %d", t)
 	}

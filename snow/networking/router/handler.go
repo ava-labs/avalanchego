@@ -85,10 +85,6 @@ import (
 // - how to track CPU utilization of a peer
 // - "MaxMessages"
 
-const (
-	maxSleepDuration = 100 * time.Millisecond
-)
-
 // Handler passes incoming messages from the network to the consensus engine
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference)
 type Handler struct {
@@ -115,9 +111,6 @@ type Handler struct {
 
 	toClose func()
 	closing utils.AtomicBool
-
-	delay          *Delay
-	subnetSyncSema <-chan struct{} // invariant: subnetSyncSema should not be nil
 }
 
 // Initialize this consensus handler
@@ -132,8 +125,6 @@ func (h *Handler) Initialize(
 	stakerCPUPortion float64,
 	namespace string,
 	metrics prometheus.Registerer,
-	delay *Delay,
-	subnetSync <-chan struct{},
 ) error {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
@@ -190,8 +181,6 @@ func (h *Handler) Initialize(
 	)
 	h.engine = engine
 	h.validators = validators
-	h.delay = delay
-	h.subnetSyncSema = subnetSync
 	return nil
 }
 
@@ -255,32 +244,6 @@ func (h *Handler) Dispatch() {
 
 // Dispatch a message to the consensus engine.
 func (h *Handler) dispatchMsg(msg message) {
-	// If messages should be delayed to this chain, hold the messages, but check
-	// to see if the chain should be closed at least every [maxSleepDuration].
-
-sleepLoop:
-	for {
-		if h.closing.GetValue() {
-			h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
-			h.metrics.dropped.Inc()
-			return
-		}
-		until := time.Until(h.delay.waitUntil)
-		if until <= 0 {
-			break
-		}
-		if until > maxSleepDuration {
-			until = maxSleepDuration
-		}
-
-		// sleep but break as soon as subnet is synced
-		select {
-		case <-time.After(until):
-		case <-h.subnetSyncSema:
-			break sleepLoop
-		}
-	}
-
 	startTime := h.clock.Time()
 
 	h.ctx.Lock.Lock()
@@ -300,6 +263,9 @@ sleepLoop:
 	case constants.GossipMsg:
 		err = h.engine.Gossip()
 		h.metrics.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
+	case constants.TimeoutMsg:
+		err = h.engine.Timeout()
+		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
 		err = h.handleValidatorMsg(msg, startTime)
 	}
@@ -414,6 +380,13 @@ func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 		messageType: constants.GetAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+	})
+}
+
+// Timeout passes a new timeout notification to the consensus engine
+func (h *Handler) Timeout() {
+	h.sendReliableMsg(message{
+		messageType: constants.TimeoutMsg,
 	})
 }
 
