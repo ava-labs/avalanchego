@@ -14,6 +14,9 @@ func OsDiskStat(path string) (uint64, error) {
 	lpFreeBytesAvailable := int64(0)
 	lpTotalNumberOfBytes := int64(0)
 	lpTotalNumberOfFreeBytes := int64(0)
+	var (
+		errNonzeroErrorCode = errors.new("nonzero return from win32 call for disk space")
+	)
 	u16p, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return 0, err
@@ -22,12 +25,8 @@ func OsDiskStat(path string) (uint64, error) {
 		uintptr(unsafe.Pointer(&lpFreeBytesAvailable)),
 		uintptr(unsafe.Pointer(&lpTotalNumberOfBytes)),
 		uintptr(unsafe.Pointer(&lpTotalNumberOfFreeBytes)))
-	err = nil
 	if status != syscall.Errno(0) {
-		err = errors.New("nonzero return from win32 call for disk space")
-	}
-	if err != nil {
-		return 0, err
+		return 0, errNonzeroErrorCode
 	}
 	return uint64(lpFreeBytesAvailable), nil
 }
