@@ -2329,25 +2329,25 @@ func TestValidatorIPs(t *testing.T) {
 	dummyNetwork.peers = make(map[ids.ShortID]*peer)
 	dummyNetwork.vdrs = validators.NewSet()
 
-	firstValidatorIpDesc := utils.IPDesc{
+	firstValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 1),
 		Port: 1,
 	}
-	firstValidatorPeer := createPeer(ids.ShortID{0x01}, firstValidatorIpDesc, appVersion)
+	firstValidatorPeer := createPeer(ids.ShortID{0x01}, firstValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, firstValidatorPeer, true)
 
-	secondValidatorIpDesc := utils.IPDesc{
+	secondValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 2),
 		Port: 2,
 	}
-	secondValidatorPeer := createPeer(ids.ShortID{0x02}, secondValidatorIpDesc, appVersion)
+	secondValidatorPeer := createPeer(ids.ShortID{0x02}, secondValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, secondValidatorPeer, true)
 
-	thirdValidatorIpDesc := utils.IPDesc{
+	thirdValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 3),
 		Port: 3,
 	}
-	thirdValidatorPeer := createPeer(ids.ShortID{0x03}, thirdValidatorIpDesc, appVersion)
+	thirdValidatorPeer := createPeer(ids.ShortID{0x03}, thirdValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, thirdValidatorPeer, true)
 
 	assert.True(t, dummyNetwork.vdrs.Contains(firstValidatorPeer.id))
@@ -2355,14 +2355,14 @@ func TestValidatorIPs(t *testing.T) {
 	assert.True(t, dummyNetwork.vdrs.Contains(thirdValidatorPeer.id))
 
 	// test
-	validatorIps, err := dummyNetwork.validatorIPs()
+	validatorIPs, err := dummyNetwork.validatorIPs()
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(validatorIps) == 3)
-	assert.True(t, isIpDescIn(firstValidatorPeer.getIP(), validatorIps))
-	assert.True(t, isIpDescIn(secondValidatorPeer.getIP(), validatorIps))
-	assert.True(t, isIpDescIn(thirdValidatorPeer.getIP(), validatorIps))
+	assert.True(t, len(validatorIPs) == 3)
+	assert.True(t, isIPDescIn(firstValidatorPeer.getIP(), validatorIPs))
+	assert.True(t, isIPDescIn(secondValidatorPeer.getIP(), validatorIPs))
+	assert.True(t, isIPDescIn(thirdValidatorPeer.getIP(), validatorIPs))
 
 	// SCENARIO: no peers case is handled
 	// context
@@ -2370,73 +2370,73 @@ func TestValidatorIPs(t *testing.T) {
 	dummyNetwork.vdrs = validators.NewSet()
 
 	// test
-	validatorIps, err = dummyNetwork.validatorIPs()
+	validatorIPs, err = dummyNetwork.validatorIPs()
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(validatorIps) == 0)
+	assert.True(t, len(validatorIPs) == 0)
 
 	// SCENARIO: validators not connected are not picked
 	// context
 	dummyNetwork.peers = make(map[ids.ShortID]*peer)
 	dummyNetwork.vdrs = validators.NewSet()
 
-	disconnectedIpValidatorIpDesc := utils.IPDesc{
+	disconnectedValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 4),
 		Port: 4,
 	}
-	disconnectedValidatorPeer := createPeer(ids.ShortID{0x01}, disconnectedIpValidatorIpDesc, appVersion)
+	disconnectedValidatorPeer := createPeer(ids.ShortID{0x01}, disconnectedValidatorIPDesc, appVersion)
 	disconnectedValidatorPeer.connected.SetValue(false)
 	addPeerToNetwork(&dummyNetwork, disconnectedValidatorPeer, true)
 	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.id))
 
 	// test
-	validatorIps, err = dummyNetwork.validatorIPs()
+	validatorIPs, err = dummyNetwork.validatorIPs()
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(validatorIps) == 0)
+	assert.True(t, len(validatorIPs) == 0)
 
 	// SCENARIO: validators with zeroed IP are not picked
 	// context
 	dummyNetwork.peers = make(map[ids.ShortID]*peer)
 	dummyNetwork.vdrs = validators.NewSet()
 
-	zeroIpValidatorIpDesc := utils.IPDesc{
+	zeroIPValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4zero,
 		Port: 1,
 	}
-	zeroValidatorPeer := createPeer(ids.ShortID{0x01}, zeroIpValidatorIpDesc, appVersion)
+	zeroValidatorPeer := createPeer(ids.ShortID{0x01}, zeroIPValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, zeroValidatorPeer, true)
 	assert.True(t, dummyNetwork.vdrs.Contains(zeroValidatorPeer.id))
 
 	// test
-	validatorIps, err = dummyNetwork.validatorIPs()
+	validatorIPs, err = dummyNetwork.validatorIPs()
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(validatorIps) == 0)
+	assert.True(t, len(validatorIPs) == 0)
 
 	// SCENARIO: Non-validator peer not selected
 	// context
 	dummyNetwork.peers = make(map[ids.ShortID]*peer)
 	dummyNetwork.vdrs = validators.NewSet()
 
-	nonValidatorIpDesc := utils.IPDesc{
+	nonValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 5),
 		Port: 5,
 	}
 
-	nonValidatorPeer := createPeer(ids.ShortID{0x04}, nonValidatorIpDesc, appVersion)
+	nonValidatorPeer := createPeer(ids.ShortID{0x04}, nonValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, nonValidatorPeer, false)
 	assert.False(t, dummyNetwork.vdrs.Contains(nonValidatorPeer.id))
 
 	// test
-	validatorIps, err = dummyNetwork.validatorIPs()
+	validatorIPs, err = dummyNetwork.validatorIPs()
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(validatorIps) == 0)
+	assert.True(t, len(validatorIPs) == 0)
 
 	// SCENARIO: validators with wrong version are not picked
 	// context
@@ -2445,27 +2445,27 @@ func TestValidatorIPs(t *testing.T) {
 
 	maskedVersion := version.NewDefaultApplication("app", 0, 1, 0)
 
-	maskedValidatorIpDesc := utils.IPDesc{
+	maskedValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 6),
 		Port: 6,
 	}
-	maskedValidatorPeer := createPeer(ids.ShortID{0x01}, maskedValidatorIpDesc, maskedVersion)
+	maskedValidatorPeer := createPeer(ids.ShortID{0x01}, maskedValidatorIPDesc, maskedVersion)
 	addPeerToNetwork(&dummyNetwork, maskedValidatorPeer, true)
 	assert.True(t, dummyNetwork.vdrs.Contains(maskedValidatorPeer.id))
 
 	// test
-	validatorIps, err = dummyNetwork.validatorIPs()
+	validatorIPs, err = dummyNetwork.validatorIPs()
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(validatorIps) == 0)
+	assert.True(t, len(validatorIPs) == 0)
 
 	// SCENARIO: validators with wrong certificate are not picked
 	// context
 	dummyNetwork.peers = make(map[ids.ShortID]*peer)
 	dummyNetwork.vdrs = validators.NewSet()
 
-	wrongCertValidatorIpDesc := utils.IPDesc{
+	wrongCertValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 7),
 		Port: 7,
 	}
@@ -2473,7 +2473,7 @@ func TestValidatorIPs(t *testing.T) {
 		IP:   net.IPv4(172, 17, 0, 8),
 		Port: 8,
 	}
-	wrongCertValidatorPeer := createPeer(ids.ShortID{0x01}, wrongCertValidatorIpDesc, appVersion)
+	wrongCertValidatorPeer := createPeer(ids.ShortID{0x01}, wrongCertValidatorIPDesc, appVersion)
 	wrongCertValidatorPeer.sigAndTime.SetValue(signedPeerIP{
 		ip:   ipOnCert,
 		time: uint64(0),
@@ -2482,18 +2482,18 @@ func TestValidatorIPs(t *testing.T) {
 	assert.True(t, dummyNetwork.vdrs.Contains(wrongCertValidatorPeer.id))
 
 	// test
-	validatorIps, err = dummyNetwork.validatorIPs()
+	validatorIPs, err = dummyNetwork.validatorIPs()
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(validatorIps) == 0)
+	assert.True(t, len(validatorIPs) == 0)
 }
 
 // Helper method for TestValidatorIPs
-func createPeer(peerId ids.ShortID, peerIpDesc utils.IPDesc, peerVersion version.Application) *peer {
+func createPeer(peerID ids.ShortID, peerIPDesc utils.IPDesc, peerVersion version.Application) *peer {
 	newPeer := peer{
-		ip: peerIpDesc,
-		id: peerId,
+		ip: peerIPDesc,
+		id: peerID,
 	}
 	newPeer.connected.SetValue(true)
 	newPeer.versionStruct.SetValue(peerVersion)
@@ -2511,18 +2511,17 @@ func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool)
 		validator := validators.NewValidator(peerToAdd.id, uint64(10))
 		currentValidators := targetNetwork.vdrs.List()
 		currentValidators = append(currentValidators, validator)
-		targetNetwork.vdrs.Set(currentValidators)
+		_ = targetNetwork.vdrs.Set(currentValidators)
 	}
 }
 
-func isIpDescIn(targetIp utils.IPDesc, ipDescList []utils.IPCertDesc) bool {
+func isIPDescIn(targetIP utils.IPDesc, ipDescList []utils.IPCertDesc) bool {
 	for _, b := range ipDescList {
-		if b.IPDesc.Equal(targetIp) {
+		if b.IPDesc.Equal(targetIP) {
 			return true
 		}
 	}
 	return false
-
 }
 
 // End of Helper method for TestValidatorIPs
