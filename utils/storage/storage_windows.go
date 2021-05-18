@@ -8,12 +8,19 @@ import (
 	"unsafe"
 )
 
+const (
+	KERNEL32DLL         = "kernel32.dll"
+	GETDISKFREESPACEEXW = "GetDiskFreeSpaceExW"
+)
+
 func OsDiskStat(path string) (uint64, error) {
-	h := syscall.MustLoadDLL("kernel32.dll")
-	c := h.MustFindProc("GetDiskFreeSpaceExW")
-	lpFreeBytesAvailable := int64(0)
-	lpTotalNumberOfBytes := int64(0)
-	lpTotalNumberOfFreeBytes := int64(0)
+	h := syscall.MustLoadDLL(KERNEL32DLL)
+	c := h.MustFindProc(GETDISKFREESPACEEXW)
+	var (
+		lpFreeBytesAvailable     int64
+		lpTotalNumberOfBytes     int64
+		lpTotalNumberOfFreeBytes int64
+	)
 	var (
 		errNonzeroErrorCode = errors.new("nonzero return from win32 call for disk space")
 	)
