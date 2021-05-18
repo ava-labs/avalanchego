@@ -1,10 +1,10 @@
 // +build !windows
 
-package main
+package storage
 
 import "syscall"
 
-func osDiskStat(storagePath string) (uint64, error) {
+func OsDiskStat(storagePath string) (uint64, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(storagePath, &stat)
 	if err != nil {

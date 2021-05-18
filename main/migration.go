@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/storage"
 )
 
 type migrationManager struct {
@@ -42,11 +43,11 @@ func (m *migrationManager) migrate() error {
 
 func (m *migrationManager) verifyDiskStorage() error {
 	storagePath := m.rootConfig.DBPath
-	avail, err := osDiskStat(storagePath)
+	avail, err := storage.OsDiskStat(storagePath)
 	if err != nil {
 		return err
 	}
-	used, err := dirSize(storagePath)
+	used, err := storage.DirSize(storagePath)
 	if err != nil {
 		return err
 	}
@@ -54,7 +55,8 @@ func (m *migrationManager) verifyDiskStorage() error {
 	saftyBuf := (twox * 15) / 100
 	required := twox + saftyBuf
 	if avail < required {
-		return fmt.Errorf("available space %d Megabyes is less then required space %d Megabytes for migration", avail/1024/1024, required/1024/1024)
+		return fmt.Errorf("available space %d Megabyes is less then required space %d Megabytes for migration",
+			avail/1024/1024, required/1024/1024)
 	}
 	if avail < constants.TwoHundredGigabytes {
 		m.log.Warn("at least 200GB of free disk space is recommended")
