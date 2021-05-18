@@ -13,8 +13,14 @@ const (
 )
 
 func OsDiskStat(path string) (uint64, error) {
-	h := syscall.MustLoadDLL(KERNEL32DLL)
-	c := h.MustFindProc(GETDISKFREESPACEEXW)
+	h, err := syscall.LoadDLL(KERNEL32DLL)
+	if err != nil {
+		return 0, err
+	}
+	c, err := h.FindProc(GETDISKFREESPACEEXW)
+	if err != nil {
+		return 0, err
+	}
 	var (
 		lpFreeBytesAvailable     int64
 		lpTotalNumberOfBytes     int64
