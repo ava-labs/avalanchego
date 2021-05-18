@@ -51,8 +51,7 @@ func (m *migrationManager) verifyDiskStorage() error {
 	if err != nil {
 		return err
 	}
-	twox := used + used
-	saftyBuf := (twox * 15) / 100
+	saftyBuf := (used * 30) / 100
 	required := used + saftyBuf // free space must be equal to used plus 30% overhead
 	if avail < required {
 		return fmt.Errorf("available space %d Megabyes is less then required space %d Megabytes for migration",
