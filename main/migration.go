@@ -56,7 +56,7 @@ func (m *migrationManager) verifyDiskStorage() error {
 	if avail < required {
 		return fmt.Errorf("available space %d is less then required space %d for migration", avail, required)
 	}
-	if avail < constants.TwoGigabytes {
+	if avail < constants.TwoHundredGigabytes {
 		m.log.Warn("at least 200GB of free disk space is recommended")
 	}
 	return nil

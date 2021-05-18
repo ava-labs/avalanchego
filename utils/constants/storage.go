@@ -5,5 +5,5 @@ package constants
 
 const (
 	// 2 GB in bytes
-	TwoGigabytes = 214748364800
+	TwoHundredGigabytes = 214748364800
 )
