@@ -2759,7 +2759,8 @@ func TestApricotPhase1Transition(t *testing.T) {
 	if err := json.Unmarshal([]byte(genesisJSONApricotPhase1), genesis); err != nil {
 		t.Fatalf("Problem unmarshaling genesis JSON: %s", err)
 	}
-	genesis.Config.ApricotPhase1BlockTimestamp = big.NewInt(time.Now().Add(5 * time.Second).Unix())
+	apricotPhase1Time := time.Now().Add(5 * time.Second)
+	genesis.Config.ApricotPhase1BlockTimestamp = big.NewInt(apricotPhase1Time.Unix())
 	customGenesisJSON, err := json.Marshal(genesis)
 	if err != nil {
 		t.Fatalf("Problem marshaling custom genesis JSON: %s", err)
@@ -2884,7 +2885,7 @@ func TestApricotPhase1Transition(t *testing.T) {
 	}
 
 	// Wait for transition
-	time.Sleep(5 * time.Second)
+	time.Sleep(time.Until(apricotPhase1Time) + time.Second)
 
 	if status := blkB.Status(); status != choices.Processing {
 		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)

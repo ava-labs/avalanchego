@@ -165,6 +165,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 		}
 	}()
 
+	parent := vm.LastAcceptedBlockInternal().(*Block)
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 
 	importAmount := uint64(5000000)
@@ -234,7 +235,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes without the UTXO being present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
@@ -249,7 +250,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -264,7 +265,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
 		t.Fatal("Semantic verification should have failed due to insufficient funds")
 	}
 
@@ -287,7 +288,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 
 	// Remove the signature
 	tx.Creds = nil
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
 		t.Fatal("SemanticVerify should have failed due to no signatures")
 	}
 
@@ -295,7 +296,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[1]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
 		t.Fatal("SemanticVerify should have failed due to an invalid signature")
 	}
 
@@ -306,7 +307,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -331,7 +332,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify fails when the UTXO is not present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
 		t.Fatal("Semantic verification should have failed after the UTXO removed from shared memory")
 	}
 }
@@ -345,6 +346,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 		}
 	}()
 
+	parent := vm.LastAcceptedBlockInternal().(*Block)
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 
 	importAmount := uint64(5000000)
@@ -414,7 +416,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes without the UTXO being present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
@@ -429,7 +431,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -444,7 +446,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
 		t.Fatal("Semantic verification should have failed due to insufficient funds")
 	}
 
@@ -460,7 +462,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
 		t.Fatal("Semantic verification should have failed due to not paying the transaction fee")
 	}
 
@@ -483,7 +485,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 
 	// Remove the signature
 	tx.Creds = nil
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
 		t.Fatal("SemanticVerify should have failed due to no signatures")
 	}
 
@@ -491,7 +493,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[1]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
 		t.Fatal("SemanticVerify should have failed due to an invalid signature")
 	}
 
@@ -502,7 +504,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -527,7 +529,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	}
 
 	// Check that SemanticVerify fails when the UTXO is not present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
 		t.Fatal("Semantic verification should have failed after the UTXO removed from shared memory")
 	}
 }
@@ -560,6 +562,7 @@ func TestNewImportTx(t *testing.T) {
 				}
 			}()
 
+			parent := vm.LastAcceptedBlockInternal().(*Block)
 			importAmount := uint64(5000000)
 			utxoID := avax.UTXOID{
 				TxID: ids.ID{
@@ -605,7 +608,7 @@ func TestNewImportTx(t *testing.T) {
 
 			importTx := tx.UnsignedAtomicTx
 
-			if err := importTx.SemanticVerify(vm, tx, apricotRulesPhase2); err != nil {
+			if err := importTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
 				t.Fatal("newImportTx created an invalid transaction")
 			}
 

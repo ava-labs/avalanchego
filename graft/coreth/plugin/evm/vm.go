@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -116,7 +115,6 @@ var (
 	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
 	errInvalidNonce               = errors.New("invalid nonce")
 	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
-	errUnknownAtomicTx            = errors.New("unknown atomic tx type")
 	errUnclesUnsupported          = errors.New("uncles unsupported")
 	errTxHashMismatch             = errors.New("txs hash does not match header")
 	errUncleHashMismatch          = errors.New("uncle hash mismatch")
@@ -173,11 +171,6 @@ func init() {
 	}
 }
 
-type blockErrorTuple struct {
-	blk *Block
-	err error
-}
-
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	ctx *snow.Context
@@ -202,15 +195,9 @@ type VM struct {
 	// [acceptedAtomicTxDB] maintains an index of accepted atomic txs.
 	acceptedAtomicTxDB database.Database
 
-	newBlockChan chan blockErrorTuple
 	// A message is sent on this channel when a new block
 	// is ready to be build. This notifies the consensus engine.
 	notifyBuildBlockChan chan<- commonEng.Message
-	newMinedBlockSub     *event.TypeMuxSubscription
-
-	txPoolStabilizedLock sync.Mutex
-	txPoolStabilizedHead common.Hash
-	txPoolStabilizedOk   chan struct{}
 
 	// [buildBlockLock] must be held when accessing [buildStatus]
 	buildBlockLock sync.Mutex
@@ -397,74 +384,56 @@ func (vm *VM) Initialize(
 		go gasPriceUpdate()
 	}
 
-	vm.chain.SetOnFinalizeAndAssemble(func(state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
-		if tx, exists := vm.mempool.NextTx(); exists {
+	vm.chain.SetOnFinalizeAndAssemble(func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
+		snapshot := state.Snapshot()
+		for {
+			tx, exists := vm.mempool.NextTx()
+			if !exists {
+				break
+			}
 			if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm, state); err != nil {
 				// Discard the transaction from the mempool on failed verification.
 				vm.mempool.DiscardCurrentTx()
-				vm.newBlockChan <- blockErrorTuple{nil, fmt.Errorf("atomic transaction %s failed verification due to %w", tx.ID(), err)}
-				return nil, err
+				state.RevertToSnapshot(snapshot)
+				continue
 			}
-			atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
+			rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
+			parentIntf, err := vm.GetBlockInternal(ids.ID(header.ParentHash))
 			if err != nil {
 				// Discard the transaction from the mempool on failed verification.
 				vm.mempool.DiscardCurrentTx()
-				vm.newBlockChan <- blockErrorTuple{nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)}
-				return nil, err
+				return nil, fmt.Errorf("failed to get parent block: %w", err)
+			}
+			parent, ok := parentIntf.(*Block)
+			if !ok {
+				// Discard the transaction from the mempool on failed verification.
+				vm.mempool.DiscardCurrentTx()
+				return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
+			}
+
+			if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+				// Discard the transaction from the mempool on failed verification.
+				vm.mempool.DiscardCurrentTx()
+				state.RevertToSnapshot(snapshot)
+				continue
+			}
+
+			atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
+			if err != nil {
+				// Discard the transaction from the mempool and error if the transaction
+				// cannot be marshalled. This should never happen.
+				vm.mempool.DiscardCurrentTx()
+				return nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 			}
 			return atomicTxBytes, nil
 		}
 
 		if len(txs) == 0 {
 			// this could happen due to the async logic of geth tx pool
-			vm.newBlockChan <- blockErrorTuple{nil, errEmptyBlock}
 			return nil, errEmptyBlock
 		}
 
 		return nil, nil
-	})
-	vm.chain.SetOnBuild(func(block *types.Block) error {
-		log.Trace("EVM built a block")
-
-		blk := &Block{
-			id:       ids.ID(block.Hash()),
-			ethBlock: block,
-			vm:       vm,
-		}
-		if err := blk.VerifyWithoutWrites(); err != nil {
-			verificationError := fmt.Errorf("block failed verify: %w", err)
-			vm.newBlockChan <- blockErrorTuple{nil, verificationError}
-			return verificationError
-		}
-		return nil
-	})
-	vm.chain.SetOnSealFinish(func(block *types.Block) error {
-		log.Trace("EVM sealed a block")
-
-		// Note: the status of block is set by ChainState
-		blk := &Block{
-			id:       ids.ID(block.Hash()),
-			ethBlock: block,
-			vm:       vm,
-		}
-		// Verify is called on a non-wrapped block here, such that this
-		// does not add [blk] to the processing blocks map in ChainState.
-		// TODO cache verification since Verify() will be called by the
-		// consensus engine as well.
-		// Note: this is only called when building a new block, so caching
-		// verification will only be a significant optimization for nodes
-		// that produce a large number of blocks.
-		if err := blk.Verify(); err != nil {
-			err = fmt.Errorf("block failed verification due to: %w", err)
-			vm.newBlockChan <- blockErrorTuple{nil, err}
-			return err
-		}
-		vm.newBlockChan <- blockErrorTuple{blk, nil}
-		// TODO clean up tx pool stabilization logic
-		vm.txPoolStabilizedLock.Lock()
-		vm.txPoolStabilizedHead = block.Hash()
-		vm.txPoolStabilizedLock.Unlock()
-		return nil
 	})
 	vm.chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
 		tx, err := vm.extractAtomicTx(block)
@@ -476,7 +445,6 @@ func (vm *VM) Initialize(
 		}
 		return tx.UnsignedAtomicTx.EVMStateTransfer(vm, state)
 	})
-	vm.newBlockChan = make(chan blockErrorTuple)
 	vm.notifyBuildBlockChan = toEngine
 
 	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
@@ -484,12 +452,8 @@ func (vm *VM) Initialize(
 	vm.buildStatus = dontBuild
 	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
 
-	vm.txPoolStabilizedOk = make(chan struct{}, 1)
 	// TODO: read size from settings
 	vm.mempool = NewMempool(defaultMempoolSize)
-	vm.newMinedBlockSub = vm.chain.SubscribeNewMinedBlockEvent()
-	vm.shutdownWg.Add(1)
-	go ctx.Log.RecoverAndPanic(vm.awaitTxPoolStabilized)
 	vm.chain.Start()
 
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
@@ -550,13 +514,13 @@ func (vm *VM) Shutdown() error {
 
 // buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock() (snowman.Block, error) {
-	vm.chain.GenBlock()
-	tup := <-vm.newBlockChan
-	block, err := tup.blk, tup.err
-
+	block, err := vm.chain.GenerateBlock()
 	// Set the buildStatus before calling Cancel or Issue on
-	// the mempool, so that when the mempool adds a new item to Pending
-	// it will be handled appropriately by [signalTxsReady]
+	// the mempool and after generating the block.
+	// This prevents [needToBuild] from returning true when the
+	// produced block will change whether or not we need to produce
+	// another block and also ensures that when the mempool adds a
+	// new item to Pending it will be handled appropriately by [signalTxsReady]
 	vm.buildBlockLock.Lock()
 	if vm.needToBuild() {
 		vm.buildStatus = conditionalBuild
@@ -567,21 +531,34 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	vm.buildBlockLock.Unlock()
 
 	if err != nil {
-		// Signal the mempool that if it was attempting to issue an atomic
-		// transaction into the next block, block building failed and the
-		// transaction should be re-issued unless it was discarded during
-		// atomic tx verification.
 		vm.mempool.CancelCurrentTx()
 		return nil, err
 	}
 
+	// Note: the status of block is set by ChainState
+	blk := &Block{
+		id:       ids.ID(block.Hash()),
+		ethBlock: block,
+		vm:       vm,
+	}
+
+	// Verify is called on a non-wrapped block here, such that this
+	// does not add [blk] to the processing blocks map in ChainState.
+	// TODO cache verification since Verify() will be called by the
+	// consensus engine as well.
+	// Note: this is only called when building a new block, so caching
+	// verification will only be a significant optimization for nodes
+	// that produce a large number of blocks.
+	if err := blk.Verify(); err != nil {
+		vm.mempool.CancelCurrentTx()
+		return nil, fmt.Errorf("block failed verification due to: %w", err)
+	}
+
+	log.Debug(fmt.Sprintf("Built block %s", blk.ID()))
 	// Marks the current tx from the mempool as being successfully issued
 	// into a block.
 	vm.mempool.IssueCurrentTx()
-	log.Debug(fmt.Sprintf("Built block %s", block.ID()))
-	// make sure Tx Pool is updated
-	<-vm.txPoolStabilizedOk
-	return block, nil
+	return blk, nil
 }
 
 // parseBlock parses [b] into a block to be wrapped by ChainState.
@@ -750,6 +727,43 @@ func (vm *VM) extractAtomicTx(block *types.Block) (*Tx, error) {
 	return atx, nil
 }
 
+func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
+	for ancestor.Status() != choices.Accepted {
+		atx, err := vm.extractAtomicTx(ancestor.ethBlock)
+		if err != nil {
+			return fmt.Errorf("problem parsing atomic tx of ancestor block %s: %w", ancestor.ID(), err)
+		}
+		// If the ancestor isn't an atomic block, it can't conflict with
+		// the import tx.
+		if atx != nil {
+			ancestorInputs := atx.UnsignedAtomicTx.InputUTXOs()
+			if inputs.Overlaps(ancestorInputs) {
+				return errConflictingAtomicInputs
+			}
+		}
+
+		// Move up the chain.
+		nextAncestorIntf := ancestor.Parent()
+		// If the ancestor is unknown, then the parent failed
+		// verification when it was called.
+		// If the ancestor is rejected, then this block shouldn't be
+		// inserted into the canonical chain because the parent is
+		// will be missing.
+		// If the ancestor is processing, then the block may have
+		// been verified.
+		if blkStatus := nextAncestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+			return errRejectedParent
+		}
+		nextAncestor, ok := nextAncestorIntf.(*Block)
+		if !ok {
+			return fmt.Errorf("ancestor block %s had unexpected type %T", nextAncestor.ID(), nextAncestorIntf)
+		}
+		ancestor = nextAncestor
+	}
+
+	return nil
+}
+
 // getAcceptedAtomicTx attempts to get [txID] from the database.
 func (vm *VM) getAcceptedAtomicTx(txID ids.ID) (*Tx, uint64, error) {
 	indexedTxBytes, err := vm.acceptedAtomicTxDB.Get(txID[:])
@@ -804,37 +818,6 @@ func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
 	txID := tx.ID()
 
 	return vm.acceptedAtomicTxDB.Put(txID[:], packer.Bytes)
-}
-
-// awaitTxPoolStabilized waits for a txPoolHead channel event
-// and notifies the VM when the tx pool has stabilized to the
-// expected block hash
-// Waits for signal to shutdown from [vm.shutdownChan]
-func (vm *VM) awaitTxPoolStabilized() {
-	defer vm.shutdownWg.Done()
-	for {
-		select {
-		case e, ok := <-vm.newMinedBlockSub.Chan():
-			if !ok {
-				return
-			}
-			if e == nil {
-				continue
-			}
-			switch h := e.Data.(type) {
-			case core.NewMinedBlockEvent:
-				vm.txPoolStabilizedLock.Lock()
-				if vm.txPoolStabilizedHead == h.Block.Hash() {
-					vm.txPoolStabilizedOk <- struct{}{}
-					vm.txPoolStabilizedHead = common.Hash{}
-				}
-				vm.txPoolStabilizedLock.Unlock()
-			default:
-			}
-		case <-vm.shutdownChan:
-			return
-		}
-	}
 }
 
 // needToBuild returns true if there are outstanding transactions to be issued

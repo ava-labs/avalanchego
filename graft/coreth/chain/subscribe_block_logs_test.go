@@ -13,16 +13,17 @@ import (
 )
 
 func TestBlockLogsAllowUnfinalized(t *testing.T) {
-	chain, newBlockChan, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
+	chain, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
 	// Override SetOnSealFinish set in NewDefaultChain, so that each sealed block
 	// is set as the new preferred block within this test.
-	chain.SetOnSealFinish(func(block *types.Block) error {
+	chain.SetOnSealFinish(func(block *types.Block) {
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatal(err)
+		}
 		if err := chain.SetPreference(block); err != nil {
 			t.Fatal(err)
 		}
-		newBlockChan <- block
-		return nil
 	})
 
 	chain.Start()
@@ -78,9 +79,11 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 		}
 	}
 	<-txSubmitCh
-	chain.GenBlock()
+	block, err := chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	block := <-newBlockChan
 	<-newTxPoolHeadChan
 
 	if block.NumberU64() != uint64(1) {

@@ -98,6 +98,7 @@ func (tx *UnsignedImportTx) Verify(
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
+	parent *Block,
 	rules params.Rules,
 ) TxError {
 	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {
@@ -163,6 +164,11 @@ func (tx *UnsignedImportTx) SemanticVerify(
 			return tempError{err}
 		}
 	}
+
+	if err := vm.conflicts(tx.InputUTXOs(), parent); err != nil {
+		return tempError{err}
+	}
+
 	return nil
 }
 
