@@ -10,6 +10,7 @@ import (
 const (
 	KERNEL32DLL         = "kernel32.dll"
 	GETDISKFREESPACEEXW = "GetDiskFreeSpaceExW"
+	errNonzeroErrorCode = errors.new("nonzero return from win32 call for disk space")
 )
 
 func OsDiskStat(path string) (uint64, error) {
@@ -25,7 +26,6 @@ func OsDiskStat(path string) (uint64, error) {
 		lpFreeBytesAvailable     int64
 		lpTotalNumberOfBytes     int64
 		lpTotalNumberOfFreeBytes int64
-		errNonzeroErrorCode = errors.new("nonzero return from win32 call for disk space")
 	)
 	u16p, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
