@@ -3,6 +3,7 @@
 package storage
 
 import (
+	"errors"
 	"syscall"
 	"unsafe"
 )
@@ -10,7 +11,10 @@ import (
 const (
 	KERNEL32DLL         = "kernel32.dll"
 	GETDISKFREESPACEEXW = "GetDiskFreeSpaceExW"
-	errNonzeroErrorCode = errors.new("nonzero return from win32 call for disk space")
+)
+
+var (
+	errNonzeroErrorCode = errors.New("nonzero return from win32 call for disk space")
 )
 
 func OsDiskStat(path string) (uint64, error) {
