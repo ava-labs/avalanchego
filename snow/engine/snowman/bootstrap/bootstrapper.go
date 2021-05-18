@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -25,6 +26,8 @@ const (
 	initialBootstrappingDelay = 500 * time.Millisecond
 	maxBootstrappingDelay     = time.Minute
 )
+
+var errUnexpectedTimeout = errors.New("unexpected timeout fired")
 
 // Config ...
 type Config struct {
@@ -64,6 +67,8 @@ type Bootstrapper struct {
 	delayAmount time.Duration
 
 	parser *parser
+
+	awaitingTimeout bool
 }
 
 // Initialize this engine.
@@ -252,6 +257,14 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(blkID)
 }
 
+func (b *Bootstrapper) Timeout() error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+
+	return b.RestartBootstrap(true)
+}
+
 // process a block
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
@@ -322,7 +335,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 // checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
-	if b.IsBootstrapped() {
+	if b.IsBootstrapped() || b.awaitingTimeout {
 		return nil
 	}
 
