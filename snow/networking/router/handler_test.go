@@ -49,7 +49,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
@@ -94,7 +93,6 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
@@ -132,7 +130,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
@@ -178,7 +175,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
