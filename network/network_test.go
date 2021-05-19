@@ -2324,9 +2324,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// SCENARIO: Connected validator peers with right version and cert are picked
 	// context
-	dummyNetwork.peers = make(map[ids.ShortID]*peer)
-	dummyNetwork.vdrs = validators.NewSet()
-
+	clearPeersData(&dummyNetwork)
 	firstValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 1),
 		Port: 1,
@@ -2364,8 +2362,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// SCENARIO: no peers case is handled
 	// context
-	dummyNetwork.peers = make(map[ids.ShortID]*peer)
-	dummyNetwork.vdrs = validators.NewSet()
+	clearPeersData(&dummyNetwork)
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2376,9 +2373,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// SCENARIO: validators not connected are not picked
 	// context
-	dummyNetwork.peers = make(map[ids.ShortID]*peer)
-	dummyNetwork.vdrs = validators.NewSet()
-
+	clearPeersData(&dummyNetwork)
 	disconnectedValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 4),
 		Port: 4,
@@ -2397,9 +2392,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// SCENARIO: validators with zeroed IP are not picked
 	// context
-	dummyNetwork.peers = make(map[ids.ShortID]*peer)
-	dummyNetwork.vdrs = validators.NewSet()
-
+	clearPeersData(&dummyNetwork)
 	zeroIPValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4zero,
 		Port: 1,
@@ -2417,9 +2410,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// SCENARIO: Non-validator peer not selected
 	// context
-	dummyNetwork.peers = make(map[ids.ShortID]*peer)
-	dummyNetwork.vdrs = validators.NewSet()
-
+	clearPeersData(&dummyNetwork)
 	nonValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 5),
 		Port: 5,
@@ -2438,9 +2429,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// SCENARIO: validators with wrong version are not picked
 	// context
-	dummyNetwork.peers = make(map[ids.ShortID]*peer)
-	dummyNetwork.vdrs = validators.NewSet()
-
+	clearPeersData(&dummyNetwork)
 	maskedVersion := version.NewDefaultApplication("app", 0, 1, 0)
 
 	maskedValidatorIPDesc := utils.IPDesc{
@@ -2460,9 +2449,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// SCENARIO: validators with wrong certificate are not picked
 	// context
-	dummyNetwork.peers = make(map[ids.ShortID]*peer)
-	dummyNetwork.vdrs = validators.NewSet()
-
+	clearPeersData(&dummyNetwork)
 	wrongCertValidatorIPDesc := utils.IPDesc{
 		IP:   net.IPv4(172, 17, 0, 7),
 		Port: 7,
@@ -2505,12 +2492,19 @@ func createPeer(peerID ids.ShortID, peerIPDesc utils.IPDesc, peerVersion version
 
 func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool) {
 	targetNetwork.peers[peerToAdd.id] = peerToAdd
+	targetNetwork.peersList = append(targetNetwork.peersList, peerToAdd)
 	if isValidator {
 		validator := validators.NewValidator(peerToAdd.id, uint64(10))
 		currentValidators := targetNetwork.vdrs.List()
 		currentValidators = append(currentValidators, validator)
 		_ = targetNetwork.vdrs.Set(currentValidators)
 	}
+}
+
+func clearPeersData(targetNetwork *network) {
+	targetNetwork.peers = make(map[ids.ShortID]*peer)
+	targetNetwork.peersList = make([]*peer, 0)
+	targetNetwork.vdrs = validators.NewSet()
 }
 
 func isIPDescIn(targetIP utils.IPDesc, ipDescList []utils.IPCertDesc) bool {

@@ -161,6 +161,7 @@ type network struct {
 	pendingBytes int64
 	closed       utils.AtomicBool
 	peers        map[ids.ShortID]*peer
+	peersList    []*peer
 
 	// disconnectedIPs, connectedIPs, peerAliasIPs, and myIPs
 	// are maps with ip.String() keys that are used to determine if
@@ -367,6 +368,7 @@ func NewNetwork(
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		peers:                              make(map[ids.ShortID]*peer),
+		peersList:                          make([]*peer, 0),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
 		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
@@ -943,6 +945,7 @@ func (n *network) close() {
 		i++
 	}
 	n.peers = make(map[ids.ShortID]*peer)
+	n.peersList = make([]*peer, 0)
 	n.stateLock.Unlock()
 
 	for _, peer := range peersToClose {
@@ -1292,6 +1295,8 @@ func (n *network) tryAddPeer(p *peer) error {
 	}
 
 	n.peers[p.id] = p
+	n.peersList = append(n.peersList, p)
+
 	n.numPeers.Set(float64(len(n.peers)))
 	p.Start()
 	return nil
@@ -1308,11 +1313,11 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	if len(n.peers) < numToSend {
 		numToSend = len(n.peers)
 	}
-	res := make([]utils.IPCertDesc, 0, numToSend)
 
 	if numToSend == 0 {
-		return res, nil
+		return nil, nil
 	}
+	res := make([]utils.IPCertDesc, 0, numToSend)
 
 	s := sampler.NewUniform()
 	if err := s.Initialize(uint64(len(n.peers))); err != nil {
@@ -1320,24 +1325,19 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	}
 
 	// sampling len(n.peers) to handle possibly invalid IPs
+	// TODO: consider possibility of grouping peers in different buckets
+	// (e.g. validators/non-validators, connected/disconnected)
+	// also TODO: consider possibility of refactoring sampler for lazy-evaluation
 	indices, err := s.Sample(len(n.peers))
 	if err != nil {
 		return nil, err
-	}
-
-	// retrieve peerIds to slice for sampling. Todo: create it upon peers insertion?
-	peerIds := make([]ids.ShortID, len(n.peers))
-	i := 0
-	for k := range n.peers {
-		peerIds[i] = k
-		i++
 	}
 
 	for _, idx := range indices {
 		if len(res) == numToSend {
 			break
 		}
-		peer := n.peers[peerIds[idx]]
+		peer := n.peersList[idx]
 
 		peerIP := peer.getIP()
 		switch {
@@ -1434,6 +1434,16 @@ func (n *network) disconnected(p *peer) {
 	n.log.Debug("disconnected from %s at %s", p.id, ip)
 
 	delete(n.peers, p.id)
+	if len(n.peersList) != 0 { // rm id from peersIDs. Order not preserved
+		for idx, peer := range n.peersList {
+			if peer.id == p.id {
+				n.peersList[idx] = n.peersList[len(n.peersList)-1]
+				break
+			}
+		}
+		n.peersList = n.peersList[:len(n.peersList)-1]
+	}
+
 	n.numPeers.Set(float64(len(n.peers)))
 
 	p.releaseAllAliases()
@@ -1489,7 +1499,7 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	return peers
 }
 
-// Safe copy the peers. Assumes the stateLock is not held.
+// Safe copy of the peers. Assumes the stateLock is not held.
 func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -1498,13 +1508,10 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, len(n.peers))
-	i := 0
-	for _, peer := range n.peers {
-		peers[i] = peer
-		i++
-	}
-	return peers
+	res := make([]*peer, len(n.peersList))
+	copy(res, n.peersList)
+
+	return res
 }
 
 // Safe find a single peer
