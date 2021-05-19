@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -97,7 +98,7 @@ func (m *manager) Marshal(version uint16, value interface{}) ([]byte, error) {
 	m.lock.RUnlock()
 
 	if !exists {
-		return nil, errUnknownVersion
+		return nil, fmt.Errorf("%w at:\n%s", errUnknownVersion, logging.Stacktrace{})
 	}
 
 	p := wrappers.Packer{
@@ -137,7 +138,7 @@ func (m *manager) Unmarshal(bytes []byte, dest interface{}) (uint16, error) {
 	c, exists := m.codecs[version]
 	m.lock.RUnlock()
 	if !exists {
-		return version, errUnknownVersion
+		return version, fmt.Errorf("%w at:\n%s", errUnknownVersion, logging.Stacktrace{})
 	}
 	return version, c.Unmarshal(p.Bytes[p.Offset:], dest)
 }
