@@ -290,6 +290,9 @@ type InternalHandler interface {
 	// able to run the engine.
 	Startup() error
 
+	// Notify this engine that a registered timeout has fired.
+	Timeout() error
+
 	// Gossip to the network a container on the accepted frontier
 	Gossip() error
 
