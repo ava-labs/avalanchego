@@ -55,6 +55,8 @@ func (t MsgType) String() string {
 		return "Get Ancestors"
 	case GetAncestorsFailedMsg:
 		return "Get Ancestors Failed"
+	case TimeoutMsg:
+		return "Timeout"
 	case PutMsg:
 		return "Put"
 	case MultiPutMsg:
@@ -77,8 +79,6 @@ func (t MsgType) String() string {
 		return "Notify"
 	case GossipMsg:
 		return "Gossip"
-	case TimeoutMsg:
-		return "Timeout"
 	default:
 		return fmt.Sprintf("Unknown Message Type: %d", t)
 	}

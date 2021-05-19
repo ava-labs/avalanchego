@@ -43,9 +43,9 @@ type handlerMetrics struct {
 	get, put, getFailed,
 	pushQuery, pullQuery, chits, queryFailed,
 	connected, disconnected,
+	timeout,
 	notify,
 	gossip,
-	timeout,
 	cpu,
 	shutdown prometheus.Histogram
 }
@@ -102,9 +102,9 @@ func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Regi
 	m.queryFailed = initHistogram(namespace, "query_failed", registerer, &errs)
 	m.connected = initHistogram(namespace, "connected", registerer, &errs)
 	m.disconnected = initHistogram(namespace, "disconnected", registerer, &errs)
+	m.timeout = initHistogram(namespace, "timeout", registerer, &errs)
 	m.notify = initHistogram(namespace, "notify", registerer, &errs)
 	m.gossip = initHistogram(namespace, "gossip", registerer, &errs)
-	m.timeout = initHistogram(namespace, "timeout", registerer, &errs)
 
 	m.cpu = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
