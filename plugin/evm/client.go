@@ -68,7 +68,8 @@ func (c *Client) GetAtomicTx(txID ids.ID) ([]byte, error) {
 	return formatting.Decode(formatting.Hex, res.Tx)
 }
 
-// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
+// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
+// from [sourceChain]
 func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
