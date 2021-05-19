@@ -12,17 +12,12 @@ import (
 
 func TestSubnet(t *testing.T) {
 	assert := assert.New(t)
-	s := subnet{
-		onFinish: func() {},
-	}
 
 	chainID0 := ids.GenerateTestID()
 	chainID1 := ids.GenerateTestID()
 	chainID2 := ids.GenerateTestID()
 
-	assert.True(s.IsBootstrapped(), "An empty subnet should be considered bootstrapped")
-
-	s.addChain(chainID0)
+	s := newSubnet(nil, chainID0)
 	assert.False(s.IsBootstrapped(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
 	s.Bootstrapped(chainID0)

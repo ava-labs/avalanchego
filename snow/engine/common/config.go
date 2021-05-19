@@ -21,7 +21,7 @@ type Config struct {
 	Sender        Sender
 	Bootstrapable Bootstrapable
 	Subnet        Subnet
-	Delay         Delay
+	Timer         Timer
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
