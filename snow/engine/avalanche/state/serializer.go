@@ -77,7 +77,12 @@ func (s *Serializer) BuildVtx(
 		if err != nil {
 			return nil, err
 		}
-		height = math.Max64(height, parent.v.vtx.Height())
+		parentHeight := parent.v.vtx.Height()
+		childHeight, err := math.Add64(parentHeight, 1)
+		if err != nil {
+			return nil, err
+		}
+		height = math.Max64(height, childHeight)
 	}
 
 	txBytes := make([][]byte, len(txs))

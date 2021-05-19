@@ -5,6 +5,7 @@ package state
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -263,4 +264,29 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		t.Fatal(err)
 	}
 	validateVertex(vtx, choices.Processing)
+}
+
+func TestParseVertexWithInvalidTxs(t *testing.T) {
+	ctx := snow.DefaultContextTest()
+	statelessVertex, err := vertex.Build(
+		ctx.ChainID,
+		0,
+		0,
+		nil,
+		[][]byte{{1}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vtxBytes := statelessVertex.Bytes()
+
+	s := newSerializer(t, func([]byte) (snowstorm.Tx, error) {
+		return nil, errors.New("invalid tx")
+	})
+
+	_, err = s.ParseVtx(vtxBytes)
+	if err == nil {
+		t.Fatal("should have failed to parse the vertex due to invalid transactions")
+	}
 }

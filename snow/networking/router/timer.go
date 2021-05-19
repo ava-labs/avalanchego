@@ -3,7 +3,9 @@
 
 package router
 
-import "time"
+import (
+	"time"
+)
 
 type Timer struct {
 	Handler *Handler
@@ -15,14 +17,9 @@ func (t *Timer) RegisterTimeout(d time.Duration) {
 		timer := time.NewTimer(d)
 		defer timer.Stop()
 
-		tickerChan := timer.C
-		closerChan := make(chan struct{})
-
-		close(closerChan)
-
 		select {
-		case <-tickerChan:
-		case <-closerChan:
+		case <-timer.C:
+		case <-t.Preempt:
 		}
 
 		t.Handler.Timeout()
