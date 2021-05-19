@@ -239,8 +239,9 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		var onBootstrapped func()
 		if chainParams.SubnetID == constants.PrimaryNetworkID {
 			onBootstrapped = func() {
-				// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
-				// If running in fetch only mode, shut down node since fetching is complete.
+				// When this subnet is done bootstrapping, mark that we have
+				// bootstrapped this database version. If running in fetch only
+				// mode, shut down node since fetching is complete.
 				if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
 					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
 					go m.ShutdownNodeFunc(1)

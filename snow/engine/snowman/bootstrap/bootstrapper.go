@@ -61,9 +61,9 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	awaitingTimeout bool
-
 	parser *parser
+
+	awaitingTimeout bool
 }
 
 // Initialize this engine.
