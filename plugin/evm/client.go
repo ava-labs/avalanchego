@@ -69,11 +69,12 @@ func (c *Client) GetAtomicTx(txID ids.ID) ([]byte, error) {
 }
 
 // GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
-func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
-		Addresses: addrs,
-		Limit:     cjson.Uint32(limit),
+		Addresses:   addrs,
+		SourceChain: sourceChain,
+		Limit:       cjson.Uint32(limit),
 		StartIndex: api.Index{
 			Address: startAddress,
 			UTXO:    startUTXOID,
