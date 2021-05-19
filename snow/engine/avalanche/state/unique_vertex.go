@@ -59,6 +59,10 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 		return vtx, nil
 	}
 
+	if _, err := vtx.Txs(); err != nil {
+		return nil, err
+	}
+
 	// The vertex is newly parsed, so set the status
 	// and persist it.
 	vtx.v.status = choices.Processing
@@ -115,6 +119,11 @@ func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
 	if vtx.v.status.Fetched() {
 		return nil
 	}
+
+	if _, err := vtx.Txs(); err != nil {
+		return err
+	}
+
 	vtx.v.status = choices.Processing
 	return vtx.persist()
 }

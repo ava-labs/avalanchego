@@ -69,7 +69,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *vertex.T
 		Alpha:      peers.Weight()/2 + 1,
 		Sender:     sender,
 		Subnet:     subnet,
-		Delay:      &common.DelayTest{},
+		Timer:      &common.TimerTest{},
 	}
 	return Config{
 		Config:     commonConfig,
