@@ -58,14 +58,12 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 		return
 	}
 
-	if s.onBootstrapped != nil {
-		s.once.Do(func() {
-			if s.onBootstrapped != nil {
-				s.onBootstrapped()
-			}
-			close(s.bootstrappedSema)
-		})
-	}
+	s.once.Do(func() {
+		if s.onBootstrapped != nil {
+			s.onBootstrapped()
+		}
+		close(s.bootstrappedSema)
+	})
 }
 
 func (s *subnet) afterBootstrapped() chan struct{} {
