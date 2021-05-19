@@ -61,11 +61,11 @@ func (b *blockJob) HasMissingDependencies() (bool, error) {
 }
 
 func (b *blockJob) Execute() error {
-	deps, err := b.MissingDependencies()
+	hasMissingDeps, err := b.HasMissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
+	if hasMissingDeps {
 		b.numDropped.Inc()
 		return errors.New("attempting to accept a block with missing dependencies")
 	}
