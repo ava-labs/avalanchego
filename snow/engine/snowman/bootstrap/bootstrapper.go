@@ -235,7 +235,10 @@ func (b *Bootstrapper) Timeout() error {
 	}
 	b.awaitingTimeout = false
 
-	return b.RestartBootstrap(true)
+	if !b.Subnet.IsBootstrapped() {
+		return b.RestartBootstrap(true)
+	}
+	return b.finish()
 }
 
 // process a block
