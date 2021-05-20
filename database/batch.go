@@ -22,7 +22,8 @@ type Batch interface {
 	// Reset resets the batch for reuse.
 	Reset()
 
-	// Replay replays the batch contents.
+	// Replay replays the batch contents in the same order they were written
+	// to the batch.
 	Replay(w KeyValueWriter) error
 
 	// Inner returns a Batch writing to the inner database, if one exists. If
