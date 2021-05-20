@@ -35,28 +35,16 @@ func (s *uniformResample) Initialize(length uint64) error {
 }
 
 func (s *uniformResample) Sample(count int) ([]uint64, error) {
-	if count < 0 || s.length < uint64(count) {
-		return nil, errOutOfRange
-	}
-
-	for k := range s.drawn {
-		delete(s.drawn, k)
-	}
+	s.Reset()
 
 	results := make([]uint64, count)
-	for i := 0; i < count; {
-		// We don't use a cryptographically secure source of randomness here, as
-		// there's no need to ensure a truly random sampling.
-		draw := uint64(rand.Int63n(int64(s.length))) // #nosec G404
-		if _, ok := s.drawn[draw]; ok {
-			continue
+	for i := 0; i < count; i++ {
+		ret, err := s.Next()
+		if err != nil {
+			return nil, err
 		}
-		s.drawn[draw] = struct{}{}
-
-		results[i] = draw
-		i++
+		results[i] = ret
 	}
-
 	return results, nil
 }
 
