@@ -51,16 +51,16 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	if err := innerVertex.Verify(); err != nil {
 		return nil, err
 	}
+	if _, err := vtx.Txs(); err != nil {
+		return nil, err
+	}
+
 	vtx.v.vtx = innerVertex
 
 	// If the vertex has already been fetched,
 	// skip persisting the vertex.
 	if vtx.v.status.Fetched() {
 		return vtx, nil
-	}
-
-	if _, err := vtx.Txs(); err != nil {
-		return nil, err
 	}
 
 	// The vertex is newly parsed, so set the status

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 func newSerializer(t *testing.T, parse func([]byte) (snowstorm.Tx, error)) *Serializer {
@@ -285,8 +286,16 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 		return nil, errors.New("invalid tx")
 	})
 
-	_, err = s.ParseVtx(vtxBytes)
-	if err == nil {
+	if _, err := s.ParseVtx(vtxBytes); err == nil {
 		t.Fatal("should have failed to parse the vertex due to invalid transactions")
+	}
+
+	if _, err := s.ParseVtx(vtxBytes); err == nil {
+		t.Fatal("should have failed to parse the vertex after previously error on parsing invalid transactions")
+	}
+
+	vtxID := hashing.ComputeHash256Array(vtxBytes)
+	if _, err := s.GetVtx(vtxID); err == nil {
+		t.Fatal("should have failed to lookup invalid vertex after previously error on parsing invalid transactions")
 	}
 }
