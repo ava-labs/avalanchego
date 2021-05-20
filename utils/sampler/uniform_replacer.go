@@ -41,6 +41,7 @@ func (s *uniformReplacer) Initialize(length uint64) error {
 		return errOutOfRange
 	}
 	s.length = length
+	s.drawn = make(defaultMap)
 	return nil
 }
 
@@ -49,12 +50,8 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 		return nil, errOutOfRange
 	}
 
-	if s.drawn == nil {
-		s.drawn = make(defaultMap, count)
-	} else {
-		for k := range s.drawn {
-			delete(s.drawn, k)
-		}
+	for k := range s.drawn {
+		delete(s.drawn, k)
 	}
 
 	results := make([]uint64, count)
@@ -68,6 +65,27 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 
 		results[i] = ret
 	}
-
 	return results, nil
+}
+
+func (s *uniformReplacer) Reset() {
+	for k := range s.drawn {
+		delete(s.drawn, k)
+	}
+}
+
+func (s *uniformReplacer) Next() (uint64, error) {
+	i := uint64(len(s.drawn))
+	if i >= s.length {
+		return 0, errOutOfRange
+	}
+
+	// We don't use a cryptographically secure source of randomness here, as
+	// there's no need to ensure a truly random sampling.
+	draw := uint64(rand.Int63n(int64(s.length-i))) + i // #nosec G404
+
+	ret := s.drawn.get(draw, draw)
+	s.drawn[draw] = s.drawn.get(i, i)
+
+	return ret, nil
 }
