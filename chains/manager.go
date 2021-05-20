@@ -761,6 +761,8 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 	return "", false
 }
 
+// getChainConfig returns value of a entry by looking at ID key and alias key
+// it first searches ID key, then falls back to it's corresponding primary alias
 func (m *manager) getChainConfig(id ids.ID) ChainConfig {
 	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
 		return val
