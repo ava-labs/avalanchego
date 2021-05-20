@@ -135,7 +135,7 @@ func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
 	genesisBytes []byte,
-	upgradebytes []byte,
+	upgradeBytes []byte,
 	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,

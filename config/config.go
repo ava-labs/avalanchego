@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
 	"path"
@@ -67,8 +68,12 @@ func init() {
 		defaultBuildDirs = append(defaultBuildDirs, folderPath)
 		defaultBuildDirs = append(defaultBuildDirs, filepath.Dir(folderPath))
 	}
+	dotDir, err := filepath.Abs(".")
+	if err != nil {
+		log.Fatal(err)
+	}
 	defaultBuildDirs = append(defaultBuildDirs,
-		".",
+		dotDir,
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
 		defaultDataDir,
 	)
