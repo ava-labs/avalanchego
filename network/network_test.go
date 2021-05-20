@@ -2491,8 +2491,7 @@ func createPeer(peerID ids.ShortID, peerIPDesc utils.IPDesc, peerVersion version
 }
 
 func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool) {
-	targetNetwork.peersList = append(targetNetwork.peersList, peerToAdd)
-	targetNetwork.peersIdxes[peerToAdd.id] = len(targetNetwork.peersList) - 1
+	targetNetwork.peers.add(peerToAdd)
 
 	if isValidator {
 		validator := validators.NewValidator(peerToAdd.id, uint64(10))
@@ -2503,8 +2502,7 @@ func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool)
 }
 
 func clearPeersData(targetNetwork *network) {
-	targetNetwork.peersList = make([]*peer, 0)
-	targetNetwork.peersIdxes = make(map[ids.ShortID]int)
+	targetNetwork.peers.reset()
 	targetNetwork.vdrs = validators.NewSet()
 }
 
