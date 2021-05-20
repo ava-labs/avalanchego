@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/node"
 )
 
 func setupViper() *viper.Viper {
@@ -40,19 +41,21 @@ func setupViper() *viper.Viper {
 
 func TestChainConfigs(t *testing.T) {
 	tests := map[string]struct {
-		configs  map[string]string
-		upgrades map[string]string
-		expected map[string]chains.ChainConfig
-		err      string
+		configs   map[string]string
+		upgrades  map[string]string
+		expected  map[string]chains.ChainConfig
+		fullParse bool
 	}{
 		"no chain configs": {
-			configs:  map[string]string{},
-			upgrades: map[string]string{},
-			expected: map[string]chains.ChainConfig{},
+			configs:   map[string]string{},
+			upgrades:  map[string]string{},
+			expected:  map[string]chains.ChainConfig{},
+			fullParse: false,
 		},
 		"valid chain-id": {
-			configs:  map[string]string{"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp": "hello", "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm": "world"},
-			upgrades: map[string]string{"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp": "helloUpgrades"},
+			configs:   map[string]string{"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp": "hello", "2JVSBoinj9C2J33VntvzYtVJNZdN2NKiwwKjcumHUWEb5DbBrm": "world"},
+			upgrades:  map[string]string{"yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp": "helloUpgrades"},
+			fullParse: true,
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				id1, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
@@ -67,8 +70,9 @@ func TestChainConfigs(t *testing.T) {
 			}(),
 		},
 		"valid alias": {
-			configs:  map[string]string{"C": "hello", "X": "world"},
-			upgrades: map[string]string{"C": "upgradess"},
+			configs:   map[string]string{"C": "hello", "X": "world"},
+			upgrades:  map[string]string{"C": "upgradess"},
+			fullParse: false,
 			expected: func() map[string]chains.ChainConfig {
 				m := map[string]chains.ChainConfig{}
 				m["C"] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
@@ -101,17 +105,23 @@ func TestChainConfigs(t *testing.T) {
 				cUpgradeFile := path.Join(upgradesDir, key+".ex")
 				assert.NoError(ioutil.WriteFile(cUpgradeFile, []byte(value), 0600))
 			}
+
 			v := setupViper()
 			v.SetConfigFile(configFile)
 			assert.NoError(v.ReadInConfig())
 
 			// Parse config
 			assert.Equal(root, v.GetString(ChainConfigDirKey))
-			nodeConfig, _, err := getConfigsFromViper(v)
-			if len(test.err) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.err)
-				return
+			var nodeConfig node.Config
+			var err error
+			if test.fullParse {
+				// this is slow
+				nodeConfig, _, err = getConfigsFromViper(v)
+			} else {
+				nodeConfig = node.Config{}
+				var conf map[string]chains.ChainConfig
+				conf, err = readChainConfigs(root)
+				nodeConfig.ChainConfigs = conf
 			}
 			assert.NoError(err)
 			assert.Equal(test.expected, nodeConfig.ChainConfigs)
@@ -119,36 +129,16 @@ func TestChainConfigs(t *testing.T) {
 	}
 }
 
-func TestChainDirStructure(t *testing.T) {
+func TestChainDirNotExist(t *testing.T) {
 	tests := map[string]struct {
 		structure string
 		file      map[string]string
-		err       string
 		expected  map[string]chains.ChainConfig
 	}{
-		"root dir not exist": {
-			structure: "",
-			file:      map[string]string{"C": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
-			err:       "",
-		},
 		"chains dir not exist": {
 			structure: "cdir/",
 			file:      map[string]string{"C": "noeffect"},
 			expected:  map[string]chains.ChainConfig{},
-			err:       "",
-		},
-		"configs dir not exist": {
-			structure: "cdir/chains/",
-			file:      map[string]string{"C": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
-			err:       "",
-		},
-		"full config structure": {
-			structure: "cdir/chains/configs",
-			file:      map[string]string{"C": "helloworld"},
-			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("helloworld")}},
-			err:       "",
 		},
 	}
 
@@ -173,11 +163,7 @@ func TestChainDirStructure(t *testing.T) {
 			// Parse config
 			assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
 			nodeConfig, _, err := getConfigsFromViper(v)
-			if len(test.err) > 0 {
-				assert.Error(err)
-				assert.Contains(err.Error(), test.err)
-				return
-			}
+			assert.NoError(err)
 			assert.Equal(test.expected, nodeConfig.ChainConfigs)
 		})
 	}

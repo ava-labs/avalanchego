@@ -42,9 +42,9 @@ import (
 const (
 	avalanchegoLatest     = "avalanchego-latest"
 	avalanchegoPreupgrade = "avalanchego-preupgrade"
-	chainConfigDir        = "configs"
-	chainUpgradeDir       = "upgrades"
-	chainsDir             = "chains"
+	chainConfigSubDir     = "configs"
+	chainUpgradeSubDir    = "upgrades"
+	chainsSubDir          = "chains"
 )
 
 // Results of parsing the CLI
@@ -722,7 +722,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// Chain Configs
 	chainConfigDir := v.GetString(ChainConfigDirKey)
-	chainConfigs, err := readChainConfigs(filepath.Join(chainConfigDir, chainsDir))
+	chainConfigs, err := readChainConfigs(path.Clean(chainConfigDir))
 	if err != nil {
 		return node.Config{}, process.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
@@ -822,11 +822,12 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 	var wg sync.WaitGroup
 	var m sync.Mutex
-	files, err := filepath.Glob(root + "/" + chainConfigDir + "/*")
+	configsPath := path.Join(root, chainsSubDir)
+	files, err := filepath.Glob(path.Join(configsPath, chainConfigSubDir) + "/*")
 	if err != nil {
 		return nil, err
 	}
-	upgrades, err := filepath.Glob(root + "/" + chainUpgradeDir + "/*")
+	upgrades, err := filepath.Glob(path.Join(configsPath, chainUpgradeSubDir) + "/*")
 	if err != nil {
 		return nil, err
 	}
@@ -871,9 +872,9 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 
 				// look parent path and decide the field name
 				switch parent {
-				case chainUpgradeDir:
+				case chainUpgradeSubDir:
 					tmp.Upgrade = content
-				case chainConfigDir:
+				case chainConfigSubDir:
 					tmp.Config = content
 				default:
 				}
