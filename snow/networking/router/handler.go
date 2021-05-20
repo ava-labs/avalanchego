@@ -277,7 +277,7 @@ func (h *Handler) dispatchMsg(msg message) {
 	}
 
 	if err != nil {
-		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s", err)
+		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s, while processing message: %s", err, msg)
 		h.closing.SetValue(true)
 	}
 }
