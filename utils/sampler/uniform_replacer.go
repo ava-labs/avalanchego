@@ -46,23 +46,14 @@ func (s *uniformReplacer) Initialize(length uint64) error {
 }
 
 func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
-	if count < 0 || s.length < uint64(count) {
-		return nil, errOutOfRange
-	}
-
-	for k := range s.drawn {
-		delete(s.drawn, k)
-	}
+	s.Reset()
 
 	results := make([]uint64, count)
 	for i := 0; i < count; i++ {
-		// We don't use a cryptographically secure source of randomness here, as
-		// there's no need to ensure a truly random sampling.
-		draw := uint64(rand.Int63n(int64(s.length-uint64(i)))) + uint64(i) // #nosec G404
-
-		ret := s.drawn.get(draw, draw)
-		s.drawn[draw] = s.drawn.get(uint64(i), uint64(i))
-
+		ret, err := s.Next()
+		if err != nil {
+			return nil, err
+		}
 		results[i] = ret
 	}
 	return results, nil
