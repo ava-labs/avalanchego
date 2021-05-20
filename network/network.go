@@ -102,65 +102,6 @@ type Network interface {
 	health.Checkable
 }
 
-type peersData struct {
-	peersIdxes map[ids.ShortID]int // peerID -> *peer index in peersList
-	peersList  []*peer             // invariant: len(peersList) == len(peersIdxes)
-}
-
-func (p *peersData) initialize() {
-	p.peersIdxes = make(map[ids.ShortID]int)
-	p.peersList = make([]*peer, 0)
-}
-
-func (p *peersData) len() int {
-	return len(p.peersList)
-}
-
-func (p *peersData) getList() []*peer {
-	return p.peersList
-}
-
-func (p *peersData) getByID(id ids.ShortID) (*peer, bool) {
-	if idx, ok := p.peersIdxes[id]; ok {
-		return p.peersList[idx], ok
-	}
-
-	return nil, false
-}
-
-func (p *peersData) reset() {
-	p.peersIdxes = make(map[ids.ShortID]int)
-	p.peersList = make([]*peer, 0)
-}
-
-func (p *peersData) getByIdx(idx int) (*peer, bool) {
-	if idx < 0 || idx > len(p.peersList) {
-		return nil, false
-	}
-	return p.peersList[idx], true
-}
-
-func (p *peersData) add(peer *peer) {
-	p.peersList = append(p.peersList, peer)
-	p.peersIdxes[peer.id] = len(p.peersList) - 1
-}
-
-func (p *peersData) remove(peer *peer) {
-	if len(p.peersList) == 1 {
-		p.reset() // simply drop
-	} else if len(p.peersList) > 1 {
-		// Drop p by replacing it with last peer in peersList.
-		// Keep peersIdxes synced. peersList order is not preserved
-		idToDrop := peer.id
-		idxToReplace := p.peersIdxes[idToDrop]
-
-		p.peersList[idxToReplace] = p.peersList[len(p.peersList)-1]
-		p.peersList = p.peersList[:len(p.peersList)-1]
-		p.peersIdxes[p.peersList[idxToReplace].id] = idxToReplace
-		delete(p.peersIdxes, idToDrop)
-	}
-}
-
 type network struct {
 	// The metrics that this network tracks
 	metrics
@@ -934,7 +875,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 	var peers []PeerID
 
 	if len(nodeIDs) == 0 {
-		peers = make([]PeerID, 0, n.peers.len())
+		peers = make([]PeerID, 0, n.peers.size())
 		for _, peer := range n.peers.getList() {
 			if peer.connected.GetValue() {
 				peers = append(peers, PeerID{
@@ -994,7 +935,7 @@ func (n *network) close() {
 	}
 	n.closed.SetValue(true)
 
-	peersToClose := make([]*peer, n.peers.len())
+	peersToClose := make([]*peer, n.peers.size())
 	copy(peersToClose, n.peers.getList())
 	n.peers.reset()
 	n.stateLock.Unlock()
@@ -1346,7 +1287,7 @@ func (n *network) tryAddPeer(p *peer) error {
 	}
 
 	n.peers.add(p)
-	n.numPeers.Set(float64(n.peers.len()))
+	n.numPeers.Set(float64(n.peers.size()))
 	p.Start()
 	return nil
 }
@@ -1359,8 +1300,8 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	defer n.stateLock.RUnlock()
 
 	numToSend := n.peerListSize
-	if n.peers.len() < numToSend {
-		numToSend = n.peers.len()
+	if n.peers.size() < numToSend {
+		numToSend = n.peers.size()
 	}
 
 	if numToSend == 0 {
@@ -1369,7 +1310,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	res := make([]utils.IPCertDesc, 0, numToSend)
 
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(n.peers.len())); err != nil {
+	if err := s.Initialize(uint64(n.peers.size())); err != nil {
 		return nil, err
 	}
 
@@ -1483,7 +1424,7 @@ func (n *network) disconnected(p *peer) {
 	n.log.Debug("disconnected from %s at %s", p.id, ip)
 
 	n.peers.remove(p)
-	n.numPeers.Set(float64(n.peers.len()))
+	n.numPeers.Set(float64(n.peers.size()))
 
 	p.releaseAllAliases()
 
@@ -1548,7 +1489,7 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	res := make([]*peer, n.peers.len())
+	res := make([]*peer, n.peers.size())
 	copy(res, n.peers.getList())
 
 	return res
