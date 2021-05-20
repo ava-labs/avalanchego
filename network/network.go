@@ -155,6 +155,7 @@ type network struct {
 	connMeterMaxConns            int
 	connMeter                    ConnMeter
 	b                            Builder
+	isFetchOnly                  bool
 
 	// stateLock should never be held when grabbing a peer senderLock
 	stateLock    sync.RWMutex
@@ -238,7 +239,7 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
-
+	isFetchOnly bool,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -280,6 +281,7 @@ func NewDefaultNetwork(
 		benchlistManager,
 		peerAliasTimeout,
 		tlsKey,
+		isFetchOnly,
 	)
 }
 
@@ -324,6 +326,7 @@ func NewNetwork(
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
+	isFetchOnly bool,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -375,6 +378,7 @@ func NewNetwork(
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
 		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
+		isFetchOnly:                        isFetchOnly,
 	}
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
