@@ -61,6 +61,9 @@ type Transitive struct {
 	// optimal number.
 	pendingTxs []snowstorm.Tx
 
+	// A uniform sampler without replacement
+	uniformSampler sampler.Uniform
+
 	errs wrappers.Errs
 }
 
@@ -77,6 +80,7 @@ func (t *Transitive) Initialize(config Config) error {
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
+	t.uniformSampler = sampler.NewUniform()
 
 	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return err
@@ -114,11 +118,10 @@ func (t *Transitive) Gossip() error {
 		return nil
 	}
 
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(edge))); err != nil {
+	if err := t.uniformSampler.Initialize(uint64(len(edge))); err != nil {
 		return err // Should never really happen
 	}
-	indices, err := s.Sample(1)
+	indices, err := t.uniformSampler.Sample(1)
 	if err != nil {
 		return err // Also should never really happen because the edge has positive length
 	}
@@ -594,12 +597,11 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 	// Randomly select parents of this vertex from among the virtuous set
 	virtuousIDs := t.Consensus.Virtuous().CappedList(t.Params.Parents)
 	numVirtuousIDs := len(virtuousIDs)
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(numVirtuousIDs)); err != nil {
+	if err := t.uniformSampler.Initialize(uint64(numVirtuousIDs)); err != nil {
 		return err
 	}
 
-	indices, err := s.Sample(numVirtuousIDs)
+	indices, err := t.uniformSampler.Sample(numVirtuousIDs)
 	if err != nil {
 		return err
 	}

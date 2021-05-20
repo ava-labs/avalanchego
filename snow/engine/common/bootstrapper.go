@@ -352,7 +352,7 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 	}
 
 	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
-		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
+		return fmt.Errorf("failed to bootstrap the chain after %d attempts", b.bootstrapAttempts)
 	}
 
 	// reset the failed responses

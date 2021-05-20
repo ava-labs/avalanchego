@@ -24,6 +24,6 @@ func DefaultConfigTest() Config {
 		Sender:        &SenderTest{},
 		Bootstrapable: &BootstrapableTest{},
 		Subnet:        subnet,
-		Delay:         &DelayTest{},
+		Timer:         &TimerTest{},
 	}
 }

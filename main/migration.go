@@ -8,6 +8,7 @@ import (
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/storage"
 )
 
 type migrationManager struct {
@@ -33,7 +34,33 @@ func (m *migrationManager) migrate() error {
 	if !shouldMigrate {
 		return nil
 	}
+	err = m.verifyDiskStorage()
+	if err != nil {
+		return err
+	}
 	return m.runMigration()
+}
+
+func (m *migrationManager) verifyDiskStorage() error {
+	storagePath := m.rootConfig.DBPath
+	avail, err := storage.OsDiskStat(storagePath)
+	if err != nil {
+		return err
+	}
+	used, err := storage.DirSize(storagePath)
+	if err != nil {
+		return err
+	}
+	safetyBuf := (used * 30) / 100
+	required := used + safetyBuf // free space must be equal to used plus 30% overhead
+	if avail < required {
+		return fmt.Errorf("available space %d Megabytes is less then required space %d Megabytes for migration",
+			avail/1024/1024, required/1024/1024)
+	}
+	if avail < constants.TwoHundredGigabytes {
+		m.log.Warn("at least 200GB of free disk space is recommended")
+	}
+	return nil
 }
 
 // Returns true if the database should be migrated from the previous database version.
