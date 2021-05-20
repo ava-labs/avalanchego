@@ -40,7 +40,6 @@ const (
 	BootstrapIDsKey                         = "bootstrap-ids"
 	StakingPortKey                          = "staking-port"
 	StakingEnabledKey                       = "staking-enabled"
-	P2pTLSEnabledKey                        = "p2p-tls-enabled"
 	StakingKeyPathKey                       = "staking-tls-key-file"
 	StakingCertPathKey                      = "staking-tls-cert-file"
 	StakingDisabledWeightKey                = "staking-disabled-weight"
