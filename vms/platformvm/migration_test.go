@@ -36,14 +36,14 @@ func TestMigrateUptime(t *testing.T) {
 	chainDBManager.On("Previous").Return(
 		&manager.VersionedDatabase{
 			Database: previousDB,
-			Version:  version.NewDefaultVersion(1, 0, 0),
+			Version:  version.DatabaseVersion1_0_0,
 		},
 		true,
 	)
 	chainDBManager.On("Current").Return(
 		&manager.VersionedDatabase{
 			Database: currentDB,
-			Version:  version.NewDefaultVersion(1, 4, 4),
+			Version:  version.DatabaseVersion1_4_4,
 		},
 	)
 	chainDBManager.On("Close").Return(nil)

@@ -224,15 +224,7 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	versionManager := version.NewCompatibility(
-		Version,
-		MinimumCompatibleVersion,
-		GetApricotPhase2Time(n.Config.NetworkID),
-		PrevMinimumCompatibleVersion,
-		MinimumUnmaskedVersion,
-		GetApricotPhase0Time(n.Config.NetworkID),
-		PrevMinimumUnmaskedVersion,
-	)
+	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -241,7 +233,7 @@ func (n *Node) initNetworking() error {
 		n.Config.StakingIP,
 		n.Config.NetworkID,
 		versionManager,
-		VersionParser,
+		version.NewDefaultApplicationParser(),
 		listener,
 		dialer,
 		serverUpgrader,
@@ -750,7 +742,7 @@ func (n *Node) initInfoAPI() error {
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
 		n.Log,
-		Version,
+		version.Current,
 		n.ID,
 		n.Config.NetworkID,
 		n.chainManager,
@@ -880,7 +872,7 @@ func (n *Node) Initialize(
 	}
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
-	n.Log.Info("node version is: %s", Version)
+	n.Log.Info("node version is: %s", version.Current)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 

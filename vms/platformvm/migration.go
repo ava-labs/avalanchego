@@ -30,8 +30,8 @@ func (vm *VM) migrateUptimes() error {
 	currentDBVersion := currentDB.Version
 
 	// Only valid migration is from database version 1.0.0 to 1.4.4
-	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
-		currentDBVersion.Compare(version.NewDefaultVersion(1, 4, 4)) == 0 {
+	if prevDBVersion.Compare(version.DatabaseVersion1_0_0) == 0 &&
+		currentDBVersion.Compare(version.DatabaseVersion1_4_4) == 0 {
 		migrater := uptimeMigrater1_4_4{vm: vm}
 		return migrater.migrate(prevDB)
 	}
