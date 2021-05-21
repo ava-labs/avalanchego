@@ -106,7 +106,7 @@ func TestMigrateUptime(t *testing.T) {
 	err = uptimeDB.Put(nodeID.Bytes(), uptimeBytes)
 	assert.NoError(t, err)
 
-	// Case 1: Validator is in database v1.0.0 but not v1.4.4
+	// Case 1: Validator is in database v1.0.0 but not v1.4.5
 	// Set up mocked VM state
 	mockCurrentStakerChainState := &mockCurrentStakerChainState{}
 	mockCurrentStakerChainState.Test(t)
@@ -128,7 +128,7 @@ func TestMigrateUptime(t *testing.T) {
 	mockInternalState.AssertNotCalled(t, "SetUptime")
 	mockCurrentStakerChainState.AssertNumberOfCalls(t, "GetStaker", 1)
 
-	// Case 2: Validator is in database v1.0.0 and v1.4.4,
+	// Case 2: Validator is in database v1.0.0 and v1.4.5,
 	// and the lastUpdated value in the database v1.0.0 <= now
 	// Should update lastUpdated and upDuration
 	// Add the node to the current validator set
@@ -152,7 +152,7 @@ func TestMigrateUptime(t *testing.T) {
 	mockCurrentStakerChainState.AssertNumberOfCalls(t, "GetStaker", 2)
 	mockInternalState.AssertNumberOfCalls(t, "SetUptime", 1)
 
-	// Case 3: Validator is in database v1.0.0 and v1.4.4,
+	// Case 3: Validator is in database v1.0.0 and v1.4.5,
 	// and the lastUpdated value in the database v1.0.0 > now
 	vm.clock.Set(time.Unix(int64(oldUptime.LastUpdated-1), 0)) // Set VM's clock to before lastUpdated in old database
 	mockInternalState.On("SetUptime", nodeID, mock.AnythingOfType("time.Duration"), mock.AnythingOfType("time.Time")).Run(
