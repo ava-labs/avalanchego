@@ -293,7 +293,43 @@ func (vm *VM) Bootstrapped() error {
 	if err := vm.StartTracking(validatorIDs); err != nil {
 		return err
 	}
+	if err := vm.setMaxUptimes(); err != nil {
+		return err
+	}
 	return vm.internalState.Commit()
+}
+
+func (vm *VM) setMaxUptimes() error {
+	primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
+	if !exist {
+		return errNoPrimaryValidators
+	}
+	primaryValidators := primaryValidatorSet.List()
+
+	cs := vm.internalState.CurrentStakerChainState()
+	currentTime := vm.clock.Time()
+
+	for _, vdr := range primaryValidators {
+		vdrID := vdr.ID()
+
+		curVdr, err := cs.GetValidator(vdrID)
+		if err != nil {
+			return err
+		}
+
+		tx := curVdr.AddValidatorTx()
+
+		startTime := tx.StartTime()
+		lastUpdated := currentTime
+		if lastUpdated.Before(startTime) {
+			lastUpdated = startTime
+		}
+
+		if err := vm.internalState.SetUptime(vdrID, lastUpdated.Sub(startTime), lastUpdated); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Shutdown this blockchain
