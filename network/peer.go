@@ -425,7 +425,7 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 
-	peerVersion := p.versionStruct.GetValue().(version.Version)
+	peerVersion := p.versionStruct.GetValue().(version.Application)
 	if p.net.versionCompatibility.Compatible(peerVersion) != nil {
 		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
 
@@ -621,7 +621,7 @@ func (p *peer) sendPong() {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetVersion(msg Msg) {
+func (p *peer) handleGetVersion(_ Msg) {
 	if !p.versionSent.GetValue() {
 		p.sendVersion()
 	}
@@ -758,7 +758,7 @@ func (p *peer) handleVersion(msg Msg) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetPeerList(msg Msg) {
+func (p *peer) handleGetPeerList(_ Msg) {
 	if p.gotVersion.GetValue() && !p.peerListSent.GetValue() {
 		p.sendPeerList()
 	}
@@ -836,11 +836,15 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 
 // assumes the [stateLock] is not held
 func (p *peer) handlePeerList(msg Msg) {
-	ips := msg.Get(SignedPeers).([]utils.IPCertDesc)
-
 	p.gotPeerList.SetValue(true)
 	p.tryMarkConnected()
 
+	if p.net.isFetchOnly {
+		// If the node is in fetch only mode, drop all incoming peers
+		return
+	}
+
+	ips := msg.Get(SignedPeers).([]utils.IPCertDesc)
 	for _, ip := range ips {
 		p.trackSignedPeer(ip)
 	}
@@ -872,7 +876,7 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -899,7 +903,7 @@ func (p *peer) handleGetAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -925,7 +929,7 @@ func (p *peer) handleAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
@@ -1021,7 +1025,7 @@ func (p *peer) handleChits(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {

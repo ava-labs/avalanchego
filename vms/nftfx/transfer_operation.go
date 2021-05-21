@@ -7,9 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	errNilTransferOperation = errors.New("nil transfer operation")
-)
+var errNilTransferOperation = errors.New("nil transfer operation")
 
 // TransferOperation ...
 type TransferOperation struct {

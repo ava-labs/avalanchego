@@ -12,9 +12,7 @@ import (
 	"time"
 )
 
-var (
-	staleSocketTimeout = 100 * time.Millisecond
-)
+var staleSocketTimeout = 100 * time.Millisecond
 
 func listen(addr string) (net.Listener, error) {
 	uAddr, err := net.ResolveUnixAddr("unix", addr)

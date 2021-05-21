@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	TestBuilder Builder
-)
+var TestBuilder Builder
 
 func TestBuildGetVersion(t *testing.T) {
 	msg, err := TestBuilder.GetVersion()

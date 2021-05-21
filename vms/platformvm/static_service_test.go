@@ -53,8 +53,7 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := CreateStaticService()
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid balance")
 	}
@@ -101,8 +100,7 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := CreateStaticService()
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid amount")
 	}
@@ -150,8 +148,7 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := CreateStaticService()
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid end time")
 	}
@@ -234,8 +231,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 	reply := BuildGenesisReply{}
 
-	ss := CreateStaticService()
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
 		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
 	}

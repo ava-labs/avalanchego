@@ -372,7 +372,6 @@ func TestFxVerifyTransferOperationWrongUTXO(t *testing.T) {
 }
 
 func TestFxVerifyTransferOperationFailedVerify(t *testing.T) {
-
 	vm := secp256k1fx.TestVM{
 		Codec: linearcodec.NewDefault(),
 		Log:   logging.NoLog{},

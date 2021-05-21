@@ -169,5 +169,4 @@ func TestDontIndexSameContainerTwice(t *testing.T) {
 	gotContainer, err := idx.GetContainerByID(containerID)
 	assert.NoError(err)
 	assert.EqualValues(gotContainer.Bytes, []byte{1, 2, 3}, "should not have accepted same container twice")
-
 }

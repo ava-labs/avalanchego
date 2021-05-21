@@ -8,9 +8,7 @@ import (
 	"math"
 )
 
-var (
-	errOverflow = errors.New("overflow occurred")
-)
+var errOverflow = errors.New("overflow occurred")
 
 // Max64 ...
 func Max64(a, b uint64) uint64 {

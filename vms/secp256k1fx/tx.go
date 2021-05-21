@@ -8,9 +8,7 @@ type Tx interface {
 	UnsignedBytes() []byte
 }
 
-var (
-	_ Tx = &TestTx{}
-)
+var _ Tx = &TestTx{}
 
 // TestTx is a minimal implementation of a Tx
 type TestTx struct{ Bytes []byte }

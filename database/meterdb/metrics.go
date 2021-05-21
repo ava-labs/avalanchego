@@ -20,6 +20,7 @@ func newLatencyMetric(namespace, name string) prometheus.Histogram {
 		Buckets:   utils.NanosecondsBuckets,
 	})
 }
+
 func newSizeMetric(namespace, name string) prometheus.Histogram {
 	return prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,

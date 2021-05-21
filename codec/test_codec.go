@@ -12,34 +12,32 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	Tests = []func(c GeneralCodec, t testing.TB){
-		TestStruct,
-		TestRegisterStructTwice,
-		TestUInt32,
-		TestSlice,
-		TestMaxSizeSlice,
-		TestBool,
-		TestArray,
-		TestBigArray,
-		TestPointerToStruct,
-		TestSliceOfStruct,
-		TestInterface,
-		TestSliceOfInterface,
-		TestArrayOfInterface,
-		TestPointerToInterface,
-		TestString,
-		TestNilSlice,
-		TestSerializeUnexportedField,
-		TestSerializeOfNoSerializeField,
-		TestNilSliceSerialization,
-		TestEmptySliceSerialization,
-		TestSliceWithEmptySerialization,
-		TestRestrictedSlice,
-		TestExtraSpace,
-		TestSliceLengthOverflow,
-	}
-)
+var Tests = []func(c GeneralCodec, t testing.TB){
+	TestStruct,
+	TestRegisterStructTwice,
+	TestUInt32,
+	TestSlice,
+	TestMaxSizeSlice,
+	TestBool,
+	TestArray,
+	TestBigArray,
+	TestPointerToStruct,
+	TestSliceOfStruct,
+	TestInterface,
+	TestSliceOfInterface,
+	TestArrayOfInterface,
+	TestPointerToInterface,
+	TestString,
+	TestNilSlice,
+	TestSerializeUnexportedField,
+	TestSerializeOfNoSerializeField,
+	TestNilSliceSerialization,
+	TestEmptySliceSerialization,
+	TestSliceWithEmptySerialization,
+	TestRestrictedSlice,
+	TestExtraSpace,
+	TestSliceLengthOverflow,
+}
 
 // The below structs and interfaces exist
 // for the sake of testing

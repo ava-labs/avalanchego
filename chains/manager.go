@@ -13,8 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -34,6 +32,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 
+	dbManager "github.com/ava-labs/avalanchego/database/manager"
+
 	avcon "github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	aveng "github.com/ava-labs/avalanchego/snow/engine/avalanche"
 	avbootstrap "github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap"
@@ -46,6 +46,8 @@ import (
 const (
 	defaultChannelSize = 1024
 )
+
+var BootstrappedKey = []byte{0x00}
 
 // Manager manages the chains running on this node.
 // It can:
@@ -109,6 +111,14 @@ type chain struct {
 	Beacons validators.Set
 }
 
+// ChainConfig is configuration settings for the current execution.
+// [Settings] is the user-provided settings blob for the chain.
+// [Upgrades] is a chain-specific blob for coordinating upgrades.
+type ChainConfig struct {
+	Settings []byte
+	Upgrades []byte
+}
+
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled            bool // True iff the network has staking enabled
@@ -121,7 +131,7 @@ type ManagerConfig struct {
 	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
 	DecisionEvents            *triggers.EventDispatcher
 	ConsensusEvents           *triggers.EventDispatcher
-	DB                        database.Database
+	DBManager                 dbManager.Manager
 	Router                    router.Router    // Routes incoming messages to the appropriate chain
 	Net                       network.Network  // Sends consensus messages to other validators
 	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
@@ -141,6 +151,14 @@ type ManagerConfig struct {
 	HealthService             health.Service
 	RetryBootstrap            bool // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
+	ChainConfigs              map[ids.ID]ChainConfig
+	// If true, shut down the node after the Primary Network has bootstrapped
+	// and use [FetchOnlyFrom] as beacons
+	FetchOnly bool
+	// [FetchOnlyFrom] ignored unless [FetchOnly] is true
+	FetchOnlyFrom validators.Set
+	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
+	ShutdownNodeFunc func(exitCode int)
 }
 
 type manager struct {
@@ -191,7 +209,7 @@ func (m *manager) CreateChain(chain ChainParameters) {
 // Create a chain, this is only called from the P-chain thread, except for
 // creating the P-chain.
 func (m *manager) ForceCreateChain(chainParams ChainParameters) {
-	if !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
+	if chainParams.SubnetID != constants.PrimaryNetworkID && !m.WhitelistedSubnets.Contains(chainParams.SubnetID) {
 		m.Log.Debug("Skipped creating non-whitelisted chain:\n"+
 			"    ID: %s\n"+
 			"    VMID:%s",
@@ -219,15 +237,34 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
 		var onBootstrapped func()
+		if chainParams.SubnetID == constants.PrimaryNetworkID {
+			onBootstrapped = func() {
+				// When this subnet is done bootstrapping, mark that we have
+				// bootstrapped this database version. If running in fetch only
+				// mode, shut down node since fetching is complete.
+				if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
+					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
+					go m.ShutdownNodeFunc(1)
+				}
+				if m.ManagerConfig.FetchOnly {
+					m.Log.Info("done with fetch only mode. Starting node shutdown")
+					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
+				}
+			}
+		}
 		sb = newSubnet(onBootstrapped, chainParams.ID)
 	} else {
 		sb.addChain(chainParams.ID)
 	}
 
+	// In fetch-only mode, use custom bootstrap beacons
+	if m.FetchOnly {
+		chainParams.CustomBeacons = m.FetchOnlyFrom
+	}
+
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
 		sb.removeChain(chainParams.ID)
-
 		m.Log.Error("Error while creating new chain: %s", err)
 		return
 	}
@@ -429,21 +466,23 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsDB, err := meterdb.New(consensusParams.Namespace+"_db", ctx.Metrics, m.DB)
+	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	db := prefixdb.New(ctx.ChainID[:], metricsDB)
-	vmDB := prefixdb.New([]byte("vm"), db)
-	vertexDB := prefixdb.New([]byte("vertex"), db)
-	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db)
-	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db)
+	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
-	vtxBlocker, err := queue.New(vertexBootstrappingDB)
+	db := dbManager.Current()
+	vertexDB := prefixdb.New([]byte("vertex"), db.Database)
+	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
+	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
+
+	vtxBlocker, err := queue.NewWithMissing(vertexBootstrappingDB, consensusParams.Namespace+"_vtx", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	txBlocker, err := queue.New(txBootstrappingDB)
+	txBlocker, err := queue.New(txBootstrappingDB, consensusParams.Namespace+"_tx", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -452,7 +491,8 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
+	chainConfig := m.ChainConfigs[ctx.ChainID]
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -560,15 +600,17 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	metricsDB, err := meterdb.New(consensusParams.Namespace+"_db", ctx.Metrics, m.DB)
+	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	db := prefixdb.New(ctx.ChainID[:], metricsDB)
-	vmDB := prefixdb.New([]byte("vm"), db)
-	bootstrappingDB := prefixdb.New([]byte("bs"), db)
+	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
-	blocked, err := queue.New(bootstrappingDB)
+	db := dbManager.Current()
+	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
+
+	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
@@ -578,7 +620,8 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	if err := vm.Initialize(ctx, vmDB, genesisData, msgChan, fxs); err != nil {
+	chainConfig := m.ChainConfigs[ctx.ChainID]
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
 		return nil, err
 	}
 

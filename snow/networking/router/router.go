@@ -28,7 +28,7 @@ type Router interface {
 		gossipFrequency,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
-		onFatal func(),
+		onFatal func(exitCode int),
 		healthConfig HealthConfig,
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
