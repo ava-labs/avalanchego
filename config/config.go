@@ -625,10 +625,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		txFee := v.GetUint64(TxFeeKey)
 		creationTxFee := v.GetUint64(CreationTxFeeKey)
-		uptimeRequirement := v.GetFloat64(UptimeRequirementKey)
 		nodeConfig.TxFee = txFee
 		nodeConfig.CreationTxFee = creationTxFee
-		nodeConfig.UptimeRequirement = uptimeRequirement
 
 		minValidatorStake := v.GetUint64(MinValidatorStakeKey)
 		maxValidatorStake := v.GetUint64(MaxValidatorStakeKey)
@@ -662,6 +660,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	} else {
 		nodeConfig.Params = *genesis.GetParams(networkID)
 	}
+	nodeConfig.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
 
 	// Load genesis data
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
