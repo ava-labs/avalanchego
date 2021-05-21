@@ -63,7 +63,7 @@ func TestMigration1_0_0To1_4_4(t *testing.T) {
 
 	DatabaseVersion1_4_4 := memdb.New()
 
-	v1_4_4 := version.DatabaseVersion1_4_4
+	v1_4_4 := version.DatabaseVersion1_4_5
 
 	dbManagerV1_4_4, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
 		{
