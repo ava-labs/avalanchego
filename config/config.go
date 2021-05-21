@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/kardianos/osext"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -753,7 +754,7 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 	if processConfig.DisplayVersionAndExit {
 		format := "%s ["
 		args := []interface{}{
-			node.Version,
+			version.Current,
 		}
 
 		networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
@@ -769,7 +770,7 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 		args = append(args, networkGeneration)
 
 		format += ", database=%s"
-		args = append(args, node.DatabaseVersion)
+		args = append(args, version.CurrentDatabase)
 
 		if commit != "" {
 			format += ", commit=%s"

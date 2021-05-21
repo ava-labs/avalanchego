@@ -21,8 +21,8 @@ func (ks *keystore) migrate(dbManager manager.Manager) error {
 	currentDB := dbManager.Current()
 	currentDBVersion := currentDB.Version
 	// Right now the only valid migration is from database version 1.0.0 to 1.4.4
-	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
-		currentDBVersion.Compare(version.NewDefaultVersion(1, 4, 4)) == 0 {
+	if prevDBVersion.Compare(version.DatabaseVersion1_0_0) == 0 &&
+		currentDBVersion.Compare(version.DatabaseVersion1_4_4) == 0 {
 		return ks.migrate1_0_0To1_4_4(prevDB, currentDB)
 	}
 	return nil

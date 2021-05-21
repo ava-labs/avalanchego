@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -9,6 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/storage"
+	"github.com/ava-labs/avalanchego/version"
+)
+
+const (
+	gb    = 1 << 30
+	gb200 = 200 * gb
 )
 
 type migrationManager struct {
@@ -47,17 +54,32 @@ func (m *migrationManager) verifyDiskStorage() error {
 	if err != nil {
 		return err
 	}
-	used, err := storage.DirSize(storagePath)
+
+	currentDBPath := filepath.Join(storagePath, version.CurrentDatabase.String())
+	prevDBPath := filepath.Join(storagePath, version.PrevDatabase.String())
+
+	currentUsed, err := storage.DirSize(currentDBPath)
 	if err != nil {
 		return err
 	}
-	safetyBuf := (used * 30) / 100
-	required := used + safetyBuf // free space must be equal to used plus 30% overhead
-	if avail < required {
-		return fmt.Errorf("available space %d Megabytes is less then required space %d Megabytes for migration",
-			avail/1024/1024, required/1024/1024)
+	prevUsed, err := storage.DirSize(prevDBPath)
+	if err != nil {
+		return err
 	}
-	if avail < constants.TwoHundredGigabytes {
+
+	safetyBuf := (prevUsed * 30) / 100
+	// Total space available to [currentDBPath] is counted as
+	// the total storage taken up by that database plus the disk
+	// space remaining on the device.
+	// Require that total space available to the current database has
+	// at least the same amount of space as the previous database plus
+	// 30% overhead.
+	required := prevUsed + safetyBuf - currentUsed
+	if avail < required {
+		return fmt.Errorf("available space %dGB is less then required space %dGB for migration",
+			avail/gb, required/gb)
+	}
+	if avail < gb200 {
 		m.log.Warn("at least 200GB of free disk space is recommended")
 	}
 	return nil
@@ -70,7 +92,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	if !m.rootConfig.DBEnabled {
 		return false, nil
 	}
-	dbManager, err := manager.New(m.rootConfig.DBPath, logging.NoLog{}, node.DatabaseVersion, true)
+	dbManager, err := manager.New(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
 	if err != nil {
 		return false, fmt.Errorf("couldn't create db manager at %s: %w", m.rootConfig.DBPath, err)
 	}
@@ -82,7 +104,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 
 	currentDBBootstrapped, err := dbManager.Current().Database.Has(chains.BootstrappedKey)
 	if err != nil {
-		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", node.DatabaseVersion, err)
+		return false, fmt.Errorf("couldn't get if database version %s is bootstrapped: %w", version.CurrentDatabase, err)
 	}
 	if currentDBBootstrapped {
 		return false, nil

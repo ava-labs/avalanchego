@@ -1,9 +1,0 @@
-// (c) 2021, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
-package constants
-
-const (
-	// 200 GB in bytes
-	TwoHundredGigabytes = 214748364800
-)
