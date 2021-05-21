@@ -1320,10 +1320,6 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 		return nil, err
 	}
 
-	// sampling totalNumPeers to handle possibly invalid IPs
-	// TODO: consider possibility of grouping peers in different buckets
-	// (e.g. validators/non-validators, connected/disconnected)
-
 	for len(res) != numToSend {
 		sampledIdx, err := s.Next() // lazy-sampling
 		if err != nil {
@@ -1331,7 +1327,13 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			// return what we have
 			return res, nil
 		}
-		peer, _ := n.peers.getByIdx(int(sampledIdx))
+
+		// TODO: consider possibility of grouping peers in different buckets
+		// (e.g. validators/non-validators, connected/disconnected)
+		peer, found := n.peers.getByIdx(int(sampledIdx))
+		if !found {
+			return res, fmt.Errorf("no peer at index %v", sampledIdx)
+		}
 
 		peerIP := peer.getIP()
 		switch {
@@ -1472,7 +1474,10 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	i := 0
 	for validatorID := range validatorIDs {
 		vID := validatorID // Prevent overwrite in next loop iteration
-		peer, _ := n.peers.getByID(vID)
+		peer, found := n.peers.getByID(vID)
+		if !found {
+			n.log.Warn("while listing peers, peer with id %v not found. Set to nil.", vID)
+		}
 		peers[i] = &PeerElement{
 			peer: peer,
 			id:   vID,
@@ -1508,7 +1513,10 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 		return nil
 	}
 
-	res, _ := n.peers.getByID(validatorID)
+	res, found := n.peers.getByID(validatorID)
+	if !found {
+		n.log.Warn("peer with id %v not found. Set to nil.", validatorID)
+	}
 	return res
 }
 
