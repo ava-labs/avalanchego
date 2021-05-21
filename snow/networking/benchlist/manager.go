@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
-var (
-	errUnknownValidators = errors.New("unknown validator set for provided chain")
-)
+var errUnknownValidators = errors.New("unknown validator set for provided chain")
 
 // Manager provides an interface for a benchlist to register whether
 // queries have been successful or unsuccessful and place validators with

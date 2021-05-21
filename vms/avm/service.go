@@ -173,12 +173,11 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		err       error
 	)
 	if sourceChain == service.vm.ctx.ChainID {
-		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
+		utxos, endAddr, endUTXOID, err = service.vm.getPaginatedUTXOs(
 			addrSet,
 			startAddr,
 			startUTXO,
 			int(args.Limit),
-			true,
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
@@ -293,7 +292,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	addrSet := ids.ShortSet{}
 	addrSet.Add(addr)
 
-	utxos, _, _, err := service.vm.GetUTXOs(addrSet, ids.ShortEmpty, ids.Empty, -1, false)
+	utxos, err := service.vm.getAllUTXOs(addrSet)
 	if err != nil {
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
@@ -357,7 +356,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	addrSet := ids.ShortSet{}
 	addrSet.Add(address)
 
-	utxos, _, _, err := service.vm.GetUTXOs(addrSet, ids.ShortEmpty, ids.Empty, -1, false)
+	utxos, err := service.vm.getAllUTXOs(addrSet)
 	if err != nil {
 		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}

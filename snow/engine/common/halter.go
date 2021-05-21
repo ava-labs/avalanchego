@@ -7,6 +7,13 @@ import (
 	"sync/atomic"
 )
 
+var _ Haltable = &Halter{}
+
+type Haltable interface {
+	Halt()
+	Halted() bool
+}
+
 type Halter struct {
 	halted uint32
 }

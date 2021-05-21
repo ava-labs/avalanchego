@@ -255,9 +255,7 @@ func (h *Handler) dispatchMsg(msg message) {
 		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
 	}
 
-	var (
-		err error
-	)
+	var err error
 	switch msg.messageType {
 	case constants.NotifyMsg:
 		err = h.engine.Notify(msg.notification)
@@ -531,9 +529,7 @@ func (h *Handler) shutdownDispatch() {
 }
 
 func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
-	var (
-		err error
-	)
+	var err error
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
 		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)

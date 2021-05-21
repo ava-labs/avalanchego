@@ -132,7 +132,6 @@ func (dg *Directed) Add(tx Tx) error {
 
 		// Update txs conflicting with tx to account for its issuance
 		for conflictIDKey := range spenders {
-
 			// Get the node that contains this conflicting tx
 			conflict := dg.txs[conflictIDKey]
 

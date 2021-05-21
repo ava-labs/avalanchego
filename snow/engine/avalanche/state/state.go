@@ -60,17 +60,11 @@ func (s *state) Status(id ids.ID) choices.Status {
 		return status
 	}
 
-	if b, err := s.db.Get(id[:]); err == nil {
+	if val, err := database.GetUInt32(s.db, id[:]); err == nil {
 		// The key was in the database
-		p := wrappers.Packer{Bytes: b}
-		status := choices.Status(p.UnpackInt())
-		if p.Offset == len(b) && !p.Errored() {
-			s.dbCache.Put(id, status)
-			return status
-		}
-		s.serializer.ctx.Log.Error("Parsing failed on saved status.\nPrefixed key = %s\nBytes = \n%s",
-			id,
-			formatting.DumpBytes{Bytes: b})
+		status := choices.Status(val)
+		s.dbCache.Put(id, status)
+		return status
 	}
 
 	s.dbCache.Put(id, choices.Unknown)
@@ -84,15 +78,7 @@ func (s *state) SetStatus(id ids.ID, status choices.Status) error {
 	if status == choices.Unknown {
 		return s.db.Delete(id[:])
 	}
-
-	p := wrappers.Packer{Bytes: make([]byte, 4)}
-
-	p.PackInt(uint32(status))
-
-	s.serializer.ctx.Log.AssertNoError(p.Err)
-	s.serializer.ctx.Log.AssertTrue(p.Offset == len(p.Bytes), "Wrong offset after packing")
-
-	return s.db.Put(id[:], p.Bytes)
+	return database.PutUInt32(s.db, id[:], uint32(status))
 }
 
 func (s *state) Edge(id ids.ID) []ids.ID {

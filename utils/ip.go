@@ -33,9 +33,7 @@ func init() {
 	}
 }
 
-var (
-	errBadIP = errors.New("bad ip format")
-)
+var errBadIP = errors.New("bad ip format")
 
 // IPDesc ...
 type IPDesc struct {

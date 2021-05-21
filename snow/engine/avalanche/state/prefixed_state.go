@@ -16,9 +16,7 @@ const (
 	edgeID
 )
 
-var (
-	uniqueEdgeID = ids.Empty.Prefix(edgeID)
-)
+var uniqueEdgeID = ids.Empty.Prefix(edgeID)
 
 type prefixedState struct {
 	state *state

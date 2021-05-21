@@ -4,12 +4,10 @@
 package platformvm
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -17,12 +15,12 @@ import (
 
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	nodeID := keys[0].PublicKey().Address()
@@ -30,10 +28,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// Case: tx is nil
 	var unsignedTx *UnsignedAddSubnetValidatorTx
 	if err := unsignedTx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -57,10 +55,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -84,10 +82,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -111,10 +109,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -139,10 +137,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -166,10 +164,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -193,10 +191,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err == nil {
@@ -215,10 +213,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err != nil {
@@ -228,12 +226,12 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	nodeID := keys[0].PublicKey().Address()
@@ -251,7 +249,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
 	}
 
@@ -269,7 +267,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err != nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -285,7 +283,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	DSEndTime := DSStartTime.Add(5 * defaultMinStakingDuration)
 
 	addDSTx, err := vm.newAddValidatorTx(
-		vm.minValidatorStake,                    // stake amount
+		vm.MinValidatorStake,                    // stake amount
 		uint64(DSStartTime.Unix()),              // start time
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
@@ -310,16 +308,19 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
 	}
 
-	if err := vm.addStaker(vm.DB, constants.PrimaryNetworkID, &rewardTx{
-		Reward: 0,
-		Tx:     *addDSTx,
-	}); err != nil {
+	vm.internalState.AddCurrentStaker(addDSTx, 0)
+	vm.internalState.AddTx(addDSTx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
 	}
+	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+		t.Fatal(err)
+	}
+
 	// Node with ID key.PublicKey().Address() now a pending validator for primary network
 
 	// Case: Proposed validator is pending validator of primary network
@@ -334,7 +335,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator starts validating primary " +
 			"network before starting to validate primary network")
 	}
@@ -351,7 +352,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator stops validating primary " +
 			"network after stops validating primary network")
 	}
@@ -368,16 +369,14 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err != nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil {
 		t.Fatalf("should have passed verification")
 	}
 
 	// Case: Proposed validator start validating at/before current timestamp
 	// First, advance the timestamp
 	newTimestamp := defaultGenesisTime.Add(2 * time.Second)
-	if err := vm.putTimestamp(vm.DB, newTimestamp); err != nil {
-		t.Fatal(err)
-	}
+	vm.internalState.SetTimestamp(newTimestamp)
 
 	if tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,               // weight
@@ -389,18 +388,16 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because starts validating at current timestamp")
 	}
 
 	// reset the timestamp
-	if err := vm.putTimestamp(vm.DB, defaultGenesisTime); err != nil {
-		t.Fatal(err)
-	}
+	vm.internalState.SetTimestamp(defaultGenesisTime)
 
 	// Case: Proposed validator already validating the subnet
 	// First, add validator as validator of subnet
-	if tx, err := vm.newAddSubnetValidatorTx(
+	subnetTx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
@@ -408,17 +405,22 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
-	); err != nil {
-		t.Fatal(err)
-	} else if err := vm.addStaker(vm.DB, testSubnet1.ID(), &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	}); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
-	// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
 
-	if tx, err := vm.newAddSubnetValidatorTx(
+	vm.internalState.AddCurrentStaker(subnetTx, 0)
+	vm.internalState.AddTx(subnetTx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Node with ID nodeIDKey.PublicKey().Address() now validating subnet with ID testSubnet1.ID
+	duplicateSubnetTx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,                           // weight
 		uint64(defaultValidateStartTime.Unix()), // start time
 		uint64(defaultValidateEndTime.Unix()),   // end time
@@ -426,19 +428,25 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		testSubnet1.ID(),                        // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	}
+
+	if _, _, _, _, err := duplicateSubnetTx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, duplicateSubnetTx); err == nil {
 		t.Fatal("should have failed verification because validator already validating the specified subnet")
-	} else if err := vm.removeStaker(vm.DB, testSubnet1.ID(), &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	}); err != nil {
+	}
+
+	vm.internalState.DeleteCurrentStaker(subnetTx)
+	if err := vm.internalState.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
 		t.Fatal(err)
 	}
 
 	// Case: Too many signatures
-	if tx, err := vm.newAddSubnetValidatorTx(
+	tx, err := vm.newAddSubnetValidatorTx(
 		defaultWeight,                     // weight
 		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
@@ -446,14 +454,16 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1], testSubnet1ControlKeys[2]},
 		ids.ShortEmpty, // change addr
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	}
+	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because tx has 3 signatures but only 2 needed")
 	}
 
 	// Case: Too few signatures
-	tx, err := vm.newAddSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,                     // weight
 		uint64(defaultGenesisTime.Unix()), // start time
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix()), // end time
@@ -468,9 +478,9 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	// Remove a signature
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
 		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
-		// This tx was syntactically verified when it was created...pretend it wan't so we don't use cache
+		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because not enough control sigs")
 	}
 
@@ -493,13 +503,13 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because a control sig is invalid")
 	}
 
 	// Case: Proposed validator in pending validator set for subnet
 	// First, add validator to pending validator set of subnet
-	if tx, err := vm.newAddSubnetValidatorTx(
+	tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,                       // weight
 		uint64(defaultGenesisTime.Unix())+1, // start time
 		uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())+1, // end time
@@ -507,14 +517,21 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		testSubnet1.ID(), // subnet ID
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
 		ids.ShortEmpty, // change addr
-	); err != nil {
+	)
+	if err != nil {
 		t.Fatal(err)
-	} else if err = vm.addStaker(vm.DB, testSubnet1.ID(), &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	}); err != nil {
+	}
+
+	vm.internalState.AddCurrentStaker(tx, 0)
+	vm.internalState.AddTx(tx, Committed)
+	if err := vm.internalState.Commit(); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.DB, tx); err == nil {
+	}
+	if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
 	}
 }
@@ -522,12 +539,12 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 // Test that marshalling/unmarshalling works
 func TestAddSubnetValidatorMarshal(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	var unmarshaledTx Tx
@@ -544,26 +561,28 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if txBytes, err := Codec.Marshal(codecVersion, tx); err != nil {
+	}
+	txBytes, err := Codec.Marshal(codecVersion, tx)
+	if err != nil {
 		t.Fatal(err)
-	} else if _, err := Codec.Unmarshal(txBytes, &unmarshaledTx); err != nil {
+	}
+
+	if _, err := Codec.Unmarshal(txBytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
-	} else if err := unmarshaledTx.Sign(vm.codec, nil); err != nil {
+	}
+
+	if err := unmarshaledTx.Sign(vm.codec, nil); err != nil {
 		t.Fatal(err)
-	} else if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
-		vm.Ctx,
+	}
+
+	if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+		vm.ctx,
 		vm.codec,
-		vm.txFee,
-		vm.Ctx.AVAXAssetID,
+		vm.TxFee,
+		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
 	); err != nil {
 		t.Fatal(err)
-	}
-	if tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Memo == nil { // reflect.DeepEqual considers []byte{} and nil to be different so change nil to []byte{}
-		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Memo = []byte{}
-	}
-	if !reflect.DeepEqual(*tx, unmarshaledTx) {
-		t.Fatal("should be equal")
 	}
 }

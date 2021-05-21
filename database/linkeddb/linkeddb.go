@@ -14,14 +14,16 @@ const (
 	defaultCacheSize = 1024
 )
 
-var (
-	headKey = []byte{0x01}
-)
+var headKey = []byte{0x01}
 
 // LinkedDB provides a key value interface while allowing iteration.
 type LinkedDB interface {
 	database.KeyValueReader
 	database.KeyValueWriter
+
+	IsEmpty() (bool, error)
+	HeadKey() ([]byte, error)
+	Head() (key []byte, value []byte, err error)
 
 	NewIterator() database.Iterator
 	NewIteratorWithStart(start []byte) database.Iterator
@@ -192,14 +194,52 @@ func (ldb *linkedDB) Delete(key []byte) error {
 	return ldb.writeBatch()
 }
 
+func (ldb *linkedDB) IsEmpty() (bool, error) {
+	_, err := ldb.HeadKey()
+	if err == database.ErrNotFound {
+		return true, nil
+	}
+	return false, err
+}
+
+func (ldb *linkedDB) HeadKey() ([]byte, error) {
+	ldb.lock.RLock()
+	defer ldb.lock.RUnlock()
+
+	return ldb.getHeadKey()
+}
+
+func (ldb *linkedDB) Head() ([]byte, []byte, error) {
+	ldb.lock.RLock()
+	defer ldb.lock.RUnlock()
+
+	headKey, err := ldb.getHeadKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	head, err := ldb.getNode(headKey)
+	return headKey, head.Value, err
+}
+
+// This iterator does not guarantee that keys are returned in lexicographic
+// order.
 func (ldb *linkedDB) NewIterator() database.Iterator { return &iterator{ldb: ldb} }
 
+// NewIteratorWithStart returns an iterator that starts at [start].
+// This iterator does not guarantee that keys are returned in lexicographic
+// order.
+// If [start] is not in the list, starts iterating from the list head.
 func (ldb *linkedDB) NewIteratorWithStart(start []byte) database.Iterator {
-	return &iterator{
-		ldb:         ldb,
-		initialized: true,
-		nextKey:     start,
+	hasStartKey, err := ldb.Has(start)
+	if err == nil && hasStartKey {
+		return &iterator{
+			ldb:         ldb,
+			initialized: true,
+			nextKey:     start,
+		}
 	}
+	// If the start key isn't present, start from the head
+	return ldb.NewIterator()
 }
 
 func (ldb *linkedDB) getHeadKey() ([]byte, error) {
@@ -270,7 +310,7 @@ func (ldb *linkedDB) getNode(key []byte) (node, error) {
 	n := node{}
 	_, err = c.Unmarshal(nodeBytes, &n)
 	if err == nil {
-		ldb.nodeCache.Put(keyStr, n)
+		ldb.nodeCache.Put(keyStr, &n)
 	}
 	return n, err
 }
@@ -296,6 +336,7 @@ func (ldb *linkedDB) resetBatch() {
 	}
 	ldb.batch.Reset()
 }
+
 func (ldb *linkedDB) writeBatch() error {
 	if err := ldb.batch.Write(); err != nil {
 		return err

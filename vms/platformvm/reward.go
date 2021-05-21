@@ -22,19 +22,14 @@ var (
 	consumptionRateDenominator = new(big.Int).SetUint64(PercentDenominator)
 )
 
-type rewardTx struct {
-	Reward uint64 `serialize:"true"`
-	Tx     Tx     `serialize:"true"`
-}
-
-// Reward returns the amount of tokens to reward the staker with.
+// reward returns the amount of tokens to reward the staker with.
 //
 // RemainingSupply = SupplyCap - ExistingSupply
 // PortionOfExistingSupply = StakedAmount / ExistingSupply
 // PortionOfStakingDuration = StakingDuration / MaximumStakingDuration
 // MintingRate = MinMintingRate + MaxSubMinMintingRate * PortionOfStakingDuration
 // Reward = RemainingSupply * PortionOfExistingSupply * MintingRate * PortionOfStakingDuration
-func Reward(
+func reward(
 	rawDuration time.Duration,
 	rawStakedAmount,
 	rawMaxExistingAmount uint64,

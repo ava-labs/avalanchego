@@ -8,9 +8,7 @@ import (
 	"time"
 )
 
-var (
-	convertEToBase2 = math.Log(2)
-)
+var convertEToBase2 = math.Log(2)
 
 type continuousAverager struct {
 	halflife    float64

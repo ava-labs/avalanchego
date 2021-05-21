@@ -9,9 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	errUnknownStatus = errors.New("unknown status")
-)
+var errUnknownStatus = errors.New("unknown status")
 
 // Status ...
 type Status uint32

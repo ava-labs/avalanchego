@@ -3,5 +3,4 @@ curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/insta
 
 golangci-lint --version
 
-
-golangci-lint run --max-same-issues 0
+golangci-lint run --max-same-issues=0 --timeout=2m

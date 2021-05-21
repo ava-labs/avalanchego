@@ -8,9 +8,7 @@ import (
 	"time"
 )
 
-var (
-	convertEToBase2 = math.Log(2)
-)
+var convertEToBase2 = math.Log(2)
 
 // ContinuousFactory implements the Factory interface by returning a continuous
 // time meter.

@@ -9,9 +9,7 @@ import (
 	streakKnife "github.com/holiman/bloomfilter/v2"
 )
 
-var (
-	ErrMaxBytes = fmt.Errorf("too large")
-)
+var ErrMaxBytes = fmt.Errorf("too large")
 
 type Filter interface {
 	// Add adds to filter, assumed thread safe
