@@ -57,6 +57,11 @@ func TestPeersData(t *testing.T) {
 		id: ids.ShortID{0xff},
 	}
 
+	// query for unknown peer is handled
+	retrievedUnknownPeer, unknownPeerfound := data.getByID(unknownPeer.id)
+	assert.False(t, unknownPeerfound)
+	assert.True(t, retrievedUnknownPeer == nil)
+
 	// removal of unknown peer is handled
 	data.remove(&unknownPeer)
 	retrievedPeer2, peer2Found = data.getByID(peer2.id)

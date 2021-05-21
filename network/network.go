@@ -876,7 +876,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 
 	if len(nodeIDs) == 0 {
 		peers = make([]PeerID, 0, n.peers.size())
-		for _, peer := range n.peers.getList() {
+		for _, peer := range n.peers.peersList {
 			if peer.connected.GetValue() {
 				peers = append(peers, PeerID{
 					IP:           peer.conn.RemoteAddr().String(),
@@ -936,7 +936,7 @@ func (n *network) close() {
 	n.closed.SetValue(true)
 
 	peersToClose := make([]*peer, n.peers.size())
-	copy(peersToClose, n.peers.getList())
+	copy(peersToClose, n.peers.peersList)
 	n.peers.reset()
 	n.stateLock.Unlock()
 
@@ -1299,9 +1299,11 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
+	totalNumPeers := n.peers.size()
+
 	numToSend := n.peerListSize
-	if n.peers.size() < numToSend {
-		numToSend = n.peers.size()
+	if totalNumPeers < numToSend {
+		numToSend = totalNumPeers
 	}
 
 	if numToSend == 0 {
@@ -1310,15 +1312,15 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	res := make([]utils.IPCertDesc, 0, numToSend)
 
 	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(n.peers.size())); err != nil {
+	if err := s.Initialize(uint64(totalNumPeers)); err != nil {
 		return nil, err
 	}
 
-	// sampling len(n.peers) to handle possibly invalid IPs
+	// sampling totalNumPeers to handle possibly invalid IPs
 	// TODO: consider possibility of grouping peers in different buckets
 	// (e.g. validators/non-validators, connected/disconnected)
 	// also TODO: consider possibility of refactoring sampler for lazy-evaluation
-	indices, err := s.Sample(len(n.peers.getList()))
+	indices, err := s.Sample(totalNumPeers)
 	if err != nil {
 		return nil, err
 	}
@@ -1349,13 +1351,12 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			continue
 		}
 
-		item := utils.IPCertDesc{
+		res = append(res, utils.IPCertDesc{
 			IPDesc:    peerIP,
 			Signature: signedIP.signature,
 			Cert:      peer.cert,
 			Time:      signedIP.time,
-		}
-		res = append(res, item)
+		})
 	}
 
 	return res, nil
@@ -1490,7 +1491,7 @@ func (n *network) getAllPeers() []*peer {
 	}
 
 	res := make([]*peer, n.peers.size())
-	copy(res, n.peers.getList())
+	copy(res, n.peers.peersList)
 
 	return res
 }
@@ -1517,7 +1518,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 	// Get some data with the state lock held
 	connectedTo := 0
 	n.stateLock.RLock()
-	for _, peer := range n.peers.getList() {
+	for _, peer := range n.peers.peersList {
 		if peer != nil && peer.connected.GetValue() {
 			connectedTo++
 		}

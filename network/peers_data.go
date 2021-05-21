@@ -18,8 +18,7 @@ func (p *peersData) initialize() {
 }
 
 func (p *peersData) reset() {
-	p.peersIdxes = make(map[ids.ShortID]int)
-	p.peersList = make([]*peer, 0)
+	p.initialize()
 }
 
 func (p *peersData) add(peer *peer) {
@@ -43,8 +42,9 @@ func (p *peersData) remove(peer *peer) {
 	idxToReplace := p.peersIdxes[idToDrop]
 
 	if idxToReplace != len(p.peersList)-1 {
-		p.peersList[idxToReplace] = p.peersList[len(p.peersList)-1]
-		p.peersIdxes[p.peersList[idxToReplace].id] = idxToReplace
+		lastPeer := p.peersList[len(p.peersList)-1]
+		p.peersList[idxToReplace] = lastPeer
+		p.peersIdxes[lastPeer.id] = idxToReplace
 	}
 	p.peersList = p.peersList[:len(p.peersList)-1]
 	delete(p.peersIdxes, idToDrop)
@@ -69,9 +69,4 @@ func (p *peersData) getByIdx(idx int) (*peer, bool) {
 
 func (p *peersData) size() int {
 	return len(p.peersList)
-}
-
-// exposed for to allow iteration
-func (p *peersData) getList() []*peer {
-	return p.peersList
 }
