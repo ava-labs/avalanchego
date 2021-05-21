@@ -2472,6 +2472,29 @@ func TestValidatorIPs(t *testing.T) {
 	// checks
 	assert.NoError(t, err)
 	assert.True(t, len(validatorIPs) == 0)
+
+	// SCENARIO: At most peerListSize validators are picked
+	// context
+	clearPeersData(&dummyNetwork)
+	dummyNetwork.peerListSize = 2
+
+	validPeerCount := dummyNetwork.peerListSize * 2
+	for i := 0; i < validPeerCount; i++ {
+		ipDesc := utils.IPDesc{
+			IP:   net.IPv4(172, 17, 0, byte(i)),
+			Port: uint16(i),
+		}
+		peer := createPeer(ids.ShortID{byte(i)}, ipDesc, appVersion)
+		addPeerToNetwork(&dummyNetwork, peer, true)
+		assert.True(t, dummyNetwork.vdrs.Contains(peer.id))
+	}
+
+	// test
+	IPs, err := dummyNetwork.validatorIPs()
+
+	// checks
+	assert.NoError(t, err)
+	assert.True(t, len(IPs) == dummyNetwork.peerListSize)
 }
 
 // Helper method for TestValidatorIPs

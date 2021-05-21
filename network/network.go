@@ -1319,17 +1319,15 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	// sampling totalNumPeers to handle possibly invalid IPs
 	// TODO: consider possibility of grouping peers in different buckets
 	// (e.g. validators/non-validators, connected/disconnected)
-	// also TODO: consider possibility of refactoring sampler for lazy-evaluation
-	indices, err := s.Sample(totalNumPeers)
-	if err != nil {
-		return nil, err
-	}
 
-	for _, idx := range indices {
-		if len(res) == numToSend {
-			break
+	for len(res) != numToSend {
+		sampledIdx, err := s.Next() // lazy-sampling
+		if err != nil {
+			// all peers have been sampled and not enough valid ones found.
+			// return what we have
+			return res, nil
 		}
-		peer, _ := n.peers.getByIdx(int(idx))
+		peer, _ := n.peers.getByIdx(int(sampledIdx))
 
 		peerIP := peer.getIP()
 		switch {
