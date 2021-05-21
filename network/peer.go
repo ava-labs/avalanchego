@@ -836,11 +836,15 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 
 // assumes the [stateLock] is not held
 func (p *peer) handlePeerList(msg Msg) {
-	ips := msg.Get(SignedPeers).([]utils.IPCertDesc)
-
 	p.gotPeerList.SetValue(true)
 	p.tryMarkConnected()
 
+	if p.net.isFetchOnly {
+		// If the node is in fetch only mode, drop all incoming peers
+		return
+	}
+
+	ips := msg.Get(SignedPeers).([]utils.IPCertDesc)
 	for _, ip := range ips {
 		p.trackSignedPeer(ip)
 	}
