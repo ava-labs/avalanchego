@@ -20,15 +20,15 @@ func (ks *keystore) migrate(dbManager manager.Manager) error {
 	prevDBVersion := prevDB.Version
 	currentDB := dbManager.Current()
 	currentDBVersion := currentDB.Version
-	// Right now the only valid migration is from database version 1.0.0 to 1.4.4
+	// Right now the only valid migration is from database version 1.0.0 to 1.4.5
 	if prevDBVersion.Compare(version.DatabaseVersion1_0_0) == 0 &&
-		currentDBVersion.Compare(version.DatabaseVersion1_4_4) == 0 {
-		return ks.migrate1_0_0To1_4_4(prevDB, currentDB)
+		currentDBVersion.Compare(version.DatabaseVersion1_4_5) == 0 {
+		return ks.migrate1_0_0To1_4_5(prevDB, currentDB)
 	}
 	return nil
 }
 
-func (ks *keystore) migrate1_0_0To1_4_4(prevDB, currentDB *manager.VersionedDatabase) error {
+func (ks *keystore) migrate1_0_0To1_4_5(prevDB, currentDB *manager.VersionedDatabase) error {
 	migrated, err := currentDB.Database.Has(migratedKey)
 	if err != nil {
 		return err
