@@ -259,6 +259,7 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
+		n.Config.FetchOnly,
 	)
 
 	return nil
