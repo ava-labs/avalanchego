@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	defaultCacheSize = 2048
+	defaultCacheSize = 256
 )
 
 var (
