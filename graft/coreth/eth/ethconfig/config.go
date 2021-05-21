@@ -63,7 +63,7 @@ func NewDefaultConfig() Config {
 		LightPeers:              100,
 		UltraLightFraction:      75,
 		DatabaseCache:           512,
-		TrieCleanCache:          154,
+		TrieCleanCache:          75,
 		TrieCleanCacheJournal:   "triecache",
 		TrieCleanCacheRejournal: 60 * time.Minute,
 		TrieDirtyCache:          256,
