@@ -29,31 +29,31 @@ func (vm *VM) migrateUptimes() error {
 	currentDB := vm.dbManager.Current()
 	currentDBVersion := currentDB.Version
 
-	// Only valid migration is from database version 1.0.0 to 1.4.4
-	if prevDBVersion.Compare(version.NewDefaultVersion(1, 0, 0)) == 0 &&
-		currentDBVersion.Compare(version.NewDefaultVersion(1, 4, 4)) == 0 {
-		migrater := uptimeMigrater1_4_4{vm: vm}
+	// Only valid migration is from database version 1.0.0 to 1.4.5
+	if prevDBVersion.Compare(version.DatabaseVersion1_0_0) == 0 &&
+		currentDBVersion.Compare(version.DatabaseVersion1_4_5) == 0 {
+		migrater := uptimeMigrater1_4_5{vm: vm}
 		return migrater.migrate(prevDB)
 	}
 	return nil
 }
 
-type uptimeMigrater1_4_4 struct {
+type uptimeMigrater1_4_5 struct {
 	vm *VM
 }
 
-// migrate validator uptimes from database version 1.0.0 to database version 1.4.4.
-func (um *uptimeMigrater1_4_4) migrate(dbV100 *manager.VersionedDatabase) error {
+// migrate validator uptimes from database version 1.0.0 to database version 1.4.5.
+func (um *uptimeMigrater1_4_5) migrate(dbV100 *manager.VersionedDatabase) error {
 	migrated, err := um.vm.internalState.IsMigrated()
 	if err != nil {
-		return fmt.Errorf("couldn't get whether the v1.0.0 --> v1.4.4 database migration has occurred: %s", err)
+		return fmt.Errorf("couldn't get whether the v1.0.0 --> v1.4.5 database migration has occurred: %s", err)
 	} else if migrated { // already did migration
 		um.vm.ctx.Log.Info("not doing uptime migration")
 		return nil
 	}
 	now := um.vm.clock.Time()
 
-	um.vm.ctx.Log.Info("migrating validator uptimes from database v1.0.0 to v1.4.4")
+	um.vm.ctx.Log.Info("migrating validator uptimes from database v1.0.0 to v1.4.5")
 	stopPrefix := []byte(fmt.Sprintf("%s%s", constants.PrimaryNetworkID, stopDBPrefix))
 	stopDB := prefixdb.NewNested(stopPrefix, dbV100.Database)
 	defer stopDB.Close()
@@ -97,7 +97,7 @@ func (um *uptimeMigrater1_4_4) migrate(dbV100 *manager.VersionedDatabase) error 
 			return fmt.Errorf("couldn't get add validator tx %s for %s: %s", addVdrTx.ID(), nodeID.PrefixedString(constants.NodeIDPrefix), err)
 		}
 
-		// In v1.0.0, up duration is stored in seconds. In v1.4.4, it is stored in nanoseconds.
+		// In v1.0.0, up duration is stored in seconds. In v1.4.5, it is stored in nanoseconds.
 		// Convert from seconds to nanoseconds by multiplying by uint64(time.Second)
 		upDuration := uptimeV100.UpDuration * uint64(time.Second)
 		// Update the validator's uptime
@@ -109,7 +109,7 @@ func (um *uptimeMigrater1_4_4) migrate(dbV100 *manager.VersionedDatabase) error 
 		}
 
 		um.vm.ctx.Log.Debug(
-			"migrating uptime for node %s (tx %s) from database v1.0.0 to v1.4.4. Uptime: %s. Last updated: %s",
+			"migrating uptime for node %s (tx %s) from database v1.0.0 to v1.4.5. Uptime: %s. Last updated: %s",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			addVdrTx.ID(),
 			time.Duration(upDuration),
@@ -128,11 +128,11 @@ func (um *uptimeMigrater1_4_4) migrate(dbV100 *manager.VersionedDatabase) error 
 	if err := um.vm.internalState.Commit(); err != nil {
 		return fmt.Errorf("couldn't commit state: %s", err)
 	}
-	um.vm.ctx.Log.Info("finished migrating platformvm from database v1.0.0 to v1.4.4")
+	um.vm.ctx.Log.Info("finished migrating platformvm from database v1.0.0 to v1.4.5")
 	return nil
 }
 
-func (um *uptimeMigrater1_4_4) previousVersionGetUptime(db database.Database, nodeID ids.ShortID) (*uptimeV100, error) {
+func (um *uptimeMigrater1_4_5) previousVersionGetUptime(db database.Database, nodeID ids.ShortID) (*uptimeV100, error) {
 	uptimeDB := prefixdb.NewNested([]byte(uptimeDBPrefix), db)
 	defer uptimeDB.Close()
 

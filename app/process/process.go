@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -94,7 +95,7 @@ func (a *App) Start() int {
 	// start the db manager
 	var dbManager manager.Manager
 	if a.config.DBEnabled {
-		dbManager, err = manager.New(a.config.DBPath, a.log, node.DatabaseVersion, !a.config.FetchOnly)
+		dbManager, err = manager.New(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
 		if err != nil {
 			a.log.Fatal("couldn't create db manager at %s: %s", a.config.DBPath, err)
 			return 1
@@ -104,7 +105,7 @@ func (a *App) Start() int {
 			[]*manager.VersionedDatabase{
 				{
 					Database: memdb.New(),
-					Version:  node.DatabaseVersion,
+					Version:  version.CurrentDatabase,
 				},
 			})
 		if err != nil {
@@ -116,7 +117,7 @@ func (a *App) Start() int {
 	// ensure migrations are done
 	currentDBBootstrapped, err := dbManager.Current().Database.Has(chains.BootstrappedKey)
 	if err != nil {
-		a.log.Fatal("couldn't get whether database version %s ever bootstrapped: %s", node.DatabaseVersion, err)
+		a.log.Fatal("couldn't get whether database version %s ever bootstrapped: %s", version.CurrentDatabase, err)
 		return 1
 	}
 	a.log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
@@ -130,7 +131,7 @@ func (a *App) Start() int {
 		a.log.Info(upgradingMsg)
 	} else {
 		prevDB, exists := dbManager.Previous()
-		if !currentDBBootstrapped && exists && prevDB.Version.Compare(node.PrevDatabaseVersion) == 0 {
+		if !currentDBBootstrapped && exists && prevDB.Version.Compare(version.PrevDatabase) == 0 {
 			// If we have the previous database version but not the current one then node
 			// must run in fetch only mode (--fetch-only). The default behavior for a node in
 			// fetch only mode is to bootstrap from a node on the same machine (127.0.0.1)

@@ -30,8 +30,8 @@ func TestMigrationNoPrevDB(t *testing.T) {
 	assert.NoError(err)
 }
 
-// Test migration from database version 1.0.0 to 1.4.4
-func TestMigration1_0_0To1_4_4(t *testing.T) {
+// Test migration from database version 1.0.0 to 1.4.5
+func TestMigration1_0_0To1_4_5(t *testing.T) {
 	assert := assert.New(t)
 
 	username := "bob"
@@ -39,11 +39,11 @@ func TestMigration1_0_0To1_4_4(t *testing.T) {
 	key := []byte{1}
 	value := []byte{2}
 
-	dbV1_0_0 := memdb.New()
+	DatabaseVersion1_0_0 := memdb.New()
 
 	dbManagerV1_0_0, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
 		{
-			Database: prefixdb.New(nil, dbV1_0_0),
+			Database: prefixdb.New(nil, DatabaseVersion1_0_0),
 			Version:  version.DefaultVersion1_0_0,
 		},
 	})
@@ -55,35 +55,35 @@ func TestMigration1_0_0To1_4_4(t *testing.T) {
 	err = ksV1_0_0.CreateUser(username, strongPassword)
 	assert.NoError(err)
 
-	userDBV1_0_0, err := ksV1_0_0.GetDatabase(ids.Empty, username, strongPassword)
+	userDatabaseVersion1_0_0, err := ksV1_0_0.GetDatabase(ids.Empty, username, strongPassword)
 	assert.NoError(err)
 
-	err = userDBV1_0_0.Put(key, value)
+	err = userDatabaseVersion1_0_0.Put(key, value)
 	assert.NoError(err)
 
-	dbV1_4_4 := memdb.New()
+	DatabaseVersion1_4_5 := memdb.New()
 
-	v1_4_4 := version.NewDefaultVersion(1, 4, 4)
+	v1_4_5 := version.DatabaseVersion1_4_5
 
-	dbManagerV1_4_4, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
+	dbManagerV1_4_5, err := manager.NewManagerFromDBs([]*manager.VersionedDatabase{
 		{
-			Database: prefixdb.New(nil, dbV1_4_4),
-			Version:  v1_4_4,
+			Database: prefixdb.New(nil, DatabaseVersion1_4_5),
+			Version:  v1_4_5,
 		},
 		{
-			Database: prefixdb.New(nil, dbV1_0_0),
+			Database: prefixdb.New(nil, DatabaseVersion1_0_0),
 			Version:  version.DefaultVersion1_0_0,
 		},
 	})
 	assert.NoError(err)
 
-	ksV1_4_4, err := New(&logging.NoLog{}, dbManagerV1_4_4)
+	ksV1_4_5, err := New(&logging.NoLog{}, dbManagerV1_4_5)
 	assert.NoError(err)
 
-	userDBV1_4_4, err := ksV1_4_4.GetDatabase(ids.Empty, username, strongPassword)
+	userDatabaseVersion1_4_5, err := ksV1_4_5.GetDatabase(ids.Empty, username, strongPassword)
 	assert.NoError(err)
 
-	val, err := userDBV1_4_4.Get(key)
+	val, err := userDatabaseVersion1_4_5.Get(key)
 	assert.NoError(err)
 	assert.Equal(value, val)
 }

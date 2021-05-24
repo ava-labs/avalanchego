@@ -773,7 +773,7 @@ type currentValidatorState struct {
 	txID        ids.ID
 	lastUpdated time.Time
 
-	UpDuration      time.Duration `serialize:"true"` // In seconds
+	UpDuration      time.Duration `serialize:"true"`
 	LastUpdated     uint64        `serialize:"true"` // Unix time in seconds
 	PotentialReward uint64        `serialize:"true"`
 }
