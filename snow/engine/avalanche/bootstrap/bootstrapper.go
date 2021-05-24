@@ -458,6 +458,7 @@ func (b *Bootstrapper) checkFinish() error {
 
 	// Notify the subnet that this chain is synced
 	b.Subnet.Bootstrapped(b.Ctx.ChainID)
+	b.processedCache.Flush()
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
@@ -483,7 +484,6 @@ func (b *Bootstrapper) finish() error {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}
-	b.processedCache.Flush()
 
 	// Start consensus
 	if err := b.OnFinished(); err != nil {

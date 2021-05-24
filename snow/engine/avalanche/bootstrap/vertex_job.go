@@ -58,12 +58,26 @@ func (v *vertexJob) MissingDependencies() (ids.Set, error) {
 	return missing, nil
 }
 
+// Returns true if this vertex job has at least 1 missing dependency
+func (v *vertexJob) HasMissingDependencies() (bool, error) {
+	parents, err := v.vtx.Parents()
+	if err != nil {
+		return false, err
+	}
+	for _, parent := range parents {
+		if parent.Status() != choices.Accepted {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (v *vertexJob) Execute() error {
-	deps, err := v.MissingDependencies()
+	hasMissingDependencies, err := v.HasMissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
+	if hasMissingDependencies {
 		v.numDropped.Inc()
 		return errors.New("attempting to execute blocked vertex")
 	}
