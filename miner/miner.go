@@ -29,7 +29,6 @@ package miner
 
 import (
 	"math/big"
-	"time"
 
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core"
@@ -47,177 +46,29 @@ type Backend interface {
 
 // Config is the configuration parameters of mining.
 type Config struct {
-	Etherbase common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
-	Notify    []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages(only useful in ethash).
-	// ExtraData    hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
-	GasFloor              uint64        // Target gas floor for mined blocks.
-	GasCeil               uint64        // Target gas ceiling for mined blocks.
-	ApricotPhase1GasLimit uint64        // Gas Limit for mined blocks as of Apricot Phase 1.
-	GasPrice              *big.Int      // Minimum gas price for mining a transaction
-	Recommit              time.Duration // The time interval for miner to re-create mining work.
-	Noverify              bool          // Disable remote mining solution verification(only useful in ethash).
+	Etherbase             common.Address `toml:",omitempty"` // Public address for block mining rewards (default = first account)
+	GasFloor              uint64         // Target gas floor for mined blocks.
+	GasCeil               uint64         // Target gas ceiling for mined blocks.
+	GasPrice              *big.Int       // Minimum gas price for mining a transaction
+	ApricotPhase1GasLimit uint64         // Gas Limit for mined blocks as of Apricot Phase 1.
 }
 
 type Miner struct {
-	// Original code:
-	// mux      *event.TypeMux
-	// coinbase common.Address
-	// eth      Backend
-	// engine   consensus.Engine
-	// exitCh   chan struct{}
-	// startCh  chan common.Address
-	// stopCh   chan struct{}
 	worker *worker
 }
 
 func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, mcb *MinerCallbacks) *Miner {
 	return &Miner{
-		// Original code:
-		// eth:     eth,
-		// mux:     mux,
-		// engine:  engine,
-		// exitCh:  make(chan struct{}),
-		// startCh: make(chan common.Address),
-		// stopCh:  make(chan struct{}),
-		worker: newWorker(config, chainConfig, engine, eth, mux, isLocalBlock, true, mcb),
+		worker: newWorker(config, chainConfig, engine, eth, mux, mcb),
 	}
 }
 
-// Original code:
-// // update keeps track of the downloader events. Please be aware that this is a one shot type of update loop.
-// // It's entered once and as soon as `Done` or `Failed` has been broadcasted the events are unregistered and
-// // the loop is exited. This to prevent a major security vuln where external parties can DOS you with blocks
-// // and halt your mining operation for as long as the DOS continues.
-// func (miner *Miner) update() {
-// 	events := miner.mux.Subscribe(downloader.StartEvent{}, downloader.DoneEvent{}, downloader.FailedEvent{})
-// 	defer func() {
-// 		if !events.Closed() {
-// 			events.Unsubscribe()
-// 		}
-// 	}()
-//
-// 	shouldStart := false
-// 	canStart := true
-// 	dlEventCh := events.Chan()
-// 	for {
-// 		select {
-// 		case ev := <-dlEventCh:
-// 			if ev == nil {
-// 				// Unsubscription done, stop listening
-// 				dlEventCh = nil
-// 				continue
-// 			}
-// 			switch ev.Data.(type) {
-// 			case downloader.StartEvent:
-// 				wasMining := miner.Mining()
-// 				miner.worker.stop()
-// 				canStart = false
-// 				if wasMining {
-// 					// Resume mining after sync was finished
-// 					shouldStart = true
-// 					log.Info("Mining aborted due to sync")
-// 				}
-// 			case downloader.FailedEvent:
-// 				canStart = true
-// 				if shouldStart {
-// 					miner.SetEtherbase(miner.coinbase)
-// 					miner.worker.start()
-// 				}
-// 			case downloader.DoneEvent:
-// 				canStart = true
-// 				if shouldStart {
-// 					miner.SetEtherbase(miner.coinbase)
-// 					miner.worker.start()
-// 				}
-// 				// Stop reacting to downloader events
-// 				events.Unsubscribe()
-// 			}
-// 		case addr := <-miner.startCh:
-// 			miner.SetEtherbase(addr)
-// 			if canStart {
-// 				miner.worker.start()
-// 			}
-// 			shouldStart = true
-// 		case <-miner.stopCh:
-// 			shouldStart = false
-// 			miner.worker.stop()
-// 		case <-miner.exitCh:
-// 			miner.worker.close()
-// 			return
-// 		}
-// 	}
-// }
-
-func (miner *Miner) Start(coinbase common.Address) {
-	miner.worker.start()
-}
-
-func (miner *Miner) Stop() {
-	miner.worker.stop()
-}
-
-func (miner *Miner) Mining() bool {
-	return miner.worker.isRunning()
-}
-
-func (miner *Miner) HashRate() uint64 {
-	// Original code:
-	// if pow, ok := miner.engine.(consensus.PoW); ok {
-	// 	return uint64(pow.Hashrate())
-	// }
-	return 0
-}
-
-// Original Code:
-// func (miner *Miner) SetExtra(extra []byte) error {
-// 	if uint64(len(extra)) > params.MaximumExtraDataSize {
-// 		return fmt.Errorf("extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
-// 	}
-// 	miner.worker.setExtra(extra)
-// 	return nil
-// }
-
-// SetRecommitInterval sets the interval for sealing work resubmitting.
-func (miner *Miner) SetRecommitInterval(interval time.Duration) {
-	miner.worker.setRecommitInterval(interval)
-}
-
-// Original code:
-// Pending returns the currently pending block and associated state.
-// func (miner *Miner) Pending() (*types.Block, *state.StateDB) {
-// 	return miner.worker.pending()
-// }
-//
-// PendingBlock returns the currently pending block.
-//
-// Note, to access both the pending block and the pending state
-// simultaneously, please use Pending(), as the pending state can
-// change between multiple method calls
-// func (miner *Miner) PendingBlock() *types.Block {
-// 	return miner.worker.pendingBlock()
-// }
-
 func (miner *Miner) SetEtherbase(addr common.Address) {
-	// Original code:
-	// miner.coinbase = addr
 	miner.worker.setEtherbase(addr)
 }
 
-// EnablePreseal turns on the preseal mining feature. It's enabled by default.
-// Note this function shouldn't be exposed to API, it's unnecessary for users
-// (miners) to actually know the underlying detail. It's only for outside project
-// which uses this library.
-func (miner *Miner) EnablePreseal() {
-	miner.worker.enablePreseal()
-}
-
-// DisablePreseal turns off the preseal mining feature. It's necessary for some
-// fake consensus engine which can seal blocks instantaneously.
-// Note this function shouldn't be exposed to API, it's unnecessary for users
-// (miners) to actually know the underlying detail. It's only for outside project
-// which uses this library.
-func (miner *Miner) DisablePreseal() {
-	miner.worker.disablePreseal()
+func (miner *Miner) GenerateBlock() (*types.Block, error) {
+	return miner.worker.commitNewWork()
 }
 
 // SubscribePendingLogs starts delivering logs from pending transactions
@@ -225,10 +76,7 @@ func (miner *Miner) DisablePreseal() {
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return miner.worker.pendingLogsFeed.Subscribe(ch)
 }
-func (miner *Miner) GenBlock() {
-	miner.worker.genBlock()
-}
 
-func (miner *Miner) GetWorkerMux() *event.TypeMux {
-	return miner.worker.mux
+func (miner *Miner) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
+	return miner.worker.mux.Subscribe(core.NewMinedBlockEvent{})
 }

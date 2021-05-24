@@ -40,7 +40,7 @@ import (
 
 const (
 	// Number of codehash->size associations to keep.
-	codeSizeCacheSize = 100000
+	codeSizeCacheSize = 25000
 
 	// Cache size granted for caching clean code.
 	codeCacheSize = 64 * 1024 * 1024

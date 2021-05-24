@@ -121,8 +121,8 @@ func (v blockValidatorPhase0) SyntacticVerify(b *Block) error {
 	}
 	// Block must not be empty
 	//
-	// Note: getAtomicTx also asserts a maximum size
-	atomicTx, err := b.vm.getAtomicTx(b.ethBlock)
+	// Note: extractAtomicTx also asserts a maximum size
+	atomicTx, err := b.vm.extractAtomicTx(b.ethBlock)
 	if err != nil {
 		return err
 	}
@@ -226,8 +226,8 @@ func (blockValidatorPhase1) SyntacticVerify(b *Block) error {
 	}
 	// Block must not be empty
 	//
-	// Note: getAtomicTx also asserts a maximum size
-	atomicTx, err := b.vm.getAtomicTx(b.ethBlock)
+	// Note: extractAtomicTx also asserts a maximum size
+	atomicTx, err := b.vm.extractAtomicTx(b.ethBlock)
 	if err != nil {
 		return err
 	}

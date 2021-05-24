@@ -11,7 +11,7 @@ import (
 )
 
 func TestSubscribeTransactionsTest(t *testing.T) {
-	chain, newBlockChan, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
+	chain, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
 	ethBackend := chain.APIBackend()
 	eventSystem := filters.NewEventSystem(ethBackend, true)
@@ -23,13 +23,15 @@ func TestSubscribeTransactionsTest(t *testing.T) {
 	pendingTxsEvents := eventSystem.SubscribePendingTxs(pendingTxsEventsChannel)
 
 	// Override SetOnSealFinish set in NewDefaultChain, so that each sealed block
-	// is set as the new preferred block within this test.
-	chain.SetOnSealFinish(func(block *types.Block) error {
+	// is set as the new preferred block within this test, but not immediately marked
+	// as accepted.
+	chain.SetOnSealFinish(func(block *types.Block) {
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatal(err)
+		}
 		if err := chain.SetPreference(block); err != nil {
 			t.Fatal(err)
 		}
-		newBlockChan <- block
-		return nil
 	})
 
 	chain.Start()
@@ -79,9 +81,10 @@ func TestSubscribeTransactionsTest(t *testing.T) {
 		}
 	}
 	txs := <-txSubmitCh
-	chain.GenBlock()
-
-	block := <-newBlockChan
+	block, err := chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	<-newTxPoolHeadChan
 
