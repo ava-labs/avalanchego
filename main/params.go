@@ -19,8 +19,6 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	"github.com/kardianos/osext"
-
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -52,22 +50,9 @@ var (
 	defaultDbDir           = filepath.Join(defaultDataDir, "db")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
-	defaultPluginDirs      = []string{
-		filepath.Join(".", "build", "plugins"),
-		filepath.Join(".", "plugins"),
-		filepath.Join("/", "usr", "local", "lib", constants.AppName),
-		filepath.Join(defaultDataDir, "plugins"),
-	}
 	// GitCommit should be optionally set at compile time.
 	GitCommit string
 )
-
-func init() {
-	folderPath, err := osext.ExecutableFolder()
-	if err == nil {
-		defaultPluginDirs = append(defaultPluginDirs, filepath.Join(folderPath, "plugins"))
-	}
-}
 
 var (
 	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
@@ -88,8 +73,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(configFileKey, defaultString, "Specifies a config file")
 	// Genesis Config File
 	fs.String(genesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
-	// Plugins
-	fs.String(pluginDirKey, defaultString, "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(networkNameKey, defaultNetworkName, "Network ID this node will connect to")
 	// AVAX fees
@@ -246,6 +229,9 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Plugin
 	fs.Bool(pluginMode, false, "Whether the app should run as a plugin. Defaults to false")
+
+	// Build directory
+	fs.String(BuildDirKey, "", "Path to the build directory")
 
 	return fs
 }
@@ -479,22 +465,6 @@ func setNodeConfig(v *viper.Viper) error {
 		}
 	}
 
-	// Plugins
-	pluginDir := v.GetString(pluginDirKey)
-	if pluginDir == defaultString {
-		Config.PluginDir = defaultPluginDirs[0]
-	} else {
-		Config.PluginDir = pluginDir
-	}
-	if _, err := os.Stat(Config.PluginDir); os.IsNotExist(err) {
-		for _, dir := range defaultPluginDirs {
-			if _, err := os.Stat(dir); !os.IsNotExist(err) {
-				Config.PluginDir = dir
-				break
-			}
-		}
-	}
-
 	// HTTP:
 	Config.HTTPHost = v.GetString(httpHostKey)
 	Config.HTTPPort = uint16(v.GetUint(httpPortKey))
@@ -725,6 +695,13 @@ func setNodeConfig(v *viper.Viper) error {
 
 	// Plugin config
 	Config.PluginMode = v.GetBool(pluginMode)
+
+	buildDir := v.GetString(BuildDirKey)
+	if buildDir == "" {
+		return errors.New("expected build directory to be given")
+	}
+
+	Config.PluginDir = fmt.Sprintf("%s/avalanchego-preupgrade/plugins", os.ExpandEnv(buildDir))
 
 	return nil
 }
