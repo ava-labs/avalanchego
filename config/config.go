@@ -88,8 +88,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ConfigFileKey, "", "Specifies a config file")
 	// Genesis config File
 	fs.String(GenesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
-	// Plugins
-	fs.String(PluginDirKey, "", "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
 	// AVAX fees
@@ -273,6 +271,17 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	processConfig := process.Config{}
 	processConfig.DisplayVersionAndExit = v.GetBool(VersionKey)
 	processConfig.PluginMode = v.GetBool(PluginModeKey)
+
+	// Build directory should have this structure:
+	// build
+	// |_avalanchego-latest
+	//   |_avalanchego-process (the binary from compiling the app directory)
+	//   |_plugins
+	//     |_evm
+	// |_avalanchego-preupgrade
+	//   |_avalanchego-process (the binary from compiling the app directory)
+	//   |_plugins
+	//     |_evm
 	processConfig.BuildDir = os.ExpandEnv(v.GetString(BuildDirKey))
 	validBuildDir := func(dir string) bool {
 		info, err := os.Stat(dir)
@@ -304,6 +313,10 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// Then, get the node config
 	nodeConfig := node.Config{}
+
+	// Plugin directory defaults to [buildDirectory]/avalanchego-latest/plugins
+	nodeConfig.PluginDir = filepath.Join(processConfig.BuildDir, avalanchegoLatest, "plugins")
+
 	nodeConfig.FetchOnly = v.GetBool(FetchOnlyKey)
 
 	// Consensus Parameters
@@ -462,25 +475,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 			}
 			nodeConfig.WhitelistedSubnets.Add(subnetID)
 		}
-	}
-
-	// Build directory
-	// The directory should have this structure:
-	// build
-	// |_avalanchego-latest
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-	// |_avalanchego-preupgrade
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-
-	// Plugin directory. Defaults to [buildDirectory]/plugins
-	if !v.IsSet(PluginDirKey) {
-		nodeConfig.PluginDir = filepath.Join(processConfig.BuildDir, avalanchegoLatest, "plugins")
-	} else {
-		nodeConfig.PluginDir = v.GetString(PluginDirKey)
 	}
 
 	// HTTP:

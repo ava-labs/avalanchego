@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 5)
+	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 6)
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 0)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 3, 0)
 	MinimumUnmaskedVersion       = NewDefaultApplication(constants.PlatformName, 1, 1, 0)
