@@ -194,7 +194,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(StakingCertPathKey, defaultStakingCertPath, "Path to the TLS certificate for staking")
 	fs.Uint64(StakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
-	fs.Float64(UptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
+	fs.Float64(UptimeRequirementKey, 0, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network
 	fs.Uint64(MinValidatorStakeKey, 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
 	// Maximum Stake that can be staked and delegated to a validator on the Primary Network
@@ -625,10 +625,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		txFee := v.GetUint64(TxFeeKey)
 		creationTxFee := v.GetUint64(CreationTxFeeKey)
-		uptimeRequirement := v.GetFloat64(UptimeRequirementKey)
 		nodeConfig.TxFee = txFee
 		nodeConfig.CreationTxFee = creationTxFee
-		nodeConfig.UptimeRequirement = uptimeRequirement
 
 		minValidatorStake := v.GetUint64(MinValidatorStakeKey)
 		maxValidatorStake := v.GetUint64(MaxValidatorStakeKey)
@@ -662,6 +660,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	} else {
 		nodeConfig.Params = *genesis.GetParams(networkID)
 	}
+	nodeConfig.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
 
 	// Load genesis data
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
