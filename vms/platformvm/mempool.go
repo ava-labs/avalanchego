@@ -64,6 +64,7 @@ type Mempool struct {
 	timer *timer.Timer
 
 	// Transactions that have not been put into blocks yet
+	dropIncoming        bool
 	unissuedProposalTxs *EventHeap
 	unissuedDecisionTxs []*Tx
 	unissuedAtomicTxs   []*Tx
@@ -91,6 +92,10 @@ func (m *Mempool) Initialize(vm *VM) {
 
 // IssueTx enqueues the [tx] to be put into a block
 func (m *Mempool) IssueTx(tx *Tx) error {
+	if m.dropIncoming {
+		return nil
+	}
+
 	// Initialize the transaction
 	if err := tx.Sign(m.vm.codec, nil); err != nil {
 		return err
@@ -116,6 +121,11 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 
 // BuildBlock builds a block to be added to consensus
 func (m *Mempool) BuildBlock() (snowman.Block, error) {
+	m.dropIncoming = true
+	defer func() {
+		m.dropIncoming = false
+	}()
+
 	m.vm.ctx.Log.Debug("in BuildBlock")
 
 	// Get the preferred block (which we want to build off)
