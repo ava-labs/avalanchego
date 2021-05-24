@@ -34,7 +34,7 @@ func (out *OutputOwners) Addresses() [][]byte {
 
 // AddressesSet returns addresses as a set
 func (out *OutputOwners) AddressesSet() ids.ShortSet {
-	set := ids.ShortSet{}
+	set := ids.NewShortSet(len(out.Addrs))
 	set.Add(out.Addrs...)
 	return set
 }
@@ -49,7 +49,7 @@ func (out *OutputOwners) Equals(other *OutputOwners) bool {
 	}
 	for i, addr := range out.Addrs {
 		otherAddr := other.Addrs[i]
-		if !addr.Equals(otherAddr) {
+		if addr != otherAddr {
 			return false
 		}
 	}

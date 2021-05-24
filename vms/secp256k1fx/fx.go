@@ -31,6 +31,7 @@ var (
 	errTimelocked                     = errors.New("output is time locked")
 	errTooManySigners                 = errors.New("input has more signers than expected")
 	errTooFewSigners                  = errors.New("input has less signers than expected")
+	errInputOutputIndexOutOfBounds    = errors.New("input referenced a nonexistent address in the output")
 	errInputCredentialSignersMismatch = errors.New("input expected a different number of signers than provided in the credential")
 )
 
@@ -48,12 +49,12 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	}
 
 	log := fx.VM.Logger()
-	log.Debug("Initializing secp561k1 fx")
+	log.Debug("initializing secp561k1 fx")
 
 	fx.SECPFactory = crypto.FactorySECP256K1R{
 		Cache: cache.LRU{Size: defaultCacheSize},
 	}
-	c := fx.VM.Codec()
+	c := fx.VM.CodecRegistry()
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&TransferInput{}),
@@ -190,14 +191,18 @@ func (fx *Fx) VerifyCredentials(tx Tx, in *Input, cred *Credential, out *OutputO
 
 	txHash := hashing.ComputeHash256(tx.UnsignedBytes())
 	for i, index := range in.SigIndices {
-		// Make sure each signature in the signature list is from
-		// an owner of the output being consumed
+		// Make sure the input references an address that exists
+		if index >= uint32(len(out.Addrs)) {
+			return errInputOutputIndexOutOfBounds
+		}
+		// Make sure each signature in the signature list is from an owner of
+		// the output being consumed
 		sig := cred.Sigs[i]
 		pk, err := fx.SECPFactory.RecoverHashPublicKey(txHash, sig[:])
 		if err != nil {
 			return err
 		}
-		if expectedAddress := out.Addrs[index]; !expectedAddress.Equals(pk.Address()) {
+		if expectedAddress := out.Addrs[index]; expectedAddress != pk.Address() {
 			return fmt.Errorf("expected signature from %s but got from %s",
 				expectedAddress,
 				pk.Address())

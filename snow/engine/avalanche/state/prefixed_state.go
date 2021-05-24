@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 )
 
 const (
@@ -15,9 +16,7 @@ const (
 	edgeID
 )
 
-var (
-	uniqueEdgeID = ids.Empty.Prefix(edgeID)
-)
+var uniqueEdgeID = ids.Empty.Prefix(edgeID)
 
 type prefixedState struct {
 	state *state
@@ -39,7 +38,7 @@ func (s *prefixedState) UniqueVertex(vtx *uniqueVertex) *uniqueVertex {
 	return s.uniqueVtx.Deduplicate(vtx).(*uniqueVertex)
 }
 
-func (s *prefixedState) Vertex(id ids.ID) *innerVertex {
+func (s *prefixedState) Vertex(id ids.ID) vertex.StatelessVertex {
 	var vID ids.ID
 	if cachedVtxIDIntf, found := s.vtx.Get(id); found {
 		vID = cachedVtxIDIntf.(ids.ID)
@@ -51,13 +50,14 @@ func (s *prefixedState) Vertex(id ids.ID) *innerVertex {
 	return s.state.Vertex(vID)
 }
 
-func (s *prefixedState) SetVertex(vtx *innerVertex) error {
+func (s *prefixedState) SetVertex(vtx vertex.StatelessVertex) error {
+	rawVertexID := vtx.ID()
 	var vID ids.ID
-	if cachedVtxIDIntf, found := s.vtx.Get(vtx.id); found {
+	if cachedVtxIDIntf, found := s.vtx.Get(rawVertexID); found {
 		vID = cachedVtxIDIntf.(ids.ID)
 	} else {
-		vID = vtx.id.Prefix(vtxID)
-		s.vtx.Put(vtx.id, vID)
+		vID = rawVertexID.Prefix(vtxID)
+		s.vtx.Put(rawVertexID, vID)
 	}
 
 	return s.state.SetVertex(vID, vtx)

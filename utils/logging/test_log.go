@@ -8,9 +8,7 @@ import (
 	"sync"
 )
 
-var (
-	errNoLoggerWrite = errors.New("NoLogger can't write")
-)
+var errNoLoggerWrite = errors.New("NoLogger can't write")
 
 // NoLog ...
 type NoLog struct{}

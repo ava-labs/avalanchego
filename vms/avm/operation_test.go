@@ -6,8 +6,9 @@ package avm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -21,25 +22,40 @@ type testOperable struct {
 func (o *testOperable) Outs() []verify.State { return o.Outputs }
 
 func TestOperationVerifyNil(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
+
 	op := (*Operation)(nil)
-	if err := op.Verify(c); err == nil {
+	if err := op.Verify(m); err == nil {
 		t.Fatalf("Should have errored due to nil operation")
 	}
 }
 
 func TestOperationVerifyEmpty(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
+
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 	}
-	if err := op.Verify(c); err == nil {
+	if err := op.Verify(m); err == nil {
 		t.Fatalf("Should have errored due to empty operation")
 	}
 }
 
 func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
+
 	op := &Operation{
 		Asset: avax.Asset{ID: ids.Empty},
 		UTXOIDs: []*avax.UTXOID{
@@ -54,31 +70,42 @@ func TestOperationVerifyUTXOIDsNotSorted(t *testing.T) {
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(c); err == nil {
+	if err := op.Verify(m); err == nil {
 		t.Fatalf("Should have errored due to unsorted utxoIDs")
 	}
 }
 
 func TestOperationVerify(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
+
+	assetID := ids.GenerateTestID()
 	op := &Operation{
-		Asset: avax.Asset{ID: ids.Empty},
+		Asset: avax.Asset{ID: assetID},
 		UTXOIDs: []*avax.UTXOID{
 			{
-				TxID:        ids.Empty,
+				TxID:        assetID,
 				OutputIndex: 1,
 			},
 		},
 		Op: &testOperable{},
 	}
-	if err := op.Verify(c); err != nil {
+	if err := op.Verify(m); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestOperationSorting(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&testOperable{}); err != nil {
+		t.Fatal(err)
+	}
+
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -104,11 +131,11 @@ func TestOperationSorting(t *testing.T) {
 			Op: &testOperable{},
 		},
 	}
-	if isSortedAndUniqueOperations(ops, c) {
+	if isSortedAndUniqueOperations(ops, m) {
 		t.Fatalf("Shouldn't be sorted")
 	}
-	sortOperations(ops, c)
-	if !isSortedAndUniqueOperations(ops, c) {
+	sortOperations(ops, m)
+	if !isSortedAndUniqueOperations(ops, m) {
 		t.Fatalf("Should be sorted")
 	}
 	ops = append(ops, &Operation{
@@ -121,7 +148,7 @@ func TestOperationSorting(t *testing.T) {
 		},
 		Op: &testOperable{},
 	})
-	if isSortedAndUniqueOperations(ops, c) {
+	if isSortedAndUniqueOperations(ops, m) {
 		t.Fatalf("Shouldn't be unique")
 	}
 }

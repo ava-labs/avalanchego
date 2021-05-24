@@ -7,18 +7,16 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errNoExportOutputs = errors.New("no export outputs")
-)
+var errNoExportOutputs = errors.New("no export outputs")
 
 // ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {
@@ -34,7 +32,7 @@ type ExportTx struct {
 // SyntacticVerify that this transaction is well-formed.
 func (t *ExportTx) SyntacticVerify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -43,8 +41,6 @@ func (t *ExportTx) SyntacticVerify(
 	switch {
 	case t == nil:
 		return errNilTx
-	case t.DestinationChain.IsZero():
-		return errWrongBlockchainID
 	case len(t.ExportedOuts) == 0:
 		return errNoExportOutputs
 	}
@@ -67,12 +63,14 @@ func (t *ExportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is valid to be spent.
 func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
-	subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
-	if err != nil {
-		return err
-	}
-	if !vm.ctx.SubnetID.Equals(subnetID) || t.DestinationChain.Equals(vm.ctx.ChainID) {
-		return errWrongBlockchainID
+	if vm.bootstrapped {
+		subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
+		if err != nil {
+			return err
+		}
+		if vm.ctx.SubnetID != subnetID || t.DestinationChain == vm.ctx.ChainID {
+			return errWrongBlockchainID
+		}
 	}
 
 	for _, out := range t.ExportedOuts {
@@ -81,7 +79,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			return err
 		}
 		assetID := out.AssetID()
-		if !out.AssetID().Equals(vm.ctx.AVAXAssetID) && t.DestinationChain.Equals(constants.PlatformChainID) {
+		if out.AssetID() != vm.ctx.AVAXAssetID && t.DestinationChain == constants.PlatformChainID {
 			return errWrongAssetID
 		}
 		if !vm.verifyFxUsage(fxIndex, assetID) {
@@ -107,13 +105,14 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := vm.codec.Marshal(utxo)
+		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			return err
 		}
 
+		inputID := utxo.InputID()
 		elem := &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   inputID[:],
 			Value: utxoBytes,
 		}
 		if out, ok := utxo.Out.(avax.Addressable); ok {

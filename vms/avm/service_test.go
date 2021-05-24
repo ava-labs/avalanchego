@@ -6,12 +6,10 @@ package avm
 import (
 	"bytes"
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
-
-	"math/rand"
-
-	"github.com/stretchr/testify/assert"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
@@ -25,11 +23,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testChangeAddr = ids.GenerateTestShortID()
-)
+var testChangeAddr = ids.GenerateTestShortID()
 
 // Returns:
 // 1) genesis bytes of vm
@@ -38,8 +35,11 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore := keystore.CreateTestKeystore()
-	if err := keystore.AddUser(username, password); err != nil {
+	keystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := keystore.CreateUser(username, password); err != nil {
 		t.Fatalf("couldn't add user: %s", err)
 	}
 	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
@@ -109,12 +109,12 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 // Returns error if [numTxFees] tx fees was not deducted from the addresses in [fromAddrs]
 // relative to their starting balance
 func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numTxFees int) error {
-	totalTxFee := numTxFees * int(s.vm.txFee)
-	fromAddrsStartBalance := int(startBalance) * len(fromAddrs)
+	totalTxFee := uint64(numTxFees) * s.vm.txFee
+	fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
 
 	// Key: Address
 	// Value: AVAX balance
-	balances := map[[20]byte]int{}
+	balances := map[ids.ShortID]uint64{}
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)
@@ -132,12 +132,12 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 		if err != nil {
 			return fmt.Errorf("couldn't get balance of %s: %w", addr, err)
 		}
-		balances[addr.Key()] = int(reply.Balance)
+		balances[addr] = uint64(reply.Balance)
 	}
 
-	fromAddrsTotalBalance := 0
+	fromAddrsTotalBalance := uint64(0)
 	for _, addr := range fromAddrs {
-		fromAddrsTotalBalance += balances[addr.Key()]
+		fromAddrsTotalBalance += balances[addr]
 	}
 
 	if fromAddrsTotalBalance != fromAddrsStartBalance-totalTxFee {
@@ -166,13 +166,16 @@ func TestServiceIssueTx(t *testing.T) {
 	}
 
 	tx := NewTx(t, genesisBytes, vm)
-	txArgs.Tx = formatting.Hex{Bytes: tx.Bytes()}.String()
-	txArgs.Encoding = formatting.HexEncoding
+	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	txArgs.Encoding = formatting.Hex
 	txReply = &api.JSONTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
 		t.Fatal(err)
 	}
-	if !txReply.TxID.Equals(tx.ID()) {
+	if txReply.TxID != tx.ID() {
 		t.Fatalf("Expected %q, got %q", txReply.TxID, tx.ID())
 	}
 }
@@ -205,9 +208,13 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
+	txStr, err := formatting.Encode(formatting.Hex, tx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	txArgs := &api.FormattedTx{
-		Tx:       formatting.Hex{Bytes: tx.Bytes()}.String(),
-		Encoding: formatting.HexEncoding,
+		Tx:       txStr,
+		Encoding: formatting.Hex,
 	}
 	txReply := &api.JSONTxID{}
 	if err := s.IssueTx(nil, txArgs, txReply); err != nil {
@@ -225,8 +232,9 @@ func TestServiceGetTxStatus(t *testing.T) {
 	}
 }
 
-func TestServiceGetBalance(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+// Test the GetBalance method when argument Strict is true
+func TestServiceGetBalanceStrict(t *testing.T) {
+	_, vm, s, _ := setup(t)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -234,27 +242,153 @@ func TestServiceGetBalance(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+	assetID := ids.GenerateTestID()
+	addr := ids.GenerateTestShortID()
 	addrStr, err := vm.FormatLocalAddress(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// A UTXO with a 2 out of 2 multisig
+	// where one of the addresses is [addr]
+	twoOfTwoUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
 	balanceArgs := &GetBalanceArgs{
-		Address: addrStr,
-		AssetID: assetID.String(),
+		Address:        addrStr,
+		AssetID:        assetID.String(),
+		IncludePartial: true,
 	}
 	balanceReply := &GetBalanceReply{}
 	err = s.GetBalance(nil, balanceArgs, balanceReply)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(balanceReply.Balance), startBalance)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Equal(t, uint64(1337), uint64(balanceReply.Balance))
 	assert.Len(t, balanceReply.UTXOIDs, 1, "should have only returned 1 utxoID")
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetBalanceArgs{
+		Address: addrStr,
+		AssetID: assetID.String(),
+	}
+	balanceReply = &GetBalanceReply{}
+	err = s.GetBalance(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+	// The balance should not include the UTXO since it is only partly owned by [addr]
+	assert.Equal(t, uint64(0), uint64(balanceReply.Balance))
+	assert.Len(t, balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
+
+	// A UTXO with a 1 out of 2 multisig
+	// where one of the addresses is [addr]
+	oneOfTwoUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetBalanceArgs{
+		Address:        addrStr,
+		AssetID:        assetID.String(),
+		IncludePartial: true,
+	}
+	balanceReply = &GetBalanceReply{}
+	err = s.GetBalance(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Equal(t, uint64(1337+1337), uint64(balanceReply.Balance))
+	assert.Len(t, balanceReply.UTXOIDs, 2, "should have only returned 2 utxoIDs")
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetBalanceArgs{
+		Address: addrStr,
+		AssetID: assetID.String(),
+	}
+	balanceReply = &GetBalanceReply{}
+	err = s.GetBalance(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+	// The balance should not include the UTXO since it is only partly owned by [addr]
+	assert.Equal(t, uint64(0), uint64(balanceReply.Balance))
+	assert.Len(t, balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
+
+	// A UTXO with a 1 out of 1 multisig
+	// but with a locktime in the future
+	now := vm.Clock().Time()
+	futureUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  uint64(now.Add(10 * time.Hour).Unix()),
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetBalanceArgs{
+		Address:        addrStr,
+		AssetID:        assetID.String(),
+		IncludePartial: true,
+	}
+	balanceReply = &GetBalanceReply{}
+	err = s.GetBalance(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Equal(t, uint64(1337*3), uint64(balanceReply.Balance))
+	assert.Len(t, balanceReply.UTXOIDs, 3, "should have returned 3 utxoIDs")
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetBalanceArgs{
+		Address: addrStr,
+		AssetID: assetID.String(),
+	}
+	balanceReply = &GetBalanceReply{}
+	err = s.GetBalance(nil, balanceArgs, balanceReply)
+	assert.NoError(t, err)
+	// The balance should not include the UTXO since it is only partly owned by [addr]
+	assert.Equal(t, uint64(0), uint64(balanceReply.Balance))
+	assert.Len(t, balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
 }
 
 func TestServiceGetAllBalances(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	_, vm, s, _ := setup(t)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -262,30 +396,188 @@ func TestServiceGetAllBalances(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+	assetID := ids.GenerateTestID()
+	addr := ids.GenerateTestShortID()
 	addrStr, err := vm.FormatLocalAddress(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	balanceArgs := &api.JSONAddress{
-		Address: addrStr,
+	// A UTXO with a 2 out of 2 multisig
+	// where one of the addresses is [addr]
+	twoOfTwoUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
 	}
-	balanceReply := &GetAllBalancesReply{}
-	err = s.GetAllBalances(nil, balanceArgs, balanceReply)
+	// Insert the UTXO
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
 	assert.NoError(t, err)
 
-	assert.Len(t, balanceReply.Balances, 1)
-
-	balance := balanceReply.Balances[0]
-	alias, err := vm.PrimaryAlias(assetID)
-	if err != nil {
-		t.Fatalf("Failed to get primary alias of genesis asset: %s", err)
+	// Check the balance with IncludePartial set to true
+	balanceArgs := &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
 	}
-	assert.Equal(t, balance.AssetID, alias)
-	assert.Equal(t, uint64(balance.Balance), startBalance)
+	reply := &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 1)
+	assert.Equal(t, assetID.String(), reply.Balances[0].AssetID)
+	assert.Equal(t, uint64(1337), uint64(reply.Balances[0].Balance))
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	assert.Len(t, reply.Balances, 0)
+
+	// A UTXO with a 1 out of 2 multisig
+	// where one of the addresses is [addr]
+	oneOfTwoUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 1)
+	assert.Equal(t, assetID.String(), reply.Balances[0].AssetID)
+	assert.Equal(t, uint64(1337*2), uint64(reply.Balances[0].Balance))
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should not include the UTXO since it is only partly owned by [addr]
+	assert.Len(t, reply.Balances, 0)
+
+	// A UTXO with a 1 out of 1 multisig
+	// but with a locktime in the future
+	now := vm.Clock().Time()
+	futureUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  uint64(now.Add(10 * time.Hour).Unix()),
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 1)
+	assert.Equal(t, assetID.String(), reply.Balances[0].AssetID)
+	assert.Equal(t, uint64(1337*3), uint64(reply.Balances[0].Balance))
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should not include the UTXO since it is only partly owned by [addr]
+	assert.Len(t, reply.Balances, 0)
+
+	// A UTXO for a different asset
+	otherAssetID := ids.GenerateTestID()
+	otherAssetUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 0,
+		},
+		Asset: avax.Asset{ID: otherAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1337,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 2,
+				Addrs:     []ids.ShortID{addr, ids.GenerateTestShortID()},
+			},
+		},
+	}
+	// Insert the UTXO
+	err = vm.state.PutUTXO(otherAssetUTXO.InputID(), otherAssetUTXO)
+	assert.NoError(t, err)
+
+	// Check the balance with IncludePartial set to true
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress:    api.JSONAddress{Address: addrStr},
+		IncludePartial: true,
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 2)
+	gotAssetIDs := []string{reply.Balances[0].AssetID, reply.Balances[1].AssetID}
+	assert.Contains(t, gotAssetIDs, assetID.String())
+	assert.Contains(t, gotAssetIDs, otherAssetID.String())
+	gotBalances := []uint64{uint64(reply.Balances[0].Balance), uint64(reply.Balances[1].Balance)}
+	assert.Contains(t, gotBalances, uint64(1337))
+	assert.Contains(t, gotBalances, uint64(1337*3))
+
+	// Check the balance with IncludePartial set to false
+	balanceArgs = &GetAllBalancesArgs{
+		JSONAddress: api.JSONAddress{Address: addrStr},
+	}
+	reply = &GetAllBalancesReply{}
+	err = s.GetAllBalances(nil, balanceArgs, reply)
+	assert.NoError(t, err)
+	// The balance should include the UTXO since it is partly owned by [addr]
+	assert.Len(t, reply.Balances, 0)
 }
 
 func TestServiceGetTx(t *testing.T) {
@@ -306,11 +598,10 @@ func TestServiceGetTx(t *testing.T) {
 		TxID: txID,
 	}, &reply)
 	assert.NoError(t, err)
-	encoding, err := vm.encodingManager.GetEncoding(reply.Encoding)
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := encoding.ConvertString(reply.Tx)
+	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +651,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	numUTXOs := 10
 	// Put a bunch of UTXOs
 	for i := 0; i < numUTXOs; i++ {
-		if err := vm.state.FundUTXO(&avax.UTXO{
+		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
@@ -372,7 +663,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 					Addrs:     []ids.ShortID{rawAddr},
 				},
 			},
-		}); err != nil {
+		}
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -395,12 +687,13 @@ func TestServiceGetUTXOs(t *testing.T) {
 			},
 		}
 
-		utxoBytes, err := vm.codec.Marshal(utxo)
+		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
+		utxoID := utxo.InputID()
 		elems[i] = &atomic.Element{
-			Key:   utxo.InputID().Bytes(),
+			Key:   utxoID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
 				rawAddr.Bytes(),
@@ -434,66 +727,66 @@ func TestServiceGetUTXOs(t *testing.T) {
 		label     string
 		count     int
 		shouldErr bool
-		args      *GetUTXOsArgs
+		args      *api.GetUTXOsArgs
 	}{
 		{
 			label:     "invalid address: ''",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{""},
 			},
 		},
 		{
 			label:     "invalid address: '-'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{"-"},
 			},
 		},
 		{
 			label:     "invalid address: 'foo'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo"},
 			},
 		},
 		{
 			label:     "invalid address: 'foo-bar'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{"foo-bar"},
 			},
 		},
 		{
 			label:     "invalid address: '<ChainID>'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{vm.ctx.ChainID.String()},
 			},
 		},
 		{
 			label:     "invalid address: '<ChainID>-'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{fmt.Sprintf("%s-", vm.ctx.ChainID.String())},
 			},
 		},
 		{
 			label:     "invalid address: '<Unknown ID>-<addr>'",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{unknownChainAddr},
 			},
 		},
 		{
 			label:     "no addresses",
 			shouldErr: true,
-			args:      &GetUTXOsArgs{},
+			args:      &api.GetUTXOsArgs{},
 		},
 		{
 			label: "get all X-chain UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -502,7 +795,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get one X-chain UTXO",
 			count: 1,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -512,7 +805,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "limit greater than number of UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -522,7 +815,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "no utxos to return",
 			count: 0,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xEmptyAddr,
 				},
@@ -531,7 +824,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "multiple address with utxos",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xEmptyAddr,
 					xAddr,
@@ -541,7 +834,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get all P-chain UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -552,7 +845,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 			label:     "invalid source chain ID",
 			shouldErr: true,
 			count:     numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -562,7 +855,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label: "get all P-chain UTXOs",
 			count: numUTXOs,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 				},
@@ -572,7 +865,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label:     "get UTXOs from multiple chains",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					xAddr,
 					pAddr,
@@ -582,7 +875,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		{
 			label:     "get UTXOs for an address on a different chain",
 			shouldErr: true,
-			args: &GetUTXOsArgs{
+			args: &api.GetUTXOsArgs{
 				Addresses: []string{
 					pAddr,
 				},
@@ -591,7 +884,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.label, func(t *testing.T) {
-			reply := &GetUTXOsReply{}
+			reply := &api.GetUTXOsReply{}
 			err := s.GetUTXOs(nil, test.args, reply)
 			if err != nil {
 				if !test.shouldErr {
@@ -690,7 +983,7 @@ func TestCreateFixedCapAsset(t *testing.T) {
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateFixedCapAsset(nil, &CreateFixedCapAssetArgs{
+	err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
 				Username: username,
@@ -724,17 +1017,17 @@ func TestCreateVariableCapAsset(t *testing.T) {
 	}()
 
 	reply := AssetIDChangeAddr{}
-	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+	minterAddrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+	changeAddrStr := fromAddrsStr[0]
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	err = s.CreateVariableCapAsset(nil, &CreateVariableCapAssetArgs{
+	err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
 				Username: username,
@@ -749,7 +1042,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 			{
 				Threshold: 1,
 				Minters: []string{
-					addrStr,
+					minterAddrStr,
 				},
 			},
 		},
@@ -783,7 +1076,7 @@ func TestCreateVariableCapAsset(t *testing.T) {
 		},
 		Amount:  200,
 		AssetID: createdAssetID,
-		To:      addrStr,
+		To:      minterAddrStr, // Send newly minted tokens to this address
 	}
 	mintReply := &api.JSONTxIDChangeAddr{}
 	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
@@ -810,13 +1103,13 @@ func TestCreateVariableCapAsset(t *testing.T) {
 				Username: username,
 				Password: password,
 			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+			JSONFromAddrs:  api.JSONFromAddrs{From: []string{minterAddrStr}},
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 		},
 		SendOutput: SendOutput{
 			Amount:  200,
 			AssetID: createdAssetID,
-			To:      addrStr,
+			To:      fromAddrsStr[0],
 		},
 	}
 	sendReply := &api.JSONTxIDChangeAddr{}
@@ -886,6 +1179,10 @@ func TestNFTWorkflow(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
+	if err != nil {
+		t.Fatal(err)
+	}
 	mintArgs := &MintNFTArgs{
 		JSONSpendHeader: api.JSONSpendHeader{
 			UserPass: api.UserPass{
@@ -896,9 +1193,9 @@ func TestNFTWorkflow(t *testing.T) {
 			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
 		},
 		AssetID:  assetID.String(),
-		Payload:  formatting.Hex{Bytes: []byte{1, 2, 3, 4, 5}}.String(),
+		Payload:  payload,
 		To:       addrStr,
-		Encoding: formatting.HexEncoding,
+		Encoding: formatting.Hex,
 	}
 	mintReply := &api.JSONTxIDChangeAddr{}
 
@@ -958,13 +1255,16 @@ func TestImportExportKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	formattedKey := formatting.CB58{Bytes: sk.Bytes()}
+	privKeyStr, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	importArgs := &ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
+		PrivateKey: constants.SecretKeyPrefix + privKeyStr,
 	}
 	importReply := &api.JSONAddress{}
 	if err = s.ImportKey(nil, importArgs, importReply); err != nil {
@@ -991,11 +1291,11 @@ func TestImportExportKey(t *testing.T) {
 		t.Fatalf("ExportKeyReply private key: %s mssing secret key prefix: %s", exportReply.PrivateKey, constants.SecretKeyPrefix)
 	}
 
-	exportedKey := formatting.CB58{}
-	if err := exportedKey.FromString(strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix)); err != nil {
+	parsedKeyBytes, err := formatting.Decode(formatting.CB58, strings.TrimPrefix(exportReply.PrivateKey, constants.SecretKeyPrefix))
+	if err != nil {
 		t.Fatal("Failed to parse exported private key")
 	}
-	if !bytes.Equal(exportedKey.Bytes, formattedKey.Bytes) {
+	if !bytes.Equal(sk.Bytes(), parsedKeyBytes) {
 		t.Fatal("Unexpected key was found in ExportKeyReply")
 	}
 }
@@ -1016,13 +1316,16 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-
+	privKeyStr, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
 	args := ImportKeyArgs{
 		UserPass: api.UserPass{
 			Username: username,
 			Password: password,
 		},
-		PrivateKey: constants.SecretKeyPrefix + formatting.CB58{Bytes: sk.Bytes()}.String(),
+		PrivateKey: constants.SecretKeyPrefix + privKeyStr,
 	}
 	reply := api.JSONAddress{}
 	if err = s.ImportKey(nil, &args, &reply); err != nil {
@@ -1116,7 +1419,7 @@ func TestSend(t *testing.T) {
 		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
 	}
 
-	if !reply.TxID.Equals(pendingTxs[0].ID()) {
+	if reply.TxID != pendingTxs[0].ID() {
 		t.Fatal("Transaction ID returned by Send does not match the transaction found in vm's pending transactions")
 	}
 }
@@ -1179,7 +1482,7 @@ func TestSendMultiple(t *testing.T) {
 		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
 	}
 
-	if !reply.TxID.Equals(pendingTxs[0].ID()) {
+	if reply.TxID != pendingTxs[0].ID() {
 		t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
 	}
 
@@ -1251,14 +1554,15 @@ func TestImportAVAX(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(utxo)
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	peerSharedMemory := m.NewSharedMemory(platformChainID)
+	utxoID := utxo.InputID()
 	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   utxo.InputID().Bytes(),
+		Key:   utxoID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			addr0.Bytes(),

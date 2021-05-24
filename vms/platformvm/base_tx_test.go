@@ -6,22 +6,23 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 func TestBaseTxMarshalJSON(t *testing.T) {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
-	blockchainID := ids.NewID([32]byte{1})
-	utxoTxID := ids.NewID([32]byte{2})
-	assetID := ids.NewID([32]byte{3})
+	blockchainID := ids.ID{1}
+	utxoTxID := ids.ID{2}
+	assetID := ids.ID{3}
 	tx := &BaseTx{BaseTx: avax.BaseTx{
 		BlockchainID: blockchainID,
 		NetworkID:    4,

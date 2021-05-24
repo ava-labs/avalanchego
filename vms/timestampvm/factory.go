@@ -10,7 +10,7 @@ import (
 
 // ID is a unique identifier for this VM
 var (
-	ID = ids.NewID([32]byte{'t', 'i', 'm', 'e', 's', 't', 'a', 'm', 'p'})
+	ID = ids.ID{'t', 'i', 'm', 'e', 's', 't', 'a', 'm', 'p'}
 )
 
 // Factory ...

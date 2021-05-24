@@ -11,7 +11,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build:
+  build-win:
     # The type of runner that the job will run on
     runs-on: windows-2019 
 
@@ -19,6 +19,10 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+         go-version: '1.15.5' # The Go version to download (if necessary) and use.
+    - run: go version
 
     - name: Get the version
       id: get_version
@@ -33,15 +37,21 @@ jobs:
     - name: Create zip
       run: |
         mv .\build\avalanchego .\build\avalanchego.exe
-        mv .\build\plugins\evm .\build\plugins\evm.exe
-        Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
+        mv .\build\avalanchego-latest\avalanchego-process .\build\avalanchego-latest\avalanchego-process.exe
+        mv .\build\avalanchego-latest\plugins\evm .\build\avalanchego-latest\plugins\evm.exe
+        mv .\build\avalanchego-preupgrade\avalanchego-process .\build\avalanchego-preupgrade\avalanchego-process.exe
+        mv .\build\avalanchego-preupgrade\plugins\evm .\build\avalanchego-preupgrade\plugins\evm.exe
+        Compress-Archive -Path .\build\avalanchego.exe,.\build\avalanchego-latest,.\build\avalanchego-preupgrade -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
-    - name: Install aws cli
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Move to S3
       run: |
         Install-Module -Name AWS.Tools.Installer -Force
         Install-AWSToolsModule AWS.Tools.EC2,AWS.Tools.S3 -CleanUp -Force
         Write-S3Object -BucketName ${{ secrets.BUCKET }} -File .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip -Key windows/avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
-

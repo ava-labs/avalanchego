@@ -34,7 +34,7 @@ func TestRequests(t *testing.T) {
 	_, removed = req.Remove(ids.ShortEmpty, 1)
 	assert.False(t, removed, "shouldn't have removed the request")
 
-	_, removed = req.Remove(ids.NewShortID([20]byte{1}), 0)
+	_, removed = req.Remove(ids.ShortID{1}, 0)
 	assert.False(t, removed, "shouldn't have removed the request")
 
 	constains = req.Contains(ids.Empty)
@@ -51,7 +51,7 @@ func TestRequests(t *testing.T) {
 	_, removed = req.Remove(ids.ShortEmpty, 1)
 	assert.False(t, removed, "shouldn't have removed the request")
 
-	_, removed = req.Remove(ids.NewShortID([20]byte{1}), 0)
+	_, removed = req.Remove(ids.ShortID{1}, 0)
 	assert.False(t, removed, "shouldn't have removed the request")
 
 	constains = req.Contains(ids.Empty)
@@ -61,11 +61,11 @@ func TestRequests(t *testing.T) {
 	assert.Equal(t, 2, length, "should have had two outstanding requests")
 
 	removedID, removed := req.Remove(ids.ShortEmpty, 0)
-	assert.True(t, removedID.Equals(ids.Empty), "should have removed the requested ID")
+	assert.Equal(t, ids.Empty, removedID, "should have removed the requested ID")
 	assert.True(t, removed, "should have removed the request")
 
 	removedID, removed = req.Remove(ids.ShortEmpty, 10)
-	assert.True(t, removedID.Equals(ids.Empty.Prefix(0)), "should have removed the requested ID")
+	assert.Equal(t, ids.Empty.Prefix(0), removedID, "should have removed the requested ID")
 	assert.True(t, removed, "should have removed the request")
 
 	length = req.Len()

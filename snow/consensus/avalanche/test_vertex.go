@@ -16,6 +16,8 @@ type TestVertex struct {
 	ParentsErrV error
 	HeightV     uint64
 	HeightErrV  error
+	EpochV      uint32
+	EpochErrV   error
 	TxsV        []snowstorm.Tx
 	TxsErrV     error
 	BytesV      []byte
@@ -26,6 +28,9 @@ func (v *TestVertex) Parents() ([]Vertex, error) { return v.ParentsV, v.ParentsE
 
 // Height implements the Vertex interface
 func (v *TestVertex) Height() (uint64, error) { return v.HeightV, v.HeightErrV }
+
+// Epoch implements the Vertex interface
+func (v *TestVertex) Epoch() (uint32, error) { return v.EpochV, v.EpochErrV }
 
 // Txs implements the Vertex interface
 func (v *TestVertex) Txs() ([]snowstorm.Tx, error) { return v.TxsV, v.TxsErrV }

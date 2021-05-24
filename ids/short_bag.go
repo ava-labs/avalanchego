@@ -10,13 +10,13 @@ import (
 
 // ShortBag is a multiset of ShortIDs.
 type ShortBag struct {
-	counts map[[20]byte]int
+	counts map[ShortID]int
 	size   int
 }
 
 func (b *ShortBag) init() {
 	if b.counts == nil {
-		b.counts = make(map[[20]byte]int, minBagSize)
+		b.counts = make(map[ShortID]int, minBagSize)
 	}
 }
 
@@ -37,22 +37,22 @@ func (b *ShortBag) AddCount(id ShortID, count int) {
 
 	b.init()
 
-	totalCount := b.counts[*id.ID] + count
-	b.counts[*id.ID] = totalCount
+	totalCount := b.counts[id] + count
+	b.counts[id] = totalCount
 	b.size += count
 }
 
 // Count returns the number of times the id has been added.
 func (b *ShortBag) Count(id ShortID) int {
 	b.init()
-	return b.counts[*id.ID]
+	return b.counts[id]
 }
 
 // Remove sets the count of the provided ID to zero.
 func (b *ShortBag) Remove(id ShortID) {
 	b.init()
-	count := b.counts[*id.ID]
-	delete(b.counts, *id.ID)
+	count := b.counts[id]
+	delete(b.counts, id)
 	b.size -= count
 }
 
@@ -64,7 +64,7 @@ func (b *ShortBag) List() []ShortID {
 	idList := make([]ShortID, len(b.counts))
 	i := 0
 	for id := range b.counts {
-		idList[i] = NewShortID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -88,8 +88,7 @@ func (b *ShortBag) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("Bag: (Size = %d)", b.Len()))
-	for idBytes, count := range b.counts {
-		id := NewShortID(idBytes)
+	for id, count := range b.counts {
 		sb.WriteString(fmt.Sprintf("\n%s    ID[%s]: Count = %d", prefix, id, count))
 	}
 

@@ -22,7 +22,7 @@ const blockSize = 40 // hashing.HashLen (32) + length of uin64 (8)
 
 func (b *block) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, blockSize)}
-	p.PackFixedBytes(b.parentID.Bytes())
+	p.PackFixedBytes(b.parentID[:])
 	p.PackLong(b.value)
 	return p.Bytes, p.Err
 }
@@ -62,7 +62,7 @@ const accountSize = 32 + 8 + 8
 
 func (acc *account) Bytes() ([]byte, error) {
 	p := wrappers.Packer{Bytes: make([]byte, accountSize)}
-	p.PackFixedBytes(acc.id.Bytes())
+	p.PackFixedBytes(acc.id[:])
 	p.PackLong(acc.balance)
 	p.PackLong(acc.nonce)
 	return p.Bytes, p.Err
@@ -102,16 +102,15 @@ func TestPutUnregistered(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := memdb.New()
-	defer db.Close()
 
 	// make an account
 	acc1 := &account{
-		id:      ids.NewID([32]byte{1, 2, 3}),
+		id:      ids.ID{1, 2, 3},
 		balance: 1,
 		nonce:   2,
 	}
 
-	if err := state.Put(db, 1, ids.NewID([32]byte{1, 2, 3}), acc1); err == nil {
+	if err := state.Put(db, 1, ids.ID{1, 2, 3}, acc1); err == nil {
 		t.Fatal("should have failed because type ID is unregistred")
 	}
 
@@ -121,7 +120,11 @@ func TestPutUnregistered(t *testing.T) {
 	}
 
 	// should not error now
-	if err := state.Put(db, 1, ids.NewID([32]byte{1, 2, 3}), acc1); err != nil {
+	if err := state.Put(db, 1, ids.ID{1, 2, 3}, acc1); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -135,9 +138,8 @@ func TestKeyDoesNotExist(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := memdb.New()
-	defer db.Close()
 
-	if _, err := state.Get(db, 1, ids.NewID([32]byte{1, 2, 3})); err == nil {
+	if _, err := state.Get(db, 1, ids.ID{1, 2, 3}); err == nil {
 		t.Fatal("should have failed because no such key or typeID exists")
 	}
 
@@ -148,8 +150,12 @@ func TestKeyDoesNotExist(t *testing.T) {
 	}
 
 	// Should still fail because there is no value with this key
-	if _, err := state.Get(db, typeID, ids.NewID([32]byte{1, 2, 3})); err == nil {
+	if _, err := state.Get(db, typeID, ids.ID{1, 2, 3}); err == nil {
 		t.Fatal("should have failed because no such key exists")
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -161,7 +167,6 @@ func TestRegisterExistingTypeID(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := memdb.New()
-	defer db.Close()
 
 	// register type with ID 1
 	typeID := uint64(1)
@@ -174,6 +179,9 @@ func TestRegisterExistingTypeID(t *testing.T) {
 		t.Fatal("Should have errored because typeID already registered")
 	}
 
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // Ensure there is an error when someone tries to get a value using the wrong typeID
@@ -184,7 +192,6 @@ func TestGetWrongTypeID(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := memdb.New()
-	defer db.Close()
 
 	// register type with ID 1
 	blockTypeID := uint64(1)
@@ -194,10 +201,10 @@ func TestGetWrongTypeID(t *testing.T) {
 
 	// make and put a block
 	block := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: ids.ID{4, 5, 6},
 		value:    5,
 	}
-	blockID := ids.NewID([32]byte{1, 2, 3})
+	blockID := ids.ID{1, 2, 3}
 	if err = state.Put(db, blockTypeID, blockID, block); err != nil {
 		t.Fatal(err)
 	}
@@ -205,6 +212,10 @@ func TestGetWrongTypeID(t *testing.T) {
 	// try to get it using the right key but wrong typeID
 	if _, err := state.Get(db, 2, blockID); err == nil {
 		t.Fatal("should have failed because type ID is wrong")
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -217,7 +228,6 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := memdb.New()
-	defer db.Close()
 
 	// register block type with ID 1
 	blockTypeID := uint64(1)
@@ -231,11 +241,11 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sharedKey := ids.NewID([32]byte{1, 2, 3})
+	sharedKey := ids.ID{1, 2, 3}
 
 	// make an account
 	acc := &account{
-		id:      ids.NewID([32]byte{1, 2, 3}),
+		id:      ids.ID{1, 2, 3},
 		balance: 1,
 		nonce:   2,
 	}
@@ -247,7 +257,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 
 	// make a block
 	block1 := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: ids.ID{4, 5, 6},
 		value:    5,
 	}
 
@@ -267,7 +277,7 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 		t.Fatal("should have been type *account")
 	case accFromState.balance != acc.balance:
 		t.Fatal("balances should be same")
-	case !accFromState.id.Equals(acc.id):
+	case accFromState.id != acc.id:
 		t.Fatal("ids should be the same")
 	case accFromState.nonce != acc.nonce:
 		t.Fatal("nonces should be same")
@@ -283,10 +293,14 @@ func TestSameKeyDifferentTypeID(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !blockFromState.parentID.Equals(block1.parentID):
+	case blockFromState.parentID != block1.parentID:
 		t.Fatal("parentIDs should be same")
 	case blockFromState.value != block1.value:
 		t.Fatal("values should be same")
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -298,7 +312,6 @@ func TestOverwrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := memdb.New()
-	defer db.Close()
 
 	// register block type with ID 1
 	blockTypeID := uint64(1)
@@ -308,11 +321,11 @@ func TestOverwrite(t *testing.T) {
 
 	// make a block
 	block1 := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: ids.ID{4, 5, 6},
 		value:    5,
 	}
 
-	key := ids.NewID([32]byte{1, 2, 3})
+	key := ids.ID{1, 2, 3}
 
 	// put it
 	if err = state.Put(db, blockTypeID, key, block1); err != nil {
@@ -321,7 +334,7 @@ func TestOverwrite(t *testing.T) {
 
 	// make another block
 	block2 := &block{
-		parentID: ids.NewID([32]byte{100, 200, 1}),
+		parentID: ids.ID{100, 200, 1},
 		value:    6,
 	}
 
@@ -341,10 +354,14 @@ func TestOverwrite(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !blockFromState.parentID.Equals(block2.parentID):
+	case blockFromState.parentID != block2.parentID:
 		t.Fatal("parentIDs should be same")
 	case blockFromState.value != block2.value:
 		t.Fatal("values should be same")
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -356,7 +373,6 @@ func TestHappyPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	db := memdb.New()
-	defer db.Close()
 
 	accountTypeID := uint64(1)
 
@@ -367,7 +383,7 @@ func TestHappyPath(t *testing.T) {
 
 	// make an account
 	acc1 := &account{
-		id:      ids.NewID([32]byte{1, 2, 3}),
+		id:      ids.ID{1, 2, 3},
 		balance: 1,
 		nonce:   2,
 	}
@@ -389,7 +405,7 @@ func TestHappyPath(t *testing.T) {
 		t.Fatal("should have been type *account")
 	case acc1FromState.balance != acc1.balance:
 		t.Fatal("balances should be same")
-	case !acc1FromState.id.Equals(acc1.id):
+	case acc1FromState.id != acc1.id:
 		t.Fatal("ids should be the same")
 	case acc1FromState.nonce != acc1.nonce:
 		t.Fatal("nonces should be same")
@@ -397,7 +413,7 @@ func TestHappyPath(t *testing.T) {
 
 	// make another account
 	acc2 := &account{
-		id:      ids.NewID([32]byte{9, 2, 1}),
+		id:      ids.ID{9, 2, 1},
 		balance: 7,
 		nonce:   44,
 	}
@@ -419,7 +435,7 @@ func TestHappyPath(t *testing.T) {
 		t.Fatal("should have been type *account")
 	case acc2FromState.balance != acc2.balance:
 		t.Fatal("balances should be same")
-	case !acc2FromState.id.Equals(acc2.id):
+	case acc2FromState.id != acc2.id:
 		t.Fatal("ids should be the same")
 	case acc2FromState.nonce != acc2.nonce:
 		t.Fatal("nonces should be same")
@@ -432,9 +448,9 @@ func TestHappyPath(t *testing.T) {
 	}
 
 	// make a block
-	block1ID := ids.NewID([32]byte{9, 9, 9})
+	block1ID := ids.ID{9, 9, 9}
 	block1 := &block{
-		parentID: ids.NewID([32]byte{4, 5, 6}),
+		parentID: ids.ID{4, 5, 6},
 		value:    5,
 	}
 
@@ -453,16 +469,16 @@ func TestHappyPath(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !block1FromState.parentID.Equals(block1.parentID):
+	case block1FromState.parentID != block1.parentID:
 		t.Fatal("parentIDs should be same")
 	case block1FromState.value != block1.value:
 		t.Fatal("values should be same")
 	}
 
 	// make another block
-	block2ID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9})
+	block2ID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	block2 := &block{
-		parentID: ids.NewID([32]byte{10, 1, 2}),
+		parentID: ids.ID{10, 1, 2},
 		value:    67,
 	}
 
@@ -481,9 +497,13 @@ func TestHappyPath(t *testing.T) {
 	switch {
 	case !ok:
 		t.Fatal("should have been type *block")
-	case !block2FromState.parentID.Equals(block2.parentID):
+	case block2FromState.parentID != block2.parentID:
 		t.Fatal("parentIDs should be same")
 	case block2FromState.value != block2.value:
 		t.Fatal("values should be same")
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
 	}
 }

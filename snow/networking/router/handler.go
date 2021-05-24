@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -86,7 +88,7 @@ import (
 // Handler passes incoming messages from the network to the consensus engine
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference)
 type Handler struct {
-	metrics
+	metrics handlerMetrics
 
 	validators validators.Set
 
@@ -108,7 +110,7 @@ type Handler struct {
 	engine common.Engine
 
 	toClose func()
-	closing bool
+	closing utils.AtomicBool
 }
 
 // Initialize this consensus handler
@@ -117,13 +119,13 @@ func (h *Handler) Initialize(
 	engine common.Engine,
 	validators validators.Set,
 	msgChan <-chan common.Message,
-	bufferSize int,
+	maxPendingMsgs uint32,
 	maxNonStakerPendingMsgs uint32,
 	stakerMsgPortion,
 	stakerCPUPortion float64,
 	namespace string,
 	metrics prometheus.Registerer,
-) {
+) error {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
 		h.ctx.Log.Warn("initializing handler metrics errored with: %s", err)
@@ -153,27 +155,33 @@ func (h *Handler) Initialize(
 
 	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, cpuInterval)
 	msgTracker := tracker.NewMessageTracker()
-	msgManager := NewMsgManager(
+	msgManager, err := NewMsgManager(
 		validators,
 		h.ctx.Log,
 		msgTracker,
 		h.cpuTracker,
-		uint32(bufferSize),
+		maxPendingMsgs,
 		maxNonStakerPendingMsgs,
 		stakerMsgPortion,
 		stakerCPUPortion,
+		namespace,
+		metrics,
 	)
+	if err != nil {
+		return err
+	}
 
 	h.serviceQueue, h.msgSema = newMultiLevelQueue(
 		msgManager,
 		consumptionRanges,
 		consumptionAllotments,
-		bufferSize,
+		maxPendingMsgs,
 		h.ctx.Log,
 		&h.metrics,
 	)
 	h.engine = engine
 	h.validators = validators
+	return nil
 }
 
 // Context of this Handler
@@ -200,7 +208,7 @@ func (h *Handler) Dispatch() {
 
 			msg, err := h.serviceQueue.PopMessage()
 			if err != nil {
-				h.ctx.Log.Warn("Could not pop messsage from service queue")
+				h.ctx.Log.Warn("Could not pop message from service queue")
 				continue
 			}
 			if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
@@ -228,7 +236,7 @@ func (h *Handler) Dispatch() {
 			h.dispatchMsg(message{messageType: constants.NotifyMsg, notification: msg})
 		}
 
-		if h.closing {
+		if h.closing.GetValue() {
 			return
 		}
 	}
@@ -236,12 +244,6 @@ func (h *Handler) Dispatch() {
 
 // Dispatch a message to the consensus engine.
 func (h *Handler) dispatchMsg(msg message) {
-	if h.closing {
-		h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
-		h.metrics.dropped.Inc()
-		return
-	}
-
 	startTime := h.clock.Time()
 
 	h.ctx.Lock.Lock()
@@ -253,23 +255,30 @@ func (h *Handler) dispatchMsg(msg message) {
 		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
 	}
 
-	var (
-		err error
-	)
+	var err error
 	switch msg.messageType {
 	case constants.NotifyMsg:
 		err = h.engine.Notify(msg.notification)
-		h.notify.Observe(float64(h.clock.Time().Sub(startTime)))
+		h.metrics.notify.Observe(float64(h.clock.Time().Sub(startTime)))
 	case constants.GossipMsg:
 		err = h.engine.Gossip()
-		h.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
+		h.metrics.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
+	case constants.TimeoutMsg:
+		err = h.engine.Timeout()
+		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
 		err = h.handleValidatorMsg(msg, startTime)
 	}
 
+	if msg.IsPeriodic() {
+		h.ctx.Log.Verbo("Finished sending message to consensus: %s", msg.messageType)
+	} else {
+		h.ctx.Log.Debug("Finished sending message to consensus: %s", msg.messageType)
+	}
+
 	if err != nil {
-		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s", err)
-		h.closing = true
+		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s, while processing message: %s", err, msg)
+		h.closing.SetValue(true)
 	}
 }
 
@@ -287,7 +296,7 @@ func (h *Handler) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32,
 
 // AcceptedFrontier passes a AcceptedFrontier message received from the network
 // to the consensus engine.
-func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+func (h *Handler) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.AcceptedFrontierMsg,
 		validatorID:  validatorID,
@@ -309,7 +318,7 @@ func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID u
 
 // GetAccepted passes a GetAccepted message received from the
 // network to the consensus engine.
-func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerIDs ids.Set) bool {
+func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, deadline time.Time, containerIDs []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.GetAcceptedMsg,
 		validatorID:  validatorID,
@@ -322,7 +331,7 @@ func (h *Handler) GetAccepted(validatorID ids.ShortID, requestID uint32, deadlin
 
 // Accepted passes a Accepted message received from the network to the consensus
 // engine.
-func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) bool {
+func (h *Handler) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.AcceptedMsg,
 		validatorID:  validatorID,
@@ -371,6 +380,13 @@ func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 		messageType: constants.GetAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+	})
+}
+
+// Timeout passes a new timeout notification to the consensus engine
+func (h *Handler) Timeout() {
+	h.sendReliableMsg(message{
+		messageType: constants.TimeoutMsg,
 	})
 }
 
@@ -433,7 +449,7 @@ func (h *Handler) PullQuery(validatorID ids.ShortID, requestID uint32, deadline 
 }
 
 // Chits passes a Chits message received from the network to the consensus engine.
-func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set) bool {
+func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID) bool {
 	return h.serviceQueue.PushMessage(message{
 		messageType:  constants.ChitsMsg,
 		validatorID:  validatorID,
@@ -491,6 +507,8 @@ func (h *Handler) Notify(msg common.Message) {
 // The handler should never be invoked again after calling
 // Shutdown.
 func (h *Handler) Shutdown() {
+	h.closing.SetValue(true)
+	h.engine.Halt()
 	h.serviceQueue.Shutdown()
 }
 
@@ -502,19 +520,16 @@ func (h *Handler) shutdownDispatch() {
 	if err := h.engine.Shutdown(); err != nil {
 		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
-	h.ctx.Log.Info("finished shutting down chain")
 	if h.toClose != nil {
 		go h.toClose()
 	}
-	h.closing = true
-	h.shutdown.Observe(float64(time.Since(startTime)))
+	h.closing.SetValue(true)
+	h.metrics.shutdown.Observe(float64(time.Since(startTime)))
 	close(h.closed)
 }
 
 func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
-	var (
-		err error
-	)
+	var err error
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
 		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
@@ -556,7 +571,7 @@ func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
 	endTime := h.clock.Time()
 	timeConsumed := endTime.Sub(startTime)
 
-	histogram := h.getMSGHistogram(msg.messageType)
+	histogram := h.metrics.getMSGHistogram(msg.messageType)
 	histogram.Observe(float64(timeConsumed))
 
 	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)

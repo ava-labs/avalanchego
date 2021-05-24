@@ -14,6 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
+const (
+	iterativeDeleteThreshold = 512
+)
+
 // Database implements the Database interface by living on top of another
 // database, writing changes to the underlying database only when commit is
 // called.
@@ -210,7 +214,17 @@ func (db *Database) Abort() {
 	db.abort()
 }
 
-func (db *Database) abort() { db.mem = make(map[string]valueDelete, memdb.DefaultSize) }
+func (db *Database) abort() {
+	// If there are a lot of keys, clear the map by just allocating a new one
+	if len(db.mem) > iterativeDeleteThreshold {
+		db.mem = make(map[string]valueDelete, memdb.DefaultSize)
+		return
+	}
+	// If there aren't many keys, clear the map iteratively
+	for key := range db.mem {
+		delete(db.mem, key)
+	}
+}
 
 // CommitBatch returns a batch that contains all uncommitted puts/deletes.
 // Calling Write() on the returned batch causes the puts/deletes to be
@@ -273,19 +287,19 @@ type batch struct {
 // Put implements the Database interface
 func (b *batch) Put(key, value []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
-	b.size += len(value)
+	b.size += len(key) + len(value)
 	return nil
 }
 
 // Delete implements the Database interface
 func (b *batch) Delete(key []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
-	b.size++
+	b.size += len(key)
 	return nil
 }
 
-// ValueSize implements the Database interface
-func (b *batch) ValueSize() int { return b.size }
+// Size implements the Database interface
+func (b *batch) Size() int { return b.size }
 
 // Write implements the Database interface
 func (b *batch) Write() error {

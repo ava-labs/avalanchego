@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -111,8 +112,8 @@ func TestOutputVerifyUnsorted(t *testing.T) {
 			Locktime:  1,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID([20]byte{1}),
-				ids.NewShortID([20]byte{0}),
+				{1},
+				{0},
 			},
 		},
 	}
@@ -141,7 +142,11 @@ func TestOutputVerifyDuplicated(t *testing.T) {
 }
 
 func TestOutputSerialize(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(0, c); err != nil {
+		t.Fatal(err)
+	}
 
 	expected := []byte{
 		// Codec version
@@ -169,16 +174,16 @@ func TestOutputSerialize(t *testing.T) {
 			Locktime:  54321,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID([20]byte{
+				{
 					0x51, 0x02, 0x5c, 0x61, 0xfb, 0xcf, 0xc0, 0x78,
 					0xf6, 0x93, 0x34, 0xf8, 0x34, 0xbe, 0x6d, 0xd2,
 					0x6d, 0x55, 0xa9, 0x55,
-				}),
-				ids.NewShortID([20]byte{
+				},
+				{
 					0xc3, 0x34, 0x41, 0x28, 0xe0, 0x60, 0x12, 0x8e,
 					0xde, 0x35, 0x23, 0xa2, 0x4a, 0x46, 0x1c, 0x89,
 					0x43, 0xab, 0x08, 0x59,
-				}),
+				},
 			},
 		},
 	}
@@ -187,7 +192,7 @@ func TestOutputSerialize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := c.Marshal(&out)
+	result, err := m.Marshal(0, &out)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,16 +209,16 @@ func TestOutputAddresses(t *testing.T) {
 			Locktime:  54321,
 			Threshold: 1,
 			Addrs: []ids.ShortID{
-				ids.NewShortID([20]byte{
+				{
 					0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 					0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 					0x10, 0x11, 0x12, 0x13,
-				}),
-				ids.NewShortID([20]byte{
+				},
+				{
 					0x14, 0x15, 0x16, 0x17,
 					0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
 					0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-				}),
+				},
 			},
 		},
 	}

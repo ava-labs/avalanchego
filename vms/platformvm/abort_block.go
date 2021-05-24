@@ -7,12 +7,17 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
-// Abort being accepted results in the proposal of its parent (which must be a proposal block)
-// being rejected.
-type Abort struct {
+var (
+	_ Block    = &AbortBlock{}
+	_ decision = &AbortBlock{}
+)
+
+// AbortBlock being accepted results in the proposal of its parent (which must
+// be a proposal block) being rejected.
+type AbortBlock struct {
 	DoubleDecisionBlock `serialize:"true"`
 }
 
@@ -20,37 +25,47 @@ type Abort struct {
 //
 // The parent block must be a proposal
 //
-// This function also sets onAcceptDB database if the verification passes.
-func (a *Abort) Verify() error {
-	parent, ok := a.parentBlock().(*ProposalBlock)
-	// Abort is a decision, so its parent must be a proposal
+// This function also sets onAcceptState if the verification passes.
+func (a *AbortBlock) Verify() error {
+	blkID := a.ID()
+
+	if err := a.DoubleDecisionBlock.Verify(); err != nil {
+		if err := a.Reject(); err != nil {
+			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", blkID, err)
+		}
+		return err
+	}
+
+	parentIntf, err := a.parent()
+	if err != nil {
+		return err
+	}
+
+	// The parent of an Abort block should always be a proposal
+	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
-		if err := a.Reject(); err == nil {
-			if err := a.vm.DB.Commit(); err != nil {
-				return fmt.Errorf("failed to commit database while rejecting block %s: %w", a.ID(), err)
-			}
-		} else {
-			a.vm.DB.Abort()
+		if err := a.Reject(); err != nil {
+			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", blkID, err)
 		}
 		return errInvalidBlockType
 	}
 
-	a.onAcceptDB, a.onAcceptFunc = parent.onAbort()
+	a.onAcceptState, a.onAcceptFunc = parent.onAbort()
 
-	a.vm.currentBlocks[a.ID().Key()] = a
-	a.parentBlock().addChild(a)
+	a.vm.currentBlocks[blkID] = a
+	parent.addChild(a)
 	return nil
 }
 
 // newAbortBlock returns a new *Abort block where the block's parent, a proposal
 // block, has ID [parentID].
-func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*Abort, error) {
-	abort := &Abort{
+func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error) {
+	abort := &AbortBlock{
 		DoubleDecisionBlock: DoubleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
 				CommonBlock: CommonBlock{
-					Block: core.NewBlock(parentID, height),
-					vm:    vm,
+					PrntID: parentID,
+					Hght:   height,
 				},
 			},
 		},
@@ -59,11 +74,9 @@ func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*Abort, error) {
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(abort)
-	bytes, err := Codec.Marshal(&blk)
+	bytes, err := Codec.Marshal(codecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}
-
-	abort.Block.Initialize(bytes, vm.SnowmanVM)
-	return abort, nil
+	return abort, abort.DoubleDecisionBlock.initialize(vm, bytes, choices.Processing, abort)
 }

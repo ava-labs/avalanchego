@@ -38,4 +38,7 @@ type Block interface {
 	// This is used for sending blocks to peers. The bytes should be able to be
 	// parsed into the same block on another node.
 	Bytes() []byte
+
+	// Height returns the height of this block in the chain.
+	Height() uint64
 }

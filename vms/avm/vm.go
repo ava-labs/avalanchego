@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -15,17 +15,20 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/pubsub"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/codec"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -41,11 +44,10 @@ import (
 const (
 	batchTimeout       = time.Second
 	batchSize          = 30
-	stateCacheSize     = 30000
-	idCacheSize        = 30000
-	txCacheSize        = 30000
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
+
+	codecVersion = 0
 )
 
 var (
@@ -55,14 +57,18 @@ var (
 	errWrongBlockchainID         = errors.New("wrong blockchain ID")
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
+
+	_ vertex.DAGVM    = &VM{}
+	_ common.StaticVM = &VM{}
+	_ secp256k1fx.VM  = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
 	metrics
+	avax.AddressManager
+	avax.AtomicUTXOManager
 	ids.Aliaser
-
-	encodingManager formatting.EncodingManager
 
 	// Contains information of where this VM is executing
 	ctx *snow.Context
@@ -70,13 +76,14 @@ type VM struct {
 	// Used to check local time
 	clock timer.Clock
 
-	genesisCodec codec.Codec
-	codec        codec.Codec
+	genesisCodec  codec.Manager
+	codec         codec.Manager
+	codecRegistry codec.Registry
 
-	pubsub *cjson.PubSubServer
+	pubsub *pubsub.Server
 
 	// State management
-	state *prefixedState
+	state State
 
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
@@ -104,48 +111,6 @@ type VM struct {
 	walletService WalletService
 }
 
-type codecRegistry struct {
-	genesisCodec  codec.Codec
-	codec         codec.Codec
-	index         int
-	typeToFxIndex map[reflect.Type]int
-}
-
-func (cr *codecRegistry) Skip(amount int) {
-	cr.genesisCodec.Skip(amount)
-	cr.codec.Skip(amount)
-}
-
-func (cr *codecRegistry) RegisterType(val interface{}) error {
-	valType := reflect.TypeOf(val)
-	cr.typeToFxIndex[valType] = cr.index
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		cr.genesisCodec.RegisterType(val),
-		cr.codec.RegisterType(val),
-	)
-	return errs.Err
-}
-
-func (cr *codecRegistry) SetMaxSize(size int) {
-	cr.genesisCodec.SetMaxSize(size)
-	cr.codec.SetMaxSize(size)
-}
-
-func (cr *codecRegistry) SetMaxSliceLen(size int) {
-	cr.genesisCodec.SetMaxSliceLen(size)
-	cr.codec.SetMaxSliceLen(size)
-}
-
-func (cr *codecRegistry) Marshal(v interface{}) ([]byte, error) {
-	return cr.codec.Marshal(v)
-}
-
-func (cr *codecRegistry) Unmarshal(b []byte, v interface{}) error {
-	return cr.codec.Unmarshal(b, v)
-}
-
 /*
  ******************************************************************************
  ******************************** Avalanche API *******************************
@@ -155,47 +120,51 @@ func (cr *codecRegistry) Unmarshal(b []byte, v interface{}) error {
 // Initialize implements the avalanche.DAGVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisBytes []byte,
+	upgradeBytes []byte,
+	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+		return err
+	}
+	vm.AddressManager = avax.NewAddressManager(ctx)
+	vm.Aliaser.Initialize()
+
+	db := dbManager.Current().Database
 	vm.ctx = ctx
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
 	vm.typeToFxIndex = map[reflect.Type]int{}
-	vm.Aliaser.Initialize()
-	encodingManager, err := formatting.NewEncodingManager(formatting.CB58Encoding)
-	if err != nil {
-		return fmt.Errorf("problem creating encoding manager: %w", err)
-	}
-	vm.encodingManager = encodingManager
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
-	vm.pubsub = cjson.NewPubSubServer(ctx)
-	vm.genesisCodec = codec.New(math.MaxUint32, 1<<20)
-	c := codec.NewDefault()
+	vm.pubsub = pubsub.New(ctx.NetworkID, ctx.Log)
+
+	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	c := linearcodec.NewDefault()
+
+	vm.genesisCodec = codec.NewManager(math.MaxInt32)
+	vm.codec = codec.NewDefaultManager()
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		vm.metrics.Initialize(ctx.Namespace, ctx.Metrics),
-
-		vm.pubsub.Register("accepted"),
-		vm.pubsub.Register("rejected"),
-		vm.pubsub.Register("verified"),
-
 		c.RegisterType(&BaseTx{}),
 		c.RegisterType(&CreateAssetTx{}),
 		c.RegisterType(&OperationTx{}),
 		c.RegisterType(&ImportTx{}),
 		c.RegisterType(&ExportTx{}),
+		vm.codec.RegisterCodec(codecVersion, c),
 
-		vm.genesisCodec.RegisterType(&BaseTx{}),
-		vm.genesisCodec.RegisterType(&CreateAssetTx{}),
-		vm.genesisCodec.RegisterType(&OperationTx{}),
-		vm.genesisCodec.RegisterType(&ImportTx{}),
-		vm.genesisCodec.RegisterType(&ExportTx{}),
+		genesisCodec.RegisterType(&BaseTx{}),
+		genesisCodec.RegisterType(&CreateAssetTx{}),
+		genesisCodec.RegisterType(&OperationTx{}),
+		genesisCodec.RegisterType(&ImportTx{}),
+		genesisCodec.RegisterType(&ExportTx{}),
+		vm.genesisCodec.RegisterCodec(codecVersion, genesisCodec),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -214,39 +183,31 @@ func (vm *VM) Initialize(
 			ID: fxContainer.ID,
 			Fx: fx,
 		}
-		vm.codec = &codecRegistry{
-			genesisCodec:  vm.genesisCodec,
-			codec:         c,
-			index:         i,
-			typeToFxIndex: vm.typeToFxIndex,
+		vm.codecRegistry = &codecRegistry{
+			codecs:      []codec.Registry{genesisCodec, c},
+			index:       i,
+			typeToIndex: vm.typeToFxIndex,
 		}
 		if err := fx.Initialize(vm); err != nil {
 			return err
 		}
 	}
 
-	vm.codec = c
-
-	vm.state = &prefixedState{
-		state: &state{State: avax.State{
-			Cache:        &cache.LRU{Size: stateCacheSize},
-			DB:           vm.db,
-			GenesisCodec: vm.genesisCodec,
-			Codec:        vm.codec,
-		}},
-
-		tx:       &cache.LRU{Size: idCacheSize},
-		utxo:     &cache.LRU{Size: idCacheSize},
-		txStatus: &cache.LRU{Size: idCacheSize},
-
-		uniqueTx: &cache.EvictableLRU{Size: txCacheSize},
+	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, ctx.Namespace, ctx.Metrics)
+	if err != nil {
+		return err
 	}
+	vm.state = state
 
 	if err := vm.initAliases(genesisBytes); err != nil {
 		return err
 	}
 
-	if dbStatus, err := vm.state.DBInitialized(); err != nil || dbStatus == choices.Unknown {
+	initialized, err := vm.state.IsInitialized()
+	if err != nil {
+		return err
+	}
+	if !initialized {
 		if err := vm.initState(genesisBytes); err != nil {
 			return err
 		}
@@ -262,7 +223,7 @@ func (vm *VM) Initialize(
 	vm.batchTimeout = batchTimeout
 
 	vm.walletService.vm = vm
-	vm.walletService.pendingTxMap = make(map[[32]byte]*list.Element)
+	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
 
 	return vm.db.Commit()
@@ -311,7 +272,7 @@ func (vm *VM) Shutdown() error {
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	vm.metrics.numCreateHandlersCalls.Inc()
 
 	codec := cjson.NewCodec()
@@ -319,39 +280,45 @@ func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
 	// name this service "avm"
-	vm.ctx.Log.AssertNoError(rpcServer.RegisterService(&Service{vm: vm}, "avm"))
+	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
+		return nil, err
+	}
 
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	// name this service "avm"
-	vm.ctx.Log.AssertNoError(walletServer.RegisterService(&vm.walletService, "wallet"))
+	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
+	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	// name this service "wallet"
+	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
 	return map[string]*common.HTTPHandler{
 		"":        {Handler: rpcServer},
 		"/wallet": {Handler: walletServer},
-		"/pubsub": {LockOptions: common.NoLock, Handler: vm.pubsub},
-	}
+		"/events": {LockOptions: common.NoLock, Handler: vm.pubsub},
+	}, err
 }
 
-// CreateStaticHandlers implements the avalanche.DAGVM interface
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler {
+// CreateStaticHandlers implements the common.StaticVM interface
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+
 	// name this service "avm"
-	staticService, _ := CreateStaticService(formatting.CB58Encoding)
-	_ = newServer.RegisterService(staticService, "avm")
+	staticService := CreateStaticService()
 	return map[string]*common.HTTPHandler{
 		"": {LockOptions: common.WriteLock, Handler: newServer},
-	}
+	}, newServer.RegisterService(staticService, "avm")
 }
 
-// PendingTxs implements the avalanche.DAGVM interface
+// Pending implements the avalanche.DAGVM interface
 func (vm *VM) PendingTxs() []snowstorm.Tx {
-	vm.metrics.numPendingTxsCalls.Inc()
+	vm.metrics.numPendingCalls.Inc()
 
 	vm.timer.Cancel()
 
@@ -360,16 +327,16 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 	return txs
 }
 
-// ParseTx implements the avalanche.DAGVM interface
+// Parse implements the avalanche.DAGVM interface
 func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
-	vm.metrics.numParseTxCalls.Inc()
+	vm.metrics.numParseCalls.Inc()
 
 	return vm.parseTx(b)
 }
 
-// GetTx implements the avalanche.DAGVM interface
+// Get implements the avalanche.DAGVM interface
 func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
-	vm.metrics.numGetTxCalls.Inc()
+	vm.metrics.numGetCalls.Inc()
 
 	tx := &UniqueTx{
 		vm:   vm,
@@ -405,74 +372,16 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	return tx.ID(), nil
 }
 
-// GetAtomicUTXOs returns imported/exports UTXOs such that at least one of the addresses in [addrs] is referenced.
-// Returns at most [limit] UTXOs.
-// If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
-// Returns:
-// * The fetched of UTXOs
-// * true if all there are no more UTXOs in this range to fetch
-// * The address associated with the last UTXO fetched
-// * The ID of the last UTXO fetched
-func (vm *VM) GetAtomicUTXOs(
-	chainID ids.ID,
-	addrs ids.ShortSet,
-	startAddr ids.ShortID,
-	startUTXOID ids.ID,
-	limit int,
-) ([]*avax.UTXO, ids.ShortID, ids.ID, error) {
-	if limit <= 0 || limit > maxUTXOsToFetch {
-		limit = maxUTXOsToFetch
-	}
-
-	addrsList := make([][]byte, addrs.Len())
-	i := 0
-	for addr := range addrs {
-		copied := addr
-		addrsList[i] = copied[:]
-		i++
-	}
-
-	allUTXOBytes, lastAddr, lastUTXO, err := vm.ctx.SharedMemory.Indexed(
-		chainID,
-		addrsList,
-		startAddr.Bytes(),
-		startUTXOID.Bytes(),
-		limit,
-	)
-	if err != nil {
-		return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error fetching atomic UTXOs: %w", err)
-	}
-
-	lastAddrID, err := ids.ToShortID(lastAddr)
-	if err != nil {
-		lastAddrID = ids.ShortEmpty
-	}
-	lastUTXOID, err := ids.ToID(lastUTXO)
-	if err != nil {
-		lastUTXOID = ids.Empty
-	}
-
-	utxos := make([]*avax.UTXO, len(allUTXOBytes))
-	for i, utxoBytes := range allUTXOBytes {
-		utxo := &avax.UTXO{}
-		if err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("error parsing UTXO: %w", err)
-		}
-		utxos[i] = utxo
-	}
-	return utxos, lastAddrID, lastUTXOID, nil
-}
-
-// GetUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
+// getPaginatedUTXOs returns UTXOs such that at least one of the addresses in [addrs] is referenced.
 // Returns at most [limit] UTXOs.
 // If [limit] <= 0 or [limit] > maxUTXOsToFetch, it is set to [maxUTXOsToFetch].
 // Only returns UTXOs associated with addresses >= [startAddr].
 // For address [startAddr], only returns UTXOs whose IDs are greater than [startUTXOID].
 // Returns:
-// * The fetched of UTXOs
+// * The fetched UTXOs
 // * The address associated with the last UTXO fetched
 // * The ID of the last UTXO fetched
-func (vm *VM) GetUTXOs(
+func (vm *VM) getPaginatedUTXOs(
 	addrs ids.ShortSet,
 	startAddr ids.ShortID,
 	startUTXOID ids.ID,
@@ -481,13 +390,17 @@ func (vm *VM) GetUTXOs(
 	if limit <= 0 || limit > maxUTXOsToFetch {
 		limit = maxUTXOsToFetch
 	}
-
-	seen := ids.Set{} // IDs of UTXOs already in the list
-	utxos := make([]*avax.UTXO, 0, limit)
 	lastAddr := ids.ShortEmpty
 	lastIndex := ids.Empty
+	searchSize := limit // maximum number of utxos that can be returned
+
+	utxos := make([]*avax.UTXO, 0, limit)
+	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
+
+	// enforces the same ordering for pagination
 	addrsList := addrs.List()
 	ids.SortShortIDs(addrsList)
+
 	for _, addr := range addrsList {
 		start := ids.Empty
 		if comp := bytes.Compare(addr.Bytes(), startAddr.Bytes()); comp == -1 { // Skip addresses before [startAddr]
@@ -495,29 +408,84 @@ func (vm *VM) GetUTXOs(
 		} else if comp == 0 {
 			start = startUTXOID
 		}
-		utxoIDs, err := vm.state.Funds(addr.Bytes(), start, limit) // Get UTXOs associated with [addr]
+
+		// Get UTXOs associated with [addr]. [searchSize] is used here to ensure
+		// that no UTXOs are dropped due to duplicated fetching.
+		utxoIDs, err := vm.state.UTXOIDs(addr.Bytes(), start, searchSize)
 		if err != nil {
-			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s", addr)
+			return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
 		}
+		for _, utxoID := range utxoIDs {
+			lastIndex = utxoID // The last searched UTXO - not the last found
+			lastAddr = addr    // The last address searched that has UTXOs (even duplicated) - not the last found
+
+			if seen.Contains(utxoID) { // Already have this UTXO in the list
+				continue
+			}
+
+			utxo, err := vm.state.GetUTXO(utxoID)
+			if err != nil {
+				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+			}
+
+			utxos = append(utxos, utxo)
+			seen.Add(utxoID)
+			limit--
+			if limit <= 0 {
+				return utxos, lastAddr, lastIndex, nil // Found [limit] utxos; stop.
+			}
+		}
+	}
+	return utxos, lastAddr, lastIndex, nil // Didn't reach the [limit] utxos; no more were found
+}
+
+func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, error) {
+	seen := make(ids.Set, maxUTXOsToFetch) // IDs of UTXOs already in the list
+	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
+
+	// enforces the same ordering for pagination
+	addrsList := addrs.List()
+	ids.SortShortIDs(addrsList)
+
+	// iterate over the addresses and get all the utxos
+	for _, addr := range addrsList {
+		if err := vm.getAllUniqueAddressUTXOs(addr, &seen, &utxos); err != nil {
+			return nil, fmt.Errorf("couldn't get UTXOs for address %s: %w", addr, err)
+		}
+	}
+	return utxos, nil
+}
+
+func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[]*avax.UTXO) error {
+	lastIndex := ids.Empty
+	addrBytes := addr.Bytes()
+
+	for {
+		utxoIDs, err := vm.state.UTXOIDs(addrBytes, lastIndex, maxUTXOsToFetch) // Get UTXOs associated with [addr]
+		if err != nil {
+			return err
+		}
+
+		// There are no more UTXO IDs to fetch
+		if len(utxoIDs) == 0 || utxoIDs[len(utxoIDs)-1] == lastIndex {
+			return nil
+		}
+
+		lastIndex = utxoIDs[len(utxoIDs)-1]
+
 		for _, utxoID := range utxoIDs {
 			if seen.Contains(utxoID) { // Already have this UTXO in the list
 				continue
 			}
-			utxo, err := vm.state.UTXO(utxoID)
+
+			utxo, err := vm.state.GetUTXO(utxoID)
 			if err != nil {
-				return nil, ids.ShortID{}, ids.ID{}, fmt.Errorf("couldn't get UTXO %s: %w", utxoID, err)
+				return err
 			}
-			utxos = append(utxos, utxo)
+			*utxos = append(*utxos, utxo)
 			seen.Add(utxoID)
-			lastAddr = addr
-			lastIndex = utxoID
-			limit--
-			if limit <= 0 {
-				break // Found [limit] utxos; stop.
-			}
 		}
 	}
-	return utxos, lastAddr, lastIndex, nil
 }
 
 /*
@@ -530,7 +498,10 @@ func (vm *VM) GetUTXOs(
 func (vm *VM) Clock() *timer.Clock { return &vm.clock }
 
 // Codec returns a reference to the internal codec of this VM
-func (vm *VM) Codec() codec.Codec { return vm.codec }
+func (vm *VM) Codec() codec.Manager { return vm.codec }
+
+// CodecRegistry returns a reference to the internal codec registry of this VM
+func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 
 // Logger returns a reference to the internal logger of this VM
 func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
@@ -562,7 +533,7 @@ func (vm *VM) FlushTxs() {
 
 func (vm *VM) initAliases(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -589,7 +560,7 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 
 func (vm *VM) initState(genesisBytes []byte) error {
 	genesis := Genesis{}
-	if err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
@@ -606,21 +577,21 @@ func (vm *VM) initState(genesisBytes []byte) error {
 		}
 
 		txID := tx.ID()
-		vm.ctx.Log.Info("Initializing with AssetID %s", txID)
-		if err := vm.state.SetTx(txID, &tx); err != nil {
+		vm.ctx.Log.Info("initializing with AssetID %s", txID)
+		if err := vm.state.PutTx(txID, &tx); err != nil {
 			return err
 		}
-		if err := vm.state.SetStatus(txID, choices.Accepted); err != nil {
+		if err := vm.state.PutStatus(txID, choices.Accepted); err != nil {
 			return err
 		}
 		for _, utxo := range tx.UTXOs() {
-			if err := vm.state.FundUTXO(utxo); err != nil {
+			if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 				return err
 			}
 		}
 	}
 
-	return vm.state.SetDBInitialized(choices.Processing)
+	return vm.state.SetInitialized()
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
@@ -630,7 +601,7 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	}
 
 	tx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: rawTx,
 		},
 		vm:   vm,
@@ -641,7 +612,7 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 	}
 
 	if tx.Status() == choices.Unknown {
-		if err := vm.state.SetTx(tx.ID(), tx.Tx); err != nil {
+		if err := vm.state.PutTx(tx.ID(), tx.Tx); err != nil {
 			return nil, err
 		}
 		if err := tx.setStatus(choices.Processing); err != nil {
@@ -655,11 +626,11 @@ func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
 
 func (vm *VM) parsePrivateTx(txBytes []byte) (*Tx, error) {
 	tx := &Tx{}
-	err := vm.codec.Unmarshal(txBytes, tx)
+	_, err := vm.codec.Unmarshal(txBytes, tx)
 	if err != nil {
 		return nil, err
 	}
-	unsignedBytes, err := vm.codec.Marshal(&tx.UnsignedTx)
+	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return nil, err
 	}
@@ -679,7 +650,7 @@ func (vm *VM) issueTx(tx snowstorm.Tx) {
 
 func (vm *VM) getUTXO(utxoID *avax.UTXOID) (*avax.UTXO, error) {
 	inputID := utxoID.InputID()
-	utxo, err := vm.state.UTXO(inputID)
+	utxo, err := vm.state.GetUTXO(inputID)
 	if err == nil {
 		return utxo, nil
 	}
@@ -752,7 +723,7 @@ func (vm *VM) verifyTransferOfUTXO(tx UnsignedTx, in *avax.TransferableInput, cr
 
 	utxoAssetID := utxo.AssetID()
 	inAssetID := in.AssetID()
-	if !utxoAssetID.Equals(inAssetID) {
+	if utxoAssetID != inAssetID {
 		return errAssetIDMismatch
 	}
 
@@ -783,7 +754,7 @@ func (vm *VM) verifyOperation(tx UnsignedTx, op *Operation, cred verify.Verifiab
 		}
 
 		utxoAssetID := utxo.AssetID()
-		if !utxoAssetID.Equals(opAssetID) {
+		if utxoAssetID != opAssetID {
 			return errAssetIDMismatch
 		}
 		utxos[i] = utxo.Out
@@ -825,32 +796,14 @@ func (vm *VM) LoadUser(
 
 	user := userState{vm: vm}
 
-	// true iff we should only return UTXOs that reference one or more addresses in [addrsToUse]
-	filterAddresses := len(addrsToUse) > 0
-
-	// The error is explicitly dropped, as it may just mean that there are no addresses.
-	addresses, _ := user.Addresses(db)
-
-	addrs := ids.ShortSet{}
-	for _, addr := range addresses {
-		if !filterAddresses {
-			addrs.Add(addr)
-		} else if filterAddresses && addrsToUse.Contains(addr) {
-			addrs.Add(addr)
-		}
+	kc, err := user.Keychain(db, addrsToUse)
+	if err != nil {
+		return nil, nil, err
 	}
-	utxos, _, _, err := vm.GetUTXOs(addrs, ids.ShortEmpty, ids.Empty, -1)
+
+	utxos, err := vm.getAllUTXOs(kc.Addresses())
 	if err != nil {
 		return nil, nil, fmt.Errorf("problem retrieving user's UTXOs: %w", err)
-	}
-
-	kc := secp256k1fx.NewKeychain()
-	for _, addr := range addrs.List() {
-		sk, err := user.Key(db, addr)
-		if err != nil {
-			return nil, nil, fmt.Errorf("problem retrieving private key: %w", err)
-		}
-		kc.Add(sk)
 	}
 
 	return utxos, kc, db.Close()
@@ -860,23 +813,22 @@ func (vm *VM) LoadUser(
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
-	amounts map[[32]byte]uint64,
+	amounts map[ids.ID]uint64,
 ) (
-	map[[32]byte]uint64,
+	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64, len(amounts))
+	amountsSpent := make(map[ids.ID]uint64, len(amounts))
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amount := amounts[assetKey]
-		amountSpent := amountsSpent[assetKey]
+		amount := amounts[assetID]
+		amountSpent := amountsSpent[assetID]
 
 		if amountSpent >= amount {
 			// we already have enough inputs allocated to this asset
@@ -898,7 +850,7 @@ func (vm *VM) Spend(
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
-		amountsSpent[assetKey] = newAmountSpent
+		amountsSpent[assetID] = newAmountSpent
 
 		// add the new input to the array
 		ins = append(ins, &avax.TransferableInput{
@@ -914,7 +866,7 @@ func (vm *VM) Spend(
 		if amountsSpent[asset] < amount {
 			return nil, nil, nil, fmt.Errorf("want to spend %d of asset %s but only have %d",
 				amount,
-				ids.NewID(asset),
+				asset,
 				amountsSpent[asset],
 			)
 		}
@@ -950,7 +902,7 @@ func (vm *VM) SpendNFT(
 			break
 		}
 
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			// wrong asset ID
 			continue
 		}
@@ -1004,20 +956,19 @@ func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
 ) (
-	map[[32]byte]uint64,
+	map[ids.ID]uint64,
 	[]*avax.TransferableInput,
 	[][]*crypto.PrivateKeySECP256K1R,
 	error,
 ) {
-	amountsSpent := make(map[[32]byte]uint64)
+	amountsSpent := make(map[ids.ID]uint64)
 	time := vm.clock.Unix()
 
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 	for _, utxo := range utxos {
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amountSpent := amountsSpent[assetKey]
+		amountSpent := amountsSpent[assetID]
 
 		inputIntf, signers, err := kc.Spend(utxo.Out, time)
 		if err != nil {
@@ -1034,7 +985,7 @@ func (vm *VM) SpendAll(
 			// there was an error calculating the consumed amount, just error
 			return nil, nil, nil, errSpendOverflow
 		}
-		amountsSpent[assetKey] = newAmountSpent
+		amountsSpent[assetID] = newAmountSpent
 
 		// add the new input to the array
 		ins = append(ins, &avax.TransferableInput{
@@ -1054,7 +1005,7 @@ func (vm *VM) SpendAll(
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
-	amounts map[[32]byte]uint64,
+	amounts map[ids.ID]uint64,
 	to ids.ShortID,
 ) (
 	[]*Operation,
@@ -1071,8 +1022,7 @@ func (vm *VM) Mint(
 		utxo := utxo
 
 		assetID := utxo.AssetID()
-		assetKey := assetID.Key()
-		amount := amounts[assetKey]
+		amount := amounts[assetID]
 		if amount == 0 {
 			continue
 		}
@@ -1112,7 +1062,7 @@ func (vm *VM) Mint(
 		keys = append(keys, signers)
 
 		// remove the asset from the required amounts to mint
-		delete(amounts, assetKey)
+		delete(amounts, assetID)
 	}
 
 	for _, amount := range amounts {
@@ -1151,7 +1101,7 @@ func (vm *VM) MintNFT(
 			break
 		}
 
-		if !utxo.AssetID().Equals(assetID) {
+		if utxo.AssetID() != assetID {
 			// wrong asset id
 			continue
 		}
@@ -1195,61 +1145,6 @@ func (vm *VM) MintNFT(
 
 	sortOperationsWithSigners(ops, keys, vm.codec)
 	return ops, keys, nil
-}
-
-// ParseLocalAddress takes in an address for this chain and produces the ID
-func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
-	chainID, addr, err := vm.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ShortID{}, err
-	}
-	if !chainID.Equals(vm.ctx.ChainID) {
-		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
-			vm.ctx.ChainID, chainID)
-	}
-	return addr, nil
-}
-
-// ParseAddress takes in an address and produces the ID of the chain it's for
-// the ID of the address
-func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
-	chainIDAlias, hrp, addrBytes, err := formatting.ParseAddress(addrStr)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	chainID, err := vm.ctx.BCLookup.Lookup(chainIDAlias)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-
-	expectedHRP := constants.GetHRP(vm.ctx.NetworkID)
-	if hrp != expectedHRP {
-		return ids.ID{}, ids.ShortID{}, fmt.Errorf("expected hrp %q but got %q",
-			expectedHRP, hrp)
-	}
-
-	addr, err := ids.ToShortID(addrBytes)
-	if err != nil {
-		return ids.ID{}, ids.ShortID{}, err
-	}
-	return chainID, addr, nil
-}
-
-// FormatLocalAddress takes in a raw address and produces the formatted address
-func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
-	return vm.FormatAddress(vm.ctx.ChainID, addr)
-}
-
-// FormatAddress takes in a chainID and a raw address and produces the formatted
-// address
-func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
-	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
-	if err != nil {
-		return "", err
-	}
-	hrp := constants.GetHRP(vm.ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
 }
 
 // selectChangeAddr returns the change address to be used for [kc] when [changeAddr] is given

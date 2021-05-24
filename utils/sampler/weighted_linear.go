@@ -28,10 +28,11 @@ type weightedLinear struct {
 }
 
 func (s *weightedLinear) Initialize(weights []uint64) error {
-	if len(weights) > len(s.arr) {
-		s.arr = make([]weightedLinearElement, len(weights))
+	numWeights := len(weights)
+	if numWeights <= cap(s.arr) {
+		s.arr = s.arr[:numWeights]
 	} else {
-		s.arr = s.arr[:len(weights)]
+		s.arr = make([]weightedLinearElement, numWeights)
 	}
 
 	for i, weight := range weights {
@@ -77,12 +78,15 @@ type innerSortWeightedLinear []weightedLinearElement
 func (lst innerSortWeightedLinear) Less(i, j int) bool {
 	return lst[i].cumulativeWeight > lst[j].cumulativeWeight
 }
+
 func (lst innerSortWeightedLinear) Len() int {
 	return len(lst)
 }
+
 func (lst innerSortWeightedLinear) Swap(i, j int) {
 	lst[j], lst[i] = lst[i], lst[j]
 }
+
 func sortWeightedLinear(lst []weightedLinearElement) {
 	sort.Sort(innerSortWeightedLinear(lst))
 }

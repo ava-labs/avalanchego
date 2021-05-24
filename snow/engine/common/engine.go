@@ -4,6 +4,7 @@
 package common
 
 import (
+	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -20,7 +21,10 @@ type Engine interface {
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
-	Health() (interface{}, error)
+	health.Checkable
+
+	// GetVM returns this engine's VM
+	GetVM() VM
 }
 
 // Handler defines the functions that are acted on the node
@@ -64,7 +68,7 @@ type FrontierHandler interface {
 	AcceptedFrontier(
 		validatorID ids.ShortID,
 		requestID uint32,
-		containerIDs ids.Set,
+		containerIDs []ids.ID,
 	) error
 
 	// Notify this engine that a get accepted frontier request it issued has
@@ -96,7 +100,7 @@ type AcceptedHandler interface {
 	GetAccepted(
 		validatorID ids.ShortID,
 		requestID uint32,
-		containerIDs ids.Set,
+		containerIDs []ids.ID,
 	) error
 
 	// Notify this engine of a set of accepted vertices.
@@ -109,7 +113,7 @@ type AcceptedHandler interface {
 	Accepted(
 		validatorID ids.ShortID,
 		requestID uint32,
-		containerIDs ids.Set,
+		containerIDs []ids.ID,
 	) error
 
 	// Notify this engine that a get accepted request it issued has failed.
@@ -262,7 +266,7 @@ type QueryHandler interface {
 	// This function can be called by any validator. It is not safe to assume
 	// this message is in response to a PullQuery or a PushQuery message.
 	// However, the validatorID is assumed to be authenticated.
-	Chits(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error
+	Chits(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 
 	// Notify this engine that a query it issued has failed.
 	//
@@ -286,8 +290,18 @@ type InternalHandler interface {
 	// able to run the engine.
 	Startup() error
 
+	// Notify this engine that a registered timeout has fired.
+	Timeout() error
+
 	// Gossip to the network a container on the accepted frontier
 	Gossip() error
+
+	// Halt this engine.
+	//
+	// This function will be called before the environment starts exiting. This
+	// function is slightly special, in that it does not expect the chain's
+	// context lock to be held before calling this function.
+	Halt()
 
 	// Shutdown this engine.
 	//

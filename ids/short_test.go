@@ -4,11 +4,12 @@
 package ids
 
 import (
+	"fmt"
 	"testing"
 )
 
 func TestShortString(t *testing.T) {
-	id := NewShortID([20]byte{1})
+	id := ShortID{1}
 
 	xPrefixedID := id.PrefixedString("X-")
 	pPrefixedID := id.PrefixedString("P-")
@@ -17,7 +18,7 @@ func TestShortString(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !newID.Equals(id) {
+	if newID != id {
 		t.Fatalf("ShortFromPrefixedString did not produce the identical ID")
 	}
 
@@ -50,5 +51,76 @@ func TestIsUniqueShortIDs(t *testing.T) {
 	ids = append(ids, id1)
 	if IsUniqueShortIDs(ids) == true {
 		t.Fatal("should not be unique")
+	}
+}
+
+func TestIsSortedAndUniqueShortIDs(t *testing.T) {
+	id0 := ShortID{0}
+	id1 := ShortID{1}
+	id2 := ShortID{2}
+
+	tests := []struct {
+		arr      []ShortID
+		isSorted bool
+	}{
+		{
+			arr:      nil,
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{GenerateTestShortID()},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{id0, id0},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id1},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{id1, id0},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id1, id2},
+			isSorted: true,
+		},
+		{
+			arr:      []ShortID{id0, id1, id2, id2},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id1, id1},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id0, id0, id1},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id2, id1, id0},
+			isSorted: false,
+		},
+		{
+			arr:      []ShortID{id2, id1, id2},
+			isSorted: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(fmt.Sprintf("%v", test.arr), func(t *testing.T) {
+			if test.isSorted {
+				if !IsSortedAndUniqueShortIDs(test.arr) {
+					t.Fatal("should have been marked as sorted and unique")
+				}
+			} else if IsSortedAndUniqueShortIDs(test.arr) {
+				t.Fatal("shouldn't have been marked as sorted and unique")
+			}
+		})
 	}
 }

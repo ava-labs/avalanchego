@@ -26,7 +26,7 @@ func TestMintOperationOuts(t *testing.T) {
 			OutputOwners: OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
-					ids.NewShortID(addrBytes),
+					addr,
 				},
 			},
 		},

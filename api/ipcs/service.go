@@ -10,7 +10,9 @@ import (
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
@@ -19,14 +21,14 @@ import (
 
 // IPCServer maintains the IPCs
 type IPCServer struct {
-	httpServer   *api.Server
+	httpServer   *server.Server
 	chainManager chains.Manager
 	log          logging.Logger
 	ipcs         *ipcs.ChainIPCs
 }
 
 // NewService returns a new IPCs API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server, ipcs *ipcs.ChainIPCs) (*common.HTTPHandler, error) {
 	ipcServer := &IPCServer{
 		log:          log,
 		chainManager: chainManager,
@@ -96,4 +98,15 @@ func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockc
 
 	reply.Success = true
 	return err
+}
+
+// GetPublishedBlockchainsReply is the result from calling GetPublishedBlockchains
+type GetPublishedBlockchainsReply struct {
+	Chains []ids.ID `json:"chains"`
+}
+
+// GetPublishedBlockchains returns blockchains being published
+func (ipc *IPCServer) GetPublishedBlockchains(r *http.Request, args *struct{}, reply *GetPublishedBlockchainsReply) error {
+	reply.Chains = ipc.ipcs.GetPublishedBlockchains()
+	return nil
 }

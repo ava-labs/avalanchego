@@ -7,9 +7,9 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -24,8 +24,8 @@ var (
 	denominationTooLarge = byte(maxDenomination + 1)
 )
 
-func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Context) {
-	c := setupCodec()
+func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Manager, *snow.Context) {
+	_, c := setupCodec()
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -42,12 +42,12 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 			}},
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
-					TxID: ids.NewID([32]byte{
+					TxID: ids.ID{
 						0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8,
 						0xf7, 0xf6, 0xf5, 0xf4, 0xf3, 0xf2, 0xf1, 0xf0,
 						0xef, 0xee, 0xed, 0xec, 0xeb, 0xea, 0xe9, 0xe8,
 						0xe7, 0xe6, 0xe5, 0xe4, 0xe3, 0xe2, 0xe1, 0xe0,
-					}),
+					},
 					OutputIndex: 1,
 				},
 				Asset: avax.Asset{ID: assetID},
@@ -78,7 +78,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Codec, *snow.Contex
 		},
 	}
 
-	unsignedBytes, err := c.Marshal(tx)
+	unsignedBytes, err := c.Marshal(codecVersion, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,21 +172,21 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 	tx := &Tx{UnsignedTx: &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID: 2,
-			BlockchainID: ids.NewID([32]byte{
+			BlockchainID: ids.ID{
 				0xff, 0xff, 0xff, 0xff, 0xee, 0xee, 0xee, 0xee,
 				0xdd, 0xdd, 0xdd, 0xdd, 0xcc, 0xcc, 0xcc, 0xcc,
 				0xbb, 0xbb, 0xbb, 0xbb, 0xaa, 0xaa, 0xaa, 0xaa,
 				0x99, 0x99, 0x99, 0x99, 0x88, 0x88, 0x88, 0x88,
-			}),
+			},
 			Memo: []byte{0x00, 0x01, 0x02, 0x03},
 			Outs: []*avax.TransferableOutput{{
 				Asset: avax.Asset{
-					ID: ids.NewID([32]byte{
+					ID: ids.ID{
 						0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 						0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 						0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 						0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-					}),
+					},
 				},
 				Out: &secp256k1fx.TransferOutput{
 					Amt: 12345,
@@ -194,37 +194,37 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 						Locktime:  54321,
 						Threshold: 1,
 						Addrs: []ids.ShortID{
-							ids.NewShortID([20]byte{
+							{
 								0x51, 0x02, 0x5c, 0x61, 0xfb, 0xcf, 0xc0, 0x78,
 								0xf6, 0x93, 0x34, 0xf8, 0x34, 0xbe, 0x6d, 0xd2,
 								0x6d, 0x55, 0xa9, 0x55,
-							}),
-							ids.NewShortID([20]byte{
+							},
+							{
 								0xc3, 0x34, 0x41, 0x28, 0xe0, 0x60, 0x12, 0x8e,
 								0xde, 0x35, 0x23, 0xa2, 0x4a, 0x46, 0x1c, 0x89,
 								0x43, 0xab, 0x08, 0x59,
-							}),
+							},
 						},
 					},
 				},
 			}},
 			Ins: []*avax.TransferableInput{{
 				UTXOID: avax.UTXOID{
-					TxID: ids.NewID([32]byte{
+					TxID: ids.ID{
 						0xf1, 0xe1, 0xd1, 0xc1, 0xb1, 0xa1, 0x91, 0x81,
 						0x71, 0x61, 0x51, 0x41, 0x31, 0x21, 0x11, 0x01,
 						0xf0, 0xe0, 0xd0, 0xc0, 0xb0, 0xa0, 0x90, 0x80,
 						0x70, 0x60, 0x50, 0x40, 0x30, 0x20, 0x10, 0x00,
-					}),
+					},
 					OutputIndex: 5,
 				},
 				Asset: avax.Asset{
-					ID: ids.NewID([32]byte{
+					ID: ids.ID{
 						0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 						0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 						0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
 						0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
-					}),
+					},
 				},
 				In: &secp256k1fx.TransferInput{
 					Amt: 123456789,
@@ -247,16 +247,16 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 							Locktime:  54321,
 							Threshold: 1,
 							Addrs: []ids.ShortID{
-								ids.NewShortID([20]byte{
+								{
 									0x51, 0x02, 0x5c, 0x61, 0xfb, 0xcf, 0xc0, 0x78,
 									0xf6, 0x93, 0x34, 0xf8, 0x34, 0xbe, 0x6d, 0xd2,
 									0x6d, 0x55, 0xa9, 0x55,
-								}),
-								ids.NewShortID([20]byte{
+								},
+								{
 									0xc3, 0x34, 0x41, 0x28, 0xe0, 0x60, 0x12, 0x8e,
 									0xde, 0x35, 0x23, 0xa2, 0x4a, 0x46, 0x1c, 0x89,
 									0x43, 0xab, 0x08, 0x59,
-								}),
+								},
 							},
 						},
 					},
@@ -265,7 +265,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 		},
 	}}
 
-	c := setupCodec()
+	_, c := setupCodec()
 	if err := tx.SignSECP256K1Fx(c, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -304,7 +304,7 @@ func TestCreateAssetTxGetters(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -327,7 +327,7 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := (*CreateAssetTx)(nil)
 
@@ -338,7 +338,7 @@ func TestCreateAssetTxSyntacticVerifyNil(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -361,7 +361,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -386,7 +386,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -409,7 +409,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -432,7 +432,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -452,7 +452,7 @@ func TestCreateAssetTxSyntacticVerifyNoFxs(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -475,7 +475,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -498,7 +498,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -521,7 +521,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -544,7 +544,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -567,7 +567,7 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -590,7 +590,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -613,7 +613,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 
 func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
 	ctx := NewContext(t)
-	c := setupCodec()
+	_, c := setupCodec()
 
 	tx := &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -780,7 +780,6 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 	if err := tx.SyntacticVerify(ctx, c, assetID, 0, 0, 3); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to non-unique initial states")
 	}
-
 }
 
 func TestCreateAssetTxSyntacticVerifyBaseTx(t *testing.T) {

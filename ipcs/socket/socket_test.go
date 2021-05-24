@@ -29,9 +29,7 @@ func TestSocketSendAndReceive(t *testing.T) {
 	// Start sending in the background
 	go func() {
 		for {
-			if err := socket.Send(msg); err != nil {
-				t.Fatal("Failed to send to socket:", err.Error())
-			}
+			socket.Send(msg)
 		}
 	}()
 

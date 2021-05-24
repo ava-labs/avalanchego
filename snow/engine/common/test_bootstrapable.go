@@ -18,9 +18,9 @@ type BootstrapableTest struct {
 	CantFilterAccepted,
 	CantForceAccepted bool
 
-	CurrentAcceptedFrontierF func() (acceptedContainerIDs ids.Set)
-	FilterAcceptedF          func(containerIDs ids.Set) (acceptedContainerIDs ids.Set)
-	ForceAcceptedF           func(acceptedContainerIDs ids.Set) error
+	CurrentAcceptedFrontierF func() (acceptedContainerIDs []ids.ID, err error)
+	FilterAcceptedF          func(containerIDs []ids.ID) (acceptedContainerIDs []ids.ID)
+	ForceAcceptedF           func(acceptedContainerIDs []ids.ID) error
 }
 
 // Default sets the default on call handling
@@ -31,29 +31,29 @@ func (b *BootstrapableTest) Default(cant bool) {
 }
 
 // CurrentAcceptedFrontier implements the Bootstrapable interface
-func (b *BootstrapableTest) CurrentAcceptedFrontier() ids.Set {
+func (b *BootstrapableTest) CurrentAcceptedFrontier() ([]ids.ID, error) {
 	if b.CurrentAcceptedFrontierF != nil {
 		return b.CurrentAcceptedFrontierF()
 	}
 	if b.CantCurrentAcceptedFrontier && b.T != nil {
 		b.T.Fatalf("Unexpectedly called CurrentAcceptedFrontier")
 	}
-	return ids.Set{}
+	return nil, nil
 }
 
 // FilterAccepted implements the Bootstrapable interface
-func (b *BootstrapableTest) FilterAccepted(containerIDs ids.Set) ids.Set {
+func (b *BootstrapableTest) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	if b.FilterAcceptedF != nil {
 		return b.FilterAcceptedF(containerIDs)
 	}
 	if b.CantFilterAccepted && b.T != nil {
 		b.T.Fatalf("Unexpectedly called FilterAccepted")
 	}
-	return ids.Set{}
+	return nil
 }
 
 // ForceAccepted implements the Bootstrapable interface
-func (b *BootstrapableTest) ForceAccepted(containerIDs ids.Set) error {
+func (b *BootstrapableTest) ForceAccepted(containerIDs []ids.ID) error {
 	if b.ForceAcceptedF != nil {
 		return b.ForceAcceptedF(containerIDs)
 	} else if b.CantForceAccepted {

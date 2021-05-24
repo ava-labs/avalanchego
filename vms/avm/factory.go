@@ -10,7 +10,7 @@ import (
 
 // ID that this VM uses when labeled
 var (
-	ID = ids.NewID([32]byte{'a', 'v', 'm'})
+	ID = ids.ID{'a', 'v', 'm'}
 )
 
 // Factory ...

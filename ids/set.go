@@ -10,17 +10,32 @@ import (
 const (
 	// The minimum capacity of a set
 	minSetSize = 16
+
+	// If a set has more than this many keys, it will be cleared by setting the map to nil
+	// rather than iteratively deleting
+	clearSizeThreshold = 512
 )
 
 // Set is a set of IDs
-type Set map[[32]byte]bool
+type Set map[ID]struct{}
+
+// Return a new set with initial capacity [size].
+// More or less than [size] elements can be added to this set.
+// Using NewSet() rather than ids.Set{} is just an optimization that can
+// be used if you know how many elements will be put in this set.
+func NewSet(size int) Set {
+	if size < 0 {
+		return Set{}
+	}
+	return make(map[ID]struct{}, size)
+}
 
 func (ids *Set) init(size int) {
 	if *ids == nil {
 		if minSetSize > size {
 			size = minSetSize
 		}
-		*ids = make(map[[32]byte]bool, size)
+		*ids = make(map[ID]struct{}, size)
 	}
 }
 
@@ -28,7 +43,7 @@ func (ids *Set) init(size int) {
 func (ids *Set) Add(idList ...ID) {
 	ids.init(2 * len(idList))
 	for _, id := range idList {
-		(*ids)[*id.ID] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
@@ -36,14 +51,14 @@ func (ids *Set) Add(idList ...ID) {
 func (ids *Set) Union(set Set) {
 	ids.init(2 * set.Len())
 	for id := range set {
-		(*ids)[id] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
 // Contains returns true if the set contains this id, false otherwise
 func (ids *Set) Contains(id ID) bool {
-	ids.init(1)
-	return (*ids)[*id.ID]
+	_, contains := (*ids)[id]
+	return contains
 }
 
 // Overlaps returns true if the intersection of the set is non-empty
@@ -67,21 +82,28 @@ func (ids Set) Len() int { return len(ids) }
 
 // Remove all the id from this set, if the id isn't in the set, nothing happens
 func (ids *Set) Remove(idList ...ID) {
-	ids.init(1)
 	for _, id := range idList {
-		delete(*ids, *id.ID)
+		delete(*ids, id)
 	}
 }
 
 // Clear empties this set
-func (ids *Set) Clear() { *ids = nil }
+func (ids *Set) Clear() {
+	if len(*ids) > clearSizeThreshold {
+		*ids = nil
+		return
+	}
+	for key := range *ids {
+		delete(*ids, key)
+	}
+}
 
 // List converts this set into a list
 func (ids Set) List() []ID {
 	idList := make([]ID, ids.Len())
 	i := 0
 	for id := range ids {
-		idList[i] = NewID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -102,7 +124,7 @@ func (ids Set) CappedList(size int) []ID {
 		if i >= size {
 			break
 		}
-		idList[i] = NewID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -114,7 +136,7 @@ func (ids Set) Equals(oIDs Set) bool {
 		return false
 	}
 	for key := range oIDs {
-		if !ids[key] {
+		if _, contains := ids[key]; !contains {
 			return false
 		}
 	}
@@ -126,12 +148,12 @@ func (ids Set) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("{")
 	first := true
-	for idBytes := range ids {
+	for id := range ids {
 		if !first {
 			sb.WriteString(", ")
 		}
 		first = false
-		sb.WriteString(NewID(idBytes).String())
+		sb.WriteString(id.String())
 	}
 	sb.WriteString("}")
 	return sb.String()

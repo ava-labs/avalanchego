@@ -78,7 +78,7 @@ func (f *FactorySECP256K1R) RecoverHashPublicKey(hash, sig []byte) (PublicKey, e
 	cacheBytes := make([]byte, len(hash)+len(sig))
 	copy(cacheBytes, hash)
 	copy(cacheBytes[len(hash):], sig)
-	id := ids.NewID(hashing.ComputeHash256Array(cacheBytes))
+	id := hashing.ComputeHash256Array(cacheBytes)
 	if cachedPublicKey, ok := f.Cache.Get(id); ok {
 		return cachedPublicKey.(*PublicKeySECP256K1R), nil
 	}
@@ -125,7 +125,7 @@ func (k *PublicKeySECP256K1R) VerifyHash(hash, sig []byte) bool {
 	if err != nil {
 		return false
 	}
-	return k.Address().Equals(pk.Address())
+	return k.Address() == pk.Address()
 }
 
 // ToECDSA returns the ecdsa representation of this public key
@@ -135,7 +135,7 @@ func (k *PublicKeySECP256K1R) ToECDSA() *stdecdsa.PublicKey {
 
 // Address implements the PublicKey interface
 func (k *PublicKeySECP256K1R) Address() ids.ShortID {
-	if k.addr.IsZero() {
+	if k.addr == ids.ShortEmpty {
 		addr, err := ids.ToShortID(hashing.PubkeyBytesToAddress(k.Bytes()))
 		if err != nil {
 			panic(err)

@@ -5,6 +5,7 @@ package state
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -16,11 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-func newSerializer(t *testing.T, parseTx func([]byte) (snowstorm.Tx, error)) *Serializer {
+func newSerializer(t *testing.T, parse func([]byte) (snowstorm.Tx, error)) *Serializer {
 	vm := vertex.TestVM{}
 	vm.T = t
 	vm.Default(true)
-	vm.ParseTxF = parseTx
+	vm.ParseTxF = parse
 
 	baseDB := memdb.New()
 	ctx := snow.DefaultContextTest()
@@ -34,7 +35,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 
 	uVtx := &uniqueVertex{
 		serializer: s,
-		vtxID:      ids.NewID([32]byte{}),
+		vtxID:      ids.ID{},
 	}
 
 	status := uVtx.Status()
@@ -59,23 +60,32 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 }
 
 func TestUniqueVertexCacheHit(t *testing.T) {
-	s := newSerializer(t, nil)
-
 	testTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
-		IDV: ids.NewID([32]byte{1}),
+		IDV: ids.ID{1},
 	}}
 
-	vtxID := ids.NewID([32]byte{2})
-	parentID := ids.NewID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
+	s := newSerializer(t, func(b []byte) (snowstorm.Tx, error) {
+		if !bytes.Equal(b, []byte{0}) {
+			t.Fatal("unknown tx")
+		}
+		return testTx, nil
+	})
+
+	vtxID := ids.ID{2}
+	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.NewID([32]byte{}) // Same as chainID of serializer
+	chainID := ids.ID{} // Same as chainID of serializer
 	height := uint64(1)
-	vtx := &innerVertex{
-		id:        vtxID,
-		parentIDs: parentIDs,
-		chainID:   chainID,
-		height:    height,
-		txs:       []snowstorm.Tx{testTx},
+	vtx, err := vertex.Build(
+		chainID,
+		height,
+		0,
+		parentIDs,
+		[][]byte{{0}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	uVtx := &uniqueVertex{
@@ -98,7 +108,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	if len(parents) != 1 {
 		t.Fatalf("Parents should have length 1")
 	}
-	if !parents[0].ID().Equals(parentID) {
+	if parents[0].ID() != parentID {
 		t.Fatalf("ParentID is incorrect")
 	}
 
@@ -130,7 +140,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	txBytes := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	testTx := &snowstorm.TestTx{
 		TestDecidable: choices.TestDecidable{
-			IDV: ids.NewID([32]byte{1}),
+			IDV: ids.ID{1},
 		},
 		BytesV: txBytes,
 	}
@@ -142,22 +152,24 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		return testTx, nil
 	}
 	s := newSerializer(t, parseTx)
-	parentID := ids.NewID([32]byte{'p', 'a', 'r', 'e', 'n', 't'})
+	parentID := ids.ID{'p', 'a', 'r', 'e', 'n', 't'}
 	parentIDs := []ids.ID{parentID}
-	chainID := ids.NewID([32]byte{})
+	chainID := ids.ID{}
 	height := uint64(1)
-	innerVertex := &innerVertex{
-		parentIDs: parentIDs,
-		chainID:   chainID,
-		height:    height,
-		txs:       []snowstorm.Tx{testTx},
-	}
-	vertexBytes, err := innerVertex.Marshal()
+	innerVertex, err := vertex.Build(
+		chainID,
+		height,
+		0,
+		parentIDs,
+		[][]byte{txBytes},
+		nil,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	vtxID := ids.NewID(hashing.ComputeHash256Array(vertexBytes))
+	vtxID := innerVertex.ID()
+	vtxBytes := innerVertex.Bytes()
 
 	uVtx := uniqueVertex{
 		vtxID:      vtxID,
@@ -170,7 +182,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	}
 
 	// Register cache hit
-	vtx, err := newUniqueVertex(s, vertexBytes)
+	vtx, err := newUniqueVertex(s, vtxBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +203,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		// Call bytes first to check for regression bug
 		// where it's unsafe to call Bytes or Verify directly
 		// after calling Status to refresh a vertex
-		if !bytes.Equal(vtx.Bytes(), vertexBytes) {
+		if !bytes.Equal(vtx.Bytes(), vtxBytes) {
 			t.Fatalf("Found unexpected vertex bytes")
 		}
 
@@ -212,7 +224,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 			t.Fatalf("Expected vertex height to be %d, but found %d", height, vtxHeight)
 		case len(vtxParents) != 1:
 			t.Fatalf("Expected vertex to have 1 parent, but found %d", len(vtxParents))
-		case !vtxParents[0].ID().Equals(parentID):
+		case vtxParents[0].ID() != parentID:
 			t.Fatalf("Found unexpected parentID: %s, expected: %s", vtxParents[0].ID(), parentID)
 		case len(vtxTxs) != 1:
 			t.Fatalf("Exepcted vertex to have 1 transaction, but found %d", len(vtxTxs))
@@ -231,7 +243,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	validateVertex(vtx, choices.Processing)
 
 	// Check that a newly parsed vertex refreshed from the cache is valid
-	vtx, err = newUniqueVertex(s, vertexBytes)
+	vtx, err = newUniqueVertex(s, vtxBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,9 +260,80 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	validateVertex(vtx, choices.Processing)
 
 	s.state.uniqueVtx.Flush()
-	vtx, err = newUniqueVertex(s, vertexBytes)
+	vtx, err = newUniqueVertex(s, vtxBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
 	validateVertex(vtx, choices.Processing)
+}
+
+func TestParseVertexWithInvalidTxs(t *testing.T) {
+	ctx := snow.DefaultContextTest()
+	statelessVertex, err := vertex.Build(
+		ctx.ChainID,
+		0,
+		0,
+		nil,
+		[][]byte{{1}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vtxBytes := statelessVertex.Bytes()
+
+	s := newSerializer(t, func(b []byte) (snowstorm.Tx, error) {
+		switch {
+		case bytes.Equal(b, []byte{1}):
+			return nil, errors.New("invalid tx")
+		case bytes.Equal(b, []byte{2}):
+			return &snowstorm.TestTx{}, nil
+		default:
+			return nil, errors.New("invalid tx")
+		}
+	})
+
+	if _, err := s.ParseVtx(vtxBytes); err == nil {
+		t.Fatal("should have failed to parse the vertex due to invalid transactions")
+	}
+
+	if _, err := s.ParseVtx(vtxBytes); err == nil {
+		t.Fatal("should have failed to parse the vertex after previously error on parsing invalid transactions")
+	}
+
+	vtxID := hashing.ComputeHash256Array(vtxBytes)
+	if _, err := s.GetVtx(vtxID); err == nil {
+		t.Fatal("should have failed to lookup invalid vertex after previously error on parsing invalid transactions")
+	}
+
+	childStatelessVertex, err := vertex.Build(
+		ctx.ChainID,
+		1,
+		0,
+		[]ids.ID{vtxID},
+		[][]byte{{2}},
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	childVtxBytes := childStatelessVertex.Bytes()
+
+	childVtx, err := s.ParseVtx(childVtxBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parents, err := childVtx.Parents()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parents) != 1 {
+		t.Fatal("wrong number of parents")
+	}
+	parent := parents[0]
+
+	if parent.Status().Fetched() {
+		t.Fatal("the parent is invalid, so it shouldn't be marked as fetched")
+	}
 }

@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"unicode"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -54,7 +54,7 @@ type UnsignedCreateChainTx struct {
 // Verify this transaction is well-formed
 func (tx *UnsignedCreateChainTx) Verify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	feeAmount uint64,
 	feeAssetID ids.ID,
 ) error {
@@ -63,13 +63,11 @@ func (tx *UnsignedCreateChainTx) Verify(
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SubnetID.IsZero():
-		return errNoSubnetID
-	case tx.SubnetID.Equals(constants.PrimaryNetworkID):
+	case tx.SubnetID == constants.PrimaryNetworkID:
 		return errDSCantValidate
 	case len(tx.ChainName) > maxNameLen:
 		return errNameTooLong
-	case tx.VMID.IsZero():
+	case tx.VMID == ids.Empty:
 		return errInvalidVMID
 	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
 		return errFxIDsNotSortedAndUnique
@@ -97,7 +95,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	vs VersionedState,
 	stx *Tx,
 ) (
 	func() error,
@@ -107,7 +105,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -117,49 +115,43 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, baseTxCreds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
-	txID := tx.ID()
-
-	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
+	subnetIntf, _, err := vs.GetTx(tx.SubnetID)
+	if err == database.ErrNotFound {
+		return nil, permError{
+			fmt.Errorf("%s isn't a known subnet", tx.SubnetID),
+		}
+	}
+	if err != nil {
 		return nil, tempError{err}
 	}
-	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return nil, tempError{err}
+
+	subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
+	if !ok {
+		return nil, permError{
+			fmt.Errorf("%s isn't a subnet", tx.SubnetID),
+		}
 	}
 
 	// Verify that this chain is authorized by the subnet
-	subnet, err := vm.getSubnet(db, tx.SubnetID)
-	if err != nil {
-		return nil, err
-	}
-	unsignedSubnet := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
-	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, unsignedSubnet.Owner); err != nil {
+	if err := vm.fx.VerifyPermission(tx, tx.SubnetAuth, subnetCred, subnet.Owner); err != nil {
 		return nil, permError{err}
 	}
 
-	// Attempt to add the new chain to the database
-	currentChains, sErr := vm.getChains(db) // chains that currently exist
-	if sErr != nil {
-		return nil, tempError{fmt.Errorf("couldn't get list of blockchains: %w", sErr)}
-	}
-	for _, chain := range currentChains {
-		if chain.ID().Equals(tx.ID()) {
-			return nil, permError{fmt.Errorf("chain %s already exists", chain.ID())}
-		}
-	}
-	currentChains = append(currentChains, stx) // add this new chain
-	if err := vm.putChains(db, currentChains); err != nil {
-		return nil, tempError{err}
-	}
+	// Consume the UTXOS
+	consumeInputs(vs, tx.Ins)
+	// Produce the UTXOS
+	txID := tx.ID()
+	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	// Attempt to the new chain to the database
+	vs.AddChain(stx)
 
 	// If this proposal is committed and this node is a member of the
 	// subnet that validates the blockchain, create the blockchain
-	onAccept := func() error { vm.createChain(stx); return nil }
+	onAccept := func() error { return vm.createChain(stx) }
 	return onAccept, nil
 }
 
@@ -173,12 +165,12 @@ func (vm *VM) newCreateChainTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.creationTxFee, changeAddr)
+	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 
-	subnetAuth, subnetSigners, err := vm.authorize(vm.DB, subnetID, keys)
+	subnetAuth, subnetSigners, err := vm.authorize(vm.internalState, subnetID, keys)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't authorize tx's subnet restrictions: %w", err)
 	}
@@ -190,8 +182,8 @@ func (vm *VM) newCreateChainTx(
 	// Create the tx
 	utx := &UnsignedCreateChainTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: vm.Ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
 			Outs:         outs,
 		}},
@@ -206,5 +198,5 @@ func (vm *VM) newCreateChainTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
 }

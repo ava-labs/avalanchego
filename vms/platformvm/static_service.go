@@ -33,16 +33,7 @@ var (
 )
 
 // StaticService defines the static API methods exposed by the platform VM
-type StaticService struct{ encodingManager formatting.EncodingManager }
-
-// CreateStaticService ...
-func CreateStaticService(defaultEnc string) (*StaticService, error) {
-	encodingManager, err := formatting.NewEncodingManager(defaultEnc)
-	if err != nil {
-		return nil, err
-	}
-	return &StaticService{encodingManager: encodingManager}, nil
-}
+type StaticService struct{}
 
 // APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type APIUTXO struct {
@@ -138,13 +129,13 @@ type BuildGenesisArgs struct {
 	Time          json.Uint64           `json:"time"`
 	InitialSupply json.Uint64           `json:"initialSupply"`
 	Message       string                `json:"message"`
-	Encoding      string                `json:"encoding"`
+	Encoding      formatting.Encoding   `json:"encoding"`
 }
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes    string `json:"bytes"`
-	Encoding string `json:"encoding"`
+	Bytes    string              `json:"bytes"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // GenesisUTXO adds messages to UTXOs
@@ -189,10 +180,6 @@ func bech32ToID(address string) (ids.ShortID, error) {
 
 // BuildGenesis build the genesis state of the Platform Chain (and thereby the Avalanche network.)
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	encoding, err := ss.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
 	// Specify the UTXOs on the Platform chain that exist at genesis.
 	utxos := make([]*GenesisUTXO, 0, len(args.UTXOs))
 	for i, apiUTXO := range args.UTXOs {
@@ -225,7 +212,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
 		}
-		messageBytes, err := encoding.ConvertString(apiUTXO.Message)
+		messageBytes, err := formatting.Decode(args.Encoding, apiUTXO.Message)
 		if err != nil {
 			return fmt.Errorf("problem decoding UTXO message bytes: %w", err)
 		}
@@ -241,7 +228,6 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		weight := uint64(0)
 		stake := make([]*avax.TransferableOutput, len(validator.Staked))
 		sortAPIUTXOs(validator.Staked)
-		memo := []byte(nil)
 		for i, apiUTXO := range validator.Staked {
 			addrID, err := bech32ToID(apiUTXO.Address)
 			if err != nil {
@@ -272,11 +258,6 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				return errStakeOverflow
 			}
 			weight = newWeight
-			messageBytes, err := encoding.ConvertString(apiUTXO.Message)
-			if err != nil {
-				return fmt.Errorf("problem decoding validator UTXO message bytes: %w", err)
-			}
-			memo = append(memo, messageBytes...)
 		}
 
 		if weight == 0 {
@@ -333,7 +314,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	// Specify the chains that exist at genesis.
 	chains := []*Tx{}
 	for _, chain := range args.Chains {
-		genesisBytes, err := encoding.ConvertString(chain.GenesisData)
+		genesisBytes, err := formatting.Decode(args.Encoding, chain.GenesisData)
 		if err != nil {
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
@@ -367,10 +348,16 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := GenesisCodec.Marshal(genesis)
-	reply.Bytes = encoding.ConvertBytes(bytes)
-	reply.Encoding = encoding.Encoding()
-	return err
+	bytes, err := GenesisCodec.Marshal(codecVersion, genesis)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal genesis: %w", err)
+	}
+	reply.Bytes, err = formatting.Encode(args.Encoding, bytes)
+	if err != nil {
+		return fmt.Errorf("couldn't encode genesis as string: %w", err)
+	}
+	reply.Encoding = args.Encoding
+	return nil
 }
 
 type innerSortAPIUTXO []APIUTXO

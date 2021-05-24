@@ -14,7 +14,7 @@ import (
 )
 
 func TestNewWallet(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -25,7 +25,7 @@ func TestNewWallet(t *testing.T) {
 }
 
 func TestWalletGetAddress(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -35,13 +35,13 @@ func TestWalletGetAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if addr0.IsZero() || addr0.Equals(ids.ShortEmpty) {
+	if addr0 == ids.ShortEmpty {
 		t.Fatalf("expected new address but got %s", addr0)
 	}
 }
 
 func TestWalletGetMultipleAddresses(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -55,13 +55,13 @@ func TestWalletGetMultipleAddresses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !addr0.Equals(addr1) {
+	if addr0 != addr1 {
 		t.Fatalf("Should have returned the same address from multiple Get Address calls")
 	}
 }
 
 func TestWalletEmptyBalance(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -73,7 +73,7 @@ func TestWalletEmptyBalance(t *testing.T) {
 }
 
 func TestWalletAddUTXO(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +95,7 @@ func TestWalletAddUTXO(t *testing.T) {
 }
 
 func TestWalletAddInvalidUTXO(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -114,7 +114,7 @@ func TestWalletAddInvalidUTXO(t *testing.T) {
 }
 
 func TestWalletCreateTx(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func TestWalletCreateTx(t *testing.T) {
 }
 
 func TestWalletImportKey(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -183,13 +183,13 @@ func TestWalletImportKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !addr0.Equals(addr1) {
+	if addr0 != addr1 {
 		t.Fatalf("Should have returned the same address from the Get Address call")
 	}
 }
 
 func TestWalletString(t *testing.T) {
-	chainID := ids.NewID([32]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	chainID := ids.ID{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 	w, err := NewWallet(logging.NoLog{}, 12345, chainID, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -210,7 +210,7 @@ func TestWalletString(t *testing.T) {
 	w.ImportKey(sk.(*crypto.PrivateKeySECP256K1R))
 
 	expected := "Keychain:" +
-		"\n    Key[0]: Key: ZrYnAmArnk97JGzkq3kxTmFuKQnmajc86Xyd3JXC29meZ7znH Address: EHQiyKpq1VxkyNzt9bj1BLn5tzQ6Vt96q" +
+		"\n    Key[0]: Key: 0x4a9982985c39a804874c623cd49ea77d635f927cb96b3fb73b9359a24fb40c9e3ea07c56 Address: EHQiyKpq1VxkyNzt9bj1BLn5tzQ6Vt96q" +
 		"\nUTXOs (length=0):"
 	if str := w.String(); str != expected {
 		t.Fatalf("got:\n%s\n\nexpected:\n%s", str, expected)

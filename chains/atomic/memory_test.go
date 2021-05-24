@@ -18,19 +18,25 @@ var (
 
 func TestMemorySharedID(t *testing.T) {
 	m := Memory{}
-	m.Initialize(logging.NoLog{}, memdb.New())
+	err := m.Initialize(logging.NoLog{}, memdb.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	sharedID0 := m.sharedID(blockchainID0, blockchainID1)
 	sharedID1 := m.sharedID(blockchainID1, blockchainID0)
 
-	if !sharedID0.Equals(sharedID1) {
+	if sharedID0 != sharedID1 {
 		t.Fatalf("SharedMemory.sharedID should be communitive")
 	}
 }
 
 func TestMemoryMakeReleaseLock(t *testing.T) {
 	m := Memory{}
-	m.Initialize(logging.NoLog{}, memdb.New())
+	err := m.Initialize(logging.NoLog{}, memdb.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	sharedID := m.sharedID(blockchainID0, blockchainID1)
 
@@ -55,7 +61,10 @@ func TestMemoryMakeReleaseLock(t *testing.T) {
 
 func TestMemoryUnknownFree(t *testing.T) {
 	m := Memory{}
-	m.Initialize(logging.NoLog{}, memdb.New())
+	err := m.Initialize(logging.NoLog{}, memdb.New())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	sharedID := m.sharedID(blockchainID0, blockchainID1)
 

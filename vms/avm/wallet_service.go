@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -20,17 +21,16 @@ import (
 type WalletService struct {
 	vm *VM
 
-	pendingTxMap      map[[32]byte]*list.Element
+	pendingTxMap      map[ids.ID]*list.Element
 	pendingTxOrdering *list.List
 }
 
 func (w *WalletService) decided(txID ids.ID) {
-	txKey := txID.Key()
-	e, ok := w.pendingTxMap[txKey]
+	e, ok := w.pendingTxMap[txID]
 	if !ok {
 		return
 	}
-	delete(w.pendingTxMap, txKey)
+	delete(w.pendingTxMap, txID)
 	w.pendingTxOrdering.Remove(e)
 }
 
@@ -45,19 +45,18 @@ func (w *WalletService) issue(txBytes []byte) (ids.ID, error) {
 		return ids.ID{}, err
 	}
 
-	txKey := txID.Key()
-	if _, dup := w.pendingTxMap[txKey]; dup {
+	if _, dup := w.pendingTxMap[txID]; dup {
 		return txID, nil
 	}
 
-	w.pendingTxMap[txKey] = w.pendingTxOrdering.PushBack(tx)
+	w.pendingTxMap[txID] = w.pendingTxOrdering.PushBack(tx)
 	return txID, nil
 }
 
 func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
-	utxoMap := make(map[[32]byte]*avax.UTXO, len(utxos))
+	utxoMap := make(map[ids.ID]*avax.UTXO, len(utxos))
 	for _, utxo := range utxos {
-		utxoMap[utxo.InputID().Key()] = utxo
+		utxoMap[utxo.InputID()] = utxo
 	}
 
 	for e := w.pendingTxOrdering.Front(); e != nil; e = e.Next() {
@@ -66,15 +65,15 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 			if inputUTXO.Symbolic() {
 				continue
 			}
-			utxoKey := inputUTXO.InputID().Key()
-			if _, exists := utxoMap[utxoKey]; !exists {
+			utxoID := inputUTXO.InputID()
+			if _, exists := utxoMap[utxoID]; !exists {
 				return nil, errMissingUTXO
 			}
-			delete(utxoMap, utxoKey)
+			delete(utxoMap, utxoID)
 		}
 
 		for _, utxo := range tx.UTXOs() {
-			utxoMap[utxo.InputID().Key()] = utxo
+			utxoMap[utxo.InputID()] = utxo
 		}
 	}
 
@@ -91,11 +90,7 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	w.vm.ctx.Log.Info("AVM Wallet: IssueTx called with %s", args.Tx)
 
-	encoding, err := w.vm.encodingManager.GetEncoding(args.Encoding)
-	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
-	}
-	txBytes, err := encoding.ConvertString(args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -109,7 +104,6 @@ func (w *WalletService) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 	return w.SendMultiple(r, &SendMultipleArgs{
 		JSONSpendHeader: args.JSONSpendHeader,
 		Outputs:         []SendOutput{args.SendOutput},
-		From:            args.From,
 		Memo:            args.Memo,
 	}, reply)
 }
@@ -129,7 +123,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
+	fromAddrs := ids.NewShortSet(len(args.From))
 	for _, addrStr := range args.From {
 		addr, err := w.vm.ParseLocalAddress(addrStr)
 		if err != nil {
@@ -162,12 +156,12 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	// String repr. of asset ID --> asset ID
 	assetIDs := make(map[string]ids.ID)
 	// Asset ID --> amount of that asset being sent
-	amounts := make(map[[32]byte]uint64)
+	amounts := make(map[ids.ID]uint64)
 	// Outputs of our tx
 	outs := []*avax.TransferableOutput{}
 	for _, output := range args.Outputs {
 		if output.Amount == 0 {
-			return errInvalidAmount
+			return errZeroAmount
 		}
 		assetID, ok := assetIDs[output.AssetID] // Asset ID of next output
 		if !ok {
@@ -177,13 +171,12 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 			}
 			assetIDs[output.AssetID] = assetID
 		}
-		assetKey := assetID.Key() // ID as bytes
-		currentAmount := amounts[assetKey]
+		currentAmount := amounts[assetID]
 		newAmount, err := safemath.Add64(currentAmount, uint64(output.Amount))
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
-		amounts[assetKey] = newAmount
+		amounts[assetID] = newAmount
 
 		// Parse the to address
 		to, err := w.vm.ParseLocalAddress(output.To)
@@ -205,17 +198,16 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		})
 	}
 
-	amountsWithFee := make(map[[32]byte]uint64, len(amounts)+1)
+	amountsWithFee := make(map[ids.ID]uint64, len(amounts)+1)
 	for assetKey, amount := range amounts {
 		amountsWithFee[assetKey] = amount
 	}
 
-	avaxKey := w.vm.ctx.AVAXAssetID.Key()
-	amountWithFee, err := safemath.Add64(amounts[avaxKey], w.vm.txFee)
+	amountWithFee, err := safemath.Add64(amounts[w.vm.ctx.AVAXAssetID], w.vm.txFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
-	amountsWithFee[avaxKey] = amountWithFee
+	amountsWithFee[w.vm.ctx.AVAXAssetID] = amountWithFee
 
 	amountsSpent, ins, keys, err := w.vm.Spend(
 		utxos,
@@ -227,9 +219,8 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Add the required change outputs
-	for asset, amountWithFee := range amountsWithFee {
-		assetID := ids.NewID(asset)
-		amountSpent := amountsSpent[asset]
+	for assetID, amountWithFee := range amountsWithFee {
+		amountSpent := amountsSpent[assetID]
 
 		if amountSpent > amountWithFee {
 			outs = append(outs, &avax.TransferableOutput{

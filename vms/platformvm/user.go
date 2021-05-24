@@ -7,24 +7,23 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
 // Key in the database whose corresponding value is the list of
 // addresses this user controls
-var addressesKey = ids.Empty.Bytes()
+var addressesKey = ids.Empty[:]
 
 var (
-	errDBNil        = errors.New("db uninitialized")
-	errKeyNil       = errors.New("key uninitialized")
-	errEmptyAddress = errors.New("address is empty")
+	errDBNil  = errors.New("db uninitialized")
+	errKeyNil = errors.New("key uninitialized")
 )
 
 type user struct {
 	// This user's database, acquired from the keystore
-	db database.Database
+	db *encdb.Database
 }
 
 // Get the addresses controlled by this user
@@ -48,7 +47,7 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 		return nil, err
 	}
 	addresses := []ids.ShortID{}
-	if err := Codec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil
@@ -58,8 +57,6 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 func (u *user) controlsAddress(address ids.ShortID) (bool, error) {
 	if u.db == nil {
 		return false, errDBNil
-	} else if address.IsZero() {
-		return false, errEmptyAddress
 	}
 	return u.db.Has(address.Bytes())
 }
@@ -94,7 +91,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		}
 	}
 	addresses = append(addresses, address)
-	bytes, err := Codec.Marshal(addresses)
+	bytes, err := Codec.Marshal(codecVersion, addresses)
 	if err != nil {
 		return err
 	}
@@ -108,8 +105,6 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 func (u *user) getKey(address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error) {
 	if u.db == nil {
 		return nil, errDBNil
-	} else if address.IsZero() {
-		return nil, errEmptyAddress
 	}
 
 	factory := crypto.FactorySECP256K1R{}

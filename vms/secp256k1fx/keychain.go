@@ -14,14 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errCantSpend = errors.New("unable to spend this UTXO")
-)
+var errCantSpend = errors.New("unable to spend this UTXO")
 
 // Keychain is a collection of keys that can be used to spend outputs
 type Keychain struct {
 	factory        *crypto.FactorySECP256K1R
-	addrToKeyIndex map[[20]byte]int
+	addrToKeyIndex map[ids.ShortID]int
 
 	// These can be used to iterate over. However, they should not be modified externally.
 	Addrs ids.ShortSet
@@ -32,16 +30,15 @@ type Keychain struct {
 func NewKeychain() *Keychain {
 	return &Keychain{
 		factory:        &crypto.FactorySECP256K1R{},
-		addrToKeyIndex: make(map[[20]byte]int),
+		addrToKeyIndex: make(map[ids.ShortID]int),
 	}
 }
 
 // Add a new key to the key chain
 func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
 	addr := key.PublicKey().Address()
-	addrHash := addr.Key()
-	if _, ok := kc.addrToKeyIndex[addrHash]; !ok {
-		kc.addrToKeyIndex[addrHash] = len(kc.Keys)
+	if _, ok := kc.addrToKeyIndex[addr]; !ok {
+		kc.addrToKeyIndex[addr] = len(kc.Keys)
 		kc.Keys = append(kc.Keys, key)
 		kc.Addrs.Add(addr)
 	}
@@ -49,7 +46,7 @@ func (kc *Keychain) Add(key *crypto.PrivateKeySECP256K1R) {
 
 // Get a key from the keychain. If the key is unknown, the
 func (kc Keychain) Get(id ids.ShortID) (*crypto.PrivateKeySECP256K1R, bool) {
-	if i, ok := kc.addrToKeyIndex[id.Key()]; ok {
+	if i, ok := kc.addrToKeyIndex[id]; ok {
 		return kc.Keys[i], true
 	}
 	return &crypto.PrivateKeySECP256K1R{}, false
@@ -114,14 +111,16 @@ func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*crypt
 // added before every line.
 func (kc *Keychain) PrefixedString(prefix string) string {
 	s := strings.Builder{}
-
 	format := fmt.Sprintf("%%sKey[%s]: Key: %%s Address: %%s\n",
 		formatting.IntFormat(len(kc.Keys)-1))
 	for i, key := range kc.Keys {
+		// We assume that the maximum size of a byte slice that
+		// can be stringified is at least the length of a SECP256K1 private key
+		keyStr, _ := formatting.Encode(defaultEncoding, key.Bytes())
 		s.WriteString(fmt.Sprintf(format,
 			prefix,
 			i,
-			formatting.CB58{Bytes: key.Bytes()},
+			keyStr,
 			key.PublicKey().Address()))
 	}
 

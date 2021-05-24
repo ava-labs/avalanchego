@@ -5,15 +5,17 @@ package admin
 
 import (
 	"errors"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -25,20 +27,18 @@ const (
 	stacktraceFile = "stacktrace.txt"
 )
 
-var (
-	errAliasTooLong = errors.New("alias length is too long")
-)
+var errAliasTooLong = errors.New("alias length is too long")
 
 // Admin is the API service for node admin management
 type Admin struct {
 	log          logging.Logger
-	performance  Performance
+	performance  *Performance
 	chainManager chains.Manager
-	httpServer   *api.Server
+	httpServer   *server.Server
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api.Server) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -47,6 +47,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *api
 		log:          log,
 		chainManager: chainManager,
 		httpServer:   httpServer,
+		performance:  NewDefaultPerformanceService(),
 	}, "admin"); err != nil {
 		return nil, err
 	}
@@ -128,11 +129,34 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
 }
 
+// GetChainAliasesArgs are the arguments for calling GetChainAliases
+type GetChainAliasesArgs struct {
+	Chain string `json:"chain"`
+}
+
+// GetChainAliasesReply are the aliases of the given chain
+type GetChainAliasesReply struct {
+	Aliases []string `json:"aliases"`
+}
+
+// GetChainAliases returns the aliases of the chain
+func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
+	service.log.Info("Admin: GetChainAliases called with Chain: %s", args.Chain)
+
+	id, err := ids.FromString(args.Chain)
+	if err != nil {
+		return err
+	}
+
+	reply.Aliases = service.chainManager.Aliases(id)
+	return nil
+}
+
 // Stacktrace returns the current global stacktrace
 func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: Stacktrace called")
 
 	reply.Success = true
 	stacktrace := []byte(logging.Stacktrace{Global: true}.String())
-	return ioutil.WriteFile(stacktraceFile, stacktrace, 0600)
+	return perms.WriteFile(stacktraceFile, stacktrace, perms.ReadWrite)
 }

@@ -4,66 +4,94 @@
 package avm
 
 import (
-	"errors"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var (
-	errCacheTypeMismatch = errors.New("type returned from cache doesn't match the expected type")
+const (
+	txDeduplicatorSize = 8192
 )
 
-func uniqueID(id ids.ID, prefix uint64, cacher cache.Cacher) ids.ID {
-	if cachedIDIntf, found := cacher.Get(id); found {
-		return cachedIDIntf.(ids.ID)
-	}
-	uID := id.Prefix(prefix)
-	cacher.Put(id, uID)
-	return uID
+var (
+	utxoStatePrefix      = []byte("utxo")
+	statusStatePrefix    = []byte("status")
+	singletonStatePrefix = []byte("singleton")
+	txStatePrefix        = []byte("tx")
+)
+
+// State persistently maintains a set of UTXOs, transaction, statuses, and
+// singletons.
+type State interface {
+	avax.UTXOState
+	avax.StatusState
+	avax.SingletonState
+	TxState
+
+	DeduplicateTx(tx *UniqueTx) *UniqueTx
 }
 
-// state is a thin wrapper around a database to provide, caching, serialization,
-// and de-serialization.
-type state struct{ avax.State }
+type state struct {
+	avax.UTXOState
+	avax.StatusState
+	avax.SingletonState
+	TxState
 
-// Tx attempts to load a transaction from storage.
-func (s *state) Tx(id ids.ID) (*Tx, error) {
-	if txIntf, found := s.Cache.Get(id); found {
-		if tx, ok := txIntf.(*Tx); ok {
-			return tx, nil
-		}
-		return nil, errCacheTypeMismatch
+	uniqueTxs cache.Deduplicator
+}
+
+func NewState(db database.Database, genesisCodec, codec codec.Manager) State {
+	utxoDB := prefixdb.New(utxoStatePrefix, db)
+	statusDB := prefixdb.New(statusStatePrefix, db)
+	singletonDB := prefixdb.New(singletonStatePrefix, db)
+	txDB := prefixdb.New(txStatePrefix, db)
+
+	return &state{
+		UTXOState:      avax.NewUTXOState(utxoDB, codec),
+		StatusState:    avax.NewStatusState(statusDB),
+		SingletonState: avax.NewSingletonState(singletonDB),
+		TxState:        NewTxState(txDB, genesisCodec),
+
+		uniqueTxs: &cache.EvictableLRU{
+			Size: txDeduplicatorSize,
+		},
 	}
+}
 
-	bytes, err := s.DB.Get(id.Bytes())
+func NewMeteredState(db database.Database, genesisCodec, codec codec.Manager, namespace string, metrics prometheus.Registerer) (State, error) {
+	utxoDB := prefixdb.New(utxoStatePrefix, db)
+	statusDB := prefixdb.New(statusStatePrefix, db)
+	singletonDB := prefixdb.New(singletonStatePrefix, db)
+	txDB := prefixdb.New(txStatePrefix, db)
+
+	utxoState, err := avax.NewMeteredUTXOState(utxoDB, codec, namespace, metrics)
 	if err != nil {
 		return nil, err
 	}
 
-	// The key was in the database
-	tx := &Tx{}
-	if err := s.GenesisCodec.Unmarshal(bytes, tx); err != nil {
-		return nil, err
-	}
-	unsignedBytes, err := s.GenesisCodec.Marshal(&tx.UnsignedTx)
+	statusState, err := avax.NewMeteredStatusState(statusDB, namespace, metrics)
 	if err != nil {
 		return nil, err
 	}
-	tx.Initialize(unsignedBytes, bytes)
 
-	s.Cache.Put(id, tx)
-	return tx, nil
+	txState, err := NewMeteredTxState(txDB, genesisCodec, namespace, metrics)
+	return &state{
+		UTXOState:      utxoState,
+		StatusState:    statusState,
+		SingletonState: avax.NewSingletonState(singletonDB),
+		TxState:        txState,
+
+		uniqueTxs: &cache.EvictableLRU{
+			Size: txDeduplicatorSize,
+		},
+	}, err
 }
 
-// SetTx saves the provided transaction to storage.
-func (s *state) SetTx(id ids.ID, tx *Tx) error {
-	if tx == nil {
-		s.Cache.Evict(id)
-		return s.DB.Delete(id.Bytes())
-	}
-
-	s.Cache.Put(id, tx)
-	return s.DB.Put(id.Bytes(), tx.Bytes())
+// UniqueTx de-duplicates the transaction.
+func (s *state) DeduplicateTx(tx *UniqueTx) *UniqueTx {
+	return s.uniqueTxs.Deduplicate(tx).(*UniqueTx)
 }

@@ -7,21 +7,20 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var blockchainID = ids.NewID([32]byte{1, 2, 3})
+var blockchainID = ids.ID{1, 2, 3}
 
 // Utility function to assert that [block] has:
 // * Parent with ID [parentID]
 // * Data [expectedData]
 // * Verify() returns nil iff passesVerify == true
 func assertBlock(block *Block, parentID ids.ID, expectedData [dataLen]byte, passesVerify bool) error {
-	if !block.ParentID().Equals(parentID) {
+	if block.ParentID() != parentID {
 		return fmt.Errorf("expect parent ID to be %s but was %s", parentID, block.ParentID())
 	}
 	if block.Data != expectedData {
@@ -39,13 +38,13 @@ func assertBlock(block *Block, parentID ids.ID, expectedData [dataLen]byte, pass
 // Assert that after initialization, the vm has the state we expect
 func TestGenesis(t *testing.T) {
 	// Initialize the vm
-	db := memdb.New()
+	dbManager := manager.NewDefaultMemDBManager()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
 
-	if err := vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -55,8 +54,11 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Get lastAccepted
-	lastAccepted := vm.LastAccepted()
-	if lastAccepted.IsZero() {
+	lastAccepted, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastAccepted == ids.Empty {
 		t.Fatal("lastAccepted should not be empty")
 	}
 
@@ -72,28 +74,34 @@ func TestGenesis(t *testing.T) {
 	}
 
 	// Verify that the genesis block has the data we expect
-	if err := assertBlock(genesisBlock, ids.Empty, [32]byte{0, 0, 0, 0, 0}, true); err != nil {
+	if err := assertBlock(genesisBlock, ids.Empty, ids.ID{0, 0, 0, 0, 0}, true); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestHappyPath(t *testing.T) {
 	// Initialize the vm
-	db := memdb.New()
+	dbManager := manager.NewDefaultMemDBManager()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-	if err := vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
-	genesisBlock, err := vm.GetBlock(vm.LastAccepted())
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	genesisBlock, err := vm.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Fatal("could not get genesis block")
 	}
 	// in an actual execution, the engine would set the preference
-	vm.SetPreference(genesisBlock.ID())
+	if err := vm.SetPreference(genesisBlock.ID()); err != nil {
+		t.Fatal(err)
+	}
 
 	ctx.Lock.Lock()
 	vm.proposeBlock([dataLen]byte{0, 0, 0, 0, 1}) // propose a value
@@ -120,10 +128,16 @@ func TestHappyPath(t *testing.T) {
 	if err := snowmanBlock2.Accept(); err != nil { // accept the block
 		t.Fatal(err)
 	}
-	vm.SetPreference(snowmanBlock2.ID())
+	if err := vm.SetPreference(snowmanBlock2.ID()); err != nil {
+		t.Fatal(err)
+	}
 
+	lastAcceptedID, err = vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Should be the block we just accepted
-	snowmanBlock2, err = vm.GetBlock(vm.LastAccepted())
+	snowmanBlock2, err = vm.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Fatal("couldn't get block")
 	}
@@ -160,11 +174,17 @@ func TestHappyPath(t *testing.T) {
 		if err := block.Accept(); err != nil { // accept the block
 			t.Fatal(err)
 		}
-		vm.SetPreference(block.ID())
+		if err := vm.SetPreference(block.ID()); err != nil {
+			t.Fatal(err)
+		}
 	}
 
+	lastAcceptedID, err = vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
 	// The block we just accepted
-	snowmanBlock3, err := vm.GetBlock(vm.LastAccepted())
+	snowmanBlock3, err := vm.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Fatal("couldn't get block")
 	}
@@ -180,32 +200,26 @@ func TestHappyPath(t *testing.T) {
 	// Next, check the blocks we added are there
 	if block2FromState, err := vm.GetBlock(block2.ID()); err != nil {
 		t.Fatal(err)
-	} else if !block2FromState.ID().Equals(block2.ID()) {
+	} else if block2FromState.ID() != block2.ID() {
 		t.Fatal("expected IDs to match but they don't")
 	}
 	if block3FromState, err := vm.GetBlock(block3.ID()); err != nil {
 		t.Fatal(err)
-	} else if !block3FromState.ID().Equals(block3.ID()) {
+	} else if block3FromState.ID() != block3.ID() {
 		t.Fatal("expected IDs to match but they don't")
 	}
 
 	ctx.Lock.Unlock()
 }
 
-func TestMakeStringFrom32Bytes(t *testing.T) {
-	bytes := [32]byte{'w', 'o', 'o'}
-	bytesFormatter := formatting.CB58{Bytes: bytes[:]}
-	t.Log(bytesFormatter.String())
-}
-
 func TestService(t *testing.T) {
 	// Initialize the vm
-	db := memdb.New()
+	dbManager := manager.NewDefaultMemDBManager()
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-	if err := vm.Initialize(ctx, db, []byte{0, 0, 0, 0, 0}, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 

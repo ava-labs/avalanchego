@@ -30,7 +30,7 @@ func TestSnowballGovernance(t *testing.T) {
 	}
 
 	for _, node := range nBitwise.nodes {
-		if !node.Preference().Equals(nBitwise.colors[0]) {
+		if node.Preference() != nBitwise.colors[0] {
 			t.Fatalf("Wrong preferences")
 		}
 	}
@@ -51,7 +51,7 @@ func TestSnowballGovernance(t *testing.T) {
 		if _, ok := node.(*Byzantine); ok {
 			continue
 		}
-		if !node.Preference().Equals(nBitwise.colors[0]) {
+		if node.Preference() != nBitwise.colors[0] {
 			t.Fatalf("Wrong preferences")
 		}
 	}

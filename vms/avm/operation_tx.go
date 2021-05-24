@@ -6,9 +6,9 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -86,7 +86,7 @@ func (t *OperationTx) UTXOs() []*avax.UTXO {
 // SyntacticVerify that this transaction is well-formed.
 func (t *OperationTx) SyntacticVerify(
 	ctx *snow.Context,
-	c codec.Codec,
+	c codec.Manager,
 	txFeeAssetID ids.ID,
 	txFee uint64,
 	_ uint64,
@@ -103,7 +103,7 @@ func (t *OperationTx) SyntacticVerify(
 		return err
 	}
 
-	inputs := ids.Set{}
+	inputs := ids.NewSet(len(t.Ins))
 	for _, in := range t.Ins {
 		inputs.Add(in.InputID())
 	}

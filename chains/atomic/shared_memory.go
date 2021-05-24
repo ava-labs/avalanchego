@@ -7,11 +7,12 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
@@ -84,7 +85,7 @@ func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(largerValuePrefix, db)
 		s.indexDB = prefixdb.New(largerIndexPrefix, db)
 	} else {
@@ -113,7 +114,7 @@ func (sm *sharedMemory) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error)
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(smallerValuePrefix, db)
 	} else {
 		s.valueDB = prefixdb.New(largerValuePrefix, db)
@@ -144,7 +145,7 @@ func (sm *sharedMemory) Indexed(
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(smallerValuePrefix, db)
 		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
 	} else {
@@ -176,7 +177,7 @@ func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID.Bytes(), peerChainID.Bytes()) == -1 {
+	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 		s.valueDB = prefixdb.New(smallerValuePrefix, db)
 		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
 	} else {
@@ -198,7 +199,7 @@ func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...dat
 }
 
 type state struct {
-	c       codec.Codec
+	c       codec.Manager
 	valueDB database.Database
 	indexDB database.Database
 }
@@ -241,7 +242,8 @@ func (s *state) SetValue(e *Element) error {
 
 	for _, trait := range e.Traits {
 		traitDB := prefixdb.New(trait, s.indexDB)
-		if err := traitDB.Put(e.Key, nil); err != nil {
+		traitList := linkeddb.NewDefault(traitDB)
+		if err := traitList.Put(e.Key, nil); err != nil {
 			return err
 		}
 	}
@@ -252,7 +254,7 @@ func (s *state) SetValue(e *Element) error {
 		Traits:  e.Traits,
 	}
 
-	valueBytes, err := s.c.Marshal(&dbElem)
+	valueBytes, err := s.c.Marshal(codecVersion, &dbElem)
 	if err != nil {
 		return err
 	}
@@ -269,16 +271,22 @@ func (s *state) RemoveValue(key []byte) error {
 
 		// The value doesn't exist, so we should optimistically deleted it
 		dbElem := dbElement{Present: false}
-		valueBytes, err := s.c.Marshal(&dbElem)
+		valueBytes, err := s.c.Marshal(codecVersion, &dbElem)
 		if err != nil {
 			return err
 		}
 		return s.valueDB.Put(key, valueBytes)
 	}
 
+	// Don't allow the removal of something that was already removed.
+	if !value.Present {
+		return errDuplicatedOperation
+	}
+
 	for _, trait := range value.Traits {
 		traitDB := prefixdb.New(trait, s.indexDB)
-		if err := traitDB.Delete(key); err != nil {
+		traitList := linkeddb.NewDefault(traitDB)
+		if err := traitList.Delete(key); err != nil {
 			return err
 		}
 	}
@@ -293,7 +301,8 @@ func (s *state) loadValue(key []byte) (*dbElement, error) {
 
 	// The key was in the database
 	value := &dbElement{}
-	return value, s.c.Unmarshal(valueBytes, value)
+	_, err = s.c.Unmarshal(valueBytes, value)
+	return value, err
 }
 
 func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int) ([][]byte, []byte, []byte, error) {
@@ -311,29 +320,38 @@ func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int)
 		}
 
 		lastTrait = trait
-		lastKey = startKey
-
-		traitDB := prefixdb.New(trait, s.indexDB)
-		iter := traitDB.NewIteratorWithStart(startKey)
-		for iter.Next() {
-			if limit == 0 {
-				iter.Release()
-				return keys, lastTrait, lastKey, nil
-			}
-
-			key := iter.Key()
-			lastKey = key
-
-			id := ids.NewID(hashing.ComputeHash256Array(key))
-			if tracked.Contains(id) {
-				continue
-			}
-
-			tracked.Add(id)
-			keys = append(keys, key)
-			limit--
+		var err error
+		lastKey, err = s.appendTraitKeys(&keys, &tracked, &limit, trait, startKey)
+		if err != nil {
+			return nil, nil, nil, err
 		}
-		iter.Release()
+
+		if limit == 0 {
+			break
+		}
 	}
 	return keys, lastTrait, lastKey, nil
+}
+
+func (s *state) appendTraitKeys(keys *[][]byte, tracked *ids.Set, limit *int, trait, startKey []byte) ([]byte, error) {
+	lastKey := startKey
+
+	traitDB := prefixdb.New(trait, s.indexDB)
+	traitList := linkeddb.NewDefault(traitDB)
+	iter := traitList.NewIteratorWithStart(startKey)
+	defer iter.Release()
+	for iter.Next() && *limit > 0 {
+		key := iter.Key()
+		lastKey = key
+
+		id := hashing.ComputeHash256Array(key)
+		if tracked.Contains(id) {
+			continue
+		}
+
+		tracked.Add(id)
+		*keys = append(*keys, key)
+		*limit--
+	}
+	return lastKey, iter.Error()
 }

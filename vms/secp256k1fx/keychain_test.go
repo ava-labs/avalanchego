@@ -14,9 +14,9 @@ import (
 
 var (
 	keys = []string{
-		"2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY",
-		"cxb7KpGWhDMALTjNNSJ7UQkkomPesyWAPUaWRGdyeBNzR6f35",
-		"24jUJ9vZexUM6expyMcT48LBx27k1m7xpraoV62oSQAHdziao5",
+		"0xb1ed77ad48555d49f03a7465f0685a7d86bfd5f3a3ccf1be01971ea8dec5471c9f028757",
+		"0x51a5e21237263396a5dfce60496d0ca3829d23fd33c38e6d13ae53b4810df9ca827089f8",
+		"0x8c2bae69b0e1f6f3a5e784504ee93279226f997c5a6771b9bd6b881a8fee1e9d4c0b130c",
 	}
 	addrs = []string{
 		"B6D4v1VtPYLbiUvYXtW4Px8oE9imC2vGW",
@@ -44,11 +44,10 @@ func TestKeychainGetUnknownAddr(t *testing.T) {
 func TestKeychainAdd(t *testing.T) {
 	kc := NewKeychain()
 
-	cb58 := formatting.CB58{}
-	if err := cb58.FromString(keys[0]); err != nil {
+	skBytes, err := formatting.Decode(defaultEncoding, keys[0])
+	if err != nil {
 		t.Fatal(err)
 	}
-	skBytes := cb58.Bytes
 
 	skIntff, err := kc.factory.ToPrivateKey(skBytes)
 	if err != nil {
@@ -99,13 +98,12 @@ func TestKeychainNew(t *testing.T) {
 func TestKeychainMatch(t *testing.T) {
 	kc := NewKeychain()
 
-	cb58 := formatting.CB58{}
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		if err := cb58.FromString(keyStr); err != nil {
+		skBytes, err := formatting.Decode(defaultEncoding, keyStr)
+		if err != nil {
 			t.Fatal(err)
 		}
-		skBytes := cb58.Bytes
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
 		if err != nil {
@@ -145,7 +143,7 @@ func TestKeychainMatch(t *testing.T) {
 		t.Fatalf("Should have returned one key")
 	} else if index := indices[0]; index != 0 {
 		t.Fatalf("Should have returned index 0 for the key")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 
@@ -159,7 +157,7 @@ func TestKeychainMatch(t *testing.T) {
 		t.Fatalf("Should have returned one key")
 	} else if index := indices[0]; index != 0 {
 		t.Fatalf("Should have returned index 0 for the key")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 }
@@ -167,13 +165,12 @@ func TestKeychainMatch(t *testing.T) {
 func TestKeychainSpendMint(t *testing.T) {
 	kc := NewKeychain()
 
-	cb58 := formatting.CB58{}
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		if err := cb58.FromString(keyStr); err != nil {
+		skBytes, err := formatting.Decode(defaultEncoding, keyStr)
+		if err != nil {
 			t.Fatal(err)
 		}
-		skBytes := cb58.Bytes
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
 		if err != nil {
@@ -219,9 +216,9 @@ func TestKeychainSpendMint(t *testing.T) {
 		t.Fatalf("Should have returned index of secret key 2")
 	} else if numKeys := len(keys); numKeys != 2 {
 		t.Fatalf("Should have returned two keys")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
-	} else if key := keys[1]; !key.PublicKey().Address().Equals(sks[2].PublicKey().Address()) {
+	} else if key := keys[1]; key.PublicKey().Address() != sks[2].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 }
@@ -229,13 +226,12 @@ func TestKeychainSpendMint(t *testing.T) {
 func TestKeychainSpendTransfer(t *testing.T) {
 	kc := NewKeychain()
 
-	cb58 := formatting.CB58{}
 	sks := []*crypto.PrivateKeySECP256K1R{}
 	for _, keyStr := range keys {
-		if err := cb58.FromString(keyStr); err != nil {
+		skBytes, err := formatting.Decode(defaultEncoding, keyStr)
+		if err != nil {
 			t.Fatal(err)
 		}
-		skBytes := cb58.Bytes
 
 		skIntf, err := kc.factory.ToPrivateKey(skBytes)
 		if err != nil {
@@ -291,9 +287,9 @@ func TestKeychainSpendTransfer(t *testing.T) {
 		t.Fatalf("Should have returned index of secret key 2")
 	} else if numKeys := len(keys); numKeys != 2 {
 		t.Fatalf("Should have returned two keys")
-	} else if key := keys[0]; !key.PublicKey().Address().Equals(sks[1].PublicKey().Address()) {
+	} else if key := keys[0]; key.PublicKey().Address() != sks[1].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
-	} else if key := keys[1]; !key.PublicKey().Address().Equals(sks[2].PublicKey().Address()) {
+	} else if key := keys[1]; key.PublicKey().Address() != sks[2].PublicKey().Address() {
 		t.Fatalf("Returned wrong key")
 	}
 }
@@ -301,11 +297,10 @@ func TestKeychainSpendTransfer(t *testing.T) {
 func TestKeychainString(t *testing.T) {
 	kc := NewKeychain()
 
-	cb58 := formatting.CB58{}
-	if err := cb58.FromString(keys[0]); err != nil {
+	skBytes, err := formatting.Decode(defaultEncoding, keys[0])
+	if err != nil {
 		t.Fatal(err)
 	}
-	skBytes := cb58.Bytes
 
 	skIntf, err := kc.factory.ToPrivateKey(skBytes)
 	if err != nil {
@@ -318,7 +313,7 @@ func TestKeychainString(t *testing.T) {
 
 	kc.Add(sk)
 
-	expected := "Key[0]: Key: 2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY Address: B6D4v1VtPYLbiUvYXtW4Px8oE9imC2vGW"
+	expected := "Key[0]: Key: 0xb1ed77ad48555d49f03a7465f0685a7d86bfd5f3a3ccf1be01971ea8dec5471c9f028757 Address: B6D4v1VtPYLbiUvYXtW4Px8oE9imC2vGW"
 
 	if result := kc.String(); result != expected {
 		t.Fatalf("Keychain.String returned:\n%s\nexpected:\n%s", result, expected)
@@ -328,11 +323,10 @@ func TestKeychainString(t *testing.T) {
 func TestKeychainPrefixedString(t *testing.T) {
 	kc := NewKeychain()
 
-	cb58 := formatting.CB58{}
-	if err := cb58.FromString(keys[0]); err != nil {
+	skBytes, err := formatting.Decode(defaultEncoding, keys[0])
+	if err != nil {
 		t.Fatal(err)
 	}
-	skBytes := cb58.Bytes
 
 	skIntf, err := kc.factory.ToPrivateKey(skBytes)
 	if err != nil {
@@ -345,7 +339,7 @@ func TestKeychainPrefixedString(t *testing.T) {
 
 	kc.Add(sk)
 
-	expected := "xDKey[0]: Key: 2MMvUMsxx6zsHSNXJdFD8yc5XkancvwyKPwpw4xUK3TCGDuNBY Address: B6D4v1VtPYLbiUvYXtW4Px8oE9imC2vGW"
+	expected := "xDKey[0]: Key: 0xb1ed77ad48555d49f03a7465f0685a7d86bfd5f3a3ccf1be01971ea8dec5471c9f028757 Address: B6D4v1VtPYLbiUvYXtW4Px8oE9imC2vGW"
 
 	if result := kc.PrefixedString("xD"); result != expected {
 		t.Fatalf(`Keychain.PrefixedString("xD") returned:\n%s\nexpected:\n%s`, result, expected)

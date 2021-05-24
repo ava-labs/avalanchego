@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -27,7 +28,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		return nil
 	}
 
-	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) error {
+	engine.GetAcceptedF = func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 		called <- struct{}{}
 		return nil
 	}
@@ -38,7 +39,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	if err := vdrs.AddWeight(vdr0, 1); err != nil {
 		t.Fatal(err)
 	}
-	handler.Initialize(
+	err := handler.Initialize(
 		&engine,
 		vdrs,
 		nil,
@@ -49,12 +50,13 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
+	assert.NoError(t, err)
 
 	currentTime := time.Now()
 	handler.clock.Set(currentTime)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, currentTime.Add(-time.Second))
-	handler.GetAccepted(ids.NewShortID([20]byte{}), 1, currentTime.Add(time.Second), ids.Set{})
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, currentTime.Add(-time.Second))
+	handler.GetAccepted(ids.ShortID{}, 1, currentTime.Add(time.Second), nil)
 
 	go handler.Dispatch()
 
@@ -81,7 +83,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 
 	handler := &Handler{}
 	validators := validators.NewSet()
-	handler.Initialize(
+	err := handler.Initialize(
 		&engine,
 		validators,
 		nil,
@@ -92,8 +94,9 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
+	assert.NoError(t, err)
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Time{})
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Time{})
 	go handler.Dispatch()
 
 	ticker := time.NewTicker(20 * time.Millisecond)
@@ -117,7 +120,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 
 	handler := &Handler{}
-	handler.Initialize(
+	err := handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
@@ -128,6 +131,8 @@ func TestHandlerClosesOnError(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
+	assert.NoError(t, err)
+
 	handler.clock.Set(time.Now())
 
 	handler.toClose = func() {
@@ -135,7 +140,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	go handler.Dispatch()
 
-	handler.GetAcceptedFrontier(ids.NewShortID([20]byte{}), 1, time.Now().Add(time.Second))
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Now().Add(time.Second))
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {
@@ -160,7 +165,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	}
 
 	handler := &Handler{}
-	handler.Initialize(
+	err := handler.Initialize(
 		&engine,
 		validators.NewSet(),
 		nil,
@@ -171,6 +176,8 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 	)
+	assert.NoError(t, err)
+
 	handler.clock.Set(time.Now())
 
 	go handler.Dispatch()

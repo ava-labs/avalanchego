@@ -24,14 +24,14 @@ type nnarySnowball struct {
 
 	// numSuccessfulPolls tracks the total number of successful network polls of
 	// the choices
-	numSuccessfulPolls map[[32]byte]int
+	numSuccessfulPolls map[ids.ID]int
 }
 
 // Initialize implements the NnarySnowball interface
 func (sb *nnarySnowball) Initialize(betaVirtuous, betaRogue int, choice ids.ID) {
 	sb.nnarySnowflake.Initialize(betaVirtuous, betaRogue, choice)
 	sb.preference = choice
-	sb.numSuccessfulPolls = make(map[[32]byte]int)
+	sb.numSuccessfulPolls = make(map[ids.ID]int)
 }
 
 // Preference implements the NnarySnowball interface
@@ -48,9 +48,8 @@ func (sb *nnarySnowball) Preference() ids.ID {
 
 // RecordSuccessfulPoll implements the NnarySnowball interface
 func (sb *nnarySnowball) RecordSuccessfulPoll(choice ids.ID) {
-	key := choice.Key()
-	numSuccessfulPolls := sb.numSuccessfulPolls[key] + 1
-	sb.numSuccessfulPolls[key] = numSuccessfulPolls
+	numSuccessfulPolls := sb.numSuccessfulPolls[choice] + 1
+	sb.numSuccessfulPolls[choice] = numSuccessfulPolls
 
 	if numSuccessfulPolls > sb.maxSuccessfulPolls {
 		sb.preference = choice

@@ -6,11 +6,10 @@ package platformvm
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -30,7 +29,7 @@ type UnsignedDecisionTx interface {
 	UnsignedTx
 
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, db database.Database, stx *Tx) (
+	SemanticVerify(vm *VM, vs VersionedState, stx *Tx) (
 		onAcceptFunc func() error,
 		err TxError,
 	)
@@ -41,9 +40,9 @@ type UnsignedProposalTx interface {
 	UnsignedTx
 
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, db database.Database, stx *Tx) (
-		onCommitDB *versiondb.Database,
-		onAbortDB *versiondb.Database,
+	SemanticVerify(vm *VM, state MutableState, stx *Tx) (
+		onCommitState VersionedState,
+		onAbortState VersionedState,
 		onCommitFunc func() error,
 		onAbortFunc func() error,
 		err TxError,
@@ -58,7 +57,7 @@ type UnsignedAtomicTx interface {
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, db database.Database, stx *Tx) TxError
+	SemanticVerify(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
@@ -74,8 +73,8 @@ type Tx struct {
 }
 
 // Sign this transaction with the provided signers
-func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(&tx.UnsignedTx)
+func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -96,7 +95,7 @@ func (tx *Tx) Sign(c codec.Codec, signers [][]*crypto.PrivateKeySECP256K1R) erro
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(tx)
+	signedBytes, err := c.Marshal(codecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

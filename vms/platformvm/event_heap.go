@@ -55,7 +55,9 @@ func (h *EventHeap) Less(i, j int) bool {
 		if iOk != jOk {
 			return iOk == h.SortByStartTime
 		}
-		return bytes.Compare(iTx.ID().Bytes(), jTx.ID().Bytes()) == -1
+		id1 := iTx.ID()
+		id2 := jTx.ID()
+		return bytes.Compare(id1[:], id2[:]) == -1
 	default:
 		return false
 	}
@@ -93,5 +95,5 @@ func (h *EventHeap) Pop() interface{} {
 
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() ([]byte, error) {
-	return Codec.Marshal(h)
+	return Codec.Marshal(codecVersion, h)
 }

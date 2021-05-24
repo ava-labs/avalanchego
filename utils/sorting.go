@@ -28,7 +28,14 @@ func (su32 innerSortUint32) Swap(i, j int)      { su32[j], su32[i] = su32[i], su
 func SortUint32(u32 []uint32) { sort.Sort(innerSortUint32(u32)) }
 
 // IsSortedAndUniqueUint32 returns true if the array of uint32s are sorted and unique
-func IsSortedAndUniqueUint32(u32 []uint32) bool { return IsSortedAndUnique(innerSortUint32(u32)) }
+func IsSortedAndUniqueUint32(arr []uint32) bool {
+	for i := 0; i < len(arr)-1; i++ {
+		if arr[i] >= arr[i+1] {
+			return false
+		}
+	}
+	return true
+}
 
 type innerSortUint64 []uint64
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -37,8 +38,10 @@ func TestUserNilDB(t *testing.T) {
 }
 
 func TestUserClosedDB(t *testing.T) {
-	db := memdb.New()
-	err := db.Close()
+	db, err := encdb.New([]byte(testPassword), memdb.New())
+	assert.NoError(t, err)
+
+	err = db.Close()
 	assert.NoError(t, err)
 
 	u := user{db}
@@ -64,24 +67,20 @@ func TestUserClosedDB(t *testing.T) {
 }
 
 func TestUserNilSK(t *testing.T) {
-	u := user{db: memdb.New()}
+	db, err := encdb.New([]byte(testPassword), memdb.New())
+	assert.NoError(t, err)
 
-	err := u.putAddress(nil)
+	u := user{db: db}
+
+	err = u.putAddress(nil)
 	assert.Error(t, err, "nil key should have caused an error")
 }
 
-func TestUserNilAddress(t *testing.T) {
-	u := user{db: memdb.New()}
-
-	_, err := u.controlsAddress(ids.ShortID{})
-	assert.Error(t, err, "nil address should have caused an error")
-
-	_, err = u.getKey(ids.ShortID{})
-	assert.Error(t, err, "nil address should have caused an error")
-}
-
 func TestUser(t *testing.T) {
-	u := user{db: memdb.New()}
+	db, err := encdb.New([]byte(testPassword), memdb.New())
+	assert.NoError(t, err)
+
+	u := user{db: db}
 
 	addresses, err := u.getAddresses()
 	assert.NoError(t, err)
@@ -109,6 +108,5 @@ func TestUser(t *testing.T) {
 	assert.Len(t, addresses, 1, "address should have been added")
 
 	savedAddr := addresses[0]
-	equals := addr.Equals(savedAddr)
-	assert.True(t, equals, "saved address should match provided address")
+	assert.Equal(t, addr, savedAddr, "saved address should match provided address")
 }

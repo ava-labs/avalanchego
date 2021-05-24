@@ -4,6 +4,9 @@
 package common
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -18,28 +21,27 @@ type req struct {
 
 // Requests tracks pending container messages from a peer.
 type Requests struct {
-	reqsToID map[[20]byte]map[uint32]ids.ID
-	idToReq  map[[32]byte]req
+	reqsToID map[ids.ShortID]map[uint32]ids.ID
+	idToReq  map[ids.ID]req
 }
 
 // Add a request. Assumes that requestIDs are unique. Assumes that containerIDs
 // are only in one request at a time.
 func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 	if r.reqsToID == nil {
-		r.reqsToID = make(map[[20]byte]map[uint32]ids.ID, minRequestsSize)
+		r.reqsToID = make(map[ids.ShortID]map[uint32]ids.ID, minRequestsSize)
 	}
-	vdrKey := vdr.Key()
-	vdrReqs, ok := r.reqsToID[vdrKey]
+	vdrReqs, ok := r.reqsToID[vdr]
 	if !ok {
 		vdrReqs = make(map[uint32]ids.ID)
-		r.reqsToID[vdrKey] = vdrReqs
+		r.reqsToID[vdr] = vdrReqs
 	}
 	vdrReqs[requestID] = containerID
 
 	if r.idToReq == nil {
-		r.idToReq = make(map[[32]byte]req, minRequestsSize)
+		r.idToReq = make(map[ids.ID]req, minRequestsSize)
 	}
-	r.idToReq[containerID.Key()] = req{
+	r.idToReq[containerID] = req{
 		vdr: vdr,
 		id:  requestID,
 	}
@@ -49,8 +51,7 @@ func (r *Requests) Add(vdr ids.ShortID, requestID uint32, containerID ids.ID) {
 // currently outstanding, the requested ID will be returned along with true. If
 // the request isn't currently outstanding, false will be returned.
 func (r *Requests) Remove(vdr ids.ShortID, requestID uint32) (ids.ID, bool) {
-	vdrKey := vdr.Key()
-	vdrReqs, ok := r.reqsToID[vdrKey]
+	vdrReqs, ok := r.reqsToID[vdr]
 	if !ok {
 		return ids.ID{}, false
 	}
@@ -60,19 +61,19 @@ func (r *Requests) Remove(vdr ids.ShortID, requestID uint32) (ids.ID, bool) {
 	}
 
 	if len(vdrReqs) == 1 {
-		delete(r.reqsToID, vdrKey)
+		delete(r.reqsToID, vdr)
 	} else {
 		delete(vdrReqs, requestID)
 	}
 
-	delete(r.idToReq, containerID.Key())
+	delete(r.idToReq, containerID)
 	return containerID, true
 }
 
 // RemoveAny outstanding requests for the container ID. True is returned if the
 // container ID had an outstanding request.
 func (r *Requests) RemoveAny(containerID ids.ID) bool {
-	req, ok := r.idToReq[containerID.Key()]
+	req, ok := r.idToReq[containerID]
 	if !ok {
 		return false
 	}
@@ -87,6 +88,18 @@ func (r *Requests) Len() int { return len(r.idToReq) }
 // Contains returns true if there is an outstanding request for the container
 // ID.
 func (r *Requests) Contains(containerID ids.ID) bool {
-	_, ok := r.idToReq[containerID.Key()]
+	_, ok := r.idToReq[containerID]
 	return ok
+}
+
+func (r Requests) String() string {
+	sb := strings.Builder{}
+	sb.WriteString(fmt.Sprintf("Requests: (Num Validators = %d)", len(r.reqsToID)))
+	for vdr, reqs := range r.reqsToID {
+		sb.WriteString(fmt.Sprintf("\n  VDR[%s]: (Outstanding Requests %d)", vdr, len(reqs)))
+		for reqID, containerID := range reqs {
+			sb.WriteString(fmt.Sprintf("\n    Request[%d]: %s", reqID, containerID))
+		}
+	}
+	return sb.String()
 }

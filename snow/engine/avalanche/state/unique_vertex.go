@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
@@ -32,7 +33,7 @@ type uniqueVertex struct {
 // and then parsing the vertex bytes on a cache miss.
 func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	vtx := &uniqueVertex{
-		vtxID:      ids.NewID(hashing.ComputeHash256Array(b)),
+		vtxID:      hashing.ComputeHash256Array(b),
 		serializer: s,
 	}
 	vtx.shallowRefresh()
@@ -50,7 +51,19 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	if err := innerVertex.Verify(); err != nil {
 		return nil, err
 	}
+
+	unparsedTxs := innerVertex.Txs()
+	txs := make([]snowstorm.Tx, len(unparsedTxs))
+	for i, txBytes := range unparsedTxs {
+		tx, err := vtx.serializer.vm.ParseTx(txBytes)
+		if err != nil {
+			return nil, err
+		}
+		txs[i] = tx
+	}
+
 	vtx.v.vtx = innerVertex
+	vtx.v.txs = txs
 
 	// If the vertex has already been fetched,
 	// skip persisting the vertex.
@@ -107,13 +120,18 @@ func (vtx *uniqueVertex) Evict() {
 	}
 }
 
-func (vtx *uniqueVertex) setVertex(innerVtx *innerVertex) error {
+func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
 	vtx.shallowRefresh()
 	vtx.v.vtx = innerVtx
 
 	if vtx.v.status.Fetched() {
 		return nil
 	}
+
+	if _, err := vtx.Txs(); err != nil {
+		return err
+	}
+
 	vtx.v.status = choices.Processing
 	return vtx.persist()
 }
@@ -137,7 +155,8 @@ func (vtx *uniqueVertex) setStatus(status choices.Status) error {
 	return vtx.serializer.state.SetStatus(vtx.ID(), status)
 }
 
-func (vtx *uniqueVertex) ID() ids.ID { return vtx.vtxID }
+func (vtx *uniqueVertex) ID() ids.ID       { return vtx.vtxID }
+func (vtx *uniqueVertex) Key() interface{} { return vtx.vtxID }
 
 func (vtx *uniqueVertex) Accept() error {
 	if err := vtx.setStatus(choices.Accepted); err != nil {
@@ -189,9 +208,10 @@ func (vtx *uniqueVertex) Parents() ([]avalanche.Vertex, error) {
 		return nil, fmt.Errorf("failed to get parents for vertex with status: %s", vtx.v.status)
 	}
 
-	if len(vtx.v.parents) != len(vtx.v.vtx.parentIDs) {
-		vtx.v.parents = make([]avalanche.Vertex, len(vtx.v.vtx.parentIDs))
-		for i, parentID := range vtx.v.vtx.parentIDs {
+	parentIDs := vtx.v.vtx.ParentIDs()
+	if len(vtx.v.parents) != len(parentIDs) {
+		vtx.v.parents = make([]avalanche.Vertex, len(parentIDs))
+		for i, parentID := range parentIDs {
 			vtx.v.parents[i] = &uniqueVertex{
 				serializer: vtx.serializer,
 				vtxID:      parentID,
@@ -209,7 +229,17 @@ func (vtx *uniqueVertex) Height() (uint64, error) {
 		return 0, fmt.Errorf("failed to get height for vertex with status: %s", vtx.v.status)
 	}
 
-	return vtx.v.vtx.height, nil
+	return vtx.v.vtx.Height(), nil
+}
+
+func (vtx *uniqueVertex) Epoch() (uint32, error) {
+	vtx.refresh()
+
+	if vtx.v.vtx == nil {
+		return 0, fmt.Errorf("failed to get epoch for vertex with status: %s", vtx.v.status)
+	}
+
+	return vtx.v.vtx.Epoch(), nil
 }
 
 func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
@@ -219,9 +249,14 @@ func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 		return nil, fmt.Errorf("failed to get txs for vertex with status: %s", vtx.v.status)
 	}
 
-	if len(vtx.v.vtx.txs) != len(vtx.v.txs) {
-		vtx.v.txs = make([]snowstorm.Tx, len(vtx.v.vtx.txs))
-		for i, tx := range vtx.v.vtx.txs {
+	txs := vtx.v.vtx.Txs()
+	if len(txs) != len(vtx.v.txs) {
+		vtx.v.txs = make([]snowstorm.Tx, len(txs))
+		for i, txBytes := range txs {
+			tx, err := vtx.serializer.vm.ParseTx(txBytes)
+			if err != nil {
+				return nil, err
+			}
 			vtx.v.txs[i] = tx
 		}
 	}
@@ -273,7 +308,7 @@ func (vtx *uniqueVertex) String() string {
 type vertexState struct {
 	unique bool
 
-	vtx    *innerVertex
+	vtx    vertex.StatelessVertex
 	status choices.Status
 
 	parents []avalanche.Vertex

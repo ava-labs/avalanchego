@@ -8,8 +8,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -17,43 +18,59 @@ import (
 )
 
 func TestInitialStateVerifyNil(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := (*InitialState)(nil)
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to nil initial state")
 	}
 }
 
 func TestInitialStateVerifyUnknownFxID(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := InitialState{
 		FxID: 1,
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to unknown FxID")
 	}
 }
 
 func TestInitialStateVerifyNilOutput(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
+		t.Fatal(err)
+	}
 	numFxs := 1
 
 	is := InitialState{
 		FxID: 0,
 		Outs: []verify.State{nil},
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to a nil output")
 	}
 }
 
 func TestInitialStateVerifyInvalidOutput(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&avax.TestVerifiable{}); err != nil {
+		t.Fatal(err)
+	}
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 	numFxs := 1
@@ -62,14 +79,18 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 		FxID: 0,
 		Outs: []verify.State{&avax.TestVerifiable{Err: errors.New("")}},
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to an invalid output")
 	}
 }
 
 func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&avax.TestTransferable{}); err != nil {
+		t.Fatal(err)
+	}
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 	numFxs := 1
@@ -81,20 +102,24 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 			&avax.TestTransferable{Val: 0},
 		},
 	}
-	if err := is.Verify(c, numFxs); err == nil {
+	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to unsorted outputs")
 	}
 
-	is.Sort(c)
+	is.Sort(m)
 
-	if err := is.Verify(c, numFxs); err != nil {
+	if err := is.Verify(m, numFxs); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestInitialStateVerifySerialization(t *testing.T) {
-	c := codec.NewDefault()
+	c := linearcodec.NewDefault()
 	if err := c.RegisterType(&secp256k1fx.TransferOutput{}); err != nil {
+		t.Fatal(err)
+	}
+	m := codec.NewDefaultManager()
+	if err := m.RegisterCodec(codecVersion, c); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,23 +151,23 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 					Locktime:  54321,
 					Threshold: 1,
 					Addrs: []ids.ShortID{
-						ids.NewShortID([20]byte{
+						{
 							0x51, 0x02, 0x5c, 0x61, 0xfb, 0xcf, 0xc0, 0x78,
 							0xf6, 0x93, 0x34, 0xf8, 0x34, 0xbe, 0x6d, 0xd2,
 							0x6d, 0x55, 0xa9, 0x55,
-						}),
-						ids.NewShortID([20]byte{
+						},
+						{
 							0xc3, 0x34, 0x41, 0x28, 0xe0, 0x60, 0x12, 0x8e,
 							0xde, 0x35, 0x23, 0xa2, 0x4a, 0x46, 0x1c, 0x89,
 							0x43, 0xab, 0x08, 0x59,
-						}),
+						},
 					},
 				},
 			},
 		},
 	}
 
-	isBytes, err := c.Marshal(is)
+	isBytes, err := m.Marshal(codecVersion, is)
 	if err != nil {
 		t.Fatal(err)
 	}

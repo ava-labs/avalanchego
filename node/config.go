@@ -4,12 +4,14 @@
 package node
 
 import (
+	"crypto/tls"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -22,6 +24,13 @@ import (
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	genesis.Params
+
+	// If true, bootstrap the current database version and then end the node.
+	FetchOnly bool
+
+	// Genesis information
+	GenesisBytes []byte
+	AvaxAssetID  ids.ID
 
 	// protocol to use for opening the network interface
 	Nat nat.Router
@@ -38,28 +47,41 @@ type Config struct {
 	// Crypto configuration
 	EnableCrypto bool
 
-	// Database to use for the node
-	DB database.Database
+	// Path to database
+	DBPath string
+
+	// If false, uses an in memory database
+	DBEnabled bool
 
 	// Staking configuration
-	StakingIP               utils.DynamicIPDesc
-	EnableP2PTLS            bool
-	EnableStaking           bool
-	StakingKeyFile          string
-	StakingCertFile         string
-	DisabledStakingWeight   uint64
-	MaxNonStakerPendingMsgs uint
+	StakingIP             utils.DynamicIPDesc
+	EnableStaking         bool
+	StakingTLSCert        tls.Certificate
+	DisabledStakingWeight uint64
+
+	// Throttling
+	MaxNonStakerPendingMsgs uint32
 	StakerMSGPortion        float64
 	StakerCPUPortion        float64
+	SendQueueSize           uint32
+	MaxPendingMsgs          uint32
+
+	// Health
+	HealthCheckFreq time.Duration
 
 	// Network configuration
-	NetworkConfig timer.AdaptiveTimeoutConfig
+	NetworkConfig       timer.AdaptiveTimeoutConfig
+	NetworkHealthConfig network.HealthConfig
+	PeerListSize        uint32
+	PeerListGossipSize  uint32
+	PeerListGossipFreq  time.Duration
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
 
 	// Bootstrapping configuration
-	BootstrapPeers []*Peer
+	BootstrapIDs []ids.ShortID
+	BootstrapIPs []utils.IPDesc
 
 	// HTTP configuration
 	HTTPHost string
@@ -70,6 +92,7 @@ type Config struct {
 	HTTPSCertFile       string
 	APIRequireAuthToken bool
 	APIAuthPassword     string
+	APIAllowedOrigins   []string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
@@ -77,6 +100,7 @@ type Config struct {
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
+	IndexAPIEnabled    bool
 
 	// Logging configuration
 	LoggingConfig logging.Config
@@ -87,10 +111,6 @@ type Config struct {
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters
 
-	// Throughput configuration
-	ThroughputPort          uint16
-	ThroughputServerEnabled bool
-
 	// IPC configuration
 	IPCAPIEnabled      bool
 	IPCPath            string
@@ -98,6 +118,7 @@ type Config struct {
 
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
+	RouterHealthConfig       router.HealthConfig
 	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
 
@@ -112,4 +133,24 @@ type Config struct {
 
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
+
+	// Coreth
+	CorethConfig string
+
+	IndexAllowIncomplete bool
+
+	// Should Bootstrap be retried
+	RetryBootstrap bool
+
+	// Max number of times to retry bootstrap
+	RetryBootstrapMaxAttempts int
+
+	// Timeout when connecting to bootstrapping beacons
+	BootstrapBeaconConnectionTimeout time.Duration
+
+	// Peer alias configuration
+	PeerAliasTimeout time.Duration
+
+	// ChainConfigs
+	ChainConfigs map[ids.ID]chains.ChainConfig
 }

@@ -14,10 +14,10 @@ const (
 
 // Bag is a multiset of IDs.
 //
-// A bag has the ability to split and filter on it's bits for ease of use for
+// A bag has the ability to split and filter on its bits for ease of use for
 // binary voting.
 type Bag struct {
-	counts map[[32]byte]int
+	counts map[ID]int
 	size   int
 
 	mode     ID
@@ -29,7 +29,7 @@ type Bag struct {
 
 func (b *Bag) init() {
 	if b.counts == nil {
-		b.counts = make(map[[32]byte]int, minBagSize)
+		b.counts = make(map[ID]int, minBagSize)
 	}
 }
 
@@ -44,7 +44,7 @@ func (b *Bag) SetThreshold(threshold int) {
 	b.metThreshold.Clear()
 	for vote, count := range b.counts {
 		if count >= threshold {
-			b.metThreshold.Add(NewID(vote))
+			b.metThreshold.Add(vote)
 		}
 	}
 }
@@ -56,7 +56,7 @@ func (b *Bag) Add(ids ...ID) {
 	}
 }
 
-// AddCount increases the nubmer of times the id has been seen by count.
+// AddCount increases the number of times the id has been seen by count.
 //
 // count must be >= 0
 func (b *Bag) AddCount(id ID, count int) {
@@ -66,8 +66,8 @@ func (b *Bag) AddCount(id ID, count int) {
 
 	b.init()
 
-	totalCount := b.counts[*id.ID] + count
-	b.counts[*id.ID] = totalCount
+	totalCount := b.counts[id] + count
+	b.counts[id] = totalCount
 	b.size += count
 
 	if totalCount > b.modeFreq {
@@ -81,8 +81,7 @@ func (b *Bag) AddCount(id ID, count int) {
 
 // Count returns the number of times the id has been added.
 func (b *Bag) Count(id ID) int {
-	b.init()
-	return b.counts[*id.ID]
+	return b.counts[id]
 }
 
 // Len returns the number of times an id has been added.
@@ -93,7 +92,7 @@ func (b *Bag) List() []ID {
 	idList := make([]ID, len(b.counts))
 	i := 0
 	for id := range b.counts {
-		idList[i] = NewID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -126,9 +125,8 @@ func (b *Bag) Threshold() Set { return b.metThreshold }
 func (b *Bag) Filter(start, end int, id ID) Bag {
 	newBag := Bag{}
 	for vote, count := range b.counts {
-		voteID := NewID(vote)
-		if EqualSubset(start, end, id, voteID) {
-			newBag.AddCount(voteID, count)
+		if EqualSubset(start, end, id, vote) {
+			newBag.AddCount(vote, count)
 		}
 	}
 	return newBag
@@ -140,9 +138,8 @@ func (b *Bag) Filter(start, end int, id ID) Bag {
 func (b *Bag) Split(index uint) [2]Bag {
 	splitVotes := [2]Bag{}
 	for vote, count := range b.counts {
-		voteID := NewID(vote)
-		bit := voteID.Bit(index)
-		splitVotes[bit].AddCount(voteID, count)
+		bit := vote.Bit(index)
+		splitVotes[bit].AddCount(vote, count)
 	}
 	return splitVotes
 }
@@ -151,8 +148,7 @@ func (b *Bag) String() string {
 	sb := strings.Builder{}
 
 	sb.WriteString(fmt.Sprintf("Bag: (Size = %d)", b.Len()))
-	for idBytes, count := range b.counts {
-		id := NewID(idBytes)
+	for id, count := range b.counts {
 		sb.WriteString(fmt.Sprintf("\n    ID[%s]: Count = %d", id, count))
 	}
 

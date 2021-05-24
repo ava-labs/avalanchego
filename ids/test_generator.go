@@ -3,9 +3,7 @@
 
 package ids
 
-var (
-	offset = uint64(0)
-)
+var offset = uint64(0)
 
 // GenerateTestID returns a new ID that should only be used for testing
 func GenerateTestID() ID {
@@ -16,6 +14,6 @@ func GenerateTestID() ID {
 // GenerateTestShortID returns a new ID that should only be used for testing
 func GenerateTestShortID() ShortID {
 	newID := GenerateTestID()
-	newShortID, _ := ToShortID(newID.Bytes()[:20])
+	newShortID, _ := ToShortID(newID[:20])
 	return newShortID
 }

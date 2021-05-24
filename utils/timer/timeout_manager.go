@@ -21,7 +21,7 @@ type timeout struct {
 type TimeoutManager struct {
 	lock        sync.Mutex
 	duration    time.Duration // Amount of time before a timeout
-	timeoutMap  map[[32]byte]*list.Element
+	timeoutMap  map[ids.ID]*list.Element
 	timeoutList *list.List
 	timer       *Timer // Timer that will fire to clear the timeouts
 }
@@ -29,7 +29,7 @@ type TimeoutManager struct {
 // Initialize is a constructor b/c Golang, in its wisdom, doesn't ... have them?
 func (tm *TimeoutManager) Initialize(duration time.Duration) {
 	tm.duration = duration
-	tm.timeoutMap = make(map[[32]byte]*list.Element)
+	tm.timeoutMap = make(map[ids.ID]*list.Element)
 	tm.timeoutList = list.New()
 	tm.timer = NewTimer(tm.Timeout)
 }
@@ -84,7 +84,7 @@ func (tm *TimeoutManager) timeout() {
 func (tm *TimeoutManager) put(id ids.ID, handler func()) {
 	tm.remove(id)
 
-	tm.timeoutMap[id.Key()] = tm.timeoutList.PushBack(timeout{
+	tm.timeoutMap[id] = tm.timeoutList.PushBack(timeout{
 		id:      id,
 		handler: handler,
 		timer:   time.Now(),
@@ -96,12 +96,11 @@ func (tm *TimeoutManager) put(id ids.ID, handler func()) {
 }
 
 func (tm *TimeoutManager) remove(id ids.ID) {
-	key := id.Key()
-	e, exists := tm.timeoutMap[key]
+	e, exists := tm.timeoutMap[id]
 	if !exists {
 		return
 	}
-	delete(tm.timeoutMap, key)
+	delete(tm.timeoutMap, id)
 	tm.timeoutList.Remove(e)
 }
 

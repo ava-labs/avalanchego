@@ -26,7 +26,7 @@ type FrontierSender interface {
 
 	// AcceptedFrontier responds to a AcceptedFrontier message with this
 	// engine's current accepted frontier.
-	AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
+	AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID)
 }
 
 // AcceptedSender defines how a consensus engine sends messages pertaining to
@@ -35,11 +35,11 @@ type AcceptedSender interface {
 	// GetAccepted requests that every validator in [validatorIDs] sends an
 	// Accepted message with all the IDs in [containerIDs] that the validator
 	// thinks is accepted.
-	GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs ids.Set)
+	GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID)
 
 	// Accepted responds to a GetAccepted message with a set of IDs of
 	// containers that are accepted.
-	Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set)
+	Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID)
 }
 
 // FetchSender defines how a consensus engine sends retrieval messages to other
@@ -77,7 +77,7 @@ type QuerySender interface {
 	PullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID)
 
 	// Chits sends chits to the specified validator
-	Chits(validatorID ids.ShortID, requestID uint32, votes ids.Set)
+	Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted

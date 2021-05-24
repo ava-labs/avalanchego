@@ -8,8 +8,8 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -26,7 +26,7 @@ type InitialState struct {
 }
 
 // Verify implements the verify.Verifiable interface
-func (is *InitialState) Verify(c codec.Codec, numFxs int) error {
+func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	switch {
 	case is == nil:
 		return errNilInitialState
@@ -50,22 +50,22 @@ func (is *InitialState) Verify(c codec.Codec, numFxs int) error {
 }
 
 // Sort ...
-func (is *InitialState) Sort(c codec.Codec) { sortState(is.Outs, c) }
+func (is *InitialState) Sort(c codec.Manager) { sortState(is.Outs, c) }
 
 type innerSortState struct {
 	vers  []verify.State
-	codec codec.Codec
+	codec codec.Manager
 }
 
 func (vers *innerSortState) Less(i, j int) bool {
 	iVer := vers.vers[i]
 	jVer := vers.vers[j]
 
-	iBytes, err := vers.codec.Marshal(&iVer)
+	iBytes, err := vers.codec.Marshal(codecVersion, &iVer)
 	if err != nil {
 		return false
 	}
-	jBytes, err := vers.codec.Marshal(&jVer)
+	jBytes, err := vers.codec.Marshal(codecVersion, &jVer)
 	if err != nil {
 		return false
 	}
@@ -74,10 +74,11 @@ func (vers *innerSortState) Less(i, j int) bool {
 func (vers *innerSortState) Len() int      { return len(vers.vers) }
 func (vers *innerSortState) Swap(i, j int) { v := vers.vers; v[j], v[i] = v[i], v[j] }
 
-func sortState(vers []verify.State, c codec.Codec) {
+func sortState(vers []verify.State, c codec.Manager) {
 	sort.Sort(&innerSortState{vers: vers, codec: c})
 }
-func isSortedState(vers []verify.State, c codec.Codec) bool {
+
+func isSortedState(vers []verify.State, c codec.Manager) bool {
 	return sort.IsSorted(&innerSortState{vers: vers, codec: c})
 }
 

@@ -1,9 +1,8 @@
-- name: Install Go
-  become: true
-  apt:
-    name:
-      # Avalanche (in May 2020) requires Go 1.13. On Ubuntu 20.04 LTS this package,
-      # provides the appropriate version.
-      - golang-go
+- name: Dispatch tasks
+  include_tasks: "{{ item }}"
+  with_first_found:
+    - "{{ ansible_facts.distribution | lower }}-{{ ansible_facts.distribution_version }}.yml"
+    - "{{ ansible_facts.distribution | lower }}-{{ ansible_facts.distribution_major_version }}.yml"
+    - "not_supported.yml"
   tags:
     - golang_base

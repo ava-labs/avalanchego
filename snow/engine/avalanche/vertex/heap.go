@@ -7,22 +7,16 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
 
-// A vertexItem is a Vertex managed by the priority queue.
-type vertexItem struct {
-	vertex avalanche.Vertex
-	index  int // The index of the item in the heap.
-}
-
 // A priorityQueue implements heap.Interface and holds vertexItems.
-type priorityQueue []*vertexItem
+type priorityQueue []avalanche.Vertex
 
 func (pq priorityQueue) Len() int { return len(pq) }
 
 // Returns true if the vertex at index i has greater height than the vertex at
 // index j.
 func (pq priorityQueue) Less(i, j int) bool {
-	statusI := pq[i].vertex.Status()
-	statusJ := pq[j].vertex.Status()
+	statusI := pq[i].Status()
+	statusJ := pq[j].Status()
 
 	// Put unknown vertices at the front of the heap to ensure once we have made
 	// it below a certain height in DAG traversal we do not need to reset
@@ -34,11 +28,11 @@ func (pq priorityQueue) Less(i, j int) bool {
 	}
 
 	// Treat errors on retrieving the height as if the vertex is not fetched
-	heightI, errI := pq[i].vertex.Height()
+	heightI, errI := pq[i].Height()
 	if errI != nil {
 		return true
 	}
-	heightJ, errJ := pq[j].vertex.Height()
+	heightJ, errJ := pq[j].Height()
 	if errJ != nil {
 		return false
 	}
@@ -47,15 +41,11 @@ func (pq priorityQueue) Less(i, j int) bool {
 
 func (pq priorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
-	pq[i].index = i
-	pq[j].index = j
 }
 
 // Push adds an item to this priority queue. x must have type *vertexItem
 func (pq *priorityQueue) Push(x interface{}) {
-	n := len(*pq)
-	item := x.(*vertexItem)
-	item.index = n
+	item := x.(avalanche.Vertex)
 	*pq = append(*pq, item)
 }
 
@@ -65,7 +55,6 @@ func (pq *priorityQueue) Pop() interface{} {
 	n := len(old)
 	item := old[n-1]
 	old[n-1] = nil
-	item.index = -1
 	*pq = old[0 : n-1]
 	return item
 }
@@ -112,10 +101,7 @@ func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 	}
 
 	vh.elementIDs.Add(vtxID)
-	item := &vertexItem{
-		vertex: vtx,
-	}
-	heap.Push(&vh.heap, item)
+	heap.Push(&vh.heap, vtx)
 	return true
 }
 
@@ -123,7 +109,7 @@ func (vh *maxHeightVertexHeap) Push(vtx avalanche.Vertex) bool {
 // vertex and returns it. Otherwise, removes and returns the vertex in this heap
 // with the greatest height.
 func (vh *maxHeightVertexHeap) Pop() avalanche.Vertex {
-	vtx := heap.Pop(&vh.heap).(*vertexItem).vertex
+	vtx := heap.Pop(&vh.heap).(avalanche.Vertex)
 	vh.elementIDs.Remove(vtx.ID())
 	return vtx
 }

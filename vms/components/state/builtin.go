@@ -14,7 +14,7 @@ import (
 
 func marshalID(idIntf interface{}) ([]byte, error) {
 	if id, ok := idIntf.(ids.ID); ok {
-		return id.Bytes(), nil
+		return id[:], nil
 	}
 	return nil, errors.New("expected ids.ID but got unexpected type")
 }

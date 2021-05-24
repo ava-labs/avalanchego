@@ -11,7 +11,7 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   # This workflow contains a single job called "build"
-  build:
+  build-mac:
     # The type of runner that the job will run on
     runs-on: macos-10.15 
 
@@ -19,6 +19,10 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+         go-version: '1.15.5' # The Go version to download (if necessary) and use.
+    - run: go version
 
     # Runs a single command using the runners shell
     - name: Build the avalanchego binaries 
@@ -35,11 +39,19 @@ jobs:
         sudo installer -pkg AWSCLIV2.pkg -target /
 
     - name: Create zip file
-      run: 7z a avalanchego-macos-${{ steps.get_version.outputs.VERSION }}.zip build/avalanchego build/plugins
+      run: 7z a avalanchego-macos-${VERSION}.zip build/avalanchego build/avalanchego-latest build/avalanchego-preupgrade
+      env:
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
 
     - name: Upload file to S3 
-      run: aws s3 cp avalanchego-macos-${{ steps.get_version.outputs.VERSION }}.zip s3://${{ secrets.BUCKET }}/macos/ 
+      run: aws s3 cp avalanchego-macos-${VERSION}.zip s3://${BUCKET}/macos/ 
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.UPLOAD_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.UPLOAD_KEY }}
         BUCKET: ${{ secrets.BUCKET }}
+        VERSION: ${{ steps.get_version.outputs.VERSION }}

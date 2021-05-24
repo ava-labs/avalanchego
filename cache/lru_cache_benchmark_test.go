@@ -15,11 +15,11 @@ func BenchmarkLRUCachePutSmall(b *testing.B) {
 	cache := &LRU{Size: smallLen}
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < smallLen; i++ {
-			var idBytes [32]byte
-			if _, err := rand.Read(idBytes[:]); err != nil {
+			var id ids.ID
+			if _, err := rand.Read(id[:]); err != nil {
 				b.Fatal(err)
 			}
-			cache.Put(ids.NewID(idBytes), n)
+			cache.Put(id, n)
 		}
 		b.StopTimer()
 		cache.Flush()
@@ -32,11 +32,11 @@ func BenchmarkLRUCachePutMedium(b *testing.B) {
 	cache := &LRU{Size: mediumLen}
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < mediumLen; i++ {
-			var idBytes [32]byte
-			if _, err := rand.Read(idBytes[:]); err != nil {
+			var id ids.ID
+			if _, err := rand.Read(id[:]); err != nil {
 				b.Fatal(err)
 			}
-			cache.Put(ids.NewID(idBytes), n)
+			cache.Put(id, n)
 		}
 		b.StopTimer()
 		cache.Flush()
@@ -49,11 +49,11 @@ func BenchmarkLRUCachePutLarge(b *testing.B) {
 	cache := &LRU{Size: largeLen}
 	for n := 0; n < b.N; n++ {
 		for i := 0; i < largeLen; i++ {
-			var idBytes [32]byte
-			if _, err := rand.Read(idBytes[:]); err != nil {
+			var id ids.ID
+			if _, err := rand.Read(id[:]); err != nil {
 				b.Fatal(err)
 			}
-			cache.Put(ids.NewID(idBytes), n)
+			cache.Put(id, n)
 		}
 		b.StopTimer()
 		cache.Flush()

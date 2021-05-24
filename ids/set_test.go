@@ -8,7 +8,7 @@ import (
 )
 
 func TestSet(t *testing.T) {
-	id1 := NewID([32]byte{1})
+	id1 := ID{1}
 
 	ids := Set{}
 
@@ -29,7 +29,7 @@ func TestSet(t *testing.T) {
 		t.Fatalf("Bad set size")
 	} else if list := ids.List(); len(list) != 1 {
 		t.Fatalf("Bad list size")
-	} else if !list[0].Equals(id1) {
+	} else if list[0] != id1 {
 		t.Fatalf("Set value not correct")
 	}
 
@@ -71,30 +71,61 @@ func TestSetCappedList(t *testing.T) {
 		t.Fatalf("List should have been empty but was %v", list)
 	} else if list := set.CappedList(1); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; !id.Equals(returnedID) {
+	} else if returnedID := list[0]; id != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	} else if list := set.CappedList(2); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; !id.Equals(returnedID) {
+	} else if returnedID := list[0]; id != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	}
 
-	id2 := NewID([32]byte{1})
+	id2 := ID{1}
 	set.Add(id2)
 
 	if list := set.CappedList(0); len(list) != 0 {
 		t.Fatalf("List should have been empty but was %v", list)
 	} else if list := set.CappedList(1); len(list) != 1 {
 		t.Fatalf("List should have had length %d but had %d", 1, len(list))
-	} else if returnedID := list[0]; !id.Equals(returnedID) && !id2.Equals(returnedID) {
+	} else if returnedID := list[0]; id != returnedID && id2 != returnedID {
 		t.Fatalf("List should have been %s but was %s", id, returnedID)
 	} else if list := set.CappedList(2); len(list) != 2 {
 		t.Fatalf("List should have had length %d but had %d", 2, len(list))
 	} else if list := set.CappedList(3); len(list) != 2 {
 		t.Fatalf("List should have had length %d but had %d", 2, len(list))
-	} else if returnedID := list[0]; !id.Equals(returnedID) && !id2.Equals(returnedID) {
+	} else if returnedID := list[0]; id != returnedID && id2 != returnedID {
 		t.Fatalf("list contains unexpected element %s", returnedID)
-	} else if returnedID := list[1]; !id.Equals(returnedID) && !id2.Equals(returnedID) {
+	} else if returnedID := list[1]; id != returnedID && id2 != returnedID {
 		t.Fatalf("list contains unexpected element %s", returnedID)
+	}
+}
+
+// Test that Clear() works with both the iterative and set-to-nil path
+func TestSetClearLarge(t *testing.T) {
+	// Using iterative clear path
+	set := Set{}
+	for i := 0; i < clearSizeThreshold; i++ {
+		set.Add(GenerateTestID())
+	}
+	set.Clear()
+	if set.Len() != 0 {
+		t.Fatal("length should be 0")
+	}
+	set.Add(GenerateTestID())
+	if set.Len() != 1 {
+		t.Fatal("length should be 1")
+	}
+
+	// Using bulk (set map to nil) path
+	set = Set{}
+	for i := 0; i < clearSizeThreshold+1; i++ {
+		set.Add(GenerateTestID())
+	}
+	set.Clear()
+	if set.Len() != 0 {
+		t.Fatal("length should be 0")
+	}
+	set.Add(GenerateTestID())
+	if set.Len() != 1 {
+		t.Fatal("length should be 1")
 	}
 }

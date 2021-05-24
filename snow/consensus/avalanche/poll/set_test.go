@@ -44,11 +44,11 @@ func TestCreateAndFinishPoll(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vtxID := ids.NewID([32]byte{1})
+	vtxID := ids.ID{1}
 	votes := []ids.ID{vtxID}
 
-	vdr1 := ids.NewShortID([20]byte{1})
-	vdr2 := ids.NewShortID([20]byte{2}) // k = 2
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2} // k = 2
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(
@@ -76,7 +76,7 @@ func TestCreateAndFinishPoll(t *testing.T) {
 		t.Fatalf("Should have finished the")
 	} else if list := result.List(); len(list) != 1 {
 		t.Fatalf("Wrong number of vertices returned")
-	} else if retVtxID := list[0]; !retVtxID.Equals(vtxID) {
+	} else if retVtxID := list[0]; retVtxID != vtxID {
 		t.Fatalf("Wrong vertex returned")
 	} else if set := result.GetSet(vtxID); set.Len() != 2 {
 		t.Fatalf("Wrong number of votes returned")
@@ -90,7 +90,7 @@ func TestSetString(t *testing.T) {
 	registerer := prometheus.NewRegistry()
 	s := NewSet(factory, log, namespace, registerer)
 
-	vdr1 := ids.NewShortID([20]byte{1}) // k = 1
+	vdr1 := ids.ShortID{1} // k = 1
 
 	vdrs := ids.ShortBag{}
 	vdrs.Add(vdr1)

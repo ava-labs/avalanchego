@@ -8,20 +8,28 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/codec"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
-const dataLen = 32
+const (
+	dataLen      = 32
+	codecVersion = 0
+)
 
 var (
 	errNoPendingBlocks = errors.New("there is no block to propose")
 	errBadGenesisBytes = errors.New("genesis data should be bytes (max length 32)")
+
+	_ block.ChainVM   = &VM{}
+	_ common.StaticVM = &VM{}
 )
 
 // VM implements the snowman.VM interface
@@ -29,29 +37,36 @@ var (
 // and a piece of data (a string)
 type VM struct {
 	core.SnowmanVM
-	codec codec.Codec
+	codec codec.Manager
 	// Proposed pieces of data that haven't been put into a block and proposed yet
 	mempool [][dataLen]byte
 }
 
 // Initialize this vm
 // [ctx] is this vm's context
-// [db] is this vm's database
+// [dbManager] is the manager of this vm's database
 // [toEngine] is used to notify the consensus engine that new blocks are
 //   ready to be added to consensus
 // The data in the genesis block is [genesisData]
 func (vm *VM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisData []byte,
+	upgradeData []byte,
+	configData []byte,
 	toEngine chan<- common.Message,
 	_ []*common.Fx,
 ) error {
-	if err := vm.SnowmanVM.Initialize(ctx, db, vm.ParseBlock, toEngine); err != nil {
+	if err := vm.SnowmanVM.Initialize(ctx, dbManager.Current().Database, vm.ParseBlock, toEngine); err != nil {
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
 	}
-	vm.codec = codec.NewDefault()
+	c := linearcodec.NewDefault()
+	manager := codec.NewDefaultManager()
+	if err := manager.RegisterCodec(codecVersion, c); err != nil {
+		return err
+	}
+	vm.codec = manager
 
 	// If database is empty, create it using the provided genesis data
 	if !vm.DBInitialized() {
@@ -99,19 +114,21 @@ func (vm *VM) Initialize(
 // CreateHandlers returns a map where:
 // Keys: The path extension for this VM's API (empty in this case)
 // Values: The handler for the API
-func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	handler, err := vm.NewHandler("timestamp", &Service{vm})
-	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{
 		"": handler,
-	}
+	}, err
 }
 
 // CreateStaticHandlers returns a map where:
 // Keys: The path extension for this VM's static API
 // Values: The handler for that static API
 // We return nil because this VM has no static API
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler { return nil }
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) { return nil, nil }
+
+// Health implements the common.VM interface
+func (vm *VM) HealthCheck() (interface{}, error) { return nil, nil }
 
 // BuildBlock returns a block that this vm wants to add to consensus
 func (vm *VM) BuildBlock() (snowman.Block, error) {
@@ -156,7 +173,7 @@ func (vm *VM) proposeBlock(data [dataLen]byte) {
 // This function is used by the vm's state to unmarshal blocks saved in state
 func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 	block := &Block{}
-	err := vm.codec.Unmarshal(bytes, block)
+	_, err := vm.codec.Unmarshal(bytes, block)
 	block.Initialize(bytes, &vm.SnowmanVM)
 	return block, err
 }
@@ -172,7 +189,7 @@ func (vm *VM) NewBlock(parentID ids.ID, height uint64, data [dataLen]byte, times
 		Data:      data,
 		Timestamp: timestamp.Unix(),
 	}
-	blockBytes, err := vm.codec.Marshal(block)
+	blockBytes, err := vm.codec.Marshal(codecVersion, block)
 	if err != nil {
 		return nil, err
 	}

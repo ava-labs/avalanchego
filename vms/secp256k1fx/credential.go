@@ -12,8 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-var (
-	errNilCredential = errors.New("nil credential")
+var errNilCredential = errors.New("nil credential")
+
+const (
+	defaultEncoding = formatting.Hex
 )
 
 // Credential ...
@@ -22,10 +24,15 @@ type Credential struct {
 }
 
 // MarshalJSON marshals [cr] to JSON
+// The string representation of each signature is created using the hex formatter
 func (cr *Credential) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString("{\"signatures\":[")
 	for i, sig := range cr.Sigs {
-		buffer.WriteString(fmt.Sprintf("\"%s\"", formatting.Hex{Bytes: sig[:]}))
+		sigStr, err := formatting.Encode(defaultEncoding, sig[:])
+		if err != nil {
+			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
+		}
+		buffer.WriteString(fmt.Sprintf("\"%s\"", sigStr))
 		if i != len(cr.Sigs)-1 {
 			buffer.WriteString(",")
 		}

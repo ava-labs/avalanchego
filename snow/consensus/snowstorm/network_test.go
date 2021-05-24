@@ -19,7 +19,7 @@ import (
 type Network struct {
 	params         sbcon.Parameters
 	consumers      []*TestTx
-	nodeTxs        []map[[32]byte]*TestTx
+	nodeTxs        []map[ids.ID]*TestTx
 	nodes, running []Consensus
 }
 
@@ -44,16 +44,16 @@ func (n *Network) Initialize(
 
 	idCount := uint64(0)
 
-	colorMap := map[[32]byte]int{}
+	colorMap := map[ids.ID]int{}
 	colors := []ids.ID{}
 	for i := 0; i < numColors; i++ {
 		idCount++
 		color := ids.Empty.Prefix(idCount)
-		colorMap[color.Key()] = i
+		colorMap[color] = i
 		colors = append(colors, color)
 	}
 
-	count := map[[32]byte]int{}
+	count := map[ids.ID]int{}
 	for len(colors) > 0 {
 		selected := []ids.ID{}
 		s := sampler.NewUniform()
@@ -68,20 +68,18 @@ func (n *Network) Initialize(
 		}
 
 		for _, sID := range selected {
-			sKey := sID.Key()
-			newCount := count[sKey] + 1
-			count[sKey] = newCount
+			newCount := count[sID] + 1
+			count[sID] = newCount
 			if newCount >= maxInputConflicts {
-				i := colorMap[sKey]
+				i := colorMap[sID]
 				e := len(colorMap) - 1
 
 				eID := colors[e]
-				eKey := eID.Key()
 
-				colorMap[eKey] = i
+				colorMap[eID] = i
 				colors[i] = eID
 
-				delete(colorMap, sKey)
+				delete(colorMap, sID)
 				colors = colors[:e]
 			}
 		}
@@ -105,7 +103,7 @@ func (n *Network) AddNode(cg Consensus) error {
 
 	n.shuffleConsumers()
 
-	txs := map[[32]byte]*TestTx{}
+	txs := map[ids.ID]*TestTx{}
 	for _, tx := range n.consumers {
 		newTx := &TestTx{
 			TestDecidable: choices.TestDecidable{
@@ -114,7 +112,7 @@ func (n *Network) AddNode(cg Consensus) error {
 			},
 			InputIDsV: tx.InputIDs(),
 		}
-		txs[newTx.ID().Key()] = newTx
+		txs[newTx.ID()] = newTx
 
 		if err := cg.Add(newTx); err != nil {
 			return err
@@ -178,7 +176,7 @@ func (n *Network) Disagreement() bool {
 		accepted := false
 		rejected := false
 		for _, nodeTx := range n.nodeTxs {
-			tx := nodeTx[color.ID().Key()]
+			tx := nodeTx[color.ID()]
 			accepted = accepted || tx.Status() == choices.Accepted
 			rejected = rejected || tx.Status() == choices.Rejected
 		}
@@ -190,16 +188,16 @@ func (n *Network) Disagreement() bool {
 }
 
 func (n *Network) Agreement() bool {
-	statuses := map[[32]byte]choices.Status{}
+	statuses := map[ids.ID]choices.Status{}
 	for _, color := range n.consumers {
 		for _, nodeTx := range n.nodeTxs {
-			key := color.ID().Key()
-			tx := nodeTx[key]
-			prevStatus, exists := statuses[key]
+			colorID := color.ID()
+			tx := nodeTx[colorID]
+			prevStatus, exists := statuses[colorID]
 			if exists && prevStatus != tx.Status() {
 				return false
 			}
-			statuses[key] = tx.Status()
+			statuses[colorID] = tx.Status()
 		}
 	}
 	return !n.Disagreement()

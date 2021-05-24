@@ -11,7 +11,7 @@ import (
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
 type EvictableLRU struct {
 	lock      sync.Mutex
-	entryMap  map[[32]byte]*list.Element
+	entryMap  map[interface{}]*list.Element
 	entryList *list.List
 	Size      int
 }
@@ -34,7 +34,7 @@ func (c *EvictableLRU) Flush() {
 
 func (c *EvictableLRU) init() {
 	if c.entryMap == nil {
-		c.entryMap = make(map[[32]byte]*list.Element)
+		c.entryMap = make(map[interface{}]*list.Element)
 	}
 	if c.entryList == nil {
 		c.entryList = list.New()
@@ -50,7 +50,7 @@ func (c *EvictableLRU) resize() {
 		c.entryList.Remove(e)
 
 		val := e.Value.(Evictable)
-		delete(c.entryMap, val.ID().Key())
+		delete(c.entryMap, val.Key())
 		val.Evict()
 	}
 }
@@ -59,14 +59,14 @@ func (c *EvictableLRU) deduplicate(value Evictable) Evictable {
 	c.init()
 	c.resize()
 
-	key := value.ID().Key()
+	key := value.Key()
 	if e, ok := c.entryMap[key]; !ok {
 		if c.entryList.Len() >= c.Size {
 			e = c.entryList.Front()
 			c.entryList.MoveToBack(e)
 
 			val := e.Value.(Evictable)
-			delete(c.entryMap, val.ID().Key())
+			delete(c.entryMap, val.Key())
 			val.Evict()
 
 			e.Value = value

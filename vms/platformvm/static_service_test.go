@@ -13,7 +13,7 @@ import (
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
-	id := ids.NewShortID([20]byte{1, 2, 3})
+	id := ids.ShortID{1, 2, 3}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
@@ -48,22 +48,19 @@ func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid balance")
 	}
 }
 
 func TestBuildGenesisInvalidAmount(t *testing.T) {
-	id := ids.NewShortID([20]byte{1, 2, 3})
+	id := ids.ShortID{1, 2, 3}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
@@ -98,22 +95,19 @@ func TestBuildGenesisInvalidAmount(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid amount")
 	}
 }
 
 func TestBuildGenesisInvalidEndtime(t *testing.T) {
-	id := ids.NewShortID([20]byte{1, 2, 3})
+	id := ids.ShortID{1, 2, 3}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
@@ -149,22 +143,19 @@ func TestBuildGenesisInvalidEndtime(t *testing.T) {
 		Validators: []APIPrimaryValidator{
 			validator,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err == nil {
 		t.Fatalf("Should have errored due to an invalid end time")
 	}
 }
 
 func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
-	id := ids.NewShortID([20]byte{1})
+	id := ids.ShortID{1}
 	nodeID := id.PrefixedString(constants.NodeIDPrefix)
 	hrp := constants.NetworkIDToHRP[testNetworkID]
 	addr, err := formatting.FormatBech32(hrp, id.Bytes())
@@ -226,7 +217,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	args := BuildGenesisArgs{
-		AvaxAssetID: ids.NewID([32]byte{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'}),
+		AvaxAssetID: ids.ID{'d', 'u', 'm', 'm', 'y', ' ', 'I', 'D'},
 		UTXOs: []APIUTXO{
 			utxo,
 		},
@@ -235,30 +226,23 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 			validator2,
 			validator3,
 		},
-		Time: 5,
+		Time:     5,
+		Encoding: formatting.Hex,
 	}
 	reply := BuildGenesisReply{}
 
-	ss, err := CreateStaticService(formatting.CB58Encoding)
-	if err != nil {
-		t.Fatalf("Failed to create static service due to: %s", err)
-	}
-
+	ss := StaticService{}
 	if err := ss.BuildGenesis(nil, &args, &reply); err != nil {
 		t.Fatalf("BuildGenesis should not have errored but got error: %s", err)
 	}
 
-	encoding, err := ss.encodingManager.GetEncoding(reply.Encoding)
-	if err != nil {
-		t.Fatalf("Failed to get encoding due to: %s", err)
-	}
-	genesisBytes, err := encoding.ConvertString(reply.Bytes)
+	genesisBytes, err := formatting.Decode(reply.Encoding, reply.Bytes)
 	if err != nil {
 		t.Fatalf("Problem decoding BuildGenesis response: %s", err)
 	}
 
 	genesis := &Genesis{}
-	if err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
+	if _, err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
 		t.Fatal(err)
 	}
 	validators := genesis.Validators

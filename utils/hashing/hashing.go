@@ -13,9 +13,7 @@ import (
 	"golang.org/x/crypto/ripemd160"
 )
 
-var (
-	errBadLength = errors.New("input has insufficient length")
-)
+var errBadLength = errors.New("input has insufficient length")
 
 // HashLen ...
 const HashLen = sha256.Size

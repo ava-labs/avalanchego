@@ -10,14 +10,25 @@ const (
 )
 
 // ShortSet is a set of ShortIDs
-type ShortSet map[[20]byte]bool
+type ShortSet map[ShortID]struct{}
+
+// Return a new ShortSet with initial capacity [size].
+// More or less than [size] elements can be added to this set.
+// Using NewSet() rather than ids.Set{} is just an optimization that can
+// be used if you know how many elements will be put in this set.
+func NewShortSet(size int) ShortSet {
+	if size < 0 {
+		return ShortSet{}
+	}
+	return make(map[ShortID]struct{}, size)
+}
 
 func (ids *ShortSet) init(size int) {
 	if *ids == nil {
 		if minShortSetSize > size {
 			size = minShortSetSize
 		}
-		*ids = make(map[[20]byte]bool, size)
+		*ids = make(map[ShortID]struct{}, size)
 	}
 }
 
@@ -25,7 +36,7 @@ func (ids *ShortSet) init(size int) {
 func (ids *ShortSet) Add(idList ...ShortID) {
 	ids.init(2 * len(idList))
 	for _, id := range idList {
-		(*ids)[id.Key()] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
@@ -33,14 +44,15 @@ func (ids *ShortSet) Add(idList ...ShortID) {
 func (ids *ShortSet) Union(idSet ShortSet) {
 	ids.init(2 * idSet.Len())
 	for id := range idSet {
-		(*ids)[id] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
 // Contains returns true if the set contains this id, false otherwise
 func (ids *ShortSet) Contains(id ShortID) bool {
 	ids.init(1)
-	return (*ids)[id.Key()]
+	_, contains := (*ids)[id]
+	return contains
 }
 
 // Len returns the number of ids in this set
@@ -50,7 +62,7 @@ func (ids ShortSet) Len() int { return len(ids) }
 func (ids *ShortSet) Remove(idList ...ShortID) {
 	ids.init(1)
 	for _, id := range idList {
-		delete(*ids, id.Key())
+		delete(*ids, id)
 	}
 }
 
@@ -72,7 +84,7 @@ func (ids ShortSet) CappedList(size int) []ShortID {
 		if i >= size {
 			break
 		}
-		idList[i] = NewShortID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -83,7 +95,7 @@ func (ids ShortSet) List() []ShortID {
 	idList := make([]ShortID, len(ids))
 	i := 0
 	for id := range ids {
-		idList[i] = NewShortID(id)
+		idList[i] = id
 		i++
 	}
 	return idList
@@ -95,7 +107,7 @@ func (ids ShortSet) Equals(oIDs ShortSet) bool {
 		return false
 	}
 	for key := range oIDs {
-		if !ids[key] {
+		if _, contains := ids[key]; !contains {
 			return false
 		}
 	}
@@ -107,12 +119,12 @@ func (ids ShortSet) String() string {
 	sb := strings.Builder{}
 	sb.WriteString("{")
 	first := true
-	for idBytes := range ids {
+	for id := range ids {
 		if !first {
 			sb.WriteString(", ")
 		}
 		first = false
-		sb.WriteString(NewShortID(idBytes).String())
+		sb.WriteString(id.String())
 	}
 	sb.WriteString("}")
 	return sb.String()

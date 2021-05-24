@@ -16,7 +16,7 @@ func TestNnarySnowball(t *testing.T) {
 	sb.Add(Blue)
 	sb.Add(Green)
 
-	if pref := sb.Preference(); !Red.Equals(pref) {
+	if pref := sb.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -24,7 +24,7 @@ func TestNnarySnowball(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -32,7 +32,7 @@ func TestNnarySnowball(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Red)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -40,7 +40,7 @@ func TestNnarySnowball(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -48,7 +48,7 @@ func TestNnarySnowball(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Should be finalized")
@@ -62,7 +62,7 @@ func TestVirtuousNnarySnowball(t *testing.T) {
 	sb := nnarySnowball{}
 	sb.Initialize(betaVirtuous, betaRogue, Red)
 
-	if pref := sb.Preference(); !Red.Equals(pref) {
+	if pref := sb.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -70,7 +70,7 @@ func TestVirtuousNnarySnowball(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Red)
 
-	if pref := sb.Preference(); !Red.Equals(pref) {
+	if pref := sb.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Should be finalized")
@@ -85,7 +85,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	sb.Initialize(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
-	if pref := sb.Preference(); !Red.Equals(pref) {
+	if pref := sb.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -93,7 +93,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -103,7 +103,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -111,7 +111,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	} else if !sb.Finalized() {
 		t.Fatalf("Finalized too late")
@@ -125,7 +125,7 @@ func TestNarySnowballRecordUnsuccessfulPoll(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		sb.RecordSuccessfulPoll(Red)
 
-		if pref := sb.Preference(); !Blue.Equals(pref) {
+		if pref := sb.Preference(); Blue != pref {
 			t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 		} else if !sb.Finalized() {
 			t.Fatalf("Finalized too late")
@@ -141,7 +141,7 @@ func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
 	sb.Initialize(betaVirtuous, betaRogue, Red)
 	sb.Add(Blue)
 
-	if pref := sb.Preference(); !Red.Equals(pref) {
+	if pref := sb.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Red, pref)
 	} else if sb.Finalized() {
 		t.Fatalf("Finalized too early")
@@ -149,15 +149,15 @@ func TestNarySnowballDifferentSnowflakeColor(t *testing.T) {
 
 	sb.RecordSuccessfulPoll(Blue)
 
-	if pref := sb.nnarySnowflake.Preference(); !Blue.Equals(pref) {
+	if pref := sb.nnarySnowflake.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	}
 
 	sb.RecordSuccessfulPoll(Red)
 
-	if pref := sb.Preference(); !Blue.Equals(pref) {
+	if pref := sb.Preference(); Blue != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
-	} else if pref := sb.nnarySnowflake.Preference(); !Red.Equals(pref) {
+	} else if pref := sb.nnarySnowflake.Preference(); Red != pref {
 		t.Fatalf("Wrong preference. Expected %s got %s", Blue, pref)
 	}
 }

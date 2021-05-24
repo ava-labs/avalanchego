@@ -20,16 +20,16 @@ type SenderTest struct {
 	CantGossip bool
 
 	GetAcceptedFrontierF func(ids.ShortSet, uint32)
-	AcceptedFrontierF    func(ids.ShortID, uint32, ids.Set)
-	GetAcceptedF         func(ids.ShortSet, uint32, ids.Set)
-	AcceptedF            func(ids.ShortID, uint32, ids.Set)
+	AcceptedFrontierF    func(ids.ShortID, uint32, []ids.ID)
+	GetAcceptedF         func(ids.ShortSet, uint32, []ids.ID)
+	AcceptedF            func(ids.ShortID, uint32, []ids.ID)
 	GetF                 func(ids.ShortID, uint32, ids.ID)
 	GetAncestorsF        func(ids.ShortID, uint32, ids.ID)
 	PutF                 func(ids.ShortID, uint32, ids.ID, []byte)
 	MultiPutF            func(ids.ShortID, uint32, [][]byte)
 	PushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
 	PullQueryF           func(ids.ShortSet, uint32, ids.ID)
-	ChitsF               func(ids.ShortID, uint32, ids.Set)
+	ChitsF               func(ids.ShortID, uint32, []ids.ID)
 	GossipF              func(ids.ID, []byte)
 }
 
@@ -63,7 +63,7 @@ func (s *SenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID ui
 // AcceptedFrontier calls AcceptedFrontierF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
+func (s *SenderTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if s.AcceptedFrontierF != nil {
 		s.AcceptedFrontierF(validatorID, requestID, containerIDs)
 	} else if s.CantAcceptedFrontier && s.T != nil {
@@ -74,7 +74,7 @@ func (s *SenderTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32,
 // GetAccepted calls GetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs ids.Set) {
+func (s *SenderTest) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
 	if s.GetAcceptedF != nil {
 		s.GetAcceptedF(validatorIDs, requestID, containerIDs)
 	} else if s.CantGetAccepted && s.T != nil {
@@ -85,7 +85,7 @@ func (s *SenderTest) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, co
 // Accepted calls AcceptedF if it was initialized. If it wasn't initialized and
 // this function shouldn't be called and testing was initialized, then testing
 // will fail.
-func (s *SenderTest) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs ids.Set) {
+func (s *SenderTest) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if s.AcceptedF != nil {
 		s.AcceptedF(validatorID, requestID, containerIDs)
 	} else if s.CantAccepted && s.T != nil {
@@ -162,7 +162,7 @@ func (s *SenderTest) PullQuery(vdrs ids.ShortSet, requestID uint32, vtxID ids.ID
 // Chits calls ChitsF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) Chits(vdr ids.ShortID, requestID uint32, votes ids.Set) {
+func (s *SenderTest) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) {
 	if s.ChitsF != nil {
 		s.ChitsF(vdr, requestID, votes)
 	} else if s.CantChits && s.T != nil {

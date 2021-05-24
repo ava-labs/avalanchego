@@ -1,6 +1,8 @@
 syntax = "proto3";
 package vmproto;
 
+// To compile: protoc --go_out=plugins=grpc:. vm.proto
+
 message InitializeRequest {
     uint32 networkID = 1;
     bytes subnetID = 2;
@@ -9,17 +11,31 @@ message InitializeRequest {
     bytes xChainID = 5;
     bytes avaxAssetID = 6;
     bytes genesisBytes = 7;
+    bytes upgradeBytes = 8;
+    bytes configBytes = 9;
     
-    uint32 dbServer = 8;
-    uint32 engineServer = 9;
-    uint32 keystoreServer = 10;
-    uint32 sharedMemoryServer = 11;
-    uint32 bcLookupServer = 12;
-    uint32 snLookupServer = 13;
+    repeated VersionedDBServer dbServers = 10;
+    uint32 engineServer = 11;
+    uint32 keystoreServer = 12;
+    uint32 sharedMemoryServer = 13;
+    uint32 bcLookupServer = 14;
+    uint32 snLookupServer = 15;
+
+    bytes epochFirstTransition = 16;
+    uint64 EpochDuration = 17;
 }
 
 message InitializeResponse {
     bytes lastAcceptedID = 1;
+    bytes lastAcceptedParentID = 2;
+    uint32 status = 3;
+    uint64 height = 4;
+    bytes bytes = 5;
+}
+
+message VersionedDBServer {
+    uint32 dbServer = 1;
+    string version = 2;
 }
 
 message BootstrappingRequest {}
@@ -52,6 +68,7 @@ message BuildBlockResponse {
     bytes id = 1;
     bytes parentID = 2;
     bytes bytes = 3;
+    uint64 height = 4;
     // status is always processing
 }
 
@@ -63,6 +80,7 @@ message ParseBlockResponse {
     bytes id = 1;
     bytes parentID = 2;
     uint32 status = 3;
+    uint64 height = 4;
 }
 
 message GetBlockRequest {
@@ -73,6 +91,7 @@ message GetBlockResponse {
     bytes parentID = 1;
     bytes bytes = 2;
     uint32 status = 3;
+    uint64 height = 4;
 }
 
 message SetPreferenceRequest {

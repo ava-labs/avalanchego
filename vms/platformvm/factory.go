@@ -14,41 +14,58 @@ import (
 
 // ID of the platform VM
 var (
-	ID = ids.NewID([32]byte{'p', 'l', 'a', 't', 'f', 'o', 'r', 'm', 'v', 'm'})
+	ID = ids.ID{'p', 'l', 'a', 't', 'f', 'o', 'r', 'm', 'v', 'm'}
 )
 
 // Factory can create new instances of the Platform Chain
 type Factory struct {
-	ChainManager       chains.Manager
-	Validators         validators.Manager
-	StakingEnabled     bool
-	CreationFee        uint64        // Transaction fee with state creation
-	Fee                uint64        // Transaction fee
-	MinValidatorStake  uint64        // Min amt required to validate primary network
-	MaxValidatorStake  uint64        // Max amt allowed to validate primary network
-	MinDelegatorStake  uint64        // Min amt that can be delegated
-	MinDelegationFee   uint32        // Min fee for delegation
-	UptimePercentage   float64       // Required uptime to get a reward in [0,1]
-	MinStakeDuration   time.Duration // Min time allowed for validating
-	MaxStakeDuration   time.Duration // Max time allowed for validating
-	StakeMintingPeriod time.Duration // Staking consumption period
+	// The node's chain manager
+	Chains chains.Manager
+
+	// Node's validator set maps subnetID -> validators of the subnet
+	Validators validators.Manager
+
+	// True if the node is being run with staking enabled
+	StakingEnabled bool
+
+	// Set of subnets that this node is validating
+	WhitelistedSubnets ids.Set
+
+	// Fee that must be burned by every state creating transaction
+	CreationTxFee uint64
+
+	// Fee that must be burned by every create staker transaction
+	AddStakerTxFee uint64
+
+	// Fee that is burned by every non-state creating transaction
+	TxFee uint64
+
+	// The minimum amount of tokens one must bond to be a validator
+	MinValidatorStake uint64
+
+	// The maximum amount of tokens that can be bonded on a validator
+	MaxValidatorStake uint64
+
+	// Minimum stake, in nAVAX, that can be delegated on the primary network
+	MinDelegatorStake uint64
+
+	// Minimum fee that can be charged for delegation
+	MinDelegationFee uint32
+
+	// UptimePercentage is the minimum uptime required to be rewarded for staking
+	UptimePercentage float64
+
+	// Minimum amount of time to allow a staker to stake
+	MinStakeDuration time.Duration
+
+	// Maximum amount of time to allow a staker to stake
+	MaxStakeDuration time.Duration
+
+	// Consumption period for the minting function
+	StakeMintingPeriod time.Duration
 }
 
 // New returns a new instance of the Platform Chain
 func (f *Factory) New(*snow.Context) (interface{}, error) {
-	return &VM{
-		chainManager:       f.ChainManager,
-		vdrMgr:             f.Validators,
-		stakingEnabled:     f.StakingEnabled,
-		creationTxFee:      f.CreationFee,
-		txFee:              f.Fee,
-		uptimePercentage:   f.UptimePercentage,
-		minValidatorStake:  f.MinValidatorStake,
-		maxValidatorStake:  f.MaxValidatorStake,
-		minDelegatorStake:  f.MinDelegatorStake,
-		minDelegationFee:   f.MinDelegationFee,
-		minStakeDuration:   f.MinStakeDuration,
-		maxStakeDuration:   f.MaxStakeDuration,
-		stakeMintingPeriod: f.StakeMintingPeriod,
-	}, nil
+	return &VM{Factory: *f}, nil
 }

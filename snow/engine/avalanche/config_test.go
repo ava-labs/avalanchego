@@ -16,8 +16,8 @@ import (
 )
 
 func DefaultConfig() Config {
-	vtxBlocked, _ := queue.New(memdb.New())
-	txBlocked, _ := queue.New(memdb.New())
+	vtxBlocked, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
+	txBlocked, _ := queue.New(memdb.New(), "", prometheus.NewRegistry())
 	return Config{
 		Config: bootstrap.Config{
 			Config:     common.DefaultConfigTest(),
@@ -28,12 +28,15 @@ func DefaultConfig() Config {
 		},
 		Params: avalanche.Parameters{
 			Parameters: snowball.Parameters{
-				Metrics:           prometheus.NewRegistry(),
-				K:                 1,
-				Alpha:             1,
-				BetaVirtuous:      1,
-				BetaRogue:         2,
-				ConcurrentRepolls: 1,
+				Metrics:               prometheus.NewRegistry(),
+				K:                     1,
+				Alpha:                 1,
+				BetaVirtuous:          1,
+				BetaRogue:             2,
+				ConcurrentRepolls:     1,
+				OptimalProcessing:     100,
+				MaxOutstandingItems:   1,
+				MaxItemProcessingTime: 1,
 			},
 			Parents:   2,
 			BatchSize: 1,

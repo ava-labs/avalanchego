@@ -14,13 +14,13 @@ type evictable struct {
 	evicted int
 }
 
-func (e *evictable) ID() ids.ID { return e.id }
-func (e *evictable) Evict()     { e.evicted++ }
+func (e *evictable) Key() interface{} { return e.id }
+func (e *evictable) Evict()           { e.evicted++ }
 
 func TestEvictableLRU(t *testing.T) {
 	cache := EvictableLRU{}
 
-	expectedValue1 := &evictable{id: ids.NewID([32]byte{1})}
+	expectedValue1 := &evictable{id: ids.ID{1}}
 	if returnedValue := cache.Deduplicate(expectedValue1).(*evictable); returnedValue != expectedValue1 {
 		t.Fatalf("Returned unknown value")
 	} else if expectedValue1.evicted != 0 {
@@ -31,7 +31,7 @@ func TestEvictableLRU(t *testing.T) {
 		t.Fatalf("Value was evicted unexpectedly")
 	}
 
-	expectedValue2 := &evictable{id: ids.NewID([32]byte{2})}
+	expectedValue2 := &evictable{id: ids.ID{2}}
 	returnedValue := cache.Deduplicate(expectedValue2).(*evictable)
 	switch {
 	case returnedValue != expectedValue2:
@@ -44,7 +44,7 @@ func TestEvictableLRU(t *testing.T) {
 
 	cache.Size = 2
 
-	expectedValue3 := &evictable{id: ids.NewID([32]byte{2})}
+	expectedValue3 := &evictable{id: ids.ID{2}}
 	returnedValue = cache.Deduplicate(expectedValue3).(*evictable)
 	switch {
 	case returnedValue != expectedValue2:

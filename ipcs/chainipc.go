@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -30,7 +31,7 @@ type context struct {
 // ChainIPCs maintains IPCs for a set of chains
 type ChainIPCs struct {
 	context
-	chains          map[[32]byte]*EventSockets
+	chains          map[ids.ID]*EventSockets
 	consensusEvents *triggers.EventDispatcher
 	decisionEvents  *triggers.EventDispatcher
 }
@@ -44,7 +45,7 @@ func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusEv
 			networkID: networkID,
 			path:      path,
 		},
-		chains:          make(map[[32]byte]*EventSockets),
+		chains:          make(map[ids.ID]*EventSockets),
 		consensusEvents: consensusEvents,
 		decisionEvents:  decisionEvents,
 	}
@@ -58,9 +59,7 @@ func NewChainIPCs(log logging.Logger, path string, networkID uint32, consensusEv
 
 // Publish creates a set of eventSockets for the given chainID
 func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
-	chainIDKey := chainID.Key()
-
-	if es, ok := cipcs.chains[chainIDKey]; ok {
+	if es, ok := cipcs.chains[chainID]; ok {
 		cipcs.log.Info("returning existing blockchainID %s", chainID.String())
 		return es, nil
 	}
@@ -71,7 +70,7 @@ func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
 		return nil, err
 	}
 
-	cipcs.chains[chainIDKey] = es
+	cipcs.chains[chainID] = es
 	cipcs.log.Info("created IPC sockets for blockchain %s at %s and %s", chainID.String(), es.ConsensusURL(), es.DecisionsURL())
 	return es, nil
 }
@@ -79,11 +78,33 @@ func (cipcs *ChainIPCs) Publish(chainID ids.ID) (*EventSockets, error) {
 // Unpublish stops the eventSocket for the given chain if it exists. It returns
 // whether or not the socket existed and errors when trying to close it
 func (cipcs *ChainIPCs) Unpublish(chainID ids.ID) (bool, error) {
-	chainIPCs, ok := cipcs.chains[chainID.Key()]
+	chainIPCs, ok := cipcs.chains[chainID]
 	if !ok {
 		return false, nil
 	}
+	delete(cipcs.chains, chainID)
 	return true, chainIPCs.stop()
+}
+
+// GetPublishedBlockchains returns the chains that are currently being published
+func (cipcs *ChainIPCs) GetPublishedBlockchains() []ids.ID {
+	chainIds := make([]ids.ID, 0, len(cipcs.chains))
+
+	for id := range cipcs.chains {
+		chainIds = append(chainIds, id)
+	}
+
+	return chainIds
+}
+
+func (cipcs *ChainIPCs) Shutdown() error {
+	cipcs.log.Info("shutting down chain IPCs")
+
+	errs := wrappers.Errs{}
+	for _, ch := range cipcs.chains {
+		errs.Add(ch.stop())
+	}
+	return errs.Err
 }
 
 func ipcURL(ctx context, chainID ids.ID, eventType string) string {

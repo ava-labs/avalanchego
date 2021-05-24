@@ -33,6 +33,7 @@ func (m defaultMap) get(key uint64, defaultVal uint64) uint64 {
 // Sampling is performed in O(count) time and O(count) space.
 type uniformReplacer struct {
 	length uint64
+	drawn  defaultMap
 }
 
 func (s *uniformReplacer) Initialize(length uint64) error {
@@ -48,15 +49,22 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 		return nil, errOutOfRange
 	}
 
-	drawn := make(defaultMap, count)
+	if s.drawn == nil {
+		s.drawn = make(defaultMap, count)
+	} else {
+		for k := range s.drawn {
+			delete(s.drawn, k)
+		}
+	}
+
 	results := make([]uint64, count)
 	for i := 0; i < count; i++ {
 		// We don't use a cryptographically secure source of randomness here, as
 		// there's no need to ensure a truly random sampling.
 		draw := uint64(rand.Int63n(int64(s.length-uint64(i)))) + uint64(i) // #nosec G404
 
-		ret := drawn.get(draw, draw)
-		drawn[draw] = drawn.get(uint64(i), uint64(i))
+		ret := s.drawn.get(draw, draw)
+		s.drawn[draw] = s.drawn.get(uint64(i), uint64(i))
 
 		results[i] = ret
 	}

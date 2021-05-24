@@ -7,79 +7,60 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 var (
-	errParseTx = errors.New("unexpectedly called ParseTx")
-	errIssueTx = errors.New("unexpectedly called IssueTx")
-	errGetTx   = errors.New("unexpectedly called GetTx")
+	errPending = errors.New("unexpectedly called Pending")
+
+	_ DAGVM = &TestVM{}
 )
 
-// TestVM ...
 type TestVM struct {
 	common.TestVM
 
-	CantPendingTxs, CantParseTx, CantIssueTx, CantGetTx bool
+	CantPendingTxs, CantParse, CantGet bool
 
 	PendingTxsF func() []snowstorm.Tx
 	ParseTxF    func([]byte) (snowstorm.Tx, error)
-	IssueTxF    func([]byte, func(choices.Status), func(choices.Status)) (ids.ID, error)
 	GetTxF      func(ids.ID) (snowstorm.Tx, error)
 }
 
-// Default ...
 func (vm *TestVM) Default(cant bool) {
 	vm.TestVM.Default(cant)
 
 	vm.CantPendingTxs = cant
-	vm.CantParseTx = cant
-	vm.CantIssueTx = cant
-	vm.CantGetTx = cant
+	vm.CantParse = cant
+	vm.CantGet = cant
 }
 
-// PendingTxs ...
 func (vm *TestVM) PendingTxs() []snowstorm.Tx {
 	if vm.PendingTxsF != nil {
 		return vm.PendingTxsF()
 	}
 	if vm.CantPendingTxs && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called PendingTxs")
+		vm.T.Fatal(errPending)
 	}
 	return nil
 }
 
-// ParseTx ...
 func (vm *TestVM) ParseTx(b []byte) (snowstorm.Tx, error) {
 	if vm.ParseTxF != nil {
 		return vm.ParseTxF(b)
 	}
-	if vm.CantParseTx && vm.T != nil {
-		vm.T.Fatal(errParseTx)
+	if vm.CantParse && vm.T != nil {
+		vm.T.Fatal(errParse)
 	}
-	return nil, errParseTx
+	return nil, errParse
 }
 
-// IssueTx ...
-func (vm *TestVM) IssueTx(b []byte, issued, finalized func(choices.Status)) (ids.ID, error) {
-	if vm.IssueTxF != nil {
-		return vm.IssueTxF(b, issued, finalized)
-	}
-	if vm.CantIssueTx && vm.T != nil {
-		vm.T.Fatal(errIssueTx)
-	}
-	return ids.ID{}, errIssueTx
-}
-
-// GetTx ...
 func (vm *TestVM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
 	if vm.GetTxF != nil {
 		return vm.GetTxF(txID)
 	}
-	if vm.CantGetTx && vm.T != nil {
-		vm.T.Fatal(errGetTx)
+	if vm.CantGet && vm.T != nil {
+		vm.T.Fatal(errGet)
 	}
-	return nil, errGetTx
+	return nil, errGet
 }

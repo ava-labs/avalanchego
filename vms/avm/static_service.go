@@ -10,8 +10,10 @@ import (
 	"math"
 	"net/http"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/codec"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -20,27 +22,21 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var (
-	errUnknownAssetType = errors.New("unknown asset type")
-)
+var errUnknownAssetType = errors.New("unknown asset type")
 
 // StaticService defines the base service for the asset vm
-type StaticService struct{ encodingManager formatting.EncodingManager }
+type StaticService struct{}
 
 // CreateStaticService ...
-func CreateStaticService(defaultEnc string) (*StaticService, error) {
-	encodingManager, err := formatting.NewEncodingManager(defaultEnc)
-	if err != nil {
-		return nil, err
-	}
-	return &StaticService{encodingManager: encodingManager}, nil
+func CreateStaticService() *StaticService {
+	return &StaticService{}
 }
 
 // BuildGenesisArgs are arguments for BuildGenesis
 type BuildGenesisArgs struct {
 	NetworkID   cjson.Uint32               `json:"networkID"`
 	GenesisData map[string]AssetDefinition `json:"genesisData"`
-	Encoding    string                     `json:"encoding"`
+	Encoding    formatting.Encoding        `json:"encoding"`
 }
 
 // AssetDefinition ...
@@ -54,40 +50,21 @@ type AssetDefinition struct {
 
 // BuildGenesisReply is the reply from BuildGenesis
 type BuildGenesisReply struct {
-	Bytes    string `json:"bytes"`
-	Encoding string `json:"encoding"`
+	Bytes    string              `json:"bytes"`
+	Encoding formatting.Encoding `json:"encoding"`
 }
 
 // BuildGenesis returns the UTXOs such that at least one address in [args.Addresses] is
 // referenced in the UTXO.
 func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, reply *BuildGenesisReply) error {
-	errs := wrappers.Errs{}
-
-	c := codec.New(math.MaxUint32, 1<<20)
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-	)
-	if errs.Errored() {
-		return errs.Err
-	}
-
-	encoding, err := ss.encodingManager.GetEncoding(args.Encoding)
+	manager, err := staticCodec()
 	if err != nil {
-		return fmt.Errorf("problem getting encoding formatter for '%s': %w", args.Encoding, err)
+		return err
 	}
 
 	g := Genesis{}
 	for assetAlias, assetDefinition := range args.GenesisData {
-		assetMemo, err := encoding.ConvertString(assetDefinition.Memo)
+		assetMemo, err := formatting.Decode(args.Encoding, assetDefinition.Memo)
 		if err != nil {
 			return fmt.Errorf("problem formatting asset definition memo due to: %w", err)
 		}
@@ -171,7 +148,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 					return errUnknownAssetType
 				}
 			}
-			initialState.Sort(c)
+			initialState.Sort(manager)
 			asset.States = append(asset.States, initialState)
 		}
 		asset.Sort()
@@ -179,12 +156,36 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 	g.Sort()
 
-	b, err := c.Marshal(&g)
+	b, err := manager.Marshal(codecVersion, &g)
 	if err != nil {
 		return fmt.Errorf("problem marshaling genesis: %w", err)
 	}
 
-	reply.Bytes = encoding.ConvertBytes(b)
-	reply.Encoding = encoding.Encoding()
+	reply.Bytes, err = formatting.Encode(args.Encoding, b)
+	if err != nil {
+		return fmt.Errorf("couldn't encode genesis as string: %s", err)
+	}
+	reply.Encoding = args.Encoding
 	return nil
+}
+
+func staticCodec() (codec.Manager, error) {
+	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
+	manager := codec.NewManager(math.MaxUint32)
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(&BaseTx{}),
+		c.RegisterType(&CreateAssetTx{}),
+		c.RegisterType(&OperationTx{}),
+		c.RegisterType(&ImportTx{}),
+		c.RegisterType(&ExportTx{}),
+		c.RegisterType(&secp256k1fx.TransferInput{}),
+		c.RegisterType(&secp256k1fx.MintOutput{}),
+		c.RegisterType(&secp256k1fx.TransferOutput{}),
+		c.RegisterType(&secp256k1fx.MintOperation{}),
+		c.RegisterType(&secp256k1fx.Credential{}),
+		manager.RegisterCodec(codecVersion, c),
+	)
+	return manager, errs.Err
 }
