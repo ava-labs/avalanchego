@@ -66,7 +66,6 @@ const (
 	BenchlistPeerSummaryEnabledKey          = "benchlist-peer-summary-enabled"
 	BenchlistDurationKey                    = "benchlist-duration"
 	BenchlistMinFailingDurationKey          = "benchlist-min-failing-duration"
-	PluginDirKey                            = "plugin-dir"
 	BuildDirKey                             = "build-dir"
 	LogsDirKey                              = "log-dir"
 	LogLevelKey                             = "log-level"
