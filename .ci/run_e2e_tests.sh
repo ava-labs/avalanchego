@@ -17,7 +17,7 @@ AVALANCHE_IMAGE="$AVALANCHE_IMAGE_REPO:$AVALANCHE_IMAGE_TAG"
 echo "Using Avalanche Image: $AVALANCHE_IMAGE"
 
 DOCKER_REPO="avaplatform"
-TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:apricot-phase2"
+TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:apricot-phase2-db-upgrade" # FIXME update
 
 # Kurtosis Environment Parameters
 KURTOSIS_CORE_CHANNEL="1.0.3"

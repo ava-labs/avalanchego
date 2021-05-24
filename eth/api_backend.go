@@ -137,7 +137,7 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 	// identically.
 	acceptedBlock := b.eth.LastAcceptedBlock()
 	if number.IsAccepted() {
-		return b.eth.LastAcceptedBlock(), nil
+		return acceptedBlock, nil
 	}
 
 	if !b.GetVMConfig().AllowUnfinalizedQueries && acceptedBlock != nil {
@@ -294,10 +294,6 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 		return errExpired
 	}
 	err := b.eth.txPool.AddLocal(signedTx)
-	select {
-	case b.eth.txSubmitChan <- struct{}{}:
-	default:
-	}
 	return err
 }
 
