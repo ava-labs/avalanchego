@@ -111,6 +111,14 @@ type VM struct {
 	walletService WalletService
 }
 
+func (vm *VM) Connected(id ids.ShortID) error {
+	return nil //noop
+}
+
+func (vm *VM) Disconnected(id ids.ShortID) error {
+	return nil //noop
+}
+
 /*
  ******************************************************************************
  ******************************** Avalanche API *******************************

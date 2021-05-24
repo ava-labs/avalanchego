@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // VM describes the interface that all consensus VMs must implement
@@ -14,6 +15,12 @@ type VM interface {
 	// Returns nil if the VM is healthy.
 	// Periodically called and reported via the node's Health API.
 	health.Checkable
+
+	// StaticVM allows a user to interact with a VM statically.
+	StaticVM
+
+	// Connector represents a handler that is called on connection connect/disconnect
+	validators.Connector
 
 	// Initialize this VM.
 	// [ctx]: Metadata about this VM.

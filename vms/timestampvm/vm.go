@@ -42,6 +42,7 @@ type VM struct {
 	mempool [][dataLen]byte
 }
 
+
 // Initialize this vm
 // [ctx] is this vm's context
 // [dbManager] is the manager of this vm's database
@@ -195,4 +196,12 @@ func (vm *VM) NewBlock(parentID ids.ID, height uint64, data [dataLen]byte, times
 	}
 	block.Initialize(blockBytes, &vm.SnowmanVM)
 	return block, nil
+}
+
+func (vm *VM) Connected(id ids.ShortID) error {
+	return nil //noop
+}
+
+func (vm *VM) Disconnected(id ids.ShortID) error {
+	return nil //noop
 }
