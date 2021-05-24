@@ -6,7 +6,6 @@ package chain
 import (
 	"crypto/rand"
 	"math/big"
-	"sync"
 	"testing"
 
 	"github.com/ava-labs/coreth/accounts/keystore"
@@ -24,13 +23,14 @@ import (
 )
 
 type testChain struct {
+	t           *testing.T
 	hasBlock    map[common.Hash]struct{}
 	blocks      []common.Hash
 	blkCount    uint32
 	chain       *ETHChain
 	parentBlock common.Hash
 	outBlockCh  chan<- []byte
-	blockWait   sync.WaitGroup
+	inAckCh     <-chan struct{}
 }
 
 func (tc *testChain) insertBlock(block *types.Block) {
@@ -45,14 +45,16 @@ func newTestChain(name string, config *eth.Config,
 	inAckCh <-chan struct{}, outAckCh chan<- struct{},
 	t *testing.T) *testChain {
 	tc := &testChain{
+		t:          t,
 		hasBlock:   make(map[common.Hash]struct{}),
 		blocks:     make([]common.Hash, 0),
 		blkCount:   0,
 		chain:      NewETHChain(config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true),
 		outBlockCh: outBlockCh,
+		inAckCh:    inAckCh,
 	}
 	tc.insertBlock(tc.chain.GetGenesisBlock())
-	tc.chain.SetOnFinalizeAndAssemble(func(_ *state.StateDB, _ []*types.Transaction) ([]byte, error) {
+	tc.chain.SetOnFinalizeAndAssemble(func(_ *types.Header, _ *state.StateDB, _ []*types.Transaction) ([]byte, error) {
 		// NOTE: introduce random data as the extra data in the block so all
 		// blocks have distinct hashes in this unit test. Do NOT use this trick
 		// in production!
@@ -62,23 +64,6 @@ func newTestChain(name string, config *eth.Config,
 			t.Fatal(err)
 		}
 		return randData, nil
-	})
-	tc.chain.SetOnSealFinish(func(block *types.Block) error {
-		tc.blkCount++
-		if len(block.Uncles()) != 0 {
-			t.Fatal("#uncles should be zero")
-		}
-		tc.insertBlock(block)
-		if tc.outBlockCh != nil {
-			serialized, err := rlp.EncodeToBytes(block)
-			if err != nil {
-				t.Fatal(err)
-			}
-			tc.outBlockCh <- serialized
-			<-inAckCh
-		}
-		tc.blockWait.Done()
-		return nil
 	})
 	go func() {
 		for serialized := range inBlockCh {
@@ -117,10 +102,32 @@ func (tc *testChain) GenRandomTree(n int, max int) {
 		pb, _ := rand.Int(rand.Reader, big.NewInt((int64)(m)))
 		pn := pb.Int64()
 		tc.parentBlock = tc.blocks[numBlocks-1-(int)(pn)]
-		tc.chain.SetPreference(tc.chain.GetBlockByHash(tc.parentBlock))
-		tc.blockWait.Add(1)
-		tc.chain.GenBlock()
-		tc.blockWait.Wait()
+		parentBlock := tc.chain.GetBlockByHash(tc.parentBlock)
+		if parentBlock == nil {
+			tc.t.Fatalf("Failed to get parent block by hash %s, %d", tc.parentBlock, numBlocks)
+		}
+		tc.chain.SetPreference(parentBlock)
+		block, err := tc.chain.GenerateBlock()
+		if err != nil {
+			tc.t.Fatal(err)
+		}
+		if _, err := tc.chain.InsertChain([]*types.Block{block}); err != nil {
+			tc.t.Fatal(err)
+		}
+
+		tc.blkCount++
+		if len(block.Uncles()) != 0 {
+			tc.t.Fatal("#uncles should be zero")
+		}
+		tc.insertBlock(block)
+		if tc.outBlockCh != nil {
+			serialized, err := rlp.EncodeToBytes(block)
+			if err != nil {
+				tc.t.Fatal(err)
+			}
+			tc.outBlockCh <- serialized
+			<-tc.inAckCh
+		}
 	}
 }
 

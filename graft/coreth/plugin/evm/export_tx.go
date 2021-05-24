@@ -86,6 +86,7 @@ func (tx *UnsignedExportTx) Verify(
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
+	_ *Block,
 	rules params.Rules,
 ) TxError {
 	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {
@@ -141,7 +142,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 }
 
 // Accept this transaction.
-func (tx *UnsignedExportTx) Accept(ctx *snow.Context, _ database.Batch) error {
+func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
@@ -171,7 +172,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, _ database.Batch) error {
 		elems[i] = elem
 	}
 
-	return ctx.SharedMemory.Put(tx.DestinationChain, elems)
+	return ctx.SharedMemory.Put(tx.DestinationChain, elems, batch)
 }
 
 // newExportTx returns a new ExportTx

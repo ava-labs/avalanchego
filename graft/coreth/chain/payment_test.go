@@ -13,7 +13,7 @@ import (
 
 // TestPayment tests basic payment (balance, not multi-coin)
 func TestPayment(t *testing.T) {
-	chain, newBlockChan, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
+	chain, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
 	// Mark the genesis block as accepted and start the chain
 	chain.Start()
@@ -38,8 +38,10 @@ func TestPayment(t *testing.T) {
 	}
 	<-txSubmitCh
 
-	chain.GenBlock()
-	block := <-newBlockChan
+	block, err := chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 	<-newTxPoolHeadChan
 
 	if txs := block.Transactions(); len(txs) != numTxs {
