@@ -6,7 +6,7 @@ set -o pipefail
 
 # Build AvalancheGo image using local verion of coreth and the AvalancheGo version set here.
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
-AVALANCHE_VERSION="v1.3.2"
+AVALANCHE_VERSION="07da0c58" # FIXME update
 CORETH_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
 DOCKERHUB_REPO="avaplatform/avalanchego"
 

@@ -47,7 +47,7 @@ func init() {
 	alice = genKey
 }
 
-func NewDefaultChain(t *testing.T) (*ETHChain, chan *types.Block, chan core.NewTxPoolHeadEvent, <-chan core.NewTxsEvent) {
+func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-chan core.NewTxsEvent) {
 	// configure the chain
 	config := ethconfig.NewDefaultConfig()
 	chainConfig := &params.ChainConfig{
@@ -81,21 +81,21 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan *types.Block, chan core.NewT
 		t.Fatal(err)
 	}
 
-	newBlockChan := make(chan *types.Block)
-	chain.SetOnSealFinish(func(block *types.Block) error {
+	chain.SetOnSealFinish(func(block *types.Block) {
+		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+			t.Fatal(err)
+		}
 		if err := chain.SetPreference(block); err != nil {
 			t.Fatal(err)
 		}
 		if err := chain.Accept(block); err != nil {
 			t.Fatal(err)
 		}
-		newBlockChan <- block
-		return nil
 	})
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolHeadEvent, 1)
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
 
 	txSubmitCh := chain.GetTxSubmitCh()
-	return chain, newBlockChan, newTxPoolHeadChan, txSubmitCh
+	return chain, newTxPoolHeadChan, txSubmitCh
 }

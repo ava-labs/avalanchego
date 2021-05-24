@@ -22,7 +22,7 @@ import (
 )
 
 func TestCounter(t *testing.T) {
-	chain, newBlockChan, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
+	chain, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
 	// Mark the genesis block as accepted and start the chain
 	chain.Start()
@@ -56,9 +56,11 @@ func TestCounter(t *testing.T) {
 	}
 	<-txSubmitCh
 	nonce++
-	chain.GenBlock()
+	block, err := chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	block := <-newBlockChan
 	<-newTxPoolHeadChan
 	log.Info("Generated block with new counter contract creation", "blkNumber", block.NumberU64())
 
@@ -86,9 +88,11 @@ func TestCounter(t *testing.T) {
 	}
 	<-txSubmitCh
 	// Generate block
-	chain.GenBlock()
+	block, err = chain.GenerateBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	block = <-newBlockChan
 	<-newTxPoolHeadChan
 	log.Info("Generated block with counter contract interactions", "blkNumber", block.NumberU64())
 	receipts = chain.GetReceiptsByHash(block.Hash())

@@ -47,14 +47,10 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Databas
 	if nodecfg == nil {
 		nodecfg = &node.Config{}
 	}
-	//mux := new(event.TypeMux)
 	node, err := node.New(nodecfg)
 	if err != nil {
 		panic(err)
 	}
-	//if ep != "" {
-	//	log.Info(fmt.Sprintf("temporary keystore = %s", ep))
-	//}
 	cb := new(dummy.ConsensusCallbacks)
 	mcb := new(miner.MinerCallbacks)
 	backend, err := eth.New(node, config, cb, mcb, chainDB, settings, initGenesis)
@@ -66,21 +62,20 @@ func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Databas
 	return chain
 }
 
-func (self *ETHChain) Start() error {
+func (self *ETHChain) Start() {
 	self.backend.Start()
-	return self.backend.StartMining()
 }
 
 func (self *ETHChain) Stop() {
 	self.backend.Stop()
 }
 
-func (self *ETHChain) GenBlock() {
-	self.backend.Miner().GenBlock()
+func (self *ETHChain) GenerateBlock() (*types.Block, error) {
+	return self.backend.Miner().GenerateBlock()
 }
 
 func (self *ETHChain) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
-	return self.backend.Miner().GetWorkerMux().Subscribe(core.NewMinedBlockEvent{})
+	return self.backend.Miner().SubscribeNewMinedBlockEvent()
 }
 
 func (self *ETHChain) BlockChain() *core.BlockChain {
@@ -112,15 +107,7 @@ func (self *ETHChain) SetOnSeal(cb func(*types.Block) error) {
 	self.cb.OnSeal = cb
 }
 
-func (self *ETHChain) SetOnSealHash(cb func(*types.Header)) {
-	self.cb.OnSealHash = cb
-}
-
-func (self *ETHChain) SetOnBuild(cb func(*types.Block) error) {
-	self.mcb.OnBuild = cb
-}
-
-func (self *ETHChain) SetOnSealFinish(cb func(*types.Block) error) {
+func (self *ETHChain) SetOnSealFinish(cb func(*types.Block)) {
 	self.mcb.OnSealFinish = cb
 }
 
