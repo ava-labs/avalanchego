@@ -112,7 +112,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	assert.NoError(t, err)
 
 	_, err = New(dir, logging.NoLog{}, v1, true)
-	assert.Error(t, err, "expected to error due to non-directory file being present")
+	assert.NoError(t, err, "expected not to error with a non-directory file being present")
 }
 
 func TestNewSortsDatabases(t *testing.T) {
