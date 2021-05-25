@@ -24,7 +24,7 @@ const (
 	DBTypeKey                               = "db-type"
 	DBPathKey                               = "db-dir"
 	PublicIPKey                             = "public-ip"
-	DynamicUpdateDurationKey                = "dynamic-update-dhosturation"
+	DynamicUpdateDurationKey                = "dynamic-update-duration"
 	DynamicPublicIPResolverKey              = "dynamic-public-ip"
 	ConnMeterResetDurationKey               = "conn-meter-reset-duration"
 	ConnMeterMaxConnsKey                    = "conn-meter-max-conns"
