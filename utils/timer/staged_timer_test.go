@@ -94,7 +94,7 @@ func TestCancelStagedTimer(t *testing.T) {
 	// callback.
 	msTimer := NewStagedTimer(func() (time.Duration, bool) {
 		if i > 0 {
-			fatalErrors <- fmt.Errorf("Timer should have been canceled before being called")
+			fatalErrors <- fmt.Errorf("Timer should have been canceled before being called a second time")
 			return 0, false // no need to call it again
 		}
 		defer wg.Done()
