@@ -33,7 +33,7 @@ const (
 	// should be added to a batch size per operation.
 	rocksDBByteOverhead = 8
 )
-
+var _ database.Database = &Database{}
 var errFailedToCreateIterator = errors.New("failed to create iterator")
 
 // Database is a persistent key-value store. Apart from basic data storage
