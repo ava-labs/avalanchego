@@ -11,6 +11,8 @@ import (
 type Job interface {
 	ID() ids.ID
 	MissingDependencies() (ids.Set, error)
+	// Returns true if this job has at least 1 missing dependency
+	HasMissingDependencies() (bool, error)
 	Execute() error
 	Bytes() []byte
 }

@@ -1497,10 +1497,13 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	res := make([]*peer, n.peers.size())
-	copy(res, n.peers.peersList)
-
-	return res
+	peers := make([]*peer, 0, n.peers.size())
+	for _, peer := range n.peers.peersList {
+		if peer.connected.GetValue() && peer.compatible.GetValue() {
+			peers = append(peers, peer)
+		}
+	}
+	return peers
 }
 
 // Safe find a single peer
