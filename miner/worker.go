@@ -187,7 +187,7 @@ func (w *worker) createCurrentEnvironment(parent *types.Block, header *types.Hea
 		return nil, err
 	}
 	return &environment{
-		signer:  types.LatestSigner(w.chainConfig),
+		signer:  types.MakeSigner(w.chainConfig, header.Number, new(big.Int).SetUint64(header.Time)),
 		state:   state,
 		header:  header,
 		tcount:  0,
