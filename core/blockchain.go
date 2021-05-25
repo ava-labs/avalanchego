@@ -1721,6 +1721,11 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 
 	bc.lastAccepted = block
 
+	// Flatten the entire snap Trie to disk
+	if err := bc.snaps.Cap(block.Root(), 0); err != nil {
+		log.Warn("Failed to cap snapshot tree", "root", block.Root(), "layers", 0, "err", err)
+	}
+
 	// Fetch block logs
 	receipts := rawdb.ReadReceipts(bc.db, block.Hash(), block.NumberU64(), bc.chainConfig)
 	var logs []*types.Log
