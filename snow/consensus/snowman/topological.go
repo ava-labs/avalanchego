@@ -52,6 +52,12 @@ type Topological struct {
 
 	// tail is the preferred block with no children
 	tail ids.ID
+
+	// Used in [calculateInDegree] and.
+	// Should only be accessed in that method.
+	// We use this one instance of ids.Set instead of creating a
+	// new ids.Set during each call to [calculateInDegree].
+	leaves ids.Set
 }
 
 // Used to track the kahn topological sort status
@@ -79,7 +85,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	if err := ts.Metrics.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
 	}
-
+	ts.leaves = ids.Set{}
 	ts.ctx = ctx
 	ts.params = params
 	ts.head = rootID
@@ -293,7 +299,7 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 func (ts *Topological) calculateInDegree(
 	votes ids.Bag) (map[ids.ID]kahnNode, []ids.ID) {
 	kahns := make(map[ids.ID]kahnNode, minMapSize)
-	leaves := ids.Set{}
+	ts.leaves.Clear()
 
 	for _, vote := range votes.List() {
 		votedBlock, validVote := ts.blocks[vote]
@@ -326,7 +332,7 @@ func (ts *Topological) calculateInDegree(
 		}
 
 		// If I've never seen this parent block before, it is currently a leaf.
-		leaves.Add(parentID)
+		ts.leaves.Add(parentID)
 
 		// iterate through all the block's ancestors and set up the inDegrees of
 		// the blocks
@@ -348,11 +354,11 @@ func (ts *Topological) calculateInDegree(
 			// If I am transitively seeing this block for the first time, either
 			// the block was previously unknown or it was previously a leaf.
 			// Regardless, it shouldn't be tracked as a leaf.
-			leaves.Remove(parentID)
+			ts.leaves.Remove(parentID)
 		}
 	}
 
-	return kahns, leaves.List()
+	return kahns, ts.leaves.List()
 }
 
 // convert the tree into a branch of snowball instances with at least alpha

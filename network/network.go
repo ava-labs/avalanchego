@@ -1482,11 +1482,11 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, len(n.peers))
-	i := 0
+	peers := make([]*peer, 0, len(n.peers))
 	for _, peer := range n.peers {
-		peers[i] = peer
-		i++
+		if peer.connected.GetValue() && peer.compatible.GetValue() {
+			peers = append(peers, peer)
+		}
 	}
 	return peers
 }

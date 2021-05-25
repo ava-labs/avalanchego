@@ -56,6 +56,12 @@ type Topological struct {
 	// preferenceCache is the cache for strongly preferred checks
 	// virtuousCache is the cache for strongly virtuous checks
 	preferenceCache, virtuousCache map[ids.ID]bool
+
+	// Used in [calculateInDegree] and [markAncestorInDegrees].
+	// Should only be accessed in those methods.
+	// We use this one instance of ids.Set instead of creating a
+	// new ids.Set during each call to [calculateInDegree].
+	leaves ids.Set
 }
 
 type kahnNode struct {
@@ -75,6 +81,7 @@ func (ta *Topological) Initialize(
 
 	ta.ctx = ctx
 	ta.params = params
+	ta.leaves = ids.Set{}
 
 	if err := ta.Metrics.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
@@ -235,7 +242,7 @@ func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
 	error,
 ) {
 	kahns := make(map[ids.ID]kahnNode, minMapSize)
-	leaves := ids.Set{}
+	ta.leaves.Clear()
 
 	for vote := range responses {
 		// If it is not found, then the vote is either for something decided,
@@ -248,28 +255,27 @@ func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
 
 			if !previouslySeen {
 				// If I've never seen this node before, it is currently a leaf.
-				leaves.Add(vote)
+				ta.leaves.Add(vote)
 				parents, err := vtx.Parents()
 				if err != nil {
 					return nil, nil, err
 				}
-				kahns, leaves, err = ta.markAncestorInDegrees(kahns, leaves, parents)
+				kahns, err = ta.markAncestorInDegrees(kahns, parents)
 				if err != nil {
 					return nil, nil, err
 				}
 			}
 		}
 	}
-
-	return kahns, leaves.List(), nil
+	return kahns, ta.leaves.List(), nil
 }
 
-// adds a new in-degree reference for all nodes
+// adds a new in-degree reference for all nodes.
+// should only be called from [calculateInDegree]
 func (ta *Topological) markAncestorInDegrees(
 	kahns map[ids.ID]kahnNode,
-	leaves ids.Set,
 	deps []Vertex,
-) (map[ids.ID]kahnNode, ids.Set, error) {
+) (map[ids.ID]kahnNode, error) {
 	frontier := make([]Vertex, 0, len(deps))
 	for _, vtx := range deps {
 		// The vertex may have been decided, no need to vote in that case
@@ -292,7 +298,7 @@ func (ta *Topological) markAncestorInDegrees(
 		if kahn.inDegree == 1 {
 			// If I am transitively seeing this node for the first
 			// time, it is no longer a leaf.
-			leaves.Remove(currentID)
+			ta.leaves.Remove(currentID)
 		}
 
 		if !alreadySeen {
@@ -300,7 +306,7 @@ func (ta *Topological) markAncestorInDegrees(
 			// parents
 			parents, err := current.Parents()
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			for _, depVtx := range parents {
 				// No need to traverse to a decided vertex
@@ -310,7 +316,7 @@ func (ta *Topological) markAncestorInDegrees(
 			}
 		}
 	}
-	return kahns, leaves, nil
+	return kahns, nil
 }
 
 // count the number of votes for each operation
