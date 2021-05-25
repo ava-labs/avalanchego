@@ -54,7 +54,6 @@ func (p *peersData) getByID(id ids.ShortID) (*peer, bool) {
 	if idx, ok := p.peersIdxes[id]; ok {
 		return p.peersList[idx], ok
 	}
-
 	return nil, false
 }
 

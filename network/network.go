@@ -1473,11 +1473,8 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	peers := make([]*PeerElement, validatorIDs.Len())
 	i := 0
 	for validatorID := range validatorIDs {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		peer, found := n.peers.getByID(vID)
-		if !found {
-			n.log.Warn("while listing peers, peer with id %v not found. Set to nil.", vID)
-		}
+		vID := validatorID              // Prevent overwrite in next loop iteration
+		peer, _ := n.peers.getByID(vID) // note: peer may be nil
 		peers[i] = &PeerElement{
 			peer: peer,
 			id:   vID,
@@ -1516,10 +1513,7 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 		return nil
 	}
 
-	res, found := n.peers.getByID(validatorID)
-	if !found {
-		n.log.Warn("peer with id %v not found. Set to nil.", validatorID)
-	}
+	res, _ := n.peers.getByID(validatorID) // note: peer may be nil
 	return res
 }
 

@@ -90,12 +90,9 @@ func TestPeersData(t *testing.T) {
 	assert.True(t, outOfIndexPeer == nil)
 
 	// reset is idempotent
-	data.remove(&peer2)
-	data.remove(&peer3)
-	data.remove(&peer4)
+	data.reset()
 	assert.True(t, data.size() == 0)
 
-	data.reset()
 	data.reset()
 	assert.True(t, data.size() == 0)
 }
