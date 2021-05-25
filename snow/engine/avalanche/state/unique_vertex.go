@@ -51,16 +51,24 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	if err := innerVertex.Verify(); err != nil {
 		return nil, err
 	}
+
+	unparsedTxs := innerVertex.Txs()
+	txs := make([]snowstorm.Tx, len(unparsedTxs))
+	for i, txBytes := range unparsedTxs {
+		tx, err := vtx.serializer.vm.ParseTx(txBytes)
+		if err != nil {
+			return nil, err
+		}
+		txs[i] = tx
+	}
+
 	vtx.v.vtx = innerVertex
+	vtx.v.txs = txs
 
 	// If the vertex has already been fetched,
 	// skip persisting the vertex.
 	if vtx.v.status.Fetched() {
 		return vtx, nil
-	}
-
-	if _, err := vtx.Txs(); err != nil {
-		return nil, err
 	}
 
 	// The vertex is newly parsed, so set the status

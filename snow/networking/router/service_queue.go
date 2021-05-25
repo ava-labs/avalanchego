@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var (
-	errNoMessages = errors.New("no messages remaining on queue")
-)
+var errNoMessages = errors.New("no messages remaining on queue")
 
 type messageQueue interface {
 	PopMessage() (message, error)          // Pop the next message from the queue

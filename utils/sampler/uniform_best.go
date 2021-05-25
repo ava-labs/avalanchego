@@ -12,9 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-var (
-	errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
-)
+var errNoValidUniformSamplers = errors.New("no valid uniform samplers found")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 

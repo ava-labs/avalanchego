@@ -18,9 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
-var (
-	_ gkeystoreproto.KeystoreServer = &Server{}
-)
+var _ gkeystoreproto.KeystoreServer = &Server{}
 
 // Server is a snow.Keystore that is managed over RPC.
 type Server struct {

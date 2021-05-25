@@ -304,7 +304,7 @@ func (r *rejector) Fulfill(ids.ID) {
 		return
 	}
 	r.rejected = true
-	asSet := ids.Set{}
+	asSet := ids.NewSet(1)
 	asSet.Add(r.txID)
 	r.errs.Add(r.g.reject(asSet))
 }

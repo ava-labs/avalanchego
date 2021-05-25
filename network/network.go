@@ -76,9 +76,13 @@ type Network interface {
 	// or the network is closed. Returns a non-nil error.
 	Dispatch() error
 
-	// Attempt to connect to this node ID at IP. Thread safety must be managed internally
+	// Attempt to connect to this IP. Thread safety must be managed internally
 	// to the network. The network will never stop attempting to connect to this
 	// IP.
+	TrackIP(ip utils.IPDesc)
+
+	// Attempt to connect to this node ID at IP. Thread safety must be managed
+	// internally to the network.
 	Track(ip utils.IPDesc, nodeID ids.ShortID)
 
 	// Returns the description of the specified [nodeIDs] this network is currently
@@ -117,7 +121,7 @@ type network struct {
 	ip                                 utils.DynamicIPDesc
 	networkID                          uint32
 	versionCompatibility               version.Compatibility
-	parser                             version.Parser
+	parser                             version.ApplicationParser
 	listener                           net.Listener
 	dialer                             Dialer
 	serverUpgrader                     Upgrader
@@ -151,6 +155,7 @@ type network struct {
 	connMeterMaxConns            int
 	connMeter                    ConnMeter
 	b                            Builder
+	isFetchOnly                  bool
 
 	// stateLock should never be held when grabbing a peer senderLock
 	stateLock    sync.RWMutex
@@ -216,7 +221,7 @@ func NewDefaultNetwork(
 	ip utils.DynamicIPDesc,
 	networkID uint32,
 	versionCompatibility version.Compatibility,
-	parser version.Parser,
+	parser version.ApplicationParser,
 	listener net.Listener,
 	dialer Dialer,
 	serverUpgrader,
@@ -234,7 +239,7 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
-
+	isFetchOnly bool,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -276,6 +281,7 @@ func NewDefaultNetwork(
 		benchlistManager,
 		peerAliasTimeout,
 		tlsKey,
+		isFetchOnly,
 	)
 }
 
@@ -287,7 +293,7 @@ func NewNetwork(
 	ip utils.DynamicIPDesc,
 	networkID uint32,
 	versionCompatibility version.Compatibility,
-	parser version.Parser,
+	parser version.ApplicationParser,
 	listener net.Listener,
 	dialer Dialer,
 	serverUpgrader,
@@ -320,6 +326,7 @@ func NewNetwork(
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
+	isFetchOnly bool,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -371,6 +378,7 @@ func NewNetwork(
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
 		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
+		isFetchOnly:                        isFetchOnly,
 	}
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
@@ -946,11 +954,18 @@ func (n *network) close() {
 	}
 }
 
+// TrackIP implements the Network interface
+// assumes the stateLock is not held.
+func (n *network) TrackIP(ip utils.IPDesc) {
+	n.Track(ip, ids.ShortEmpty)
+}
+
 // Track implements the Network interface
 // assumes the stateLock is not held.
 func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
+
 	n.track(ip, nodeID)
 }
 
@@ -1305,7 +1320,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			continue
 		}
 
-		peerVersion := peer.versionStruct.GetValue().(version.Version)
+		peerVersion := peer.versionStruct.GetValue().(version.Application)
 		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
 			continue
 		}
@@ -1349,7 +1364,7 @@ func (n *network) connected(p *peer) {
 
 	p.connected.SetValue(true)
 
-	peerVersion := p.versionStruct.GetValue().(version.Version)
+	peerVersion := p.versionStruct.GetValue().(version.Application)
 
 	if n.hasMasked {
 		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
@@ -1467,11 +1482,11 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, len(n.peers))
-	i := 0
+	peers := make([]*peer, 0, len(n.peers))
 	for _, peer := range n.peers {
-		peers[i] = peer
-		i++
+		if peer.connected.GetValue() && peer.compatible.GetValue() {
+			peers = append(peers, peer)
+		}
 	}
 	return peers
 }

@@ -276,7 +276,6 @@ func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 	if failureStreak.consecutive >= b.threshold && now.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
 	}
-
 }
 
 // Assumes [b.lock] is held

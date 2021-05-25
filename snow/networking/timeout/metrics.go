@@ -72,7 +72,6 @@ func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
 	}
 	m.chainToMetrics[ctx.ChainID] = cm
 	return nil
-
 }
 
 // Record that a response to a message of type [msgType] regarding chain [chainID] took [latency]

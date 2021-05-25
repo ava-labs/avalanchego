@@ -12,10 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var (
-	// DefaultLogDirectory ...
-	DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
-)
+// DefaultLogDirectory ...
+var DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
 
 // Config ...
 type Config struct {

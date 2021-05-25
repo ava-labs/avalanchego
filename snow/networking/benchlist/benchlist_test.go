@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	minimumFailingDuration = 5 * time.Minute
-)
+var minimumFailingDuration = 5 * time.Minute
 
 // Test that validators are properly added to the bench
 func TestBenchlistAdd(t *testing.T) {

@@ -10,14 +10,25 @@ const (
 )
 
 // ShortSet is a set of ShortIDs
-type ShortSet map[ShortID]bool
+type ShortSet map[ShortID]struct{}
+
+// Return a new ShortSet with initial capacity [size].
+// More or less than [size] elements can be added to this set.
+// Using NewSet() rather than ids.Set{} is just an optimization that can
+// be used if you know how many elements will be put in this set.
+func NewShortSet(size int) ShortSet {
+	if size < 0 {
+		return ShortSet{}
+	}
+	return make(map[ShortID]struct{}, size)
+}
 
 func (ids *ShortSet) init(size int) {
 	if *ids == nil {
 		if minShortSetSize > size {
 			size = minShortSetSize
 		}
-		*ids = make(map[ShortID]bool, size)
+		*ids = make(map[ShortID]struct{}, size)
 	}
 }
 
@@ -25,7 +36,7 @@ func (ids *ShortSet) init(size int) {
 func (ids *ShortSet) Add(idList ...ShortID) {
 	ids.init(2 * len(idList))
 	for _, id := range idList {
-		(*ids)[id] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
@@ -33,14 +44,15 @@ func (ids *ShortSet) Add(idList ...ShortID) {
 func (ids *ShortSet) Union(idSet ShortSet) {
 	ids.init(2 * idSet.Len())
 	for id := range idSet {
-		(*ids)[id] = true
+		(*ids)[id] = struct{}{}
 	}
 }
 
 // Contains returns true if the set contains this id, false otherwise
 func (ids *ShortSet) Contains(id ShortID) bool {
 	ids.init(1)
-	return (*ids)[id]
+	_, contains := (*ids)[id]
+	return contains
 }
 
 // Len returns the number of ids in this set
@@ -95,7 +107,7 @@ func (ids ShortSet) Equals(oIDs ShortSet) bool {
 		return false
 	}
 	for key := range oIDs {
-		if !ids[key] {
+		if _, contains := ids[key]; !contains {
 			return false
 		}
 	}

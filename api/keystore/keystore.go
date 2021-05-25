@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/encdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -30,6 +31,10 @@ const (
 var (
 	errEmptyUsername = errors.New("empty username")
 	errUserMaxLength = fmt.Errorf("username exceeds maximum length of %d chars", maxUserLen)
+
+	usersPrefix = []byte("users")
+	bcsPrefix   = []byte("bcs")
+	migratedKey = []byte("migrated")
 
 	_ Keystore = &keystore{}
 )
@@ -107,13 +112,15 @@ type keystore struct {
 	//          BID  BID  BID
 }
 
-func New(log logging.Logger, db database.Database) Keystore {
-	return &keystore{
+func New(log logging.Logger, dbManager manager.Manager) (Keystore, error) {
+	currentDB := dbManager.Current()
+	keystore := &keystore{
 		log:                log,
 		usernameToPassword: make(map[string]*password.Hash),
-		userDB:             prefixdb.New([]byte("users"), db),
-		bcDB:               prefixdb.New([]byte("bcs"), db),
+		userDB:             prefixdb.New(usersPrefix, currentDB.Database),
+		bcDB:               prefixdb.New(bcsPrefix, currentDB.Database),
 	}
+	return keystore, keystore.migrate(dbManager)
 }
 
 func (ks *keystore) CreateHandler() (http.Handler, error) {

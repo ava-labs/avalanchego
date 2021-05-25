@@ -18,53 +18,53 @@ var (
 // Compatibility a utility for checking the compatibility of peer versions
 type Compatibility interface {
 	// Returns the local version
-	Version() Version
+	Version() Application
 
 	// Returns nil if the provided version is able to connect with the local
 	// version. This means that the node will keep connections open with the
 	// peer.
-	Connectable(Version) error
+	Connectable(Application) error
 
 	// Returns nil if the provided version is compatible with the local version.
 	// This means that the version is connectable and that consensus messages
 	// can be made to them.
-	Compatible(Version) error
+	Compatible(Application) error
 
 	// Returns nil if the provided version shouldn't be masked. This means that
 	// the version is connectable but not compatible. The version is so old that
 	// it should just be masked.
-	Unmaskable(Version) error
+	Unmaskable(Application) error
 
 	// Returns nil if the provided version will not be masked by this version.
-	WontMask(Version) error
+	WontMask(Application) error
 
 	// Returns when additional masking will occur.
 	MaskTime() time.Time
 }
 
 type compatibility struct {
-	version Version
+	version Application
 
-	minCompatable     Version
+	minCompatable     Application
 	minCompatableTime time.Time
-	prevMinCompatable Version
+	prevMinCompatable Application
 
-	minUnmaskable     Version
+	minUnmaskable     Application
 	minUnmaskableTime time.Time
-	prevMinUnmaskable Version
+	prevMinUnmaskable Application
 
 	clock timer.Clock
 }
 
 // NewCompatibility returns a compatibility checker with the provided options
 func NewCompatibility(
-	version Version,
-	minCompatable Version,
+	version Application,
+	minCompatable Application,
 	minCompatableTime time.Time,
-	prevMinCompatable Version,
-	minUnmaskable Version,
+	prevMinCompatable Application,
+	minUnmaskable Application,
 	minUnmaskableTime time.Time,
-	prevMinUnmaskable Version,
+	prevMinUnmaskable Application,
 ) Compatibility {
 	return &compatibility{
 		version:           version,
@@ -77,13 +77,13 @@ func NewCompatibility(
 	}
 }
 
-func (c *compatibility) Version() Version { return c.version }
+func (c *compatibility) Version() Application { return c.version }
 
-func (c *compatibility) Connectable(peer Version) error {
+func (c *compatibility) Connectable(peer Application) error {
 	return c.version.Compatible(peer)
 }
 
-func (c *compatibility) Compatible(peer Version) error {
+func (c *compatibility) Compatible(peer Application) error {
 	if err := c.Connectable(peer); err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (c *compatibility) Compatible(peer Version) error {
 	return errIncompatible
 }
 
-func (c *compatibility) Unmaskable(peer Version) error {
+func (c *compatibility) Unmaskable(peer Application) error {
 	if err := c.Connectable(peer); err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (c *compatibility) Unmaskable(peer Version) error {
 	return errMaskable
 }
 
-func (c *compatibility) WontMask(peer Version) error {
+func (c *compatibility) WontMask(peer Application) error {
 	if err := c.Connectable(peer); err != nil {
 		return err
 	}

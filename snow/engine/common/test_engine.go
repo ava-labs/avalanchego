@@ -301,7 +301,6 @@ func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, con
 		e.T.Fatalf("Unexpectedly called GetAncestors")
 	}
 	return errors.New("unexpectedly called GetAncestors")
-
 }
 
 func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error {

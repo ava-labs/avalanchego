@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/staking"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/stretchr/testify/assert"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -200,6 +200,7 @@ func (h *testHandler) Connected(id ids.ShortID) {
 		h.connected(id)
 	}
 }
+
 func (h *testHandler) Disconnected(id ids.ShortID) {
 	if h.disconnected != nil {
 		h.disconnected(id)
@@ -269,8 +270,8 @@ func TestNewDefaultNetwork(t *testing.T) {
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
 		addr: &net.TCPAddr{
@@ -328,6 +329,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net)
 
@@ -344,8 +346,8 @@ func TestEstablishConnection(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -458,6 +460,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -486,6 +489,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -514,8 +518,8 @@ func TestDoubleTrack(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -627,6 +631,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -655,6 +660,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -684,8 +690,8 @@ func TestDoubleClose(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -797,6 +803,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -825,6 +832,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -859,8 +867,8 @@ func TestTrackConnected(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -972,6 +980,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -1000,6 +1009,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -1030,8 +1040,8 @@ func TestTrackConnectedRace(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -1121,6 +1131,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -1149,6 +1160,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -1183,8 +1195,8 @@ func TestPeerAliasesTicker(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -1401,6 +1413,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -1429,6 +1442,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -1457,6 +1471,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net2)
 
@@ -1485,6 +1500,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net3)
 
@@ -1579,8 +1595,8 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	vdrs := validators.NewSet()
 
@@ -1834,6 +1850,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -1862,6 +1879,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -1890,6 +1908,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net2)
 
@@ -1918,6 +1937,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net3)
 
@@ -2016,8 +2036,8 @@ func TestPeerSignature(t *testing.T) {
 
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
 	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
@@ -2101,9 +2121,7 @@ func TestPeerSignature(t *testing.T) {
 	_ = vdrs.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
 
 	allPeers := ids.ShortSet{}
-	allPeers[id0] = true
-	allPeers[id1] = true
-	allPeers[id2] = true
+	allPeers.Add(id0, id1, id2)
 
 	var (
 		wg0 sync.WaitGroup
@@ -2185,6 +2203,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net0)
 
@@ -2213,6 +2232,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net1)
 
@@ -2241,6 +2261,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, net2)
 
