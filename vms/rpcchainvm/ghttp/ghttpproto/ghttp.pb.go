@@ -15,11 +15,9 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ = proto.Marshal
-	_ = fmt.Errorf
-	_ = math.Inf
-)
+var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -46,19 +44,15 @@ func (*Userinfo) Descriptor() ([]byte, []int) {
 func (m *Userinfo) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Userinfo.Unmarshal(m, b)
 }
-
 func (m *Userinfo) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Userinfo.Marshal(b, m, deterministic)
 }
-
 func (m *Userinfo) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Userinfo.Merge(m, src)
 }
-
 func (m *Userinfo) XXX_Size() int {
 	return xxx_messageInfo_Userinfo.Size(m)
 }
-
 func (m *Userinfo) XXX_DiscardUnknown() {
 	xxx_messageInfo_Userinfo.DiscardUnknown(m)
 }
@@ -111,19 +105,15 @@ func (*URL) Descriptor() ([]byte, []int) {
 func (m *URL) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_URL.Unmarshal(m, b)
 }
-
 func (m *URL) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_URL.Marshal(b, m, deterministic)
 }
-
 func (m *URL) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_URL.Merge(m, src)
 }
-
 func (m *URL) XXX_Size() int {
 	return xxx_messageInfo_URL.Size(m)
 }
-
 func (m *URL) XXX_DiscardUnknown() {
 	xxx_messageInfo_URL.DiscardUnknown(m)
 }
@@ -211,19 +201,15 @@ func (*Element) Descriptor() ([]byte, []int) {
 func (m *Element) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Element.Unmarshal(m, b)
 }
-
 func (m *Element) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Element.Marshal(b, m, deterministic)
 }
-
 func (m *Element) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Element.Merge(m, src)
 }
-
 func (m *Element) XXX_Size() int {
 	return xxx_messageInfo_Element.Size(m)
 }
-
 func (m *Element) XXX_DiscardUnknown() {
 	xxx_messageInfo_Element.DiscardUnknown(m)
 }
@@ -261,19 +247,15 @@ func (*Certificates) Descriptor() ([]byte, []int) {
 func (m *Certificates) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Certificates.Unmarshal(m, b)
 }
-
 func (m *Certificates) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Certificates.Marshal(b, m, deterministic)
 }
-
 func (m *Certificates) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Certificates.Merge(m, src)
 }
-
 func (m *Certificates) XXX_Size() int {
 	return xxx_messageInfo_Certificates.Size(m)
 }
-
 func (m *Certificates) XXX_DiscardUnknown() {
 	xxx_messageInfo_Certificates.DiscardUnknown(m)
 }
@@ -315,19 +297,15 @@ func (*ConnectionState) Descriptor() ([]byte, []int) {
 func (m *ConnectionState) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ConnectionState.Unmarshal(m, b)
 }
-
 func (m *ConnectionState) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ConnectionState.Marshal(b, m, deterministic)
 }
-
 func (m *ConnectionState) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ConnectionState.Merge(m, src)
 }
-
 func (m *ConnectionState) XXX_Size() int {
 	return xxx_messageInfo_ConnectionState.Size(m)
 }
-
 func (m *ConnectionState) XXX_DiscardUnknown() {
 	xxx_messageInfo_ConnectionState.DiscardUnknown(m)
 }
@@ -450,19 +428,15 @@ func (*Request) Descriptor() ([]byte, []int) {
 func (m *Request) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Request.Unmarshal(m, b)
 }
-
 func (m *Request) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Request.Marshal(b, m, deterministic)
 }
-
 func (m *Request) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Request.Merge(m, src)
 }
-
 func (m *Request) XXX_Size() int {
 	return xxx_messageInfo_Request.Size(m)
 }
-
 func (m *Request) XXX_DiscardUnknown() {
 	xxx_messageInfo_Request.DiscardUnknown(m)
 }
@@ -599,19 +573,15 @@ func (*ResponseWriter) Descriptor() ([]byte, []int) {
 func (m *ResponseWriter) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ResponseWriter.Unmarshal(m, b)
 }
-
 func (m *ResponseWriter) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ResponseWriter.Marshal(b, m, deterministic)
 }
-
 func (m *ResponseWriter) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ResponseWriter.Merge(m, src)
 }
-
 func (m *ResponseWriter) XXX_Size() int {
 	return xxx_messageInfo_ResponseWriter.Size(m)
 }
-
 func (m *ResponseWriter) XXX_DiscardUnknown() {
 	xxx_messageInfo_ResponseWriter.DiscardUnknown(m)
 }
@@ -650,19 +620,15 @@ func (*HTTPRequest) Descriptor() ([]byte, []int) {
 func (m *HTTPRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_HTTPRequest.Unmarshal(m, b)
 }
-
 func (m *HTTPRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_HTTPRequest.Marshal(b, m, deterministic)
 }
-
 func (m *HTTPRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HTTPRequest.Merge(m, src)
 }
-
 func (m *HTTPRequest) XXX_Size() int {
 	return xxx_messageInfo_HTTPRequest.Size(m)
 }
-
 func (m *HTTPRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_HTTPRequest.DiscardUnknown(m)
 }
@@ -699,19 +665,15 @@ func (*HTTPResponse) Descriptor() ([]byte, []int) {
 func (m *HTTPResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_HTTPResponse.Unmarshal(m, b)
 }
-
 func (m *HTTPResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_HTTPResponse.Marshal(b, m, deterministic)
 }
-
 func (m *HTTPResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HTTPResponse.Merge(m, src)
 }
-
 func (m *HTTPResponse) XXX_Size() int {
 	return xxx_messageInfo_HTTPResponse.Size(m)
 }
-
 func (m *HTTPResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_HTTPResponse.DiscardUnknown(m)
 }
@@ -791,10 +753,8 @@ var fileDescriptor_e26bba3d5e69055f = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ context.Context
-	_ grpc.ClientConnInterface
-)
+var _ context.Context
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -830,7 +790,8 @@ type HTTPServer interface {
 }
 
 // UnimplementedHTTPServer can be embedded to have forward compatible implementations.
-type UnimplementedHTTPServer struct{}
+type UnimplementedHTTPServer struct {
+}
 
 func (*UnimplementedHTTPServer) Handle(ctx context.Context, req *HTTPRequest) (*HTTPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Handle not implemented")

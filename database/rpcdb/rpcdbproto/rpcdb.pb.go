@@ -6,20 +6,17 @@ package rpcdbproto
 import (
 	context "context"
 	fmt "fmt"
-	math "math"
-
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ = proto.Marshal
-	_ = fmt.Errorf
-	_ = math.Inf
-)
+var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -44,19 +41,15 @@ func (*HasRequest) Descriptor() ([]byte, []int) {
 func (m *HasRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_HasRequest.Unmarshal(m, b)
 }
-
 func (m *HasRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_HasRequest.Marshal(b, m, deterministic)
 }
-
 func (m *HasRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HasRequest.Merge(m, src)
 }
-
 func (m *HasRequest) XXX_Size() int {
 	return xxx_messageInfo_HasRequest.Size(m)
 }
-
 func (m *HasRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_HasRequest.DiscardUnknown(m)
 }
@@ -88,19 +81,15 @@ func (*HasResponse) Descriptor() ([]byte, []int) {
 func (m *HasResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_HasResponse.Unmarshal(m, b)
 }
-
 func (m *HasResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_HasResponse.Marshal(b, m, deterministic)
 }
-
 func (m *HasResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HasResponse.Merge(m, src)
 }
-
 func (m *HasResponse) XXX_Size() int {
 	return xxx_messageInfo_HasResponse.Size(m)
 }
-
 func (m *HasResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_HasResponse.DiscardUnknown(m)
 }
@@ -138,19 +127,15 @@ func (*GetRequest) Descriptor() ([]byte, []int) {
 func (m *GetRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetRequest.Unmarshal(m, b)
 }
-
 func (m *GetRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetRequest.Marshal(b, m, deterministic)
 }
-
 func (m *GetRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_GetRequest.Merge(m, src)
 }
-
 func (m *GetRequest) XXX_Size() int {
 	return xxx_messageInfo_GetRequest.Size(m)
 }
-
 func (m *GetRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_GetRequest.DiscardUnknown(m)
 }
@@ -182,19 +167,15 @@ func (*GetResponse) Descriptor() ([]byte, []int) {
 func (m *GetResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetResponse.Unmarshal(m, b)
 }
-
 func (m *GetResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetResponse.Marshal(b, m, deterministic)
 }
-
 func (m *GetResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_GetResponse.Merge(m, src)
 }
-
 func (m *GetResponse) XXX_Size() int {
 	return xxx_messageInfo_GetResponse.Size(m)
 }
-
 func (m *GetResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_GetResponse.DiscardUnknown(m)
 }
@@ -233,19 +214,15 @@ func (*PutRequest) Descriptor() ([]byte, []int) {
 func (m *PutRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PutRequest.Unmarshal(m, b)
 }
-
 func (m *PutRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PutRequest.Marshal(b, m, deterministic)
 }
-
 func (m *PutRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PutRequest.Merge(m, src)
 }
-
 func (m *PutRequest) XXX_Size() int {
 	return xxx_messageInfo_PutRequest.Size(m)
 }
-
 func (m *PutRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_PutRequest.DiscardUnknown(m)
 }
@@ -283,19 +260,15 @@ func (*PutResponse) Descriptor() ([]byte, []int) {
 func (m *PutResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PutResponse.Unmarshal(m, b)
 }
-
 func (m *PutResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PutResponse.Marshal(b, m, deterministic)
 }
-
 func (m *PutResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PutResponse.Merge(m, src)
 }
-
 func (m *PutResponse) XXX_Size() int {
 	return xxx_messageInfo_PutResponse.Size(m)
 }
-
 func (m *PutResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_PutResponse.DiscardUnknown(m)
 }
@@ -326,19 +299,15 @@ func (*DeleteRequest) Descriptor() ([]byte, []int) {
 func (m *DeleteRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DeleteRequest.Unmarshal(m, b)
 }
-
 func (m *DeleteRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DeleteRequest.Marshal(b, m, deterministic)
 }
-
 func (m *DeleteRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeleteRequest.Merge(m, src)
 }
-
 func (m *DeleteRequest) XXX_Size() int {
 	return xxx_messageInfo_DeleteRequest.Size(m)
 }
-
 func (m *DeleteRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeleteRequest.DiscardUnknown(m)
 }
@@ -369,19 +338,15 @@ func (*DeleteResponse) Descriptor() ([]byte, []int) {
 func (m *DeleteResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_DeleteResponse.Unmarshal(m, b)
 }
-
 func (m *DeleteResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_DeleteResponse.Marshal(b, m, deterministic)
 }
-
 func (m *DeleteResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_DeleteResponse.Merge(m, src)
 }
-
 func (m *DeleteResponse) XXX_Size() int {
 	return xxx_messageInfo_DeleteResponse.Size(m)
 }
-
 func (m *DeleteResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_DeleteResponse.DiscardUnknown(m)
 }
@@ -412,19 +377,15 @@ func (*StatRequest) Descriptor() ([]byte, []int) {
 func (m *StatRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StatRequest.Unmarshal(m, b)
 }
-
 func (m *StatRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StatRequest.Marshal(b, m, deterministic)
 }
-
 func (m *StatRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatRequest.Merge(m, src)
 }
-
 func (m *StatRequest) XXX_Size() int {
 	return xxx_messageInfo_StatRequest.Size(m)
 }
-
 func (m *StatRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatRequest.DiscardUnknown(m)
 }
@@ -456,19 +417,15 @@ func (*StatResponse) Descriptor() ([]byte, []int) {
 func (m *StatResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StatResponse.Unmarshal(m, b)
 }
-
 func (m *StatResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StatResponse.Marshal(b, m, deterministic)
 }
-
 func (m *StatResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StatResponse.Merge(m, src)
 }
-
 func (m *StatResponse) XXX_Size() int {
 	return xxx_messageInfo_StatResponse.Size(m)
 }
-
 func (m *StatResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_StatResponse.DiscardUnknown(m)
 }
@@ -507,19 +464,15 @@ func (*CompactRequest) Descriptor() ([]byte, []int) {
 func (m *CompactRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactRequest.Unmarshal(m, b)
 }
-
 func (m *CompactRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactRequest.Marshal(b, m, deterministic)
 }
-
 func (m *CompactRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CompactRequest.Merge(m, src)
 }
-
 func (m *CompactRequest) XXX_Size() int {
 	return xxx_messageInfo_CompactRequest.Size(m)
 }
-
 func (m *CompactRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_CompactRequest.DiscardUnknown(m)
 }
@@ -557,19 +510,15 @@ func (*CompactResponse) Descriptor() ([]byte, []int) {
 func (m *CompactResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CompactResponse.Unmarshal(m, b)
 }
-
 func (m *CompactResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CompactResponse.Marshal(b, m, deterministic)
 }
-
 func (m *CompactResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CompactResponse.Merge(m, src)
 }
-
 func (m *CompactResponse) XXX_Size() int {
 	return xxx_messageInfo_CompactResponse.Size(m)
 }
-
 func (m *CompactResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_CompactResponse.DiscardUnknown(m)
 }
@@ -599,19 +548,15 @@ func (*CloseRequest) Descriptor() ([]byte, []int) {
 func (m *CloseRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CloseRequest.Unmarshal(m, b)
 }
-
 func (m *CloseRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CloseRequest.Marshal(b, m, deterministic)
 }
-
 func (m *CloseRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CloseRequest.Merge(m, src)
 }
-
 func (m *CloseRequest) XXX_Size() int {
 	return xxx_messageInfo_CloseRequest.Size(m)
 }
-
 func (m *CloseRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_CloseRequest.DiscardUnknown(m)
 }
@@ -635,19 +580,15 @@ func (*CloseResponse) Descriptor() ([]byte, []int) {
 func (m *CloseResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CloseResponse.Unmarshal(m, b)
 }
-
 func (m *CloseResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CloseResponse.Marshal(b, m, deterministic)
 }
-
 func (m *CloseResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CloseResponse.Merge(m, src)
 }
-
 func (m *CloseResponse) XXX_Size() int {
 	return xxx_messageInfo_CloseResponse.Size(m)
 }
-
 func (m *CloseResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_CloseResponse.DiscardUnknown(m)
 }
@@ -681,19 +622,15 @@ func (*WriteBatchRequest) Descriptor() ([]byte, []int) {
 func (m *WriteBatchRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteBatchRequest.Unmarshal(m, b)
 }
-
 func (m *WriteBatchRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteBatchRequest.Marshal(b, m, deterministic)
 }
-
 func (m *WriteBatchRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteBatchRequest.Merge(m, src)
 }
-
 func (m *WriteBatchRequest) XXX_Size() int {
 	return xxx_messageInfo_WriteBatchRequest.Size(m)
 }
-
 func (m *WriteBatchRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteBatchRequest.DiscardUnknown(m)
 }
@@ -745,19 +682,15 @@ func (*WriteBatchResponse) Descriptor() ([]byte, []int) {
 func (m *WriteBatchResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteBatchResponse.Unmarshal(m, b)
 }
-
 func (m *WriteBatchResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteBatchResponse.Marshal(b, m, deterministic)
 }
-
 func (m *WriteBatchResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteBatchResponse.Merge(m, src)
 }
-
 func (m *WriteBatchResponse) XXX_Size() int {
 	return xxx_messageInfo_WriteBatchResponse.Size(m)
 }
-
 func (m *WriteBatchResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteBatchResponse.DiscardUnknown(m)
 }
@@ -787,19 +720,15 @@ func (*NewIteratorRequest) Descriptor() ([]byte, []int) {
 func (m *NewIteratorRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NewIteratorRequest.Unmarshal(m, b)
 }
-
 func (m *NewIteratorRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NewIteratorRequest.Marshal(b, m, deterministic)
 }
-
 func (m *NewIteratorRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NewIteratorRequest.Merge(m, src)
 }
-
 func (m *NewIteratorRequest) XXX_Size() int {
 	return xxx_messageInfo_NewIteratorRequest.Size(m)
 }
-
 func (m *NewIteratorRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_NewIteratorRequest.DiscardUnknown(m)
 }
@@ -824,19 +753,15 @@ func (*NewIteratorWithStartAndPrefixRequest) Descriptor() ([]byte, []int) {
 func (m *NewIteratorWithStartAndPrefixRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NewIteratorWithStartAndPrefixRequest.Unmarshal(m, b)
 }
-
 func (m *NewIteratorWithStartAndPrefixRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NewIteratorWithStartAndPrefixRequest.Marshal(b, m, deterministic)
 }
-
 func (m *NewIteratorWithStartAndPrefixRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NewIteratorWithStartAndPrefixRequest.Merge(m, src)
 }
-
 func (m *NewIteratorWithStartAndPrefixRequest) XXX_Size() int {
 	return xxx_messageInfo_NewIteratorWithStartAndPrefixRequest.Size(m)
 }
-
 func (m *NewIteratorWithStartAndPrefixRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_NewIteratorWithStartAndPrefixRequest.DiscardUnknown(m)
 }
@@ -874,19 +799,15 @@ func (*NewIteratorWithStartAndPrefixResponse) Descriptor() ([]byte, []int) {
 func (m *NewIteratorWithStartAndPrefixResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NewIteratorWithStartAndPrefixResponse.Unmarshal(m, b)
 }
-
 func (m *NewIteratorWithStartAndPrefixResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NewIteratorWithStartAndPrefixResponse.Marshal(b, m, deterministic)
 }
-
 func (m *NewIteratorWithStartAndPrefixResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NewIteratorWithStartAndPrefixResponse.Merge(m, src)
 }
-
 func (m *NewIteratorWithStartAndPrefixResponse) XXX_Size() int {
 	return xxx_messageInfo_NewIteratorWithStartAndPrefixResponse.Size(m)
 }
-
 func (m *NewIteratorWithStartAndPrefixResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_NewIteratorWithStartAndPrefixResponse.DiscardUnknown(m)
 }
@@ -917,19 +838,15 @@ func (*IteratorNextRequest) Descriptor() ([]byte, []int) {
 func (m *IteratorNextRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IteratorNextRequest.Unmarshal(m, b)
 }
-
 func (m *IteratorNextRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IteratorNextRequest.Marshal(b, m, deterministic)
 }
-
 func (m *IteratorNextRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IteratorNextRequest.Merge(m, src)
 }
-
 func (m *IteratorNextRequest) XXX_Size() int {
 	return xxx_messageInfo_IteratorNextRequest.Size(m)
 }
-
 func (m *IteratorNextRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_IteratorNextRequest.DiscardUnknown(m)
 }
@@ -962,19 +879,15 @@ func (*IteratorNextResponse) Descriptor() ([]byte, []int) {
 func (m *IteratorNextResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IteratorNextResponse.Unmarshal(m, b)
 }
-
 func (m *IteratorNextResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IteratorNextResponse.Marshal(b, m, deterministic)
 }
-
 func (m *IteratorNextResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IteratorNextResponse.Merge(m, src)
 }
-
 func (m *IteratorNextResponse) XXX_Size() int {
 	return xxx_messageInfo_IteratorNextResponse.Size(m)
 }
-
 func (m *IteratorNextResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_IteratorNextResponse.DiscardUnknown(m)
 }
@@ -1019,19 +932,15 @@ func (*IteratorErrorRequest) Descriptor() ([]byte, []int) {
 func (m *IteratorErrorRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IteratorErrorRequest.Unmarshal(m, b)
 }
-
 func (m *IteratorErrorRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IteratorErrorRequest.Marshal(b, m, deterministic)
 }
-
 func (m *IteratorErrorRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IteratorErrorRequest.Merge(m, src)
 }
-
 func (m *IteratorErrorRequest) XXX_Size() int {
 	return xxx_messageInfo_IteratorErrorRequest.Size(m)
 }
-
 func (m *IteratorErrorRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_IteratorErrorRequest.DiscardUnknown(m)
 }
@@ -1062,19 +971,15 @@ func (*IteratorErrorResponse) Descriptor() ([]byte, []int) {
 func (m *IteratorErrorResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IteratorErrorResponse.Unmarshal(m, b)
 }
-
 func (m *IteratorErrorResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IteratorErrorResponse.Marshal(b, m, deterministic)
 }
-
 func (m *IteratorErrorResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IteratorErrorResponse.Merge(m, src)
 }
-
 func (m *IteratorErrorResponse) XXX_Size() int {
 	return xxx_messageInfo_IteratorErrorResponse.Size(m)
 }
-
 func (m *IteratorErrorResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_IteratorErrorResponse.DiscardUnknown(m)
 }
@@ -1105,19 +1010,15 @@ func (*IteratorReleaseRequest) Descriptor() ([]byte, []int) {
 func (m *IteratorReleaseRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IteratorReleaseRequest.Unmarshal(m, b)
 }
-
 func (m *IteratorReleaseRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IteratorReleaseRequest.Marshal(b, m, deterministic)
 }
-
 func (m *IteratorReleaseRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IteratorReleaseRequest.Merge(m, src)
 }
-
 func (m *IteratorReleaseRequest) XXX_Size() int {
 	return xxx_messageInfo_IteratorReleaseRequest.Size(m)
 }
-
 func (m *IteratorReleaseRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_IteratorReleaseRequest.DiscardUnknown(m)
 }
@@ -1148,19 +1049,15 @@ func (*IteratorReleaseResponse) Descriptor() ([]byte, []int) {
 func (m *IteratorReleaseResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IteratorReleaseResponse.Unmarshal(m, b)
 }
-
 func (m *IteratorReleaseResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IteratorReleaseResponse.Marshal(b, m, deterministic)
 }
-
 func (m *IteratorReleaseResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IteratorReleaseResponse.Merge(m, src)
 }
-
 func (m *IteratorReleaseResponse) XXX_Size() int {
 	return xxx_messageInfo_IteratorReleaseResponse.Size(m)
 }
-
 func (m *IteratorReleaseResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_IteratorReleaseResponse.DiscardUnknown(m)
 }
@@ -1254,10 +1151,8 @@ var fileDescriptor_af52f4b90339c3f4 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ context.Context
-	_ grpc.ClientConnInterface
-)
+var _ context.Context
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -1414,52 +1309,42 @@ type DatabaseServer interface {
 }
 
 // UnimplementedDatabaseServer can be embedded to have forward compatible implementations.
-type UnimplementedDatabaseServer struct{}
+type UnimplementedDatabaseServer struct {
+}
 
 func (*UnimplementedDatabaseServer) Has(ctx context.Context, req *HasRequest) (*HasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Has not implemented")
 }
-
 func (*UnimplementedDatabaseServer) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
-
 func (*UnimplementedDatabaseServer) Put(ctx context.Context, req *PutRequest) (*PutResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
 }
-
 func (*UnimplementedDatabaseServer) Delete(ctx context.Context, req *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
-
 func (*UnimplementedDatabaseServer) Stat(ctx context.Context, req *StatRequest) (*StatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stat not implemented")
 }
-
 func (*UnimplementedDatabaseServer) Compact(ctx context.Context, req *CompactRequest) (*CompactResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Compact not implemented")
 }
-
 func (*UnimplementedDatabaseServer) Close(ctx context.Context, req *CloseRequest) (*CloseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
 }
-
 func (*UnimplementedDatabaseServer) WriteBatch(ctx context.Context, req *WriteBatchRequest) (*WriteBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteBatch not implemented")
 }
-
 func (*UnimplementedDatabaseServer) NewIteratorWithStartAndPrefix(ctx context.Context, req *NewIteratorWithStartAndPrefixRequest) (*NewIteratorWithStartAndPrefixResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewIteratorWithStartAndPrefix not implemented")
 }
-
 func (*UnimplementedDatabaseServer) IteratorNext(ctx context.Context, req *IteratorNextRequest) (*IteratorNextResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IteratorNext not implemented")
 }
-
 func (*UnimplementedDatabaseServer) IteratorError(ctx context.Context, req *IteratorErrorRequest) (*IteratorErrorResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IteratorError not implemented")
 }
-
 func (*UnimplementedDatabaseServer) IteratorRelease(ctx context.Context, req *IteratorReleaseRequest) (*IteratorReleaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IteratorRelease not implemented")
 }

@@ -15,11 +15,9 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ = proto.Marshal
-	_ = fmt.Errorf
-	_ = math.Inf
-)
+var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -44,19 +42,15 @@ func (*ReadRequest) Descriptor() ([]byte, []int) {
 func (m *ReadRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ReadRequest.Unmarshal(m, b)
 }
-
 func (m *ReadRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ReadRequest.Marshal(b, m, deterministic)
 }
-
 func (m *ReadRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ReadRequest.Merge(m, src)
 }
-
 func (m *ReadRequest) XXX_Size() int {
 	return xxx_messageInfo_ReadRequest.Size(m)
 }
-
 func (m *ReadRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_ReadRequest.DiscardUnknown(m)
 }
@@ -89,19 +83,15 @@ func (*ReadResponse) Descriptor() ([]byte, []int) {
 func (m *ReadResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ReadResponse.Unmarshal(m, b)
 }
-
 func (m *ReadResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ReadResponse.Marshal(b, m, deterministic)
 }
-
 func (m *ReadResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ReadResponse.Merge(m, src)
 }
-
 func (m *ReadResponse) XXX_Size() int {
 	return xxx_messageInfo_ReadResponse.Size(m)
 }
-
 func (m *ReadResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_ReadResponse.DiscardUnknown(m)
 }
@@ -146,19 +136,15 @@ func (*WriteRequest) Descriptor() ([]byte, []int) {
 func (m *WriteRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteRequest.Unmarshal(m, b)
 }
-
 func (m *WriteRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteRequest.Marshal(b, m, deterministic)
 }
-
 func (m *WriteRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteRequest.Merge(m, src)
 }
-
 func (m *WriteRequest) XXX_Size() int {
 	return xxx_messageInfo_WriteRequest.Size(m)
 }
-
 func (m *WriteRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteRequest.DiscardUnknown(m)
 }
@@ -191,19 +177,15 @@ func (*WriteResponse) Descriptor() ([]byte, []int) {
 func (m *WriteResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteResponse.Unmarshal(m, b)
 }
-
 func (m *WriteResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteResponse.Marshal(b, m, deterministic)
 }
-
 func (m *WriteResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteResponse.Merge(m, src)
 }
-
 func (m *WriteResponse) XXX_Size() int {
 	return xxx_messageInfo_WriteResponse.Size(m)
 }
-
 func (m *WriteResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteResponse.DiscardUnknown(m)
 }
@@ -247,19 +229,15 @@ func (*CloseRequest) Descriptor() ([]byte, []int) {
 func (m *CloseRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CloseRequest.Unmarshal(m, b)
 }
-
 func (m *CloseRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CloseRequest.Marshal(b, m, deterministic)
 }
-
 func (m *CloseRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CloseRequest.Merge(m, src)
 }
-
 func (m *CloseRequest) XXX_Size() int {
 	return xxx_messageInfo_CloseRequest.Size(m)
 }
-
 func (m *CloseRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_CloseRequest.DiscardUnknown(m)
 }
@@ -282,19 +260,15 @@ func (*CloseResponse) Descriptor() ([]byte, []int) {
 func (m *CloseResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_CloseResponse.Unmarshal(m, b)
 }
-
 func (m *CloseResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_CloseResponse.Marshal(b, m, deterministic)
 }
-
 func (m *CloseResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_CloseResponse.Merge(m, src)
 }
-
 func (m *CloseResponse) XXX_Size() int {
 	return xxx_messageInfo_CloseResponse.Size(m)
 }
-
 func (m *CloseResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_CloseResponse.DiscardUnknown(m)
 }
@@ -318,19 +292,15 @@ func (*SetDeadlineRequest) Descriptor() ([]byte, []int) {
 func (m *SetDeadlineRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetDeadlineRequest.Unmarshal(m, b)
 }
-
 func (m *SetDeadlineRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetDeadlineRequest.Marshal(b, m, deterministic)
 }
-
 func (m *SetDeadlineRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SetDeadlineRequest.Merge(m, src)
 }
-
 func (m *SetDeadlineRequest) XXX_Size() int {
 	return xxx_messageInfo_SetDeadlineRequest.Size(m)
 }
-
 func (m *SetDeadlineRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_SetDeadlineRequest.DiscardUnknown(m)
 }
@@ -360,19 +330,15 @@ func (*SetDeadlineResponse) Descriptor() ([]byte, []int) {
 func (m *SetDeadlineResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetDeadlineResponse.Unmarshal(m, b)
 }
-
 func (m *SetDeadlineResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetDeadlineResponse.Marshal(b, m, deterministic)
 }
-
 func (m *SetDeadlineResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SetDeadlineResponse.Merge(m, src)
 }
-
 func (m *SetDeadlineResponse) XXX_Size() int {
 	return xxx_messageInfo_SetDeadlineResponse.Size(m)
 }
-
 func (m *SetDeadlineResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_SetDeadlineResponse.DiscardUnknown(m)
 }
@@ -396,19 +362,15 @@ func (*SetReadDeadlineRequest) Descriptor() ([]byte, []int) {
 func (m *SetReadDeadlineRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetReadDeadlineRequest.Unmarshal(m, b)
 }
-
 func (m *SetReadDeadlineRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetReadDeadlineRequest.Marshal(b, m, deterministic)
 }
-
 func (m *SetReadDeadlineRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SetReadDeadlineRequest.Merge(m, src)
 }
-
 func (m *SetReadDeadlineRequest) XXX_Size() int {
 	return xxx_messageInfo_SetReadDeadlineRequest.Size(m)
 }
-
 func (m *SetReadDeadlineRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_SetReadDeadlineRequest.DiscardUnknown(m)
 }
@@ -438,19 +400,15 @@ func (*SetReadDeadlineResponse) Descriptor() ([]byte, []int) {
 func (m *SetReadDeadlineResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetReadDeadlineResponse.Unmarshal(m, b)
 }
-
 func (m *SetReadDeadlineResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetReadDeadlineResponse.Marshal(b, m, deterministic)
 }
-
 func (m *SetReadDeadlineResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SetReadDeadlineResponse.Merge(m, src)
 }
-
 func (m *SetReadDeadlineResponse) XXX_Size() int {
 	return xxx_messageInfo_SetReadDeadlineResponse.Size(m)
 }
-
 func (m *SetReadDeadlineResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_SetReadDeadlineResponse.DiscardUnknown(m)
 }
@@ -474,19 +432,15 @@ func (*SetWriteDeadlineRequest) Descriptor() ([]byte, []int) {
 func (m *SetWriteDeadlineRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetWriteDeadlineRequest.Unmarshal(m, b)
 }
-
 func (m *SetWriteDeadlineRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetWriteDeadlineRequest.Marshal(b, m, deterministic)
 }
-
 func (m *SetWriteDeadlineRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SetWriteDeadlineRequest.Merge(m, src)
 }
-
 func (m *SetWriteDeadlineRequest) XXX_Size() int {
 	return xxx_messageInfo_SetWriteDeadlineRequest.Size(m)
 }
-
 func (m *SetWriteDeadlineRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_SetWriteDeadlineRequest.DiscardUnknown(m)
 }
@@ -516,19 +470,15 @@ func (*SetWriteDeadlineResponse) Descriptor() ([]byte, []int) {
 func (m *SetWriteDeadlineResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetWriteDeadlineResponse.Unmarshal(m, b)
 }
-
 func (m *SetWriteDeadlineResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetWriteDeadlineResponse.Marshal(b, m, deterministic)
 }
-
 func (m *SetWriteDeadlineResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SetWriteDeadlineResponse.Merge(m, src)
 }
-
 func (m *SetWriteDeadlineResponse) XXX_Size() int {
 	return xxx_messageInfo_SetWriteDeadlineResponse.Size(m)
 }
-
 func (m *SetWriteDeadlineResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_SetWriteDeadlineResponse.DiscardUnknown(m)
 }
@@ -580,10 +530,8 @@ var fileDescriptor_aa209fc9da7fc9d0 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ context.Context
-	_ grpc.ClientConnInterface
-)
+var _ context.Context
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -674,28 +622,24 @@ type ConnServer interface {
 }
 
 // UnimplementedConnServer can be embedded to have forward compatible implementations.
-type UnimplementedConnServer struct{}
+type UnimplementedConnServer struct {
+}
 
 func (*UnimplementedConnServer) Read(ctx context.Context, req *ReadRequest) (*ReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
 }
-
 func (*UnimplementedConnServer) Write(ctx context.Context, req *WriteRequest) (*WriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
-
 func (*UnimplementedConnServer) Close(ctx context.Context, req *CloseRequest) (*CloseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
 }
-
 func (*UnimplementedConnServer) SetDeadline(ctx context.Context, req *SetDeadlineRequest) (*SetDeadlineResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetDeadline not implemented")
 }
-
 func (*UnimplementedConnServer) SetReadDeadline(ctx context.Context, req *SetReadDeadlineRequest) (*SetReadDeadlineResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetReadDeadline not implemented")
 }
-
 func (*UnimplementedConnServer) SetWriteDeadline(ctx context.Context, req *SetWriteDeadlineRequest) (*SetWriteDeadlineResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetWriteDeadline not implemented")
 }

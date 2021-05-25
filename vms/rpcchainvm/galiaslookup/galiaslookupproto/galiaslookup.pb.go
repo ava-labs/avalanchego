@@ -15,11 +15,9 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ = proto.Marshal
-	_ = fmt.Errorf
-	_ = math.Inf
-)
+var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -44,19 +42,15 @@ func (*LookupRequest) Descriptor() ([]byte, []int) {
 func (m *LookupRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LookupRequest.Unmarshal(m, b)
 }
-
 func (m *LookupRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_LookupRequest.Marshal(b, m, deterministic)
 }
-
 func (m *LookupRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_LookupRequest.Merge(m, src)
 }
-
 func (m *LookupRequest) XXX_Size() int {
 	return xxx_messageInfo_LookupRequest.Size(m)
 }
-
 func (m *LookupRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_LookupRequest.DiscardUnknown(m)
 }
@@ -87,19 +81,15 @@ func (*LookupResponse) Descriptor() ([]byte, []int) {
 func (m *LookupResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LookupResponse.Unmarshal(m, b)
 }
-
 func (m *LookupResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_LookupResponse.Marshal(b, m, deterministic)
 }
-
 func (m *LookupResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_LookupResponse.Merge(m, src)
 }
-
 func (m *LookupResponse) XXX_Size() int {
 	return xxx_messageInfo_LookupResponse.Size(m)
 }
-
 func (m *LookupResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_LookupResponse.DiscardUnknown(m)
 }
@@ -130,19 +120,15 @@ func (*PrimaryAliasRequest) Descriptor() ([]byte, []int) {
 func (m *PrimaryAliasRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PrimaryAliasRequest.Unmarshal(m, b)
 }
-
 func (m *PrimaryAliasRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PrimaryAliasRequest.Marshal(b, m, deterministic)
 }
-
 func (m *PrimaryAliasRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PrimaryAliasRequest.Merge(m, src)
 }
-
 func (m *PrimaryAliasRequest) XXX_Size() int {
 	return xxx_messageInfo_PrimaryAliasRequest.Size(m)
 }
-
 func (m *PrimaryAliasRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_PrimaryAliasRequest.DiscardUnknown(m)
 }
@@ -173,19 +159,15 @@ func (*PrimaryAliasResponse) Descriptor() ([]byte, []int) {
 func (m *PrimaryAliasResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PrimaryAliasResponse.Unmarshal(m, b)
 }
-
 func (m *PrimaryAliasResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PrimaryAliasResponse.Marshal(b, m, deterministic)
 }
-
 func (m *PrimaryAliasResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PrimaryAliasResponse.Merge(m, src)
 }
-
 func (m *PrimaryAliasResponse) XXX_Size() int {
 	return xxx_messageInfo_PrimaryAliasResponse.Size(m)
 }
-
 func (m *PrimaryAliasResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_PrimaryAliasResponse.DiscardUnknown(m)
 }
@@ -225,10 +207,8 @@ var fileDescriptor_8db91dfd8bfd37e6 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ context.Context
-	_ grpc.ClientConnInterface
-)
+var _ context.Context
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -275,12 +255,12 @@ type AliasLookupServer interface {
 }
 
 // UnimplementedAliasLookupServer can be embedded to have forward compatible implementations.
-type UnimplementedAliasLookupServer struct{}
+type UnimplementedAliasLookupServer struct {
+}
 
 func (*UnimplementedAliasLookupServer) Lookup(ctx context.Context, req *LookupRequest) (*LookupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Lookup not implemented")
 }
-
 func (*UnimplementedAliasLookupServer) PrimaryAlias(ctx context.Context, req *PrimaryAliasRequest) (*PrimaryAliasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrimaryAlias not implemented")
 }

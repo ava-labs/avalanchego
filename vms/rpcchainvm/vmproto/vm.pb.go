@@ -8,15 +8,14 @@ package vmproto
 
 import (
 	context "context"
-	reflect "reflect"
-	sync "sync"
-
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -1688,40 +1687,37 @@ func file_vm_proto_rawDescGZIP() []byte {
 	return file_vm_proto_rawDescData
 }
 
-var (
-	file_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
-	file_vm_proto_goTypes  = []interface{}{
-		(*InitializeRequest)(nil),      // 0: vmproto.InitializeRequest
-		(*InitializeResponse)(nil),     // 1: vmproto.InitializeResponse
-		(*VersionedDBServer)(nil),      // 2: vmproto.VersionedDBServer
-		(*BootstrappingRequest)(nil),   // 3: vmproto.BootstrappingRequest
-		(*BootstrappingResponse)(nil),  // 4: vmproto.BootstrappingResponse
-		(*BootstrappedRequest)(nil),    // 5: vmproto.BootstrappedRequest
-		(*BootstrappedResponse)(nil),   // 6: vmproto.BootstrappedResponse
-		(*ShutdownRequest)(nil),        // 7: vmproto.ShutdownRequest
-		(*ShutdownResponse)(nil),       // 8: vmproto.ShutdownResponse
-		(*CreateHandlersRequest)(nil),  // 9: vmproto.CreateHandlersRequest
-		(*CreateHandlersResponse)(nil), // 10: vmproto.CreateHandlersResponse
-		(*Handler)(nil),                // 11: vmproto.Handler
-		(*BuildBlockRequest)(nil),      // 12: vmproto.BuildBlockRequest
-		(*BuildBlockResponse)(nil),     // 13: vmproto.BuildBlockResponse
-		(*ParseBlockRequest)(nil),      // 14: vmproto.ParseBlockRequest
-		(*ParseBlockResponse)(nil),     // 15: vmproto.ParseBlockResponse
-		(*GetBlockRequest)(nil),        // 16: vmproto.GetBlockRequest
-		(*GetBlockResponse)(nil),       // 17: vmproto.GetBlockResponse
-		(*SetPreferenceRequest)(nil),   // 18: vmproto.SetPreferenceRequest
-		(*SetPreferenceResponse)(nil),  // 19: vmproto.SetPreferenceResponse
-		(*BlockVerifyRequest)(nil),     // 20: vmproto.BlockVerifyRequest
-		(*BlockVerifyResponse)(nil),    // 21: vmproto.BlockVerifyResponse
-		(*BlockAcceptRequest)(nil),     // 22: vmproto.BlockAcceptRequest
-		(*BlockAcceptResponse)(nil),    // 23: vmproto.BlockAcceptResponse
-		(*BlockRejectRequest)(nil),     // 24: vmproto.BlockRejectRequest
-		(*BlockRejectResponse)(nil),    // 25: vmproto.BlockRejectResponse
-		(*HealthRequest)(nil),          // 26: vmproto.HealthRequest
-		(*HealthResponse)(nil),         // 27: vmproto.HealthResponse
-	}
-)
-
+var file_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
+var file_vm_proto_goTypes = []interface{}{
+	(*InitializeRequest)(nil),      // 0: vmproto.InitializeRequest
+	(*InitializeResponse)(nil),     // 1: vmproto.InitializeResponse
+	(*VersionedDBServer)(nil),      // 2: vmproto.VersionedDBServer
+	(*BootstrappingRequest)(nil),   // 3: vmproto.BootstrappingRequest
+	(*BootstrappingResponse)(nil),  // 4: vmproto.BootstrappingResponse
+	(*BootstrappedRequest)(nil),    // 5: vmproto.BootstrappedRequest
+	(*BootstrappedResponse)(nil),   // 6: vmproto.BootstrappedResponse
+	(*ShutdownRequest)(nil),        // 7: vmproto.ShutdownRequest
+	(*ShutdownResponse)(nil),       // 8: vmproto.ShutdownResponse
+	(*CreateHandlersRequest)(nil),  // 9: vmproto.CreateHandlersRequest
+	(*CreateHandlersResponse)(nil), // 10: vmproto.CreateHandlersResponse
+	(*Handler)(nil),                // 11: vmproto.Handler
+	(*BuildBlockRequest)(nil),      // 12: vmproto.BuildBlockRequest
+	(*BuildBlockResponse)(nil),     // 13: vmproto.BuildBlockResponse
+	(*ParseBlockRequest)(nil),      // 14: vmproto.ParseBlockRequest
+	(*ParseBlockResponse)(nil),     // 15: vmproto.ParseBlockResponse
+	(*GetBlockRequest)(nil),        // 16: vmproto.GetBlockRequest
+	(*GetBlockResponse)(nil),       // 17: vmproto.GetBlockResponse
+	(*SetPreferenceRequest)(nil),   // 18: vmproto.SetPreferenceRequest
+	(*SetPreferenceResponse)(nil),  // 19: vmproto.SetPreferenceResponse
+	(*BlockVerifyRequest)(nil),     // 20: vmproto.BlockVerifyRequest
+	(*BlockVerifyResponse)(nil),    // 21: vmproto.BlockVerifyResponse
+	(*BlockAcceptRequest)(nil),     // 22: vmproto.BlockAcceptRequest
+	(*BlockAcceptResponse)(nil),    // 23: vmproto.BlockAcceptResponse
+	(*BlockRejectRequest)(nil),     // 24: vmproto.BlockRejectRequest
+	(*BlockRejectResponse)(nil),    // 25: vmproto.BlockRejectResponse
+	(*HealthRequest)(nil),          // 26: vmproto.HealthRequest
+	(*HealthResponse)(nil),         // 27: vmproto.HealthResponse
+}
 var file_vm_proto_depIdxs = []int32{
 	2,  // 0: vmproto.InitializeRequest.dbServers:type_name -> vmproto.VersionedDBServer
 	11, // 1: vmproto.CreateHandlersResponse.handlers:type_name -> vmproto.Handler
@@ -2122,10 +2118,8 @@ func file_vm_proto_init() {
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ context.Context
-	_ grpc.ClientConnInterface
-)
+var _ context.Context
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -2293,56 +2287,45 @@ type VMServer interface {
 }
 
 // UnimplementedVMServer can be embedded to have forward compatible implementations.
-type UnimplementedVMServer struct{}
+type UnimplementedVMServer struct {
+}
 
 func (*UnimplementedVMServer) Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Initialize not implemented")
 }
-
 func (*UnimplementedVMServer) Bootstrapping(context.Context, *BootstrappingRequest) (*BootstrappingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapping not implemented")
 }
-
 func (*UnimplementedVMServer) Bootstrapped(context.Context, *BootstrappedRequest) (*BootstrappedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapped not implemented")
 }
-
 func (*UnimplementedVMServer) Shutdown(context.Context, *ShutdownRequest) (*ShutdownResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
-
 func (*UnimplementedVMServer) CreateHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHandlers not implemented")
 }
-
 func (*UnimplementedVMServer) BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildBlock not implemented")
 }
-
 func (*UnimplementedVMServer) ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ParseBlock not implemented")
 }
-
 func (*UnimplementedVMServer) GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlock not implemented")
 }
-
 func (*UnimplementedVMServer) SetPreference(context.Context, *SetPreferenceRequest) (*SetPreferenceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetPreference not implemented")
 }
-
 func (*UnimplementedVMServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
 }
-
 func (*UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
 }
-
 func (*UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (*BlockAcceptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockAccept not implemented")
 }
-
 func (*UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (*BlockRejectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockReject not implemented")
 }

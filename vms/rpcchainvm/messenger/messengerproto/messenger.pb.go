@@ -15,11 +15,9 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ = proto.Marshal
-	_ = fmt.Errorf
-	_ = math.Inf
-)
+var _ = proto.Marshal
+var _ = fmt.Errorf
+var _ = math.Inf
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -44,19 +42,15 @@ func (*NotifyRequest) Descriptor() ([]byte, []int) {
 func (m *NotifyRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NotifyRequest.Unmarshal(m, b)
 }
-
 func (m *NotifyRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NotifyRequest.Marshal(b, m, deterministic)
 }
-
 func (m *NotifyRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NotifyRequest.Merge(m, src)
 }
-
 func (m *NotifyRequest) XXX_Size() int {
 	return xxx_messageInfo_NotifyRequest.Size(m)
 }
-
 func (m *NotifyRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_NotifyRequest.DiscardUnknown(m)
 }
@@ -86,19 +80,15 @@ func (*NotifyResponse) Descriptor() ([]byte, []int) {
 func (m *NotifyResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_NotifyResponse.Unmarshal(m, b)
 }
-
 func (m *NotifyResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_NotifyResponse.Marshal(b, m, deterministic)
 }
-
 func (m *NotifyResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_NotifyResponse.Merge(m, src)
 }
-
 func (m *NotifyResponse) XXX_Size() int {
 	return xxx_messageInfo_NotifyResponse.Size(m)
 }
-
 func (m *NotifyResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_NotifyResponse.DiscardUnknown(m)
 }
@@ -125,10 +115,8 @@ var fileDescriptor_b99aba0cbf4e4b91 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var (
-	_ context.Context
-	_ grpc.ClientConnInterface
-)
+var _ context.Context
+var _ grpc.ClientConnInterface
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -164,7 +152,8 @@ type MessengerServer interface {
 }
 
 // UnimplementedMessengerServer can be embedded to have forward compatible implementations.
-type UnimplementedMessengerServer struct{}
+type UnimplementedMessengerServer struct {
+}
 
 func (*UnimplementedMessengerServer) Notify(ctx context.Context, req *NotifyRequest) (*NotifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")
