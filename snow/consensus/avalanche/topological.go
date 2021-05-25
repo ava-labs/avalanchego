@@ -62,6 +62,12 @@ type Topological struct {
 	// We use this one instance of ids.Set instead of creating a
 	// new ids.Set during each call to [calculateInDegree].
 	leaves ids.Set
+
+	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
+	// Should only be accessed in those methods.
+	// We use this one map instead of creating a new map
+	// during each call to [calculateInDegree].
+	kahnNodes map[ids.ID]kahnNode
 }
 
 type kahnNode struct {
@@ -82,6 +88,7 @@ func (ta *Topological) Initialize(
 	ta.ctx = ctx
 	ta.params = params
 	ta.leaves = ids.Set{}
+	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
 	if err := ta.Metrics.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
@@ -185,12 +192,12 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	}
 
 	// Set up the topological sort: O(|Live Set|)
-	kahns, leaves, err := ta.calculateInDegree(responses)
+	leaves, err := ta.calculateInDegree(responses)
 	if err != nil {
 		return err
 	}
 	// Collect the votes for each transaction: O(|Live Set|)
-	votes, err := ta.pushVotes(kahns, leaves)
+	votes, err := ta.pushVotes(leaves)
 	if err != nil {
 		return err
 	}
@@ -237,37 +244,40 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf nodes.
 func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
-	map[ids.ID]kahnNode,
 	[]ids.ID,
 	error,
 ) {
-	kahns := make(map[ids.ID]kahnNode, minMapSize)
+	// Clear the kahn node set
+	for k := range ta.kahnNodes {
+		delete(ta.kahnNodes, k)
+	}
+	// Clear the leaf set
 	ta.leaves.Clear()
 
 	for vote := range responses {
 		// If it is not found, then the vote is either for something decided,
 		// or something we haven't heard of yet.
 		if vtx := ta.nodes[vote]; vtx != nil {
-			kahn, previouslySeen := kahns[vote]
+			kahn, previouslySeen := ta.kahnNodes[vote]
 			// Add this new vote to the current bag of votes
 			kahn.votes.Union(responses.GetSet(vote))
-			kahns[vote] = kahn
+			ta.kahnNodes[vote] = kahn
 
 			if !previouslySeen {
 				// If I've never seen this node before, it is currently a leaf.
 				ta.leaves.Add(vote)
 				parents, err := vtx.Parents()
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
-				kahns, err = ta.markAncestorInDegrees(kahns, parents)
+				ta.kahnNodes, err = ta.markAncestorInDegrees(ta.kahnNodes, parents)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 			}
 		}
 	}
-	return kahns, ta.leaves.List(), nil
+	return ta.leaves.List(), nil
 }
 
 // adds a new in-degree reference for all nodes.
@@ -320,10 +330,7 @@ func (ta *Topological) markAncestorInDegrees(
 }
 
 // count the number of votes for each operation
-func (ta *Topological) pushVotes(
-	kahnNodes map[ids.ID]kahnNode,
-	leaves []ids.ID,
-) (ids.Bag, error) {
+func (ta *Topological) pushVotes(leaves []ids.ID) (ids.Bag, error) {
 	votes := make(ids.UniqueBag)
 	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
 
@@ -332,7 +339,7 @@ func (ta *Topological) pushVotes(
 		leaf := leaves[newLeavesSize]
 		leaves = leaves[:newLeavesSize]
 
-		kahn := kahnNodes[leaf]
+		kahn := ta.kahnNodes[leaf]
 
 		if vtx := ta.nodes[leaf]; vtx != nil {
 			txs, err := vtx.Txs()
@@ -356,11 +363,11 @@ func (ta *Topological) pushVotes(
 			}
 			for _, dep := range parents {
 				depID := dep.ID()
-				if depNode, notPruned := kahnNodes[depID]; notPruned {
+				if depNode, notPruned := ta.kahnNodes[depID]; notPruned {
 					depNode.inDegree--
 					// Give the votes to my parents
 					depNode.votes.Union(kahn.votes)
-					kahnNodes[depID] = depNode
+					ta.kahnNodes[depID] = depNode
 
 					if depNode.inDegree == 0 {
 						// Only traverse into the leaves
