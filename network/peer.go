@@ -131,6 +131,7 @@ type peer struct {
 	// [handleGetAccepted], [handleChits].
 	// We use this one ids.Set rather than allocating one per method call.
 	// Should be cleared before use.
+	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
 }
 
