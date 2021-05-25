@@ -6,17 +6,20 @@ package gsharedmemoryproto
 import (
 	context "context"
 	fmt "fmt"
+	math "math"
+
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -42,15 +45,19 @@ func (*BatchPut) Descriptor() ([]byte, []int) {
 func (m *BatchPut) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BatchPut.Unmarshal(m, b)
 }
+
 func (m *BatchPut) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_BatchPut.Marshal(b, m, deterministic)
 }
+
 func (m *BatchPut) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_BatchPut.Merge(m, src)
 }
+
 func (m *BatchPut) XXX_Size() int {
 	return xxx_messageInfo_BatchPut.Size(m)
 }
+
 func (m *BatchPut) XXX_DiscardUnknown() {
 	xxx_messageInfo_BatchPut.DiscardUnknown(m)
 }
@@ -88,15 +95,19 @@ func (*BatchDelete) Descriptor() ([]byte, []int) {
 func (m *BatchDelete) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_BatchDelete.Unmarshal(m, b)
 }
+
 func (m *BatchDelete) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_BatchDelete.Marshal(b, m, deterministic)
 }
+
 func (m *BatchDelete) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_BatchDelete.Merge(m, src)
 }
+
 func (m *BatchDelete) XXX_Size() int {
 	return xxx_messageInfo_BatchDelete.Size(m)
 }
+
 func (m *BatchDelete) XXX_DiscardUnknown() {
 	xxx_messageInfo_BatchDelete.DiscardUnknown(m)
 }
@@ -129,15 +140,19 @@ func (*Batch) Descriptor() ([]byte, []int) {
 func (m *Batch) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Batch.Unmarshal(m, b)
 }
+
 func (m *Batch) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Batch.Marshal(b, m, deterministic)
 }
+
 func (m *Batch) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Batch.Merge(m, src)
 }
+
 func (m *Batch) XXX_Size() int {
 	return xxx_messageInfo_Batch.Size(m)
 }
+
 func (m *Batch) XXX_DiscardUnknown() {
 	xxx_messageInfo_Batch.DiscardUnknown(m)
 }
@@ -184,15 +199,19 @@ func (*Element) Descriptor() ([]byte, []int) {
 func (m *Element) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Element.Unmarshal(m, b)
 }
+
 func (m *Element) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Element.Marshal(b, m, deterministic)
 }
+
 func (m *Element) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Element.Merge(m, src)
 }
+
 func (m *Element) XXX_Size() int {
 	return xxx_messageInfo_Element.Size(m)
 }
+
 func (m *Element) XXX_DiscardUnknown() {
 	xxx_messageInfo_Element.DiscardUnknown(m)
 }
@@ -241,15 +260,19 @@ func (*PutRequest) Descriptor() ([]byte, []int) {
 func (m *PutRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PutRequest.Unmarshal(m, b)
 }
+
 func (m *PutRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PutRequest.Marshal(b, m, deterministic)
 }
+
 func (m *PutRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PutRequest.Merge(m, src)
 }
+
 func (m *PutRequest) XXX_Size() int {
 	return xxx_messageInfo_PutRequest.Size(m)
 }
+
 func (m *PutRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_PutRequest.DiscardUnknown(m)
 }
@@ -307,15 +330,19 @@ func (*PutResponse) Descriptor() ([]byte, []int) {
 func (m *PutResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PutResponse.Unmarshal(m, b)
 }
+
 func (m *PutResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PutResponse.Marshal(b, m, deterministic)
 }
+
 func (m *PutResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PutResponse.Merge(m, src)
 }
+
 func (m *PutResponse) XXX_Size() int {
 	return xxx_messageInfo_PutResponse.Size(m)
 }
+
 func (m *PutResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_PutResponse.DiscardUnknown(m)
 }
@@ -342,15 +369,19 @@ func (*GetRequest) Descriptor() ([]byte, []int) {
 func (m *GetRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetRequest.Unmarshal(m, b)
 }
+
 func (m *GetRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetRequest.Marshal(b, m, deterministic)
 }
+
 func (m *GetRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_GetRequest.Merge(m, src)
 }
+
 func (m *GetRequest) XXX_Size() int {
 	return xxx_messageInfo_GetRequest.Size(m)
 }
+
 func (m *GetRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_GetRequest.DiscardUnknown(m)
 }
@@ -403,15 +434,19 @@ func (*GetResponse) Descriptor() ([]byte, []int) {
 func (m *GetResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetResponse.Unmarshal(m, b)
 }
+
 func (m *GetResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetResponse.Marshal(b, m, deterministic)
 }
+
 func (m *GetResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_GetResponse.Merge(m, src)
 }
+
 func (m *GetResponse) XXX_Size() int {
 	return xxx_messageInfo_GetResponse.Size(m)
 }
+
 func (m *GetResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_GetResponse.DiscardUnknown(m)
 }
@@ -455,15 +490,19 @@ func (*IndexedRequest) Descriptor() ([]byte, []int) {
 func (m *IndexedRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IndexedRequest.Unmarshal(m, b)
 }
+
 func (m *IndexedRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IndexedRequest.Marshal(b, m, deterministic)
 }
+
 func (m *IndexedRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IndexedRequest.Merge(m, src)
 }
+
 func (m *IndexedRequest) XXX_Size() int {
 	return xxx_messageInfo_IndexedRequest.Size(m)
 }
+
 func (m *IndexedRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_IndexedRequest.DiscardUnknown(m)
 }
@@ -539,15 +578,19 @@ func (*IndexedResponse) Descriptor() ([]byte, []int) {
 func (m *IndexedResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_IndexedResponse.Unmarshal(m, b)
 }
+
 func (m *IndexedResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_IndexedResponse.Marshal(b, m, deterministic)
 }
+
 func (m *IndexedResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_IndexedResponse.Merge(m, src)
 }
+
 func (m *IndexedResponse) XXX_Size() int {
 	return xxx_messageInfo_IndexedResponse.Size(m)
 }
+
 func (m *IndexedResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_IndexedResponse.DiscardUnknown(m)
 }
@@ -603,15 +646,19 @@ func (*RemoveRequest) Descriptor() ([]byte, []int) {
 func (m *RemoveRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RemoveRequest.Unmarshal(m, b)
 }
+
 func (m *RemoveRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RemoveRequest.Marshal(b, m, deterministic)
 }
+
 func (m *RemoveRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RemoveRequest.Merge(m, src)
 }
+
 func (m *RemoveRequest) XXX_Size() int {
 	return xxx_messageInfo_RemoveRequest.Size(m)
 }
+
 func (m *RemoveRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_RemoveRequest.DiscardUnknown(m)
 }
@@ -669,15 +716,19 @@ func (*RemoveResponse) Descriptor() ([]byte, []int) {
 func (m *RemoveResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RemoveResponse.Unmarshal(m, b)
 }
+
 func (m *RemoveResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RemoveResponse.Marshal(b, m, deterministic)
 }
+
 func (m *RemoveResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RemoveResponse.Merge(m, src)
 }
+
 func (m *RemoveResponse) XXX_Size() int {
 	return xxx_messageInfo_RemoveResponse.Size(m)
 }
+
 func (m *RemoveResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_RemoveResponse.DiscardUnknown(m)
 }
@@ -741,8 +792,10 @@ var fileDescriptor_cc30293c358724c5 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -811,18 +864,20 @@ type SharedMemoryServer interface {
 }
 
 // UnimplementedSharedMemoryServer can be embedded to have forward compatible implementations.
-type UnimplementedSharedMemoryServer struct {
-}
+type UnimplementedSharedMemoryServer struct{}
 
 func (*UnimplementedSharedMemoryServer) Put(ctx context.Context, req *PutRequest) (*PutResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
 }
+
 func (*UnimplementedSharedMemoryServer) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
+
 func (*UnimplementedSharedMemoryServer) Indexed(ctx context.Context, req *IndexedRequest) (*IndexedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Indexed not implemented")
 }
+
 func (*UnimplementedSharedMemoryServer) Remove(ctx context.Context, req *RemoveRequest) (*RemoveResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
 }

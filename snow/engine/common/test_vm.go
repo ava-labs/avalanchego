@@ -7,6 +7,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
+
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -125,4 +127,12 @@ func (vm *TestVM) HealthCheck() (interface{}, error) {
 		vm.T.Fatal(errHealthCheck)
 	}
 	return nil, errHealthCheck
+}
+
+func (vm *TestVM) Connected(id ids.ShortID) error {
+	return nil // noop
+}
+
+func (vm *TestVM) Disconnected(id ids.ShortID) error {
+	return nil // noop
 }

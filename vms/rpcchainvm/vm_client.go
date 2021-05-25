@@ -454,9 +454,9 @@ func (b *BlockClient) Bytes() []byte  { return b.bytes }
 func (b *BlockClient) Height() uint64 { return b.height }
 
 func (vm *VMClient) Connected(id ids.ShortID) error {
-	return nil //noop
+	return nil // noop
 }
 
 func (vm *VMClient) Disconnected(id ids.ShortID) error {
-	return nil //noop
+	return nil // noop
 }

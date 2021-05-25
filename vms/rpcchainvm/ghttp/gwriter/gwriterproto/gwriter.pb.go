@@ -15,9 +15,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -42,15 +44,19 @@ func (*WriteRequest) Descriptor() ([]byte, []int) {
 func (m *WriteRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteRequest.Unmarshal(m, b)
 }
+
 func (m *WriteRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteRequest.Marshal(b, m, deterministic)
 }
+
 func (m *WriteRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteRequest.Merge(m, src)
 }
+
 func (m *WriteRequest) XXX_Size() int {
 	return xxx_messageInfo_WriteRequest.Size(m)
 }
+
 func (m *WriteRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteRequest.DiscardUnknown(m)
 }
@@ -83,15 +89,19 @@ func (*WriteResponse) Descriptor() ([]byte, []int) {
 func (m *WriteResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteResponse.Unmarshal(m, b)
 }
+
 func (m *WriteResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteResponse.Marshal(b, m, deterministic)
 }
+
 func (m *WriteResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteResponse.Merge(m, src)
 }
+
 func (m *WriteResponse) XXX_Size() int {
 	return xxx_messageInfo_WriteResponse.Size(m)
 }
+
 func (m *WriteResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteResponse.DiscardUnknown(m)
 }
@@ -142,8 +152,10 @@ var fileDescriptor_0043bbf29025db7a = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -179,8 +191,7 @@ type WriterServer interface {
 }
 
 // UnimplementedWriterServer can be embedded to have forward compatible implementations.
-type UnimplementedWriterServer struct {
-}
+type UnimplementedWriterServer struct{}
 
 func (*UnimplementedWriterServer) Write(ctx context.Context, req *WriteRequest) (*WriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")

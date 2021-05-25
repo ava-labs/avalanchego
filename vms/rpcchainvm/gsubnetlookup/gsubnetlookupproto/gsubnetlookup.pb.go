@@ -15,9 +15,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -42,15 +44,19 @@ func (*SubnetIDRequest) Descriptor() ([]byte, []int) {
 func (m *SubnetIDRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SubnetIDRequest.Unmarshal(m, b)
 }
+
 func (m *SubnetIDRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SubnetIDRequest.Marshal(b, m, deterministic)
 }
+
 func (m *SubnetIDRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SubnetIDRequest.Merge(m, src)
 }
+
 func (m *SubnetIDRequest) XXX_Size() int {
 	return xxx_messageInfo_SubnetIDRequest.Size(m)
 }
+
 func (m *SubnetIDRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_SubnetIDRequest.DiscardUnknown(m)
 }
@@ -81,15 +87,19 @@ func (*SubnetIDResponse) Descriptor() ([]byte, []int) {
 func (m *SubnetIDResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SubnetIDResponse.Unmarshal(m, b)
 }
+
 func (m *SubnetIDResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SubnetIDResponse.Marshal(b, m, deterministic)
 }
+
 func (m *SubnetIDResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SubnetIDResponse.Merge(m, src)
 }
+
 func (m *SubnetIDResponse) XXX_Size() int {
 	return xxx_messageInfo_SubnetIDResponse.Size(m)
 }
+
 func (m *SubnetIDResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_SubnetIDResponse.DiscardUnknown(m)
 }
@@ -125,8 +135,10 @@ var fileDescriptor_a2050f029eebeabc = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -162,8 +174,7 @@ type SubnetLookupServer interface {
 }
 
 // UnimplementedSubnetLookupServer can be embedded to have forward compatible implementations.
-type UnimplementedSubnetLookupServer struct {
-}
+type UnimplementedSubnetLookupServer struct{}
 
 func (*UnimplementedSubnetLookupServer) SubnetID(ctx context.Context, req *SubnetIDRequest) (*SubnetIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubnetID not implemented")

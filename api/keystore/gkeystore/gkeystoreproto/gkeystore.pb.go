@@ -15,9 +15,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -43,15 +45,19 @@ func (*GetDatabaseRequest) Descriptor() ([]byte, []int) {
 func (m *GetDatabaseRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetDatabaseRequest.Unmarshal(m, b)
 }
+
 func (m *GetDatabaseRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetDatabaseRequest.Marshal(b, m, deterministic)
 }
+
 func (m *GetDatabaseRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_GetDatabaseRequest.Merge(m, src)
 }
+
 func (m *GetDatabaseRequest) XXX_Size() int {
 	return xxx_messageInfo_GetDatabaseRequest.Size(m)
 }
+
 func (m *GetDatabaseRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_GetDatabaseRequest.DiscardUnknown(m)
 }
@@ -89,15 +95,19 @@ func (*GetDatabaseResponse) Descriptor() ([]byte, []int) {
 func (m *GetDatabaseResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetDatabaseResponse.Unmarshal(m, b)
 }
+
 func (m *GetDatabaseResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetDatabaseResponse.Marshal(b, m, deterministic)
 }
+
 func (m *GetDatabaseResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_GetDatabaseResponse.Merge(m, src)
 }
+
 func (m *GetDatabaseResponse) XXX_Size() int {
 	return xxx_messageInfo_GetDatabaseResponse.Size(m)
 }
+
 func (m *GetDatabaseResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_GetDatabaseResponse.DiscardUnknown(m)
 }
@@ -134,8 +144,10 @@ var fileDescriptor_afa8d7e5e06303c6 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -171,8 +183,7 @@ type KeystoreServer interface {
 }
 
 // UnimplementedKeystoreServer can be embedded to have forward compatible implementations.
-type UnimplementedKeystoreServer struct {
-}
+type UnimplementedKeystoreServer struct{}
 
 func (*UnimplementedKeystoreServer) GetDatabase(ctx context.Context, req *GetDatabaseRequest) (*GetDatabaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDatabase not implemented")

@@ -112,11 +112,11 @@ type VM struct {
 }
 
 func (vm *VM) Connected(id ids.ShortID) error {
-	return nil //noop
+	return nil // noop
 }
 
 func (vm *VM) Disconnected(id ids.ShortID) error {
-	return nil //noop
+	return nil // noop
 }
 
 /*

@@ -15,9 +15,11 @@ import (
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -43,15 +45,19 @@ func (*Header) Descriptor() ([]byte, []int) {
 func (m *Header) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Header.Unmarshal(m, b)
 }
+
 func (m *Header) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Header.Marshal(b, m, deterministic)
 }
+
 func (m *Header) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Header.Merge(m, src)
 }
+
 func (m *Header) XXX_Size() int {
 	return xxx_messageInfo_Header.Size(m)
 }
+
 func (m *Header) XXX_DiscardUnknown() {
 	xxx_messageInfo_Header.DiscardUnknown(m)
 }
@@ -90,15 +96,19 @@ func (*WriteRequest) Descriptor() ([]byte, []int) {
 func (m *WriteRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteRequest.Unmarshal(m, b)
 }
+
 func (m *WriteRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteRequest.Marshal(b, m, deterministic)
 }
+
 func (m *WriteRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteRequest.Merge(m, src)
 }
+
 func (m *WriteRequest) XXX_Size() int {
 	return xxx_messageInfo_WriteRequest.Size(m)
 }
+
 func (m *WriteRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteRequest.DiscardUnknown(m)
 }
@@ -136,15 +146,19 @@ func (*WriteResponse) Descriptor() ([]byte, []int) {
 func (m *WriteResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteResponse.Unmarshal(m, b)
 }
+
 func (m *WriteResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteResponse.Marshal(b, m, deterministic)
 }
+
 func (m *WriteResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteResponse.Merge(m, src)
 }
+
 func (m *WriteResponse) XXX_Size() int {
 	return xxx_messageInfo_WriteResponse.Size(m)
 }
+
 func (m *WriteResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteResponse.DiscardUnknown(m)
 }
@@ -176,15 +190,19 @@ func (*WriteHeaderRequest) Descriptor() ([]byte, []int) {
 func (m *WriteHeaderRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteHeaderRequest.Unmarshal(m, b)
 }
+
 func (m *WriteHeaderRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteHeaderRequest.Marshal(b, m, deterministic)
 }
+
 func (m *WriteHeaderRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteHeaderRequest.Merge(m, src)
 }
+
 func (m *WriteHeaderRequest) XXX_Size() int {
 	return xxx_messageInfo_WriteHeaderRequest.Size(m)
 }
+
 func (m *WriteHeaderRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteHeaderRequest.DiscardUnknown(m)
 }
@@ -221,15 +239,19 @@ func (*WriteHeaderResponse) Descriptor() ([]byte, []int) {
 func (m *WriteHeaderResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WriteHeaderResponse.Unmarshal(m, b)
 }
+
 func (m *WriteHeaderResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WriteHeaderResponse.Marshal(b, m, deterministic)
 }
+
 func (m *WriteHeaderResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WriteHeaderResponse.Merge(m, src)
 }
+
 func (m *WriteHeaderResponse) XXX_Size() int {
 	return xxx_messageInfo_WriteHeaderResponse.Size(m)
 }
+
 func (m *WriteHeaderResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_WriteHeaderResponse.DiscardUnknown(m)
 }
@@ -252,15 +274,19 @@ func (*FlushRequest) Descriptor() ([]byte, []int) {
 func (m *FlushRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_FlushRequest.Unmarshal(m, b)
 }
+
 func (m *FlushRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_FlushRequest.Marshal(b, m, deterministic)
 }
+
 func (m *FlushRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_FlushRequest.Merge(m, src)
 }
+
 func (m *FlushRequest) XXX_Size() int {
 	return xxx_messageInfo_FlushRequest.Size(m)
 }
+
 func (m *FlushRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_FlushRequest.DiscardUnknown(m)
 }
@@ -283,15 +309,19 @@ func (*FlushResponse) Descriptor() ([]byte, []int) {
 func (m *FlushResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_FlushResponse.Unmarshal(m, b)
 }
+
 func (m *FlushResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_FlushResponse.Marshal(b, m, deterministic)
 }
+
 func (m *FlushResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_FlushResponse.Merge(m, src)
 }
+
 func (m *FlushResponse) XXX_Size() int {
 	return xxx_messageInfo_FlushResponse.Size(m)
 }
+
 func (m *FlushResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_FlushResponse.DiscardUnknown(m)
 }
@@ -314,15 +344,19 @@ func (*HijackRequest) Descriptor() ([]byte, []int) {
 func (m *HijackRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_HijackRequest.Unmarshal(m, b)
 }
+
 func (m *HijackRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_HijackRequest.Marshal(b, m, deterministic)
 }
+
 func (m *HijackRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HijackRequest.Merge(m, src)
 }
+
 func (m *HijackRequest) XXX_Size() int {
 	return xxx_messageInfo_HijackRequest.Size(m)
 }
+
 func (m *HijackRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_HijackRequest.DiscardUnknown(m)
 }
@@ -352,15 +386,19 @@ func (*HijackResponse) Descriptor() ([]byte, []int) {
 func (m *HijackResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_HijackResponse.Unmarshal(m, b)
 }
+
 func (m *HijackResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_HijackResponse.Marshal(b, m, deterministic)
 }
+
 func (m *HijackResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_HijackResponse.Merge(m, src)
 }
+
 func (m *HijackResponse) XXX_Size() int {
 	return xxx_messageInfo_HijackResponse.Size(m)
 }
+
 func (m *HijackResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_HijackResponse.DiscardUnknown(m)
 }
@@ -462,8 +500,10 @@ var fileDescriptor_e66e50a6e6dcfab4 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -532,18 +572,20 @@ type WriterServer interface {
 }
 
 // UnimplementedWriterServer can be embedded to have forward compatible implementations.
-type UnimplementedWriterServer struct {
-}
+type UnimplementedWriterServer struct{}
 
 func (*UnimplementedWriterServer) Write(ctx context.Context, req *WriteRequest) (*WriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
+
 func (*UnimplementedWriterServer) WriteHeader(ctx context.Context, req *WriteHeaderRequest) (*WriteHeaderResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteHeader not implemented")
 }
+
 func (*UnimplementedWriterServer) Flush(ctx context.Context, req *FlushRequest) (*FlushResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Flush not implemented")
 }
+
 func (*UnimplementedWriterServer) Hijack(ctx context.Context, req *HijackRequest) (*HijackResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Hijack not implemented")
 }

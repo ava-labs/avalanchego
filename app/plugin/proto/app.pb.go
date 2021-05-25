@@ -6,17 +6,20 @@ package appproto
 import (
 	context "context"
 	fmt "fmt"
+	math "math"
+
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -40,15 +43,19 @@ func (*StartRequest) Descriptor() ([]byte, []int) {
 func (m *StartRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StartRequest.Unmarshal(m, b)
 }
+
 func (m *StartRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StartRequest.Marshal(b, m, deterministic)
 }
+
 func (m *StartRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StartRequest.Merge(m, src)
 }
+
 func (m *StartRequest) XXX_Size() int {
 	return xxx_messageInfo_StartRequest.Size(m)
 }
+
 func (m *StartRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_StartRequest.DiscardUnknown(m)
 }
@@ -72,15 +79,19 @@ func (*StartResponse) Descriptor() ([]byte, []int) {
 func (m *StartResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StartResponse.Unmarshal(m, b)
 }
+
 func (m *StartResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StartResponse.Marshal(b, m, deterministic)
 }
+
 func (m *StartResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StartResponse.Merge(m, src)
 }
+
 func (m *StartResponse) XXX_Size() int {
 	return xxx_messageInfo_StartResponse.Size(m)
 }
+
 func (m *StartResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_StartResponse.DiscardUnknown(m)
 }
@@ -110,15 +121,19 @@ func (*StopRequest) Descriptor() ([]byte, []int) {
 func (m *StopRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StopRequest.Unmarshal(m, b)
 }
+
 func (m *StopRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StopRequest.Marshal(b, m, deterministic)
 }
+
 func (m *StopRequest) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StopRequest.Merge(m, src)
 }
+
 func (m *StopRequest) XXX_Size() int {
 	return xxx_messageInfo_StopRequest.Size(m)
 }
+
 func (m *StopRequest) XXX_DiscardUnknown() {
 	xxx_messageInfo_StopRequest.DiscardUnknown(m)
 }
@@ -141,15 +156,19 @@ func (*StopResponse) Descriptor() ([]byte, []int) {
 func (m *StopResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_StopResponse.Unmarshal(m, b)
 }
+
 func (m *StopResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_StopResponse.Marshal(b, m, deterministic)
 }
+
 func (m *StopResponse) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_StopResponse.Merge(m, src)
 }
+
 func (m *StopResponse) XXX_Size() int {
 	return xxx_messageInfo_StopResponse.Size(m)
 }
+
 func (m *StopResponse) XXX_DiscardUnknown() {
 	xxx_messageInfo_StopResponse.DiscardUnknown(m)
 }
@@ -182,8 +201,10 @@ var fileDescriptor_e0f9056a14b86d47 = []byte{
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ context.Context
-var _ grpc.ClientConnInterface
+var (
+	_ context.Context
+	_ grpc.ClientConnInterface
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
@@ -230,12 +251,12 @@ type NodeServer interface {
 }
 
 // UnimplementedNodeServer can be embedded to have forward compatible implementations.
-type UnimplementedNodeServer struct {
-}
+type UnimplementedNodeServer struct{}
 
 func (*UnimplementedNodeServer) Start(ctx context.Context, req *StartRequest) (*StartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
+
 func (*UnimplementedNodeServer) Stop(ctx context.Context, req *StopRequest) (*StopResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }
