@@ -53,7 +53,7 @@ type Database struct {
 	// Delete and batch writes fail with ErrAvoidCorruption.
 	errored uint64
 }
-
+var _ database.Database = &Database{}
 // New returns a wrapped LevelDB object.
 func New(file string, log logging.Logger) (*Database, error) {
 	// Open the db and recover any potential corruptions
