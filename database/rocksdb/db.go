@@ -177,9 +177,7 @@ func (db *Database) NewBatch() database.Batch {
 // Inner returns itself
 func (b *batch) Inner() database.Batch { return b }
 
-var (
-	errFailedToCreateIterator = errors.New("failed to create iterator")
-)
+var errFailedToCreateIterator = errors.New("failed to create iterator")
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
