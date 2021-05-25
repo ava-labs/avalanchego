@@ -187,7 +187,7 @@ func (w *worker) createCurrentEnvironment(parent *types.Block, header *types.Hea
 		return nil, err
 	}
 	return &environment{
-		signer:  types.NewEIP155Signer(w.chainConfig.ChainID),
+		signer:  types.LatestSigner(w.chainConfig),
 		state:   state,
 		header:  header,
 		tcount:  0,
