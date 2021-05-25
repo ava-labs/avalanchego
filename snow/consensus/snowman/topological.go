@@ -230,11 +230,12 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 		// If there is no way for an alpha majority to occur, there is no need
 		// to perform any traversals.
 
+		// Populates [ts.kahnNodes] and [ts.leaves]
 		// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
-		leaves := ts.calculateInDegree(voteBag)
+		ts.calculateInDegree(voteBag)
 
 		// Runtime = |live set| ; Space = |live set|
-		voteStack = ts.pushVotes(leaves)
+		voteStack = ts.pushVotes()
 	}
 
 	// Runtime = |live set| ; Space = Constant
@@ -299,7 +300,7 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 // takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf blocks.
-func (ts *Topological) calculateInDegree(votes ids.Bag) []ids.ID {
+func (ts *Topological) calculateInDegree(votes ids.Bag) {
 	// Clear the Kahn node set
 	for k := range ts.kahnNodes {
 		delete(ts.kahnNodes, k)
@@ -363,19 +364,20 @@ func (ts *Topological) calculateInDegree(votes ids.Bag) []ids.ID {
 			ts.leaves.Remove(parentID)
 		}
 	}
-
-	return ts.leaves.List()
 }
 
 // convert the tree into a branch of snowball instances with at least alpha
 // votes
-func (ts *Topological) pushVotes(leaves []ids.ID) []votes {
+func (ts *Topological) pushVotes() []votes {
 	voteStack := make([]votes, 0, len(ts.kahnNodes))
-	for len(leaves) > 0 {
-		// pop a leaf off the stack
-		newLeavesSize := len(leaves) - 1
-		leafID := leaves[newLeavesSize]
-		leaves = leaves[:newLeavesSize]
+	for ts.leaves.Len() > 0 {
+		// Pop one element of [leaves]
+		var leafID ids.ID
+		for l := range ts.leaves { // Iterates exactly once
+			leafID = l
+			break
+		}
+		ts.leaves.Remove(leafID)
 
 		// get the block and sort information about the block
 		kahnNode := ts.kahnNodes[leafID]
@@ -407,7 +409,7 @@ func (ts *Topological) pushVotes(leaves []ids.ID) []votes {
 
 		// If the inDegree is zero, then the parent node is now a leaf
 		if parentKahnNode.inDegree == 0 {
-			leaves = append(leaves, parentID)
+			ts.leaves.Add(parentID)
 		}
 	}
 	return voteStack

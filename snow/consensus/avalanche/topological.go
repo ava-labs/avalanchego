@@ -192,12 +192,11 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	}
 
 	// Set up the topological sort: O(|Live Set|)
-	leaves, err := ta.calculateInDegree(responses)
-	if err != nil {
+	if err := ta.calculateInDegree(responses); err != nil {
 		return err
 	}
 	// Collect the votes for each transaction: O(|Live Set|)
-	votes, err := ta.pushVotes(leaves)
+	votes, err := ta.pushVotes()
 	if err != nil {
 		return err
 	}
@@ -243,10 +242,7 @@ func (ta *Topological) HealthCheck() (interface{}, error) {
 // Takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf nodes.
-func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
-	[]ids.ID,
-	error,
-) {
+func (ta *Topological) calculateInDegree(responses ids.UniqueBag) error {
 	// Clear the kahn node set
 	for k := range ta.kahnNodes {
 		delete(ta.kahnNodes, k)
@@ -268,16 +264,16 @@ func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
 				ta.leaves.Add(vote)
 				parents, err := vtx.Parents()
 				if err != nil {
-					return nil, err
+					return err
 				}
 				ta.kahnNodes, err = ta.markAncestorInDegrees(ta.kahnNodes, parents)
 				if err != nil {
-					return nil, err
+					return err
 				}
 			}
 		}
 	}
-	return ta.leaves.List(), nil
+	return nil
 }
 
 // adds a new in-degree reference for all nodes.
@@ -330,14 +326,18 @@ func (ta *Topological) markAncestorInDegrees(
 }
 
 // count the number of votes for each operation
-func (ta *Topological) pushVotes(leaves []ids.ID) (ids.Bag, error) {
+func (ta *Topological) pushVotes() (ids.Bag, error) {
 	votes := make(ids.UniqueBag)
 	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
 
-	for len(leaves) > 0 {
-		newLeavesSize := len(leaves) - 1
-		leaf := leaves[newLeavesSize]
-		leaves = leaves[:newLeavesSize]
+	for ta.leaves.Len() > 0 {
+		// Pop one element of [leaves]
+		var leaf ids.ID
+		for l := range ta.leaves { // Iterates exactly once
+			leaf = l
+			break
+		}
+		ta.leaves.Remove(leaf)
 
 		kahn := ta.kahnNodes[leaf]
 
@@ -371,7 +371,7 @@ func (ta *Topological) pushVotes(leaves []ids.ID) (ids.Bag, error) {
 
 					if depNode.inDegree == 0 {
 						// Only traverse into the leaves
-						leaves = append(leaves, depID)
+						ta.leaves.Add(depID)
 					}
 				}
 			}
