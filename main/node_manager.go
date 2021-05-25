@@ -186,7 +186,7 @@ func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
 	args = append(
 		args,
 		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
-		fmt.Sprintf("--%s=%s", config.PluginDirKey, filepath.Join(nm.buildDirPath, preupgradeVersionDir, "plugins")),
+		fmt.Sprintf("--%s=%s", config.BuildDirKey, nm.buildDirPath),
 	)
 
 	binaryPath := filepath.Join(nm.buildDirPath, preupgradeVersionDir, "avalanchego-process")

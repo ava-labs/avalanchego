@@ -136,11 +136,11 @@ func (j *Jobs) ExecuteAll(ctx *snow.Context, halter common.Haltable, restarted b
 			if err != nil {
 				return 0, fmt.Errorf("failed to get job %s from blocking jobs due to %w", dependentID, err)
 			}
-			deps, err := job.MissingDependencies()
+			hasMissingDeps, err := job.HasMissingDependencies()
 			if err != nil {
 				return 0, fmt.Errorf("failed to get missing dependencies for %s due to %w", dependentID, err)
 			}
-			if deps.Len() > 0 {
+			if hasMissingDeps {
 				continue
 			}
 			if err := j.state.AddRunnableJob(dependentID); err != nil {
