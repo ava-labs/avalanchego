@@ -7,12 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
@@ -75,6 +73,7 @@ import (
 //	  proposal is being rejected
 
 var (
+	errBlockNil         = errors.New("block is nil")
 	errInvalidBlockType = errors.New("invalid block type")
 )
 
@@ -83,28 +82,34 @@ type Block interface {
 	snowman.Block
 
 	// initialize this block's non-serialized fields.
+	//
 	// This method should be called when a block is unmarshaled from bytes.
+	//
 	// [vm] is the vm the block exists in
 	// [bytes] is the byte representation of this block
-	initialize(vm *VM, bytes []byte) error
+	// [status] is the current status of this block
+	// [self] is the lowest implementing struct of this block
+	initialize(vm *VM, bytes []byte, status choices.Status, self Block) error
 
-	conflicts(ids.Set) bool
+	// returns true if this block or any processing ancestors consume any of the
+	// named atomic imports.
+	conflicts(ids.Set) (bool, error)
 
-	// parentBlock returns the parent block, similarly to Parent. However, it
-	// provides the more specific staking.Block interface.
-	parentBlock() Block
+	// parent returns the parent block, similarly to Parent. However, it
+	// provides the more specific Block interface.
+	parent() (Block, error)
 
-	// addChild notifies this block that it has a child block building on
-	// its database. When this block commits its database, it should set the
-	// child's database to the former's underlying database instance. This ensures that
-	// the database versions do not recurse the length of the chain.
+	// addChild notifies this block that it has a child block building on it.
+	// When this block commits its changes, it should set the child's base state
+	// to the internal state. This ensures that the state versions do not
+	// recurse the length of the chain.
 	addChild(Block)
 
 	// free all the references of this block from the vm's memory
 	free()
 
-	// Set the database underlying the block's versiondb's to [db]
-	setBaseDatabase(db database.Database)
+	// Set the block's underlying state to the chain's internal state
+	setBaseState()
 }
 
 // A decision block (either Commit, Abort, or DecisionBlock.) represents a
@@ -113,113 +118,157 @@ type Block interface {
 // immediately.
 type decision interface {
 	// This function should only be called after Verify is called.
-	// returns a database that contains the state of the chain if this block is
-	// accepted.
-	onAccept() database.Database
+	// onAccept returns:
+	// 1) The current state of the chain, if this block is decided or hasn't
+	//    been verified.
+	// 2) The state of the chain after this block is accepted, if this block was
+	//    verified successfully.
+	onAccept() MutableState
 }
 
-// CommonBlock contains the fields common to all blocks of the Platform Chain
+// CommonBlock contains fields and methods common to all blocks in this VM.
 type CommonBlock struct {
-	*core.Block `serialize:"true"`
-	vm          *VM
+	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
+	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
+
+	self   Block // self is a reference to this block's implementing struct
+	id     ids.ID
+	bytes  []byte
+	status choices.Status
+	vm     *VM
 
 	// This block's children
 	children []Block
 }
 
-// Verify implements the snowman.Block interface
-func (cb *CommonBlock) Verify() error {
-	if expectedHeight := cb.Parent().Height() + 1; expectedHeight != cb.Height() {
-		return fmt.Errorf("expected block to have height %d, but found %d", expectedHeight, cb.Height())
+func (b *CommonBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
+	b.self = self
+	b.id = hashing.ComputeHash256Array(bytes)
+	b.bytes = bytes
+	b.status = status
+	b.vm = vm
+	return nil
+}
+
+// ID returns the ID of this block
+func (b *CommonBlock) ID() ids.ID { return b.id }
+
+// Status returns the status of this block
+func (b *CommonBlock) Bytes() []byte { return b.bytes }
+
+// Status returns the status of this block
+func (b *CommonBlock) Status() choices.Status { return b.status }
+
+// ParentID returns [b]'s parent's ID
+func (b *CommonBlock) ParentID() ids.ID { return b.PrntID }
+
+// Height returns this block's height. The genesis block has height 0.
+func (b *CommonBlock) Height() uint64 { return b.Hght }
+
+// Parent returns [b]'s parent
+func (b *CommonBlock) Parent() snowman.Block {
+	// TODO: This should properly propegate the error.
+	if parent, err := b.parent(); err == nil {
+		return parent
+	}
+	return &missing.Block{BlkID: b.ParentID()}
+}
+
+// Parent returns [b]'s parent
+func (b *CommonBlock) parent() (Block, error) {
+	return b.vm.getBlock(b.ParentID())
+}
+
+func (b *CommonBlock) addChild(child Block) {
+	b.children = append(b.children, child)
+}
+
+func (b *CommonBlock) free() {
+	delete(b.vm.currentBlocks, b.ID())
+	b.children = nil
+}
+
+func (b *CommonBlock) conflicts(s ids.Set) (bool, error) {
+	if b.Status() == choices.Accepted {
+		return false, nil
+	}
+	parent, err := b.parent()
+	if err != nil {
+		return false, err
+	}
+	return parent.conflicts(s)
+}
+
+func (b *CommonBlock) Verify() error {
+	if b == nil {
+		return errBlockNil
+	}
+
+	parent, err := b.parent()
+	if err != nil {
+		return err
+	}
+	if expectedHeight := parent.Height() + 1; expectedHeight != b.Hght {
+		return fmt.Errorf(
+			"expected block to have height %d, but found %d",
+			expectedHeight,
+			b.Hght,
+		)
 	}
 	return nil
 }
 
-// Reject implements the snowman.Block interface
-func (cb *CommonBlock) Reject() error {
-	defer cb.free() // remove this block from memory
+func (b *CommonBlock) Reject() error {
+	defer b.free()
 
-	if err := cb.Block.Reject(); err != nil {
-		return err
-	}
-
-	return cb.vm.DB.Commit()
+	b.status = choices.Rejected
+	b.vm.internalState.AddBlock(b.self)
+	return b.vm.internalState.Commit()
 }
 
-// free removes this block from memory
-func (cb *CommonBlock) free() {
-	delete(cb.vm.currentBlocks, cb.ID())
-	cb.children = nil
-}
+func (b *CommonBlock) Accept() error {
+	blkID := b.ID()
 
-// Reject implements the snowman.Block interface
-func (cb *CommonBlock) conflicts(s ids.Set) bool {
-	if cb.Status() == choices.Accepted {
-		return false
-	}
-	return cb.parentBlock().conflicts(s)
+	b.status = choices.Accepted
+	b.vm.internalState.AddBlock(b.self)
+	b.vm.internalState.SetLastAccepted(blkID)
+	b.vm.lastAcceptedID = blkID
+	return b.vm.metrics.AcceptBlock(b.self)
 }
-
-// Parent returns this block's parent
-func (cb *CommonBlock) Parent() snowman.Block {
-	parent := cb.parentBlock()
-	if parent != nil {
-		return parent
-	}
-	return &missing.Block{BlkID: cb.ParentID()}
-}
-
-// parentBlock returns this block's parent
-func (cb *CommonBlock) parentBlock() Block {
-	// Get the parent from database
-	parentID := cb.ParentID()
-	parent, err := cb.vm.getBlock(parentID)
-	if err != nil {
-		return nil
-	}
-	return parent.(Block)
-}
-
-// addChild adds [child] as a child of this block
-func (cb *CommonBlock) addChild(child Block) { cb.children = append(cb.children, child) }
 
 // CommonDecisionBlock contains the fields and methods common to all decision blocks
 type CommonDecisionBlock struct {
 	CommonBlock `serialize:"true"`
 
 	// state of the chain if this block is accepted
-	onAcceptDB *versiondb.Database
+	onAcceptState VersionedState
 
 	// to be executed if this block is accepted
 	onAcceptFunc func() error
 }
 
-// initialize this block
-func (cdb *CommonDecisionBlock) initialize(vm *VM, bytes []byte) error {
-	cdb.vm = vm
-	cdb.Block.Initialize(bytes, vm.SnowmanVM)
-	return nil
+func (cdb *CommonDecisionBlock) free() {
+	cdb.CommonBlock.free()
+	cdb.onAcceptState = nil
 }
 
-// setBaseDatabase sets this block's base database to [db]
-func (cdb *CommonDecisionBlock) setBaseDatabase(db database.Database) {
-	if err := cdb.onAcceptDB.SetDatabase(db); err != nil {
-		cdb.vm.Ctx.Log.Error("problem while setting base database: %s", err)
-	}
+func (cdb *CommonDecisionBlock) setBaseState() {
+	cdb.onAcceptState.SetBase(cdb.vm.internalState)
 }
 
-// onAccept returns:
-// 1) The current state of the chain, if this block is decided or hasn't been
-//    verified.
-// 2) The state of the chain after this block is accepted, if this block was
-//    verified successfully.
-func (cdb *CommonDecisionBlock) onAccept() database.Database {
-	// While this function should never be called if the block isn't accepted or
-	// verified, we handle the case as a matter of precaution.
-	if cdb.Status().Decided() || cdb.onAcceptDB == nil {
-		return cdb.vm.DB
+func (cdb *CommonDecisionBlock) onAccept() MutableState {
+	if cdb.Status().Decided() || cdb.onAcceptState == nil {
+		return cdb.vm.internalState
 	}
-	return cdb.onAcceptDB
+	return cdb.onAcceptState
+}
+
+func (cdb *CommonDecisionBlock) Reject() error {
+	defer cdb.free()
+
+	cdb.status = choices.Rejected
+	cdb.vm.internalState.AddBlock(cdb.self)
+	return cdb.vm.internalState.Commit()
 }
 
 // SingleDecisionBlock contains the accept for standalone decision blocks
@@ -229,22 +278,20 @@ type SingleDecisionBlock struct {
 
 // Accept implements the snowman.Block interface
 func (sdb *SingleDecisionBlock) Accept() error {
-	sdb.VM.Ctx.Log.Verbo("accepting block with ID %s", sdb.ID())
+	sdb.vm.ctx.Log.Verbo("accepting block with ID %s", sdb.ID())
 
-	if err := sdb.CommonBlock.Accept(); err != nil {
+	if err := sdb.CommonDecisionBlock.Accept(); err != nil {
 		return fmt.Errorf("failed to accept CommonBlock: %w", err)
 	}
 
 	// Update the state of the chain in the database
-	if err := sdb.onAcceptDB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
-	}
-	if err := sdb.vm.DB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's DB: %w", err)
+	sdb.onAcceptState.Apply(sdb.vm.internalState)
+	if err := sdb.vm.internalState.Commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 
 	for _, child := range sdb.children {
-		child.setBaseDatabase(sdb.vm.DB)
+		child.setBaseState()
 	}
 	if sdb.onAcceptFunc != nil {
 		if err := sdb.onAcceptFunc(); err != nil {
@@ -263,11 +310,16 @@ type DoubleDecisionBlock struct {
 
 // Accept implements the snowman.Block interface
 func (ddb *DoubleDecisionBlock) Accept() error {
-	ddb.VM.Ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
+	ddb.vm.ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
 
-	parent, ok := ddb.parentBlock().(*ProposalBlock)
+	parentIntf, err := ddb.parent()
+	if err != nil {
+		return err
+	}
+
+	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
-		ddb.vm.Ctx.Log.Error("double decision block should only follow a proposal block")
+		ddb.vm.ctx.Log.Error("double decision block should only follow a proposal block")
 		return errInvalidBlockType
 	}
 
@@ -280,15 +332,13 @@ func (ddb *DoubleDecisionBlock) Accept() error {
 	}
 
 	// Update the state of the chain in the database
-	if err := ddb.onAcceptDB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit onAcceptDB: %w", err)
-	}
-	if err := ddb.vm.DB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit vm's DB: %w", err)
+	ddb.onAcceptState.Apply(ddb.vm.internalState)
+	if err := ddb.vm.internalState.Commit(); err != nil {
+		return fmt.Errorf("failed to commit vm's state: %w", err)
 	}
 
 	for _, child := range ddb.children {
-		child.setBaseDatabase(ddb.vm.DB)
+		child.setBaseState()
 	}
 	if ddb.onAcceptFunc != nil {
 		if err := ddb.onAcceptFunc(); err != nil {

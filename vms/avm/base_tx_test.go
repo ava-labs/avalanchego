@@ -8,10 +8,11 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -723,7 +724,7 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -779,7 +780,7 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -831,7 +832,7 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -863,8 +864,10 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -912,7 +915,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -967,7 +970,7 @@ func TestBaseTxSemanticVerifyInvalidSignature(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1015,7 +1018,7 @@ func TestBaseTxSemanticVerifyMissingUTXO(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1064,7 +1067,7 @@ func TestBaseTxSemanticVerifyInvalidUTXO(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1159,7 +1162,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1255,7 +1258,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1284,8 +1287,10 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -1397,7 +1402,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1426,8 +1431,10 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -1541,7 +1548,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,
@@ -1650,7 +1657,7 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 	}
 
 	uTx := &UniqueTx{
-		TxState: &TxState{
+		TxCachedState: &TxCachedState{
 			Tx: tx,
 		},
 		vm:   vm,

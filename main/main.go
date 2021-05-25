@@ -1,213 +1,76 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"syscall"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/rocksdb"
-	"github.com/ava-labs/avalanchego/nat"
-	"github.com/ava-labs/avalanchego/node"
+	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-const (
-	header = "" +
-		`     _____               .__                       .__` + "\n" +
-		`    /  _  \___  _______  |  | _____    ____   ____ |  |__   ____    ,_ o` + "\n" +
-		`   /  /_\  \  \/ /\__  \ |  | \__  \  /    \_/ ___\|  |  \_/ __ \   / //\,` + "\n" +
-		`  /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |` + "\n" +
-		`  \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\` + "\n" +
-		`          \/           \/          \/     \/     \/     \/     \/`
-)
+// GitCommit should be optionally set at compile time.
+var GitCommit string
 
-var (
-	stakingPortName = fmt.Sprintf("%s-staking", constants.AppName)
-	httpPortName    = fmt.Sprintf("%s-http", constants.AppName)
-)
-
-// main is the primary entry point to Avalanche.
+// main is the entry point to AvalancheGo.
 func main() {
-	// parse config using viper
-	if err := parseViper(); err != nil {
-		fmt.Printf("parsing parameters returned with error %s\n", err)
-		return
+	// Get the config
+	nodeConfig, processConfig, err := config.GetConfigs(GitCommit)
+	if err != nil {
+		fmt.Printf("couldn't get config: %s", err)
+		os.Exit(1)
 	}
 
-	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(defaultDataDir, true, perms.ReadWriteExecute); err != nil {
-		fmt.Printf("failed to restrict the permissions of the data directory with error %s\n", err)
-		return
+	if processConfig.DisplayVersionAndExit {
+		fmt.Print(processConfig.VersionStr)
+		os.Exit(0)
 	}
 
-	logFactory := logging.NewFactory(Config.LoggingConfig)
-	defer logFactory.Close()
+	fmt.Println(process.Header)
+
+	// Set the log directory for this process by adding a subdirectory
+	// "daemon" to the log directory given in the config
+	logConfigCopy := nodeConfig.LoggingConfig
+	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
+	logFactory := logging.NewFactory(logConfigCopy)
 
 	log, err := logFactory.Make()
 	if err != nil {
+		logFactory.Close()
+
 		fmt.Printf("starting logger failed with: %s\n", err)
-		return
-	}
-	fmt.Println(header)
-
-	var db database.Database
-	switch Config.DBName {
-	case leveldb.Name:
-		db, err = leveldb.New(Config.DBPath, log)
-		if err != nil {
-			log.Error("couldn't open leveldb at %s: %s", Config.DBPath, err)
-			return
-		}
-	case rocksdb.Name:
-		db, err = rocksdb.New(Config.DBPath, log)
-		if err != nil {
-			log.Error("couldn't open rocksdb at %s: %s", Config.DBPath, err)
-			return
-		}
-	case memdb.Name:
-		db = memdb.New()
-	default:
-		log.Error("unknown database type %s", Config.DBName)
-		return
+		os.Exit(1)
 	}
 
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("Recovered panic from", r)
-		}
-	}()
+	log.Info("using build directory at path '%s'", processConfig.BuildDir)
 
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Warn("failed to close the node's DB: %s", err)
-		}
-		log.StopOnPanic()
-		log.Stop()
-	}()
-
-	// Track if sybil control is enforced
-	if !Config.EnableStaking {
-		log.Warn("Staking is disabled. Sybil control is not enforced.")
-	}
-
-	// Check if transaction signatures should be checked
-	if !Config.EnableCrypto {
-		log.Warn("transaction signatures are not being checked")
-	}
-	crypto.EnableCrypto = Config.EnableCrypto
-
-	if err := Config.ConsensusParams.Valid(); err != nil {
-		log.Error("consensus parameters are invalid: %s", err)
-		return
-	}
-
-	// Track if assertions should be executed
-	if Config.LoggingConfig.Assertions {
-		log.Debug("assertions are enabled. This may slow down execution")
-	}
-
-	// SupportsNAT() for NoRouter is false.
-	// Which means we tried to perform a NAT activity but we were not successful.
-	if Config.AttemptedNATTraversal && !Config.Nat.SupportsNAT() {
-		log.Error("UPnP or NAT-PMP router attach failed, you may not be listening publicly," +
-			" please confirm the settings in your router")
-	}
-
-	mapper := nat.NewPortMapper(log, Config.Nat)
-	defer mapper.UnmapAllPorts()
-
-	// Open staking port we want for NAT Traversal to have the external port
-	// (Config.StakingIP.Port) to connect to our internal listening port
-	// (Config.InternalStakingPort) which should be the same in most cases.
-	mapper.Map(
-		"TCP",
-		Config.StakingIP.IP().Port,
-		Config.StakingIP.IP().Port,
-		stakingPortName,
-		&Config.StakingIP,
-		Config.DynamicUpdateDuration,
+	nodeManager := newNodeManager(processConfig.BuildDir, log)
+	_ = utils.HandleSignals(
+		func(os.Signal) {
+			// SIGINT and SIGTERM cause all running nodes to stop
+			nodeManager.shutdown()
+		},
+		syscall.SIGINT, syscall.SIGTERM,
 	)
 
-	// Open the HTTP port iff the HTTP server is not listening on localhost
-	if Config.HTTPHost != "127.0.0.1" && Config.HTTPHost != "localhost" {
-		// For NAT Traversal we want to route from the external port
-		// (Config.ExternalHTTPPort) to our internal port (Config.HTTPPort)
-		mapper.Map(
-			"TCP",
-			Config.HTTPPort,
-			Config.HTTPPort,
-			httpPortName,
-			nil,
-			Config.DynamicUpdateDuration,
-		)
+	// Migrate the database if necessary
+	migrationManager := newMigrationManager(nodeManager, nodeConfig, log)
+	if err := migrationManager.migrate(); err != nil {
+		log.Error("error while running migration: %s", err)
+		nodeManager.shutdown()
 	}
 
-	// Regularly updates our public IP (or does nothing, if configured that way)
-	externalIPUpdater := dynamicip.NewDynamicIPManager(
-		Config.DynamicPublicIPResolver,
-		Config.DynamicUpdateDuration,
-		log,
-		&Config.StakingIP,
-	)
-	defer externalIPUpdater.Stop()
+	// Run normally
+	exitCode, err := nodeManager.runNormal()
+	log.Debug("node returned exit code %s, error %v", exitCode, err)
+	nodeManager.shutdown() // make sure all the nodes are stopped
 
-	log.Info("this node's IP is set to: %s", Config.StakingIP.IP())
-
-	for {
-		shouldRestart, err := run(db, log, logFactory)
-		if err != nil {
-			break
-		}
-		// If the node says it should restart, do that. Otherwise, end the program.
-		if !shouldRestart {
-			break
-		}
-		log.Info("restarting node")
-	}
-}
-
-// Initialize and run the node.
-// Returns true if the node should restart after this function returns.
-func run(db database.Database, log logging.Logger, logFactory logging.Factory) (bool, error) {
-	log.Info("initializing node")
-	node := node.Node{}
-	restarter := &restarter{
-		node:          &node,
-		shouldRestart: &utils.AtomicBool{},
-	}
-	if err := node.Initialize(&Config, db, log, logFactory, restarter); err != nil {
-		log.Error("error initializing node: %s", err)
-		return restarter.shouldRestart.GetValue(), err
-	}
-
-	log.Debug("dispatching node handlers")
-	err := node.Dispatch()
-	if err != nil {
-		log.Debug("node dispatch returned: %s", err)
-	}
-	return restarter.shouldRestart.GetValue(), nil
-}
-
-// restarter implements utils.Restarter
-type restarter struct {
-	node *node.Node
-	// If true, node should restart after shutting down
-	shouldRestart *utils.AtomicBool
-}
-
-// Restarter shuts down the node and marks that it should restart
-// It is safe to call Restart multiple times
-func (r *restarter) Restart() {
-	r.shouldRestart.SetValue(true)
-	// Shutdown is safe to call multiple times because it uses sync.Once
-	r.node.Shutdown()
+	logFactory.Close()
+	os.Exit(exitCode)
 }

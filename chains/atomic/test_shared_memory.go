@@ -124,23 +124,23 @@ func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 S
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 1)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}}, values, "wrong indexed values returned")
+	assert.Equal([][]byte{{5}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 2)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}}, nil, nil, 3)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{3}}, nil, nil, 3)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 
 	values, _, _, err = sm1.Indexed(chainID0, [][]byte{{2}, {3}}, nil, nil, 3)
 	assert.NoError(err)
-	assert.Equal([][]byte{{1}, {5}}, values, "wrong indexed values returned")
+	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 }
 
 func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {

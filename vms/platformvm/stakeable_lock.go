@@ -6,9 +6,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var (
-	errInvalidLocktime = errors.New("invalid locktime")
-)
+var errInvalidLocktime = errors.New("invalid locktime")
 
 // StakeableLockOut ...
 type StakeableLockOut struct {

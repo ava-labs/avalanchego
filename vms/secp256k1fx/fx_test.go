@@ -47,7 +47,6 @@ func init() {
 		panic(err)
 	}
 	copy(sig2Bytes[:], b)
-
 }
 
 func TestFxInitialize(t *testing.T) {

@@ -7,9 +7,7 @@ import (
 	"errors"
 )
 
-var (
-	errNoValueOutput = errors.New("output has no value")
-)
+var errNoValueOutput = errors.New("output has no value")
 
 // TransferOutput ...
 type TransferOutput struct {

@@ -37,10 +37,11 @@ jobs:
     - name: Create zip
       run: |
         mv .\build\avalanchego .\build\avalanchego.exe
-        mv .\build\plugins\evm .\build\plugins\evm.exe
-        Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${VERSION}-experimental.zip
-      env:
-        VERSION: ${{ steps.get_version.outputs.VERSION }}
+        mv .\build\avalanchego-latest\avalanchego-process .\build\avalanchego-latest\avalanchego-process.exe
+        mv .\build\avalanchego-latest\plugins\evm .\build\avalanchego-latest\plugins\evm.exe
+        mv .\build\avalanchego-preupgrade\avalanchego-process .\build\avalanchego-preupgrade\avalanchego-process.exe
+        mv .\build\avalanchego-preupgrade\plugins\evm .\build\avalanchego-preupgrade\plugins\evm.exe
+        Compress-Archive -Path .\build\avalanchego.exe,.\build\avalanchego-latest,.\build\avalanchego-preupgrade -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -53,8 +54,4 @@ jobs:
       run: |
         Install-Module -Name AWS.Tools.Installer -Force
         Install-AWSToolsModule AWS.Tools.EC2,AWS.Tools.S3 -CleanUp -Force
-        Write-S3Object -BucketName ${{ secrets.BUCKET }} -File .\build\avalanchego-win-${VERSION}-experimental.zip -Key windows/avalanchego-win-${VERSION}-experimental.zip
-      env:
-        BUCKET: ${{ secrets.BUCKET }}
-        VERSION: ${{ steps.get_version.outputs.VERSION }}
-
+        Write-S3Object -BucketName ${{ secrets.BUCKET }} -File .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip -Key windows/avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip

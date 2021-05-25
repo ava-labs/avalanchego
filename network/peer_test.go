@@ -29,9 +29,11 @@ func newTestMsg(op Op, bits []byte) *TestMsg {
 func (m *TestMsg) Op() Op {
 	return m.op
 }
+
 func (*TestMsg) Get(Field) interface{} {
 	return nil
 }
+
 func (m *TestMsg) Bytes() []byte {
 	return m.bytes
 }
@@ -44,8 +46,8 @@ func TestPeer_Close(t *testing.T) {
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
 		addr: &net.TCPAddr{
@@ -95,15 +97,15 @@ func TestPeer_Close(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		false,
 	)
 	assert.NotNil(t, netwrk)
 
@@ -137,7 +139,7 @@ func TestPeer_Close(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	peer.close()
+	peer.Close()
 
 	// The network pending bytes should be reduced back to zero on close.
 	if basenetwork.pendingBytes != int64(0) {

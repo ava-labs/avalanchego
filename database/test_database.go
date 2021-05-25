@@ -11,34 +11,32 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	// Tests is a list of all database tests
-	Tests = []func(t *testing.T, db Database){
-		TestSimpleKeyValue,
-		TestKeyEmptyValue,
-		TestSimpleKeyValueClosed,
-		TestBatchPut,
-		TestBatchDelete,
-		TestBatchReset,
-		TestBatchReuse,
-		TestBatchRewrite,
-		TestBatchReplay,
-		TestBatchInner,
-		TestBatchLargeSize,
-		TestIterator,
-		TestIteratorStart,
-		TestIteratorPrefix,
-		TestIteratorStartPrefix,
-		TestIteratorMemorySafety,
-		TestIteratorClosed,
-		TestIteratorError,
-		TestIteratorErrorAfterRelease,
-		TestStatNoPanic,
-		TestCompactNoPanic,
-		TestMemorySafetyDatabase,
-		TestMemorySafetyBatch,
-	}
-)
+// Tests is a list of all database tests
+var Tests = []func(t *testing.T, db Database){
+	TestSimpleKeyValue,
+	TestKeyEmptyValue,
+	TestSimpleKeyValueClosed,
+	TestBatchPut,
+	TestBatchDelete,
+	TestBatchReset,
+	TestBatchReuse,
+	TestBatchRewrite,
+	TestBatchReplay,
+	TestBatchInner,
+	TestBatchLargeSize,
+	TestIterator,
+	TestIteratorStart,
+	TestIteratorPrefix,
+	TestIteratorStartPrefix,
+	TestIteratorMemorySafety,
+	TestIteratorClosed,
+	TestIteratorError,
+	TestIteratorErrorAfterRelease,
+	TestStatNoPanic,
+	TestCompactNoPanic,
+	TestMemorySafetyDatabase,
+	TestMemorySafetyBatch,
+}
 
 // TestSimpleKeyValue tests to make sure that simple Put + Get + Delete + Has
 // calls return the expected values.

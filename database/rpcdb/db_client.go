@@ -23,9 +23,7 @@ const (
 	baseElementSize = 8 // bytes
 )
 
-var (
-	_ database.Database = &DatabaseClient{}
-)
+var _ database.Database = &DatabaseClient{}
 
 // DatabaseClient is an implementation of database that talks over RPC.
 type DatabaseClient struct {

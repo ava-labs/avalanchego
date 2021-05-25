@@ -14,23 +14,19 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testChangeAddr = ids.GenerateTestShortID()
-)
+var testChangeAddr = ids.GenerateTestShortID()
 
 // Returns:
 // 1) genesis bytes of vm
@@ -39,7 +35,10 @@ var (
 // 4) atomic memory to use in tests
 func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore := keystore.New(logging.NoLog{}, memdb.New())
+	keystore, err := keystore.CreateTestKeystore()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := keystore.CreateUser(username, password); err != nil {
 		t.Fatalf("couldn't add user: %s", err)
 	}
@@ -267,7 +266,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -312,7 +311,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -359,7 +358,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -420,7 +419,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -462,7 +461,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -507,7 +506,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -550,7 +549,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(otherAssetUTXO)
+	err = vm.state.PutUTXO(otherAssetUTXO.InputID(), otherAssetUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -580,6 +579,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	// The balance should include the UTXO since it is partly owned by [addr]
 	assert.Len(t, reply.Balances, 0)
 }
+
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
@@ -651,7 +651,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	numUTXOs := 10
 	// Put a bunch of UTXOs
 	for i := 0; i < numUTXOs; i++ {
-		if err := vm.state.FundUTXO(&avax.UTXO{
+		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
@@ -663,7 +663,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 					Addrs:     []ids.ShortID{rawAddr},
 				},
 			},
-		}); err != nil {
+		}
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			t.Fatal(err)
 		}
 	}

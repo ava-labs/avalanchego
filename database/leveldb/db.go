@@ -177,7 +177,7 @@ func (db *Database) handleError(err error) error {
 	// If we get an error other than "not found" or "closed", disallow future
 	// database operations to avoid possible corruption
 	default:
-		db.log.Fatal("leveldb error: %w", err)
+		db.log.Fatal("leveldb error: %s", err)
 		atomic.StoreUint64(&db.errored, 1)
 	}
 	return err
