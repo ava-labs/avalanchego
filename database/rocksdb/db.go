@@ -34,6 +34,8 @@ const (
 	rocksDBByteOverhead = 8
 )
 
+var errFailedToCreateIterator = errors.New("failed to create iterator")
+
 // Database is a persistent key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace
 // in binary-alphabetical order.
@@ -176,8 +178,6 @@ func (db *Database) NewBatch() database.Batch {
 
 // Inner returns itself
 func (b *batch) Inner() database.Batch { return b }
-
-var errFailedToCreateIterator = errors.New("failed to create iterator")
 
 // NewIterator creates a lexicographically ordered iterator over the database
 func (db *Database) NewIterator() database.Iterator {
