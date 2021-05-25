@@ -68,6 +68,11 @@ type Topological struct {
 	// We use this one map instead of creating a new map
 	// during each call to [calculateInDegree].
 	kahnNodes map[ids.ID]kahnNode
+
+	// Used in [pushVotes]. Should only be accessed in that method.
+	// We use this one instance instead of creating a new ids.UniqueBag
+	// during each call to [pushVotes].
+	votes ids.UniqueBag
 }
 
 type kahnNode struct {
@@ -88,6 +93,7 @@ func (ta *Topological) Initialize(
 	ta.ctx = ctx
 	ta.params = params
 	ta.leaves = ids.Set{}
+	ta.votes = ids.UniqueBag{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
 	if err := ta.Metrics.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
@@ -327,7 +333,7 @@ func (ta *Topological) markAncestorInDegrees(
 
 // count the number of votes for each operation
 func (ta *Topological) pushVotes() (ids.Bag, error) {
-	votes := make(ids.UniqueBag)
+	ta.votes.Clear()
 	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
 
 	for ta.leaves.Len() > 0 {
@@ -349,7 +355,7 @@ func (ta *Topological) pushVotes() (ids.Bag, error) {
 			for _, tx := range txs {
 				// Give the votes to the consumer
 				txID := tx.ID()
-				votes.UnionSet(txID, kahn.votes)
+				ta.votes.UnionSet(txID, kahn.votes)
 
 				// Map txID to set of Conflicts
 				if _, exists := txConflicts[txID]; !exists {
@@ -382,12 +388,12 @@ func (ta *Topological) pushVotes() (ids.Bag, error) {
 	conflictingVotes := make(ids.UniqueBag)
 	for txID, conflicts := range txConflicts {
 		for conflictTxID := range conflicts {
-			conflictingVotes.UnionSet(txID, votes.GetSet(conflictTxID))
+			conflictingVotes.UnionSet(txID, ta.votes.GetSet(conflictTxID))
 		}
 	}
 
-	votes.Difference(&conflictingVotes)
-	return votes.Bag(ta.params.Alpha), nil
+	ta.votes.Difference(&conflictingVotes)
+	return ta.votes.Bag(ta.params.Alpha), nil
 }
 
 // If I've already checked, do nothing
