@@ -312,7 +312,7 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
-	panic("implement me")
+	return map[string]*common.HTTPHandler{}, nil
 }
 
 func (vm *VMClient) buildBlock() (snowman.Block, error) {
