@@ -95,8 +95,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint64(TxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
 	fs.Uint64(CreationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
 	// Database
-	fs.String(DBTypeKey, defaultDBDir, "Path to database directory")
 	fs.String(DBTypeKey, leveldb.Name, "Database type to use. Should be one of {level, rocks, mem}")
+	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
 	// Coreth config
 	fs.String(CorethConfigKey, "", "Specifies config to pass into coreth")
 	// Logging
