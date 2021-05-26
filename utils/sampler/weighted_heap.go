@@ -95,12 +95,15 @@ type innerSortWeightedHeap []weightedHeapElement
 func (lst innerSortWeightedHeap) Less(i, j int) bool {
 	return lst[i].weight > lst[j].weight
 }
+
 func (lst innerSortWeightedHeap) Len() int {
 	return len(lst)
 }
+
 func (lst innerSortWeightedHeap) Swap(i, j int) {
 	lst[j], lst[i] = lst[i], lst[j]
 }
+
 func sortWeightedHeap(heap []weightedHeapElement) {
 	sort.Sort(innerSortWeightedHeap(heap))
 }

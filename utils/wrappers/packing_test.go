@@ -6,7 +6,6 @@ package wrappers
 import (
 	"bytes"
 	"crypto/x509"
-	"math"
 	"net"
 	"reflect"
 	"testing"
@@ -589,33 +588,6 @@ func TestPacker2DByteSlice(t *testing.T) {
 	if !bytes.Equal(arrUnpacked[1], arr[1]) {
 		t.Fatal("should match")
 	}
-}
-
-func TestPackLong(t *testing.T) {
-	for _, n := range []uint64{0, 10000, math.MaxUint64} {
-		bytes := PackLong(n)
-		got, err := UnpackLong(bytes)
-		assert.NoError(t, err)
-		assert.Equal(t, n, got)
-	}
-}
-
-func TestUnpackLong(t *testing.T) {
-	// Too few bytes
-	bytes := make([]byte, 7)
-	_, err := UnpackLong(bytes)
-	assert.Error(t, err)
-
-	// Too many bytes
-	bytes = make([]byte, 9)
-	_, err = UnpackLong(bytes)
-	assert.Error(t, err)
-
-	// Right number of bytes
-	bytes = make([]byte, 8)
-	n, err := UnpackLong(bytes)
-	assert.NoError(t, err)
-	assert.EqualValues(t, 0, n)
 }
 
 func TestPackX509Certificate(t *testing.T) {

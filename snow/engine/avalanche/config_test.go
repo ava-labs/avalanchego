@@ -16,8 +16,8 @@ import (
 )
 
 func DefaultConfig() Config {
-	vtxBlocked, _ := queue.New(memdb.New())
-	txBlocked, _ := queue.New(memdb.New())
+	vtxBlocked, _ := queue.NewWithMissing(memdb.New(), "", prometheus.NewRegistry())
+	txBlocked, _ := queue.New(memdb.New(), "", prometheus.NewRegistry())
 	return Config{
 		Config: bootstrap.Config{
 			Config:     common.DefaultConfigTest(),

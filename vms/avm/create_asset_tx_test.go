@@ -780,7 +780,6 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 	if err := tx.SyntacticVerify(ctx, c, assetID, 0, 0, 3); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to non-unique initial states")
 	}
-
 }
 
 func TestCreateAssetTxSyntacticVerifyBaseTx(t *testing.T) {

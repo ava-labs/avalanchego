@@ -6,9 +6,13 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/core"
+	"github.com/ava-labs/avalanchego/snow/choices"
+)
+
+var (
+	_ Block    = &StandardBlock{}
+	_ decision = &StandardBlock{}
 )
 
 // StandardBlock being accepted results in the transactions contained in the
@@ -19,9 +23,8 @@ type StandardBlock struct {
 	Txs []*Tx `serialize:"true" json:"txs"`
 }
 
-// initialize this block
-func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
-	if err := sb.SingleDecisionBlock.initialize(vm, bytes); err != nil {
+func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
+	if err := sb.SingleDecisionBlock.initialize(vm, bytes, status, blk); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
@@ -38,27 +41,45 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte) error {
 //
 // This function also sets onAcceptDB database if the verification passes.
 func (sb *StandardBlock) Verify() error {
+	blkID := sb.ID()
+
 	if err := sb.SingleDecisionBlock.Verify(); err != nil {
 		if err := sb.Reject(); err != nil {
-			sb.vm.Ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
+			sb.vm.ctx.Log.Error(
+				"failed to reject standard block %s due to %s",
+				blkID,
+				err,
+			)
 		}
 		return err
 	}
 
-	parentBlock := sb.parentBlock()
+	parentIntf, err := sb.parent()
+	if err != nil {
+		return err
+	}
+
 	// StandardBlock is not a modifier on a proposal block, so its parent must
 	// be a decision.
-	parent, ok := parentBlock.(decision)
+	parent, ok := parentIntf.(decision)
 	if !ok {
 		if err := sb.Reject(); err != nil {
-			sb.vm.Ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
+			sb.vm.ctx.Log.Error(
+				"failed to reject standard block %s due to %s",
+				blkID,
+				err,
+			)
 		}
 		return errInvalidBlockType
 	}
 
-	pdb := parent.onAccept()
+	parentState := parent.onAccept()
+	sb.onAcceptState = newVersionedState(
+		parentState,
+		parentState.CurrentStakerChainState(),
+		parentState.PendingStakerChainState(),
+	)
 
-	sb.onAcceptDB = versiondb.New(pdb)
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
 		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
@@ -66,21 +87,20 @@ func (sb *StandardBlock) Verify() error {
 			return errWrongTxType
 		}
 		txID := tx.ID()
-		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptDB, tx)
+		onAccept, err := utx.SemanticVerify(sb.vm, sb.onAcceptState, tx)
 		if err != nil {
 			sb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
 			if err := sb.Reject(); err != nil {
-				sb.vm.Ctx.Log.Error("failed to reject standard block %s due to %s", sb.ID(), err)
+				sb.vm.ctx.Log.Error(
+					"failed to reject standard block %s due to %s",
+					blkID,
+					err,
+				)
 			}
 			return err
 		}
-		if txBytes, err := sb.vm.codec.Marshal(codecVersion, tx); err != nil {
-			return fmt.Errorf("failed to marshal tx %s: %w", txID, err)
-		} else if err := sb.vm.putTx(sb.onAcceptDB, txID, txBytes); err != nil {
-			return fmt.Errorf("failed to put tx %s: %w", txID, err)
-		} else if err := sb.vm.putStatus(sb.onAcceptDB, txID, Committed); err != nil {
-			return fmt.Errorf("failed to put tx %s status: %w", txID, err)
-		} else if onAccept != nil {
+		sb.onAcceptState.AddTx(tx, Committed)
+		if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
 	}
@@ -98,18 +118,26 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
-	sb.vm.currentBlocks[sb.ID()] = sb
-	sb.parentBlock().addChild(sb)
+	sb.vm.currentBlocks[blkID] = sb
+	parentIntf.addChild(sb)
 	return nil
 }
 
-// Reject implements the snowman.Block interface
 func (sb *StandardBlock) Reject() error {
-	sb.vm.Ctx.Log.Verbo("Rejecting Standard Block %s at height %d with parent %s", sb.ID(), sb.Height(), sb.ParentID())
+	sb.vm.ctx.Log.Verbo(
+		"Rejecting Standard Block %s at height %d with parent %s",
+		sb.ID(),
+		sb.Height(),
+		sb.ParentID(),
+	)
 
 	for _, tx := range sb.Txs {
 		if err := sb.vm.mempool.IssueTx(tx); err != nil {
-			sb.vm.Ctx.Log.Debug("failed to reissue tx %q due to: %s", tx.ID(), err)
+			sb.vm.ctx.Log.Debug(
+				"failed to reissue tx %q due to: %s",
+				tx.ID(),
+				err,
+			)
 		}
 	}
 	return sb.SingleDecisionBlock.Reject()
@@ -122,8 +150,8 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 		SingleDecisionBlock: SingleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
 				CommonBlock: CommonBlock{
-					Block: core.NewBlock(parentID, height),
-					vm:    vm,
+					PrntID: parentID,
+					Hght:   height,
 				},
 			},
 		},
@@ -137,6 +165,5 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	sb.Block.Initialize(bytes, vm.SnowmanVM)
-	return sb, nil
+	return sb, sb.SingleDecisionBlock.initialize(vm, bytes, choices.Processing, sb)
 }

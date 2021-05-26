@@ -10,9 +10,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	errWeightsTooLarge = errors.New("total weight is too large")
-)
+var errWeightsTooLarge = errors.New("total weight is too large")
 
 // weightedUniform implements the Weighted interface.
 //

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -6,9 +6,9 @@ package avm
 import (
 	"fmt"
 
-	"github.com/prometheus/client_golang/prometheus"
-
+	"github.com/ava-labs/avalanchego/utils/metricutils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func newCallsMetric(namespace, name string) prometheus.Counter {
@@ -24,6 +24,8 @@ type metrics struct {
 	numPendingCalls, numParseCalls, numGetCalls prometheus.Counter
 
 	numTxRefreshes, numTxRefreshHits, numTxRefreshMisses prometheus.Counter
+
+	apiRequestMetric metricutils.APIRequestMetrics
 }
 
 func (m *metrics) Initialize(
@@ -53,6 +55,7 @@ func (m *metrics) Initialize(
 		Help:      "Number of times unique txs have not been unique and weren't cached",
 	})
 
+	m.apiRequestMetric = metricutils.NewAPIMetrics(namespace)
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(m.numBootstrappingCalls),
@@ -64,6 +67,8 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numTxRefreshes),
 		registerer.Register(m.numTxRefreshHits),
 		registerer.Register(m.numTxRefreshMisses),
+
+		m.apiRequestMetric.Register(registerer),
 	)
 	return errs.Err
 }

@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader/greaderproto"
 )
 
-var (
-	_ io.Reader = &Client{}
-)
+var _ io.Reader = &Client{}
 
 // Client is a reader that talks over RPC.
 type Client struct{ client greaderproto.ReaderClient }

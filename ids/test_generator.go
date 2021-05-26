@@ -3,9 +3,7 @@
 
 package ids
 
-var (
-	offset = uint64(0)
-)
+var offset = uint64(0)
 
 // GenerateTestID returns a new ID that should only be used for testing
 func GenerateTestID() ID {

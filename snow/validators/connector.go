@@ -10,6 +10,6 @@ import (
 // Connector represents a handler that is called when a connection is marked as
 // connected or disconnected
 type Connector interface {
-	Connected(id ids.ShortID)
-	Disconnected(id ids.ShortID)
+	Connected(id ids.ShortID) error
+	Disconnected(id ids.ShortID) error
 }

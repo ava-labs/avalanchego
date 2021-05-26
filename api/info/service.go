@@ -21,7 +21,7 @@ import (
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
-	version       version.Version
+	version       version.Application
 	nodeID        ids.ShortID
 	networkID     uint32
 	log           logging.Logger
@@ -34,7 +34,7 @@ type Info struct {
 // NewService returns a new admin API service
 func NewService(
 	log logging.Logger,
-	version version.Version,
+	version version.Application,
 	nodeID ids.ShortID,
 	networkID uint32,
 	chainManager chains.Manager,

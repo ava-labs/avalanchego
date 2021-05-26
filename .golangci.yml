@@ -1,15 +1,23 @@
+run:
+  # skip auto-generated files.
+  skip-files:
+    - ".*\\.pb\\.go$"
+
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
   # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
 
   enable:
+    - asciicheck
     - bodyclose
     - deadcode
     - errcheck
+    - exportloopref
     - goconst
     - gocritic
     - gofmt
+    - gofumpt
     - goimports
     - golint
     - gosec
@@ -19,9 +27,20 @@ linters:
     - interfacer
     - misspell
     - nakedret
+    - nolintlint
+    - prealloc
+    - stylecheck
+    - typecheck
     - unconvert
+    - unparam
+    - unused
     - varcheck
+    - unconvert
+    - whitespace
     # - lll
-    # - gocyclo
     # - gomnd
     # - goprintffuncname
+    # - staticcheck
+    # - structcheck
+    # - goerr113
+    # - noctx

@@ -62,7 +62,7 @@ type ChainRouter struct {
 	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
 	benched        map[ids.ShortID]ids.Set
 	criticalChains ids.Set
-	onFatal        func()
+	onFatal        func(exitCode int)
 	metrics        *routerMetrics
 	// Parameters for doing health checks
 	healthConfig HealthConfig
@@ -89,7 +89,7 @@ func (cr *ChainRouter) Initialize(
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
-	onFatal func(),
+	onFatal func(exitCode int),
 	healthConfig HealthConfig,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
@@ -246,7 +246,7 @@ func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
 	ticker.Stop()
 
 	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
-		go cr.onFatal()
+		go cr.onFatal(1)
 	}
 }
 
@@ -607,7 +607,6 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
-
 }
 
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]

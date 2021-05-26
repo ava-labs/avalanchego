@@ -82,7 +82,6 @@ func (m *manager) GetVMFactory(vmID ids.ID) (VMFactory, error) {
 		return factory, nil
 	}
 	return nil, fmt.Errorf("no vm with ID '%v' has been registered", vmID)
-
 }
 
 // Map [vmID] to [factory]. [factory] creates new instances of the vm whose

@@ -18,6 +18,7 @@ type EngineTest struct {
 
 	CantIsBootstrapped,
 	CantStartup,
+	CantTimeout,
 	CantGossip,
 	CantHalt,
 	CantShutdown,
@@ -56,7 +57,7 @@ type EngineTest struct {
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
 	HaltF                                              func()
-	StartupF, GossipF, ShutdownF                       func() error
+	StartupF, TimeoutF, GossipF, ShutdownF             func() error
 	NotifyF                                            func(Message) error
 	GetF, GetAncestorsF, PullQueryF                    func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
 	PutF, PushQueryF                                   func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
@@ -77,6 +78,7 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantIsBootstrapped = cant
 
 	e.CantStartup = cant
+	e.CantTimeout = cant
 	e.CantGossip = cant
 	e.CantHalt = cant
 	e.CantShutdown = cant
@@ -135,6 +137,19 @@ func (e *EngineTest) Startup() error {
 		e.T.Fatalf("Unexpectedly called Startup")
 	}
 	return errors.New("unexpectedly called Startup")
+}
+
+func (e *EngineTest) Timeout() error {
+	if e.TimeoutF != nil {
+		return e.TimeoutF()
+	}
+	if !e.CantTimeout {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called Timeout")
+	}
+	return errors.New("unexpectedly called Timeout")
 }
 
 func (e *EngineTest) Gossip() error {
@@ -286,7 +301,6 @@ func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, con
 		e.T.Fatalf("Unexpectedly called GetAncestors")
 	}
 	return errors.New("unexpectedly called GetAncestors")
-
 }
 
 func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error {

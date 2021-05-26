@@ -91,7 +91,7 @@ func newIndex(
 	}
 
 	// Get next accepted index from db
-	nextAcceptedIndexBytes, err := i.vDB.Get(nextAcceptedIndexKey)
+	nextAcceptedIndex, err := database.GetUInt64(i.vDB, nextAcceptedIndexKey)
 	if err == database.ErrNotFound {
 		// Couldn't find it in the database. Must not have accepted any containers in previous runs.
 		i.log.Info("next accepted index %d", i.nextAcceptedIndex)
@@ -100,10 +100,7 @@ func newIndex(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get next accepted index from database: %w", err)
 	}
-	i.nextAcceptedIndex, err = wrappers.UnpackLong(nextAcceptedIndexBytes)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse next accepted index from bytes: %w", err)
-	}
+	i.nextAcceptedIndex = nextAcceptedIndex
 	i.log.Info("next accepted index %d", i.nextAcceptedIndex)
 	return i, nil
 }
@@ -142,7 +139,7 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 
 	ctx.Log.Debug("indexing %d --> container %s", i.nextAcceptedIndex, containerID)
 	// Persist index --> Container
-	nextAcceptedIndexBytes := wrappers.PackLong(i.nextAcceptedIndex)
+	nextAcceptedIndexBytes := database.PackUInt64(i.nextAcceptedIndex)
 	bytes, err := i.codec.Marshal(codecVersion, Container{
 		ID:        containerID,
 		Bytes:     containerBytes,
@@ -162,8 +159,7 @@ func (i *index) Accept(ctx *snow.Context, containerID ids.ID, containerBytes []b
 
 	// Persist next accepted index
 	i.nextAcceptedIndex++
-	nextAcceptedIndexBytes = wrappers.PackLong(i.nextAcceptedIndex)
-	if err := i.vDB.Put(nextAcceptedIndexKey, nextAcceptedIndexBytes); err != nil {
+	if err := database.PutUInt64(i.vDB, nextAcceptedIndexKey, i.nextAcceptedIndex); err != nil {
 		return fmt.Errorf("couldn't put accepted container %s into index: %w", containerID, err)
 	}
 
@@ -188,7 +184,7 @@ func (i *index) getContainerByIndex(index uint64) (Container, error) {
 	if !ok || index > lastAcceptedIndex {
 		return Container{}, fmt.Errorf("no container at index %d", index)
 	}
-	indexBytes := wrappers.PackLong(index)
+	indexBytes := database.PackUInt64(index)
 	return i.getContainerByIndexBytes(indexBytes)
 }
 
@@ -252,17 +248,7 @@ func (i *index) GetIndex(containerID ids.ID) (uint64, error) {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	indexBytes, err := i.containerToIndex.Get(containerID[:])
-	if err != nil {
-		return 0, err
-	}
-	index, err := wrappers.UnpackLong(indexBytes)
-	if err != nil {
-		// Should never happen
-		i.log.Error("couldn't unpack index: %w", err)
-		return 0, err
-	}
-	return index, nil
+	return database.GetUInt64(i.containerToIndex, containerID[:])
 }
 
 func (i *index) GetContainerByID(containerID ids.ID) (Container, error) {

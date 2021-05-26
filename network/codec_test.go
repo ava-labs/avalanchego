@@ -10,9 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	TestCodec Codec
-)
+var TestCodec Codec
 
 func TestCodecPackInvalidOp(t *testing.T) {
 	_, err := TestCodec.Pack(math.MaxUint8, make(map[Field]interface{}))
