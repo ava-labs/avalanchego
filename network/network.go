@@ -1073,6 +1073,7 @@ func (n *network) gossipPeerList() {
 	t := time.NewTicker(n.peerListGossipFreq)
 	defer t.Stop()
 
+outerLoop:
 	for range t.C {
 		if n.closed.GetValue() {
 			return
@@ -1142,18 +1143,28 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		msg, err := n.b.PeerList(ipCerts)
-		if err != nil {
-			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
-				err,
-				len(ipCerts))
-			continue
-		}
-
+		// We have to create a [msg] for each call to Send
+		// because Send's spec. says it may modify [msg]
 		for _, index := range stakerIndices {
+			msg, err := n.b.PeerList(ipCerts)
+			if err != nil {
+				n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
+					err,
+					len(ipCerts),
+				)
+				continue outerLoop
+			}
 			stakers[int(index)].Send(msg)
 		}
 		for _, index := range nonStakerIndices {
+			msg, err := n.b.PeerList(ipCerts)
+			if err != nil {
+				n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
+					err,
+					len(ipCerts),
+				)
+				continue outerLoop
+			}
 			nonStakers[int(index)].Send(msg)
 		}
 	}
