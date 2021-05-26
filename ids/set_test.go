@@ -5,6 +5,8 @@ package ids
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSet(t *testing.T) {
@@ -128,4 +130,30 @@ func TestSetClearLarge(t *testing.T) {
 	if set.Len() != 1 {
 		t.Fatal("length should be 1")
 	}
+}
+
+func TestSetPop(t *testing.T) {
+	var s Set
+	_, ok := s.Pop()
+	assert.False(t, ok)
+
+	s = make(Set)
+	_, ok = s.Pop()
+	assert.False(t, ok)
+
+	id1, id2 := GenerateTestID(), GenerateTestID()
+	s.Add(id1, id2)
+
+	got, ok := s.Pop()
+	assert.True(t, ok)
+	assert.True(t, got == id1 || got == id2)
+	assert.EqualValues(t, 1, s.Len())
+
+	got, ok = s.Pop()
+	assert.True(t, ok)
+	assert.True(t, got == id1 || got == id2)
+	assert.EqualValues(t, 0, s.Len())
+
+	_, ok = s.Pop()
+	assert.False(t, ok)
 }

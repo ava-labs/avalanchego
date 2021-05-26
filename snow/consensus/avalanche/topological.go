@@ -17,7 +17,10 @@ const (
 	minMapSize = 16
 )
 
-var errUnhealthy = errors.New("avalanche consensus is not healthy")
+var (
+	errUnhealthy = errors.New("avalanche consensus is not healthy")
+	errNoLeaves  = errors.New("couldn't pop a leaf from leaf set")
+)
 
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
@@ -338,12 +341,12 @@ func (ta *Topological) pushVotes() (ids.Bag, error) {
 
 	for ta.leaves.Len() > 0 {
 		// Pop one element of [leaves]
-		var leaf ids.ID
-		for l := range ta.leaves { // Iterates exactly once
-			leaf = l
-			break
+		leaf, ok := ta.leaves.Pop()
+		if !ok {
+			// Should never happen because we just
+			// checked that [ta.leaves] is non-empty.
+			return ids.Bag{}, errNoLeaves
 		}
-		ta.leaves.Remove(leaf)
 
 		kahn := ta.kahnNodes[leaf]
 
