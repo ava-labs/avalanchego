@@ -52,7 +52,7 @@ const (
 	defaultReadBufferSize                            = 16 * 1024 // 16 KB
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultConnMeterCacheSize                        = 1000
-	defaultByteSliceLen                              = 128
+	defaultByteSliceCap                              = 128
 )
 
 var (
@@ -214,7 +214,7 @@ type network struct {
 
 	// Contains []byte. Used as an optimization.
 	// Can be accessed by multiple goroutines concurrently.
-	byteSlicePool *sync.Pool
+	byteSlicePool sync.Pool
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -384,9 +384,9 @@ func NewNetwork(
 		tlsKey:                             tlsKey,
 		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
 		isFetchOnly:                        isFetchOnly,
-		byteSlicePool: &sync.Pool{
+		byteSlicePool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, defaultByteSliceLen)
+				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
 	}
