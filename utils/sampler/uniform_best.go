@@ -75,5 +75,6 @@ samplerLoop:
 	if s.Uniform == nil {
 		return errNoValidUniformSamplers
 	}
+	s.Uniform.Reset()
 	return nil
 }
