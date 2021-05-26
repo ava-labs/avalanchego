@@ -72,6 +72,10 @@ type ChainRouter struct {
 	dropRateCalculator math.Averager
 	// Last time at which there were no outstanding requests
 	lastTimeNoOutstanding time.Time
+	// Used in [createRequestID]. Should only be accessed
+	// in that method.
+	// [lock] should be held when [requestIDBytes] is accessed.
+	requestIDBytes []byte
 }
 
 // Initialize the router.
@@ -108,6 +112,7 @@ func (cr *ChainRouter) Initialize(
 	// Set up meter to count dropped messages
 	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
 	cr.healthConfig = healthConfig
+	cr.requestIDBytes = make([]byte, wrappers.IntLen)
 
 	// Register metrics
 	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
@@ -140,8 +145,8 @@ func (cr *ChainRouter) RegisterRequest(
 	requestID uint32,
 	msgType constants.MsgType,
 ) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 	if cr.timedRequests.Len() == 0 {
 		cr.lastTimeNoOutstanding = cr.clock.Time()
 	}
@@ -287,7 +292,7 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -323,9 +328,10 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 // request from the validator with ID [validatorID] to the consensus engine
 // working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -378,7 +384,7 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -414,9 +420,10 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -469,7 +476,7 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -504,9 +511,10 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 // GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -577,7 +585,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -612,9 +620,10 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -686,7 +695,7 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -721,9 +730,10 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -878,8 +888,9 @@ func (cr *ChainRouter) registerMsgSuccess(isBootstrapped bool) {
 	}
 }
 
-func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
-	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
+// Assumes [cr.lock] is held
+func (cr *ChainRouter) createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
+	p := wrappers.Packer{Bytes: cr.requestIDBytes}
 	p.PackInt(requestID)
 	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
 }
