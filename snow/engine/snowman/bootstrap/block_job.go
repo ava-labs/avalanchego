@@ -13,18 +13,18 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 type parser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
-	vm                      block.ChainVM
+	proVM                   proposervm.VM
 }
 
 func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
-	blk, err := p.vm.ParseBlock(blkBytes)
+	blk, err := p.proVM.ParseBlock(blkBytes)
 	if err != nil {
 		return nil, err
 	}

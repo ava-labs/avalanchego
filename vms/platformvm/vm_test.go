@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/timestampvm"
 
@@ -2130,7 +2131,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Subnet:     subnet,
 			},
 			Blocked: blocked,
-			VM:      vm,
+			ProVM:   proposervm.New(vm),
 		},
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),

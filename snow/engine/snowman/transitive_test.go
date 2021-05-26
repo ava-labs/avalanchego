@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 var (
@@ -46,7 +47,8 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -408,7 +410,8 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -852,7 +855,8 @@ func TestVoteCanceling(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -971,7 +975,8 @@ func TestEngineNoQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 	te := &Transitive{}
 	if err := te.Initialize(config); err != nil {
 		t.Fatal(err)
@@ -1018,7 +1023,8 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 	te := &Transitive{}
 	if err := te.Initialize(config); err != nil {
 		t.Fatal(err)
@@ -1650,7 +1656,8 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -1772,7 +1779,8 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 
 	vm.Default(true)
 	vm.CantSetPreference = false
@@ -1903,7 +1911,8 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	config.VM = vm
+	proVM := proposervm.New(vm)
+	config.ProVM = proVM
 
 	vm.Default(true)
 	vm.CantSetPreference = false

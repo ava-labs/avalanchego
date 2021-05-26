@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
+	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
@@ -650,6 +651,9 @@ func (m *manager) createSnowmanChain(
 		Preempt: sb.afterBootstrapped(),
 	}
 
+	// wrap vm to handle extra fields introduced with leader-ed snowman
+	proposerVM := proposervm.New(vm)
+
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
 	if err := engine.Initialize(smeng.Config{
@@ -668,7 +672,7 @@ func (m *manager) createSnowmanChain(
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			Blocked:      blocked,
-			VM:           vm,
+			ProVM:        proposerVM,
 			Bootstrapped: m.unblockChains,
 		},
 		Params:    consensusParams,
