@@ -800,8 +800,8 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	// Am I already peered to them? (safe because [p.net.stateLock] is held)
-	foundPeer, ok := p.net.peers[nodeID]
-	if ok && !foundPeer.closed.GetValue() {
+
+	if foundPeer, ok := p.net.peers.getByID(nodeID); ok && !foundPeer.closed.GetValue() {
 		p.net.log.Verbo(
 			"not peering to %s because we are already connected to %s",
 			peer.IPDesc,
