@@ -359,7 +359,8 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
 	b.failedAcceptedVdrs = ids.ShortSet{}
 	b.sampledBeacons = validators.NewSet()
-
+	b.pendingAccepted.Clear()
+	b.pendingAcceptedFrontier.Clear()
 	b.acceptedFrontier.Clear()
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
@@ -374,7 +375,7 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
-		b.pendingAcceptedFrontier.Add(vdrID) // necessarily emptied out
+		b.pendingAcceptedFrontier.Add(vdrID)
 	}
 
 	for _, vdr := range b.Beacons.List() {
