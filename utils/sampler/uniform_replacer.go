@@ -42,7 +42,8 @@ func (s *uniformReplacer) Initialize(length uint64) error {
 		return errOutOfRange
 	}
 	s.length = length
-	s.Reset()
+	s.drawn = make(defaultMap)
+	s.drawsCount = 0
 	return nil
 }
 
@@ -61,7 +62,9 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 }
 
 func (s *uniformReplacer) Reset() {
-	s.drawn = make(defaultMap)
+	for k := range s.drawn {
+		delete(s.drawn, k)
+	}
 	s.drawsCount = 0
 }
 
