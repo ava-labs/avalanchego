@@ -4,6 +4,7 @@
 package router
 
 import (
+	"encoding/binary"
 	"errors"
 	"sync"
 	"time"
@@ -72,8 +73,8 @@ type ChainRouter struct {
 	dropRateCalculator math.Averager
 	// Last time at which there were no outstanding requests
 	lastTimeNoOutstanding time.Time
-	// Used in [createRequestID]. Should only be accessed
-	// in that method.
+	// Used in [createRequestID].
+	// Should only be accessed in that method.
 	// [lock] should be held when [requestIDBytes] is accessed.
 	requestIDBytes []byte
 }
@@ -112,7 +113,7 @@ func (cr *ChainRouter) Initialize(
 	// Set up meter to count dropped messages
 	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
 	cr.healthConfig = healthConfig
-	cr.requestIDBytes = make([]byte, wrappers.IntLen)
+	cr.requestIDBytes = make([]byte, 2*hashing.HashLen+wrappers.IntLen) // Validator ID, Chain ID, Request ID
 
 	// Register metrics
 	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
@@ -890,7 +891,8 @@ func (cr *ChainRouter) registerMsgSuccess(isBootstrapped bool) {
 
 // Assumes [cr.lock] is held
 func (cr *ChainRouter) createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
-	p := wrappers.Packer{Bytes: cr.requestIDBytes}
-	p.PackInt(requestID)
-	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
+	copy(cr.requestIDBytes, validatorID[:])
+	copy(cr.requestIDBytes[hashing.HashLen:], chainID[:])
+	binary.BigEndian.PutUint32(cr.requestIDBytes[2*hashing.HashLen:], requestID)
+	return hashing.ComputeHash256Array(cr.requestIDBytes)
 }
