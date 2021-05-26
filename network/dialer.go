@@ -22,7 +22,9 @@ type dialer struct {
 
 // NewDialer returns a new Dialer that calls `net.Dial` with the provided
 // network.
-func NewDialer(network string) Dialer { return &dialer{network: network, throttler: NewThrottler(2)} }
+func NewDialer(network string) Dialer {
+	return &dialer{network: network, throttler: NewRandomisedBackoffThrottler(2, time.Duration(1)*time.Millisecond, time.Duration(100)*time.Millisecond)}
+}
 
 func (d *dialer) Dial(ip utils.IPDesc) (net.Conn, error) {
 	fmt.Println(time.Now(), "Acquiring lock to dial", ip)

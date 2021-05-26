@@ -110,6 +110,7 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Networking
 	// Peer List Gossip
+	// todo look here for peer delay
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] peers to [%s] peers every [%s]",
 		NetworkPeerListSizeKey,
