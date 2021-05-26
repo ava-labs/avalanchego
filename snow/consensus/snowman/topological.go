@@ -13,10 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
-const (
-	minMapSize = 16
-)
-
 var errUnhealthy = errors.New("snowman consensus is not healthy")
 
 // TopologicalFactory implements Factory by returning a topological struct
@@ -58,6 +54,12 @@ type Topological struct {
 	// We use this one instance of ids.Set instead of creating a
 	// new ids.Set during each call to [calculateInDegree].
 	leaves ids.Set
+
+	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
+	// Should only be accessed in those methods.
+	// We use this one map instead of creating a new map
+	// during each call to [calculateInDegree].
+	kahnNodes map[ids.ID]kahnNode
 }
 
 // Used to track the kahn topological sort status
@@ -86,6 +88,7 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 		return err
 	}
 	ts.leaves = ids.Set{}
+	ts.kahnNodes = make(map[ids.ID]kahnNode)
 	ts.ctx = ctx
 	ts.params = params
 	ts.head = rootID
@@ -227,11 +230,12 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 		// If there is no way for an alpha majority to occur, there is no need
 		// to perform any traversals.
 
+		// Populates [ts.kahnNodes] and [ts.leaves]
 		// Runtime = |live set| + |votes| ; Space = |live set| + |votes|
-		kahnGraph, leaves := ts.calculateInDegree(voteBag)
+		ts.calculateInDegree(voteBag)
 
 		// Runtime = |live set| ; Space = |live set|
-		voteStack = ts.pushVotes(kahnGraph, leaves)
+		voteStack = ts.pushVotes()
 	}
 
 	// Runtime = |live set| ; Space = Constant
@@ -296,9 +300,12 @@ func (ts *Topological) HealthCheck() (interface{}, error) {
 // takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf blocks.
-func (ts *Topological) calculateInDegree(
-	votes ids.Bag) (map[ids.ID]kahnNode, []ids.ID) {
-	kahns := make(map[ids.ID]kahnNode, minMapSize)
+func (ts *Topological) calculateInDegree(votes ids.Bag) {
+	// Clear the Kahn node set
+	for k := range ts.kahnNodes {
+		delete(ts.kahnNodes, k)
+	}
+	// Clear the leaf set
 	ts.leaves.Clear()
 
 	for _, vote := range votes.List() {
@@ -321,9 +328,9 @@ func (ts *Topological) calculateInDegree(
 
 		// Add the votes for this block to the parent's set of responses
 		numVotes := votes.Count(vote)
-		kahn, previouslySeen := kahns[parentID]
+		kahn, previouslySeen := ts.kahnNodes[parentID]
 		kahn.votes.AddCount(vote, numVotes)
-		kahns[parentID] = kahn
+		ts.kahnNodes[parentID] = kahn
 
 		// If the parent block already had registered votes, then there is no
 		// need to iterate into the parents
@@ -341,9 +348,9 @@ func (ts *Topological) calculateInDegree(
 			parentID = parent.ID()
 
 			// Increase the inDegree by one
-			kahn := kahns[parentID]
+			kahn := ts.kahnNodes[parentID]
 			kahn.inDegree++
-			kahns[parentID] = kahn
+			ts.kahnNodes[parentID] = kahn
 
 			// If we have already seen this block, then we shouldn't increase
 			// the inDegree of the ancestors through this block again.
@@ -357,23 +364,20 @@ func (ts *Topological) calculateInDegree(
 			ts.leaves.Remove(parentID)
 		}
 	}
-
-	return kahns, ts.leaves.List()
 }
 
 // convert the tree into a branch of snowball instances with at least alpha
 // votes
-func (ts *Topological) pushVotes(
-	kahnNodes map[ids.ID]kahnNode, leaves []ids.ID) []votes {
-	voteStack := make([]votes, 0, len(kahnNodes))
-	for len(leaves) > 0 {
-		// pop a leaf off the stack
-		newLeavesSize := len(leaves) - 1
-		leafID := leaves[newLeavesSize]
-		leaves = leaves[:newLeavesSize]
+func (ts *Topological) pushVotes() []votes {
+	voteStack := make([]votes, 0, len(ts.kahnNodes))
+	for ts.leaves.Len() > 0 {
+		// Pop one element of [leaves]
+		leafID, _ := ts.leaves.Pop()
+		// Should never return false because we just
+		// checked that [ts.leaves] is non-empty.
 
 		// get the block and sort information about the block
-		kahnNode := kahnNodes[leafID]
+		kahnNode := ts.kahnNodes[leafID]
 		block := ts.blocks[leafID]
 
 		// If there are at least Alpha votes, then this block needs to record
@@ -395,14 +399,14 @@ func (ts *Topological) pushVotes(
 		parentID := parent.ID()
 
 		// Remove an inbound edge from the parent kahn node and push the votes.
-		parentKahnNode := kahnNodes[parentID]
+		parentKahnNode := ts.kahnNodes[parentID]
 		parentKahnNode.inDegree--
 		parentKahnNode.votes.AddCount(leafID, kahnNode.votes.Len())
-		kahnNodes[parentID] = parentKahnNode
+		ts.kahnNodes[parentID] = parentKahnNode
 
 		// If the inDegree is zero, then the parent node is now a leaf
 		if parentKahnNode.inDegree == 0 {
-			leaves = append(leaves, parentID)
+			ts.leaves.Add(parentID)
 		}
 	}
 	return voteStack
