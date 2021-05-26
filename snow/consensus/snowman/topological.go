@@ -372,12 +372,9 @@ func (ts *Topological) pushVotes() []votes {
 	voteStack := make([]votes, 0, len(ts.kahnNodes))
 	for ts.leaves.Len() > 0 {
 		// Pop one element of [leaves]
-		var leafID ids.ID
-		for l := range ts.leaves { // Iterates exactly once
-			leafID = l
-			break
-		}
-		ts.leaves.Remove(leafID)
+		leafID, _ := ts.leaves.Pop()
+		// Should never return false because we just
+		// checked that [ts.leaves] is non-empty.
 
 		// get the block and sort information about the block
 		kahnNode := ts.kahnNodes[leafID]
