@@ -13,7 +13,10 @@ import (
 var _ greadcloserproto.ReaderServer = &Server{}
 
 // Server is a io.ReadCloser that is managed over RPC.
-type Server struct{ readCloser io.ReadCloser }
+type Server struct {
+	greadcloserproto.UnimplementedReaderServer
+	readCloser io.ReadCloser
+}
 
 // NewServer returns an io.ReadCloser instance managed remotely
 func NewServer(readCloser io.ReadCloser) *Server {
