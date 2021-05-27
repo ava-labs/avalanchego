@@ -27,7 +27,7 @@ func NewStaticBackoffThrottler(throttleLimit int, backOffDuration time.Duration)
 }
 
 func staticBackoffFn(backOffDuration time.Duration) func(attempt int) {
-	return func(attempt int) {
+	return func(_ int) {
 		time.Sleep(backOffDuration)
 	}
 }
