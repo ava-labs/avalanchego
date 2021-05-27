@@ -53,8 +53,11 @@ func SetupBenchmark(b *testing.B, count int, size int) ([][]byte, [][]byte) {
 // BenchmarkGet measures the time it takes to get an operation from a database.
 func BenchmarkGet(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
+	if count == 0 {
+		b.Fatal("no keys")
+	}
 
-	b.Run(fmt.Sprintf("%s_%dbytes_get", name, count), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_values_%d_bytes_get", name, count, len(keys[0])), func(b *testing.B) {
 		for i, key := range keys {
 			value := values[i]
 			if err := db.Put(key, value); err != nil {
@@ -75,8 +78,11 @@ func BenchmarkGet(b *testing.B, db Database, name string, keys, values [][]byte)
 // BenchmarkPut measures the time it takes to write an operation to a database.
 func BenchmarkPut(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
+	if count == 0 {
+		b.Fatal("no keys")
+	}
 
-	b.Run(fmt.Sprintf("%s_%dbytes_put", name, count), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_values_%d_bytes_put", name, count, len(keys[0])), func(b *testing.B) {
 		// Writes b.N values to the db
 		for i := 0; i < b.N; i++ {
 			if err := db.Put(keys[i%count], values[i%count]); err != nil {
@@ -90,8 +96,11 @@ func BenchmarkPut(b *testing.B, db Database, name string, keys, values [][]byte)
 //nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkDelete(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
+	if count == 0 {
+		b.Fatal("no keys")
+	}
 
-	b.Run(fmt.Sprintf("%s_%dbytes_delete", name, count), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_values_%d_bytes_delete", name, count, len(keys[0])), func(b *testing.B) {
 		// Writes random values of size _size_ to the database
 		for i, key := range keys {
 			value := values[i]
@@ -114,8 +123,11 @@ func BenchmarkDelete(b *testing.B, db Database, name string, keys, values [][]by
 //nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkBatchPut(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
+	if count == 0 {
+		b.Fatal("no keys")
+	}
 
-	b.Run(fmt.Sprintf("%s_%dbytes_write_batch", name, count), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_values_%d_bytes_write_batch", name, count, len(keys[0])), func(b *testing.B) {
 		batch := db.NewBatch()
 		for i := 0; i < b.N; i++ {
 			if err := batch.Put(keys[i%count], values[i%count]); err != nil {
@@ -131,8 +143,11 @@ func BenchmarkBatchPut(b *testing.B, db Database, name string, keys, values [][]
 // BenchmarkParallelGet measures the time it takes to read in parallel.
 func BenchmarkParallelGet(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
+	if count == 0 {
+		b.Fatal("no keys")
+	}
 
-	b.Run(fmt.Sprintf("%s_%dbytes_get_par", name, count), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_values_%d_bytes_get_par", name, count, len(keys[0])), func(b *testing.B) {
 		for i, key := range keys {
 			value := values[i]
 			if err := db.Put(key, value); err != nil {
@@ -154,8 +169,11 @@ func BenchmarkParallelGet(b *testing.B, db Database, name string, keys, values [
 // BenchmarkParallelPut measures the time it takes to write to the db in parallel.
 func BenchmarkParallelPut(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
+	if count == 0 {
+		b.Fatal("no keys")
+	}
 
-	b.Run(fmt.Sprintf("%s_%dbytes_write_par", name, count), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_values_%d_bytes_write_par", name, count, len(keys[0])), func(b *testing.B) {
 		b.RunParallel(func(pb *testing.PB) {
 			// Write N values to the db
 			for i := 0; pb.Next(); i++ {
@@ -171,8 +189,11 @@ func BenchmarkParallelPut(b *testing.B, db Database, name string, keys, values [
 //nolint:interfacer // This function takes in a database to be the expected type.
 func BenchmarkParallelDelete(b *testing.B, db Database, name string, keys, values [][]byte) {
 	count := len(keys)
+	if count == 0 {
+		b.Fatal("no keys")
+	}
 
-	b.Run(fmt.Sprintf("%s_%dbytes_delete_par", name, count), func(b *testing.B) {
+	b.Run(fmt.Sprintf("%s_%d_values_%d_bytes_delete_par", name, count, len(keys[0])), func(b *testing.B) {
 		for i, key := range keys {
 			value := values[i]
 			if err := db.Put(key, value); err != nil {
