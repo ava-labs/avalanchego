@@ -16,11 +16,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect
-<<<<<<< HEAD
-	github.com/golang/protobuf v1.4.3 // indirect
-=======
 	github.com/golang/protobuf v1.5.2
->>>>>>> cdee609cda8b0070877494ea60b1d41f3f5d6280
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/gorilla/handlers v1.4.2
 	github.com/gorilla/mux v1.7.4
