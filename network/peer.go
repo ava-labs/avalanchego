@@ -330,8 +330,10 @@ func (p *peer) WriteMessages() {
 }
 
 // send assumes that the [stateLock] is not held.
-// May modify [msg].
-func (p *peer) Send(msg Msg) bool {
+// If [canModifyMsg], [msg] may be modified by this method.
+// If ![canModifyMsg], [msg] will not be modified by this method.
+// [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
+func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
 
@@ -362,15 +364,23 @@ func (p *peer) Send(msg Msg) bool {
 		return false
 	}
 
+	// If the flag says to not modify [msgBytes], copy it so that the copy,
+	// not [msgBytes], will be put back into the pool after it's written.
+	toSend := msgBytes
+	if !canModifyMsg {
+		toSend = make([]byte, msgBytesLen)
+		copy(toSend, msgBytes)
+	}
+
 	select {
-	case p.sender <- msgBytes:
+	case p.sender <- toSend:
 		p.pendingBytes = newConnPendingBytes
 		return true
 	default:
 		// we never sent the message, remove from pending totals
 		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
-		p.net.byteSlicePool.Put(msgBytes)
+		p.net.byteSlicePool.Put(toSend)
 		return false
 	}
 }
@@ -515,7 +525,8 @@ func (p *peer) sendGetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	if p.Send(msg) {
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.metrics.getVersion.numSent.Inc()
 		p.net.metrics.getVersion.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -547,7 +558,7 @@ func (p *peer) sendVersion() {
 	p.net.log.AssertNoError(err)
 
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.metrics.version.numSent.Inc()
 		p.net.metrics.version.sentBytes.Add(float64(lenMsg))
@@ -564,7 +575,8 @@ func (p *peer) sendGetPeerList() {
 	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	if p.Send(msg) {
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.getPeerlist.numSent.Inc()
 		p.net.getPeerlist.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -588,7 +600,7 @@ func (p *peer) sendPeerList() {
 	}
 
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.peerList.numSent.Inc()
 		p.net.peerList.sentBytes.Add(float64(lenMsg))
@@ -605,7 +617,8 @@ func (p *peer) sendPing() {
 	msg, err := p.net.b.Ping()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	if p.Send(msg) {
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.ping.numSent.Inc()
 		p.net.ping.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -620,7 +633,8 @@ func (p *peer) sendPong() {
 	msg, err := p.net.b.Pong()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	if p.Send(msg) {
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.pong.numSent.Inc()
 		p.net.pong.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
