@@ -107,7 +107,6 @@ type chain struct {
 	Engine  common.Engine
 	Handler *router.Handler
 	Ctx     *snow.Context
-	VM      interface{}
 	Beacons validators.Set
 }
 
@@ -580,7 +579,6 @@ func (m *manager) createAvalancheChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		VM:      vm,
 		Ctx:     ctx,
 	}, err
 }
@@ -713,7 +711,6 @@ func (m *manager) createSnowmanChain(
 		Name:    chainAlias,
 		Engine:  engine,
 		Handler: handler,
-		VM:      vm,
 		Ctx:     ctx,
 	}, nil
 }
