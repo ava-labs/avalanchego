@@ -64,11 +64,12 @@ type metrics struct {
 	sendFailRate             prometheus.Gauge
 
 	getVersion, version,
-	getPeerlist, peerlist,
+	getPeerlist, peerList,
 	ping, pong,
 	getAcceptedFrontier, acceptedFrontier,
 	getAccepted, accepted,
-	get, getAncestors, put, multiPut,
+	getAncestors, multiPut,
+	get, put,
 	pushQuery, pullQuery, chits messageMetrics
 }
 
@@ -111,17 +112,17 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		m.getVersion.initialize(GetVersion, registerer),
 		m.version.initialize(Version, registerer),
 		m.getPeerlist.initialize(GetPeerList, registerer),
-		m.peerlist.initialize(PeerList, registerer),
+		m.peerList.initialize(PeerList, registerer),
 		m.ping.initialize(Ping, registerer),
 		m.pong.initialize(Pong, registerer),
 		m.getAcceptedFrontier.initialize(GetAcceptedFrontier, registerer),
 		m.acceptedFrontier.initialize(AcceptedFrontier, registerer),
 		m.getAccepted.initialize(GetAccepted, registerer),
 		m.accepted.initialize(Accepted, registerer),
-		m.get.initialize(Get, registerer),
 		m.getAncestors.initialize(GetAncestors, registerer),
-		m.put.initialize(Put, registerer),
 		m.multiPut.initialize(MultiPut, registerer),
+		m.get.initialize(Get, registerer),
+		m.put.initialize(Put, registerer),
 		m.pushQuery.initialize(PushQuery, registerer),
 		m.pullQuery.initialize(PullQuery, registerer),
 		m.chits.initialize(Chits, registerer),
@@ -138,7 +139,7 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 	case GetPeerList:
 		return &m.getPeerlist
 	case PeerList:
-		return &m.peerlist
+		return &m.peerList
 	case Ping:
 		return &m.ping
 	case Pong:
@@ -151,14 +152,14 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 		return &m.getAccepted
 	case Accepted:
 		return &m.accepted
-	case Get:
-		return &m.get
 	case GetAncestors:
 		return &m.getAncestors
-	case Put:
-		return &m.put
 	case MultiPut:
 		return &m.multiPut
+	case Get:
+		return &m.get
+	case Put:
+		return &m.put
 	case PushQuery:
 		return &m.pushQuery
 	case PullQuery:

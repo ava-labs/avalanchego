@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
-var (
-	errMissingBlock = errors.New("missing block")
-)
+var errMissingBlock = errors.New("missing block")
 
 // Block represents a block that can't be found
 type Block struct{ BlkID ids.ID }

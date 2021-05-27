@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gwriter/gwriterproto"
 )
 
-var (
-	_ io.Writer = &Client{}
-)
+var _ io.Writer = &Client{}
 
 // Client is an io.Writer that talks over RPC.
 type Client struct{ client gwriterproto.WriterClient }

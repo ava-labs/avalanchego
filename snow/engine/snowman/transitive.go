@@ -27,6 +27,8 @@ const (
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
+var _ Engine = &Transitive{}
+
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
@@ -591,9 +593,9 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdrBag.List()...)
-
+		vdrList := vdrBag.List()
+		vdrSet := ids.NewShortSet(len(vdrList))
+		vdrSet.Add(vdrList...)
 		t.Sender.PullQuery(vdrSet, t.RequestID, blkID)
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
@@ -611,8 +613,9 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdrBag.List()...)
+		vdrList := vdrBag.List()
+		vdrSet := ids.NewShortSet(len(vdrList))
+		vdrSet.Add(vdrList...)
 
 		t.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
 	} else if err != nil {
@@ -744,4 +747,14 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 		return intf, consensusErr
 	}
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
+}
+
+// GetBlock implements the snowman.Engine interface
+func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	return t.VM.GetBlock(blkID)
+}
+
+// GetVM implements the snowman.Engine interface
+func (t *Transitive) GetVM() common.VM {
+	return t.VM
 }

@@ -29,6 +29,8 @@ const (
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
+var _ Engine = &Transitive{}
+
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
@@ -59,6 +61,9 @@ type Transitive struct {
 	// optimal number.
 	pendingTxs []snowstorm.Tx
 
+	// A uniform sampler without replacement
+	uniformSampler sampler.Uniform
+
 	errs wrappers.Errs
 }
 
@@ -75,6 +80,7 @@ func (t *Transitive) Initialize(config Config) error {
 		config.Params.Namespace,
 		config.Params.Metrics,
 	)
+	t.uniformSampler = sampler.NewUniform()
 
 	if err := t.metrics.Initialize(config.Params.Namespace, config.Params.Metrics); err != nil {
 		return err
@@ -93,7 +99,7 @@ func (t *Transitive) finishBootstrapping() error {
 	edge := t.Manager.Edge()
 	frontier := make([]avalanche.Vertex, 0, len(edge))
 	for _, vtxID := range edge {
-		if vtx, err := t.Manager.Get(vtxID); err == nil {
+		if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
 			frontier = append(frontier, vtx)
 		} else {
 			t.Ctx.Log.Error("vertex %s failed to be loaded from the frontier with %s", vtxID, err)
@@ -112,16 +118,15 @@ func (t *Transitive) Gossip() error {
 		return nil
 	}
 
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(edge))); err != nil {
+	if err := t.uniformSampler.Initialize(uint64(len(edge))); err != nil {
 		return err // Should never really happen
 	}
-	indices, err := s.Sample(1)
+	indices, err := t.uniformSampler.Sample(1)
 	if err != nil {
 		return err // Also should never really happen because the edge has positive length
 	}
 	vtxID := edge[int(indices[0])]
-	vtx, err := t.Manager.Get(vtxID)
+	vtx, err := t.Manager.GetVtx(vtxID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to: %s", vtxID, err)
 		return nil
@@ -141,7 +146,7 @@ func (t *Transitive) Shutdown() error {
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
-	if vtx, err := t.Manager.Get(vtxID); err == nil {
+	if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
 		t.Sender.Put(vdr, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
@@ -151,7 +156,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error 
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	startTime := time.Now()
 	t.Ctx.Log.Verbo("GetAncestors(%s, %d, %s) called", vdr, requestID, vtxID)
-	vertex, err := t.Manager.Get(vtxID)
+	vertex, err := t.Manager.GetVtx(vtxID)
 	if err != nil || vertex.Status() == choices.Unknown {
 		t.Ctx.Log.Verbo("dropping getAncestors")
 		return nil // Don't have the requested vertex. Drop message.
@@ -209,7 +214,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtxByt
 		return nil
 	}
 
-	vtx, err := t.Manager.Parse(vtxBytes)
+	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
@@ -291,7 +296,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID, 
 		return nil
 	}
 
-	vtx, err := t.Manager.Parse(vtxBytes)
+	vtx, err := t.Manager.ParseVtx(vtxBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse vertex %s due to: %s", vtxID, err)
 		t.Ctx.Log.Verbo("vertex:\n%s", formatting.DumpBytes{Bytes: vtxBytes})
@@ -344,7 +349,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 
 	switch msg {
 	case common.PendingTxs:
-		t.pendingTxs = append(t.pendingTxs, t.VM.Pending()...)
+		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
 		return t.attemptToIssueTxs()
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
@@ -375,7 +380,7 @@ func (t *Transitive) repoll() {
 // Fetches [vtxID] if we don't have it locally.
 // Returns true if [vtx] has been added to consensus (now or previously)
 func (t *Transitive) issueFromByID(vdr ids.ShortID, vtxID ids.ID) (bool, error) {
-	vtx, err := t.Manager.Get(vtxID)
+	vtx, err := t.Manager.GetVtx(vtxID)
 	if err != nil {
 		// We don't have [vtxID]. Request it.
 		t.sendRequest(vdr, vtxID)
@@ -462,7 +467,7 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	if err != nil {
 		return err
 	}
-	txIDs := ids.Set{}
+	txIDs := ids.NewSet(len(txs))
 	for _, tx := range txs {
 		txIDs.Add(tx.ID())
 	}
@@ -572,8 +577,9 @@ func (t *Transitive) issueRepoll() {
 		vdrBag.Add(vdr.ID())
 	}
 
-	vdrSet := ids.ShortSet{}
-	vdrSet.Add(vdrBag.List()...)
+	vdrList := vdrBag.List()
+	vdrSet := ids.NewShortSet(len(vdrList))
+	vdrSet.Add(vdrList...)
 
 	// Poll the network
 	t.RequestID++
@@ -591,12 +597,11 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 	// Randomly select parents of this vertex from among the virtuous set
 	virtuousIDs := t.Consensus.Virtuous().CappedList(t.Params.Parents)
 	numVirtuousIDs := len(virtuousIDs)
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(numVirtuousIDs)); err != nil {
+	if err := t.uniformSampler.Initialize(uint64(numVirtuousIDs)); err != nil {
 		return err
 	}
 
-	indices, err := s.Sample(numVirtuousIDs)
+	indices, err := t.uniformSampler.Sample(numVirtuousIDs)
 	if err != nil {
 		return err
 	}
@@ -606,7 +611,7 @@ func (t *Transitive) issueBatch(txs []snowstorm.Tx) error {
 		parentIDs[i] = virtuousIDs[int(index)]
 	}
 
-	vtx, err := t.Manager.Build(0, parentIDs, txs, nil)
+	vtx, err := t.Manager.BuildVtx(0, parentIDs, txs, nil)
 	if err != nil {
 		t.Ctx.Log.Warn("error building new vertex with %d parents and %d transactions",
 			len(parentIDs), len(txs))
@@ -648,4 +653,14 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 		return intf, consensusErr
 	}
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
+}
+
+// GetVtx returns a vertex by its ID.
+// Returns database.ErrNotFound if unknown.
+func (t *Transitive) GetVtx(vtxID ids.ID) (avalanche.Vertex, error) {
+	return t.Manager.GetVtx(vtxID)
+}
+
+func (t *Transitive) GetVM() common.VM {
+	return t.VM
 }

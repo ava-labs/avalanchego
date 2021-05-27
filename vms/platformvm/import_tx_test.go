@@ -1,3 +1,6 @@
+// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -6,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -16,12 +18,12 @@ import (
 
 func TestNewImportTx(t *testing.T) {
 	vm, baseDB := defaultVM()
-	vm.Ctx.Lock.Lock()
+	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.Ctx.Lock.Unlock()
+		vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -50,7 +52,7 @@ func TestNewImportTx(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		sm := m.NewSharedMemory(vm.Ctx.ChainID)
+		sm := m.NewSharedMemory(vm.ctx.ChainID)
 		peerSharedMemory := m.NewSharedMemory(avmID)
 
 		// #nosec G404
@@ -71,17 +73,17 @@ func TestNewImportTx(t *testing.T) {
 		}
 		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 		inputID := utxo.InputID()
-		if err := peerSharedMemory.Put(vm.Ctx.ChainID, []*atomic.Element{{
+		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
 				recipientKey.PublicKey().Address().Bytes(),
 			},
 		}}); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		return sm
@@ -90,23 +92,22 @@ func TestNewImportTx(t *testing.T) {
 	tests := []test{
 		{
 			description:   "recipient key can't pay fee;",
-			sharedMemory:  fundedSharedMemory(vm.txFee - 1),
+			sharedMemory:  fundedSharedMemory(vm.TxFee - 1),
 			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
 			shouldErr:     true,
 		},
 		{
 
 			description:   "recipient key pays fee",
-			sharedMemory:  fundedSharedMemory(vm.txFee),
+			sharedMemory:  fundedSharedMemory(vm.TxFee),
 			recipientKeys: []*crypto.PrivateKeySECP256K1R{recipientKey},
 			shouldErr:     false,
 		},
 	}
 
-	vdb := versiondb.New(vm.DB)
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
-		vm.Ctx.SharedMemory = tt.sharedMemory
+		vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
 		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys, ids.ShortEmpty)
 		if err != nil {
 			if !tt.shouldErr {
@@ -133,9 +134,8 @@ func TestNewImportTx(t *testing.T) {
 		for _, out := range unsignedTx.Outs {
 			totalOut += out.Out.Amount()
 		}
-		if totalIn-totalOut != vm.txFee {
-			t.Fatalf("in test '%s'. inputs (%d) != outputs (%d) + txFee (%d)", tt.description, totalIn, totalOut, vm.txFee)
+		if totalIn-totalOut != vm.TxFee {
+			t.Fatalf("in test '%s'. inputs (%d) != outputs (%d) + txFee (%d)", tt.description, totalIn, totalOut, vm.TxFee)
 		}
-		vdb.Abort()
 	}
 }

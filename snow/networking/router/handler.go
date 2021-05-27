@@ -85,10 +85,6 @@ import (
 // - how to track CPU utilization of a peer
 // - "MaxMessages"
 
-const (
-	maxSleepDuration = 100 * time.Millisecond
-)
-
 // Handler passes incoming messages from the network to the consensus engine
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference)
 type Handler struct {
@@ -115,8 +111,6 @@ type Handler struct {
 
 	toClose func()
 	closing utils.AtomicBool
-
-	delay *Delay
 }
 
 // Initialize this consensus handler
@@ -131,7 +125,6 @@ func (h *Handler) Initialize(
 	stakerCPUPortion float64,
 	namespace string,
 	metrics prometheus.Registerer,
-	delay *Delay,
 ) error {
 	h.ctx = engine.Context()
 	if err := h.metrics.Initialize(namespace, metrics); err != nil {
@@ -188,7 +181,6 @@ func (h *Handler) Initialize(
 	)
 	h.engine = engine
 	h.validators = validators
-	h.delay = delay
 	return nil
 }
 
@@ -216,7 +208,7 @@ func (h *Handler) Dispatch() {
 
 			msg, err := h.serviceQueue.PopMessage()
 			if err != nil {
-				h.ctx.Log.Warn("Could not pop messsage from service queue")
+				h.ctx.Log.Warn("Could not pop message from service queue")
 				continue
 			}
 			if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
@@ -252,25 +244,6 @@ func (h *Handler) Dispatch() {
 
 // Dispatch a message to the consensus engine.
 func (h *Handler) dispatchMsg(msg message) {
-	// If messages should be delayed to this chain, hold the messages, but check
-	// to see if the chain should be closed at least every [maxSleepDuration].
-	for {
-		if h.closing.GetValue() {
-			h.ctx.Log.Debug("dropping message due to closing:\n%s", msg)
-			h.metrics.dropped.Inc()
-			return
-		}
-		until := time.Until(h.delay.waitUntil)
-		if until <= 0 {
-			break
-		}
-		if until > maxSleepDuration {
-			time.Sleep(maxSleepDuration)
-		} else {
-			time.Sleep(until)
-		}
-	}
-
 	startTime := h.clock.Time()
 
 	h.ctx.Lock.Lock()
@@ -282,9 +255,7 @@ func (h *Handler) dispatchMsg(msg message) {
 		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
 	}
 
-	var (
-		err error
-	)
+	var err error
 	switch msg.messageType {
 	case constants.NotifyMsg:
 		err = h.engine.Notify(msg.notification)
@@ -292,6 +263,9 @@ func (h *Handler) dispatchMsg(msg message) {
 	case constants.GossipMsg:
 		err = h.engine.Gossip()
 		h.metrics.gossip.Observe(float64(h.clock.Time().Sub(startTime)))
+	case constants.TimeoutMsg:
+		err = h.engine.Timeout()
+		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
 		err = h.handleValidatorMsg(msg, startTime)
 	}
@@ -303,7 +277,7 @@ func (h *Handler) dispatchMsg(msg message) {
 	}
 
 	if err != nil {
-		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s", err)
+		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s, while processing message: %s", err, msg)
 		h.closing.SetValue(true)
 	}
 }
@@ -406,6 +380,13 @@ func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 		messageType: constants.GetAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
+	})
+}
+
+// Timeout passes a new timeout notification to the consensus engine
+func (h *Handler) Timeout() {
+	h.sendReliableMsg(message{
+		messageType: constants.TimeoutMsg,
 	})
 }
 
@@ -527,6 +508,7 @@ func (h *Handler) Notify(msg common.Message) {
 // Shutdown.
 func (h *Handler) Shutdown() {
 	h.closing.SetValue(true)
+	h.engine.Halt()
 	h.serviceQueue.Shutdown()
 }
 
@@ -547,9 +529,7 @@ func (h *Handler) shutdownDispatch() {
 }
 
 func (h *Handler) handleValidatorMsg(msg message, startTime time.Time) error {
-	var (
-		err error
-	)
+	var err error
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
 		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)

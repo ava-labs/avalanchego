@@ -7,19 +7,15 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var (
-	_ UnsignedDecisionTx = &UnsignedCreateSubnetTx{}
-)
+var _ UnsignedDecisionTx = &UnsignedCreateSubnetTx{}
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
@@ -57,47 +53,31 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
 func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	vs VersionedState,
 	stx *Tx,
 ) (
 	func() error,
 	TxError,
 ) {
 	// Make sure this transaction is well formed.
-	if err := tx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
-	// Add new subnet to list of subnets
-	subnets, err := vm.getSubnets(db)
-	if err != nil {
-		return nil, tempError{err}
-	}
-	subnets = append(subnets, stx) // add new subnet
-	if err := vm.putSubnets(db, subnets); err != nil {
-		return nil, tempError{err}
-	}
-
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(db, tx, tx.Ins, tx.Outs, stx.Creds, vm.creationTxFee, vm.Ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
-	txID := tx.ID()
-
 	// Consume the UTXOS
-	if err := vm.consumeInputs(db, tx.Ins); err != nil {
-		return nil, tempError{err}
-	}
+	consumeInputs(vs, tx.Ins)
 	// Produce the UTXOS
-	if err := vm.produceOutputs(db, txID, tx.Outs); err != nil {
-		return nil, tempError{err}
-	}
-	// Register new subnet in validator manager
-	onAccept := func() error {
-		return vm.vdrMgr.Set(tx.ID(), validators.NewSet())
-	}
-	return onAccept, nil
+	txID := tx.ID()
+	produceOutputs(vs, txID, vm.ctx.AVAXAssetID, tx.Outs)
+	// Attempt to the new chain to the database
+	vs.AddSubnet(stx)
+
+	return nil, nil
 }
 
 // [controlKeys] must be unique. They will be sorted by this method.
@@ -108,7 +88,7 @@ func (vm *VM) newCreateSubnetTx(
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(vm.DB, keys, 0, vm.creationTxFee, changeAddr)
+	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -119,8 +99,8 @@ func (vm *VM) newCreateSubnetTx(
 	// Create the tx
 	utx := &UnsignedCreateSubnetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: vm.Ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
 			Outs:         outs,
 		}},
@@ -133,5 +113,5 @@ func (vm *VM) newCreateSubnetTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.Ctx, vm.codec, vm.creationTxFee, vm.Ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
 }

@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 )
 
-var (
-	_ io.ReadCloser = &Client{}
-)
+var _ io.ReadCloser = &Client{}
 
 // Client is a read closer that talks over RPC.
 type Client struct{ client greadcloserproto.ReaderClient }

@@ -46,7 +46,10 @@ func TestInterface(t *testing.T) {
 
 		db := NewClient(rpcdbproto.NewDatabaseClient(conn))
 		test(t, db)
-		conn.Close()
+
+		if err := conn.Close(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

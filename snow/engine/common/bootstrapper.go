@@ -21,11 +21,11 @@ const (
 
 	// StatusUpdateFrequency is how many containers should be processed between
 	// logs
-	StatusUpdateFrequency = 2500
+	StatusUpdateFrequency = 5000
 
 	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not
 	// responded to/failed
-	MaxOutstandingRequests = 8
+	MaxOutstandingRequests = 10
 
 	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
 	// vertices during a call to GetAncestors
@@ -35,6 +35,7 @@ const (
 // Bootstrapper implements the Engine interface.
 type Bootstrapper struct {
 	Config
+	Halter
 
 	RequestID uint32
 
@@ -42,6 +43,8 @@ type Bootstrapper struct {
 	// received a reply from
 	pendingAcceptedFrontier ids.ShortSet
 	acceptedFrontier        ids.Set
+	// True if RestartBootstrap has been called at least once
+	Restarted bool
 
 	// holds the beacons that were sampled for the accepted frontier
 	sampledBeacons  validators.Set
@@ -106,7 +109,7 @@ func (b *Bootstrapper) Startup() error {
 	}
 
 	// Ask each of the bootstrap validators to send their accepted frontier
-	vdrs := ids.ShortSet{}
+	vdrs := ids.NewShortSet(b.pendingAcceptedFrontier.Len())
 	vdrs.Union(b.pendingAcceptedFrontier)
 
 	b.RequestID++
@@ -197,7 +200,7 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 	}
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.NewShortSet(b.pendingAccepted.Len())
 	vdrs.Union(b.pendingAccepted)
 
 	b.RequestID++
@@ -293,7 +296,11 @@ func (b *Bootstrapper) Accepted(validatorID ids.ShortID, requestID uint32, conta
 		}
 	}
 
-	b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+	if !b.Restarted {
+		b.Ctx.Log.Info("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+	} else {
+		b.Ctx.Log.Debug("Bootstrapping started syncing with %d vertices in the accepted frontier", size)
+	}
 
 	return b.Bootstrapable.ForceAccepted(accepted)
 }
@@ -333,22 +340,27 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (b *Bootstrapper) RestartBootstrap(reset bool) error {
+	if reset {
+		b.Restarted = true
+	}
+
 	// resets the attempts when we're pulling blocks/vertices
 	// we don't want to fail the bootstrap at that stage
 	if reset {
-		b.Ctx.Log.Info("Checking for new frontiers...")
+		b.Ctx.Log.Debug("Checking for new frontiers")
 		b.bootstrapAttempts = 0
 	}
 
 	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
-		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
+		return fmt.Errorf("failed to bootstrap the chain after %d attempts", b.bootstrapAttempts)
 	}
 
 	// reset the failed responses
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
 	b.failedAcceptedVdrs = ids.ShortSet{}
 	b.sampledBeacons = validators.NewSet()
-
+	b.pendingAccepted.Clear()
+	b.pendingAcceptedFrontier.Clear()
 	b.acceptedFrontier.Clear()
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
@@ -363,7 +375,7 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
-		b.pendingAcceptedFrontier.Add(vdrID) // necessarily emptied out
+		b.pendingAcceptedFrontier.Add(vdrID)
 	}
 
 	for _, vdr := range b.Beacons.List() {

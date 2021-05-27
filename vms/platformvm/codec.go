@@ -33,8 +33,8 @@ func init() {
 	for _, c := range []codec.Registry{c, gc} {
 		errs.Add(
 			c.RegisterType(&ProposalBlock{}),
-			c.RegisterType(&Abort{}),
-			c.RegisterType(&Commit{}),
+			c.RegisterType(&AbortBlock{}),
+			c.RegisterType(&CommitBlock{}),
 			c.RegisterType(&StandardBlock{}),
 			c.RegisterType(&AtomicBlock{}),
 

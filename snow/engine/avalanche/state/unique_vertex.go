@@ -51,7 +51,19 @@ func newUniqueVertex(s *Serializer, b []byte) (*uniqueVertex, error) {
 	if err := innerVertex.Verify(); err != nil {
 		return nil, err
 	}
+
+	unparsedTxs := innerVertex.Txs()
+	txs := make([]snowstorm.Tx, len(unparsedTxs))
+	for i, txBytes := range unparsedTxs {
+		tx, err := vtx.serializer.vm.ParseTx(txBytes)
+		if err != nil {
+			return nil, err
+		}
+		txs[i] = tx
+	}
+
 	vtx.v.vtx = innerVertex
+	vtx.v.txs = txs
 
 	// If the vertex has already been fetched,
 	// skip persisting the vertex.
@@ -115,6 +127,11 @@ func (vtx *uniqueVertex) setVertex(innerVtx vertex.StatelessVertex) error {
 	if vtx.v.status.Fetched() {
 		return nil
 	}
+
+	if _, err := vtx.Txs(); err != nil {
+		return err
+	}
+
 	vtx.v.status = choices.Processing
 	return vtx.persist()
 }
@@ -236,7 +253,7 @@ func (vtx *uniqueVertex) Txs() ([]snowstorm.Tx, error) {
 	if len(txs) != len(vtx.v.txs) {
 		vtx.v.txs = make([]snowstorm.Tx, len(txs))
 		for i, txBytes := range txs {
-			tx, err := vtx.serializer.vm.Parse(txBytes)
+			tx, err := vtx.serializer.vm.ParseTx(txBytes)
 			if err != nil {
 				return nil, err
 			}

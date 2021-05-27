@@ -4,6 +4,8 @@
 package rpcdb
 
 import (
+	"sync/atomic"
+
 	"golang.org/x/net/context"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -13,8 +15,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+const (
+	maxBatchSize = 64 * 1024 // 64 KiB
+
+	// baseElementSize is an approximation of the protobuf encoding overhead per
+	// element
+	baseElementSize = 8 // bytes
+)
+
+var _ database.Database = &DatabaseClient{}
+
 // DatabaseClient is an implementation of database that talks over RPC.
-type DatabaseClient struct{ client rpcdbproto.DatabaseClient }
+type DatabaseClient struct {
+	client rpcdbproto.DatabaseClient
+
+	batchIndex int64
+}
 
 // NewClient returns a database instance connected to a remote database instance
 func NewClient(client rpcdbproto.DatabaseClient) *DatabaseClient {
@@ -158,8 +174,11 @@ func (b *batch) Delete(key []byte) error {
 func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
-	request := &rpcdbproto.WriteBatchRequest{}
-
+	request := &rpcdbproto.WriteBatchRequest{
+		Id:        atomic.AddInt64(&b.db.batchIndex, 1),
+		Continues: true,
+	}
+	currentSize := 0
 	keySet := make(map[string]struct{}, len(b.writes))
 	for i := len(b.writes) - 1; i >= 0; i-- {
 		kv := b.writes[i]
@@ -168,6 +187,21 @@ func (b *batch) Write() error {
 			continue
 		}
 		keySet[key] = struct{}{}
+
+		sizeChange := baseElementSize + len(kv.key) + len(kv.value)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			resp, err := b.db.client.WriteBatch(context.Background(), request)
+			if err != nil {
+				return err
+			}
+			if err := errCodeToError[resp.Err]; err != nil {
+				return err
+			}
+			currentSize = 0
+			request.Deletes = request.Deletes[:0]
+			request.Puts = request.Puts[:0]
+		}
+		currentSize += sizeChange
 
 		if kv.delete {
 			request.Deletes = append(request.Deletes, &rpcdbproto.DeleteRequest{
@@ -181,6 +215,7 @@ func (b *batch) Write() error {
 		}
 	}
 
+	request.Continues = false
 	resp, err := b.db.client.WriteBatch(context.Background(), request)
 	if err != nil {
 		return err
@@ -261,8 +296,12 @@ func (it *iterator) Value() []byte { return it.value }
 
 // Release frees any resources held by the iterator
 func (it *iterator) Release() {
-	_, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
+	resp, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
 		Id: it.id,
 	})
-	it.errs.Add(err)
+	if err != nil {
+		it.errs.Add(err)
+	} else {
+		it.errs.Add(errCodeToError[resp.Err])
+	}
 }

@@ -16,14 +16,14 @@ func TestRewardLongerDurationBonus(t *testing.T) {
 	totalDuration := 365 * 24 * time.Hour
 	shortBalance := units.KiloAvax
 	for i := 0; i < int(totalDuration/shortDuration); i++ {
-		reward := Reward(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
-		shortBalance += reward
+		r := reward(shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
+		shortBalance += r
 	}
-	reward := Reward(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
-	shortBalance += reward
+	r := reward(totalDuration%shortDuration, shortBalance, 359*units.MegaAvax+shortBalance, defaultMaxStakingDuration)
+	shortBalance += r
 
 	longBalance := units.KiloAvax
-	longBalance += Reward(totalDuration, longBalance, 359*units.MegaAvax+longBalance, defaultMaxStakingDuration)
+	longBalance += reward(totalDuration, longBalance, 359*units.MegaAvax+longBalance, defaultMaxStakingDuration)
 
 	if shortBalance >= longBalance {
 		t.Fatalf("should promote stakers to stake longer")
@@ -107,14 +107,14 @@ func TestRewards(t *testing.T) {
 			test.expectedReward,
 		)
 		t.Run(name, func(t *testing.T) {
-			reward := Reward(
+			r := reward(
 				test.duration,
 				test.stakeAmount,
 				test.existingAmount,
 				defaultMaxStakingDuration,
 			)
-			if reward != test.expectedReward {
-				t.Fatalf("expected %d; got %d", test.expectedReward, reward)
+			if r != test.expectedReward {
+				t.Fatalf("expected %d; got %d", test.expectedReward, r)
 			}
 		})
 	}

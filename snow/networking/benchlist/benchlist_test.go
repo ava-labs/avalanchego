@@ -4,17 +4,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 )
 
-var (
-	minimumFailingDuration = 5 * time.Minute
-)
+var minimumFailingDuration = 5 * time.Minute
 
 // Test that validators are properly added to the bench
 func TestBenchlistAdd(t *testing.T) {
@@ -37,11 +37,16 @@ func TestBenchlistAdd(t *testing.T) {
 		t.Fatal(errs.Err)
 	}
 
+	benchable := &TestBenchable{T: t}
+	benchable.Default(true)
+
 	threshold := 3
 	duration := time.Minute
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
+		ids.Empty,
 		logging.NoLog{},
+		benchable,
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -99,6 +104,11 @@ func TestBenchlistAdd(t *testing.T) {
 	now = now.Add(minimumFailingDuration).Add(time.Second)
 	b.lock.Lock()
 	b.clock.Set(now)
+
+	benched := false
+	benchable.BenchedF = func(ids.ID, ids.ShortID) {
+		benched = true
+	}
 	b.lock.Unlock()
 
 	// Register another failure
@@ -115,6 +125,8 @@ func TestBenchlistAdd(t *testing.T) {
 	assert.True(t, !next.benchedUntil.After(now.Add(duration)))
 	assert.True(t, !next.benchedUntil.Before(now.Add(duration/2)))
 	assert.Len(t, b.failureStreaks, 0)
+	assert.True(t, benched)
+	benchable.BenchedF = nil
 	b.lock.Unlock()
 
 	// Give another validator [threshold-1] failures
@@ -176,7 +188,9 @@ func TestBenchlistMaxStake(t *testing.T) {
 	// Shouldn't bench more than 2550 (5100/2)
 	maxPortion := 0.5
 	benchIntf, err := NewBenchlist(
+		ids.Empty,
 		logging.NoLog{},
+		&TestBenchable{T: t},
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -302,11 +316,22 @@ func TestBenchlistRemove(t *testing.T) {
 		t.Fatal(errs.Err)
 	}
 
+	count := 0
+	benchable := &TestBenchable{
+		T:             t,
+		CantUnbenched: true,
+		UnbenchedF: func(ids.ID, ids.ShortID) {
+			count++
+		},
+	}
+
 	threshold := 3
 	duration := 2 * time.Second
 	maxPortion := 0.76 // can bench 3 of the 5 validators
 	benchIntf, err := NewBenchlist(
+		ids.Empty,
 		logging.NoLog{},
+		benchable,
 		vdrs,
 		threshold,
 		minimumFailingDuration,
@@ -392,4 +417,5 @@ func TestBenchlistRemove(t *testing.T) {
 		100*time.Millisecond,
 	)
 
+	assert.Equal(t, 3, count)
 }

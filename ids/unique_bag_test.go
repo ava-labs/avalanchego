@@ -5,6 +5,8 @@ package ids
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestUniqueBag(t *testing.T) {
@@ -105,4 +107,20 @@ func TestUniqueBag(t *testing.T) {
 	} else if !ub6id1.Contains(2) {
 		t.Fatalf("Set of Unique Bag missing element")
 	}
+}
+
+func TestUniqueBagClear(t *testing.T) {
+	b := UniqueBag{}
+	id1, id2 := GenerateTestID(), GenerateTestID()
+	b.Add(0, id1)
+	b.Add(1, id1, id2)
+
+	b.Clear()
+	assert.Len(t, b.List(), 0)
+
+	bs := b.GetSet(id1)
+	assert.EqualValues(t, 0, bs.Len())
+
+	bs = b.GetSet(id2)
+	assert.EqualValues(t, 0, bs.Len())
 }

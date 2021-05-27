@@ -7,9 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	offset = uint64(0)
-)
+var offset = uint64(0)
 
 func GenerateID() ids.ID {
 	offset++

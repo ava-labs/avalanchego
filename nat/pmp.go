@@ -14,9 +14,7 @@ import (
 	natpmp "github.com/jackpal/go-nat-pmp"
 )
 
-var (
-	pmpClientTimeout = 500 * time.Millisecond
-)
+var pmpClientTimeout = 500 * time.Millisecond
 
 // pmpRouter adapts the NAT-PMP protocol implementation so it conforms to the
 // common interface.
