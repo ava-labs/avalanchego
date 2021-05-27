@@ -24,33 +24,45 @@ func NewThrottler(throttleLimit int, onBackOffFn func(int)) Throttler {
 
 func NewStaticBackoffThrottler(throttleLimit int, backOffDuration time.Duration) Throttler {
 	return Throttler{
-		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		lock:    sync.Mutex{},
-		onBackOff: func(attempt int) {
-			time.Sleep(backOffDuration)
-		},
+		limiter:   rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
+		lock:      sync.Mutex{},
+		onBackOff: staticBackoffFn(backOffDuration),
+	}
+}
+
+func staticBackoffFn(backOffDuration time.Duration) func(attempt int) {
+	return func(attempt int) {
+		time.Sleep(backOffDuration)
 	}
 }
 
 func NewIncrementalBackoffThrottler(throttleLimit int, backOffDuration time.Duration, incrementDuration time.Duration) Throttler {
 	return Throttler{
-		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		lock:    sync.Mutex{},
-		onBackOff: func(attempt int) {
-			sleepMillis := float64(backOffDuration.Milliseconds()) + math.Pow(float64(incrementDuration), float64(attempt))
-			time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
-		},
+		limiter:   rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
+		lock:      sync.Mutex{},
+		onBackOff: incrementalBackoffFn(backOffDuration, incrementDuration),
+	}
+}
+
+func incrementalBackoffFn(backOffDuration time.Duration, incrementDuration time.Duration) func(attempt int) {
+	return func(attempt int) {
+		sleepMillis := float64(backOffDuration.Milliseconds()) + math.Pow(float64(incrementDuration), float64(attempt))
+		time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
 	}
 }
 
 func NewRandomisedBackoffThrottler(throttleLimit int, minDuration, maxDuration time.Duration) Throttler {
 	return Throttler{
-		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		lock:    sync.Mutex{},
-		onBackOff: func(attempt int) {
-			randMillis := (rand.Int63() * (maxDuration.Milliseconds() - minDuration.Milliseconds())) + minDuration.Milliseconds()
-			time.Sleep(time.Duration(randMillis) * time.Millisecond)
-		},
+		limiter:   rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
+		lock:      sync.Mutex{},
+		onBackOff: randomisedBackoffFn(maxDuration, minDuration),
+	}
+}
+
+func randomisedBackoffFn(maxDuration time.Duration, minDuration time.Duration) func(attempt int) {
+	return func(attempt int) {
+		randMillis := (rand.Int63() * (maxDuration.Milliseconds() - minDuration.Milliseconds())) + minDuration.Milliseconds()
+		time.Sleep(time.Duration(randMillis) * time.Millisecond)
 	}
 }
 
