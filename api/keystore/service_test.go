@@ -19,14 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-var (
-	// strongPassword defines a password used for the following tests that
-	// scores high enough to pass the password strength scoring system
-	strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
-)
+// strongPassword defines a password used for the following tests that
+// scores high enough to pass the password strength scoring system
+var strongPassword = "N_+=_jJ;^(<;{4,:*m6CET}'&N;83FYK.wtNpwp-Jt" // #nosec G101
 
 func TestServiceListNoUsers(t *testing.T) {
-	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +40,7 @@ func TestServiceListNoUsers(t *testing.T) {
 }
 
 func TestServiceCreateUser(t *testing.T) {
-	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +83,7 @@ func genStr(n int) string {
 // TestServiceCreateUserArgsCheck generates excessively long usernames or
 // passwords to assure the sanity checks on string length are not exceeded
 func TestServiceCreateUserArgsCheck(t *testing.T) {
-	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +128,7 @@ func TestServiceCreateUserArgsCheck(t *testing.T) {
 // TestServiceCreateUserWeakPassword tests creating a new user with a weak
 // password to ensure the password strength check is working
 func TestServiceCreateUserWeakPassword(t *testing.T) {
-	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +148,7 @@ func TestServiceCreateUserWeakPassword(t *testing.T) {
 }
 
 func TestServiceCreateDuplicate(t *testing.T) {
-	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +179,7 @@ func TestServiceCreateDuplicate(t *testing.T) {
 }
 
 func TestServiceCreateUserNoName(t *testing.T) {
-	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +194,7 @@ func TestServiceCreateUserNoName(t *testing.T) {
 }
 
 func TestServiceUseBlockchainDB(t *testing.T) {
-	ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := CreateTestKeystore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +239,7 @@ func TestServiceUseBlockchainDB(t *testing.T) {
 func TestServiceExportImport(t *testing.T) {
 	encodings := []formatting.Encoding{formatting.Hex, formatting.CB58}
 	for _, encoding := range encodings {
-		ks, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+		ks, err := CreateTestKeystore()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -282,7 +280,7 @@ func TestServiceExportImport(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		newKS, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+		newKS, err := CreateTestKeystore()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -401,7 +399,7 @@ func TestServiceDeleteUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			ksIntf, err := New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+			ksIntf, err := CreateTestKeystore()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -437,6 +435,9 @@ func TestServiceDeleteUser(t *testing.T) {
 	}
 }
 
+// 1st part -> insert data into 1.0.0
+// 2nd part -> migrate data from 1.0.0 to 1.4.5
+// 3rd part -> check if data from 1.0.0 exists in 1.4.5
 func TestMigrateKeystoreUser(t *testing.T) {
 	testUser := "testUser"
 	password := "passwTest@fake01ord"
@@ -478,7 +479,7 @@ func TestMigrateKeystoreUser(t *testing.T) {
 
 	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
 		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(1, 1, 0),
+		Version:  version.DatabaseVersion1_4_5,
 	})
 	upgradedDBManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
@@ -509,54 +510,6 @@ func TestMigrateKeystoreUser(t *testing.T) {
 	}
 
 	value, err := userDB.Get(k1)
-	if err != nil {
-		t.Fatalf("Failed to get value from userDB: %s", err)
-	}
-	if !bytes.Equal(value, v1) {
-		t.Fatalf("Expected value: %s, but found %s", value, v1)
-	}
-
-	value, err = userDB.Get(k2)
-	if err != nil {
-		t.Fatalf("Failed to get value from userDB: %s", err)
-	}
-	if !bytes.Equal(value, v2) {
-		t.Fatalf("Expected value: %s, but found %s", value, v2)
-	}
-
-	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
-		Database: memdb.New(),
-		Version:  version.NewDefaultVersion(2, 1, 0),
-	})
-	secondUpgradedDBManager, err := manager.NewManagerFromDBs(versionedDBs)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ksSecondUpgrade, err := New(logging.NoLog{}, secondUpgradedDBManager)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	users, err = ksSecondUpgrade.ListUsers()
-	if err != nil {
-		t.Fatalf("Failed to list users: %s", err)
-	}
-
-	if len(users) != 1 {
-		t.Fatalf("Exepcted 1 user, but found: %d", len(users))
-	}
-
-	if users[0] != testUser {
-		t.Fatalf("Expected first user to be %s, but found %s", testUser, users[0])
-	}
-
-	userDB, err = ksSecondUpgrade.GetDatabase(bID, testUser, password)
-	if err != nil {
-		t.Fatalf("Failed to get user database from upgraded DB: %s", err)
-	}
-
-	value, err = userDB.Get(k1)
 	if err != nil {
 		t.Fatalf("Failed to get value from userDB: %s", err)
 	}

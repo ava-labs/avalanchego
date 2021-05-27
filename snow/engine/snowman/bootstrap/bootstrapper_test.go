@@ -24,9 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var (
-	errUnknownBlock = errors.New("unknown block")
-)
+var errUnknownBlock = errors.New("unknown block")
 
 func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.TestVM) {
 	ctx := snow.DefaultContextTest()
@@ -66,7 +64,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		Alpha:      peers.Weight()/2 + 1,
 		Sender:     sender,
 		Subnet:     subnet,
-		Delay:      &common.DelayTest{},
+		Timer:      &common.TimerTest{},
 	}
 	return Config{
 		Config:  commonConfig,

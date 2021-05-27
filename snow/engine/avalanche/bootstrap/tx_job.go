@@ -53,12 +53,22 @@ func (t *txJob) MissingDependencies() (ids.Set, error) {
 	return missing, nil
 }
 
+// Returns true if this tx job has at least 1 missing dependency
+func (t *txJob) HasMissingDependencies() (bool, error) {
+	for _, dep := range t.tx.Dependencies() {
+		if dep.Status() != choices.Accepted {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (t *txJob) Execute() error {
-	deps, err := t.MissingDependencies()
+	hasMissingDeps, err := t.HasMissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
+	if hasMissingDeps {
 		t.numDropped.Inc()
 		return errors.New("attempting to accept a transaction with missing dependencies")
 	}

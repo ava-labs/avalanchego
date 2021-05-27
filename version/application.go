@@ -12,24 +12,19 @@ const (
 	defaultAppSeparator = "/"
 )
 
-var (
-	errDifferentApps = errors.New("different applications")
-)
+var errDifferentApps = errors.New("different applications")
 
 // Application defines what is needed to describe a versioned
 // Application.
 type Application interface {
 	Version
-
 	App() string
-
 	Compatible(Application) error
 	Before(Application) bool
 }
 
 type application struct {
 	Version
-
 	app string
 	str string
 }

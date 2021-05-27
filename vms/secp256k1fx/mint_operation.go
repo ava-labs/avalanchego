@@ -9,9 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errNilMintOperation = errors.New("nil mint operation")
-)
+var errNilMintOperation = errors.New("nil mint operation")
 
 // MintOperation ...
 type MintOperation struct {

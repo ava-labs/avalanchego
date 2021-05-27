@@ -52,12 +52,20 @@ func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	}
 	return missing, nil
 }
+
+func (b *blockJob) HasMissingDependencies() (bool, error) {
+	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (b *blockJob) Execute() error {
-	deps, err := b.MissingDependencies()
+	hasMissingDeps, err := b.HasMissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
+	if hasMissingDeps {
 		b.numDropped.Inc()
 		return errors.New("attempting to accept a block with missing dependencies")
 	}

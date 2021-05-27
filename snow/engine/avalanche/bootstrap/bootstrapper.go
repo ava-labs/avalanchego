@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -30,9 +31,10 @@ const (
 	cacheSize      = 100000
 
 	// Parameters for delaying bootstrapping to avoid potential CPU burns
-	initialBootstrappingDelay = 500 * time.Millisecond
-	maxBootstrappingDelay     = time.Minute
+	bootstrappingDelay = 10 * time.Second
 )
+
+var errUnexpectedTimeout = errors.New("unexpected timeout fired")
 
 // Config ...
 type Config struct {
@@ -70,7 +72,7 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount time.Duration
+	awaitingTimeout bool
 }
 
 // Initialize this engine.
@@ -87,7 +89,6 @@ func (b *Bootstrapper) Initialize(
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
-	b.delayAmount = initialBootstrappingDelay
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
@@ -325,11 +326,11 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	// All vertices added to [processVertices] have received transitive votes from the accepted frontier
 	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the valid vertices in this message
 	processVertices[0] = vtx
-	eligibleVertices := ids.Set{}
 	parents, err := vtx.Parents()
 	if err != nil {
 		return err
 	}
+	eligibleVertices := ids.NewSet(len(parents))
 	for _, parent := range parents {
 		eligibleVertices.Add(parent.ID())
 	}
@@ -372,6 +373,18 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(vtxID)
 }
 
+func (b *Bootstrapper) Timeout() error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+	b.awaitingTimeout = false
+
+	if !b.Subnet.IsBootstrapped() {
+		return b.RestartBootstrap(true)
+	}
+	return b.finish()
+}
+
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {
@@ -407,7 +420,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
 	pendingJobs := b.VtxBlocked.MissingIDs()
-	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 {
+	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -445,6 +458,7 @@ func (b *Bootstrapper) checkFinish() error {
 
 	// Notify the subnet that this chain is synced
 	b.Subnet.Bootstrapped(b.Ctx.ChainID)
+	b.processedCache.Flush()
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
@@ -454,14 +468,11 @@ func (b *Bootstrapper) checkFinish() error {
 		} else {
 			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
-		// Delay new incoming messages to avoid consuming unnecessary resources
-		// while keeping up to date on the latest tip.
-		b.Config.Delay.Delay(b.delayAmount)
-		b.delayAmount *= 2
-		if b.delayAmount > maxBootstrappingDelay {
-			b.delayAmount = maxBootstrappingDelay
-		}
-		return b.RestartBootstrap(true)
+		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
+		// on the latest tip.
+		b.Timer.RegisterTimeout(bootstrappingDelay)
+		b.awaitingTimeout = true
+		return nil
 	}
 
 	return b.finish()
@@ -473,7 +484,6 @@ func (b *Bootstrapper) finish() error {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}
-	b.processedCache.Flush()
 
 	// Start consensus
 	if err := b.OnFinished(); err != nil {

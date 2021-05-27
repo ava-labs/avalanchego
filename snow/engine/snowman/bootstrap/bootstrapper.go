@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -20,11 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
-const (
-	// Parameters for delaying bootstrapping to avoid potential CPU burns
-	initialBootstrappingDelay = 500 * time.Millisecond
-	maxBootstrappingDelay     = time.Minute
-)
+// Parameters for delaying bootstrapping to avoid potential CPU burns
+const bootstrappingDelay = 10 * time.Second
+
+var errUnexpectedTimeout = errors.New("unexpected timeout fired")
 
 // Config ...
 type Config struct {
@@ -61,9 +61,9 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount time.Duration
-
 	parser *parser
+
+	awaitingTimeout bool
 }
 
 // Initialize this engine.
@@ -78,7 +78,6 @@ func (b *Bootstrapper) Initialize(
 	b.Bootstrapped = config.Bootstrapped
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
-	b.delayAmount = initialBootstrappingDelay
 	b.startingAcceptedFrontier = ids.Set{}
 	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
@@ -252,6 +251,18 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(blkID)
 }
 
+func (b *Bootstrapper) Timeout() error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+	b.awaitingTimeout = false
+
+	if !b.Subnet.IsBootstrapped() {
+		return b.RestartBootstrap(true)
+	}
+	return b.finish()
+}
+
 // process a block
 func (b *Bootstrapper) process(blk snowman.Block) error {
 	status := blk.Status()
@@ -322,7 +333,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 // checkFinish repeatedly executes pending transactions and requests new frontier vertices until there aren't any new ones
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
-	if b.IsBootstrapped() {
+	if b.IsBootstrapped() || b.awaitingTimeout {
 		return nil
 	}
 
@@ -340,20 +351,21 @@ func (b *Bootstrapper) checkFinish() error {
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedBlocks
 
-	// Note that executedVts < c*previouslyExecuted is enforced so that the
-	// bootstrapping process will terminate even as new blocks are being issued.
-	if executedBlocks > 0 && executedBlocks < previouslyExecuted/2 && b.RetryBootstrap {
+	// Note that executedVts < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
+	// so that the bootstrapping process will terminate even as new blocks are
+	// being issued.
+	if b.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {
 		return b.RestartBootstrap(true)
 	}
-
-	// Notify the subnet that this chain is synced
-	b.Subnet.Bootstrapped(b.Ctx.ChainID)
 
 	// If there is an additional callback, notify them that this chain has been
 	// synced.
 	if b.Bootstrapped != nil {
 		b.Bootstrapped()
 	}
+
+	// Notify the subnet that this chain is synced
+	b.Subnet.Bootstrapped(b.Ctx.ChainID)
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
@@ -363,15 +375,11 @@ func (b *Bootstrapper) checkFinish() error {
 		} else {
 			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
-		// Delay new incoming messages to avoid consuming unnecessary resources
-		// while keeping up to date on the latest tip.
-		b.Config.Delay.Delay(b.delayAmount)
-		b.delayAmount *= 2
-		if b.delayAmount > maxBootstrappingDelay {
-			b.delayAmount = maxBootstrappingDelay
-		}
-
-		return b.RestartBootstrap(true)
+		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
+		// on the latest tip.
+		b.Timer.RegisterTimeout(bootstrappingDelay)
+		b.awaitingTimeout = true
+		return nil
 	}
 
 	return b.finish()

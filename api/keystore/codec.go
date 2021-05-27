@@ -16,9 +16,7 @@ const (
 	codecVersion = 0
 )
 
-var (
-	c codec.Manager
-)
+var c codec.Manager
 
 func init() {
 	lc := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLength)

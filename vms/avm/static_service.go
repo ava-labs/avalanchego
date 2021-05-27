@@ -22,9 +22,7 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var (
-	errUnknownAssetType = errors.New("unknown asset type")
-)
+var errUnknownAssetType = errors.New("unknown asset type")
 
 // StaticService defines the base service for the asset vm
 type StaticService struct{}
@@ -67,7 +65,6 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	g := Genesis{}
 	for assetAlias, assetDefinition := range args.GenesisData {
 		assetMemo, err := formatting.Decode(args.Encoding, assetDefinition.Memo)
-
 		if err != nil {
 			return fmt.Errorf("problem formatting asset definition memo due to: %w", err)
 		}

@@ -37,8 +37,6 @@
       --snow-avalanche-num-parents="{{ snow_avalanche_num_parents }}"
       --snow-avalanche-batch-size="{{ snow_avalanche_batch_size }}"
       --api-ipcs-enabled="{{ api_ipcs_enabled }}"
-      --xput-server-enabled="{{ xput_server_enabled }}"
-      --xput-server-port="{{ xput_server_port }}"
       --max-non-staker-pending-msgs="{{ max_non_staker_pending_msgs }}"
       --network-minimum-timeout={{ network_minimum_timeout }}
       --network-initial-timeout={{ network_initial_timeout }}

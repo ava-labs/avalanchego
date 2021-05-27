@@ -13,9 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var (
-	errNilUTXOID = errors.New("nil utxo ID is not valid")
-)
+var errNilUTXOID = errors.New("nil utxo ID is not valid")
 
 // UTXOID ...
 type UTXOID struct {

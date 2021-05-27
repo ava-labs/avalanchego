@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greadcloser/greadcloserproto"
 )
 
-var (
-	_ greadcloserproto.ReaderServer = &Server{}
-)
+var _ greadcloserproto.ReaderServer = &Server{}
 
 // Server is a io.ReadCloser that is managed over RPC.
 type Server struct {

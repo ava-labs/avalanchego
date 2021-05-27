@@ -20,9 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto"
 )
 
-var (
-	_ ghttpproto.HTTPServer = &Server{}
-)
+var _ ghttpproto.HTTPServer = &Server{}
 
 // Server is an http.Handler that is managed over RPC.
 type Server struct {

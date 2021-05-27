@@ -22,9 +22,7 @@ const (
 	apricotCodecVersion = uint16(1)
 )
 
-var (
-	c codec.Manager
-)
+var c codec.Manager
 
 func init() {
 	codecV0 := linearcodec.New("serializeV0", maxSize)

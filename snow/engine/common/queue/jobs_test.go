@@ -137,18 +137,22 @@ func TestRemoveDependency(t *testing.T) {
 	job1 := &TestJob{
 		T: t,
 
-		IDF:                  func() ids.ID { return job1ID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: true}, nil },
-		ExecuteF:             func() error { executed1 = true; return nil },
-		BytesF:               func() []byte { return []byte{1} },
+		IDF:                     func() ids.ID { return job1ID },
+		MissingDependenciesF:    func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil },
+		HasMissingDependenciesF: func() (bool, error) { return true, nil },
+		ExecuteF:                func() error { executed1 = true; return nil },
+		BytesF:                  func() []byte { return []byte{1} },
 	}
 	job0 := &TestJob{
 		T: t,
 
-		IDF:                  func() ids.ID { return job0ID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		IDF:                     func() ids.ID { return job0ID },
+		HasMissingDependenciesF: func() (bool, error) { return false, nil },
 		ExecuteF: func() error {
 			executed0 = true
+			job1.HasMissingDependenciesF = func() (bool, error) {
+				return false, nil
+			}
 			job1.MissingDependenciesF = func() (ids.Set, error) {
 				return ids.Set{}, nil
 			}
@@ -257,7 +261,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 		T: t,
 
 		IDF:                  func() ids.ID { return job1ID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: true}, nil },
+		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil },
 		ExecuteF:             func() error { return nil },
 		BytesF:               func() []byte { return []byte{1} },
 	}
@@ -357,20 +361,26 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	job1 := &TestJob{
 		T: t,
 
-		IDF:                  func() ids.ID { return job1ID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{job0ID: true}, nil },
-		ExecuteF:             func() error { return database.ErrClosed }, // job1 fails to execute the first time due to a closed database
-		BytesF:               func() []byte { return []byte{1} },
+		IDF:                     func() ids.ID { return job1ID },
+		MissingDependenciesF:    func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil },
+		HasMissingDependenciesF: func() (bool, error) { return true, nil },
+		ExecuteF:                func() error { return database.ErrClosed }, // job1 fails to execute the first time due to a closed database
+		BytesF:                  func() []byte { return []byte{1} },
 	}
 	job0 := &TestJob{
 		T: t,
 
-		IDF:                  func() ids.ID { return job0ID },
-		MissingDependenciesF: func() (ids.Set, error) { return ids.Set{}, nil },
+		IDF:                     func() ids.ID { return job0ID },
+		MissingDependenciesF:    func() (ids.Set, error) { return ids.Set{}, nil },
+		HasMissingDependenciesF: func() (bool, error) { return false, nil },
+
 		ExecuteF: func() error {
 			executed0 = true
 			job1.MissingDependenciesF = func() (ids.Set, error) {
 				return ids.Set{}, nil
+			}
+			job1.HasMissingDependenciesF = func() (bool, error) {
+				return false, nil
 			}
 			return nil
 		},
@@ -412,7 +422,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	assert.True(executed0)
 	assert.False(executed1)
 
-	job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{job0ID: true}, nil }
+	job1.MissingDependenciesF = func() (ids.Set, error) { return ids.Set{job0ID: struct{}{}}, nil }
 	job1.ExecuteF = func() error { executed1 = true; return nil }
 
 	// Create jobs queue from the same database and ensure that the jobs queue

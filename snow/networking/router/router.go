@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -27,7 +28,7 @@ type Router interface {
 		gossipFrequency,
 		shutdownTimeout time.Duration,
 		criticalChains ids.Set,
-		onFatal func(),
+		onFatal func(exitCode int),
 		healthConfig HealthConfig,
 		metricsNamespace string,
 		metricsRegisterer prometheus.Registerer,
@@ -62,6 +63,9 @@ type InternalRouter interface {
 	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
 	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
+
 	Connected(validatorID ids.ShortID)
 	Disconnected(validatorID ids.ShortID)
+
+	benchlist.Benchable
 }

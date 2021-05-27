@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var (
-	errBadSubnetID = errors.New("subnet ID can't be primary network ID")
-)
+var errBadSubnetID = errors.New("subnet ID can't be primary network ID")
 
 // Validator is a validator.
 type Validator struct {

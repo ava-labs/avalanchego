@@ -95,7 +95,6 @@ func (s *state) RegisterType(
 	marshal func(interface{}) ([]byte, error),
 	unmarshal func([]byte) (interface{}, error),
 ) error {
-
 	if _, exists := s.unmarshallers[typeID]; exists {
 		return fmt.Errorf("there is already a type with ID %d", typeID)
 	}

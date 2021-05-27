@@ -221,7 +221,7 @@ func TestIssueImportTx(t *testing.T) {
 	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -368,7 +368,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current()))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}

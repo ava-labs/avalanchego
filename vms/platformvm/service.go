@@ -138,13 +138,11 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 
 	trimmedPrivateKey := strings.TrimPrefix(args.PrivateKey, constants.SecretKeyPrefix)
 	privKeyBytes, err := formatting.Decode(formatting.CB58, trimmedPrivateKey)
-
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
 
-	factory := crypto.FactorySECP256K1R{}
-	skIntf, err := factory.ToPrivateKey(privKeyBytes)
+	skIntf, err := service.vm.factory.ToPrivateKey(privKeyBytes)
 	if err != nil {
 		return fmt.Errorf("problem parsing private key: %w", err)
 	}
@@ -189,7 +187,7 @@ func (service *Service) GetBalance(_ *http.Request, args *api.JSONAddress, respo
 
 	addrs := ids.ShortSet{}
 	addrs.Add(addr)
-	utxos, _, _, err := service.vm.getAllUTXOs(addrs)
+	utxos, err := service.vm.getAllUTXOs(addrs)
 	if err != nil {
 		addr, err2 := service.vm.FormatLocalAddress(addr)
 		if err2 != nil {
@@ -286,8 +284,7 @@ func (service *Service) CreateAddress(_ *http.Request, args *api.UserPass, respo
 		return fmt.Errorf("keystore user has reached its limit of %d addresses", maxKeystoreAddresses)
 	}
 
-	factory := crypto.FactorySECP256K1R{}
-	key, err := factory.NewPrivateKey()
+	key, err := service.vm.factory.NewPrivateKey()
 	if err != nil {
 		return fmt.Errorf("couldn't create key: %w", err)
 	}
@@ -537,7 +534,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 		return nil
 	}
 
-	subnetSet := ids.Set{}
+	subnetSet := ids.NewSet(len(args.IDs))
 	for _, subnetID := range args.IDs {
 		if subnetSet.Contains(subnetID) {
 			continue
@@ -1936,7 +1933,6 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 				VMID:     chain.VMID,
 			})
 		}
-
 	}
 	return nil
 }
@@ -2165,13 +2161,14 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 		addrs.Add(addr)
 	}
 
+	currentStakers := service.vm.internalState.CurrentStakerChainState()
+	stakers := currentStakers.Stakers()
+
 	var (
 		totalStake uint64
-		stakedOuts []avax.TransferableOutput
+		stakedOuts = make([]avax.TransferableOutput, 0, len(stakers))
 	)
-
-	currentStakers := service.vm.internalState.CurrentStakerChainState()
-	for _, tx := range currentStakers.Stakers() { // Iterates over current stakers
+	for _, tx := range stakers { // Iterates over current stakers
 		stakedAmt, outs, err := service.getStakeHelper(tx, addrs)
 		if err != nil {
 			return err

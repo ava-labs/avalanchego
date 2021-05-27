@@ -50,9 +50,7 @@ var (
 	hasRunKey               = []byte{0x07}
 )
 
-var (
-	_ Indexer = &indexer{}
-)
+var _ Indexer = &indexer{}
 
 // Config for an indexer
 type Config struct {
@@ -260,7 +258,6 @@ func (i *indexer) RegisterChain(name string, ctx *snow.Context, engine common.En
 		}
 		return
 	}
-
 }
 
 func (i *indexer) registerChainHelper(

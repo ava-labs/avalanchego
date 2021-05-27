@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	_ codec.Registry = &codecRegistry{}
-)
+var _ codec.Registry = &codecRegistry{}
 
 type codecRegistry struct {
 	codecs      []codec.Registry

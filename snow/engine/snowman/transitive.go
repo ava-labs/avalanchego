@@ -593,9 +593,9 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdrBag.List()...)
-
+		vdrList := vdrBag.List()
+		vdrSet := ids.NewShortSet(len(vdrList))
+		vdrSet.Add(vdrList...)
 		t.Sender.PullQuery(vdrSet, t.RequestID, blkID)
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
@@ -613,8 +613,9 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdrBag.List()...)
+		vdrList := vdrBag.List()
+		vdrSet := ids.NewShortSet(len(vdrList))
+		vdrSet.Add(vdrList...)
 
 		t.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
 	} else if err != nil {

@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package utils
@@ -32,6 +32,14 @@ var (
 		float64(100 * time.Millisecond),
 		float64(time.Second),
 		// anything larger than a second will be bucketed together
+	}
+	MillisecondsHTTPBuckets = []float64{
+		100,  // 100 ms - instant
+		250,  // 250 ms - good
+		500,  // 500 ms - not great
+		1000, // 1 second - worrisome
+		5000, // 5 seconds - bad
+		// anything larger than 5 seconds will be bucketed together
 	}
 )
 

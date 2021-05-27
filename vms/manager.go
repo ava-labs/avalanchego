@@ -82,7 +82,6 @@ func (m *manager) GetVMFactory(vmID ids.ID) (VMFactory, error) {
 		return factory, nil
 	}
 	return nil, fmt.Errorf("no vm with ID '%v' has been registered", vmID)
-
 }
 
 // Map [vmID] to [factory]. [factory] creates new instances of the vm whose
@@ -98,20 +97,19 @@ func (m *manager) RegisterVMFactory(vmID ids.ID, factory VMFactory) error {
 	m.vmFactories[vmID] = factory
 
 	// add the static API endpoints
-	m.addStaticAPIEndpoints(vmID)
-	return nil
+	return m.addStaticAPIEndpoints(vmID)
 }
 
 // VMs can expose a static API (one that does not depend on the state of a particular chain.)
 // This method adds to the node's API server the static API of the VM with ID [vmID].
 // This allows clients to call the VM's static API methods.
-func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
+func (m *manager) addStaticAPIEndpoints(vmID ids.ID) error {
 	vmFactory, err := m.GetVMFactory(vmID)
 	m.log.AssertNoError(err)
 	m.log.Debug("adding static API for VM with ID %s", vmID)
 	vm, err := vmFactory.New(nil)
 	if err != nil {
-		return
+		return err
 	}
 
 	staticVM, ok := vm.(common.StaticVM)
@@ -120,9 +118,10 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 		if ok {
 			if err := staticVM.Shutdown(); err != nil {
 				m.log.Error("shutting down static API endpoints errored with: %s", err)
+				return err
 			}
 		}
-		return
+		return nil
 	}
 
 	handlers, err := staticVM.CreateStaticHandlers()
@@ -133,9 +132,10 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 		if ok {
 			if err := staticVM.Shutdown(); err != nil {
 				m.log.Error("shutting down static API endpoints errored with: %s", err)
+				return err
 			}
 		}
-		return
+		return nil
 	}
 
 	// all static endpoints go to the vm endpoint, defaulting to the vm id
@@ -147,6 +147,8 @@ func (m *manager) addStaticAPIEndpoints(vmID ids.ID) {
 		m.log.Verbo("adding static API endpoint: %s", defaultEndpoint+extension)
 		if err := m.apiServer.AddRoute(service, lock, defaultEndpoint, extension, m.log); err != nil {
 			m.log.Warn("failed to add static API endpoint %s: %v", fmt.Sprintf("%s%s", defaultEndpoint, extension), err)
+			return err
 		}
 	}
+	return nil
 }

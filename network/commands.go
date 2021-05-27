@@ -188,10 +188,6 @@ func (op Op) String() string {
 		return "pull_query"
 	case Chits:
 		return "chits"
-	case SignedVersion:
-		return "signed_version"
-	case SignedPeerList:
-		return "signed_peer_list"
 	default:
 		return "Unknown Op"
 	}
@@ -201,9 +197,9 @@ func (op Op) String() string {
 const (
 	// Handshake:
 	GetVersion Op = iota
-	Version
+	_
 	GetPeerList
-	PeerList
+	_
 	Ping
 	Pong
 	// Bootstrapping:
@@ -220,8 +216,8 @@ const (
 	PullQuery
 	Chits
 	// Handshake / peer gossiping
-	SignedVersion
-	SignedPeerList
+	Version
+	PeerList
 )
 
 // Defines the messages that can be sent/received with this network
@@ -229,9 +225,9 @@ var (
 	Messages = map[Op][]Field{
 		// Handshake:
 		GetVersion:  {},
-		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr},
+		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes},
 		GetPeerList: {},
-		PeerList:    {Peers},
+		PeerList:    {SignedPeers},
 		Ping:        {},
 		Pong:        {},
 		// Bootstrapping:
@@ -247,8 +243,5 @@ var (
 		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
-		// Signature:
-		SignedVersion:  {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes},
-		SignedPeerList: {SignedPeers},
 	}
 )

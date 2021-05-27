@@ -10,9 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader/greaderproto"
 )
 
-var (
-	_ greaderproto.ReaderServer = &Server{}
-)
+var _ greaderproto.ReaderServer = &Server{}
 
 // Server is an io.Reader that is managed over RPC.
 type Server struct {

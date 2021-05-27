@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -125,6 +125,8 @@ type VM struct {
 	// Key: block ID
 	// Value: the block
 	currentBlocks map[ids.ID]Block
+
+	lastVdrUpdate time.Time
 }
 
 // Initialize this blockchain.
@@ -271,6 +273,7 @@ func (vm *VM) Bootstrapped() error {
 	errs.Add(
 		vm.updateValidators(false),
 		vm.fx.Bootstrapped(),
+		vm.migrateUptimes(),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -408,6 +411,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptAPIRequest)
+	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterAPIRequest)
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}
@@ -452,9 +457,11 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 }
 
 func (vm *VM) updateValidators(force bool) error {
-	if !force && !vm.bootstrapped {
+	now := vm.clock.Time()
+	if !force && !vm.bootstrapped && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
 		return nil
 	}
+	vm.lastVdrUpdate = now
 
 	currentValidators := vm.internalState.CurrentStakerChainState()
 	primaryValidators, err := currentValidators.ValidatorSet(constants.PrimaryNetworkID)
