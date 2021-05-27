@@ -110,7 +110,6 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Networking
 	// Peer List Gossip
-	// todo look here for peer delay
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] peers to [%s] peers every [%s]",
 		NetworkPeerListSizeKey,
@@ -134,6 +133,13 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(ConnMeterMaxConnsKey, 5,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+	// Outgoing Connection Throttling
+	// When we make an outgoing connection we check the throttling configuration for the allowed
+	// number of actions per second. If the outgoing connection is within the limit we make that
+	// connection instantly, else we sleep for a randomised period to try again.
+	fs.Int(OutConnThrottlingRps, 50, "Throttle outgoing connections to this number of requests per second.")
+	fs.Duration(OutConnThrottlingMinBackoffDuration, 10*time.Millisecond, "Backoff for minimum this amount of time. Backoff is randomised between the min and max duration.")
+	fs.Duration(OutConnThrottlingMaxBackoffDuration, 500*time.Millisecond, "Backoff for maximum this amount of time. Backoff is randomised between the min and max duration.")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")

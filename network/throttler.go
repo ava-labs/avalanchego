@@ -4,20 +4,17 @@ import (
 	"golang.org/x/time/rate"
 	"math"
 	"math/rand"
-	"sync"
 	"time"
 )
 
 type Throttler struct {
 	limiter   *rate.Limiter
-	lock      sync.Mutex
 	onBackOff func(int)
 }
 
 func NewThrottler(throttleLimit int, onBackOffFn func(int)) Throttler {
 	return Throttler{
 		limiter:   rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		lock:      sync.Mutex{},
 		onBackOff: onBackOffFn,
 	}
 }
@@ -25,7 +22,6 @@ func NewThrottler(throttleLimit int, onBackOffFn func(int)) Throttler {
 func NewStaticBackoffThrottler(throttleLimit int, backOffDuration time.Duration) Throttler {
 	return Throttler{
 		limiter:   rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		lock:      sync.Mutex{},
 		onBackOff: staticBackoffFn(backOffDuration),
 	}
 }
@@ -39,7 +35,6 @@ func staticBackoffFn(backOffDuration time.Duration) func(attempt int) {
 func NewIncrementalBackoffThrottler(throttleLimit int, backOffDuration time.Duration, incrementDuration time.Duration) Throttler {
 	return Throttler{
 		limiter:   rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		lock:      sync.Mutex{},
 		onBackOff: incrementalBackoffFn(backOffDuration, incrementDuration),
 	}
 }
@@ -54,7 +49,6 @@ func incrementalBackoffFn(backOffDuration time.Duration, incrementDuration time.
 func NewRandomisedBackoffThrottler(throttleLimit int, minDuration, maxDuration time.Duration) Throttler {
 	return Throttler{
 		limiter:   rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		lock:      sync.Mutex{},
 		onBackOff: randomisedBackoffFn(maxDuration, minDuration),
 	}
 }

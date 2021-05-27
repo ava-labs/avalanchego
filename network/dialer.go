@@ -6,6 +6,7 @@ package network
 import (
 	"fmt"
 	"github.com/ava-labs/avalanchego/utils"
+	"math"
 	"net"
 	"time"
 )
@@ -22,8 +23,11 @@ type dialer struct {
 
 // NewDialer returns a new Dialer that calls `net.Dial` with the provided
 // network.
-func NewDialer(network string) Dialer {
-	return &dialer{network: network, throttler: NewRandomisedBackoffThrottler(2, time.Duration(1)*time.Millisecond, time.Duration(100)*time.Millisecond)}
+func NewDialer(network string, throttleAps int, minBackoff, maxBackoff time.Duration) Dialer {
+	if throttleAps <= 0 {
+		throttleAps = math.MaxInt32
+	}
+	return &dialer{network: network, throttler: NewRandomisedBackoffThrottler(throttleAps, minBackoff, maxBackoff)}
 }
 
 func (d *dialer) Dial(ip utils.IPDesc) (net.Conn, error) {
