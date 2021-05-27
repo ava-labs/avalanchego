@@ -47,7 +47,7 @@ func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *bloc
 
 	vm := &block.TestVM{}
 	vm.T = t
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 
 	vm.Default(true)
@@ -410,7 +410,7 @@ func TestEngineMultipleQuery(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 
 	vm.Default(true)
@@ -855,7 +855,7 @@ func TestVoteCanceling(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 
 	vm.Default(true)
@@ -975,7 +975,7 @@ func TestEngineNoQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 	te := &Transitive{}
 	if err := te.Initialize(config); err != nil {
@@ -1023,7 +1023,7 @@ func TestEngineNoRepollQuery(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 	te := &Transitive{}
 	if err := te.Initialize(config); err != nil {
@@ -1656,7 +1656,7 @@ func TestEngineAggressivePolling(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 
 	vm.Default(true)
@@ -1779,7 +1779,7 @@ func TestEngineDoubleChit(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 
 	vm.Default(true)
@@ -1911,7 +1911,7 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 
 	vm := &block.TestVM{}
 	vm.T = t
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 	config.ProVM = proVM
 
 	vm.Default(true)

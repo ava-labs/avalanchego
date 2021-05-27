@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
@@ -97,6 +98,7 @@ func (t *Transitive) finishBootstrapping() error {
 		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
 		return err
 	}
+	lastAccepted = lastAccepted.(*proposervm.ProposerBlock).GetWrappedBlock()
 
 	// initialize consensus to the last accepted blockID
 	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAccepted.Height()); err != nil {
@@ -666,6 +668,11 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// any potential reentrant bugs.
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
+
+	if propBlk, ok := blk.(*proposervm.ProposerBlock); ok {
+		blk = propBlk.GetWrappedBlock()
+	}
+
 	if blk, ok := blk.(OracleBlock); ok {
 		options, err := blk.Options()
 		if err != nil {

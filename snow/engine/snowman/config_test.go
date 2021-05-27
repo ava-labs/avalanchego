@@ -22,7 +22,7 @@ func DefaultConfig() Config {
 		Config: bootstrap.Config{
 			Config:  common.DefaultConfigTest(),
 			Blocked: blocked,
-			ProVM:   proposervm.New(&block.TestVM{}),
+			ProVM:   proposervm.NewProVM(&block.TestVM{}),
 		},
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),

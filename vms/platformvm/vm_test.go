@@ -2131,7 +2131,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Subnet:     subnet,
 			},
 			Blocked: blocked,
-			ProVM:   proposervm.New(vm),
+			ProVM:   proposervm.NewProVM(vm),
 		},
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),

@@ -40,7 +40,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 	vm := &block.TestVM{}
 	vm.T = t
 	vm.Default(true)
-	proVM := proposervm.New(vm)
+	proVM := proposervm.NewProVM(vm)
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{

@@ -17,7 +17,7 @@ type VM struct {
 	wrappedVM block.ChainVM
 }
 
-func New(vm block.ChainVM) VM {
+func NewProVM(vm block.ChainVM) VM {
 	return VM{
 		wrappedVM: vm,
 	}
@@ -33,27 +33,27 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
-	// This should stay a simple forwarder
+	// simply a forwarder
 	return vm.wrappedVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes, configBytes, toEngine, fxs)
 }
 
 func (vm *VM) Bootstrapping() error {
-	// This should stay a simple forwarder
+	// simply a forwarder
 	return vm.wrappedVM.Bootstrapping()
 }
 
 func (vm *VM) Bootstrapped() error {
-	// This should stay a simple forwarder
+	// simply a forwarder
 	return vm.wrappedVM.Bootstrapped()
 }
 
 func (vm *VM) Shutdown() error {
-	// This should stay a simple forwarder
+	// simply a forwarder
 	return vm.wrappedVM.Shutdown()
 }
 
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
-	// This should stay a simple forwarder
+	// simply a forwarder
 	return vm.wrappedVM.CreateHandlers()
 }
 
@@ -63,27 +63,30 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 
 //////// block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
-	// TODO: To be overridden to handle extra fields
-	return vm.wrappedVM.BuildBlock()
+	sb, err := vm.wrappedVM.BuildBlock()
+	proBlk := NewProBlock(sb) // here new block fields will be handled
+	return &proBlk, err
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	// TODO: To be overridden to handle extra fields
-	return vm.wrappedVM.ParseBlock(b)
+	sb, err := vm.wrappedVM.ParseBlock(b)
+	proBlk := NewProBlock(sb) // here new block fields will be handled
+	return &proBlk, err
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	// TODO: To be overridden to handle extra fields
-	return vm.wrappedVM.GetBlock(id)
+	sb, err := vm.wrappedVM.GetBlock(id)
+	proBlk := NewProBlock(sb) // here new block fields will be handled
+	return &proBlk, err
 }
 
 func (vm *VM) SetPreference(id ids.ID) error {
-	// This should stay a simple forwarder
+	// simply a forwarder
 	return vm.wrappedVM.SetPreference(id)
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	// This should stay a simple forwarder
+	// simply a forwarder
 	return vm.wrappedVM.LastAccepted()
 }
 
