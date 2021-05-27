@@ -27,19 +27,19 @@ func TestInterface(t *testing.T) {
 }
 
 func BenchmarkInterface(b *testing.B) {
-	for i, bench := range database.Benchmarks {
-		for _, size := range []int{32, 64, 128, 256, 512, 1024, 2048, 4096} {
-			folder := fmt.Sprintf("db%d_%d", i, size)
+	for _, size := range database.BenchmarkSizes {
+		keys, values := database.SetupBenchmark(b, size, size)
+		for _, bench := range database.Benchmarks {
+			folder := b.TempDir()
 
 			db, err := New(folder, logging.NoLog{}, 0, 0, 0)
 			if err != nil {
 				b.Fatal(err)
 			}
 
-			bench(b, db, "leveldb", 1000, size)
+			defer db.Close()
 
-			os.RemoveAll(folder)
-			db.Close()
+			bench(b, db, "leveldb", keys, values)
 		}
 	}
 }
