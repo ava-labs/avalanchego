@@ -36,7 +36,8 @@ func TestInterface(t *testing.T) {
 		dialer := grpc.WithContextDialer(
 			func(context.Context, string) (net.Conn, error) {
 				return listener.Dial()
-			})
+			},
+		)
 
 		ctx := context.Background()
 		conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
@@ -50,6 +51,10 @@ func TestInterface(t *testing.T) {
 		if err := conn.Close(); err != nil {
 			t.Fatal(err)
 		}
+		if err := listener.Close(); err != nil {
+			t.Fatal(err)
+		}
+		server.Stop()
 	}
 }
 
@@ -69,7 +74,8 @@ func BenchmarkInterface(b *testing.B) {
 			dialer := grpc.WithContextDialer(
 				func(context.Context, string) (net.Conn, error) {
 					return listener.Dial()
-				})
+				},
+			)
 
 			ctx := context.Background()
 			conn, err := grpc.DialContext(ctx, "", dialer, grpc.WithInsecure())
@@ -81,7 +87,13 @@ func BenchmarkInterface(b *testing.B) {
 
 			bench(b, db, "rpcdb", keys, values)
 
-			conn.Close()
+			if err := conn.Close(); err != nil {
+				b.Fatal(err)
+			}
+			if err := listener.Close(); err != nil {
+				b.Fatal(err)
+			}
+			server.Stop()
 		}
 	}
 }
