@@ -57,7 +57,7 @@ func NewIncrementalBackoffThrottler(throttleLimit int, backOffDuration time.Dura
 
 func incrementalBackoffFn(backOffDuration time.Duration, incrementDuration time.Duration) func(attempt int) {
 	return func(attempt int) {
-		sleepMillis := float64(backOffDuration.Milliseconds()) + math.Pow(float64(incrementDuration), float64(attempt))
+		sleepMillis := float64(backOffDuration.Milliseconds()) + math.Pow(float64(incrementDuration.Milliseconds()), float64(attempt))
 		time.Sleep(time.Duration(sleepMillis) * time.Millisecond)
 	}
 }
