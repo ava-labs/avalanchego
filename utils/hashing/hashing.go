@@ -4,9 +4,7 @@
 package hashing
 
 import (
-	"bytes"
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"io"
 
@@ -38,19 +36,6 @@ func ComputeHash256Array(buf []byte) Hash256 {
 func ComputeHash256(buf []byte) []byte {
 	arr := ComputeHash256Array(buf)
 	return arr[:]
-}
-
-// ByteArraysToHash256Array takes in byte arrays and outputs a fixed 32 length
-//					byte array for the hash
-func ByteArraysToHash256Array(byteArray ...[]byte) [32]byte {
-	buffer := new(bytes.Buffer)
-	for _, b := range byteArray {
-		err := binary.Write(buffer, binary.LittleEndian, b)
-		if err != nil {
-			panic(err)
-		}
-	}
-	return ComputeHash256Array(buffer.Bytes())
 }
 
 // ComputeHash256Ranges Compute a cryptographically strong 256 bit hash of the input
