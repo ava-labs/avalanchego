@@ -341,7 +341,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 	block, err := vm.GetBlock(blockID)
-	if err == nil {
+	if err == nil && block.Status() == choices.Rejected {
 		b := block.(*ProposalBlock)
 		b.SetStatus(choices.Processing) // Change state of this block
 
