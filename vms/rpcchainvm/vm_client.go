@@ -312,7 +312,25 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
-	return map[string]*common.HTTPHandler{}, nil
+	resp, err := vm.client.CreateStaticHandlers(context.Background(), &vmproto.CreateStaticHandlersRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
+	for _, handler := range resp.Handlers {
+		conn, err := vm.broker.Dial(handler.Server)
+		if err != nil {
+			return nil, err
+		}
+
+		vm.conns = append(vm.conns, conn)
+		handlers[handler.Prefix] = &common.HTTPHandler{
+			LockOptions: common.LockOption(handler.LockOptions),
+			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
+		}
+	}
+	return handlers, nil
 }
 
 func (vm *VMClient) buildBlock() (snowman.Block, error) {

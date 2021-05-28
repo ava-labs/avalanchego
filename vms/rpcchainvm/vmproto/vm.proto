@@ -139,7 +139,7 @@ service VM {
     rpc Bootstrapped(BootstrappedRequest) returns (BootstrappedResponse);
     rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
     rpc CreateHandlers(CreateHandlersRequest) returns (CreateHandlersResponse);
-    rpc CreateStaticHandlers(CreateHandlersRequest) returns (CreateHandlersResponse);
+    rpc CreateStaticHandlers(CreateStaticHandlersRequest) returns (CreateStaticHandlersResponse);
     rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);

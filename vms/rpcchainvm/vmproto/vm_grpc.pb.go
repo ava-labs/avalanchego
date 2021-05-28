@@ -27,7 +27,7 @@ type VMClient interface {
 	Bootstrapped(ctx context.Context, in *BootstrappedRequest, opts ...grpc.CallOption) (*BootstrappedResponse, error)
 	Shutdown(ctx context.Context, in *ShutdownRequest, opts ...grpc.CallOption) (*ShutdownResponse, error)
 	CreateHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
-	CreateStaticHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
+	CreateStaticHandlers(ctx context.Context, in *CreateStaticHandlersRequest, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error)
 	BuildBlock(ctx context.Context, in *BuildBlockRequest, opts ...grpc.CallOption) (*BuildBlockResponse, error)
 	ParseBlock(ctx context.Context, in *ParseBlockRequest, opts ...grpc.CallOption) (*ParseBlockResponse, error)
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*GetBlockResponse, error)
@@ -91,8 +91,8 @@ func (c *vMClient) CreateHandlers(ctx context.Context, in *CreateHandlersRequest
 	return out, nil
 }
 
-func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error) {
-	out := new(CreateHandlersResponse)
+func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *CreateStaticHandlersRequest, opts ...grpc.CallOption) (*CreateStaticHandlersResponse, error) {
+	out := new(CreateStaticHandlersResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/CreateStaticHandlers", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -181,7 +181,7 @@ type VMServer interface {
 	Bootstrapped(context.Context, *BootstrappedRequest) (*BootstrappedResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*ShutdownResponse, error)
 	CreateHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error)
-	CreateStaticHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error)
+	CreateStaticHandlers(context.Context, *CreateStaticHandlersRequest) (*CreateStaticHandlersResponse, error)
 	BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error)
 	ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error)
 	GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error)
@@ -212,7 +212,7 @@ func (UnimplementedVMServer) Shutdown(context.Context, *ShutdownRequest) (*Shutd
 func (UnimplementedVMServer) CreateHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHandlers not implemented")
 }
-func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error) {
+func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *CreateStaticHandlersRequest) (*CreateStaticHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticHandlers not implemented")
 }
 func (UnimplementedVMServer) BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error) {
@@ -343,7 +343,7 @@ func _VM_CreateHandlers_Handler(srv interface{}, ctx context.Context, dec func(i
 }
 
 func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateHandlersRequest)
+	in := new(CreateStaticHandlersRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -355,7 +355,7 @@ func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec 
 		FullMethod: "/vmproto.VM/CreateStaticHandlers",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*CreateHandlersRequest))
+		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*CreateStaticHandlersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
