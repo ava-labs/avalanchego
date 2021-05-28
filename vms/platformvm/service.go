@@ -2089,8 +2089,10 @@ func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []av
 		outs = staker.Stake
 	case *UnsignedAddValidatorTx:
 		outs = staker.Stake
+	case *UnsignedAddSubnetValidatorTx:
+		return 0, nil, nil
 	default:
-		service.vm.ctx.Log.Warn("expected *UnsignedAddDelegatorTx or *UnsignedAddValidatorTx but got %T", tx.UnsignedTx)
+		service.vm.ctx.Log.Warn("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
 	}
 
 	var (
