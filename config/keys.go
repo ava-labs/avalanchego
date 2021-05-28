@@ -28,7 +28,7 @@ const (
 	DynamicPublicIPResolverKey              = "dynamic-public-ip"
 	ConnMeterResetDurationKey               = "conn-meter-reset-duration"
 	ConnMeterMaxConnsKey                    = "conn-meter-max-conns"
-	OutConnThrottlingRps                    = "out-conn-throttling-rps"
+	OutConnThrottlingAps                    = "out-conn-throttling-aps"
 	OutConnThrottlingMinBackoffDuration     = "out-conn-min-backoff-duration"
 	OutConnThrottlingMaxBackoffDuration     = "out-conn-max-backoff-duration"
 	HTTPHostKey                             = "http-host"
