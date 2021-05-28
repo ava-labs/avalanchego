@@ -76,9 +76,7 @@ type Config struct {
 	PeerListSize        uint32
 	PeerListGossipSize  uint32
 	PeerListGossipFreq  time.Duration
-	OutConnThrottleAps  uint32
-	OutConnMinBackoff   time.Duration
-	OutConnMaxBackoff   time.Duration
+	DialerConfig        network.DialerConfig
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config

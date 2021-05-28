@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/ava-labs/avalanchego/network"
 	"io/ioutil"
 	"net"
 	"os"
@@ -610,12 +611,14 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Outbound connection throttling
-	nodeConfig.OutConnThrottleAps = v.GetUint32(OutConnThrottlingAps)
-	nodeConfig.OutConnMinBackoff = v.GetDuration(OutConnThrottlingMinBackoffDuration)
-	nodeConfig.OutConnMaxBackoff = v.GetDuration(OutConnThrottlingMaxBackoffDuration)
-	if nodeConfig.OutConnMaxBackoff < nodeConfig.OutConnMinBackoff {
+	outConnThrottleAps := v.GetUint32(OutConnThrottlingAps)
+	outConnMinBackoff := v.GetDuration(OutConnThrottlingMinBackoffDuration)
+	outConnMaxBackoff := v.GetDuration(OutConnThrottlingMaxBackoffDuration)
+	if outConnMaxBackoff < outConnMinBackoff {
 		return node.Config{}, process.Config{}, errors.New("outbound connection backoff max duration must be greater than min duration")
 	}
+
+	nodeConfig.DialerConfig = network.NewDialerConfig(outConnThrottleAps, outConnMinBackoff, outConnMaxBackoff)
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)

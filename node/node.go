@@ -165,8 +165,7 @@ func (n *Node) initNetworking() error {
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
 
-	dialerConfig := network.NewDialerConfig(n.Config.OutConnThrottleAps, n.Config.OutConnMinBackoff, n.Config.OutConnMaxBackoff)
-	dialer := network.NewDialer(TCP, dialerConfig)
+	dialer := network.NewDialer(TCP, n.Config.DialerConfig)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -255,9 +254,7 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
-		n.Config.OutConnThrottleAps,
-		n.Config.OutConnMinBackoff,
-		n.Config.OutConnMaxBackoff,
+		n.Config.DialerConfig,
 		n.Config.FetchOnly,
 	)
 

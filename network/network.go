@@ -145,9 +145,7 @@ type network struct {
 	// Gossip a peer list to this many peers when gossiping
 	peerListGossipSize           int
 	peerListStakerGossipFraction int
-	outConnThrottleAps           uint32
-	outConnMinBackoff            time.Duration
-	outConnMaxBackoff            time.Duration
+	dialerConfig                 DialerConfig
 	getVersionTimeout            time.Duration
 	allowPrivateIPs              bool
 	gossipSize                   int
@@ -242,9 +240,7 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
-	outConnThrottleAps uint32,
-	outConnMinBackoff,
-	outConnMaxBackoff time.Duration,
+	dialerConfig DialerConfig,
 	isFetchOnly bool,
 ) Network {
 	return NewNetwork(
@@ -286,9 +282,7 @@ func NewDefaultNetwork(
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
-		outConnThrottleAps,
-		outConnMinBackoff,
-		outConnMaxBackoff,
+		dialerConfig,
 		tlsKey,
 		isFetchOnly,
 	)
@@ -334,9 +328,7 @@ func NewNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
-	outConnThrottleAps uint32,
-	outConnMinBackoff,
-	outConnMaxBackoff time.Duration,
+	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
 ) Network {
@@ -370,9 +362,7 @@ func NewNetwork(
 		peerListGossipFreq:                 peerListGossipFreq,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
-		outConnThrottleAps:                 outConnThrottleAps,
-		outConnMinBackoff:                  outConnMinBackoff,
-		outConnMaxBackoff:                  outConnMaxBackoff,
+		dialerConfig:                       dialerConfig,
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
 		gossipSize:                         gossipSize,
