@@ -145,7 +145,7 @@ type network struct {
 	// Gossip a peer list to this many peers when gossiping
 	peerListGossipSize           int
 	peerListStakerGossipFraction int
-	outConnThrottleAps           int
+	outConnThrottleAps           uint32
 	outConnMinBackoff            time.Duration
 	outConnMaxBackoff            time.Duration
 	getVersionTimeout            time.Duration
@@ -242,7 +242,7 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
-	outConnThrottleAps int,
+	outConnThrottleAps uint32,
 	outConnMinBackoff,
 	outConnMaxBackoff time.Duration,
 	isFetchOnly bool,
@@ -334,7 +334,7 @@ func NewNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
-	outConnThrottleAps int,
+	outConnThrottleAps uint32,
 	outConnMinBackoff,
 	outConnMaxBackoff time.Duration,
 	tlsKey crypto.Signer,

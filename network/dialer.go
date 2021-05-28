@@ -23,11 +23,11 @@ type dialer struct {
 
 // NewDialer returns a new Dialer that calls `net.Dial` with the provided
 // network.
-func NewDialer(network string, throttleAps int, minBackoff, maxBackoff time.Duration) Dialer {
+func NewDialer(network string, throttleAps uint32, minBackoff, maxBackoff time.Duration) Dialer {
 	if throttleAps <= 0 {
 		throttleAps = math.MaxInt32
 	}
-	return &dialer{network: network, throttler: NewRandomisedBackoffThrottler(throttleAps, minBackoff, maxBackoff)}
+	return &dialer{network: network, throttler: NewRandomisedBackoffThrottler(int(throttleAps), minBackoff, maxBackoff)}
 }
 
 func (d *dialer) Dial(ip utils.IPDesc) (net.Conn, error) {

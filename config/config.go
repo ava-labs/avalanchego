@@ -137,7 +137,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// When we make an outgoing connection we check the throttling configuration for the allowed
 	// number of actions per second. If the outgoing connection is within the limit we make that
 	// connection instantly, else we sleep for a randomised period to try again.
-	fs.Int(OutConnThrottlingRps, 50, "Throttle outgoing connections to this number of requests per second.")
+	fs.Uint(OutConnThrottlingRps, 50, "Throttle outgoing connections to this number of requests per second.")
 	fs.Duration(OutConnThrottlingMinBackoffDuration, 10*time.Millisecond, "Backoff for minimum this amount of time. Backoff is randomised between the min and max duration.")
 	fs.Duration(OutConnThrottlingMaxBackoffDuration, 500*time.Millisecond, "Backoff for maximum this amount of time. Backoff is randomised between the min and max duration.")
 	// Timeouts
