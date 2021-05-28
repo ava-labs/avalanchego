@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"golang.org/x/time/rate"
 	"math/rand"
 	"time"
@@ -63,12 +64,20 @@ type Throttler interface {
 	Acquire()
 }
 
-type BlockingThrottler struct {
+type WaitingThrottler struct {
+	limiter *rate.Limiter
+}
+
+type BackoffThrottler struct {
 	limiter       *rate.Limiter
 	backoffPolicy BackoffPolicy
 }
 
-func (t BlockingThrottler) Acquire() {
+func (w WaitingThrottler) Acquire() {
+	_ = w.limiter.Wait(context.Background())
+}
+
+func (t BackoffThrottler) Acquire() {
 	attempt := 0
 	for {
 		if t.limiter.Allow() {
@@ -80,29 +89,35 @@ func (t BlockingThrottler) Acquire() {
 	}
 }
 
-func NewThrottler(throttleLimit int, backoffPolicy BackoffPolicy) Throttler {
-	return BlockingThrottler{
+func NewBackoffThrottler(throttleLimit int, backoffPolicy BackoffPolicy) Throttler {
+	return BackoffThrottler{
 		limiter:       rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 		backoffPolicy: backoffPolicy,
 	}
 }
 
+func NewWaitingThrottler(throttleLimit int) Throttler {
+	return WaitingThrottler{
+		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
+	}
+}
+
 func NewStaticBackoffThrottler(throttleLimit int, backOffDuration time.Duration) Throttler {
-	return BlockingThrottler{
+	return BackoffThrottler{
 		limiter:       rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 		backoffPolicy: StaticBackoffPolicy{backoffDuration: backOffDuration},
 	}
 }
 
 func NewIncrementalBackoffThrottler(throttleLimit int, backOffDuration time.Duration, incrementDuration time.Duration) Throttler {
-	return BlockingThrottler{
+	return BackoffThrottler{
 		limiter:       rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 		backoffPolicy: IncrementalBackoffPolicy{backoffDuration: backOffDuration, incrementDuration: incrementDuration},
 	}
 }
 
 func NewRandomisedBackoffThrottler(throttleLimit int, minDuration, maxDuration time.Duration) Throttler {
-	return BlockingThrottler{
+	return BackoffThrottler{
 		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 		backoffPolicy: RandomisedBackoffPolicy{
 			minDuration: minDuration,
