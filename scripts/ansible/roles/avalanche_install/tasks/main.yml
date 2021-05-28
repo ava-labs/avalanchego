@@ -32,7 +32,7 @@
       mode: u=rX,go=
     - path: "{{ avalanche_daemon_log_dir }}"
       mode: u=rwX,go=rX
-    - path: "{{ avalanche_daemon_plugin_dir }}"
+    - path: "{{ avalanche_daemon_lib_dir }}"
       owner: root
       group: root
       mode: u=rwX,go=rX
@@ -54,16 +54,29 @@
   notify:
     - Restart Avalanche service
 
-- name: Install Avalanche plugins
+- name: Remove outdataed support files
+  become: true
+  file:
+    path: "{{ item.path }}"
+    state: absent
+  loop:
+    - path: "{{ avalanche_daemon_lib_dir }}/evm"
+  notify:
+    - Restart Avalanche service
+
+- name: Install support files
   become: true
   copy:
-    src: "{{ item.path }}"
-    dest: "{{ avalanche_daemon_plugin_dir }}"
+    src: "{{ item.src }}"
+    dest: "{{ avalanche_daemon_lib_dir }}/"
     owner: root
     group: root
     mode: u=rwx,go=rx
     remote_src: true
   loop:
-    - path: "{{ repo_folder }}/build/plugins/evm"
+    - src: "{{ repo_folder }}/build/avalanchego-preupgrade"
+    - src: "{{ repo_folder }}/build/avalanchego-latest"
+  loop_control:
+    label: "{{ avalanche_daemon_lib_dir }}/{{ item.src | basename }}"
   notify:
     - Restart Avalanche service
