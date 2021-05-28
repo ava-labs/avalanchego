@@ -35,7 +35,6 @@ func (m *metrics) Initialize(
 	m.numBootstrappedCalls = newCallsMetric(namespace, "bootstrapped")
 	m.numCreateHandlersCalls = newCallsMetric(namespace, "create_handlers")
 
-
 	m.numTxRefreshes = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "tx_refreshes",
