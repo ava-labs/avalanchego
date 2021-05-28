@@ -48,13 +48,9 @@ func TestInterface(t *testing.T) {
 		db := NewClient(rpcdbproto.NewDatabaseClient(conn))
 		test(t, db)
 
-		if err := conn.Close(); err != nil {
-			t.Fatal(err)
-		}
-		if err := listener.Close(); err != nil {
-			t.Fatal(err)
-		}
 		server.Stop()
+		_ = conn.Close()
+		_ = listener.Close()
 	}
 }
 
@@ -87,13 +83,9 @@ func BenchmarkInterface(b *testing.B) {
 
 			bench(b, db, "rpcdb", keys, values)
 
-			if err := conn.Close(); err != nil {
-				b.Fatal(err)
-			}
-			if err := listener.Close(); err != nil {
-				b.Fatal(err)
-			}
 			server.Stop()
+			_ = conn.Close()
+			_ = listener.Close()
 		}
 	}
 }
