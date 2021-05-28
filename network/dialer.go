@@ -40,13 +40,16 @@ func NewDialer(network string, dialerConfig DialerConfig) Dialer {
 	if dialerConfig.throttleAps <= 0 {
 		dialerConfig.throttleAps = math.MaxInt32
 	}
-	return &dialer{network: network, throttler: NewRandomisedBackoffThrottler(int(dialerConfig.throttleAps), dialerConfig.minBackoff, dialerConfig.maxBackoff)}
+	return &dialer{
+		network:   network,
+		throttler: NewRandomisedBackoffThrottler(int(dialerConfig.throttleAps), dialerConfig.minBackoff, dialerConfig.maxBackoff),
+	}
 }
 
 func (d *dialer) Dial(ip utils.IPDesc) (net.Conn, error) {
-	e := d.throttler.Acquire()
-	if e != nil {
-		return nil, e
+	err := d.throttler.Acquire()
+	if err != nil {
+		return nil, err
 	}
 	return net.Dial(d.network, ip.String())
 }
