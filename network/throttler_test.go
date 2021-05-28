@@ -1,8 +1,8 @@
 package network
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"testing"
 	"time"
 )
@@ -26,41 +26,43 @@ func TestIncrementalBackoffPolicy(t *testing.T) {
 	assert.Equal(t, (3*time.Second)+(5*time.Second), attempt1Duration)
 }
 
+func submitAndWait(fn func(), times int) {
+	goFn := func(w *sync.WaitGroup) {
+		fn()
+		w.Done()
+	}
+
+	wg := sync.WaitGroup{}
+	wg.Add(times)
+	for i := 0; i < times; i++ {
+		go goFn(&wg)
+	}
+	wg.Wait()
+}
+
 func TestAcquireLock(t *testing.T) {
 	thr := NewStaticBackoffThrottler(3, time.Duration(2)*time.Second)
 	t1 := time.Now()
-	fmt.Println("Acquire quick!")
-	thr.Acquire()
-	fmt.Println("Acquire quick!")
-	thr.Acquire()
-	fmt.Println("Acquire quick!")
-	thr.Acquire()
+	submitAndWait(thr.Acquire, 3)
 	t2 := time.Now()
 
-	thr = NewStaticBackoffThrottler(2, time.Duration(2)*time.Second)
-	t1 = time.Now()
-	fmt.Println("Acquire quick!")
-	thr.Acquire()
-	fmt.Println("Acquire quick!")
-	thr.Acquire()
-
-	fmt.Println("Acquire wait...")
-	thr.Acquire()
-	fmt.Println("Acquire wait...")
-	thr.Acquire()
+	// Create throttler with 2 aps limit and static backoff of 1 second
+	// We create a waitgroup for 4 actions, submit all 4 using goroutines and wait for them
+	// to complete. Since it is 2 actions allowed per second, the total time for all 4
+	// concurrent requests should be around 1 second.
+	thr = NewStaticBackoffThrottler(2, time.Duration(1)*time.Second)
+	submitAndWait(thr.Acquire, 4)
 	t2 = time.Now()
 
 	delayedDuration := t2.Sub(t1)
 
-	assert.Greater(t, delayedDuration, time.Duration(2)*time.Second)
+	assert.Greater(t, delayedDuration, 1*time.Second)
+	assert.Less(t, delayedDuration, 2*time.Second)
 
 	time.Sleep(2 * time.Second)
 
 	t1 = time.Now()
-	fmt.Println("Acquire quick!")
-	thr.Acquire()
-	fmt.Println("Acquire quick!")
-	thr.Acquire()
+	submitAndWait(thr.Acquire, 2)
 	t2 = time.Now()
 
 	finalDuration := t2.Sub(t1)
