@@ -1,5 +1,6 @@
 syntax = "proto3";
 package gwriterproto;
+option go_package = "github.com/ava-labs/avalanchego/rpcchainvm/ghttp/gwriter/gwriterproto";
 
 message WriteRequest {
     bytes payload = 1;
