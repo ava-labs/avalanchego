@@ -1,5 +1,6 @@
 syntax = "proto3";
 package vmproto;
+option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto";
 
 // To compile: protoc --go_out=plugins=grpc:. vm.proto
 

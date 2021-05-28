@@ -15,6 +15,7 @@ var _ gsubnetlookupproto.SubnetLookupServer = &Server{}
 
 // Server is a subnet lookup that is managed over RPC.
 type Server struct {
+	gsubnetlookupproto.UnimplementedSubnetLookupServer
 	aliaser snow.SubnetLookup
 }
 
