@@ -109,5 +109,5 @@ const (
 	PeerAliasTimeoutKey                     = "peer-alias-timeout"
 	PluginModeKey                           = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey     = "bootstrap-beacon-connection-timeout"
-	ChainConfigDirKey                       = "chainconfig-dir"
+	ChainConfigDirKey                       = "chain-config-dir"
 )
