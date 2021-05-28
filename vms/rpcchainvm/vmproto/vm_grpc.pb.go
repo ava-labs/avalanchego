@@ -27,6 +27,7 @@ type VMClient interface {
 	Bootstrapped(ctx context.Context, in *BootstrappedRequest, opts ...grpc.CallOption) (*BootstrappedResponse, error)
 	Shutdown(ctx context.Context, in *ShutdownRequest, opts ...grpc.CallOption) (*ShutdownResponse, error)
 	CreateHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
+	CreateStaticHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error)
 	BuildBlock(ctx context.Context, in *BuildBlockRequest, opts ...grpc.CallOption) (*BuildBlockResponse, error)
 	ParseBlock(ctx context.Context, in *ParseBlockRequest, opts ...grpc.CallOption) (*ParseBlockResponse, error)
 	GetBlock(ctx context.Context, in *GetBlockRequest, opts ...grpc.CallOption) (*GetBlockResponse, error)
@@ -84,6 +85,15 @@ func (c *vMClient) Shutdown(ctx context.Context, in *ShutdownRequest, opts ...gr
 func (c *vMClient) CreateHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error) {
 	out := new(CreateHandlersResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/CreateHandlers", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) CreateStaticHandlers(ctx context.Context, in *CreateHandlersRequest, opts ...grpc.CallOption) (*CreateHandlersResponse, error) {
+	out := new(CreateHandlersResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/CreateStaticHandlers", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -171,6 +181,7 @@ type VMServer interface {
 	Bootstrapped(context.Context, *BootstrappedRequest) (*BootstrappedResponse, error)
 	Shutdown(context.Context, *ShutdownRequest) (*ShutdownResponse, error)
 	CreateHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error)
+	CreateStaticHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error)
 	BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error)
 	ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error)
 	GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error)
@@ -200,6 +211,9 @@ func (UnimplementedVMServer) Shutdown(context.Context, *ShutdownRequest) (*Shutd
 }
 func (UnimplementedVMServer) CreateHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHandlers not implemented")
+}
+func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticHandlers not implemented")
 }
 func (UnimplementedVMServer) BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildBlock not implemented")
@@ -324,6 +338,24 @@ func _VM_CreateHandlers_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(VMServer).CreateHandlers(ctx, req.(*CreateHandlersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_CreateStaticHandlers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateHandlersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).CreateStaticHandlers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/CreateStaticHandlers",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).CreateStaticHandlers(ctx, req.(*CreateHandlersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -498,6 +530,10 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateHandlers",
 			Handler:    _VM_CreateHandlers_Handler,
+		},
+		{
+			MethodName: "CreateStaticHandlers",
+			Handler:    _VM_CreateStaticHandlers_Handler,
 		},
 		{
 			MethodName: "BuildBlock",
