@@ -613,6 +613,9 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.OutConnThrottleAps = v.GetUint32(OutConnThrottlingAps)
 	nodeConfig.OutConnMinBackoff = v.GetDuration(OutConnThrottlingMinBackoffDuration)
 	nodeConfig.OutConnMaxBackoff = v.GetDuration(OutConnThrottlingMaxBackoffDuration)
+	if nodeConfig.OutConnMaxBackoff < nodeConfig.OutConnMinBackoff {
+		return node.Config{}, process.Config{}, errors.New("outbound connection backoff max duration must be greater than min duration")
+	}
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
