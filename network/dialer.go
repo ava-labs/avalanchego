@@ -44,6 +44,9 @@ func NewDialer(network string, dialerConfig DialerConfig) Dialer {
 }
 
 func (d *dialer) Dial(ip utils.IPDesc) (net.Conn, error) {
-	d.throttler.Acquire()
+	e := d.throttler.Acquire()
+	if e != nil {
+		return nil, e
+	}
 	return net.Dial(d.network, ip.String())
 }

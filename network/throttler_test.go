@@ -26,9 +26,9 @@ func TestIncrementalBackoffPolicy(t *testing.T) {
 	assert.Equal(t, (3*time.Second)+(10*time.Second), attempt2Duration)
 }
 
-func submitConcurrentlyAndWait(fn func(), times int) {
+func submitConcurrentlyAndWait(fn func() error, times int) {
 	goFn := func(w *sync.WaitGroup) {
-		fn()
+		_ = fn()
 		w.Done()
 	}
 
