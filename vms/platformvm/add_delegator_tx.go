@@ -25,7 +25,6 @@ import (
 var (
 	errDelegatorSubset = errors.New("delegator's time range must be a subset of the validator's time range")
 	errInvalidState    = errors.New("generated output isn't valid state")
-	errCapWeightBroken = errors.New("validator would surpass maximum weight")
 	errOverDelegated   = errors.New("validator would be over delegated")
 
 	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
@@ -193,9 +192,6 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		newWeight, err := safemath.Add64(maxWeight, tx.Validator.Wght)
 		if err != nil {
 			return nil, nil, nil, nil, permError{errStakeOverflow}
-		}
-		if newWeight > vm.maxValidatorStake {
-			return nil, nil, nil, nil, permError{errCapWeightBroken}
 		}
 
 		delegationRestrict, err := safemath.Mul64(5, vdrWeight)

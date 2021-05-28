@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -334,6 +335,24 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.Ctx.Log.Info("initializing last accepted block as %s", lastAcceptedID)
+
+	blockID, err := ids.FromString("SHraz7TtMfTQ5DX1rREhNZW1bi7PpPzAq7xoJAwrWNQrLhQcD")
+	if err != nil {
+		return err
+	}
+	block, err := vm.GetBlock(blockID)
+	if err == nil {
+		b := block.(*ProposalBlock)
+		b.SetStatus(choices.Processing) // Change state of this block
+
+		// Persist data
+		if err := b.VM.State.PutStatus(b.VM.DB, blockID, choices.Processing); err != nil {
+			return err
+		}
+		if err := b.VM.DB.Commit(); err != nil {
+			return err
+		}
+	}
 
 	// Build off the most recently accepted block
 	if err := vm.SetPreference(lastAcceptedID); err != nil {
