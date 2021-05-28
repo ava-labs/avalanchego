@@ -767,12 +767,12 @@ func (m *manager) getChainConfig(id ids.ID) ChainConfig {
 	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
 		return val
 	}
-	alias, err := m.PrimaryAlias(id)
-	if err != nil {
-		return ChainConfig{}
+	aliases := m.Aliases(id)
+	for _, alias := range aliases {
+		if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
+			return val
+		}
 	}
-	if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
-		return val
-	}
+
 	return ChainConfig{}
 }
