@@ -21,7 +21,7 @@ func TestIncrementalBackoffPolicy(t *testing.T) {
 		incrementDuration: 5 * time.Second,
 	}
 	attempt0Duration := policy.GetBackoffDuration(0)
-	assert.Equal(t, (3*time.Second)+(1*time.Millisecond), attempt0Duration)
+	assert.Equal(t, 3*time.Second, attempt0Duration)
 	attempt1Duration := policy.GetBackoffDuration(1)
 	assert.Equal(t, (3*time.Second)+(5*time.Second), attempt1Duration)
 }

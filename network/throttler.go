@@ -2,7 +2,6 @@ package network
 
 import (
 	"golang.org/x/time/rate"
-	"math"
 	"math/rand"
 	"time"
 )
@@ -31,7 +30,7 @@ type IncrementalBackoffPolicy struct {
 func (n IncrementalBackoffPolicy) GetBackoffDuration(attempt int) time.Duration {
 	incrementDurationMillis := n.GetIncrementDuration().Milliseconds()
 	backoffDurationMillis := n.backoffDuration.Milliseconds()
-	sleepMillis := backoffDurationMillis + int64(math.Pow(float64(incrementDurationMillis), float64(attempt)))
+	sleepMillis := backoffDurationMillis + (incrementDurationMillis * int64(attempt))
 	return time.Duration(sleepMillis) * time.Millisecond
 }
 
@@ -70,7 +69,7 @@ type BlockingThrottler struct {
 }
 
 func (t BlockingThrottler) Acquire() {
-	attempt := 1
+	attempt := 0
 	for {
 		if t.limiter.Allow() {
 			break
