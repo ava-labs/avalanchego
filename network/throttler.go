@@ -7,121 +7,121 @@ import (
 	"time"
 )
 
-type BackoffPolicy interface {
-	Backoff(attempt int)
+type backoffPolicy interface {
+	backoff(attempt int)
 }
 
-type StaticBackoffPolicy struct {
+type staticBackoffPolicy struct {
 	backoffDuration time.Duration
 }
 
-func (p StaticBackoffPolicy) GetBackoffDuration() time.Duration {
+func (p staticBackoffPolicy) getBackoffDuration() time.Duration {
 	return p.backoffDuration
 }
 
-func (p StaticBackoffPolicy) Backoff(_ int) {
-	time.Sleep(p.GetBackoffDuration())
+func (p staticBackoffPolicy) backoff(_ int) {
+	time.Sleep(p.getBackoffDuration())
 }
 
-type IncrementalBackoffPolicy struct {
+type incrementalBackoffPolicy struct {
 	backoffDuration   time.Duration
 	incrementDuration time.Duration
 }
 
-func (n IncrementalBackoffPolicy) GetBackoffDuration(attempt int) time.Duration {
-	incrementDurationMillis := n.GetIncrementDuration().Milliseconds()
+func (n incrementalBackoffPolicy) getBackoffDuration(attempt int) time.Duration {
+	incrementDurationMillis := n.getIncrementDuration().Milliseconds()
 	backoffDurationMillis := n.backoffDuration.Milliseconds()
 	sleepMillis := backoffDurationMillis + (incrementDurationMillis * int64(attempt))
 	return time.Duration(sleepMillis) * time.Millisecond
 }
 
-func (n IncrementalBackoffPolicy) GetIncrementDuration() time.Duration {
+func (n incrementalBackoffPolicy) getIncrementDuration() time.Duration {
 	return n.incrementDuration
 }
 
-func (n IncrementalBackoffPolicy) Backoff(attempt int) {
-	time.Sleep(n.GetBackoffDuration(attempt))
+func (n incrementalBackoffPolicy) backoff(attempt int) {
+	time.Sleep(n.getBackoffDuration(attempt))
 }
 
-type RandomisedBackoffPolicy struct {
+type randomisedBackoffPolicy struct {
 	minDuration time.Duration
 	maxDuration time.Duration
 }
 
-// GetBackoffDuration If this function is called outside of the `Backoff` method, its value
+// getBackoffDuration If this function is called outside of the `backoff` method, its value
 // (randomised) is not the one to be used when the actual Backoff happens since the Backoff method
 // calls this internally.
-func (r RandomisedBackoffPolicy) GetBackoffDuration() time.Duration {
+func (r randomisedBackoffPolicy) getBackoffDuration() time.Duration {
 	randMillis := rand.Float64() * float64(r.maxDuration-r.minDuration)
 	return r.minDuration + time.Duration(randMillis)
 }
 
-func (r RandomisedBackoffPolicy) Backoff(_ int) {
-	time.Sleep(r.GetBackoffDuration())
+func (r randomisedBackoffPolicy) backoff(_ int) {
+	time.Sleep(r.getBackoffDuration())
 }
 
 type Throttler interface {
 	Acquire() error
 }
 
-type WaitingThrottler struct {
+type waitingThrottler struct {
 	limiter *rate.Limiter
 }
 
-type BackoffThrottler struct {
+type backoffThrottler struct {
 	limiter       *rate.Limiter
-	backoffPolicy BackoffPolicy
+	backoffPolicy backoffPolicy
 }
 
-func (w WaitingThrottler) Acquire() error {
+func (w waitingThrottler) Acquire() error {
 	return w.limiter.Wait(context.Background())
 }
 
-func (t BackoffThrottler) Acquire() error {
+func (t backoffThrottler) Acquire() error {
 	attempt := 0
 	for {
 		if t.limiter.Allow() {
 			break
 		}
 
-		t.backoffPolicy.Backoff(attempt)
+		t.backoffPolicy.backoff(attempt)
 		attempt += 1
 	}
 
 	return nil
 }
 
-func NewBackoffThrottler(throttleLimit int, backoffPolicy BackoffPolicy) Throttler {
-	return BackoffThrottler{
+func NewBackoffThrottler(throttleLimit int, backoffPolicy backoffPolicy) Throttler {
+	return backoffThrottler{
 		limiter:       rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 		backoffPolicy: backoffPolicy,
 	}
 }
 
 func NewWaitingThrottler(throttleLimit int) Throttler {
-	return WaitingThrottler{
+	return waitingThrottler{
 		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 	}
 }
 
 func NewStaticBackoffThrottler(throttleLimit int, backOffDuration time.Duration) Throttler {
-	return BackoffThrottler{
+	return backoffThrottler{
 		limiter:       rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		backoffPolicy: StaticBackoffPolicy{backoffDuration: backOffDuration},
+		backoffPolicy: staticBackoffPolicy{backoffDuration: backOffDuration},
 	}
 }
 
 func NewIncrementalBackoffThrottler(throttleLimit int, backOffDuration time.Duration, incrementDuration time.Duration) Throttler {
-	return BackoffThrottler{
+	return backoffThrottler{
 		limiter:       rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		backoffPolicy: IncrementalBackoffPolicy{backoffDuration: backOffDuration, incrementDuration: incrementDuration},
+		backoffPolicy: incrementalBackoffPolicy{backoffDuration: backOffDuration, incrementDuration: incrementDuration},
 	}
 }
 
 func NewRandomisedBackoffThrottler(throttleLimit int, minDuration, maxDuration time.Duration) Throttler {
-	return BackoffThrottler{
+	return backoffThrottler{
 		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
-		backoffPolicy: RandomisedBackoffPolicy{
+		backoffPolicy: randomisedBackoffPolicy{
 			minDuration: minDuration,
 			maxDuration: maxDuration,
 		},

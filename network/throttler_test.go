@@ -8,21 +8,21 @@ import (
 )
 
 func TestStaticBackoffPolicy_Backoff(t *testing.T) {
-	policy := StaticBackoffPolicy{backoffDuration: 1 * time.Second}
-	backoffDuration := policy.GetBackoffDuration()
+	policy := staticBackoffPolicy{backoffDuration: 1 * time.Second}
+	backoffDuration := policy.getBackoffDuration()
 	assert.Equal(t, backoffDuration, 1*time.Second)
 }
 
 func TestIncrementalBackoffPolicy(t *testing.T) {
-	policy := IncrementalBackoffPolicy{
+	policy := incrementalBackoffPolicy{
 		backoffDuration:   3 * time.Second,
 		incrementDuration: 5 * time.Second,
 	}
-	attempt0Duration := policy.GetBackoffDuration(0)
+	attempt0Duration := policy.getBackoffDuration(0)
 	assert.Equal(t, 3*time.Second, attempt0Duration)
-	attempt1Duration := policy.GetBackoffDuration(1)
+	attempt1Duration := policy.getBackoffDuration(1)
 	assert.Equal(t, (3*time.Second)+(5*time.Second), attempt1Duration)
-	attempt2Duration := policy.GetBackoffDuration(2)
+	attempt2Duration := policy.getBackoffDuration(2)
 	assert.Equal(t, (3*time.Second)+(10*time.Second), attempt2Duration)
 }
 
