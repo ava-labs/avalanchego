@@ -1,5 +1,6 @@
 syntax = "proto3";
 package greaderproto;
+option go_package = "github.com/ava-labs/avalanchego/rpcchainvm/ghttp/greader/greaderproto";
 
 message ReadRequest {
     int32 length = 1;

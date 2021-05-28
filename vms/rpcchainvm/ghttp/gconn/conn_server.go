@@ -16,6 +16,7 @@ var _ gconnproto.ConnServer = &Server{}
 
 // Server is an http.Conn that is managed over RPC.
 type Server struct {
+	gconnproto.UnimplementedConnServer
 	conn   net.Conn
 	closer *grpcutils.ServerCloser
 }

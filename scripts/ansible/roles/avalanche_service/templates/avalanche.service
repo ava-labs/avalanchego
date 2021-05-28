@@ -20,7 +20,6 @@ ExecStart={{ bindir }}/{{ avalanche_binary | basename }} \
 {% endif %}
             --http-host="{{ avalanche_daemon_http_host }}" \
             --db-dir="{{ avalanche_daemon_db_dir }}" \
-            --plugin-dir="{{ avalanche_daemon_plugin_dir }}" \
             --log-dir="{{ avalanche_daemon_log_dir }}" \
             --log-level="{{ log_level }}" \
             --staking-tls-cert-file="{{ avalanche_daemon_staking_tls_cert }}" \
