@@ -2,13 +2,14 @@ SCRIPTS_PATH=$(cd $(dirname "${BASH_SOURCE[0]}"); pwd)
 SRC_PATH=$(dirname "${SCRIPTS_PATH}")
 
 # Early auth to avoid limit rating
-if [[ -z ${DOCKER_USERNAME} ]]; then
-    echo "Skipping E2E Tests for untrusted build"
-    exit 0
-else
-    echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
+if [[ -z ${ENABLE_LOCAL_CI} ]]; then
+    if [[ -z ${DOCKER_USERNAME} ]]; then
+        echo "Skipping E2E Tests for untrusted build"
+        exit 0
+    else
+        echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
+    fi
 fi
-
 # Build the runnable Avalanche docker image
 bash "${SRC_PATH}"/scripts/build_image.sh
 AVALANCHE_IMAGE_REPO=$(docker image ls --format="{{.Repository}}" | head -n 1)
