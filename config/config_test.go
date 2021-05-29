@@ -5,6 +5,7 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
@@ -238,7 +239,7 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := path.Join(rootPath, "config.json")
-	assert.NoError(t, os.WriteFile(configFilePath, []byte(value), 0600))
+	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0600))
 	return configFilePath
 }
 
@@ -246,7 +247,7 @@ func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 func setupFile(t *testing.T, path string, fileName string, value string) {
 	assert.NoError(t, os.MkdirAll(path, 0700))
 	filePath := filepath.Join(path, fileName+".ex")
-	assert.NoError(t, os.WriteFile(filePath, []byte(value), 0600))
+	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0600))
 }
 
 func setupViper(configFilePath string) *viper.Viper {
