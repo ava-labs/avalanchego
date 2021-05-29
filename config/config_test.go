@@ -114,7 +114,7 @@ func TestSetChainConfigs(t *testing.T) {
 				configJSON = fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, root)
 			}
 			configFile := setupConfigJSON(t, root, configJSON)
-			chainsDir := path.Join(root, chainsSubDir)
+			chainsDir := root
 			// Create custom configs
 			for key, value := range test.configs {
 				chainDir := path.Join(chainsDir, key)
@@ -139,29 +139,39 @@ func TestSetChainConfigs(t *testing.T) {
 
 func TestSetChainConfigsDirNotExist(t *testing.T) {
 	tests := map[string]struct {
-		structure string
-		file      map[string]string
-		expected  map[string]chains.ChainConfig
+		structure  string
+		file       map[string]string
+		errMessage string
+		flagSet    bool
+		expected   map[string]chains.ChainConfig
 	}{
-		"dir not exist": {
-			structure: "/",
-			file:      map[string]string{"C": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
+		"cdir not exist": {
+			structure:  "/",
+			file:       map[string]string{"C": "noeffect"},
+			errMessage: "no directory",
+			flagSet:    true,
+			expected:   map[string]chains.ChainConfig{},
 		},
-		"chains dir not exist": {
-			structure: "/cdir/",
-			file:      map[string]string{"config": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
+		"cdir not exist flag not set": {
+			structure:  "/",
+			file:       map[string]string{"config": "noeffect"},
+			errMessage: "",
+			flagSet:    false,
+			expected:   map[string]chains.ChainConfig{},
 		},
-		"configs dir not exist": {
-			structure: "/cdir/chains/",
-			file:      map[string]string{"upgrade": "noeffect"},
-			expected:  map[string]chains.ChainConfig{},
+		"chain subdir not exist": {
+			structure:  "/cdir/",
+			file:       map[string]string{"config": "noeffect"},
+			errMessage: "",
+			flagSet:    true,
+			expected:   map[string]chains.ChainConfig{},
 		},
 		"full structure": {
-			structure: "/cdir/chains/C/",
-			file:      map[string]string{"config": "hello"},
-			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
+			structure:  "/cdir/C/",
+			file:       map[string]string{"config": "hello"},
+			errMessage: "",
+			flagSet:    true,
+			expected:   map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
 
@@ -170,7 +180,12 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
 			chainConfigDir := path.Join(root, "cdir")
-			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
+			var configJSON string
+			if test.flagSet {
+				configJSON = fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
+			} else {
+				configJSON = "{}"
+			}
 			configFile := setupConfigJSON(t, root, configJSON)
 
 			dirToCreate := path.Join(root, test.structure)
@@ -182,12 +197,21 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			v := setupViper(configFile)
 
 			// Parse config
-			assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
+			if test.flagSet {
+				assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
+			}
 			// don't read with getConfigFromViper since it's very slow.
 			nodeConfig := node.Config{}
 			err := setChainConfigs(v, &nodeConfig)
-			assert.NoError(err)
-			assert.Equal(test.expected, nodeConfig.ChainConfigs)
+			if len(test.errMessage) > 0 {
+				assert.Error(err)
+				if err != nil {
+					assert.Contains(err.Error(), test.errMessage)
+				}
+			} else {
+				assert.NoError(err)
+				assert.Equal(test.expected, nodeConfig.ChainConfigs)
+			}
 		})
 	}
 }
@@ -196,13 +220,13 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	assert := assert.New(t)
 	root := t.TempDir()
 	// changes internal package variable, since using defaultDir (under user home) is risky.
-	defaultChainConfigDir = path.Join(root, "configs")
+	defaultChainConfigDir = path.Join(root, "cdir")
 	configFilePath := setupConfigJSON(t, root, "{}")
 
 	v := setupViper(configFilePath)
 	assert.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
 
-	chainsDir := path.Join(defaultChainConfigDir, "chains", "C")
+	chainsDir := path.Join(defaultChainConfigDir, "C")
 	setupFile(t, chainsDir, "config", "helloworld")
 	var nodeConfig node.Config
 	err := setChainConfigs(v, &nodeConfig)

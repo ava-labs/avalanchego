@@ -43,7 +43,6 @@ const (
 	avalanchegoPreupgrade = "avalanchego-preupgrade"
 	chainConfigFileName   = "config"
 	chainUpgradeFileName  = "upgrade"
-	chainsSubDir          = "chains"
 )
 
 // Results of parsing the CLI
@@ -56,7 +55,7 @@ var (
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
-	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs")
+	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs", "chains")
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
 )
@@ -256,7 +255,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Build directory
 	fs.String(BuildDirKey, defaultBuildDirs[0], "path to the build directory")
 	// Chain Config Dir
-	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Plugin directory for Avalanche VMs")
+	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Chain specific configurations parent directory. Defaults to $HOME/.avalancego/configs/chains/")
 	return fs
 }
 
@@ -716,7 +715,17 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 // setChainConfigs reads & puts chainConfigs to node config
 func setChainConfigs(v *viper.Viper, nodeConfig *node.Config) error {
 	chainConfigDir := v.GetString(ChainConfigDirKey)
-	chainConfigs, err := readChainConfigs(path.Clean(chainConfigDir))
+	chainsPath := path.Clean(chainConfigDir)
+	// user specified a chain config dir explicitly, but dir does not exist.
+	if v.IsSet(ChainConfigDirKey) && !isPathExists(chainsPath) {
+		return fmt.Errorf("no directory found: %v", chainsPath)
+	}
+	// gets direct subdirs
+	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
+	if err != nil {
+		return err
+	}
+	chainConfigs, err := readChainConfigs(chainDirs)
 	if err != nil {
 		return fmt.Errorf("couldn't read chain configs: %w", err)
 	}
@@ -834,15 +843,8 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
-func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
-	// chainconfigdir/chains/
+func readChainConfigs(chainDirs []string) (map[string]chains.ChainConfig, error) {
 	chainConfigMap := make(map[string]chains.ChainConfig)
-	chainsPath := path.Join(root, chainsSubDir) // /configdir/chains/
-	// gets direct subdirs
-	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
-	if err != nil {
-		return nil, err
-	}
 	for _, chainDir := range chainDirs {
 		dirInfo, err := os.Stat(chainDir)
 		if err != nil {
@@ -854,14 +856,14 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 		}
 		chainConfig := chains.ChainConfig{}
 
-		// chainconfigdir/chains/chainId/config.*
+		// chainconfigdir/chainId/config.*
 		configData, err := readSingleFile(chainDir, chainConfigFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
 		chainConfig.Config = configData
 
-		// chainconfigdir/chains/chainId/upgrade.*
+		// chainconfigdir/chainId/upgrade.*
 		upgradeData, err := readSingleFile(chainDir, chainUpgradeFileName)
 		if err != nil {
 			return chainConfigMap, err
@@ -876,15 +878,15 @@ func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
 
 // safeReadFile does not returns an error if there is no file exists at path
 func safeReadFile(path string) ([]byte, error) {
-	if !isFileExists(path) {
+	if !isPathExists(path) {
 		return nil, nil
 	}
 	return os.ReadFile(path)
 }
 
-// fileExists checks if a file exists and is not a directory before we
+// fileExists checks if a file/folder exists before we
 // try using it to prevent further errors.
-func isFileExists(filePath string) bool {
+func isPathExists(filePath string) bool {
 	_, err := os.Stat(filePath)
 	return !os.IsNotExist(err)
 }
