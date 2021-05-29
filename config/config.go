@@ -881,7 +881,7 @@ func safeReadFile(path string) ([]byte, error) {
 	if !isPathExists(path) {
 		return nil, nil
 	}
-	return os.ReadFile(path)
+	return ioutil.ReadFile(path)
 }
 
 // fileExists checks if a file/folder exists before we
