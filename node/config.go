@@ -133,9 +133,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Coreth
-	CorethConfig string
-
 	IndexAllowIncomplete bool
 
 	// Should Bootstrap be retried

@@ -15,7 +15,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/app/process"
@@ -42,8 +41,8 @@ import (
 const (
 	avalanchegoLatest     = "avalanchego-latest"
 	avalanchegoPreupgrade = "avalanchego-preupgrade"
-	chainConfigSubDir     = "configs"
-	chainUpgradeSubDir    = "upgrades"
+	chainConfigFileName   = "config"
+	chainUpgradeFileName  = "upgrade"
 	chainsSubDir          = "chains"
 )
 
@@ -258,7 +257,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(BuildDirKey, defaultBuildDirs[0], "path to the build directory")
 	// Chain Config Dir
 	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Plugin directory for Avalanche VMs")
-
 	return fs
 }
 
@@ -284,6 +282,7 @@ func getViper() (*viper.Viper, error) {
 // getConfigFromViper sets attributes on [config] based on the values
 // defined in the [viper] environment
 func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
+	// TODO Divide this function into smaller parts (see setChainConfigs) for efficient testing
 	// First, get the process config
 	processConfig := process.Config{}
 	processConfig.DisplayVersionAndExit = v.GetBool(VersionKey)
@@ -694,21 +693,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	// Crypto
 	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
 
-	// Coreth Plugin
-	if v.IsSet(CorethConfigKey) {
-		corethConfigValue := v.Get(CorethConfigKey)
-		switch value := corethConfigValue.(type) {
-		case string:
-			nodeConfig.CorethConfig = value
-		default:
-			corethConfigBytes, err := json.Marshal(value)
-			if err != nil {
-				return node.Config{}, process.Config{}, fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-			nodeConfig.CorethConfig = string(corethConfigBytes)
-		}
-	}
-
 	// Indexer
 	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
 
@@ -721,13 +705,44 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
 
 	// Chain Configs
+	err = setChainConfigs(v, &nodeConfig)
+	if err != nil {
+		return node.Config{}, process.Config{}, err
+	}
+
+	return nodeConfig, processConfig, nil
+}
+
+// setChainConfigs reads & puts chainConfigs to node config
+func setChainConfigs(v *viper.Viper, nodeConfig *node.Config) error {
 	chainConfigDir := v.GetString(ChainConfigDirKey)
 	chainConfigs, err := readChainConfigs(path.Clean(chainConfigDir))
 	if err != nil {
-		return node.Config{}, process.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
+		return fmt.Errorf("couldn't read chain configs: %w", err)
 	}
 	nodeConfig.ChainConfigs = chainConfigs
-	return nodeConfig, processConfig, nil
+
+	// Coreth Plugin
+	// will be deprecated
+	// if C alias key and ConfigBytes is already in map, skip this. config files precedes over coreth flag.
+	if v.IsSet(CorethConfigKey) && !isCChainConfigSet(nodeConfig.ChainConfigs) {
+		corethConfigValue := v.Get(CorethConfigKey)
+		var corethConfigBytes []byte
+		switch value := corethConfigValue.(type) {
+		case string:
+			corethConfigBytes = []byte(value)
+		default:
+			corethConfigBytes, err = json.Marshal(value)
+			if err != nil {
+				return fmt.Errorf("couldn't parse coreth config: %w", err)
+			}
+		}
+		cChainPrimaryAlias := genesis.GetEvmChainAliases()[0]
+		tmp := nodeConfig.ChainConfigs[cChainPrimaryAlias]
+		tmp.Config = corethConfigBytes
+		nodeConfig.ChainConfigs[cChainPrimaryAlias] = tmp
+	}
+	return nil
 }
 
 // Initialize config.BootstrapPeers.
@@ -820,88 +835,90 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
 func readChainConfigs(root string) (map[string]chains.ChainConfig, error) {
-	var wg sync.WaitGroup
-	var m sync.Mutex
-	configsPath := path.Join(root, chainsSubDir)
-	files, err := filepath.Glob(path.Join(configsPath, chainConfigSubDir) + "/*")
+	// chainconfigdir/chains/
+	chainConfigMap := make(map[string]chains.ChainConfig)
+	chainsPath := path.Join(root, chainsSubDir) // /configdir/chains/
+	// gets direct subdirs
+	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
 	if err != nil {
 		return nil, err
 	}
-	upgrades, err := filepath.Glob(path.Join(configsPath, chainUpgradeSubDir) + "/*")
-	if err != nil {
-		return nil, err
-	}
-	files = append(files, upgrades...)
-	filesLength := len(files)
-	contents := make(map[string]chains.ChainConfig, filesLength)
-	wg.Add(filesLength)
+	for _, chainDir := range chainDirs {
+		dirInfo, err := os.Stat(chainDir)
+		if err != nil {
+			return nil, err
+		}
 
-	fatalErrors := make(chan error)
-	wgDone := make(chan bool)
+		if !dirInfo.IsDir() {
+			continue
+		}
+		chainConfig := chains.ChainConfig{}
 
-	for _, file := range files {
-		// read all files concurrently
-		go func(filePath string) bool {
-			defer wg.Done()
-			cleanedPath := path.Clean(filePath)
-			fileInfo, err := os.Stat(cleanedPath)
-			if err != nil {
-				fatalErrors <- err
-				return false
-			}
-			if fileInfo.IsDir() {
-				return false
-			}
-			parts := strings.Split(cleanedPath, "/")
-			if len(parts) >= 2 {
-				// "configs"/x.json
-				parent := parts[len(parts)-2]
-				// configs/"x.json"
-				fileName := parts[len(parts)-1]
+		// chainconfigdir/chains/chainId/config.*
+		configData, err := readSingleFile(chainDir, chainConfigFileName)
+		if err != nil {
+			return chainConfigMap, err
+		}
+		chainConfig.Config = configData
 
-				content, err := ioutil.ReadFile(cleanedPath)
-				if err != nil {
-					fatalErrors <- err
-					return false
-				}
-				// no need for file extensions in keys
-				trimmed := removeExtension(fileName)
+		// chainconfigdir/chains/chainId/upgrade.*
+		upgradeData, err := readSingleFile(chainDir, chainUpgradeFileName)
+		if err != nil {
+			return chainConfigMap, err
+		}
+		chainConfig.Upgrade = upgradeData
 
-				m.Lock()
-				tmp := contents[trimmed]
-
-				// look parent path and decide the field name
-				switch parent {
-				case chainUpgradeSubDir:
-					tmp.Upgrade = content
-				case chainConfigSubDir:
-					tmp.Config = content
-				default:
-				}
-				contents[trimmed] = tmp
-				m.Unlock()
-			}
-
-			return true
-		}(file)
+		chainConfigMap[dirInfo.Name()] = chainConfig
 	}
 
-	wg.Wait()
-	close(wgDone)
-	select {
-	case <-wgDone:
-		// carry on
-		break
-	case err := <-fatalErrors:
-		close(fatalErrors)
-		return nil, err
-	}
-
-	return contents, nil
+	return chainConfigMap, nil
 }
 
-// removeExtension returns pure filename without any ".extension"
-func removeExtension(filename string) string {
-	extension := filepath.Ext(filename)
-	return filename[0 : len(filename)-len(extension)]
+// safeReadFile does not returns an error if there is no file exists at path
+func safeReadFile(path string) ([]byte, error) {
+	if !isFileExists(path) {
+		return nil, nil
+	}
+	return os.ReadFile(path)
+}
+
+// fileExists checks if a file exists and is not a directory before we
+// try using it to prevent further errors.
+func isFileExists(filePath string) bool {
+	_, err := os.Stat(filePath)
+	return !os.IsNotExist(err)
+}
+
+// readSingleFile reads a single file with name fileName without specifying any extension.
+// it errors when there are more than 1 file with the given fileName
+func readSingleFile(parentDir string, fileName string) ([]byte, error) {
+	filePath := path.Join(parentDir, fileName)
+	files, err := filepath.Glob(filePath + ".*") // all possible extensions
+	if err != nil {
+		return nil, err
+	}
+	if len(files) > 1 {
+		return nil, fmt.Errorf("too much %s file in %s", fileName, parentDir)
+	}
+	if len(files) == 0 { // no file found, return nothing
+		return nil, nil
+	}
+	data, err := safeReadFile(files[0])
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// checks if C chain config bytes already set in map with alias key.
+// it does only checks alias key, chainId is not available at this point.
+func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
+	cChainAliases := genesis.GetEvmChainAliases()
+	for _, alias := range cChainAliases {
+		val, ok := chainConfigs[alias]
+		if ok && len(val.Config) > 1 {
+			return true
+		}
+	}
+	return false
 }
