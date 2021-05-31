@@ -877,7 +877,7 @@ func (n *Node) Initialize(
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 
-	httpLog, err := logFactory.MakeSubdir("http")
+	httpLog, err := logFactory.Make("http")
 	if err != nil {
 		return fmt.Errorf("problem initializing HTTP logger: %w", err)
 	}

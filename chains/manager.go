@@ -316,7 +316,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Create the log and context of the chain
-	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
+	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
