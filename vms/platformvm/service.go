@@ -1934,6 +1934,24 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			})
 		}
 	}
+
+	chains, err := service.vm.internalState.GetChains(constants.PrimaryNetworkID)
+	if err != nil {
+		return fmt.Errorf("couldn't retrieve subnets: %w", err)
+	}
+	for _, chainTx := range chains {
+		chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
+		if !ok {
+			return errWrongTxType
+		}
+		response.Blockchains = append(response.Blockchains, APIBlockchain{
+			ID:       chain.ID(),
+			Name:     chain.ChainName,
+			SubnetID: constants.PrimaryNetworkID,
+			VMID:     chain.VMID,
+		})
+	}
+
 	return nil
 }
 
