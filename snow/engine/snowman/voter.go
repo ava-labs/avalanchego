@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -72,13 +73,13 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.ProVM.GetBlock(vote)
+		blk, err := v.t.ProVM.GetProBlock(vote)
 		if err != nil {
 			continue
 		}
 
 		for blk.Status().Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
-			blk = blk.Parent()
+			blk = proposervm.NewProBlock(blk.Parent())
 		}
 
 		if !blk.Status().Decided() && v.t.Consensus.DecidedOrProcessing(blk) {

@@ -93,12 +93,11 @@ func (t *Transitive) finishBootstrapping() error {
 	if err != nil {
 		return err
 	}
-	lastAccepted, err := t.ProVM.GetBlock(lastAcceptedID)
+	lastAccepted, err := t.ProVM.GetProBlock(lastAcceptedID)
 	if err != nil {
 		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
 		return err
 	}
-	lastAccepted = lastAccepted.(*proposervm.ProposerBlock).GetWrappedBlock()
 
 	// initialize consensus to the last accepted blockID
 	if err := t.Consensus.Initialize(t.Ctx, t.Params, lastAcceptedID, lastAccepted.Height()); err != nil {
@@ -107,8 +106,8 @@ func (t *Transitive) finishBootstrapping() error {
 
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	switch blk := lastAccepted.(type) {
-	case OracleBlock:
+	switch blk := lastAccepted.GetWrappedBlock().(type) {
+	case snowman.OracleBlock:
 		options, err := blk.Options()
 		if err != nil {
 			return err
@@ -137,7 +136,7 @@ func (t *Transitive) Gossip() error {
 	if err != nil {
 		return err
 	}
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
 		return nil
@@ -155,7 +154,7 @@ func (t *Transitive) Shutdown() error {
 
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
@@ -172,7 +171,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	startTime := time.Now()
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil { // Don't have the block. Drop this request.
 		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)", blkID, vdr, requestID, blkID)
 		return nil
@@ -183,7 +182,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < common.MaxContainersPerMultiPut && time.Since(startTime) < common.MaxTimeFetchingAncestors; numFetched++ {
-		blk = blk.Parent()
+		blk = proposervm.NewProBlock(blk.Parent())
 		if blk.Status() == choices.Unknown {
 			break
 		}
@@ -216,7 +215,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 		return nil
 	}
 
-	blk, err := t.ProVM.ParseBlock(blkBytes)
+	blk, err := t.ProVM.ParseProBlock(blkBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
@@ -299,7 +298,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 		return nil
 	}
 
-	blk, err := t.ProVM.ParseBlock(blkBytes)
+	blk, err := t.ProVM.ParseProBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
@@ -407,7 +406,7 @@ func (t *Transitive) buildBlocks() error {
 	for t.pendingBuildBlocks > 0 && t.Consensus.NumProcessing() < t.Params.OptimalProcessing {
 		t.pendingBuildBlocks--
 
-		blk, err := t.ProVM.BuildBlock()
+		blk, err := t.ProVM.BuildProBlock()
 		if err != nil {
 			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
 			return nil
@@ -457,7 +456,7 @@ func (t *Transitive) repoll() {
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
 func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil {
 		t.sendRequest(vdr, blkID)
 		return false, nil
@@ -673,7 +672,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		blk = propBlk.GetWrappedBlock()
 	}
 
-	if blk, ok := blk.(OracleBlock); ok {
+	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options()
 		if err != nil {
 			return err
@@ -758,7 +757,7 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 
 // GetBlock implements the snowman.Engine interface
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return t.ProVM.GetBlock(blkID)
+	return t.ProVM.GetProBlock(blkID)
 }
 
 // GetVM implements the snowman.Engine interface

@@ -82,7 +82,7 @@ func (b *Bootstrapper) Initialize(
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted ID: %s", err)
 	}
-	lastAccepted, err := b.ProVM.GetBlock(lastAcceptedID)
+	lastAccepted, err := b.ProVM.GetProBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %s", err)
 	}
@@ -116,7 +116,7 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
-		if blk, err := b.ProVM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
+		if blk, err := b.ProVM.GetProBlock(blkID); err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
@@ -141,7 +141,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
-		if blk, err := b.ProVM.GetBlock(blkID); err == nil {
+		if blk, err := b.ProVM.GetProBlock(blkID); err == nil {
 			if height := blk.Height(); height > b.tipHeight {
 				b.tipHeight = height
 			}
@@ -179,7 +179,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	}
 
 	// Make sure we don't already have this block
-	if _, err := b.ProVM.GetBlock(blkID); err == nil {
+	if _, err := b.ProVM.GetProBlock(blkID); err == nil {
 		if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 			return b.checkFinish()
 		}
@@ -218,7 +218,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return nil
 	}
 
-	wantedBlk, err := b.ProVM.ParseBlock(blks[0]) // the block we requested
+	wantedBlk, err := b.ProVM.ParseProBlock(blks[0]) // the block we requested
 	if err != nil {
 		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
@@ -229,7 +229,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 	}
 
 	for _, blkBytes := range blks[1:] {
-		if _, err := b.ProVM.ParseBlock(blkBytes); err != nil { // persists the block
+		if _, err := b.ProVM.ParseProBlock(blkBytes); err != nil { // persists the block
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
 		}
