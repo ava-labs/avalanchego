@@ -506,7 +506,7 @@ func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 	err := b.VM.Disconnected(validatorID)
 	if err != nil {
-		return b.Bootstrapper.Disconnected(validatorID)
+		return err
 	}
 	return b.Bootstrapper.Disconnected(validatorID)
 }
