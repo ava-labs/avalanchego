@@ -1,0 +1,20 @@
+syntax = "proto3";
+package appproto;
+option go_package = "github.com/ava-labs/avalanchego/main/plugin/proto";
+
+// To compile: protoc --go_out=plugins=grpc:. app.proto
+
+message StartRequest {}
+
+message StartResponse {
+    int32 exitCode = 1;
+}
+
+message StopRequest {}
+
+message StopResponse {}
+
+service Node {
+    rpc Start(StartRequest) returns (StartResponse);
+    rpc Stop(StopRequest) returns (StopResponse);
+}

@@ -9,33 +9,31 @@ import (
 	"strings"
 )
 
-// Parser defines the interface of a version parser
+// Parser defines the interface of a Version parser
 type Parser interface {
 	Parse(string) (Version, error)
 }
 
 type parser struct {
-	appSeparator     string
-	versionSeparator string
+	prefix    string
+	separator string
 }
 
-// NewDefaultParser returns a new parser with the default separators
-func NewDefaultParser() Parser { return NewParser(defaultAppSeparator, defaultVersionSeparator) }
+func NewDefaultParser() Parser { return NewParser(defaultVersionPrefix, defaultVersionSeparator) }
 
-// NewParser returns a new parser
-func NewParser(appSeparator string, versionSeparator string) Parser {
+func NewParser(prefix, separator string) Parser {
 	return &parser{
-		appSeparator:     appSeparator,
-		versionSeparator: versionSeparator,
+		prefix:    prefix,
+		separator: separator,
 	}
 }
 
 func (p *parser) Parse(s string) (Version, error) {
-	splitApp := strings.SplitN(s, p.appSeparator, 2)
-	if len(splitApp) != 2 {
-		return nil, fmt.Errorf("failed to parse %s as a version", s)
+	if !strings.HasPrefix(s, p.prefix) {
+		return nil, fmt.Errorf("version string: %s missing required prefix: %s", s, p.prefix)
 	}
-	splitVersion := strings.SplitN(splitApp[1], p.versionSeparator, 3)
+
+	splitVersion := strings.SplitN(strings.TrimPrefix(s, p.prefix), p.separator, 3)
 	if len(splitVersion) != 3 {
 		return nil, fmt.Errorf("failed to parse %s as a version", s)
 	}
@@ -56,11 +54,57 @@ func (p *parser) Parse(s string) (Version, error) {
 	}
 
 	return NewVersion(
-		splitApp[0],
-		p.appSeparator,
-		p.versionSeparator,
 		major,
 		minor,
 		patch,
+		p.prefix,
+		p.separator,
+	), nil
+}
+
+// ApplicationParser defines the interface of an ApplicationVersion parser
+type ApplicationParser interface {
+	Parse(string) (Application, error)
+}
+
+type applicationParser struct {
+	appSeparator  string
+	versionParser *parser
+}
+
+// NewDefaultApplicationParser returns a new parser with the default separators
+func NewDefaultApplicationParser() ApplicationParser {
+	return NewApplicationParser(defaultAppSeparator, defaultVersionSeparator)
+}
+
+// NewApplicationParser returns a new parser
+func NewApplicationParser(appSeparator string, versionSeparator string) ApplicationParser {
+	return &applicationParser{
+		appSeparator: appSeparator,
+		versionParser: &parser{
+			prefix:    "",
+			separator: versionSeparator,
+		},
+	}
+}
+
+func (p *applicationParser) Parse(s string) (Application, error) {
+	splitApp := strings.SplitN(s, p.appSeparator, 2)
+	if len(splitApp) != 2 {
+		return nil, fmt.Errorf("failed to parse %s as a version", s)
+	}
+
+	version, err := p.versionParser.Parse(splitApp[1])
+	if err != nil {
+		return nil, err
+	}
+
+	return NewApplication(
+		splitApp[0],
+		p.appSeparator,
+		p.versionParser.separator,
+		version.Major(),
+		version.Minor(),
+		version.Patch(),
 	), nil
 }

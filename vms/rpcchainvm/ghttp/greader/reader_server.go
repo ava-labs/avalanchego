@@ -10,15 +10,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader/greaderproto"
 )
 
-// Server is a http.Handler that is managed over RPC.
-type Server struct{ reader io.Reader }
+var _ greaderproto.ReaderServer = &Server{}
 
-// NewServer returns a http.Handler instance manage remotely
+// Server is an io.Reader that is managed over RPC.
+type Server struct {
+	greaderproto.UnimplementedReaderServer
+	reader io.Reader
+}
+
+// NewServer returns an io.Reader instance managed remotely
 func NewServer(reader io.Reader) *Server {
 	return &Server{reader: reader}
 }
 
-// Read ...
 func (s *Server) Read(ctx context.Context, req *greaderproto.ReadRequest) (*greaderproto.ReadResponse, error) {
 	buf := make([]byte, int(req.Length))
 	n, err := s.reader.Read(buf)

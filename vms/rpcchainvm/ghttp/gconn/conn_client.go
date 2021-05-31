@@ -14,7 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn/gconnproto"
 )
 
-// Client is an implementation of a messenger channel that talks over RPC.
+var _ net.Conn = &Client{}
+
+// Client is an implementation of a connection that talks over RPC.
 type Client struct {
 	client  gconnproto.ConnClient
 	local   net.Addr
@@ -22,7 +24,7 @@ type Client struct {
 	toClose []io.Closer
 }
 
-// NewClient returns a database instance connected to a remote database instance
+// NewClient returns a connection connected to a remote connection
 func NewClient(client gconnproto.ConnClient, local, remote net.Addr, toClose ...io.Closer) *Client {
 	return &Client{
 		client:  client,
@@ -32,7 +34,6 @@ func NewClient(client gconnproto.ConnClient, local, remote net.Addr, toClose ...
 	}
 }
 
-// Read ...
 func (c *Client) Read(p []byte) (int, error) {
 	resp, err := c.client.Read(context.Background(), &gconnproto.ReadRequest{
 		Length: int32(len(p)),
@@ -49,7 +50,6 @@ func (c *Client) Read(p []byte) (int, error) {
 	return len(resp.Read), err
 }
 
-// Write ...
 func (c *Client) Write(b []byte) (int, error) {
 	resp, err := c.client.Write(context.Background(), &gconnproto.WriteRequest{
 		Payload: b,
@@ -64,7 +64,6 @@ func (c *Client) Write(b []byte) (int, error) {
 	return int(resp.Length), err
 }
 
-// Close ...
 func (c *Client) Close() error {
 	_, err := c.client.Close(context.Background(), &gconnproto.CloseRequest{})
 	errs := wrappers.Errs{}
@@ -75,13 +74,9 @@ func (c *Client) Close() error {
 	return errs.Err
 }
 
-// LocalAddr ...
-func (c *Client) LocalAddr() net.Addr { return c.local }
-
-// RemoteAddr ...
+func (c *Client) LocalAddr() net.Addr  { return c.local }
 func (c *Client) RemoteAddr() net.Addr { return c.remote }
 
-// SetDeadline ...
 func (c *Client) SetDeadline(t time.Time) error {
 	bytes, err := t.MarshalBinary()
 	if err != nil {
@@ -93,7 +88,6 @@ func (c *Client) SetDeadline(t time.Time) error {
 	return err
 }
 
-// SetReadDeadline ...
 func (c *Client) SetReadDeadline(t time.Time) error {
 	bytes, err := t.MarshalBinary()
 	if err != nil {
@@ -105,7 +99,6 @@ func (c *Client) SetReadDeadline(t time.Time) error {
 	return err
 }
 
-// SetWriteDeadline ...
 func (c *Client) SetWriteDeadline(t time.Time) error {
 	bytes, err := t.MarshalBinary()
 	if err != nil {

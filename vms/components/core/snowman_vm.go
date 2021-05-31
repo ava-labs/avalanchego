@@ -19,9 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/state"
 )
 
-var (
-	errBadData = errors.New("got unexpected value from database")
-)
+var errBadData = errors.New("got unexpected value from database")
 
 // If the status of this ID is not choices.Accepted,
 // the db has not yet been initialized
@@ -54,13 +52,16 @@ type SnowmanVM struct {
 }
 
 // SetPreference sets the block with ID [ID] as the preferred block
-func (svm *SnowmanVM) SetPreference(id ids.ID) { svm.preferred = id }
+func (svm *SnowmanVM) SetPreference(id ids.ID) error {
+	svm.preferred = id
+	return nil
+}
 
 // Preferred returns the ID of the preferred block
 func (svm *SnowmanVM) Preferred() ids.ID { return svm.preferred }
 
 // LastAccepted returns the block most recently accepted
-func (svm *SnowmanVM) LastAccepted() ids.ID { return svm.LastAcceptedID }
+func (svm *SnowmanVM) LastAccepted() (ids.ID, error) { return svm.LastAcceptedID, nil }
 
 // ParseBlock parses [bytes] to a block
 func (svm *SnowmanVM) ParseBlock(bytes []byte) (snowman.Block, error) {

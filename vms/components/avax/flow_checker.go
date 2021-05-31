@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	errInsufficientFunds = errors.New("insufficient funds")
-)
+var errInsufficientFunds = errors.New("insufficient funds")
 
 // FlowChecker ...
 type FlowChecker struct {

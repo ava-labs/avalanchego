@@ -4,14 +4,22 @@
 package avalanche
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/metrics"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
 const (
 	minMapSize = 16
+)
+
+var (
+	errUnhealthy = errors.New("avalanche consensus is not healthy")
+	errNoLeaves  = errors.New("couldn't pop a leaf from leaf set")
 )
 
 // TopologicalFactory implements Factory by returning a topological struct
@@ -30,7 +38,7 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // of the voting results. Assumes that vertices are inserted in topological
 // order.
 type Topological struct {
-	metrics
+	metrics.Metrics
 
 	// Context used for logging
 	ctx *snow.Context
@@ -51,6 +59,23 @@ type Topological struct {
 	// preferenceCache is the cache for strongly preferred checks
 	// virtuousCache is the cache for strongly virtuous checks
 	preferenceCache, virtuousCache map[ids.ID]bool
+
+	// Used in [calculateInDegree] and [markAncestorInDegrees].
+	// Should only be accessed in those methods.
+	// We use this one instance of ids.Set instead of creating a
+	// new ids.Set during each call to [calculateInDegree].
+	leaves ids.Set
+
+	// Kahn nodes used in [calculateInDegree] and [markAncestorInDegrees].
+	// Should only be accessed in those methods.
+	// We use this one map instead of creating a new map
+	// during each call to [calculateInDegree].
+	kahnNodes map[ids.ID]kahnNode
+
+	// Used in [pushVotes]. Should only be accessed in that method.
+	// We use this one instance instead of creating a new ids.UniqueBag
+	// during each call to [pushVotes].
+	votes ids.UniqueBag
 }
 
 type kahnNode struct {
@@ -70,8 +95,11 @@ func (ta *Topological) Initialize(
 
 	ta.ctx = ctx
 	ta.params = params
+	ta.leaves = ids.Set{}
+	ta.votes = ids.UniqueBag{}
+	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
-	if err := ta.metrics.Initialize(ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ta.Metrics.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 
@@ -109,7 +137,9 @@ func (ta *Topological) Add(vtx Vertex) error {
 		return nil // Already inserted this vertex
 	}
 
-	ta.ctx.ConsensusDispatcher.Issue(ta.ctx, vtxID, vtx.Bytes())
+	if err := ta.ctx.ConsensusDispatcher.Issue(ta.ctx, vtxID, vtx.Bytes()); err != nil {
+		return err
+	}
 
 	txs, err := vtx.Txs()
 	if err != nil {
@@ -125,7 +155,7 @@ func (ta *Topological) Add(vtx Vertex) error {
 	}
 
 	ta.nodes[vtxID] = vtx // Add this vertex to the set of nodes
-	ta.metrics.Issued(vtxID)
+	ta.Metrics.Issued(vtxID)
 
 	return ta.update(vtx) // Update the vertex and it's ancestry
 }
@@ -171,12 +201,11 @@ func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
 	}
 
 	// Set up the topological sort: O(|Live Set|)
-	kahns, leaves, err := ta.calculateInDegree(responses)
-	if err != nil {
+	if err := ta.calculateInDegree(responses); err != nil {
 		return err
 	}
 	// Collect the votes for each transaction: O(|Live Set|)
-	votes, err := ta.pushVotes(kahns, leaves)
+	votes, err := ta.pushVotes()
 	if err != nil {
 		return err
 	}
@@ -196,50 +225,72 @@ func (ta *Topological) Quiesce() bool { return ta.cg.Quiesce() }
 // Finalized implements the Avalanche interface
 func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
+// HealthCheck returns information about the consensus health.
+func (ta *Topological) HealthCheck() (interface{}, error) {
+	numOutstandingVtx := ta.Metrics.ProcessingLen()
+	healthy := numOutstandingVtx <= ta.params.MaxOutstandingItems
+	details := map[string]interface{}{
+		"outstandingVertices": numOutstandingVtx,
+	}
+
+	// check for long running vertices
+	timeReqRunning := ta.Metrics.MeasureAndGetOldestDuration()
+	healthy = healthy && timeReqRunning <= ta.params.MaxItemProcessingTime
+	details["longestRunningVertex"] = timeReqRunning.String()
+
+	snowstormReport, err := ta.cg.HealthCheck()
+	healthy = healthy && err == nil
+	details["snowstorm"] = snowstormReport
+
+	if !healthy {
+		return details, errUnhealthy
+	}
+	return details, nil
+}
+
 // Takes in a list of votes and sets up the topological ordering. Returns the
 // reachable section of the graph annotated with the number of inbound edges and
 // the non-transitively applied votes. Also returns the list of leaf nodes.
-func (ta *Topological) calculateInDegree(responses ids.UniqueBag) (
-	map[ids.ID]kahnNode,
-	[]ids.ID,
-	error,
-) {
-	kahns := make(map[ids.ID]kahnNode, minMapSize)
-	leaves := ids.Set{}
+func (ta *Topological) calculateInDegree(responses ids.UniqueBag) error {
+	// Clear the kahn node set
+	for k := range ta.kahnNodes {
+		delete(ta.kahnNodes, k)
+	}
+	// Clear the leaf set
+	ta.leaves.Clear()
 
 	for vote := range responses {
 		// If it is not found, then the vote is either for something decided,
 		// or something we haven't heard of yet.
 		if vtx := ta.nodes[vote]; vtx != nil {
-			kahn, previouslySeen := kahns[vote]
+			kahn, previouslySeen := ta.kahnNodes[vote]
 			// Add this new vote to the current bag of votes
 			kahn.votes.Union(responses.GetSet(vote))
-			kahns[vote] = kahn
+			ta.kahnNodes[vote] = kahn
 
 			if !previouslySeen {
 				// If I've never seen this node before, it is currently a leaf.
-				leaves.Add(vote)
+				ta.leaves.Add(vote)
 				parents, err := vtx.Parents()
 				if err != nil {
-					return nil, nil, err
+					return err
 				}
-				kahns, leaves, err = ta.markAncestorInDegrees(kahns, leaves, parents)
+				ta.kahnNodes, err = ta.markAncestorInDegrees(ta.kahnNodes, parents)
 				if err != nil {
-					return nil, nil, err
+					return err
 				}
 			}
 		}
 	}
-
-	return kahns, leaves.List(), nil
+	return nil
 }
 
-// adds a new in-degree reference for all nodes
+// adds a new in-degree reference for all nodes.
+// should only be called from [calculateInDegree]
 func (ta *Topological) markAncestorInDegrees(
 	kahns map[ids.ID]kahnNode,
-	leaves ids.Set,
 	deps []Vertex,
-) (map[ids.ID]kahnNode, ids.Set, error) {
+) (map[ids.ID]kahnNode, error) {
 	frontier := make([]Vertex, 0, len(deps))
 	for _, vtx := range deps {
 		// The vertex may have been decided, no need to vote in that case
@@ -262,7 +313,7 @@ func (ta *Topological) markAncestorInDegrees(
 		if kahn.inDegree == 1 {
 			// If I am transitively seeing this node for the first
 			// time, it is no longer a leaf.
-			leaves.Remove(currentID)
+			ta.leaves.Remove(currentID)
 		}
 
 		if !alreadySeen {
@@ -270,7 +321,7 @@ func (ta *Topological) markAncestorInDegrees(
 			// parents
 			parents, err := current.Parents()
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			for _, depVtx := range parents {
 				// No need to traverse to a decided vertex
@@ -280,23 +331,24 @@ func (ta *Topological) markAncestorInDegrees(
 			}
 		}
 	}
-	return kahns, leaves, nil
+	return kahns, nil
 }
 
 // count the number of votes for each operation
-func (ta *Topological) pushVotes(
-	kahnNodes map[ids.ID]kahnNode,
-	leaves []ids.ID,
-) (ids.Bag, error) {
-	votes := make(ids.UniqueBag)
+func (ta *Topological) pushVotes() (ids.Bag, error) {
+	ta.votes.Clear()
 	txConflicts := make(map[ids.ID]ids.Set, minMapSize)
 
-	for len(leaves) > 0 {
-		newLeavesSize := len(leaves) - 1
-		leaf := leaves[newLeavesSize]
-		leaves = leaves[:newLeavesSize]
+	for ta.leaves.Len() > 0 {
+		// Pop one element of [leaves]
+		leaf, ok := ta.leaves.Pop()
+		if !ok {
+			// Should never happen because we just
+			// checked that [ta.leaves] is non-empty.
+			return ids.Bag{}, errNoLeaves
+		}
 
-		kahn := kahnNodes[leaf]
+		kahn := ta.kahnNodes[leaf]
 
 		if vtx := ta.nodes[leaf]; vtx != nil {
 			txs, err := vtx.Txs()
@@ -306,7 +358,7 @@ func (ta *Topological) pushVotes(
 			for _, tx := range txs {
 				// Give the votes to the consumer
 				txID := tx.ID()
-				votes.UnionSet(txID, kahn.votes)
+				ta.votes.UnionSet(txID, kahn.votes)
 
 				// Map txID to set of Conflicts
 				if _, exists := txConflicts[txID]; !exists {
@@ -320,15 +372,15 @@ func (ta *Topological) pushVotes(
 			}
 			for _, dep := range parents {
 				depID := dep.ID()
-				if depNode, notPruned := kahnNodes[depID]; notPruned {
+				if depNode, notPruned := ta.kahnNodes[depID]; notPruned {
 					depNode.inDegree--
 					// Give the votes to my parents
 					depNode.votes.Union(kahn.votes)
-					kahnNodes[depID] = depNode
+					ta.kahnNodes[depID] = depNode
 
 					if depNode.inDegree == 0 {
 						// Only traverse into the leaves
-						leaves = append(leaves, depID)
+						ta.leaves.Add(depID)
 					}
 				}
 			}
@@ -339,12 +391,12 @@ func (ta *Topological) pushVotes(
 	conflictingVotes := make(ids.UniqueBag)
 	for txID, conflicts := range txConflicts {
 		for conflictTxID := range conflicts {
-			conflictingVotes.UnionSet(txID, votes.GetSet(conflictTxID))
+			conflictingVotes.UnionSet(txID, ta.votes.GetSet(conflictTxID))
 		}
 	}
 
-	votes.Difference(&conflictingVotes)
-	return votes.Bag(ta.params.Alpha), nil
+	ta.votes.Difference(&conflictingVotes)
+	return ta.votes.Bag(ta.params.Alpha), nil
 }
 
 // If I've already checked, do nothing
@@ -429,9 +481,11 @@ func (ta *Topological) update(vtx Vertex) error {
 			if err := vtx.Reject(); err != nil {
 				return err
 			}
-			ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
+			if err := ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes()); err != nil {
+				return err
+			}
 			delete(ta.nodes, vtxID)
-			ta.metrics.Rejected(vtxID)
+			ta.Metrics.Rejected(vtxID)
 
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
@@ -480,20 +534,26 @@ func (ta *Topological) update(vtx Vertex) error {
 	switch {
 	case acceptable:
 		// I'm acceptable, why not accept?
+		// Note that ConsensusDispatcher.Accept must be called before vtx.Accept to honor
+		// EventDispatcher.Accept's invariant.
+		if err := ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes()); err != nil {
+			return err
+		}
 		if err := vtx.Accept(); err != nil {
 			return err
 		}
-		ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxID)
-		ta.metrics.Accepted(vtxID)
+		ta.Metrics.Accepted(vtxID)
 	case rejectable:
 		// I'm rejectable, why not reject?
+		if err := ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes()); err != nil {
+			return err
+		}
 		if err := vtx.Reject(); err != nil {
 			return err
 		}
-		ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes())
 		delete(ta.nodes, vtxID)
-		ta.metrics.Rejected(vtxID)
+		ta.Metrics.Rejected(vtxID)
 	}
 	return nil
 }

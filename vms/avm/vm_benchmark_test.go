@@ -30,7 +30,6 @@ func BenchmarkLoadUser(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Failed to get user keystore db: %s", err)
 		}
-		defer db.Close()
 
 		user := userState{vm: vm}
 		factory := crypto.FactorySECP256K1R{}
@@ -63,6 +62,12 @@ func BenchmarkLoadUser(b *testing.B) {
 			if _, _, err := vm.LoadUser(username, password, fromAddrs); err != nil {
 				b.Fatalf("Failed to load user: %s", err)
 			}
+		}
+
+		b.StopTimer()
+
+		if err := db.Close(); err != nil {
+			b.Fatal(err)
 		}
 	}
 
@@ -105,7 +110,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 			},
 		}
 
-		if err := vm.state.FundUTXO(utxo); err != nil {
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -122,7 +127,7 @@ func GetAllUTXOsBenchmark(b *testing.B, utxoCount int) {
 
 	for i := 0; i < b.N; i++ {
 		// Fetch all UTXOs older version
-		notPaginatedUTXOs, _, _, err = vm.getAllUTXOs(addrsSet)
+		notPaginatedUTXOs, err = vm.getAllUTXOs(addrsSet)
 		if err != nil {
 			b.Fatal(err)
 		}

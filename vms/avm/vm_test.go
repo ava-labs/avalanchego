@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/mockdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -30,18 +30,20 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var networkID uint32 = 10
-var chainID = ids.ID{5, 4, 3, 2, 1}
-var platformChainID = ids.Empty.Prefix(0)
-var testTxFee = uint64(1000)
-var startBalance = uint64(50000)
+var (
+	networkID       uint32 = 10
+	chainID                = ids.ID{5, 4, 3, 2, 1}
+	platformChainID        = ids.Empty.Prefix(0)
+	testTxFee              = uint64(1000)
+	startBalance           = uint64(50000)
 
-var keys []*crypto.PrivateKeySECP256K1R
-var addrs []ids.ShortID // addrs[i] corresponds to keys[i]
+	keys  []*crypto.PrivateKeySECP256K1R
+	addrs []ids.ShortID // addrs[i] corresponds to keys[i]
 
-var assetID = ids.ID{1, 2, 3}
-var username = "bobby"
-var password = "StrnasfqewiurPasswdn56d" // #nosec G101
+	assetID  = ids.ID{1, 2, 3}
+	username = "bobby"
+	password = "StrnasfqewiurPasswdn56d" // #nosec G101
+)
 
 func init() {
 	factory := crypto.FactorySECP256K1R{}
@@ -201,7 +203,8 @@ func BuildGenesisTest(tb testing.TB) []byte {
 					},
 				},
 			},
-		}}
+		},
+	}
 
 	return BuildGenesisTestWithArgs(tb, defaultArgs)
 }
@@ -239,10 +242,10 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 
 	ctx := NewContext(tb)
 
-	baseDB := memdb.New()
+	baseDBManager := manager.NewDefaultMemDBManager()
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -256,7 +259,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	if err != nil {
 		tb.Fatal(err)
 	}
-	if err := userKeystore.AddUser(username, password); err != nil {
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		tb.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
@@ -268,8 +271,10 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	}
 	err = vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -505,11 +510,13 @@ func TestInvalidGenesis(t *testing.T) {
 	}()
 
 	err := vm.Initialize(
-		/*context=*/ ctx,
-		/*db=*/ memdb.New(),
-		/*genesisState=*/ nil,
-		/*engineMessenger=*/ make(chan common.Message, 1),
-		/*fxs=*/ nil,
+		ctx,                              // context
+		manager.NewDefaultMemDBManager(), // dbManager
+		nil,                              // genesisState
+		nil,                              // upgradeBytes
+		nil,                              // configBytes
+		make(chan common.Message, 1),     // engineMessenger
+		nil,                              // fxs
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid genesis")
@@ -529,11 +536,13 @@ func TestInvalidFx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		/*context=*/ ctx,
-		/*db=*/ memdb.New(),
-		/*genesisState=*/ genesisBytes,
-		/*engineMessenger=*/ make(chan common.Message, 1),
-		/*fxs=*/ []*common.Fx{
+		ctx,                              // context
+		manager.NewDefaultMemDBManager(), // dbManager
+		genesisBytes,                     // genesisState
+		nil,                              // upgradeBytes
+		nil,                              // configBytes
+		make(chan common.Message, 1),     // engineMessenger
+		[]*common.Fx{ // fxs
 			nil,
 		},
 	)
@@ -555,11 +564,13 @@ func TestFxInitializationFailure(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		/*context=*/ ctx,
-		/*db=*/ memdb.New(),
-		/*genesisState=*/ genesisBytes,
-		/*engineMessenger=*/ make(chan common.Message, 1),
-		/*fxs=*/ []*common.Fx{{
+		ctx,                              // context
+		manager.NewDefaultMemDBManager(), // dbManager
+		genesisBytes,                     // genesisState
+		nil,                              // upgradeBytes
+		nil,                              // configBytes
+		make(chan common.Message, 1),     // engineMessenger
+		[]*common.Fx{{ // fxs
 			ID: ids.Empty,
 			Fx: &FxTest{
 				InitializeF: func(interface{}) error {
@@ -600,7 +611,7 @@ func TestIssueTx(t *testing.T) {
 	}
 	ctx.Lock.Lock()
 
-	if txs := vm.Pending(); len(txs) != 1 {
+	if txs := vm.PendingTxs(); len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
 }
@@ -617,11 +628,27 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 	addrsSet := ids.ShortSet{}
 	addrsSet.Add(addrs[0])
-	utxos, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, true)
+
+	utxos, _, _, err := vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(utxos) != 4 {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
 
+	utxos, err = vm.getAllUTXOs(addrsSet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(utxos) != 4 {
+		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
+	}
+
+	utxos, _, _, err = vm.getPaginatedUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(utxos) != 4 {
 		t.Fatalf("Wrong number of utxos. Expected (%d) returned (%d)", 4, len(utxos))
 	}
@@ -663,7 +690,8 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 				Symbol:       "SYMB",
 				InitialState: holder,
 			},
-		}}
+		},
+	}
 	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
 	ctx := vm.ctx
 	defer func() {
@@ -686,7 +714,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 
 	var totalUTXOs []*avax.UTXO
 	for i := 0; i <= 3; i++ {
-		fetchedUTXOs, lastAddr, lastIdx, err = vm.GetUTXOs(addrsSet, lastAddr, lastIdx, -1, true)
+		fetchedUTXOs, lastAddr, lastIdx, err = vm.getPaginatedUTXOs(addrsSet, lastAddr, lastIdx, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -702,7 +730,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 	}
 
 	// Fetch all UTXOs
-	notPaginatedUTXOs, _, _, err := vm.GetUTXOs(addrsSet, ids.ShortEmpty, ids.Empty, -1, false)
+	notPaginatedUTXOs, err := vm.getAllUTXOs(addrsSet)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -799,7 +827,7 @@ func TestIssueDependentTx(t *testing.T) {
 	}
 	ctx.Lock.Lock()
 
-	if txs := vm.Pending(); len(txs) != 2 {
+	if txs := vm.PendingTxs(); len(txs) != 2 {
 		t.Fatalf("Should have returned %d tx(s)", 2)
 	}
 }
@@ -820,8 +848,10 @@ func TestIssueNFT(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewDefaultMemDBManager(),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -965,8 +995,10 @@ func TestIssueProperty(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		memdb.New(),
+		manager.NewDefaultMemDBManager(),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -1065,10 +1097,12 @@ func TestIssueProperty(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{Credential: secp256k1fx.Credential{
-		Sigs: [][crypto.SECP256K1RSigLen]byte{
-			fixedSig,
-		}},
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{
+		Credential: secp256k1fx.Credential{
+			Sigs: [][crypto.SECP256K1RSigLen]byte{
+				fixedSig,
+			},
+		},
 	})
 
 	signedBytes, err := vm.codec.Marshal(codecVersion, mintPropertyTx)
@@ -1154,7 +1188,7 @@ func TestTxCached(t *testing.T) {
 	newTx := NewTx(t, genesisBytes, vm)
 	txBytes := newTx.Bytes()
 
-	_, err := vm.Parse(txBytes)
+	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 
 	db := mockdb.New()
@@ -1163,10 +1197,10 @@ func TestTxCached(t *testing.T) {
 		*called = true
 		return nil, errors.New("")
 	}
-	vm.state.state.DB = db
-	vm.state.state.Cache.Flush()
 
-	_, err = vm.Parse(txBytes)
+	vm.state.(*state).TxState = NewTxState(prefixdb.New([]byte("tx"), db), vm.genesisCodec)
+
+	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 	assert.False(t, *called, "shouldn't have called the DB")
 }
@@ -1184,7 +1218,7 @@ func TestTxNotCached(t *testing.T) {
 	newTx := NewTx(t, genesisBytes, vm)
 	txBytes := newTx.Bytes()
 
-	_, err := vm.Parse(txBytes)
+	_, err := vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 
 	db := mockdb.New()
@@ -1194,11 +1228,13 @@ func TestTxNotCached(t *testing.T) {
 		return nil, errors.New("")
 	}
 	db.OnPut = func([]byte, []byte) error { return nil }
-	vm.state.state.DB = db
-	vm.state.uniqueTx.Flush()
-	vm.state.state.Cache.Flush()
 
-	_, err = vm.Parse(txBytes)
+	s := vm.state.(*state)
+	s.TxState = NewTxState(prefixdb.New(txStatePrefix, db), vm.genesisCodec)
+	s.StatusState = avax.NewStatusState(prefixdb.New(statusStatePrefix, db))
+	s.uniqueTxs.Flush()
+
+	_, err = vm.ParseTx(txBytes)
 	assert.NoError(t, err)
 	assert.True(t, *called, "should have called the DB")
 }
@@ -1281,7 +1317,7 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.Parse(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1302,7 +1338,7 @@ func TestTxVerifyAfterIssueTx(t *testing.T) {
 	}
 	ctx.Lock.Lock()
 
-	txs := vm.Pending()
+	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -1391,7 +1427,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.Parse(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1401,7 +1437,7 @@ func TestTxVerifyAfterGet(t *testing.T) {
 	if _, err := vm.IssueTx(firstTx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	parsedFirstTx, err := vm.Get(firstTx.ID())
+	parsedFirstTx, err := vm.GetTx(firstTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1524,7 +1560,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsedSecondTx, err := vm.Parse(secondTx.Bytes())
+	parsedSecondTx, err := vm.ParseTx(secondTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1537,7 +1573,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 	if _, err := vm.IssueTx(firstTxDescendant.Bytes()); err != nil {
 		t.Fatal(err)
 	}
-	parsedFirstTx, err := vm.Get(firstTx.ID())
+	parsedFirstTx, err := vm.GetTx(firstTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}

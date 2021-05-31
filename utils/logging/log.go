@@ -15,11 +15,10 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var (
-	filePrefix = fmt.Sprintf("%s/", constants.AppName)
-)
+var filePrefix = fmt.Sprintf("%s/", constants.AppName)
 
 // Log implements the Logger interface
 type Log struct {
@@ -39,7 +38,7 @@ type Log struct {
 
 // New returns a new logger set up according to [config]
 func New(config Config) (*Log, error) {
-	if err := os.MkdirAll(config.Directory, os.ModePerm); err != nil {
+	if err := os.MkdirAll(config.Directory, perms.ReadWriteExecute); err != nil {
 		return nil, err
 	}
 	l := &Log{
@@ -155,6 +154,8 @@ func (l *Log) log(level Level, format string, args ...interface{}) {
 	if !shouldLog && !shouldDisplay {
 		return
 	}
+
+	args = SanitizeArgs(args)
 
 	output := l.format(level, format, args...)
 
@@ -392,7 +393,7 @@ func (fw *fileWriter) Rotate() error {
 // Creates a file if it does not exist or opens it in append mode if it does
 func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
 	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, perms.ReadWrite)
 	if err != nil {
 		return nil, nil, err
 	}

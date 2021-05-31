@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
 
 // EngineTest is a test engine
@@ -17,7 +18,9 @@ type EngineTest struct {
 
 	CantIsBootstrapped,
 	CantStartup,
+	CantTimeout,
 	CantGossip,
+	CantHalt,
 	CantShutdown,
 
 	CantContext,
@@ -47,11 +50,14 @@ type EngineTest struct {
 	CantConnected,
 	CantDisconnected,
 
-	CantHealth bool
+	CantHealth,
+
+	CantGetVtx, CantGetVM bool
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
-	StartupF, GossipF, ShutdownF                       func() error
+	HaltF                                              func()
+	StartupF, TimeoutF, GossipF, ShutdownF             func() error
 	NotifyF                                            func(Message) error
 	GetF, GetAncestorsF, PullQueryF                    func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
 	PutF, PushQueryF                                   func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
@@ -61,6 +67,8 @@ type EngineTest struct {
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF func(validatorID ids.ShortID, requestID uint32) error
 	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
 	HealthF                   func() (interface{}, error)
+	GetVtxF                   func() (avalanche.Vertex, error)
+	GetVMF                    func() VM
 }
 
 var _ Engine = &EngineTest{}
@@ -70,7 +78,9 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantIsBootstrapped = cant
 
 	e.CantStartup = cant
+	e.CantTimeout = cant
 	e.CantGossip = cant
+	e.CantHalt = cant
 	e.CantShutdown = cant
 
 	e.CantContext = cant
@@ -101,9 +111,11 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantDisconnected = cant
 
 	e.CantHealth = cant
+
+	e.CantGetVtx = cant
+	e.CantGetVM = cant
 }
 
-// Context ...
 func (e *EngineTest) Context() *snow.Context {
 	if e.ContextF != nil {
 		return e.ContextF()
@@ -114,7 +126,6 @@ func (e *EngineTest) Context() *snow.Context {
 	return nil
 }
 
-// Startup ...
 func (e *EngineTest) Startup() error {
 	if e.StartupF != nil {
 		return e.StartupF()
@@ -128,7 +139,19 @@ func (e *EngineTest) Startup() error {
 	return errors.New("unexpectedly called Startup")
 }
 
-// Gossip ...
+func (e *EngineTest) Timeout() error {
+	if e.TimeoutF != nil {
+		return e.TimeoutF()
+	}
+	if !e.CantTimeout {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called Timeout")
+	}
+	return errors.New("unexpectedly called Timeout")
+}
+
 func (e *EngineTest) Gossip() error {
 	if e.GossipF != nil {
 		return e.GossipF()
@@ -142,7 +165,14 @@ func (e *EngineTest) Gossip() error {
 	return errors.New("unexpectedly called Gossip")
 }
 
-// Shutdown ...
+func (e *EngineTest) Halt() {
+	if e.HaltF != nil {
+		e.HaltF()
+	} else if e.CantHalt && e.T != nil {
+		e.T.Fatalf("Unexpectedly called Halt")
+	}
+}
+
 func (e *EngineTest) Shutdown() error {
 	if e.ShutdownF != nil {
 		return e.ShutdownF()
@@ -156,7 +186,6 @@ func (e *EngineTest) Shutdown() error {
 	return errors.New("unexpectedly called Shutdown")
 }
 
-// Notify ...
 func (e *EngineTest) Notify(msg Message) error {
 	if e.NotifyF != nil {
 		return e.NotifyF(msg)
@@ -170,7 +199,6 @@ func (e *EngineTest) Notify(msg Message) error {
 	return errors.New("unexpectedly called Notify")
 }
 
-// GetAcceptedFrontier ...
 func (e *EngineTest) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
 	if e.GetAcceptedFrontierF != nil {
 		return e.GetAcceptedFrontierF(validatorID, requestID)
@@ -184,7 +212,6 @@ func (e *EngineTest) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint
 	return errors.New("unexpectedly called GetAcceptedFrontier")
 }
 
-// GetAcceptedFrontierFailed ...
 func (e *EngineTest) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
 	if e.GetAcceptedFrontierFailedF != nil {
 		return e.GetAcceptedFrontierFailedF(validatorID, requestID)
@@ -198,7 +225,6 @@ func (e *EngineTest) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestI
 	return errors.New("unexpectedly called GetAcceptedFrontierFailed")
 }
 
-// AcceptedFrontier ...
 func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.AcceptedFrontierF != nil {
 		return e.AcceptedFrontierF(validatorID, requestID, containerIDs)
@@ -212,7 +238,6 @@ func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32,
 	return errors.New("unexpectedly called AcceptedFrontierF")
 }
 
-// GetAccepted ...
 func (e *EngineTest) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.GetAcceptedF != nil {
 		return e.GetAcceptedF(validatorID, requestID, containerIDs)
@@ -226,7 +251,6 @@ func (e *EngineTest) GetAccepted(validatorID ids.ShortID, requestID uint32, cont
 	return errors.New("unexpectedly called GetAccepted")
 }
 
-// GetAcceptedFailed ...
 func (e *EngineTest) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
 	if e.GetAcceptedFailedF != nil {
 		return e.GetAcceptedFailedF(validatorID, requestID)
@@ -240,7 +264,6 @@ func (e *EngineTest) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32
 	return errors.New("unexpectedly called GetAcceptedFailed")
 }
 
-// Accepted ...
 func (e *EngineTest) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.AcceptedF != nil {
 		return e.AcceptedF(validatorID, requestID, containerIDs)
@@ -254,7 +277,6 @@ func (e *EngineTest) Accepted(validatorID ids.ShortID, requestID uint32, contain
 	return errors.New("unexpectedly called Accepted")
 }
 
-// Get ...
 func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
 	if e.GetF != nil {
 		return e.GetF(validatorID, requestID, containerID)
@@ -268,7 +290,6 @@ func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID 
 	return errors.New("unexpectedly called Get")
 }
 
-// GetAncestors ...
 func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
 	if e.GetAncestorsF != nil {
 		return e.GetAncestorsF(validatorID, requestID, containerID)
@@ -280,10 +301,8 @@ func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, con
 		e.T.Fatalf("Unexpectedly called GetAncestors")
 	}
 	return errors.New("unexpectedly called GetAncestors")
-
 }
 
-// GetFailed ...
 func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error {
 	if e.GetFailedF != nil {
 		return e.GetFailedF(validatorID, requestID)
@@ -297,7 +316,6 @@ func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error 
 	return errors.New("unexpectedly called GetFailed")
 }
 
-// GetAncestorsFailed ...
 func (e *EngineTest) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
 	if e.GetAncestorsFailedF != nil {
 		return e.GetAncestorsFailedF(validatorID, requestID)
@@ -311,7 +329,6 @@ func (e *EngineTest) GetAncestorsFailed(validatorID ids.ShortID, requestID uint3
 	return errors.New("unexpectedly called GetAncestorsFailed")
 }
 
-// Put ...
 func (e *EngineTest) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
 	if e.PutF != nil {
 		return e.PutF(validatorID, requestID, containerID, container)
@@ -325,7 +342,6 @@ func (e *EngineTest) Put(validatorID ids.ShortID, requestID uint32, containerID 
 	return errors.New("unexpectedly called Put")
 }
 
-// MultiPut ...
 func (e *EngineTest) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
 	if e.MultiPutF != nil {
 		return e.MultiPutF(validatorID, requestID, containers)
@@ -339,7 +355,6 @@ func (e *EngineTest) MultiPut(validatorID ids.ShortID, requestID uint32, contain
 	return errors.New("unexpectedly called MultiPut")
 }
 
-// PushQuery ...
 func (e *EngineTest) PushQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
 	if e.PushQueryF != nil {
 		return e.PushQueryF(validatorID, requestID, containerID, container)
@@ -353,7 +368,6 @@ func (e *EngineTest) PushQuery(validatorID ids.ShortID, requestID uint32, contai
 	return errors.New("unexpectedly called PushQuery")
 }
 
-// PullQuery ...
 func (e *EngineTest) PullQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
 	if e.PullQueryF != nil {
 		return e.PullQueryF(validatorID, requestID, containerID)
@@ -367,7 +381,6 @@ func (e *EngineTest) PullQuery(validatorID ids.ShortID, requestID uint32, contai
 	return errors.New("unexpectedly called PullQuery")
 }
 
-// QueryFailed ...
 func (e *EngineTest) QueryFailed(validatorID ids.ShortID, requestID uint32) error {
 	if e.QueryFailedF != nil {
 		return e.QueryFailedF(validatorID, requestID)
@@ -381,7 +394,6 @@ func (e *EngineTest) QueryFailed(validatorID ids.ShortID, requestID uint32) erro
 	return errors.New("unexpectedly called QueryFailed")
 }
 
-// Chits ...
 func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.ChitsF != nil {
 		return e.ChitsF(validatorID, requestID, containerIDs)
@@ -395,7 +407,6 @@ func (e *EngineTest) Chits(validatorID ids.ShortID, requestID uint32, containerI
 	return errors.New("unexpectedly called Chits")
 }
 
-// Connected ...
 func (e *EngineTest) Connected(validatorID ids.ShortID) error {
 	if e.ConnectedF != nil {
 		return e.ConnectedF(validatorID)
@@ -409,7 +420,6 @@ func (e *EngineTest) Connected(validatorID ids.ShortID) error {
 	return errors.New("unexpectedly called Connected")
 }
 
-// Disconnected ...
 func (e *EngineTest) Disconnected(validatorID ids.ShortID) error {
 	if e.DisconnectedF != nil {
 		return e.DisconnectedF(validatorID)
@@ -423,7 +433,6 @@ func (e *EngineTest) Disconnected(validatorID ids.ShortID) error {
 	return errors.New("unexpectedly called Disconnected")
 }
 
-// IsBootstrapped ...
 func (e *EngineTest) IsBootstrapped() bool {
 	if e.IsBootstrappedF != nil {
 		return e.IsBootstrappedF()
@@ -434,8 +443,7 @@ func (e *EngineTest) IsBootstrapped() bool {
 	return false
 }
 
-// Health ...
-func (e *EngineTest) Health() (interface{}, error) {
+func (e *EngineTest) HealthCheck() (interface{}, error) {
 	if e.HealthF != nil {
 		return e.HealthF()
 	}
@@ -443,4 +451,24 @@ func (e *EngineTest) Health() (interface{}, error) {
 		e.T.Fatalf("Unexpectedly called Health")
 	}
 	return nil, errors.New("unexpectedly called Health")
+}
+
+func (e *EngineTest) GetVtx() (avalanche.Vertex, error) {
+	if e.GetVtxF != nil {
+		return e.GetVtxF()
+	}
+	if e.CantGetVtx && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetVtx")
+	}
+	return nil, errors.New("unexpectedly called GetVtx")
+}
+
+func (e *EngineTest) GetVM() VM {
+	if e.GetVMF != nil {
+		return e.GetVMF()
+	}
+	if e.CantGetVM && e.T != nil {
+		e.T.Fatalf("Unexpectedly called GetVM")
+	}
+	return nil
 }

@@ -26,9 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	testChangeAddr = ids.GenerateTestShortID()
-)
+var testChangeAddr = ids.GenerateTestShortID()
 
 // Returns:
 // 1) genesis bytes of vm
@@ -41,7 +39,7 @@ func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := keystore.AddUser(username, password); err != nil {
+	if err := keystore.CreateUser(username, password); err != nil {
 		t.Fatalf("couldn't add user: %s", err)
 	}
 	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
@@ -111,12 +109,12 @@ func sampleAddrs(t *testing.T, vm *VM, addrs []ids.ShortID) ([]ids.ShortID, []st
 // Returns error if [numTxFees] tx fees was not deducted from the addresses in [fromAddrs]
 // relative to their starting balance
 func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numTxFees int) error {
-	totalTxFee := numTxFees * int(s.vm.txFee)
-	fromAddrsStartBalance := int(startBalance) * len(fromAddrs)
+	totalTxFee := uint64(numTxFees) * s.vm.txFee
+	fromAddrsStartBalance := startBalance * uint64(len(fromAddrs))
 
 	// Key: Address
 	// Value: AVAX balance
-	balances := map[ids.ShortID]int{}
+	balances := map[ids.ShortID]uint64{}
 
 	for _, addr := range addrs { // get balances for all addresses
 		addrStr, err := s.vm.FormatLocalAddress(addr)
@@ -134,10 +132,10 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 		if err != nil {
 			return fmt.Errorf("couldn't get balance of %s: %w", addr, err)
 		}
-		balances[addr] = int(reply.Balance)
+		balances[addr] = uint64(reply.Balance)
 	}
 
-	fromAddrsTotalBalance := 0
+	fromAddrsTotalBalance := uint64(0)
 	for _, addr := range fromAddrs {
 		fromAddrsTotalBalance += balances[addr]
 	}
@@ -268,7 +266,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -313,7 +311,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -360,7 +358,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -421,7 +419,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(twoOfTwoUTXO)
+	err = vm.state.PutUTXO(twoOfTwoUTXO.InputID(), twoOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -463,7 +461,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(oneOfTwoUTXO)
+	err = vm.state.PutUTXO(oneOfTwoUTXO.InputID(), oneOfTwoUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -508,7 +506,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(futureUTXO)
+	err = vm.state.PutUTXO(futureUTXO.InputID(), futureUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -551,7 +549,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 		},
 	}
 	// Insert the UTXO
-	err = vm.state.FundUTXO(otherAssetUTXO)
+	err = vm.state.PutUTXO(otherAssetUTXO.InputID(), otherAssetUTXO)
 	assert.NoError(t, err)
 
 	// Check the balance with IncludePartial set to true
@@ -581,6 +579,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 	// The balance should include the UTXO since it is partly owned by [addr]
 	assert.Len(t, reply.Balances, 0)
 }
+
 func TestServiceGetTx(t *testing.T) {
 	genesisBytes, vm, s, _ := setup(t)
 	defer func() {
@@ -652,7 +651,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 	numUTXOs := 10
 	// Put a bunch of UTXOs
 	for i := 0; i < numUTXOs; i++ {
-		if err := vm.state.FundUTXO(&avax.UTXO{
+		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID: ids.GenerateTestID(),
 			},
@@ -664,7 +663,8 @@ func TestServiceGetUTXOs(t *testing.T) {
 					Addrs:     []ids.ShortID{rawAddr},
 				},
 			},
-		}); err != nil {
+		}
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1486,7 +1486,7 @@ func TestSendMultiple(t *testing.T) {
 		t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
 	}
 
-	if _, err = vm.Get(reply.TxID); err != nil {
+	if _, err = vm.GetTx(reply.TxID); err != nil {
 		t.Fatalf("Failed to retrieve created transaction: %s", err)
 	}
 }

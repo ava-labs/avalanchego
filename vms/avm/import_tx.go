@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errNoImportInputs = errors.New("no import inputs")
-)
+var errNoImportInputs = errors.New("no import inputs")
 
 // ImportTx is a transaction that imports an asset from another blockchain.
 type ImportTx struct {
@@ -94,16 +92,20 @@ func (t *ImportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is well-formed.
 func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
+		return err
+	}
+
+	if !vm.bootstrapped {
+		return nil
+	}
+
 	subnetID, err := vm.ctx.SNLookup.SubnetID(t.SourceChain)
 	if err != nil {
 		return err
 	}
 	if vm.ctx.SubnetID != subnetID || t.SourceChain == vm.ctx.ChainID {
 		return errWrongBlockchainID
-	}
-
-	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
-		return err
 	}
 
 	utxoIDs := make([][]byte, len(t.ImportedIns))

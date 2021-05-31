@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -28,7 +28,8 @@ var (
 	errNoPendingBlocks = errors.New("there is no block to propose")
 	errBadGenesisBytes = errors.New("genesis data should be bytes (max length 32)")
 
-	_ block.ChainVM = &VM{}
+	_ block.ChainVM   = &VM{}
+	_ common.StaticVM = &VM{}
 )
 
 // VM implements the snowman.VM interface
@@ -43,18 +44,20 @@ type VM struct {
 
 // Initialize this vm
 // [ctx] is this vm's context
-// [db] is this vm's database
+// [dbManager] is the manager of this vm's database
 // [toEngine] is used to notify the consensus engine that new blocks are
 //   ready to be added to consensus
 // The data in the genesis block is [genesisData]
 func (vm *VM) Initialize(
 	ctx *snow.Context,
-	db database.Database,
+	dbManager manager.Manager,
 	genesisData []byte,
+	upgradeData []byte,
+	configData []byte,
 	toEngine chan<- common.Message,
 	_ []*common.Fx,
 ) error {
-	if err := vm.SnowmanVM.Initialize(ctx, db, vm.ParseBlock, toEngine); err != nil {
+	if err := vm.SnowmanVM.Initialize(ctx, dbManager.Current().Database, vm.ParseBlock, toEngine); err != nil {
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
 	}
@@ -111,22 +114,21 @@ func (vm *VM) Initialize(
 // CreateHandlers returns a map where:
 // Keys: The path extension for this VM's API (empty in this case)
 // Values: The handler for the API
-func (vm *VM) CreateHandlers() map[string]*common.HTTPHandler {
+func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	handler, err := vm.NewHandler("timestamp", &Service{vm})
-	vm.Ctx.Log.AssertNoError(err)
 	return map[string]*common.HTTPHandler{
 		"": handler,
-	}
+	}, err
 }
 
 // CreateStaticHandlers returns a map where:
 // Keys: The path extension for this VM's static API
 // Values: The handler for that static API
 // We return nil because this VM has no static API
-func (vm *VM) CreateStaticHandlers() map[string]*common.HTTPHandler { return nil }
+func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) { return nil, nil }
 
 // Health implements the common.VM interface
-func (vm *VM) Health() (interface{}, error) { return nil, nil }
+func (vm *VM) HealthCheck() (interface{}, error) { return nil, nil }
 
 // BuildBlock returns a block that this vm wants to add to consensus
 func (vm *VM) BuildBlock() (snowman.Block, error) {

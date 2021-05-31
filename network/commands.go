@@ -25,6 +25,9 @@ const (
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
 	MultiContainerBytes              // Used in MultiPut
+	SigBytes                         // Used in handshake / peer gossiping
+	VersionTime                      // Used in handshake / peer gossiping
+	SignedPeers                      // Used in peer gossiping
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -56,6 +59,12 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case MultiContainerBytes:
 		return wrappers.TryPack2DBytes
+	case SigBytes:
+		return wrappers.TryPackBytes
+	case VersionTime:
+		return wrappers.TryPackLong
+	case SignedPeers:
+		return wrappers.TryPackIPCertList
 	default:
 		return nil
 	}
@@ -90,6 +99,12 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case MultiContainerBytes:
 		return wrappers.TryUnpack2DBytes
+	case SigBytes:
+		return wrappers.TryUnpackBytes
+	case VersionTime:
+		return wrappers.TryUnpackLong
+	case SignedPeers:
+		return wrappers.TryUnpackIPCertList
 	default:
 		return nil
 	}
@@ -123,6 +138,12 @@ func (f Field) String() string {
 		return "Container IDs"
 	case MultiContainerBytes:
 		return "MultiContainerBytes"
+	case SigBytes:
+		return "SigBytes"
+	case VersionTime:
+		return "VersionTime"
+	case SignedPeers:
+		return "SignedPeers"
 	default:
 		return "Unknown Field"
 	}
@@ -176,9 +197,9 @@ func (op Op) String() string {
 const (
 	// Handshake:
 	GetVersion Op = iota
-	Version
+	_
 	GetPeerList
-	PeerList
+	_
 	Ping
 	Pong
 	// Bootstrapping:
@@ -194,6 +215,9 @@ const (
 	PushQuery
 	PullQuery
 	Chits
+	// Handshake / peer gossiping
+	Version
+	PeerList
 )
 
 // Defines the messages that can be sent/received with this network
@@ -201,9 +225,9 @@ var (
 	Messages = map[Op][]Field{
 		// Handshake:
 		GetVersion:  {},
-		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr},
+		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes},
 		GetPeerList: {},
-		PeerList:    {Peers},
+		PeerList:    {SignedPeers},
 		Ping:        {},
 		Pong:        {},
 		// Bootstrapping:

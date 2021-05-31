@@ -16,9 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errNoExportOutputs = errors.New("no export outputs")
-)
+var errNoExportOutputs = errors.New("no export outputs")
 
 // ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {
@@ -65,12 +63,14 @@ func (t *ExportTx) SyntacticVerify(
 
 // SemanticVerify that this transaction is valid to be spent.
 func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable) error {
-	subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
-	if err != nil {
-		return err
-	}
-	if vm.ctx.SubnetID != subnetID || t.DestinationChain == vm.ctx.ChainID {
-		return errWrongBlockchainID
+	if vm.bootstrapped {
+		subnetID, err := vm.ctx.SNLookup.SubnetID(t.DestinationChain)
+		if err != nil {
+			return err
+		}
+		if vm.ctx.SubnetID != subnetID || t.DestinationChain == vm.ctx.ChainID {
+			return errWrongBlockchainID
+		}
 	}
 
 	for _, out := range t.ExportedOuts {

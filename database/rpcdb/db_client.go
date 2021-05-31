@@ -4,7 +4,7 @@
 package rpcdb
 
 import (
-	"fmt"
+	"sync/atomic"
 
 	"golang.org/x/net/context"
 
@@ -15,13 +15,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	errClosed   = fmt.Sprintf("rpc error: code = Unknown desc = %s", database.ErrClosed)
-	errNotFound = fmt.Sprintf("rpc error: code = Unknown desc = %s", database.ErrNotFound)
+const (
+	maxBatchSize = 64 * 1024 // 64 KiB
+
+	// baseElementSize is an approximation of the protobuf encoding overhead per
+	// element
+	baseElementSize = 8 // bytes
 )
 
+var _ database.Database = &DatabaseClient{}
+
 // DatabaseClient is an implementation of database that talks over RPC.
-type DatabaseClient struct{ client rpcdbproto.DatabaseClient }
+type DatabaseClient struct {
+	client rpcdbproto.DatabaseClient
+
+	batchIndex int64
+}
 
 // NewClient returns a database instance connected to a remote database instance
 func NewClient(client rpcdbproto.DatabaseClient) *DatabaseClient {
@@ -34,9 +43,9 @@ func (db *DatabaseClient) Has(key []byte) (bool, error) {
 		Key: key,
 	})
 	if err != nil {
-		return false, updateError(err)
+		return false, err
 	}
-	return resp.Has, nil
+	return resp.Has, errCodeToError[resp.Err]
 }
 
 // Get attempts to return the value that was mapped to the key that was provided
@@ -45,26 +54,32 @@ func (db *DatabaseClient) Get(key []byte) ([]byte, error) {
 		Key: key,
 	})
 	if err != nil {
-		return nil, updateError(err)
+		return nil, err
 	}
-	return resp.Value, nil
+	return resp.Value, errCodeToError[resp.Err]
 }
 
 // Put attempts to set the value this key maps to
 func (db *DatabaseClient) Put(key, value []byte) error {
-	_, err := db.client.Put(context.Background(), &rpcdbproto.PutRequest{
+	resp, err := db.client.Put(context.Background(), &rpcdbproto.PutRequest{
 		Key:   key,
 		Value: value,
 	})
-	return updateError(err)
+	if err != nil {
+		return err
+	}
+	return errCodeToError[resp.Err]
 }
 
 // Delete attempts to remove any mapping from the key
 func (db *DatabaseClient) Delete(key []byte) error {
-	_, err := db.client.Delete(context.Background(), &rpcdbproto.DeleteRequest{
+	resp, err := db.client.Delete(context.Background(), &rpcdbproto.DeleteRequest{
 		Key: key,
 	})
-	return updateError(err)
+	if err != nil {
+		return err
+	}
+	return errCodeToError[resp.Err]
 }
 
 // NewBatch returns a new batch
@@ -92,7 +107,7 @@ func (db *DatabaseClient) NewIteratorWithStartAndPrefix(start, prefix []byte) da
 		Prefix: prefix,
 	})
 	if err != nil {
-		return &nodb.Iterator{Err: updateError(err)}
+		return &nodb.Iterator{Err: err}
 	}
 	return &iterator{
 		db: db,
@@ -106,24 +121,30 @@ func (db *DatabaseClient) Stat(property string) (string, error) {
 		Property: property,
 	})
 	if err != nil {
-		return "", updateError(err)
+		return "", err
 	}
-	return resp.Stat, nil
+	return resp.Stat, errCodeToError[resp.Err]
 }
 
 // Compact attempts to optimize the space utilization in the provided range
 func (db *DatabaseClient) Compact(start, limit []byte) error {
-	_, err := db.client.Compact(context.Background(), &rpcdbproto.CompactRequest{
+	resp, err := db.client.Compact(context.Background(), &rpcdbproto.CompactRequest{
 		Start: start,
 		Limit: limit,
 	})
-	return updateError(err)
+	if err != nil {
+		return err
+	}
+	return errCodeToError[resp.Err]
 }
 
 // Close attempts to close the database
 func (db *DatabaseClient) Close() error {
-	_, err := db.client.Close(context.Background(), &rpcdbproto.CloseRequest{})
-	return updateError(err)
+	resp, err := db.client.Close(context.Background(), &rpcdbproto.CloseRequest{})
+	if err != nil {
+		return err
+	}
+	return errCodeToError[resp.Err]
 }
 
 type keyValue struct {
@@ -140,21 +161,24 @@ type batch struct {
 
 func (b *batch) Put(key, value []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), utils.CopyBytes(value), false})
-	b.size += len(value)
+	b.size += len(key) + len(value)
 	return nil
 }
 
 func (b *batch) Delete(key []byte) error {
 	b.writes = append(b.writes, keyValue{utils.CopyBytes(key), nil, true})
-	b.size++
+	b.size += len(key)
 	return nil
 }
 
-func (b *batch) ValueSize() int { return b.size }
+func (b *batch) Size() int { return b.size }
 
 func (b *batch) Write() error {
-	request := &rpcdbproto.WriteBatchRequest{}
-
+	request := &rpcdbproto.WriteBatchRequest{
+		Id:        atomic.AddInt64(&b.db.batchIndex, 1),
+		Continues: true,
+	}
+	currentSize := 0
 	keySet := make(map[string]struct{}, len(b.writes))
 	for i := len(b.writes) - 1; i >= 0; i-- {
 		kv := b.writes[i]
@@ -163,6 +187,21 @@ func (b *batch) Write() error {
 			continue
 		}
 		keySet[key] = struct{}{}
+
+		sizeChange := baseElementSize + len(kv.key) + len(kv.value)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			resp, err := b.db.client.WriteBatch(context.Background(), request)
+			if err != nil {
+				return err
+			}
+			if err := errCodeToError[resp.Err]; err != nil {
+				return err
+			}
+			currentSize = 0
+			request.Deletes = request.Deletes[:0]
+			request.Puts = request.Puts[:0]
+		}
+		currentSize += sizeChange
 
 		if kv.delete {
 			request.Deletes = append(request.Deletes, &rpcdbproto.DeleteRequest{
@@ -176,8 +215,12 @@ func (b *batch) Write() error {
 		}
 	}
 
-	_, err := b.db.client.WriteBatch(context.Background(), request)
-	return updateError(err)
+	request.Continues = false
+	resp, err := b.db.client.WriteBatch(context.Background(), request)
+	if err != nil {
+		return err
+	}
+	return errCodeToError[resp.Err]
 }
 
 func (b *batch) Reset() {
@@ -218,11 +261,11 @@ func (it *iterator) Next() bool {
 	resp, err := it.db.client.IteratorNext(context.Background(), &rpcdbproto.IteratorNextRequest{
 		Id: it.id,
 	})
-	it.errs.Add(updateError(err))
-
 	if err != nil {
+		it.errs.Add(err)
 		return false
 	}
+
 	it.key = resp.Key
 	it.value = resp.Value
 	return resp.FoundNext
@@ -234,10 +277,14 @@ func (it *iterator) Error() error {
 		return it.errs.Err
 	}
 
-	_, err := it.db.client.IteratorError(context.Background(), &rpcdbproto.IteratorErrorRequest{
+	resp, err := it.db.client.IteratorError(context.Background(), &rpcdbproto.IteratorErrorRequest{
 		Id: it.id,
 	})
-	it.errs.Add(updateError(err))
+	if err != nil {
+		it.errs.Add(err)
+	} else {
+		it.errs.Add(errCodeToError[resp.Err])
+	}
 	return it.errs.Err
 }
 
@@ -249,25 +296,12 @@ func (it *iterator) Value() []byte { return it.value }
 
 // Release frees any resources held by the iterator
 func (it *iterator) Release() {
-	_, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
+	resp, err := it.db.client.IteratorRelease(context.Background(), &rpcdbproto.IteratorReleaseRequest{
 		Id: it.id,
 	})
-	it.errs.Add(updateError(err))
-}
-
-// updateError sets the error value to the errors required by the Database
-// interface
-func updateError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	switch err.Error() {
-	case errClosed:
-		return database.ErrClosed
-	case errNotFound:
-		return database.ErrNotFound
-	default:
-		return err
+	if err != nil {
+		it.errs.Add(err)
+	} else {
+		it.errs.Add(errCodeToError[resp.Err])
 	}
 }

@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var (
-	errNilTx = errors.New("nil tx is not valid")
-)
+var errNilTx = errors.New("nil tx is not valid")
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {

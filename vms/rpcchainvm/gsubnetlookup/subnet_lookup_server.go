@@ -11,17 +11,19 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 )
 
-// Server is a messenger that is managed over RPC.
+var _ gsubnetlookupproto.SubnetLookupServer = &Server{}
+
+// Server is a subnet lookup that is managed over RPC.
 type Server struct {
+	gsubnetlookupproto.UnimplementedSubnetLookupServer
 	aliaser snow.SubnetLookup
 }
 
-// NewServer returns a vm instance connected to a remote vm instance
+// NewServer returns a subnet lookup connected to a remote subnet lookup
 func NewServer(aliaser snow.SubnetLookup) *Server {
 	return &Server{aliaser: aliaser}
 }
 
-// SubnetID ...
 func (s *Server) SubnetID(
 	_ context.Context,
 	req *gsubnetlookupproto.SubnetIDRequest,

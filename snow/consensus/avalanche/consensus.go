@@ -70,4 +70,7 @@ type Consensus interface {
 	// finalized. Note, it is possible that after returning finalized, a new
 	// decision may be added such that this instance is no longer finalized.
 	Finalized() bool
+
+	// HealthCheck returns information about the consensus health.
+	HealthCheck() (interface{}, error)
 }

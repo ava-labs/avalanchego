@@ -29,6 +29,7 @@ func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
 		return nil, err
 	}
 	return &blockJob{
+		parser:      p,
 		log:         p.log,
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
@@ -37,6 +38,7 @@ func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
 }
 
 type blockJob struct {
+	parser                  *parser
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	blk                     snowman.Block
@@ -50,12 +52,20 @@ func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	}
 	return missing, nil
 }
+
+func (b *blockJob) HasMissingDependencies() (bool, error) {
+	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (b *blockJob) Execute() error {
-	deps, err := b.MissingDependencies()
+	hasMissingDeps, err := b.HasMissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
+	if hasMissingDeps {
 		b.numDropped.Inc()
 		return errors.New("attempting to accept a block with missing dependencies")
 	}
@@ -66,14 +76,13 @@ func (b *blockJob) Execute() error {
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
 		if err := b.blk.Verify(); err != nil {
-			return fmt.Errorf("block %s failed verification during bootstrapping due to: %w",
-				b.blk.ID(), err)
+			b.log.Error("block %s failed verification during bootstrapping due to %s", b.blk.ID(), err)
+			return fmt.Errorf("failed to verify block in bootstrapping: %w", err)
 		}
 
 		b.numAccepted.Inc()
 		if err := b.blk.Accept(); err != nil {
-			b.log.Debug("block %s failed to accept during bootstrapping due to %s",
-				b.blk.ID(), err)
+			b.log.Debug("block %s failed to accept during bootstrapping due to %s", b.blk.ID(), err)
 			return fmt.Errorf("failed to accept block in bootstrapping: %w", err)
 		}
 	}

@@ -12,10 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var (
-	// DefaultLogDirectory is the default directory where logs are saved
-	DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
-)
+// DefaultLogDirectory is the default directory where logs are saved
+var DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
 
 // Config defines the configuration of a logger
 type Config struct {

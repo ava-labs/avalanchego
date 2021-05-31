@@ -13,19 +13,21 @@ import (
 
 var (
 	errFullQueue = errors.New("full message queue")
+
+	_ messengerproto.MessengerServer = &Server{}
 )
 
 // Server is a messenger that is managed over RPC.
 type Server struct {
+	messengerproto.UnimplementedMessengerServer
 	messenger chan<- common.Message
 }
 
-// NewServer returns a vm instance connected to a remote vm instance
+// NewServer returns a messenger connected to a remote channel
 func NewServer(messenger chan<- common.Message) *Server {
 	return &Server{messenger: messenger}
 }
 
-// Notify ...
 func (s *Server) Notify(_ context.Context, req *messengerproto.NotifyRequest) (*messengerproto.NotifyResponse, error) {
 	msg := common.Message(req.Message)
 	select {

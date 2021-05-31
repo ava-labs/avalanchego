@@ -10,9 +10,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var (
-	errWeightsTooLarge = errors.New("total weight is too large")
-)
+var errWeightsTooLarge = errors.New("total weight is too large")
 
 // weightedUniform implements the Weighted interface.
 //
@@ -44,7 +42,7 @@ func (s *weightedUniform) Initialize(weights []uint64) error {
 	}
 	size := int(totalWeight)
 
-	if size > len(s.indices) {
+	if size > cap(s.indices) {
 		s.indices = make([]int, size)
 	} else {
 		s.indices = s.indices[:size]

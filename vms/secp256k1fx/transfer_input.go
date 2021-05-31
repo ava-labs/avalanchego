@@ -7,9 +7,7 @@ import (
 	"errors"
 )
 
-var (
-	errNoValueInput = errors.New("input has no value")
-)
+var errNoValueInput = errors.New("input has no value")
 
 // TransferInput ...
 type TransferInput struct {

@@ -24,7 +24,7 @@ type txParser struct {
 }
 
 func (p *txParser) Parse(txBytes []byte) (queue.Job, error) {
-	tx, err := p.vm.Parse(txBytes)
+	tx, err := p.vm.ParseTx(txBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -53,12 +53,22 @@ func (t *txJob) MissingDependencies() (ids.Set, error) {
 	return missing, nil
 }
 
+// Returns true if this tx job has at least 1 missing dependency
+func (t *txJob) HasMissingDependencies() (bool, error) {
+	for _, dep := range t.tx.Dependencies() {
+		if dep.Status() != choices.Accepted {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (t *txJob) Execute() error {
-	deps, err := t.MissingDependencies()
+	hasMissingDeps, err := t.HasMissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
+	if hasMissingDeps {
 		t.numDropped.Inc()
 		return errors.New("attempting to accept a transaction with missing dependencies")
 	}
@@ -70,8 +80,9 @@ func (t *txJob) Execute() error {
 		return fmt.Errorf("attempting to execute transaction with status %s", status)
 	case choices.Processing:
 		if err := t.tx.Verify(); err != nil {
-			t.log.Debug("transaction %s failed verification during bootstrapping due to %s",
+			t.log.Error("transaction %s failed verification during bootstrapping due to %s",
 				t.tx.ID(), err)
+			return fmt.Errorf("failed to verify transaction in bootstrapping: %w", err)
 		}
 
 		t.numAccepted.Inc()

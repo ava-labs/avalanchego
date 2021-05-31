@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -132,97 +131,98 @@ func (tx *UnsignedAddValidatorTx) Verify(
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
-	db database.Database,
+	parentState MutableState,
 	stx *Tx,
 ) (
-	*versiondb.Database,
-	*versiondb.Database,
+	VersionedState,
+	VersionedState,
 	func() error,
 	func() error,
 	TxError,
 ) {
 	// Verify the tx is well-formed
 	if err := tx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
-		vm.minStakeDuration,
-		vm.maxStakeDuration,
-		vm.minDelegationFee,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
+		vm.MinStakeDuration,
+		vm.MaxStakeDuration,
+		vm.MinDelegationFee,
 	); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
+
+	currentStakers := parentState.CurrentStakerChainState()
+	pendingStakers := parentState.PendingStakerChainState()
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
 	copy(outs, tx.Outs)
 	copy(outs[len(tx.Outs):], tx.Stake)
 
 	if vm.bootstrapped {
+		currentTimestamp := parentState.GetTimestamp()
 		// Ensure the proposed validator starts after the current time
-		if currentTime, err := vm.getTimestamp(db); err != nil {
-			return nil, nil, nil, nil, tempError{
-				fmt.Errorf("failed to get timestamp: %w", err),
-			}
-		} else if startTime := tx.StartTime(); !currentTime.Before(startTime) {
+		if startTime := tx.StartTime(); !currentTimestamp.Before(startTime) {
 			return nil, nil, nil, nil, permError{
-				fmt.Errorf("validator's start time (%s) at or before current timestamp (%s)",
+				fmt.Errorf(
+					"validator's start time (%s) at or before current timestamp (%s)",
 					startTime,
-					currentTime,
+					currentTimestamp,
 				),
 			}
-		} else if startTime.After(currentTime.Add(maxFutureStartTime)) {
+		} else if startTime.After(currentTimestamp.Add(maxFutureStartTime)) {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
 					"validator start time (%s) more than two weeks after current chain timestamp (%s)",
 					startTime,
-					currentTime,
+					currentTimestamp,
 				),
 			}
 		}
 
-		_, isValidator, err := vm.isValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return nil, nil, nil, nil, tempError{
+		// Ensure this validator isn't currently a validator.
+		_, err := currentStakers.GetValidator(tx.Validator.NodeID)
+		if err == nil {
+			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
-					"failed to get whether %s is a validator: %w",
-					tx.Validator.NodeID,
-					err,
+					"%s is already a primary network validator",
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
 				),
 			}
 		}
-		if isValidator {
-			return nil, nil, nil, nil, permError{
+		if err != database.ErrNotFound {
+			return nil, nil, nil, nil, tempError{
 				fmt.Errorf(
-					"validator %s is already a primary network validator",
-					tx.Validator.NodeID,
+					"failed to find whether %s is a validator: %w",
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+					err,
 				),
 			}
 		}
 
-		// Ensure that the period this validator validates the specified subnet
-		// is a subnet of the time they will validate the primary network.
-		_, willBeValidator, err := vm.willBeValidator(db, constants.PrimaryNetworkID, tx.Validator.NodeID)
-		if err != nil {
-			return nil, nil, nil, nil, tempError{
+		// Ensure this validator isn't about to become a validator.
+		_, err = pendingStakers.GetValidatorTx(tx.Validator.NodeID)
+		if err == nil {
+			return nil, nil, nil, nil, permError{
 				fmt.Errorf(
-					"failed to get whether %s will be a validator: %w",
-					tx.Validator.NodeID,
-					err,
+					"%s is about to become a primary network validator",
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
 				),
 			}
 		}
-		if willBeValidator {
-			return nil, nil, nil, nil, permError{
+		if err != database.ErrNotFound {
+			return nil, nil, nil, nil, tempError{
 				fmt.Errorf(
-					"validator %s is already a primary network validator",
-					tx.Validator.NodeID,
+					"failed to find whether %s is about to become a validator: %w",
+					tx.Validator.NodeID.PrefixedString(constants.NodeIDPrefix),
+					err,
 				),
 			}
 		}
 
 		// Verify the flowcheck
-		if err := vm.semanticVerifySpend(db, tx, tx.Ins, outs, stx.Creds, 0, vm.Ctx.AVAXAssetID); err != nil {
+		if err := vm.semanticVerifySpend(parentState, tx, tx.Ins, outs, stx.Creds, vm.AddStakerTxFee, vm.ctx.AVAXAssetID); err != nil {
 			switch err.(type) {
 			case permError:
 				return nil, nil, nil, nil, permError{
@@ -236,45 +236,24 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 		}
 	}
 
+	// Set up the state if this tx is committed
+	newlyPendingStakers := pendingStakers.AddStaker(stx)
+	onCommitState := newVersionedState(parentState, currentStakers, newlyPendingStakers)
+
+	// Consume the UTXOS
+	consumeInputs(onCommitState, tx.Ins)
+	// Produce the UTXOS
 	txID := tx.ID()
+	produceOutputs(onCommitState, txID, vm.ctx.AVAXAssetID, tx.Outs)
 
-	// Verify inputs/outputs and update the UTXO set
-	onCommitDB := versiondb.New(db)
+	// Set up the state if this tx is aborted
+	onAbortState := newVersionedState(parentState, currentStakers, pendingStakers)
 	// Consume the UTXOS
-	if err := vm.consumeInputs(onCommitDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to consume inputs: %w", err),
-		}
-	}
+	consumeInputs(onAbortState, tx.Ins)
 	// Produce the UTXOS
-	if err := vm.produceOutputs(onCommitDB, txID, tx.Outs); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to produce outputs: %w", err),
-		}
-	}
+	produceOutputs(onAbortState, txID, vm.ctx.AVAXAssetID, outs)
 
-	// Add validator to set of pending validators
-	if err := vm.enqueueStaker(onCommitDB, constants.PrimaryNetworkID, stx); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to enqueue staker: %w", err),
-		}
-	}
-
-	onAbortDB := versiondb.New(db)
-	// Consume the UTXOS
-	if err := vm.consumeInputs(onAbortDB, tx.Ins); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to consume inputs: %w", err),
-		}
-	}
-	// Produce the UTXOS
-	if err := vm.produceOutputs(onAbortDB, txID, outs); err != nil {
-		return nil, nil, nil, nil, tempError{
-			fmt.Errorf("failed to produce outputs: %w", err),
-		}
-	}
-
-	return onCommitDB, onAbortDB, nil, nil, nil
+	return onCommitState, onAbortState, nil, nil, nil
 }
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
@@ -294,15 +273,15 @@ func (vm *VM) newAddValidatorTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(vm.DB, keys, stakeAmt, 0, changeAddr)
+	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 	// Create the tx
 	utx := &UnsignedAddValidatorTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.Ctx.NetworkID,
-			BlockchainID: vm.Ctx.ChainID,
+			NetworkID:    vm.ctx.NetworkID,
+			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
@@ -325,12 +304,12 @@ func (vm *VM) newAddValidatorTx(
 		return nil, err
 	}
 	return tx, utx.Verify(
-		vm.Ctx,
+		vm.ctx,
 		vm.codec,
-		vm.minValidatorStake,
-		vm.maxValidatorStake,
-		vm.minStakeDuration,
-		vm.maxStakeDuration,
-		vm.minDelegationFee,
+		vm.MinValidatorStake,
+		vm.MaxValidatorStake,
+		vm.MinStakeDuration,
+		vm.MaxStakeDuration,
+		vm.MinDelegationFee,
 	)
 }

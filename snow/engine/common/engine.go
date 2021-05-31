@@ -4,6 +4,7 @@
 package common
 
 import (
+	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -20,7 +21,10 @@ type Engine interface {
 
 	// Returns nil if the engine is healthy.
 	// Periodically called and reported through the health API
-	Health() (interface{}, error)
+	health.Checkable
+
+	// GetVM returns this engine's VM
+	GetVM() VM
 }
 
 // Handler defines the functions that are acted on the node
@@ -286,8 +290,18 @@ type InternalHandler interface {
 	// able to run the engine.
 	Startup() error
 
+	// Notify this engine that a registered timeout has fired.
+	Timeout() error
+
 	// Gossip to the network a container on the accepted frontier
 	Gossip() error
+
+	// Halt this engine.
+	//
+	// This function will be called before the environment starts exiting. This
+	// function is slightly special, in that it does not expect the chain's
+	// context lock to be held before calling this function.
+	Halt()
 
 	// Shutdown this engine.
 	//

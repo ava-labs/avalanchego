@@ -8,9 +8,7 @@ import (
 	"testing"
 )
 
-var (
-	errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
-)
+var errCalculatedSubsetWrong = errors.New("incorrectly calculated whether one duration was subset of other")
 
 func TestValidatorBoundedBy(t *testing.T) {
 	// case 1: a starts, a finishes, b starts, b finishes

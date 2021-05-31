@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	GenesisID = ids.Empty.Prefix(0)
-	Genesis   = &TestBlock{TestDecidable: choices.TestDecidable{
+	GenesisID     = ids.Empty.Prefix(0)
+	GenesisHeight = uint64(0)
+	Genesis       = &TestBlock{TestDecidable: choices.TestDecidable{
 		IDV:     GenesisID,
 		StatusV: choices.Accepted,
 	}}
@@ -29,10 +30,10 @@ var (
 		AddToTailTest,
 		AddToNonTailTest,
 		AddToUnknownTest,
-		IssuedPreviouslyAcceptedTest,
-		IssuedPreviouslyRejectedTest,
-		IssuedUnissuedTest,
-		IssuedIssuedTest,
+		StatusOrProcessingPreviouslyAcceptedTest,
+		StatusOrProcessingPreviouslyRejectedTest,
+		StatusOrProcessingUnissuedTest,
+		StatusOrProcessingIssuedTest,
 		RecordPollAcceptSingleBlockTest,
 		RecordPollAcceptAndRejectTest,
 		RecordPollWhenFinalizedTest,
@@ -41,6 +42,7 @@ var (
 		RecordPollInvalidVoteTest,
 		RecordPollTransitiveVotingTest,
 		RecordPollDivergedVotingTest,
+		RecordPollChangePreferredChainTest,
 		MetricsProcessingErrorTest,
 		MetricsAcceptedErrorTest,
 		MetricsRejectedErrorTest,
@@ -65,16 +67,18 @@ func InitializeTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -93,15 +97,17 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,15 +149,17 @@ func AddToTailTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -166,8 +174,10 @@ func AddToTailTest(t *testing.T, factory Factory) {
 	// Adding to the previous preference will update the preference
 	if err := sm.Add(block); err != nil {
 		t.Fatal(err)
-	} else if pref := sm.Preference(); pref != block.IDV {
-		t.Fatalf("Wrong preference. Expected %s, got %s", block.IDV, pref)
+	} else if pref := sm.Preference(); pref != block.ID() {
+		t.Fatalf("Wrong preference. Expected %s, got %s", block.ID(), pref)
+	} else if !sm.IsPreferred(block) {
+		t.Fatalf("Should have marked %s as being Preferred", pref)
 	}
 }
 
@@ -177,15 +187,17 @@ func AddToNonTailTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -227,15 +239,17 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -263,42 +277,52 @@ func AddToUnknownTest(t *testing.T, factory Factory) {
 	}
 }
 
-func IssuedPreviouslyAcceptedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingPreviouslyAcceptedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
-	if !sm.Issued(Genesis) {
-		t.Fatalf("Should have marked an accepted block as having been issued")
+	if !sm.AcceptedOrProcessing(Genesis) {
+		t.Fatalf("Should have marked an accepted block as having been decided")
+	}
+	if !sm.DecidedOrProcessing(Genesis) {
+		t.Fatalf("Should have marked an accepted block as having been decided")
+	}
+	if !sm.IsPreferred(Genesis) {
+		t.Fatalf("Should have marked an accepted block as being preferred")
 	}
 }
 
-func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -310,25 +334,33 @@ func IssuedPreviouslyRejectedTest(t *testing.T, factory Factory) {
 		ParentV: Genesis,
 	}
 
-	if !sm.Issued(block) {
-		t.Fatalf("Should have marked a rejected block as having been issued")
+	if sm.AcceptedOrProcessing(block) {
+		t.Fatalf("Shouldn't have marked a rejected block as having been accepted")
+	}
+	if !sm.DecidedOrProcessing(block) {
+		t.Fatalf("Should have marked a rejected block as having been decided")
+	}
+	if sm.IsPreferred(block) {
+		t.Fatalf("Shouldn't have marked a rejected block as being preferred")
 	}
 }
 
-func IssuedUnissuedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingUnissuedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -338,27 +370,36 @@ func IssuedUnissuedTest(t *testing.T, factory Factory) {
 			StatusV: choices.Processing,
 		},
 		ParentV: Genesis,
+		HeightV: 1,
 	}
 
-	if sm.Issued(block) {
-		t.Fatalf("Shouldn't have marked an unissued block as having been issued")
+	if sm.AcceptedOrProcessing(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as being processing")
+	}
+	if sm.DecidedOrProcessing(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as being processing")
+	}
+	if sm.IsPreferred(block) {
+		t.Fatalf("Shouldn't have marked an unissued block as being preferred")
 	}
 }
 
-func IssuedIssuedTest(t *testing.T, factory Factory) {
+func StatusOrProcessingIssuedTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      3,
-		BetaRogue:         5,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          3,
+		BetaRogue:             5,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -372,8 +413,15 @@ func IssuedIssuedTest(t *testing.T, factory Factory) {
 
 	if err := sm.Add(block); err != nil {
 		t.Fatal(err)
-	} else if !sm.Issued(block) {
-		t.Fatalf("Should have marked a pending block as having been issued")
+	}
+	if !sm.AcceptedOrProcessing(block) {
+		t.Fatalf("Should have marked a the block as processing")
+	}
+	if !sm.DecidedOrProcessing(block) {
+		t.Fatalf("Should have marked a the block as processing")
+	}
+	if !sm.IsPreferred(block) {
+		t.Fatalf("Should have marked the tail as being preferred")
 	}
 }
 
@@ -382,15 +430,17 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      2,
-		BetaRogue:         3,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          2,
+		BetaRogue:             3,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -432,15 +482,17 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -496,15 +548,17 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -524,15 +578,17 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -602,15 +658,17 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      2,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          2,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -715,15 +773,17 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      2,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          2,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -764,15 +824,17 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 3,
-		Alpha:             3,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     3,
+		Alpha:                 3,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -904,15 +966,17 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         2,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             2,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -980,31 +1044,167 @@ func RecordPollDivergedVotingTest(t *testing.T, factory Factory) {
 	}
 }
 
+func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
+	sm := factory.New()
+
+	ctx := snow.DefaultContextTest()
+	params := snowball.Parameters{
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          10,
+		BetaRogue:             10,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
+	}
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
+		t.Fatal(err)
+	}
+
+	a1Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis,
+		HeightV: 1,
+	}
+	b1Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: Genesis,
+		HeightV: 1,
+	}
+	a2Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: a1Block,
+		HeightV: 2,
+	}
+	b2Block := &TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: b1Block,
+		HeightV: 2,
+	}
+
+	if err := sm.Add(a1Block); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.Add(a2Block); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.Add(b1Block); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.Add(b2Block); err != nil {
+		t.Fatal(err)
+	}
+
+	if sm.Preference() != a2Block.ID() {
+		t.Fatal("Wrong preference reported")
+	}
+
+	if !sm.IsPreferred(a1Block) {
+		t.Fatalf("Should have reported a1 as being preferred")
+	}
+	if !sm.IsPreferred(a2Block) {
+		t.Fatalf("Should have reported a2 as being preferred")
+	}
+	if sm.IsPreferred(b1Block) {
+		t.Fatalf("Shouldn't have reported b1 as being preferred")
+	}
+	if sm.IsPreferred(b2Block) {
+		t.Fatalf("Shouldn't have reported b2 as being preferred")
+	}
+
+	b2Votes := ids.Bag{}
+	b2Votes.Add(b2Block.ID())
+
+	if err := sm.RecordPoll(b2Votes); err != nil {
+		t.Fatal(err)
+	}
+
+	if sm.Preference() != b2Block.ID() {
+		t.Fatal("Wrong preference reported")
+	}
+
+	if sm.IsPreferred(a1Block) {
+		t.Fatalf("Shouldn't have reported a1 as being preferred")
+	}
+	if sm.IsPreferred(a2Block) {
+		t.Fatalf("Shouldn't have reported a2 as being preferred")
+	}
+	if !sm.IsPreferred(b1Block) {
+		t.Fatalf("Should have reported b1 as being preferred")
+	}
+	if !sm.IsPreferred(b2Block) {
+		t.Fatalf("Should have reported b2 as being preferred")
+	}
+
+	a1Votes := ids.Bag{}
+	a1Votes.Add(a1Block.ID())
+
+	if err := sm.RecordPoll(a1Votes); err != nil {
+		t.Fatal(err)
+	}
+	if err := sm.RecordPoll(a1Votes); err != nil {
+		t.Fatal(err)
+	}
+
+	if sm.Preference() != a2Block.ID() {
+		t.Fatal("Wrong preference reported")
+	}
+
+	if !sm.IsPreferred(a1Block) {
+		t.Fatalf("Should have reported a1 as being preferred")
+	}
+	if !sm.IsPreferred(a2Block) {
+		t.Fatalf("Should have reported a2 as being preferred")
+	}
+	if sm.IsPreferred(b1Block) {
+		t.Fatalf("Shouldn't have reported b1 as being preferred")
+	}
+	if sm.IsPreferred(b2Block) {
+		t.Fatalf("Shouldn't have reported b2 as being preferred")
+	}
+}
+
 func MetricsProcessingErrorTest(t *testing.T, factory Factory) {
 	sm := factory.New()
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	numProcessing := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "processing",
+			Name:      "blks_processing",
 		})
 
 	if err := params.Metrics.Register(numProcessing); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1014,26 +1214,28 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	numAccepted := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "accepted",
+			Name:      "blks_accepted",
 		})
 
 	if err := params.Metrics.Register(numAccepted); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1043,26 +1245,28 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
 	numRejected := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "rejected",
+			Name:      "blks_rejected",
 		})
 
 	if err := params.Metrics.Register(numRejected); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err == nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err == nil {
 		t.Fatalf("should have errored during initialization due to a duplicate metric")
 	}
 }
@@ -1072,16 +1276,18 @@ func ErrorOnInitialRejectionTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1109,16 +1315,18 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1147,16 +1355,18 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1194,16 +1404,18 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 
 	ctx := snow.DefaultContextTest()
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 1,
-		Alpha:             1,
-		BetaVirtuous:      1,
-		BetaRogue:         1,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     1,
+		Alpha:                 1,
+		BetaVirtuous:          1,
+		BetaRogue:             1,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 
-	if err := sm.Initialize(ctx, params, GenesisID); err != nil {
+	if err := sm.Initialize(ctx, params, GenesisID, GenesisHeight); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1249,13 +1461,15 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	numColors := 50
 	numNodes := 100
 	params := snowball.Parameters{
-		Metrics:           prometheus.NewRegistry(),
-		K:                 20,
-		Alpha:             15,
-		BetaVirtuous:      20,
-		BetaRogue:         30,
-		ConcurrentRepolls: 1,
-		OptimalProcessing: 1,
+		Metrics:               prometheus.NewRegistry(),
+		K:                     20,
+		Alpha:                 15,
+		BetaVirtuous:          20,
+		BetaRogue:             30,
+		ConcurrentRepolls:     1,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
 	seed := int64(0)
 

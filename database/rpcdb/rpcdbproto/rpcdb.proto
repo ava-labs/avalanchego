@@ -1,5 +1,6 @@
 syntax = "proto3";
 package rpcdbproto;
+option go_package = "github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto";
 
 message HasRequest {
     bytes key = 1;
@@ -7,6 +8,7 @@ message HasRequest {
 
 message HasResponse {
     bool has = 1;
+    uint32 err = 2;
 }
 
 message GetRequest {
@@ -15,6 +17,7 @@ message GetRequest {
 
 message GetResponse {
     bytes value = 1;
+    uint32 err = 2;
 }
 
 message PutRequest {
@@ -22,13 +25,17 @@ message PutRequest {
     bytes value = 2;
 }
 
-message PutResponse {}
+message PutResponse {
+    uint32 err = 1;
+}
 
 message DeleteRequest {
     bytes key = 1;
 }
 
-message DeleteResponse {}
+message DeleteResponse {
+    uint32 err = 1;
+}
 
 message StatRequest {
     string property = 1;
@@ -36,6 +43,7 @@ message StatRequest {
 
 message StatResponse {
     string stat = 1;
+    uint32 err = 2;
 }
 
 message CompactRequest {
@@ -43,18 +51,26 @@ message CompactRequest {
     bytes limit = 2;
 }
 
-message CompactResponse {}
+message CompactResponse {
+    uint32 err = 1;
+}
 
 message CloseRequest {}
 
-message CloseResponse {}
+message CloseResponse {
+    uint32 err = 1;
+}
 
 message WriteBatchRequest {
     repeated PutRequest puts = 1;
     repeated DeleteRequest deletes = 2;
+    int64 id = 3;
+    bool continues = 4;
 }
 
-message WriteBatchResponse {}
+message WriteBatchResponse {
+    uint32 err = 1;
+}
 
 message NewIteratorRequest {}
 
@@ -81,13 +97,17 @@ message IteratorErrorRequest {
     uint64 id = 1;
 }
 
-message IteratorErrorResponse {}
+message IteratorErrorResponse {
+    uint32 err = 1;
+}
 
 message IteratorReleaseRequest {
     uint64 id = 1;
 }
 
-message IteratorReleaseResponse {}
+message IteratorReleaseResponse {
+    uint32 err = 1;
+}
 
 service Database {
     rpc Has(HasRequest) returns (HasResponse);

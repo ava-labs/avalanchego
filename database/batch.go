@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // For ease of implementation, our database's interface matches Ethereum's
-// database implementation. This was to allow use to use Geth code as is for the
+// database implementation. This was to allow us to use Geth code as is for the
 // EVM chain.
 
 package database
@@ -12,8 +12,9 @@ package database
 type Batch interface {
 	KeyValueWriter
 
-	// ValueSize retrieves the amount of data queued up for writing.
-	ValueSize() int
+	// Size retrieves the amount of data queued up for writing, this includes
+	// the keys, values, and deleted keys.
+	Size() int
 
 	// Write flushes any accumulated data to disk.
 	Write() error
@@ -21,7 +22,8 @@ type Batch interface {
 	// Reset resets the batch for reuse.
 	Reset()
 
-	// Replay replays the batch contents.
+	// Replay replays the batch contents in the same order they were written
+	// to the batch.
 	Replay(w KeyValueWriter) error
 
 	// Inner returns a Batch writing to the inner database, if one exists. If

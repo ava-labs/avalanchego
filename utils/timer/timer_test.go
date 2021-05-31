@@ -4,9 +4,12 @@
 package timer
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTimer(t *testing.T) {
@@ -21,22 +24,33 @@ func TestTimer(t *testing.T) {
 }
 
 func TestTimerCancel(t *testing.T) {
+	fatalErrors := make(chan error)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
-	defer wg.Wait()
 
 	failTimer := NewTimer(func() {
-		wg.Done()
-		t.Fatalf("Timer should have been canceled before being called")
+		fatalErrors <- fmt.Errorf("Timer should have been canceled before being called")
 	})
 	cancelTimer := NewTimer(func() {
-		wg.Done()
+		defer wg.Done()
 		failTimer.Cancel()
 	})
 
 	go failTimer.Dispatch()
 	go cancelTimer.Dispatch()
 
-	failTimer.SetTimeoutIn(time.Second)
+	failTimer.SetTimeoutIn(20 * time.Millisecond)
 	cancelTimer.SetTimeoutIn(time.Millisecond)
+
+	wg.Wait()
+	// Sleep for 25ms, so that if cancellation does not work the timer will
+	// go off and cause the test to fail.
+	time.Sleep(25 * time.Millisecond)
+
+	select {
+	case err := <-fatalErrors:
+		close(fatalErrors)
+		assert.NoError(t, err)
+	default:
+	}
 }
