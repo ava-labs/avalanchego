@@ -281,7 +281,7 @@ func getViper() (*viper.Viper, error) {
 // getConfigFromViper sets attributes on [config] based on the values
 // defined in the [viper] environment
 func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
-	// TODO Divide this function into smaller parts (see setChainConfigs) for efficient testing
+	// TODO Divide this function into smaller parts (see getChainConfigs) for efficient testing
 	// First, get the process config
 	processConfig := process.Config{}
 	processConfig.DisplayVersionAndExit = v.GetBool(VersionKey)
@@ -704,37 +704,42 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
 
 	// Chain Configs
-	err = setChainConfigs(v, &nodeConfig)
+	chainConfigs, err := getChainConfigs(v)
 	if err != nil {
 		return node.Config{}, process.Config{}, err
 	}
+	nodeConfig.ChainConfigs = chainConfigs
 
 	return nodeConfig, processConfig, nil
 }
 
-// setChainConfigs reads & puts chainConfigs to node config
-func setChainConfigs(v *viper.Viper, nodeConfig *node.Config) error {
+// getChainConfigs reads & puts chainConfigs to node config
+func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+	var chainConfigs map[string]chains.ChainConfig
 	chainConfigDir := v.GetString(ChainConfigDirKey)
 	chainsPath := path.Clean(chainConfigDir)
 	// user specified a chain config dir explicitly, but dir does not exist.
 	if v.IsSet(ChainConfigDirKey) && !isPathExists(chainsPath) {
-		return fmt.Errorf("no directory found: %v", chainsPath)
+		return nil, fmt.Errorf("no directory found: %v", chainsPath)
 	}
 	// gets direct subdirs
 	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	chainConfigs, err := readChainConfigs(chainDirs)
+	chainConfigMap, err := readChainConfigDirs(chainDirs)
 	if err != nil {
-		return fmt.Errorf("couldn't read chain configs: %w", err)
+		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
-	nodeConfig.ChainConfigs = chainConfigs
+	chainConfigs = chainConfigMap
 
 	// Coreth Plugin
 	// will be deprecated
 	// if C alias key and ConfigBytes is already in map, skip this. config files precedes over coreth flag.
-	if v.IsSet(CorethConfigKey) && !isCChainConfigSet(nodeConfig.ChainConfigs) {
+	if v.IsSet(CorethConfigKey) {
+		if isCChainConfigSet(chainConfigs) {
+			return nil, fmt.Errorf("config for coreth(C) is already provided in chain config files")
+		}
 		corethConfigValue := v.Get(CorethConfigKey)
 		var corethConfigBytes []byte
 		switch value := corethConfigValue.(type) {
@@ -743,15 +748,15 @@ func setChainConfigs(v *viper.Viper, nodeConfig *node.Config) error {
 		default:
 			corethConfigBytes, err = json.Marshal(value)
 			if err != nil {
-				return fmt.Errorf("couldn't parse coreth config: %w", err)
+				return nil, fmt.Errorf("couldn't parse coreth config: %w", err)
 			}
 		}
 		cChainPrimaryAlias := genesis.GetEvmChainAliases()[0]
-		tmp := nodeConfig.ChainConfigs[cChainPrimaryAlias]
+		tmp := chainConfigs[cChainPrimaryAlias]
 		tmp.Config = corethConfigBytes
-		nodeConfig.ChainConfigs[cChainPrimaryAlias] = tmp
+		chainConfigs[cChainPrimaryAlias] = tmp
 	}
-	return nil
+	return chainConfigs, nil
 }
 
 // Initialize config.BootstrapPeers.
@@ -843,7 +848,7 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,
 // if successful.
-func readChainConfigs(chainDirs []string) (map[string]chains.ChainConfig, error) {
+func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, error) {
 	chainConfigMap := make(map[string]chains.ChainConfig)
 	for _, chainDir := range chainDirs {
 		dirInfo, err := os.Stat(chainDir)

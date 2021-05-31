@@ -18,7 +18,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/node"
 )
 
 func TestSetChainConfigs(t *testing.T) {
@@ -26,6 +25,7 @@ func TestSetChainConfigs(t *testing.T) {
 		configs      map[string]string
 		upgrades     map[string]string
 		corethConfig string
+		errMessage   string
 		expected     map[string]chains.ChainConfig
 	}{
 		"no chain configs": {
@@ -70,25 +70,15 @@ func TestSetChainConfigs(t *testing.T) {
 			configs:      map[string]string{"C": "hello", "X": "world"},
 			upgrades:     map[string]string{"C": "upgradess"},
 			corethConfig: "hellocoreth",
-			expected: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
-				m["C"] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
-				m["X"] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
-
-				return m
-			}(),
+			errMessage:   "is already provided",
+			expected:     nil,
 		},
 		"coreth with evm alias chain config": {
 			configs:      map[string]string{"evm": "hello", "X": "world"},
 			upgrades:     map[string]string{"evm": "upgradess"},
 			corethConfig: "hellocoreth",
-			expected: func() map[string]chains.ChainConfig {
-				m := map[string]chains.ChainConfig{}
-				m["evm"] = chains.ChainConfig{Config: []byte("hello"), Upgrade: []byte("upgradess")}
-				m["X"] = chains.ChainConfig{Config: []byte("world"), Upgrade: []byte(nil)}
-
-				return m
-			}(),
+			errMessage:   "is already provided",
+			expected:     nil,
 		},
 		"coreth and c chain upgrades in config": {
 			configs:      map[string]string{"X": "world"},
@@ -130,10 +120,16 @@ func TestSetChainConfigs(t *testing.T) {
 
 			// Parse config
 			assert.Equal(root, v.GetString(ChainConfigDirKey))
-			var nodeConfig node.Config
-			err := setChainConfigs(v, &nodeConfig)
-			assert.NoError(err)
-			assert.Equal(test.expected, nodeConfig.ChainConfigs)
+			chainConfigs, err := getChainConfigs(v)
+			if len(test.errMessage) > 0 {
+				assert.Error(err)
+				if err != nil {
+					assert.Contains(err.Error(), test.errMessage)
+				}
+			} else {
+				assert.NoError(err)
+			}
+			assert.Equal(test.expected, chainConfigs)
 		})
 	}
 }
@@ -151,7 +147,7 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			file:       map[string]string{"C": "noeffect"},
 			errMessage: "no directory",
 			flagSet:    true,
-			expected:   map[string]chains.ChainConfig{},
+			expected:   nil,
 		},
 		"cdir not exist flag not set": {
 			structure:  "/",
@@ -202,8 +198,7 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 				assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
 			}
 			// don't read with getConfigFromViper since it's very slow.
-			nodeConfig := node.Config{}
-			err := setChainConfigs(v, &nodeConfig)
+			chainConfigs, err := getChainConfigs(v)
 			if len(test.errMessage) > 0 {
 				assert.Error(err)
 				if err != nil {
@@ -211,7 +206,7 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 				}
 			} else {
 				assert.NoError(err)
-				assert.Equal(test.expected, nodeConfig.ChainConfigs)
+				assert.Equal(test.expected, chainConfigs)
 			}
 		})
 	}
@@ -229,11 +224,10 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 
 	chainsDir := path.Join(defaultChainConfigDir, "C")
 	setupFile(t, chainsDir, "config", "helloworld")
-	var nodeConfig node.Config
-	err := setChainConfigs(v, &nodeConfig)
+	chainConfigs, err := getChainConfigs(v)
 	assert.NoError(err)
 	expected := map[string]chains.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
-	assert.Equal(expected, nodeConfig.ChainConfigs)
+	assert.Equal(expected, chainConfigs)
 }
 
 // setups config json file and writes content
