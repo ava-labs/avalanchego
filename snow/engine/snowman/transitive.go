@@ -106,24 +106,21 @@ func (t *Transitive) finishBootstrapping() error {
 
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	switch blk := lastAccepted.GetWrappedBlock().(type) {
-	case snowman.OracleBlock:
-		options, err := blk.Options()
+	if lastAccepted.HasOptions() {
+		options, err := lastAccepted.Options()
 		if err != nil {
 			return err
 		}
 		for _, blk := range options {
 			// note that deliver will set the VM's preference
-			if err := t.deliver(blk); err != nil {
+			if err := t.deliver(proposervm.NewProBlock(blk)); err != nil {
 				return err
 			}
 		}
-	default:
+	} else if err := t.ProVM.SetPreference(lastAcceptedID); err != nil {
 		// if there aren't blocks we need to deliver on startup, we need to set
 		// the preference to the last accepted block
-		if err := t.ProVM.SetPreference(lastAcceptedID); err != nil {
-			return err
-		}
+		return err
 	}
 
 	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
@@ -547,8 +544,8 @@ func (t *Transitive) issue(proBlk proposervm.ProposerBlock) error {
 
 	// Will add [blk] to consensus once its ancestors have been
 	i := &issuer{
-		t:   t,
-		blk: proBlk,
+		t:      t,
+		proBlk: proBlk,
 	}
 
 	// block on the parent if needed
@@ -604,7 +601,7 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 }
 
 // send a push query for this block
-func (t *Transitive) pushQuery(blk snowman.Block) {
+func (t *Transitive) pushQuery(proBlk proposervm.ProposerBlock) {
 	t.Ctx.Log.Verbo("about to sample from: %s", t.Validators)
 	vdrs, err := t.Validators.Sample(t.Params.K)
 	vdrBag := ids.ShortBag{}
@@ -618,24 +615,24 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 
-		t.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+		t.Sender.PushQuery(vdrSet, t.RequestID, proBlk.ID(), proBlk.Bytes())
 	} else if err != nil {
-		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
+		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", proBlk.ID())
 	}
 }
 
 // issue [blk] to consensus
-func (t *Transitive) deliver(blk snowman.Block) error {
-	if t.Consensus.DecidedOrProcessing(blk) {
+func (t *Transitive) deliver(proBlk proposervm.ProposerBlock) error {
+	if t.Consensus.DecidedOrProcessing(proBlk) {
 		return nil
 	}
 
 	// we are no longer waiting on adding the block to consensus, so it is no
 	// longer pending
-	blkID := blk.ID()
+	blkID := proBlk.ID()
 	t.pending.Remove(blkID)
 
-	if !t.Consensus.AcceptedOrProcessing(blk.Parent()) {
+	if !t.Consensus.AcceptedOrProcessing(proBlk.Parent()) {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(blkID)
@@ -648,7 +645,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// calling Verify on this block is allowed.
 
 	// make sure this block is valid
-	if err := blk.Verify(); err != nil {
+	if err := proBlk.Verify(); err != nil {
 		t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
 
 		// if verify fails, then all descendants are also invalid
@@ -658,34 +655,31 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	}
 
 	t.Ctx.Log.Verbo("adding block to consensus: %s", blkID)
-	if err := t.Consensus.Add(blk); err != nil {
+	if err := t.Consensus.Add(proBlk); err != nil {
 		return err
 	}
 
 	// Add all the oracle blocks if they exist. We call verify on all the blocks
 	// and add them to consensus before marking anything as fulfilled to avoid
 	// any potential reentrant bugs.
-	added := []snowman.Block{}
-	dropped := []snowman.Block{}
+	added := []proposervm.ProposerBlock{}
+	dropped := []proposervm.ProposerBlock{}
 
-	if propBlk, ok := blk.(*proposervm.ProposerBlock); ok {
-		blk = propBlk.GetWrappedBlock()
-	}
-
-	if blk, ok := blk.(snowman.OracleBlock); ok {
-		options, err := blk.Options()
+	if proBlk.HasOptions() {
+		options, err := proBlk.Options()
 		if err != nil {
 			return err
 		}
 		for _, blk := range options {
-			if err := blk.Verify(); err != nil {
+			proOpt := proposervm.NewProBlock(blk)
+			if err := proOpt.Verify(); err != nil {
 				t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
-				dropped = append(dropped, blk)
+				dropped = append(dropped, proOpt)
 			} else {
-				if err := t.Consensus.Add(blk); err != nil {
+				if err := t.Consensus.Add(proOpt); err != nil {
 					return err
 				}
-				added = append(added, blk)
+				added = append(added, proOpt)
 			}
 		}
 	}
@@ -696,23 +690,23 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
-	if t.Consensus.IsPreferred(blk) {
-		t.pushQuery(blk)
+	if t.Consensus.IsPreferred(proBlk) {
+		t.pushQuery(proBlk)
 	}
 
 	t.blocked.Fulfill(blkID)
-	for _, blk := range added {
-		if t.Consensus.IsPreferred(blk) {
-			t.pushQuery(blk)
+	for _, proOpt := range added {
+		if t.Consensus.IsPreferred(proOpt) {
+			t.pushQuery(proOpt)
 		}
 
-		blkID := blk.ID()
+		blkID := proOpt.ID()
 		t.pending.Remove(blkID)
 		t.blocked.Fulfill(blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
-	for _, blk := range dropped {
-		blkID := blk.ID()
+	for _, proOpt := range dropped {
+		blkID := proOpt.ID()
 		t.pending.Remove(blkID)
 		t.blocked.Abandon(blkID)
 		t.blkReqs.RemoveAny(blkID)
