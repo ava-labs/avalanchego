@@ -73,17 +73,17 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.ProVM.GetProBlock(vote)
+		proBlk, err := v.t.ProVM.GetProBlock(vote)
 		if err != nil {
 			continue
 		}
 
-		for blk.Status().Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
-			blk = proposervm.NewProBlock(blk.Parent())
+		for proBlk.Status().Fetched() && !v.t.Consensus.DecidedOrProcessing(proBlk) {
+			proBlk = proposervm.NewProBlock(proBlk.Parent())
 		}
 
-		if !blk.Status().Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
-			bubbledVotes.AddCount(blk.ID(), count)
+		if !proBlk.Status().Decided() && v.t.Consensus.DecidedOrProcessing(proBlk) {
+			bubbledVotes.AddCount(proBlk.ID(), count)
 		}
 	}
 	return bubbledVotes

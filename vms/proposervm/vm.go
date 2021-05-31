@@ -22,6 +22,27 @@ func NewProVM(vm block.ChainVM) VM {
 	}
 }
 
+func (vm *VM) BuildProBlock() (ProposerBlock, error) {
+	// wrapper of block.ChainVM interface method
+	sb, err := vm.wrappedVM.BuildBlock()
+	proBlk := NewProBlock(sb) // here new block fields will be handled
+	return proBlk, err
+}
+
+func (vm *VM) ParseProBlock(b []byte) (ProposerBlock, error) {
+	// wrapper of block.ChainVM interface method
+	sb, err := vm.wrappedVM.ParseBlock(b)
+	proBlk := NewProBlock(sb) // here new block fields will be handled
+	return proBlk, err
+}
+
+func (vm *VM) GetProBlock(id ids.ID) (ProposerBlock, error) {
+	// wrapper of block.ChainVM interface method
+	sb, err := vm.wrappedVM.GetBlock(id)
+	proBlk := NewProBlock(sb) // here new block fields will be handled
+	return proBlk, err
+}
+
 //////// Common.VM interface implementation
 func (vm *VM) Initialize(
 	ctx *snow.Context,
@@ -60,32 +81,13 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 	return vm.wrappedVM.HealthCheck()
 }
 
-//////// block.ChainVM interface implementation
-func (vm *VM) BuildProBlock() (ProposerBlock, error) { //NO MORE block.ChainVM interface
-	sb, err := vm.wrappedVM.BuildBlock()
-	proBlk := NewProBlock(sb) // here new block fields will be handled
-	return proBlk, err
-}
-
-func (vm *VM) ParseProBlock(b []byte) (ProposerBlock, error) { //NO MORE block.ChainVM interface
-	sb, err := vm.wrappedVM.ParseBlock(b)
-	proBlk := NewProBlock(sb) // here new block fields will be handled
-	return proBlk, err
-}
-
-func (vm *VM) GetProBlock(id ids.ID) (ProposerBlock, error) { //NO MORE block.ChainVM interface
-	sb, err := vm.wrappedVM.GetBlock(id)
-	proBlk := NewProBlock(sb) // here new block fields will be handled
-	return proBlk, err
-}
-
 func (vm *VM) SetPreference(id ids.ID) error {
-	// simply a forwarder
+	// simply a forwarder of block.ChainVM interface method
 	return vm.wrappedVM.SetPreference(id)
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	// simply a forwarder
+	// simply a forwarder of block.ChainVM interface method
 	return vm.wrappedVM.LastAccepted()
 }
 
