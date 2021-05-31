@@ -7,11 +7,14 @@ package logging
 type Factory interface {
 	// Make creates a new logger with name [name]
 	Make(name string) (Logger, error)
+
 	// MakeChain creates a new logger to log the events of chain [chainID]
 	MakeChain(chainID string) (Logger, error)
+
 	// MakeChainChild creates a new sublogger for a [name] module of a chain [chainId]
 	MakeChainChild(chainID string, name string) (Logger, error)
-	// Close stops and clears all of a Factory's instanciated loggers
+
+	// Close stops and clears all of a Factory's instantiated loggers
 	Close()
 }
 
