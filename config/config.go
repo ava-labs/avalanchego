@@ -45,6 +45,10 @@ const (
 	chainUpgradeFileName  = "upgrade"
 )
 
+var deprecatedKeys = map[string]string{
+	CorethConfigKey: "please use config files for C chain",
+}
+
 // Results of parsing the CLI
 var (
 	defaultNetworkName = constants.MainnetName
@@ -265,6 +269,12 @@ func getViper() (*viper.Viper, error) {
 	v := viper.New()
 	fs := avalancheFlagSet()
 	pflag.CommandLine.AddGoFlagSet(fs)
+
+	// Flag deprecations must be before parse
+	if err := deprecateFlags(); err != nil {
+		return nil, err
+	}
+
 	pflag.Parse()
 	if err := v.BindPFlags(pflag.CommandLine); err != nil {
 		return nil, err
@@ -275,6 +285,8 @@ func getViper() (*viper.Viper, error) {
 			return nil, err
 		}
 	}
+	// Config deprecations must be after v.ReadInConfig
+	deprecateConfigs(v)
 	return v, nil
 }
 
@@ -715,7 +727,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 // getChainConfigs reads & puts chainConfigs to node config
 func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
-	var chainConfigs map[string]chains.ChainConfig
 	chainConfigDir := v.GetString(ChainConfigDirKey)
 	chainsPath := path.Clean(chainConfigDir)
 	// user specified a chain config dir explicitly, but dir does not exist.
@@ -733,14 +744,12 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	chainConfigMap, err := readChainConfigDirs(chainDirs)
+	chainConfigs, err := readChainConfigDirs(chainDirs)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
 	}
-	chainConfigs = chainConfigMap
 
 	// Coreth Plugin
-	// will be deprecated
 	if v.IsSet(CorethConfigKey) {
 		// error if C config is already populated
 		if isCChainConfigSet(chainConfigs) {
@@ -937,4 +946,21 @@ func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
 		}
 	}
 	return false
+}
+
+func deprecateConfigs(v *viper.Viper) {
+	for key, message := range deprecatedKeys {
+		if v.InConfig(key) {
+			fmt.Printf("Config %s has been deprecated, %s\n", key, message)
+		}
+	}
+}
+
+func deprecateFlags() error {
+	for key, message := range deprecatedKeys {
+		if err := pflag.CommandLine.MarkDeprecated(key, message); err != nil {
+			return err
+		}
+	}
+	return nil
 }
