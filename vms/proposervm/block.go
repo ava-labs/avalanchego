@@ -53,15 +53,3 @@ func (pb ProposerBlock) Bytes() []byte {
 func (pb ProposerBlock) Height() uint64 {
 	return pb.wrappedBlock.Height()
 }
-
-//////// snowman.OracleBlock interface implementation
-// Options() to be called under HasOptions() otherwise could panic
-func (pb ProposerBlock) Options() ([2]snowman.Block, error) {
-	oracleBlk, _ := pb.wrappedBlock.(snowman.OracleBlock)
-	return oracleBlk.Options()
-}
-
-func (pb ProposerBlock) HasOptions() bool {
-	_, ok := pb.wrappedBlock.(snowman.OracleBlock)
-	return ok
-}

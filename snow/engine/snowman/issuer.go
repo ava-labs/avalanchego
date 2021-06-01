@@ -5,13 +5,13 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/proposervm"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 // issuer issues [blk] into to consensus after its dependencies are met.
 type issuer struct {
 	t         *Transitive
-	proBlk    proposervm.ProposerBlock
+	blk       snowman.Block
 	abandoned bool
 	deps      ids.Set
 }
@@ -27,7 +27,7 @@ func (i *issuer) Fulfill(id ids.ID) {
 // Abandon the attempt to issue [i.block]
 func (i *issuer) Abandon(ids.ID) {
 	if !i.abandoned {
-		blkID := i.proBlk.ID()
+		blkID := i.blk.ID()
 		i.t.pending.Remove(blkID)
 		i.t.blocked.Abandon(blkID)
 
@@ -43,5 +43,5 @@ func (i *issuer) Update() {
 		return
 	}
 	// Issue the block into consensus
-	i.t.errs.Add(i.t.deliver(i.proBlk))
+	i.t.errs.Add(i.t.deliver(i.blk))
 }
