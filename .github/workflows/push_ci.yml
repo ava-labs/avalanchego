@@ -29,7 +29,7 @@ jobs:
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
-    - run: .github/workflows/run_e2e_tests.sh --parallelism 3 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+    - run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
       shell: bash
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
