@@ -11,7 +11,7 @@ set -o pipefail
 # Dockerfile
 # README.md
 # go.mod
-GO_VERSION_MINIMUM="1.15.5"
+go_version_minimum="1.15.5"
 
 go_version() {
     go version | sed -nE -e 's/[^0-9.]+([0-9.]+).+/\1/p'
@@ -29,24 +29,21 @@ version_lt() {
     fi
 }
 
-if version_lt "$(go_version)" "$GO_VERSION_MINIMUM"; then
-    echo "AvalancheGo requires Go >= $GO_VERSION_MINIMUM, Go $(go_version) found." >&2
+if version_lt "$(go_version)" "$go_version_minimum"; then
+    echo "AvalancheGo requires Go >= $go_version_minimum, Go $(go_version) found." >&2
     exit 1
 fi
 
-# Directory above this script
+# Avalanchego root folder
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-
 # Load the versions
 source "$AVALANCHE_PATH"/scripts/versions.sh
-
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
 # Build AVALANCHE
 echo "Building AvalancheGo..."
-go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$AVALANCHEGO_PROCESS_PATH" "$AVALANCHE_PATH/app/"*.go
+go build -ldflags "-X main.GitCommit=$git_commit" -o "$latest_avalanchego_process_path" "$AVALANCHE_PATH/app/"*.go
 
 echo "Building AvalancheGo binary manager..."
-go build -ldflags "-X main.GitCommit=$GIT_COMMIT" -o "$BINARY_MANAGER_PATH" "$AVALANCHE_PATH/main/"*.go
-git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
+go build -ldflags "-X main.GitCommit=$git_commit" -o "$binary_manager_path" "$AVALANCHE_PATH/main/"*.go

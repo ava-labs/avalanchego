@@ -72,7 +72,8 @@ echo "Git Commit ID : ${git_commit_id}"
 custom_params_json="{
     \"isKurtosisCoreDevMode\": false,
     \"avalanchegoImage\":\"${avalanche_image}\",
-    \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\"
+    \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\",
+    \"testBatch\":\"avalanchego\"
 }"
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 

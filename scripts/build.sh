@@ -4,12 +4,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# Directory above this script
+# Avalanchego root folder
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-
 # Load the versions
 source "$AVALANCHE_PATH"/scripts/versions.sh
-
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
@@ -27,7 +25,7 @@ go mod download
 "$AVALANCHE_PATH/scripts/build_prev.sh"
 
 # Exit build successfully if the binaries are created
-if [[ -f "$AVALANCHEGO_PROCESS_PATH" && -f "$EVM_PATH" ]]; then
+if [[ -f "$latest_avalanchego_process_path" && -f "$latest_evm_path" ]]; then
         echo "Build Successful"
         exit 0
 else
