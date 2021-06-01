@@ -10,26 +10,22 @@ import (
 	"runtime"
 	"time"
 
-	"golang.org/x/crypto/sha3"
-
 	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
 
 type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
-type OnFinalizeAndAssembleCallbackType = func(state *state.StateDB, txs []*types.Transaction) ([]byte, error)
+type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
 
 type ConsensusCallbacks struct {
 	OnSeal                func(*types.Block) error
-	OnSealHash            func(*types.Header)
 	OnAPIs                OnAPIsCallbackType
 	OnFinalize            OnFinalizeCallbackType
 	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
@@ -231,7 +227,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var extdata []byte
 	if self.cb.OnFinalizeAndAssemble != nil {
-		ret, err := self.cb.OnFinalizeAndAssemble(state, txs)
+		ret, err := self.cb.OnFinalizeAndAssemble(header, state, txs)
 		extdata = ret
 		if err != nil {
 			return nil, err
@@ -247,42 +243,11 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 	), nil
 }
 
-func (self *DummyEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) (err error) {
+func (self *DummyEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block) (err error) {
 	if self.cb.OnSeal != nil {
 		err = self.cb.OnSeal(block)
-	} else {
-		err = nil
-	}
-	if err == nil {
-		results <- block
 	}
 	return
-}
-
-func (self *DummyEngine) SealHash(header *types.Header) (hash common.Hash) {
-	if self.cb.OnSealHash != nil {
-		self.cb.OnSealHash(header)
-	}
-
-	hasher := sha3.NewLegacyKeccak256()
-
-	rlp.Encode(hasher, []interface{}{
-		header.ParentHash,
-		header.UncleHash,
-		header.Coinbase,
-		header.Root,
-		header.TxHash,
-		header.ReceiptHash,
-		header.Bloom,
-		header.Difficulty,
-		header.Number,
-		header.GasLimit,
-		header.GasUsed,
-		header.Time,
-		header.Extra,
-	})
-	hasher.Sum(hash[:0])
-	return hash
 }
 
 func (self *DummyEngine) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {

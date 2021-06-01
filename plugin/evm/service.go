@@ -35,6 +35,7 @@ const (
 var (
 	errNoAddresses   = errors.New("no addresses provided")
 	errNoSourceChain = errors.New("no source chain provided")
+	errNilTxID       = errors.New("nil transaction ID")
 )
 
 // SnowmanAPI introduces snowman specific functionality to the evm
@@ -73,7 +74,7 @@ type GetAcceptedFrontReply struct {
 
 // GetAcceptedFront returns the last accepted block's hash and height
 func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontReply, error) {
-	blk := api.vm.getLastAccepted().ethBlock
+	blk := api.vm.chain.LastAcceptedBlock()
 	return &GetAcceptedFrontReply{
 		Hash:   blk.Hash(),
 		Number: blk.Number(),
@@ -84,7 +85,8 @@ func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontR
 func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	log.Info("Issuing a new block")
 
-	return api.vm.tryBlockGen()
+	api.vm.signalTxsReady()
+	return nil
 }
 
 // parseAssetID parses an assetID string into an ID
@@ -422,10 +424,81 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem initializing transaction: %w", err)
 	}
 
-	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, service.vm.currentRules()); err != nil {
+	blockIntf := service.vm.LastAcceptedBlockInternal()
+	block, ok := blockIntf.(*Block)
+	if !ok {
+		return fmt.Errorf("last accepted block %s had unexpected type %T", blockIntf.ID(), blockIntf)
+	}
+	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, block, service.vm.currentRules()); err != nil {
+		return err
+	}
+	state, err := service.vm.chain.CurrentState()
+	if err != nil {
+		return fmt.Errorf("problem retrieving current state: %w", err)
+	}
+	if err := tx.UnsignedAtomicTx.EVMStateTransfer(service.vm, state); err != nil {
 		return err
 	}
 
 	response.TxID = tx.ID()
 	return service.vm.issueTx(tx)
+}
+
+// GetAtomicTxStatusReply defines the GetAtomicTxStatus replies returned from the API
+type GetAtomicTxStatusReply struct {
+	Status      Status       `json:"status"`
+	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
+}
+
+// GetAtomicTxStatus returns the status of the specified transaction
+func (service *AvaxAPI) GetAtomicTxStatus(r *http.Request, args *api.JSONTxID, reply *GetAtomicTxStatusReply) error {
+	log.Info("EVM: GetAtomicTxStatus called with %s", args.TxID)
+
+	if args.TxID == ids.Empty {
+		return errNilTxID
+	}
+
+	_, status, height, _ := service.vm.getAtomicTx(args.TxID)
+
+	reply.Status = status
+	if status == Accepted {
+		jsonHeight := json.Uint64(height)
+		reply.BlockHeight = &jsonHeight
+	}
+	return nil
+}
+
+type FormattedTx struct {
+	api.FormattedTx
+	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
+}
+
+// GetAtomicTx returns the specified transaction
+func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply *FormattedTx) error {
+	log.Info("EVM: GetAtomicTx called with %s", args.TxID)
+
+	if args.TxID == ids.Empty {
+		return errNilTxID
+	}
+
+	tx, status, height, err := service.vm.getAtomicTx(args.TxID)
+	if err != nil {
+		return err
+	}
+
+	if status == Unknown {
+		return fmt.Errorf("could not find tx %s", args.TxID)
+	}
+
+	txBytes, err := formatting.Encode(args.Encoding, tx.Bytes())
+	if err != nil {
+		return err
+	}
+	reply.Tx = txBytes
+	reply.Encoding = args.Encoding
+	if status == Accepted {
+		jsonHeight := json.Uint64(height)
+		reply.BlockHeight = &jsonHeight
+	}
+	return nil
 }
