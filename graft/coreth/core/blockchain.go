@@ -299,7 +299,6 @@ func NewBlockChain(
 	// Original code:
 	// // Initialize the chain with ancient data if it isn't empty.
 	// var txIndexBlock uint64
-
 	// if bc.empty() {
 	// 	rawdb.InitDatabaseFromFreezer(bc.db)
 	// 	// If ancient database is not empty, reconstruct all missing
@@ -376,7 +375,6 @@ func NewBlockChain(
 	// 		}
 	// 	}
 	// }
-
 	// The first thing the node will do is reconstruct the verification data for
 	// the head block (ethash cache or clique voting snapshot). Might as well do
 	// it in advance.

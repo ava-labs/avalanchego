@@ -97,6 +97,7 @@ type Block struct {
 	id       ids.ID
 	ethBlock *types.Block
 	vm       *VM
+	status   choices.Status
 }
 
 // ID implements the snowman.Block interface
@@ -105,53 +106,84 @@ func (b *Block) ID() ids.ID { return b.id }
 // Accept implements the snowman.Block interface
 func (b *Block) Accept() error {
 	vm := b.vm
+	vm.db.StartCommit()
+	defer vm.db.AbortCommit()
 
+	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
-	if err := vm.updateStatus(b.id, choices.Accepted); err != nil {
-		return err
+	if err := vm.chain.Accept(b.ethBlock); err != nil {
+		return fmt.Errorf("chain could not accept %s: %w", b.ID(), err)
 	}
-	if err := vm.acceptedDB.Put(b.ethBlock.Number().Bytes(), b.id[:]); err != nil {
-		return err
+	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, b.id[:]); err != nil {
+		return fmt.Errorf("failed to put %s as the last accepted block: %w", b.ID(), err)
 	}
 
-	tx, err := vm.getAtomicTx(b.ethBlock)
+	tx, err := vm.extractAtomicTx(b.ethBlock)
 	if err != nil {
 		return err
 	}
 	if tx == nil {
-		return nil
+		return vm.db.Commit()
+	}
+
+	// Remove the accepted transaction from the mempool
+	vm.mempool.RemoveTx(tx.ID())
+
+	// Save the accepted atomic transaction
+	if err := vm.writeAtomicTx(b, tx); err != nil {
+		return err
 	}
 
 	if bonusBlocks.Contains(b.id) {
-		log.Info("skipping atomic tx verification on bonus block", "block", b.id)
+		log.Info("skipping atomic tx acceptance on bonus block", "block", b.id)
 		return nil
 	}
 
-	return tx.UnsignedAtomicTx.Accept(vm.ctx, nil)
+	// Note: since CommitBatch holds the database lock, this precludes any other
+	// database operations until EndBatch is called. Therefore, calling Accept
+	// on the unsigned atomic tx cannot interact with the vm's database or it will
+	// deadlock. This is ok because it only needs to interact with the shared memory
+	// database.
+	batch, err := vm.db.CommitBatch()
+	if err != nil {
+		return fmt.Errorf("failed to create commit batch due to: %w", err)
+	}
+	defer vm.db.EndBatch()
+
+	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
 
 // Reject implements the snowman.Block interface
+// If [b] contains an atomic transaction, attempt to re-issue it
 func (b *Block) Reject() error {
+	b.status = choices.Rejected
 	log.Debug(fmt.Sprintf("Rejecting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
-	return b.vm.updateStatus(b.ID(), choices.Rejected)
+	tx, _ := b.vm.extractAtomicTx(b.ethBlock)
+	if tx != nil {
+		b.vm.mempool.RejectTx(tx.ID())
+	}
+
+	return nil
 }
+
+// SetStatus implements the InternalBlock interface allowing ChainState
+// to set the status on an existing block
+func (b *Block) SetStatus(status choices.Status) { b.status = status }
 
 // Status implements the snowman.Block interface
 func (b *Block) Status() choices.Status {
-	status := b.vm.getCachedStatus(b.ID())
-	if status == choices.Unknown && b.ethBlock != nil {
-		return choices.Processing
-	}
-	return status
+	return b.status
 }
 
 // Parent implements the snowman.Block interface
 func (b *Block) Parent() snowman.Block {
 	parentID := ids.ID(b.ethBlock.ParentHash())
-	if block := b.vm.getBlock(parentID); block != nil {
-		return block
+	parentBlk, err := b.vm.GetBlockInternal(parentID)
+	if err != nil {
+		return &missing.Block{BlkID: parentID}
 	}
-	return &missing.Block{BlkID: parentID}
+
+	return parentBlk
 }
 
 // Height implements the snowman.Block interface
@@ -172,6 +204,15 @@ func (b *Block) syntacticVerify() (params.Rules, error) {
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
+	if err := b.VerifyWithoutWrites(); err != nil {
+		return err
+	}
+
+	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
+	return err
+}
+
+func (b *Block) VerifyWithoutWrites() error {
 	rules, err := b.syntacticVerify()
 	if err != nil {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
@@ -189,92 +230,47 @@ func (b *Block) Verify() error {
 
 	// If the tx is an atomic tx, ensure that it doesn't conflict with any of
 	// its processing ancestry.
-	atomicTx, err := vm.getAtomicTx(b.ethBlock)
+	atomicTx, err := vm.extractAtomicTx(b.ethBlock)
 	if err != nil {
 		return err
 	}
-	if atomicTx != nil {
-		// If the ancestor is unknown, then the parent failed verification when
-		// it was called.
-		// If the ancestor is rejected, then this block shouldn't be inserted
-		// into the canonical chain because the parent is will be missing.
-		if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
-			return errRejectedParent
-		}
-		ancestor, ok := ancestorIntf.(*Block)
-		if !ok {
-			return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
-		}
+	if atomicTx == nil {
+		return nil
+	}
 
-		parentState, err := vm.chain.BlockState(ancestor.ethBlock)
-		if err != nil {
-			return err
-		}
+	// If the ancestor is unknown, then the parent failed verification when
+	// it was called.
+	// If the ancestor is rejected, then this block shouldn't be inserted
+	// into the canonical chain because the parent is will be missing.
+	if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+		return errRejectedParent
+	}
+	ancestor, ok := ancestorIntf.(*Block)
+	if !ok {
+		return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
+	}
 
-		if bonusBlocks.Contains(b.id) {
-			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
-		} else {
-			switch atx := atomicTx.UnsignedAtomicTx.(type) {
-			case *UnsignedImportTx:
-				// If an import tx is seen, we must ensure that none of the
-				// processing ancestors consume the same UTXO.
-				inputs := atx.InputUTXOs()
-				for ancestor.Status() != choices.Accepted {
-					atx, err := vm.getAtomicTx(ancestor.ethBlock)
-					if err != nil {
-						return fmt.Errorf("block %s failed verification while parsing atomic tx from ancestor %s", b.ethBlock.Hash().Hex(), ancestor.ethBlock.Hash().Hex())
-					}
-					// If the ancestor isn't an atomic block, it can't conflict with
-					// the import tx.
-					if atx != nil {
-						ancestorInputs := atx.UnsignedAtomicTx.InputUTXOs()
-						if inputs.Overlaps(ancestorInputs) {
-							return errConflictingAtomicInputs
-						}
-					}
+	parentState, err := vm.chain.BlockState(ancestor.ethBlock)
+	if err != nil {
+		return err
+	}
 
-					// Move up the chain.
-					ancestorIntf := ancestor.Parent()
-					// If the ancestor is unknown, then the parent failed
-					// verification when it was called.
-					// If the ancestor is rejected, then this block shouldn't be
-					// inserted into the canonical chain because the parent is
-					// will be missing.
-					// If the ancestor is processing, then the block may have
-					// been verified.
-					if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
-						return errRejectedParent
-					}
-					ancestor, ok = ancestorIntf.(*Block)
-					if !ok {
-						return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
-					}
-				}
-			case *UnsignedExportTx:
-				// Export txs are validated by the processor's nonce management.
-			default:
-				return errUnknownAtomicTx
-			}
-
-			// We have verified that none of the processing ancestors conflict with
-			// the atomic transaction, so now we must ensure that the transaction is
-			// valid and doesn't have any accepted conflicts.
-			utx := atomicTx.UnsignedAtomicTx
-			if err := utx.SemanticVerify(vm, atomicTx, rules); err != nil {
-				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
-			}
-		}
-
-		// TODO: Because InsertChain calls Process, can't this invocation be removed?
-		bc := vm.chain.BlockChain()
-		_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
-		if err != nil {
-			return fmt.Errorf("invalid block due to failed processing: %w", err)
+	if bonusBlocks.Contains(b.id) {
+		log.Info("skipping atomic tx verification on bonus block", "block", b.id)
+	} else {
+		utx := atomicTx.UnsignedAtomicTx
+		if err := utx.SemanticVerify(vm, atomicTx, ancestor, rules); err != nil {
+			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 		}
 	}
 
-	_, err = vm.chain.InsertChain([]*types.Block{b.ethBlock})
-	return err
+	// TODO: Because InsertChain calls Process, can't this invocation be removed?
+	bc := vm.chain.BlockChain()
+	_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
+	if err != nil {
+		return fmt.Errorf("invalid block due to failed processing: %w", err)
+	}
+	return nil
 }
 
 // Bytes implements the snowman.Block interface

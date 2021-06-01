@@ -45,19 +45,19 @@ func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 	return res.TxID, err
 }
 
-// GetTxStatus returns the status of [txID]
-// func (c *Client) GetTxStatus(txID ids.ID) (choices.Status, error) {
-// 	res := &GetTxStatusReply{}
-// 	err := c.requester.SendRequest("getTxStatus", &api.JSONTxID{
-// 		TxID: txID,
-// 	}, res)
-// 	return res.Status, err
-// }
+// GetAtomicTxStatus returns the status of [txID]
+func (c *Client) GetAtomicTxStatus(txID ids.ID) (Status, error) {
+	res := &GetAtomicTxStatusReply{}
+	err := c.requester.SendRequest("getAtomicTxStatus", &api.JSONTxID{
+		TxID: txID,
+	}, res)
+	return res.Status, err
+}
 
-// GetTx returns the byte representation of [txID]
-func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
+// GetAtomicTx returns the byte representation of [txID]
+func (c *Client) GetAtomicTx(txID ids.ID) ([]byte, error) {
 	res := &api.FormattedTx{}
-	err := c.requester.SendRequest("getTx", &api.GetTxArgs{
+	err := c.requester.SendRequest("getAtomicTx", &api.GetTxArgs{
 		TxID:     txID,
 		Encoding: formatting.Hex,
 	}, res)
@@ -68,12 +68,14 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	return formatting.Decode(formatting.Hex, res.Tx)
 }
 
-// GetUTXOs returns the byte representation of the UTXOs controlled by [addrs]
-func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
+// GetAtomicUTXOs returns the byte representation of the atomic UTXOs controlled by [addresses]
+// from [sourceChain]
+func (c *Client) GetAtomicUTXOs(addrs []string, sourceChain string, limit uint32, startAddress, startUTXOID string) ([][]byte, api.Index, error) {
 	res := &api.GetUTXOsReply{}
 	err := c.requester.SendRequest("getUTXOs", &api.GetUTXOsArgs{
-		Addresses: addrs,
-		Limit:     cjson.Uint32(limit),
+		Addresses:   addrs,
+		SourceChain: sourceChain,
+		Limit:       cjson.Uint32(limit),
 		StartIndex: api.Index{
 			Address: startAddress,
 			UTXO:    startUTXOID,
@@ -93,13 +95,6 @@ func (c *Client) GetUTXOs(addrs []string, limit uint32, startAddress, startUTXOI
 		utxos[i] = b
 	}
 	return utxos, res.EndIndex, nil
-}
-
-// CreateAddress creates a new address controlled by [user]
-func (c *Client) CreateAddress(user api.UserPass) (string, error) {
-	res := &api.JSONAddress{}
-	err := c.requester.SendRequest("createAddress", &user, res)
-	return res.Address, err
 }
 
 // ListAddresses returns all addresses on this chain controlled by [user]

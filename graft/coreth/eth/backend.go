@@ -62,10 +62,6 @@ import (
 // Deprecated: use ethconfig.Config instead.
 type Config = ethconfig.Config
 
-type BackendCallbacks struct {
-	OnQueryAcceptedBlock func() *types.Block
-}
-
 var (
 	DefaultSettings Settings = Settings{MaxBlocksPerRequest: 2000}
 )
@@ -104,8 +100,6 @@ type Ethereum struct {
 
 	lock sync.RWMutex // Protects the variadic fields (e.g. gas price and etherbase)
 
-	txSubmitChan chan struct{}
-
 	settings Settings // Settings for Ethereum API
 }
 
@@ -121,7 +115,6 @@ func New(stack *node.Node, config *Config,
 	if chainDb == nil {
 		return nil, errors.New("chainDb cannot be nil")
 	}
-
 	// Ensure configuration values are compatible and sane
 	if config.SyncMode == downloader.LightSync {
 		return nil, errors.New("can't run eth.Ethereum in light sync mode")
@@ -134,13 +127,13 @@ func New(stack *node.Node, config *Config,
 		config.Miner.GasPrice = new(big.Int).Set(ethconfig.DefaultConfig.Miner.GasPrice)
 	}
 	if config.NoPruning && config.TrieDirtyCache > 0 {
-		if config.SnapshotCache > 0 {
-			config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
-			config.SnapshotCache += config.TrieDirtyCache * 2 / 5
-		} else {
-			config.TrieCleanCache += config.TrieDirtyCache
-		}
-		config.TrieCleanCache += config.TrieDirtyCache
+		// TODO: uncomment when re-enabling snapshots
+		// if config.SnapshotCache > 0 {
+		// 	config.TrieCleanCache += config.TrieDirtyCache * 3 / 5
+		// 	config.SnapshotCache += config.TrieDirtyCache * 2 / 5
+		// } else {
+		// 	config.TrieCleanCache += config.TrieDirtyCache
+		// }
 		config.TrieDirtyCache = 0
 	}
 	log.Info("Allocated trie memory caches", "clean", common.StorageSize(config.TrieCleanCache)*1024*1024, "dirty", common.StorageSize(config.TrieDirtyCache)*1024*1024)
@@ -168,8 +161,7 @@ func New(stack *node.Node, config *Config,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
 		// p2pServer:         stack.Server(),
-		txSubmitChan: make(chan struct{}, 1),
-		settings:     settings,
+		settings: settings,
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)
@@ -382,62 +374,6 @@ func (s *Ethereum) SetEtherbase(etherbase common.Address) {
 	s.miner.SetEtherbase(etherbase)
 }
 
-// StartMining starts the miner with the given number of CPU threads. If mining
-// is already running, this method adjust the number of threads allowed to use
-// and updates the minimum price required by the transaction pool.
-func (s *Ethereum) StartMining() error {
-	// Original code:
-	// // Update the thread count within the consensus engine
-	// type threaded interface {
-	// 	SetThreads(threads int)
-	// }
-	// if th, ok := s.engine.(threaded); ok {
-	// 	log.Info("Updated mining threads", "threads", threads)
-	// 	if threads == 0 {
-	// 		threads = -1 // Disable the miner from within
-	// 	}
-	// 	th.SetThreads(threads)
-	// }
-	// If the miner was not running, initialize it
-	if !s.IsMining() {
-		// Propagate the initial price point to the transaction pool
-		s.lock.RLock()
-		price := s.gasPrice
-		s.lock.RUnlock()
-		s.txPool.SetGasPrice(price)
-
-		// Configure the local mining address
-		eb, err := s.Etherbase()
-		if err != nil {
-			log.Error("Cannot start mining without etherbase", "err", err)
-			return fmt.Errorf("etherbase missing: %v", err)
-		}
-		//// If mining is started, we can disable the transaction rejection mechanism
-		//// introduced to speed sync times.
-		//atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
-
-		//go s.miner.Start(eb)
-		s.miner.Start(eb)
-	}
-	return nil
-}
-
-// StopMining terminates the miner, both at the consensus engine level as well as
-// at the block creation level.
-func (s *Ethereum) StopMining() {
-	// Original code:
-	// // Update the thread count within the consensus engine
-	// type threaded interface {
-	// 	SetThreads(threads int)
-	// }
-	// if th, ok := s.engine.(threaded); ok {
-	// 	th.SetThreads(-1)
-	// }
-	// Stop the block creating itself
-	s.miner.Stop()
-}
-
-func (s *Ethereum) IsMining() bool      { return s.miner.Mining() }
 func (s *Ethereum) Miner() *miner.Miner { return s.miner }
 
 func (s *Ethereum) AccountManager() *accounts.Manager { return s.accountManager }
@@ -469,7 +405,6 @@ func (s *Ethereum) Stop() error {
 	s.bloomIndexer.Close()
 	close(s.closeBloomHandler)
 	s.txPool.Stop()
-	s.miner.Stop()
 	s.blockchain.Stop()
 	s.engine.Close()
 	// Original code:
@@ -477,10 +412,6 @@ func (s *Ethereum) Stop() error {
 	s.chainDb.Close()
 	s.eventMux.Stop()
 	return nil
-}
-
-func (s *Ethereum) GetTxSubmitCh() <-chan struct{} {
-	return s.txSubmitChan
 }
 
 func (s *Ethereum) LastAcceptedBlock() *types.Block {
