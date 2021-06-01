@@ -8,13 +8,14 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/ava-labs/avalanchego/network"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/ava-labs/avalanchego/network"
 
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -139,8 +140,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	// number of actions per second. If the outgoing connection is within the limit we make that
 	// connection instantly, else we sleep for a randomised period to try again.
 	fs.Uint(OutConnThrottlingAps, 50, "Throttle outgoing connections to this number of actions per second.")
-	fs.Duration(OutConnThrottlingMinBackoffDuration, 10*time.Millisecond, "Backoff for minimum this amount of time. Backoff is randomised between the min and max duration.")
-	fs.Duration(OutConnThrottlingMaxBackoffDuration, 500*time.Millisecond, "Backoff for maximum this amount of time. Backoff is randomised between the min and max duration.")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
@@ -618,7 +617,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 		return node.Config{}, process.Config{}, errors.New("outbound connection backoff max duration must be greater than min duration")
 	}
 
-	nodeConfig.DialerConfig = network.NewDialerConfig(outConnThrottleAps, outConnMinBackoff, outConnMaxBackoff)
+	nodeConfig.DialerConfig = network.NewDialerConfig(outConnThrottleAps)
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
