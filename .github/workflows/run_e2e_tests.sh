@@ -63,12 +63,12 @@ echo "Git Commit ID : ${git_commit_id}"
 custom_params_json="{
     \"isKurtosisCoreDevMode\": false,
     \"avalanchegoImage\":\"${avalanche_image}\",
-    \"avalanchegoByzantineImage\":\"\"
+    \"testBatch\":\"avalanchego\"
 }"
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 
 bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
-    --tests "Virtuous CChain Tests,PChain WorkFlow" \
+    --tests "C-Chain Bombard WorkFlow" \
     --custom-params "${custom_params_json}" \
     "${avalanche_testing_image}" \
     $@
