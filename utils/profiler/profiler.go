@@ -6,7 +6,7 @@ package profiler
 import (
 	"errors"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 
@@ -57,9 +57,9 @@ func New(dir string) Profiler { return new(dir) }
 func new(dir string) *profiler {
 	return &profiler{
 		dir:             dir,
-		cpuProfileName:  path.Join(dir, cpuProfileFile),
-		memProfileName:  path.Join(dir, memProfileFile),
-		lockProfileName: path.Join(dir, lockProfileFile),
+		cpuProfileName:  filepath.Join(dir, cpuProfileFile),
+		memProfileName:  filepath.Join(dir, memProfileFile),
+		lockProfileName: filepath.Join(dir, lockProfileFile),
 	}
 }
 

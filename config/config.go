@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -247,7 +246,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
-	fs.Duration(ProfileContinuousHistoryKey, 5, "Maximum number of historical profiles to keep")
+	fs.Duration(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
 
 	return fs
 }
@@ -378,7 +377,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// DB:
 	nodeConfig.DBEnabled = v.GetBool(DBEnabledKey)
-	nodeConfig.DBPath = path.Join(
+	nodeConfig.DBPath = filepath.Join(
 		os.ExpandEnv(v.GetString(DBPathKey)),
 		constants.NetworkName(nodeConfig.NetworkID),
 	)
@@ -710,7 +709,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.ProfileDir = os.ExpandEnv(v.GetString(ProfileDirKey))
 	nodeConfig.ContinuousProfilingEnabled = v.GetBool(ProfileContinuousEnabledKey)
 	nodeConfig.ContinuousProfilingFrequency = v.GetDuration(ProfileContinuousFreqKey)
-	nodeConfig.ContinuousProfilingHistory = v.GetInt(ProfileContinuousHistoryKey)
+	nodeConfig.ContinuousProfilingHistory = v.GetInt(ProfileContinuousMaxFilesKey)
 
 	return nodeConfig, processConfig, nil
 }

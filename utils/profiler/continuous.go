@@ -12,24 +12,27 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// ContinuousProfiler periodically captures CPU, memory, and lock profiles
 type ContinuousProfiler interface {
 	Dispatch() error
 	Shutdown()
 }
 
 type continuousProfiler struct {
-	profiler *profiler
-	dur      time.Duration
-	maxIndex int
-	closer   chan struct{}
+	profiler    *profiler
+	dur         time.Duration
+	maxNumFiles int
+
+	// Dispatch returns when closer is closed
+	closer chan struct{}
 }
 
-func NewContinuous(dir string, dur time.Duration, maxIndex int) ContinuousProfiler {
+func NewContinuous(dir string, dur time.Duration, maxNumFiles int) ContinuousProfiler {
 	return &continuousProfiler{
-		profiler: new(dir),
-		dur:      dur,
-		maxIndex: maxIndex,
-		closer:   make(chan struct{}),
+		profiler:    new(dir),
+		dur:         dur,
+		maxNumFiles: maxNumFiles,
+		closer:      make(chan struct{}),
 	}
 }
 
@@ -73,9 +76,9 @@ func (p *continuousProfiler) stop() error {
 
 func (p *continuousProfiler) rotate() error {
 	g := errgroup.Group{}
-	g.Go(func() error { return rotate(p.profiler.cpuProfileName, p.maxIndex) })
-	g.Go(func() error { return rotate(p.profiler.memProfileName, p.maxIndex) })
-	g.Go(func() error { return rotate(p.profiler.lockProfileName, p.maxIndex) })
+	g.Go(func() error { return rotate(p.profiler.cpuProfileName, p.maxNumFiles) })
+	g.Go(func() error { return rotate(p.profiler.memProfileName, p.maxNumFiles) })
+	g.Go(func() error { return rotate(p.profiler.lockProfileName, p.maxNumFiles) })
 	return g.Wait()
 }
 
@@ -83,8 +86,10 @@ func (p *continuousProfiler) Shutdown() {
 	close(p.closer)
 }
 
-func rotate(name string, maxIndex int) error {
-	for i := maxIndex - 1; i > 0; i-- {
+// Renames the file at [name] to [name].1, the file at [name].1 to [name].2, etc.
+// Assumes that there is a file at [name].
+func rotate(name string, maxNumFiles int) error {
+	for i := maxNumFiles - 1; i > 0; i-- {
 		sourceFilename := fmt.Sprintf("%s.%d", name, i)
 		_, err := os.Stat(sourceFilename)
 		if errors.Is(err, os.ErrNotExist) {

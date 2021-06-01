@@ -108,7 +108,7 @@ const (
 	PluginModeKey                           = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey     = "bootstrap-beacon-connection-timeout"
 	ProfileDirKey                           = "profile-dir"
-	ProfileContinuousEnabledKey             = "profile-enabled"
-	ProfileContinuousFreqKey                = "profile-freq-enabled"
-	ProfileContinuousHistoryKey             = "profile-amount-enabled"
+	ProfileContinuousEnabledKey             = "profile-continuous-enabled"
+	ProfileContinuousFreqKey                = "profile-continuous-freq"
+	ProfileContinuousMaxFilesKey            = "profile-continuous-max-files"
 )

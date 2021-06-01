@@ -5,7 +5,7 @@ package profiler
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestProfiler(t *testing.T) {
 	err = p.StopCPUProfiler()
 	assert.NoError(t, err)
 
-	_, err = os.Stat(path.Join(dir, cpuProfileFile))
+	_, err = os.Stat(filepath.Join(dir, cpuProfileFile))
 	assert.NoError(t, err)
 
 	// Test Stop CPU Profiler without it running
@@ -34,13 +34,13 @@ func TestProfiler(t *testing.T) {
 	err = p.MemoryProfile()
 	assert.NoError(t, err)
 
-	_, err = os.Stat(path.Join(dir, memProfileFile))
+	_, err = os.Stat(filepath.Join(dir, memProfileFile))
 	assert.NoError(t, err)
 
 	// Test Lock Profiler
 	err = p.LockProfile()
 	assert.NoError(t, err)
 
-	_, err = os.Stat(path.Join(dir, lockProfileFile))
+	_, err = os.Stat(filepath.Join(dir, lockProfileFile))
 	assert.NoError(t, err)
 }

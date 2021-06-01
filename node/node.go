@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"path"
 	"path/filepath"
 	"sync"
 
@@ -749,7 +748,7 @@ func (n *Node) initProfiler() {
 
 	n.Log.Info("initializing continuous profiler")
 	n.profiler = profiler.NewContinuous(
-		path.Join(n.Config.ProfileDir, "continuous"),
+		filepath.Join(n.Config.ProfileDir, "continuous"),
 		n.Config.ContinuousProfilingFrequency,
 		n.Config.ContinuousProfilingHistory,
 	)
