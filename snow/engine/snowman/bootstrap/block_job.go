@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
@@ -32,7 +33,7 @@ func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
 		log:         p.log,
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
-		proBlk:      proBlk,
+		blk:         proBlk,
 	}, nil
 }
 
@@ -40,20 +41,20 @@ type blockJob struct {
 	parser                  *parser
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
-	proBlk                  proposervm.ProposerBlock
+	blk                     snowman.Block
 }
 
-func (b *blockJob) ID() ids.ID { return b.proBlk.ID() }
+func (b *blockJob) ID() ids.ID { return b.blk.ID() }
 func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
-	if parent := b.proBlk.Parent(); parent.Status() != choices.Accepted {
+	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
 		missing.Add(parent.ID())
 	}
 	return missing, nil
 }
 
 func (b *blockJob) HasMissingDependencies() (bool, error) {
-	if parent := b.proBlk.Parent(); parent.Status() != choices.Accepted {
+	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
 		return true, nil
 	}
 	return false, nil
@@ -68,23 +69,23 @@ func (b *blockJob) Execute() error {
 		b.numDropped.Inc()
 		return errors.New("attempting to accept a block with missing dependencies")
 	}
-	status := b.proBlk.Status()
+	status := b.blk.Status()
 	switch status {
 	case choices.Unknown, choices.Rejected:
 		b.numDropped.Inc()
 		return fmt.Errorf("attempting to execute block with status %s", status)
 	case choices.Processing:
-		if err := b.proBlk.Verify(); err != nil {
-			b.log.Error("block %s failed verification during bootstrapping due to %s", b.proBlk.ID(), err)
+		if err := b.blk.Verify(); err != nil {
+			b.log.Error("block %s failed verification during bootstrapping due to %s", b.blk.ID(), err)
 			return fmt.Errorf("failed to verify block in bootstrapping: %w", err)
 		}
 
 		b.numAccepted.Inc()
-		if err := b.proBlk.Accept(); err != nil {
-			b.log.Debug("block %s failed to accept during bootstrapping due to %s", b.proBlk.ID(), err)
+		if err := b.blk.Accept(); err != nil {
+			b.log.Debug("block %s failed to accept during bootstrapping due to %s", b.blk.ID(), err)
 			return fmt.Errorf("failed to accept block in bootstrapping: %w", err)
 		}
 	}
 	return nil
 }
-func (b *blockJob) Bytes() []byte { return b.proBlk.Bytes() }
+func (b *blockJob) Bytes() []byte { return b.blk.Bytes() }

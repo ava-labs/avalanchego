@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -115,7 +116,7 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
-		if proBlk, err := b.ProVM.GetProBlock(blkID); err == nil && proBlk.Status() == choices.Accepted {
+		if blk, err := b.ProVM.GetProBlock(blkID); err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
@@ -136,18 +137,18 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	// Append the list of accepted container IDs to pendingContainerIDs to ensure
 	// we iterate over every container that must be traversed.
 	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
-	toProcess := make([]proposervm.ProposerBlock, 0, len(acceptedContainerIDs))
+	toProcess := make([]snowman.Block, 0, len(acceptedContainerIDs))
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
-		if proBlk, err := b.ProVM.GetProBlock(blkID); err == nil {
-			if height := proBlk.Height(); height > b.tipHeight {
+		if blk, err := b.ProVM.GetProBlock(blkID); err == nil {
+			if height := blk.Height(); height > b.tipHeight {
 				b.tipHeight = height
 			}
-			if proBlk.Status() == choices.Accepted {
+			if blk.Status() == choices.Accepted {
 				b.Blocked.RemoveMissingID(blkID)
 			} else {
-				toProcess = append(toProcess, proBlk)
+				toProcess = append(toProcess, blk)
 			}
 		} else {
 			b.Blocked.AddMissingID(blkID)
@@ -158,8 +159,8 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	// Process received blocks
-	for _, proBlk := range toProcess {
-		if err := b.process(proBlk); err != nil {
+	for _, blk := range toProcess {
+		if err := b.process(blk); err != nil {
 			return err
 		}
 	}
@@ -217,24 +218,24 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return nil
 	}
 
-	wantedProBlk, err := b.ProVM.ParseProBlock(blks[0]) // the block we requested
+	wantedBlk, err := b.ProVM.ParseProBlock(blks[0]) // the block we requested
 	if err != nil {
 		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
-	} else if actualID := wantedProBlk.ID(); actualID != wantedBlkID {
+	} else if actualID := wantedBlk.ID(); actualID != wantedBlkID {
 		b.Ctx.Log.Debug("expected the first block to be the requested block, %s, but is %s",
-			wantedProBlk, actualID)
+			wantedBlk, actualID)
 		return b.fetch(wantedBlkID)
 	}
 
-	for _, proBlkBytes := range blks[1:] {
-		if _, err := b.ProVM.ParseProBlock(proBlkBytes); err != nil { // persists the block
+	for _, blkBytes := range blks[1:] {
+		if _, err := b.ProVM.ParseProBlock(blkBytes); err != nil { // persists the block
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
-			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: proBlkBytes})
+			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
 		}
 	}
 
-	return b.process(wantedProBlk)
+	return b.process(wantedBlk)
 }
 
 // GetAncestorsFailed is called when a GetAncestors message we sent fails
@@ -262,10 +263,10 @@ func (b *Bootstrapper) Timeout() error {
 }
 
 // process a block
-func (b *Bootstrapper) process(proBlk proposervm.ProposerBlock) error {
-	status := proBlk.Status()
-	blkID := proBlk.ID()
-	blkHeight := proBlk.Height()
+func (b *Bootstrapper) process(blk snowman.Block) error {
+	status := blk.Status()
+	blkID := blk.ID()
+	blkHeight := blk.Height()
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
 		b.tipHeight = blkHeight
 	}
@@ -280,16 +281,16 @@ func (b *Bootstrapper) process(proBlk proposervm.ProposerBlock) error {
 			parser:      b.parser,
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
-			proBlk:      proBlk,
+			blk:         blk,
 		})
 		if err != nil {
 			return err
 		}
 
 		// Traverse to the next block regardless of if the block is pushed
-		proBlk = proposervm.NewProBlock(proBlk.Parent())
-		status = proBlk.Status()
-		blkID = proBlk.ID()
+		blk = blk.Parent()
+		status = blk.Status()
+		blkID = blk.ID()
 
 		if !pushed {
 			// If this block is already on the queue, then we can stop

@@ -136,13 +136,13 @@ func (t *Transitive) Gossip() error {
 	if err != nil {
 		return err
 	}
-	proBlk, err := t.ProVM.GetProBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
 		return nil
 	}
 	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
-	t.Sender.Gossip(blkID, proBlk.Bytes())
+	t.Sender.Gossip(blkID, blk.Bytes())
 	return nil
 }
 
@@ -154,7 +154,7 @@ func (t *Transitive) Shutdown() error {
 
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	proBlk, err := t.ProVM.GetProBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
@@ -164,29 +164,29 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	t.Sender.Put(vdr, requestID, blkID, proBlk.Bytes())
+	t.Sender.Put(vdr, requestID, blkID, blk.Bytes())
 	return nil
 }
 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	startTime := time.Now()
-	proBlk, err := t.ProVM.GetProBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil { // Don't have the block. Drop this request.
 		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)", blkID, vdr, requestID, blkID)
 		return nil
 	}
 
 	ancestorsBytes := make([][]byte, 1, common.MaxContainersPerMultiPut) // First elt is byte repr. of blk, then its parents, then grandparent, etc.
-	ancestorsBytes[0] = proBlk.Bytes()
-	ancestorsBytesLen := len(proBlk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
+	ancestorsBytes[0] = blk.Bytes()
+	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < common.MaxContainersPerMultiPut && time.Since(startTime) < common.MaxTimeFetchingAncestors; numFetched++ {
-		proBlk = proposervm.NewProBlock(proBlk.Parent())
-		if proBlk.Status() == choices.Unknown {
+		blk = proposervm.NewProBlock(blk.Parent())
+		if blk.Status() == choices.Unknown {
 			break
 		}
-		blkBytes := proBlk.Bytes()
+		blkBytes := blk.Bytes()
 		// Ensure response size isn't too large. Include wrappers.IntLen because the size of the message
 		// is included with each container, and the size is repr. by an int.
 		if newLen := wrappers.IntLen + ancestorsBytesLen + len(blkBytes); newLen < maxContainersLen {
@@ -215,7 +215,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 		return nil
 	}
 
-	proBlk, err := t.ProVM.ParseProBlock(blkBytes)
+	blk, err := t.ProVM.ParseProBlock(blkBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
@@ -230,7 +230,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(vdr, proBlk); err != nil {
+	if _, err := t.issueFrom(vdr, blk); err != nil {
 		return err
 	}
 	return t.buildBlocks()
@@ -298,7 +298,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 		return nil
 	}
 
-	proBlk, err := t.ProVM.ParseProBlock(blkBytes)
+	blk, err := t.ProVM.ParseProBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
@@ -311,12 +311,12 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 	// receive requests to fill the ancestry. dependencies that have already
 	// been fetched, but with missing dependencies themselves won't be requested
 	// from the vdr.
-	if _, err := t.issueFrom(vdr, proBlk); err != nil {
+	if _, err := t.issueFrom(vdr, blk); err != nil {
 		return err
 	}
 
 	// register the chit request
-	return t.PullQuery(vdr, requestID, proBlk.ID())
+	return t.PullQuery(vdr, requestID, blk.ID())
 }
 
 // Chits implements the Engine interface
@@ -456,33 +456,33 @@ func (t *Transitive) repoll() {
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
 func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
-	proBlk, err := t.ProVM.GetProBlock(blkID)
+	blk, err := t.ProVM.GetProBlock(blkID)
 	if err != nil {
 		t.sendRequest(vdr, blkID)
 		return false, nil
 	}
-	return t.issueFrom(vdr, proBlk)
+	return t.issueFrom(vdr, blk)
 }
 
 // issueFrom attempts to issue the branch ending with block [blkID] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing, request it from [vdr].
-func (t *Transitive) issueFrom(vdr ids.ShortID, proBlk proposervm.ProposerBlock) (bool, error) {
-	blkID := proBlk.ID()
+func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error) {
+	blkID := blk.ID()
 	// issue [blk] and its ancestors to consensus.
 	// If the block has been decided, we don't need to issue it.
 	// If the block is processing, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
-	for !t.Consensus.DecidedOrProcessing(proBlk) && !t.pending.Contains(blkID) {
-		if err := t.issue(proBlk); err != nil {
+	for !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+		if err := t.issue(blk); err != nil {
 			return false, err
 		}
 
-		proBlk = proposervm.NewProBlock(proBlk.Parent())
-		blkID = proBlk.ID()
+		blk = blk.Parent()
+		blkID = blk.ID()
 
 		// If we don't have this ancestor, request it from [vdr]
-		if !proBlk.Status().Fetched() {
+		if !blk.Status().Fetched() {
 			t.sendRequest(vdr, blkID)
 			return false, nil
 		}
@@ -491,7 +491,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, proBlk proposervm.ProposerBlock)
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
 
-	issued := t.Consensus.DecidedOrProcessing(proBlk)
+	issued := t.Consensus.DecidedOrProcessing(blk)
 	if issued {
 		// A dependency should never be waiting on a decided or processing
 		// block. However, if the block was marked as rejected by the VM, the
@@ -507,19 +507,19 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, proBlk proposervm.ProposerBlock)
 // issueWithAncestors attempts to issue the branch ending with [blk] to consensus.
 // Returns true if the block is processing in consensus or is decided.
 // If a dependency is missing and the dependency hasn't been requested, the issuance will be abandoned.
-func (t *Transitive) issueWithAncestors(probBlk proposervm.ProposerBlock) (bool, error) {
-	blkID := probBlk.ID()
+func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
+	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	for probBlk.Status().Fetched() && !t.Consensus.DecidedOrProcessing(probBlk) && !t.pending.Contains(blkID) {
-		if err := t.issue(probBlk); err != nil {
+	for blk.Status().Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+		if err := t.issue(blk); err != nil {
 			return false, err
 		}
-		probBlk = proposervm.NewProBlock(probBlk.Parent())
-		blkID = probBlk.ID()
+		blk = blk.Parent()
+		blkID = blk.ID()
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if t.Consensus.DecidedOrProcessing(probBlk) {
+	if t.Consensus.DecidedOrProcessing(blk) {
 		return true, nil
 	}
 
@@ -536,8 +536,8 @@ func (t *Transitive) issueWithAncestors(probBlk proposervm.ProposerBlock) (bool,
 }
 
 // Issue [blk] to consensus once its ancestors have been issued.
-func (t *Transitive) issue(proBlk proposervm.ProposerBlock) error {
-	blkID := proBlk.ID()
+func (t *Transitive) issue(blk snowman.Block) error {
+	blkID := blk.ID()
 
 	// mark that the block is queued to be added to consensus once its ancestors have been
 	t.pending.Add(blkID)
@@ -548,11 +548,11 @@ func (t *Transitive) issue(proBlk proposervm.ProposerBlock) error {
 	// Will add [blk] to consensus once its ancestors have been
 	i := &issuer{
 		t:   t,
-		blk: proBlk,
+		blk: blk,
 	}
 
 	// block on the parent if needed
-	if parent := proBlk.Parent(); !t.Consensus.DecidedOrProcessing(parent) {
+	if parent := blk.Parent(); !t.Consensus.DecidedOrProcessing(parent) {
 		parentID := parent.ID()
 		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
