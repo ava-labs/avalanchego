@@ -732,7 +732,7 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfileDir)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir)
 	if err != nil {
 		return err
 	}
@@ -741,16 +741,16 @@ func (n *Node) initAdminAPI() error {
 
 // initProfiler initializes the continuous profiling
 func (n *Node) initProfiler() {
-	if !n.Config.ContinuousProfilingEnabled {
+	if !n.Config.ProfilerConfig.Enabled {
 		n.Log.Info("skipping profiler initialization because it has been disabled")
 		return
 	}
 
 	n.Log.Info("initializing continuous profiler")
 	n.profiler = profiler.NewContinuous(
-		filepath.Join(n.Config.ProfileDir, "continuous"),
-		n.Config.ContinuousProfilingFrequency,
-		n.Config.ContinuousProfilingHistory,
+		filepath.Join(n.Config.ProfilerConfig.Dir, "continuous"),
+		n.Config.ProfilerConfig.Freq,
+		n.Config.ProfilerConfig.MaxNumFiles,
 	)
 	go n.Log.RecoverAndPanic(func() {
 		err := n.profiler.Dispatch()

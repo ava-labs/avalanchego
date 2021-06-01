@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -103,10 +104,7 @@ type Config struct {
 	IndexAPIEnabled    bool
 
 	// Profiling configurations
-	ProfileDir                   string
-	ContinuousProfilingEnabled   bool
-	ContinuousProfilingFrequency time.Duration
-	ContinuousProfilingHistory   int
+	ProfilerConfig profiler.Config
 
 	// Logging configuration
 	LoggingConfig logging.Config

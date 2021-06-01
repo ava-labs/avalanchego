@@ -706,10 +706,10 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
 
 	// Profile config
-	nodeConfig.ProfileDir = os.ExpandEnv(v.GetString(ProfileDirKey))
-	nodeConfig.ContinuousProfilingEnabled = v.GetBool(ProfileContinuousEnabledKey)
-	nodeConfig.ContinuousProfilingFrequency = v.GetDuration(ProfileContinuousFreqKey)
-	nodeConfig.ContinuousProfilingHistory = v.GetInt(ProfileContinuousMaxFilesKey)
+	nodeConfig.ProfilerConfig.Dir = os.ExpandEnv(v.GetString(ProfileDirKey))
+	nodeConfig.ProfilerConfig.Enabled = v.GetBool(ProfileContinuousEnabledKey)
+	nodeConfig.ProfilerConfig.Freq = v.GetDuration(ProfileContinuousFreqKey)
+	nodeConfig.ProfilerConfig.MaxNumFiles = v.GetInt(ProfileContinuousMaxFilesKey)
 
 	return nodeConfig, processConfig, nil
 }

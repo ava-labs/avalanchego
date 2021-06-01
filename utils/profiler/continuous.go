@@ -12,6 +12,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Config that is used to describe the options of the continuous profiler.
+type Config struct {
+	Dir         string
+	Enabled     bool
+	Freq        time.Duration
+	MaxNumFiles int
+}
+
 // ContinuousProfiler periodically captures CPU, memory, and lock profiles
 type ContinuousProfiler interface {
 	Dispatch() error
@@ -20,24 +28,24 @@ type ContinuousProfiler interface {
 
 type continuousProfiler struct {
 	profiler    *profiler
-	dur         time.Duration
+	freq        time.Duration
 	maxNumFiles int
 
 	// Dispatch returns when closer is closed
 	closer chan struct{}
 }
 
-func NewContinuous(dir string, dur time.Duration, maxNumFiles int) ContinuousProfiler {
+func NewContinuous(dir string, freq time.Duration, maxNumFiles int) ContinuousProfiler {
 	return &continuousProfiler{
 		profiler:    new(dir),
-		dur:         dur,
+		freq:        freq,
 		maxNumFiles: maxNumFiles,
 		closer:      make(chan struct{}),
 	}
 }
 
 func (p *continuousProfiler) Dispatch() error {
-	t := time.NewTimer(p.dur)
+	t := time.NewTicker(p.freq)
 	defer t.Stop()
 
 	for {
@@ -57,8 +65,6 @@ func (p *continuousProfiler) Dispatch() error {
 		if err := p.rotate(); err != nil {
 			return err
 		}
-
-		t.Reset(p.dur)
 	}
 }
 
