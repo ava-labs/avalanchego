@@ -85,6 +85,7 @@ type Node struct {
 	DBManager manager.Manager
 	DB        database.Database
 
+	// Profiles the process. Nil if continuous profiling is disabled.
 	profiler profiler.ContinuousProfiler
 
 	// Indexes blocks, transactions and blocks
