@@ -24,7 +24,7 @@ type parser struct {
 }
 
 func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
-	proBlk, err := p.proVM.ParseProBlock(blkBytes)
+	blk, err := p.proVM.ParseBlock(blkBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
 		log:         p.log,
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
-		blk:         proBlk,
+		blk:         blk,
 	}, nil
 }
 

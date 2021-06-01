@@ -4,6 +4,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -61,22 +62,22 @@ func (vm *VM) HealthCheck() (interface{}, error) {
 }
 
 //////// block.ChainVM interface implementation
-func (vm *VM) BuildProBlock() (ProposerBlock, error) { //NO MORE block.ChainVM interface
+func (vm *VM) BuildBlock() (snowman.Block, error) {
 	sb, err := vm.wrappedVM.BuildBlock()
 	proBlk := NewProBlock(sb) // here new block fields will be handled
-	return proBlk, err
+	return &proBlk, err
 }
 
-func (vm *VM) ParseProBlock(b []byte) (ProposerBlock, error) { //NO MORE block.ChainVM interface
+func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	sb, err := vm.wrappedVM.ParseBlock(b)
 	proBlk := NewProBlock(sb) // here new block fields will be handled
-	return proBlk, err
+	return &proBlk, err
 }
 
-func (vm *VM) GetProBlock(id ids.ID) (ProposerBlock, error) { //NO MORE block.ChainVM interface
+func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 	sb, err := vm.wrappedVM.GetBlock(id)
 	proBlk := NewProBlock(sb) // here new block fields will be handled
-	return proBlk, err
+	return &proBlk, err
 }
 
 func (vm *VM) SetPreference(id ids.ID) error {
