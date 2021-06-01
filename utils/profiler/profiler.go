@@ -1,11 +1,12 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package admin
+package profiler
 
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 
@@ -26,29 +27,50 @@ var (
 	errCPUProfilerNotRunning = errors.New("cpu profiler doesn't exist")
 )
 
-// Performance provides helper methods for measuring the current performance of
-// the system
-type Performance struct {
-	cpuProfileName, memProfileName, lockProfileName string
-	cpuProfileFile                                  *os.File
+// Profiler provides helper methods for measuring the current performance of
+// this process
+type Profiler interface {
+	// StartCPUProfiler starts measuring the cpu utilization of this process
+	StartCPUProfiler() error
+
+	// StopCPUProfiler stops measuring the cpu utilization of this process
+	StopCPUProfiler() error
+
+	// MemoryProfile dumps the current memory utilization of this process
+	MemoryProfile() error
+
+	// LockProfile dumps the current lock statistics of this process
+	LockProfile() error
 }
 
-func NewPerformanceService(prefix string) *Performance {
-	return &Performance{
-		cpuProfileName:  prefix + cpuProfileFile,
-		memProfileName:  prefix + memProfileFile,
-		lockProfileName: prefix + lockProfileFile,
+type profiler struct {
+	dir,
+	cpuProfileName,
+	memProfileName,
+	lockProfileName string
+
+	cpuProfileFile *os.File
+}
+
+func New(dir string) Profiler { return new(dir) }
+
+func new(dir string) *profiler {
+	return &profiler{
+		dir:             dir,
+		cpuProfileName:  filepath.Join(dir, cpuProfileFile),
+		memProfileName:  filepath.Join(dir, memProfileFile),
+		lockProfileName: filepath.Join(dir, lockProfileFile),
 	}
 }
 
-func NewDefaultPerformanceService() *Performance { return NewPerformanceService("") }
-
-// StartCPUProfiler starts measuring the cpu utilization of this node
-func (p *Performance) StartCPUProfiler() error {
+func (p *profiler) StartCPUProfiler() error {
 	if p.cpuProfileFile != nil {
 		return errCPUProfilerRunning
 	}
 
+	if err := os.MkdirAll(p.dir, perms.ReadWriteExecute); err != nil {
+		return err
+	}
 	file, err := perms.Create(p.cpuProfileName, perms.ReadWrite)
 	if err != nil {
 		return err
@@ -63,8 +85,7 @@ func (p *Performance) StartCPUProfiler() error {
 	return nil
 }
 
-// StopCPUProfiler stops measuring the cpu utilization of this node
-func (p *Performance) StopCPUProfiler() error {
+func (p *profiler) StopCPUProfiler() error {
 	if p.cpuProfileFile == nil {
 		return errCPUProfilerNotRunning
 	}
@@ -75,8 +96,10 @@ func (p *Performance) StopCPUProfiler() error {
 	return err
 }
 
-// MemoryProfile dumps the current memory utilization of this node
-func (p *Performance) MemoryProfile() error {
+func (p *profiler) MemoryProfile() error {
+	if err := os.MkdirAll(p.dir, perms.ReadWriteExecute); err != nil {
+		return err
+	}
 	file, err := perms.Create(p.memProfileName, perms.ReadWrite)
 	if err != nil {
 		return err
@@ -89,8 +112,10 @@ func (p *Performance) MemoryProfile() error {
 	return file.Close()
 }
 
-// LockProfile dumps the current lock statistics of this node
-func (p *Performance) LockProfile() error {
+func (p *profiler) LockProfile() error {
+	if err := os.MkdirAll(p.dir, perms.ReadWriteExecute); err != nil {
+		return err
+	}
 	file, err := perms.Create(p.lockProfileName, perms.ReadWrite)
 	if err != nil {
 		return err
