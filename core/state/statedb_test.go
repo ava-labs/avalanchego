@@ -974,11 +974,15 @@ func TestMultiCoinSnapshot(t *testing.T) {
 		}
 	}
 
+	addr := common.Address{1}
+	assetHash1 := common.Hash{1}
+	assetHash2 := common.Hash{2}
+
 	// Create new state
 	stateDB, _ = New(root, sdb, snapTree)
 	assertBalances(0, 0, 0)
 
-	stateDB.AddBalance(common.Address{1}, big.NewInt(10))
+	stateDB.AddBalance(addr, big.NewInt(10))
 	assertBalances(10, 0, 0)
 
 	// Commit and get the new root
@@ -988,15 +992,15 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	// Create a new state from the latest root, add a multicoin balance, and
 	// commit it to the tree.
 	stateDB, _ = New(root, sdb, snapTree)
-	stateDB.AddBalanceMultiCoin(common.Address{1}, common.Hash{1}, big.NewInt(10))
+	stateDB.AddBalanceMultiCoin(addr, assetHash1, big.NewInt(10))
 	root, _ = stateDB.Commit(false)
 	assertBalances(10, 10, 0)
 
 	// Add more layers than the cap and ensure the balances and layers are correct
 	for i := 0; i < 256; i++ {
 		stateDB, _ = New(root, sdb, snapTree)
-		stateDB.AddBalanceMultiCoin(common.Address{1}, common.Hash{1}, big.NewInt(1))
-		stateDB.AddBalanceMultiCoin(common.Address{1}, common.Hash{2}, big.NewInt(2))
+		stateDB.AddBalanceMultiCoin(addr, assetHash1, big.NewInt(1))
+		stateDB.AddBalanceMultiCoin(addr, assetHash2, big.NewInt(2))
 		root, _ = stateDB.Commit(false)
 	}
 	assertBalances(10, 266, 512)
@@ -1004,8 +1008,8 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	// Do one more add, including the regular balance which is now in the
 	// collapsed snapshot
 	stateDB, _ = New(root, sdb, snapTree)
-	stateDB.AddBalance(common.Address{1}, big.NewInt(1))
-	stateDB.AddBalanceMultiCoin(common.Address{1}, common.Hash{1}, big.NewInt(1))
+	stateDB.AddBalance(addr, big.NewInt(1))
+	stateDB.AddBalanceMultiCoin(addr, assetHash1, big.NewInt(1))
 	_, _ = stateDB.Commit(false)
 	assertBalances(11, 267, 512)
 }
