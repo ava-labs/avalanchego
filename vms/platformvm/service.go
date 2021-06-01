@@ -2092,9 +2092,9 @@ func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []av
 	case *UnsignedAddSubnetValidatorTx:
 		return 0, nil, nil
 	default:
-		errMsg := fmt.Sprintf("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
-		service.vm.ctx.Log.Error("%s", errMsg)
-		return 0, nil, errors.New(errMsg)
+		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
+		service.vm.ctx.Log.Error("invalid tx type provided from validator set %s", err)
+		return 0, nil, err
 	}
 
 	var (
