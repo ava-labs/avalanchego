@@ -216,10 +216,7 @@ type network struct {
 	// Node ID --> Function to execute to stop trying to dial the node.
 	// A node is present in this map if and only if we are actively
 	// trying to dial the node.
-	// [connAttemptsLock] must be held while accessing [connAttempts].
-	connAttempts map[ids.ShortID]context.CancelFunc
-	// Must be held while accessing [connAttempts].
-	connAttemptsLock sync.Mutex
+	connAttempts sync.Map
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -393,7 +390,6 @@ func NewNetwork(
 		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
 		isFetchOnly:                        isFetchOnly,
 	}
-	netw.connAttempts = make(map[ids.ShortID]context.CancelFunc)
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
@@ -1200,26 +1196,23 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 
 		// If we are already trying to connect to this node ID,
 		// cancel the existing attempt.
-		n.connAttemptsLock.Lock()
-		if cancel, exists := n.connAttempts[nodeID]; exists {
-			cancel()
+		if cancel, exists := n.connAttempts.Load(nodeID); exists {
+			cancel.(context.CancelFunc)()
 		}
+
 		// When [cancel] is called, we give up on this attempt to connect
 		// (if we have not yet connected.)
 		// This occurs at the sooner of:
 		// * [connectTo] is called again with the same node ID
 		// * The call to [attemptConnect] below returns
 		ctx, cancel := context.WithCancel(context.Background())
-		n.connAttempts[nodeID] = cancel
-		n.connAttemptsLock.Unlock()
+		n.connAttempts.Store(nodeID, cancel)
 
 		// Attempt to connect
 		err := n.attemptConnect(ctx, ip)
 		cancel() // to avoid goroutine leak
 
-		n.connAttemptsLock.Lock()
-		delete(n.connAttempts, nodeID)
-		n.connAttemptsLock.Unlock()
+		n.connAttempts.Delete(nodeID)
 
 		if err == nil {
 			return
