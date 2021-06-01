@@ -212,6 +212,14 @@ type network struct {
 	// A peer is removed from this map when [connected] is called with the peer as the argument
 	// TODO also remove from this map when the peer leaves the validator set
 	latestPeerIP map[ids.ShortID]signedPeerIP
+
+	// Node ID --> Function to execute to stop trying to dial the node.
+	// A node is present in this map if and only if we are actively
+	// trying to dial the node.
+	// [connAttemptsLock] must be held while accessing [connAttempts].
+	connAttempts map[ids.ShortID]context.CancelFunc
+	// Must be held while accessing [connAttempts].
+	connAttemptsLock sync.Mutex
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -385,6 +393,7 @@ func NewNetwork(
 		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
 		isFetchOnly:                        isFetchOnly,
 	}
+	netw.connAttempts = make(map[ids.ShortID]context.CancelFunc)
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
@@ -1134,8 +1143,6 @@ func (n *network) gossipPeerList() {
 	}
 }
 
-var nodeCancelMap sync.Map
-
 // assumes the stateLock is not held. Only returns if the ip is connected to or
 // the network is closed
 func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
@@ -1193,20 +1200,24 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 
 		// If we are already trying to connect to this node ID,
 		// cancel the existing attempt.
-		existingCancelFn, exists := nodeCancelMap.LoadAndDelete(nodeID)
-		if exists {
-			existingCancelFn.(context.CancelFunc)()
+		n.connAttemptsLock.Lock()
+		if cancel, exists := n.connAttempts[nodeID]; exists {
+			cancel()
 		}
+		// [cancel] is called for the first time when the sooner of:
+		// * [connectTo] is called again with the same node ID
+		// * The call to [attemptConnect] below returns
+		ctx, cancel := context.WithCancel(context.Background())
+		n.connAttempts[nodeID] = cancel
+		n.connAttemptsLock.Unlock()
 
-		// [cancelFn] is called for the first time when the sooner of:
-		// * [connectTo] is called with the same node ID
-		// * the call to [attemptConnect] below returns
-		ctx, cancelFn := context.WithCancel(context.Background())
-		nodeCancelMap.Store(nodeID, cancelFn)
-
+		// Attempt to connect
 		err := n.attemptConnect(ctx, ip)
-		cancelFn()
-		nodeCancelMap.Delete(nodeID)
+		cancel() // to avoid goroutine leak
+
+		n.connAttemptsLock.Lock()
+		delete(n.connAttempts, nodeID)
+		n.connAttemptsLock.Unlock()
 
 		if err == nil {
 			return
