@@ -1204,7 +1204,9 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 		if cancel, exists := n.connAttempts[nodeID]; exists {
 			cancel()
 		}
-		// [cancel] is called for the first time when the sooner of:
+		// When [cancel] is called, we give up on this attempt to connect
+		// (if we have not yet connected.)
+		// This occurs at the sooner of:
 		// * [connectTo] is called again with the same node ID
 		// * The call to [attemptConnect] below returns
 		ctx, cancel := context.WithCancel(context.Background())
