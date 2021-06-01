@@ -611,12 +611,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// Outbound connection throttling
 	outConnThrottleAps := v.GetUint32(OutConnThrottlingAps)
-	outConnMinBackoff := v.GetDuration(OutConnThrottlingMinBackoffDuration)
-	outConnMaxBackoff := v.GetDuration(OutConnThrottlingMaxBackoffDuration)
-	if outConnMaxBackoff < outConnMinBackoff {
-		return node.Config{}, process.Config{}, errors.New("outbound connection backoff max duration must be greater than min duration")
-	}
-
 	nodeConfig.DialerConfig = network.NewDialerConfig(outConnThrottleAps)
 
 	// Benchlist

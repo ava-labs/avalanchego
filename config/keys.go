@@ -29,8 +29,6 @@ const (
 	ConnMeterResetDurationKey               = "conn-meter-reset-duration"
 	ConnMeterMaxConnsKey                    = "conn-meter-max-conns"
 	OutConnThrottlingAps                    = "out-conn-throttling-aps"
-	OutConnThrottlingMinBackoffDuration     = "out-conn-min-backoff-duration"
-	OutConnThrottlingMaxBackoffDuration     = "out-conn-max-backoff-duration"
 	HTTPHostKey                             = "http-host"
 	HTTPPortKey                             = "http-port"
 	HTTPSEnabledKey                         = "http-tls-enabled"

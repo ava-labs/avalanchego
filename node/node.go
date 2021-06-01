@@ -7,6 +7,10 @@ import (
 	"crypto"
 	"errors"
 	"fmt"
+	"net"
+	"path/filepath"
+	"sync"
+
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/api/health"
@@ -49,9 +53,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/timestampvm"
 	"github.com/hashicorp/go-plugin"
-	"net"
-	"path/filepath"
-	"sync"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
