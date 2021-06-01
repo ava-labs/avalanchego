@@ -3,7 +3,6 @@
 
 package logging
 
-// Color ...
 type Color string
 
 // Colors
@@ -30,5 +29,6 @@ const (
 	Reverse Color = "\033[;7m"
 )
 
-// Wrap ...
-func (lc Color) Wrap(text string) string { return string(lc) + text + string(Reset) }
+func (lc Color) Wrap(text string) string {
+	return string(lc) + text + string(Reset)
+}

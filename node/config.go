@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -101,6 +102,9 @@ type Config struct {
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
 	IndexAPIEnabled    bool
+
+	// Profiling configurations
+	ProfilerConfig profiler.Config
 
 	// Logging configuration
 	LoggingConfig logging.Config
