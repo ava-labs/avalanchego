@@ -1191,16 +1191,21 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 		n.retryDelay[str] = delay
 		n.stateLock.Unlock()
 
+		// If we are already trying to connect to this node ID,
+		// cancel the existing attempt.
 		existingCancelFn, exists := nodeCancelMap.LoadAndDelete(nodeID)
 		if exists {
-			existingCancelFn.(func())()
+			existingCancelFn.(context.CancelFunc)()
 		}
 
+		// [cancelFn] is called for the first time when the sooner of:
+		// * [connectTo] is called with the same node ID
+		// * the call to [attemptConnect] below returns
 		ctx, cancelFn := context.WithCancel(context.Background())
 		nodeCancelMap.Store(nodeID, cancelFn)
 
 		err := n.attemptConnect(ctx, ip)
-
+		cancelFn()
 		nodeCancelMap.Delete(nodeID)
 
 		if err == nil {
@@ -1211,21 +1216,28 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	}
 }
 
-// assumes the stateLock is not held. Returns nil if a connection was able to be
-// established, or the network is closed.
+// Attempt to connect to the peer at [ip].
+// If [ctx] is cancelled, stops trying to connect.
+// Returns nil if:
+// * A connection was established
+// * The network is closed.
+// * [ctx] is cancelled.
+// Assumes [n.stateLock] is not held when this method is called.
 func (n *network) attemptConnect(ctx context.Context, ip utils.IPDesc) error {
 	n.log.Verbo("attempting to connect to %s", ip)
-
-	cch, ech, err := n.dialer.Dial(ctx, ip)
+	conn, err := n.dialer.Dial(ctx, ip)
 	if err != nil {
-		return err
-	}
-
-	var conn net.Conn
-	select {
-	case <-ctx.Done():
-	case conn = <-cch:
-	case err = <-ech:
+		// Return nil if connection attempt was cancelled
+		cancelled := false
+		select {
+		case <-ctx.Done():
+			cancelled = true
+		default:
+		}
+		if cancelled {
+			return nil
+		}
+		// Error wasn't because connection attempt was cancelled
 		return err
 	}
 

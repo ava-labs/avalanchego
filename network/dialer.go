@@ -5,14 +5,20 @@ package network
 
 import (
 	"context"
-	"github.com/ava-labs/avalanchego/utils"
+	"fmt"
 	"net"
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
+
+var dialTimeout = 30 * time.Second
 
 // Dialer attempts to create a connection with the provided IP/port pair
 type Dialer interface {
-	Dial(ctx context.Context, ip utils.IPDesc) (<-chan net.Conn, <-chan error, error)
+	// If [ctx] is cancelled, gives up trying to connect to [ip]
+	// and returns an error.
+	Dial(ctx context.Context, ip utils.IPDesc) (net.Conn, error)
 }
 
 type dialer struct {
@@ -50,35 +56,14 @@ func NewDialer(network string, dialerConfig DialerConfig) Dialer {
 	}
 }
 
-func (d *dialer) Dial(ctx context.Context, ip utils.IPDesc) (<-chan net.Conn, <-chan error, error) {
-	cch := make(chan net.Conn, 1)
-	ech := make(chan error, 1)
-
-	go d.dial(ctx, ip, cch, ech)
-
-	return cch, ech, nil
-}
-
-func (d dialer) dial(ctx context.Context, ip utils.IPDesc, cch chan net.Conn, ech chan error) {
-	err := d.throttler.Acquire(ctx)
-
-	if err != nil {
-		close(cch)
-		ech <- err
-		close(ech)
-		return
+func (d *dialer) Dial(ctx context.Context, ip utils.IPDesc) (net.Conn, error) {
+	if err := d.throttler.Acquire(ctx); err != nil {
+		return nil, err
 	}
-
-	conn, err := net.Dial(d.network, ip.String())
-
+	dialer := net.Dialer{Timeout: dialTimeout}
+	conn, err := dialer.DialContext(ctx, d.network, ip.String())
 	if err != nil {
-		close(cch)
-		ech <- err
-		close(ech)
-		return
+		return nil, fmt.Errorf("error while dialing %s: %s", ip, err)
 	}
-
-	cch <- conn
-	close(cch)
-	close(ech)
+	return conn, nil
 }
