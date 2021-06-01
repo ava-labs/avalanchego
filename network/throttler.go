@@ -73,6 +73,10 @@ type backoffThrottler struct {
 	backoffPolicy backoffPolicy
 }
 
+type noThrottler struct {
+	// empty
+}
+
 func (w waitingThrottler) Acquire() error {
 	return w.limiter.Wait(context.Background())
 }
@@ -91,6 +95,10 @@ func (t backoffThrottler) Acquire() error {
 	return nil
 }
 
+func (t noThrottler) Acquire() error {
+	return nil
+}
+
 func NewBackoffThrottler(throttleLimit int, backoffPolicy backoffPolicy) Throttler {
 	return backoffThrottler{
 		limiter:       rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
@@ -102,6 +110,10 @@ func NewWaitingThrottler(throttleLimit int) Throttler {
 	return waitingThrottler{
 		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 	}
+}
+
+func NewNoThrottler() Throttler {
+	return noThrottler{}
 }
 
 func NewStaticBackoffThrottler(throttleLimit int, backOffDuration time.Duration) Throttler {

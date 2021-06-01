@@ -5,7 +5,6 @@ package network
 
 import (
 	"github.com/ava-labs/avalanchego/utils"
-	"math"
 	"net"
 	"time"
 )
@@ -37,12 +36,16 @@ func NewDialerConfig(throttleAps uint32, minBackoff, maxBackoff time.Duration) D
 // NewDialer returns a new Dialer that calls `net.Dial` with the provided
 // network.
 func NewDialer(network string, dialerConfig DialerConfig) Dialer {
+	var throttler Throttler
 	if dialerConfig.throttleAps <= 0 {
-		dialerConfig.throttleAps = math.MaxInt32
+		throttler = NewNoThrottler()
+	} else {
+		throttler = NewRandomisedBackoffThrottler(int(dialerConfig.throttleAps), dialerConfig.minBackoff, dialerConfig.maxBackoff)
 	}
+
 	return &dialer{
 		network:   network,
-		throttler: NewRandomisedBackoffThrottler(int(dialerConfig.throttleAps), dialerConfig.minBackoff, dialerConfig.maxBackoff),
+		throttler: throttler,
 	}
 }
 
