@@ -39,7 +39,8 @@ func (pb *ProposerBlock) Status() choices.Status {
 
 //////// snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
-	return pb.wrappedBlock.Parent()
+	proBlk := NewProBlock(pb.wrappedBlock.Parent()) // here full proposerBlock with all extra fields must be returned
+	return &proBlk
 }
 
 func (pb *ProposerBlock) Verify() error {
@@ -47,7 +48,7 @@ func (pb *ProposerBlock) Verify() error {
 }
 
 func (pb *ProposerBlock) Bytes() []byte {
-	return pb.wrappedBlock.Bytes()
+	return pb.wrappedBlock.Bytes() // here bytes for extra fields will be added
 }
 
 func (pb *ProposerBlock) Height() uint64 {
