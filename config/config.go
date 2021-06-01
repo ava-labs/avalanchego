@@ -66,12 +66,12 @@ func init() {
 		defaultBuildDirs = append(defaultBuildDirs, folderPath)
 		defaultBuildDirs = append(defaultBuildDirs, filepath.Dir(folderPath))
 	}
-	dotDir, err := filepath.Abs(".")
+	wd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defaultBuildDirs = append(defaultBuildDirs,
-		dotDir,
+		wd,
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
 		defaultDataDir,
 	)
@@ -719,8 +719,14 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	chainConfigDir := v.GetString(ChainConfigDirKey)
 	chainsPath := path.Clean(chainConfigDir)
 	// user specified a chain config dir explicitly, but dir does not exist.
-	if v.IsSet(ChainConfigDirKey) && !isPathExists(chainsPath) {
-		return nil, fmt.Errorf("no directory found: %v", chainsPath)
+	if v.IsSet(ChainConfigDirKey) {
+		info, err := os.Stat(chainsPath)
+		if err != nil {
+			return nil, err
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("not a directory: %v", chainsPath)
+		}
 	}
 	// gets direct subdirs
 	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
@@ -735,8 +741,8 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 
 	// Coreth Plugin
 	// will be deprecated
-	// if C alias key and ConfigBytes is already in map, skip this. config files precedes over coreth flag.
 	if v.IsSet(CorethConfigKey) {
+		// error if C config is already populated
 		if isCChainConfigSet(chainConfigs) {
 			return nil, fmt.Errorf("config for coreth(C) is already provided in chain config files")
 		}
@@ -751,10 +757,10 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 				return nil, fmt.Errorf("couldn't parse coreth config: %w", err)
 			}
 		}
-		cChainPrimaryAlias := genesis.GetEvmChainAliases()[0]
-		tmp := chainConfigs[cChainPrimaryAlias]
-		tmp.Config = corethConfigBytes
-		chainConfigs[cChainPrimaryAlias] = tmp
+		cChainPrimaryAlias := genesis.GetCChainAliases()[0]
+		cChainConfig := chainConfigs[cChainPrimaryAlias]
+		cChainConfig.Config = corethConfigBytes
+		chainConfigs[cChainPrimaryAlias] = cChainConfig
 	}
 	return chainConfigs, nil
 }
@@ -859,41 +865,48 @@ func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, err
 		if !dirInfo.IsDir() {
 			continue
 		}
-		chainConfig := chains.ChainConfig{}
 
 		// chainconfigdir/chainId/config.*
 		configData, err := readSingleFile(chainDir, chainConfigFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
-		chainConfig.Config = configData
 
 		// chainconfigdir/chainId/upgrade.*
 		upgradeData, err := readSingleFile(chainDir, chainUpgradeFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
-		chainConfig.Upgrade = upgradeData
 
-		chainConfigMap[dirInfo.Name()] = chainConfig
+		chainConfigMap[dirInfo.Name()] = chains.ChainConfig{
+			Config:  configData,
+			Upgrade: upgradeData,
+		}
 	}
 
 	return chainConfigMap, nil
 }
 
-// safeReadFile does not returns an error if there is no file exists at path
+// safeReadFile reads a file but does not return an error if there is no file exists at path
 func safeReadFile(path string) ([]byte, error) {
-	if !isPathExists(path) {
-		return nil, nil
+	ok, err := fileExists(path)
+	if err == nil && ok {
+		return ioutil.ReadFile(path)
 	}
-	return ioutil.ReadFile(path)
+	return nil, err
 }
 
-// fileExists checks if a file/folder exists before we
+// fileExists checks if a file exists before we
 // try using it to prevent further errors.
-func isPathExists(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return !os.IsNotExist(err)
+func fileExists(filePath string) (bool, error) {
+	info, err := os.Stat(filePath)
+	if err == nil {
+		return !info.IsDir(), nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
 }
 
 // readSingleFile reads a single file with name fileName without specifying any extension.
@@ -910,17 +923,13 @@ func readSingleFile(parentDir string, fileName string) ([]byte, error) {
 	if len(files) == 0 { // no file found, return nothing
 		return nil, nil
 	}
-	data, err := safeReadFile(files[0])
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
+	return safeReadFile(files[0])
 }
 
 // checks if C chain config bytes already set in map with alias key.
 // it does only checks alias key, chainId is not available at this point.
 func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
-	cChainAliases := genesis.GetEvmChainAliases()
+	cChainAliases := genesis.GetCChainAliases()
 	for _, alias := range cChainAliases {
 		val, ok := chainConfigs[alias]
 		if ok && len(val.Config) > 1 {

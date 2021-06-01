@@ -151,7 +151,7 @@ type ManagerConfig struct {
 	HealthService             health.Service
 	RetryBootstrap            bool                   // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int                    // Max number of times to retry bootstrap
-	ChainConfigs              map[string]ChainConfig // alias || chainId -> ChainConfig
+	ChainConfigs              map[string]ChainConfig // alias -> ChainConfig
 	// If true, shut down the node after the Primary Network has bootstrapped
 	// and use [FetchOnlyFrom] as beacons
 	FetchOnly bool

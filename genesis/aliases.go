@@ -35,10 +35,10 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map
 		switch uChain.VMID {
 		case avm.ID:
 			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
-			chainAliases[chain.ID()] = GetAvmChainAliases()
+			chainAliases[chain.ID()] = GetXChainAliases()
 		case evm.ID:
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
-			chainAliases[chain.ID()] = GetEvmChainAliases()
+			chainAliases[chain.ID()] = GetCChainAliases()
 		case timestampvm.ID:
 			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
 			chainAliases[chain.ID()] = []string{"timestamp"}
@@ -47,11 +47,11 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map
 	return generalAliases, chainAliases, vmAliases, nil
 }
 
-func GetEvmChainAliases() []string {
+func GetCChainAliases() []string {
 	return []string{"C", "evm"}
 }
 
-func GetAvmChainAliases() []string {
+func GetXChainAliases() []string {
 	return []string{"X", "avm"}
 }
 

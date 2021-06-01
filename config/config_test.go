@@ -109,11 +109,11 @@ func TestSetChainConfigs(t *testing.T) {
 			// Create custom configs
 			for key, value := range test.configs {
 				chainDir := path.Join(chainsDir, key)
-				setupFile(t, chainDir, chainConfigFileName, value)
+				setupFile(t, chainDir, chainConfigFileName+".ex", value)
 			}
 			for key, value := range test.upgrades {
 				chainDir := path.Join(chainsDir, key)
-				setupFile(t, chainDir, chainUpgradeFileName, value)
+				setupFile(t, chainDir, chainUpgradeFileName+".ex", value)
 			}
 
 			v := setupViper(configFile)
@@ -144,28 +144,35 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 	}{
 		"cdir not exist": {
 			structure:  "/",
-			file:       map[string]string{"C": "noeffect"},
-			errMessage: "no directory",
+			file:       map[string]string{"config.ex": "noeffect"},
+			errMessage: "no such file or directory",
+			flagSet:    true,
+			expected:   nil,
+		},
+		"cdir is file ": {
+			structure:  "/",
+			file:       map[string]string{"cdir": "noeffect"},
+			errMessage: "not a directory",
 			flagSet:    true,
 			expected:   nil,
 		},
 		"cdir not exist flag not set": {
 			structure:  "/",
-			file:       map[string]string{"config": "noeffect"},
+			file:       map[string]string{"config.ex": "noeffect"},
 			errMessage: "",
 			flagSet:    false,
 			expected:   map[string]chains.ChainConfig{},
 		},
 		"chain subdir not exist": {
 			structure:  "/cdir/",
-			file:       map[string]string{"config": "noeffect"},
+			file:       map[string]string{"config.ex": "noeffect"},
 			errMessage: "",
 			flagSet:    true,
 			expected:   map[string]chains.ChainConfig{},
 		},
 		"full structure": {
 			structure:  "/cdir/C/",
-			file:       map[string]string{"config": "hello"},
+			file:       map[string]string{"config.ex": "hello"},
 			errMessage: "",
 			flagSet:    true,
 			expected:   map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
@@ -223,7 +230,7 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	assert.Equal(defaultChainConfigDir, v.GetString(ChainConfigDirKey))
 
 	chainsDir := path.Join(defaultChainConfigDir, "C")
-	setupFile(t, chainsDir, "config", "helloworld")
+	setupFile(t, chainsDir, chainConfigFileName+".ex", "helloworld")
 	chainConfigs, err := getChainConfigs(v)
 	assert.NoError(err)
 	expected := map[string]chains.ChainConfig{"C": {Config: []byte("helloworld"), Upgrade: []byte(nil)}}
@@ -240,7 +247,7 @@ func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 // setups file creates necessary path and writes value to it.
 func setupFile(t *testing.T, path string, fileName string, value string) {
 	assert.NoError(t, os.MkdirAll(path, 0700))
-	filePath := filepath.Join(path, fileName+".ex")
+	filePath := filepath.Join(path, fileName)
 	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0600))
 }
 
