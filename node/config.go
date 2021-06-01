@@ -102,6 +102,12 @@ type Config struct {
 	HealthAPIEnabled   bool
 	IndexAPIEnabled    bool
 
+	// Profiling configurations
+	ProfileDir                   string
+	ContinuousProfilingEnabled   bool
+	ContinuousProfilingFrequency time.Duration
+	ContinuousProfilingHistory   int
+
 	// Logging configuration
 	LoggingConfig logging.Config
 

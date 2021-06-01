@@ -1,7 +1,7 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package admin
+package profiler
 
 import (
 	"os"
@@ -11,11 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPerformance(t *testing.T) {
+func TestProfiler(t *testing.T) {
 	dir := t.TempDir()
-	prefix := path.Join(dir, "test_")
 
-	p := NewPerformanceService(prefix)
+	p := New(dir)
 
 	// Test Start and Stop CPU Profiler
 	err := p.StartCPUProfiler()
@@ -24,7 +23,7 @@ func TestPerformance(t *testing.T) {
 	err = p.StopCPUProfiler()
 	assert.NoError(t, err)
 
-	_, err = os.Stat(prefix + cpuProfileFile)
+	_, err = os.Stat(path.Join(dir, cpuProfileFile))
 	assert.NoError(t, err)
 
 	// Test Stop CPU Profiler without it running
@@ -35,13 +34,13 @@ func TestPerformance(t *testing.T) {
 	err = p.MemoryProfile()
 	assert.NoError(t, err)
 
-	_, err = os.Stat(prefix + memProfileFile)
+	_, err = os.Stat(path.Join(dir, memProfileFile))
 	assert.NoError(t, err)
 
 	// Test Lock Profiler
 	err = p.LockProfile()
 	assert.NoError(t, err)
 
-	_, err = os.Stat(prefix + lockProfileFile)
+	_, err = os.Stat(path.Join(dir, lockProfileFile))
 	assert.NoError(t, err)
 }

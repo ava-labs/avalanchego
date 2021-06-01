@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -32,13 +33,13 @@ var errAliasTooLong = errors.New("alias length is too long")
 // Admin is the API service for node admin management
 type Admin struct {
 	log          logging.Logger
-	performance  *Performance
+	performance  profiler.Profiler
 	chainManager chains.Manager
 	httpServer   *server.Server
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server, profileDir string) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -47,7 +48,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 		log:          log,
 		chainManager: chainManager,
 		httpServer:   httpServer,
-		performance:  NewDefaultPerformanceService(),
+		performance:  profiler.New(profileDir),
 	}, "admin"); err != nil {
 		return nil, err
 	}

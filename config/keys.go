@@ -107,4 +107,8 @@ const (
 	PeerAliasTimeoutKey                     = "peer-alias-timeout"
 	PluginModeKey                           = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey     = "bootstrap-beacon-connection-timeout"
+	ProfileDirKey                           = "profile-dir"
+	ProfileContinuousEnabledKey             = "profile-enabled"
+	ProfileContinuousFreqKey                = "profile-freq-enabled"
+	ProfileContinuousHistoryKey             = "profile-amount-enabled"
 )
