@@ -278,10 +278,6 @@ func initCerts(t *testing.T) {
 
 var dialerConfig = NewDialerConfig(0, time.Duration(100), time.Duration(100))
 
-func TestPeerUpdate(t *testing.T) {
-	// sync test to check if cancel is being called
-}
-
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)
 
