@@ -109,7 +109,7 @@ func (b *Bootstrapper) Startup() error {
 	}
 
 	// Ask each of the bootstrap validators to send their accepted frontier
-	vdrs := ids.ShortSet{}
+	vdrs := ids.NewShortSet(b.pendingAcceptedFrontier.Len())
 	vdrs.Union(b.pendingAcceptedFrontier)
 
 	b.RequestID++
@@ -200,7 +200,7 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 			"bootstrap attempt: %d", b.failedAcceptedFrontierVdrs.Len(), b.bootstrapAttempts)
 	}
 
-	vdrs := ids.ShortSet{}
+	vdrs := ids.NewShortSet(b.pendingAccepted.Len())
 	vdrs.Union(b.pendingAccepted)
 
 	b.RequestID++
@@ -340,7 +340,9 @@ func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 }
 
 func (b *Bootstrapper) RestartBootstrap(reset bool) error {
-	b.Restarted = true
+	if reset {
+		b.Restarted = true
+	}
 
 	// resets the attempts when we're pulling blocks/vertices
 	// we don't want to fail the bootstrap at that stage
@@ -350,14 +352,15 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 	}
 
 	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
-		return fmt.Errorf("failed to boostrap the chain after %d attempts", b.bootstrapAttempts)
+		return fmt.Errorf("failed to bootstrap the chain after %d attempts", b.bootstrapAttempts)
 	}
 
 	// reset the failed responses
 	b.failedAcceptedFrontierVdrs = ids.ShortSet{}
 	b.failedAcceptedVdrs = ids.ShortSet{}
 	b.sampledBeacons = validators.NewSet()
-
+	b.pendingAccepted.Clear()
+	b.pendingAcceptedFrontier.Clear()
 	b.acceptedFrontier.Clear()
 
 	beacons, err := b.Beacons.Sample(b.Config.SampleK)
@@ -372,7 +375,7 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 
 	for _, vdr := range beacons {
 		vdrID := vdr.ID()
-		b.pendingAcceptedFrontier.Add(vdrID) // necessarily emptied out
+		b.pendingAcceptedFrontier.Add(vdrID)
 	}
 
 	for _, vdr := range b.Beacons.List() {

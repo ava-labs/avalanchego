@@ -14,7 +14,7 @@ const (
 
 // Bag is a multiset of IDs.
 //
-// A bag has the ability to split and filter on it's bits for ease of use for
+// A bag has the ability to split and filter on its bits for ease of use for
 // binary voting.
 type Bag struct {
 	counts map[ID]int
@@ -56,7 +56,7 @@ func (b *Bag) Add(ids ...ID) {
 	}
 }
 
-// AddCount increases the nubmer of times the id has been seen by count.
+// AddCount increases the number of times the id has been seen by count.
 //
 // count must be >= 0
 func (b *Bag) AddCount(id ID, count int) {

@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 )
 
-var (
-	_ snow.AliasLookup = &Client{}
-)
+var _ snow.AliasLookup = &Client{}
 
 // Client implements alias lookups that talk over RPC.
 type Client struct {

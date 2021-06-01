@@ -23,11 +23,14 @@ go mod download
 # Build coreth
 "$AVALANCHE_PATH"/scripts/build_coreth.sh
 
+# Build prev version
+"$AVALANCHE_PATH/scripts/build_prev.sh"
+
 # Exit build successfully if the binaries are created
-if [[ -f "$build_dir/avalanchego" && -f "$plugin_dir/evm" ]]; then
+if [[ -f "$AVALANCHEGO_PROCESS_PATH" && -f "$EVM_PATH" ]]; then
         echo "Build Successful"
         exit 0
 else
-        echo "Build failure" 
+        echo "Build failure" >&2
         exit 1
 fi

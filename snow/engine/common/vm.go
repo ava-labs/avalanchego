@@ -4,7 +4,7 @@
 package common
 
 import (
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow"
 )
@@ -24,7 +24,7 @@ type VM interface {
 	//     [ctx.Lock]: A Read/Write lock shared by this VM and the consensus
 	//                 engine that manages this VM. The write lock is held
 	//                 whenever code in the consensus engine calls the VM.
-	// [db]: The database this VM will persist data to.
+	// [dbManager]: The manager of the database this VM will persist data to.
 	// [genesisBytes]: The byte-encoding of the genesis information of this
 	//                 VM. The VM uses it to initialize its state. For
 	//                 example, if this VM were an account-based payments
@@ -35,8 +35,10 @@ type VM interface {
 	// [fxs]: Feature extensions that attach to this VM.
 	Initialize(
 		ctx *snow.Context,
-		db database.Database,
+		dbManager manager.Manager,
 		genesisBytes []byte,
+		upgradeBytes []byte,
+		configBytes []byte,
 		toEngine chan<- Message,
 		fxs []*Fx,
 	) error

@@ -75,5 +75,4 @@ func TestBlocker(t *testing.T) {
 	case !*calledDep, !*calledFill, !*calledAbandon, !*calledUpdate:
 		t.Fatalf("Called wrong function")
 	}
-
 }

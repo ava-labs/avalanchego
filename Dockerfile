@@ -1,3 +1,10 @@
+# Changes to the minimum golang version must also be replicated in
+# scripts/ansible/roles/golang_based/defaults/main.yml
+# scripts/build_avalanche.sh
+# scripts/local.Dockerfile
+# Dockerfile (here)
+# README.md
+# go.mod
 # ============= Compilation Stage ================
 FROM golang:1.15.5-alpine AS builder
 RUN apk add --no-cache bash git make gcc musl-dev linux-headers git ca-certificates

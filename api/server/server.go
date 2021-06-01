@@ -20,6 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -28,9 +29,7 @@ const (
 	serverShutdownTimeout = 10 * time.Second
 )
 
-var (
-	errUnknownLockOption = errors.New("invalid lock options")
-)
+var errUnknownLockOption = errors.New("invalid lock options")
 
 type RouteAdder interface {
 	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
@@ -47,7 +46,8 @@ type Server struct {
 	// points the the router handlers
 	handler http.Handler
 	// Listens for HTTP traffic on this address
-	listenAddress string
+	listenHost string
+	listenPort uint16
 
 	// http server
 	srv *http.Server
@@ -64,7 +64,8 @@ func (s *Server) Initialize(
 ) {
 	s.log = log
 	s.factory = factory
-	s.listenAddress = fmt.Sprintf("%s:%d", host, port)
+	s.listenHost = host
+	s.listenPort = port
 	s.router = newRouter()
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
@@ -81,22 +82,38 @@ func (s *Server) Initialize(
 
 // Dispatch starts the API server
 func (s *Server) Dispatch() error {
-	listener, err := net.Listen("tcp", s.listenAddress)
+	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
+	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
 	}
-	s.log.Info("HTTP API server listening on %q", s.listenAddress)
+
+	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	if err != nil {
+		s.log.Info("HTTP API server listening on %q", listenAddress)
+	} else {
+		s.log.Info("HTTP API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+	}
+
 	s.srv = &http.Server{Handler: s.handler}
 	return s.srv.Serve(listener)
 }
 
 // DispatchTLS starts the API server with the provided TLS certificate
 func (s *Server) DispatchTLS(certFile, keyFile string) error {
-	listener, err := net.Listen("tcp", s.listenAddress)
+	listenAddress := fmt.Sprintf("%s:%d", s.listenHost, s.listenPort)
+	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
 		return err
 	}
-	s.log.Info("HTTPS API server listening on %q", s.listenAddress)
+
+	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	if err != nil {
+		s.log.Info("HTTPS API server listening on %q", listenAddress)
+	} else {
+		s.log.Info("HTTPS API server listening on \"%s:%d\"", s.listenHost, ipDesc.Port)
+	}
+
 	return http.ServeTLS(listener, s.handler, certFile, keyFile)
 }
 
@@ -125,7 +142,7 @@ func (s *Server) registerChain(chainName string, ctx *snow.Context, engine commo
 		return
 	}
 
-	httpLogger, err := s.factory.MakeChain(chainName, "http")
+	httpLogger, err := s.factory.MakeChainChild(chainName, "http")
 	if err != nil {
 		s.log.Error("failed to create new http logger: %s", err)
 		return

@@ -4,6 +4,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -31,17 +31,19 @@ const (
 	cacheSize      = 100000
 
 	// Parameters for delaying bootstrapping to avoid potential CPU burns
-	initialBootstrappingDelay = 500 * time.Millisecond
-	maxBootstrappingDelay     = time.Minute
+	bootstrappingDelay = 10 * time.Second
 )
+
+var errUnexpectedTimeout = errors.New("unexpected timeout fired")
 
 // Config ...
 type Config struct {
 	common.Config
 
 	// VtxBlocked tracks operations that are blocked on vertices
+	VtxBlocked *queue.JobsWithMissing
 	// TxBlocked tracks operations that are blocked on transactions
-	VtxBlocked, TxBlocked *queue.Jobs
+	TxBlocked *queue.Jobs
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM
@@ -54,8 +56,9 @@ type Bootstrapper struct {
 	metrics
 
 	// VtxBlocked tracks operations that are blocked on vertices
+	VtxBlocked *queue.JobsWithMissing
 	// TxBlocked tracks operations that are blocked on transactions
-	VtxBlocked, TxBlocked *queue.Jobs
+	TxBlocked *queue.Jobs
 
 	Manager vertex.Manager
 	VM      vertex.DAGVM
@@ -69,7 +72,7 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions int
 
-	delayAmount time.Duration
+	awaitingTimeout bool
 }
 
 // Initialize this engine.
@@ -86,25 +89,28 @@ func (b *Bootstrapper) Initialize(
 	b.processedCache = &cache.LRU{Size: cacheSize}
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
-	b.delayAmount = initialBootstrappingDelay
 
 	if err := b.metrics.Initialize(namespace, registerer); err != nil {
 		return err
 	}
 
-	b.VtxBlocked.SetParser(&vtxParser{
+	if err := b.VtxBlocked.SetParser(&vtxParser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedVts,
 		numDropped:  b.numDroppedVts,
 		manager:     b.Manager,
-	})
+	}); err != nil {
+		return err
+	}
 
-	b.TxBlocked.SetParser(&txParser{
+	if err := b.TxBlocked.SetParser(&txParser{
 		log:         config.Ctx.Log,
 		numAccepted: b.numAcceptedTxs,
 		numDropped:  b.numDroppedTxs,
 		vm:          b.VM,
-	})
+	}); err != nil {
+		return err
+	}
 
 	config.Bootstrapable = b
 	return b.Bootstrapper.Initialize(config.Config)
@@ -166,13 +172,17 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 	// to reduce the number of repeated DAG traversals.
 	toProcess := vertex.NewHeap()
 	for _, vtx := range vtxs {
-		if _, ok := b.processedCache.Get(vtx.ID()); !ok { // only process a vertex if we haven't already
+		vtxID := vtx.ID()
+		if _, ok := b.processedCache.Get(vtxID); !ok { // only process a vertex if we haven't already
 			toProcess.Push(vtx)
+		} else {
+			b.VtxBlocked.RemoveMissingID(vtxID)
 		}
 	}
 
 	vtxHeightSet := ids.Set{}
 	prevHeight := uint64(0)
+
 	for toProcess.Len() > 0 { // While there are unprocessed vertices
 		if b.Halted() {
 			return nil
@@ -183,47 +193,56 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 
 		switch vtx.Status() {
 		case choices.Unknown:
+			b.VtxBlocked.AddMissingID(vtxID)
 			b.needToFetch.Add(vtxID) // We don't have this vertex locally. Mark that we need to fetch it.
 		case choices.Rejected:
-			b.needToFetch.Remove(vtxID) // We have this vertex locally. Mark that we don't need to fetch it.
-			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtx.ID())
+			return fmt.Errorf("tried to accept %s even though it was previously rejected", vtxID)
 		case choices.Processing:
 			b.needToFetch.Remove(vtxID)
+			b.VtxBlocked.RemoveMissingID(vtxID)
 
-			if err := b.VtxBlocked.Push(&vertexJob{ // Add to queue of vertices to execute when bootstrapping finishes.
+			// Add to queue of vertices to execute when bootstrapping finishes.
+			if pushed, err := b.VtxBlocked.Push(&vertexJob{
 				log:         b.Ctx.Log,
 				numAccepted: b.numAcceptedVts,
 				numDropped:  b.numDroppedVts,
 				vtx:         vtx,
-			}); err == nil {
-				b.numFetchedVts.Inc()
-				b.NumFetched++ // Progress tracker
-				if b.NumFetched%common.StatusUpdateFrequency == 0 {
-					if !b.Restarted {
-						b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
-					} else {
-						b.Ctx.Log.Debug("fetched %d vertices", b.NumFetched)
-					}
-				}
-			} else {
-				b.Ctx.Log.Verbo("couldn't push to vtxBlocked: %s", err)
+			}); err != nil {
+				return err
+			} else if !pushed {
+				// If the vertex is already on the queue, then we have already
+				// pushed [vtx]'s transactions and traversed into its parents.
+				continue
 			}
+
 			txs, err := vtx.Txs()
 			if err != nil {
 				return err
 			}
-			for _, tx := range txs { // Add transactions to queue of transactions to execute when bootstrapping finishes.
-				if err := b.TxBlocked.Push(&txJob{
+			for _, tx := range txs {
+				// Add to queue of txs to execute when bootstrapping finishes.
+				if pushed, err := b.TxBlocked.Push(&txJob{
 					log:         b.Ctx.Log,
 					numAccepted: b.numAcceptedTxs,
 					numDropped:  b.numDroppedTxs,
 					tx:          tx,
-				}); err == nil {
+				}); err != nil {
+					return err
+				} else if pushed {
 					b.numFetchedTxs.Inc()
-				} else {
-					b.Ctx.Log.Verbo("couldn't push to txBlocked: %s", err)
 				}
 			}
+
+			b.numFetchedVts.Inc()
+			b.NumFetched++ // Progress tracker
+			if b.NumFetched%common.StatusUpdateFrequency == 0 {
+				if !b.Restarted {
+					b.Ctx.Log.Info("fetched %d vertices", b.NumFetched)
+				} else {
+					b.Ctx.Log.Debug("fetched %d vertices", b.NumFetched)
+				}
+			}
+
 			parents, err := vtx.Parents()
 			if err != nil {
 				return err
@@ -254,10 +273,10 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 		}
 	}
 
-	if err := b.VtxBlocked.Commit(); err != nil {
+	if err := b.TxBlocked.Commit(); err != nil {
 		return err
 	}
-	if err := b.TxBlocked.Commit(); err != nil {
+	if err := b.VtxBlocked.Commit(); err != nil {
 		return err
 	}
 
@@ -307,11 +326,11 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 	// All vertices added to [processVertices] have received transitive votes from the accepted frontier
 	processVertices := make([]avalanche.Vertex, 1, len(vtxs)) // Process all of the valid vertices in this message
 	processVertices[0] = vtx
-	eligibleVertices := ids.Set{}
 	parents, err := vtx.Parents()
 	if err != nil {
 		return err
 	}
+	eligibleVertices := ids.NewSet(len(parents))
 	for _, parent := range parents {
 		eligibleVertices.Add(parent.ID())
 	}
@@ -354,6 +373,18 @@ func (b *Bootstrapper) GetAncestorsFailed(vdr ids.ShortID, requestID uint32) err
 	return b.fetch(vtxID)
 }
 
+func (b *Bootstrapper) Timeout() error {
+	if !b.awaitingTimeout {
+		return errUnexpectedTimeout
+	}
+	b.awaitingTimeout = false
+
+	if !b.Subnet.IsBootstrapped() {
+		return b.RestartBootstrap(true)
+	}
+	return b.finish()
+}
+
 // ForceAccepted starts bootstrapping. Process the vertices in [accepterContainerIDs].
 func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {
@@ -362,11 +393,22 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	}
 
 	b.NumFetched = 0
-	toProcess := make([]avalanche.Vertex, 0, len(acceptedContainerIDs))
-	for _, vtxID := range acceptedContainerIDs {
+
+	pendingContainerIDs := b.VtxBlocked.MissingIDs()
+	// Append the list of accepted container IDs to pendingContainerIDs to ensure
+	// we iterate over every container that must be traversed.
+	pendingContainerIDs = append(pendingContainerIDs, acceptedContainerIDs...)
+	b.Ctx.Log.Debug("Starting bootstrapping with %d missing vertices and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
+	toProcess := make([]avalanche.Vertex, 0, len(pendingContainerIDs))
+	for _, vtxID := range pendingContainerIDs {
 		if vtx, err := b.Manager.GetVtx(vtxID); err == nil {
-			toProcess = append(toProcess, vtx) // Process this vertex.
+			if vtx.Status() == choices.Accepted {
+				b.VtxBlocked.RemoveMissingID(vtxID)
+			} else {
+				toProcess = append(toProcess, vtx) // Process this vertex.
+			}
 		} else {
+			b.VtxBlocked.AddMissingID(vtxID)
 			b.needToFetch.Add(vtxID) // We don't have this vertex. Mark that we have to fetch it.
 		}
 	}
@@ -377,7 +419,8 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 // after which it finishes the bootstrap process
 func (b *Bootstrapper) checkFinish() error {
 	// If there are outstanding requests for vertices or we still need to fetch vertices, we can't finish
-	if b.Ctx.IsBootstrapped() || b.OutstandingRequests.Len() > 0 || b.needToFetch.Len() > 0 {
+	pendingJobs := b.VtxBlocked.MissingIDs()
+	if b.Ctx.IsBootstrapped() || len(pendingJobs) > 0 || b.awaitingTimeout {
 		return nil
 	}
 
@@ -387,7 +430,7 @@ func (b *Bootstrapper) checkFinish() error {
 		b.Ctx.Log.Debug("bootstrapping fetched %d vertices. Executing transaction state transitions...", b.NumFetched)
 	}
 
-	_, err := b.executeAll(b.TxBlocked, b.Ctx.DecisionDispatcher)
+	_, err := b.TxBlocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.DecisionDispatcher)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -397,7 +440,7 @@ func (b *Bootstrapper) checkFinish() error {
 	} else {
 		b.Ctx.Log.Debug("executing vertex state transitions...")
 	}
-	executedVts, err := b.executeAll(b.VtxBlocked, b.Ctx.ConsensusDispatcher)
+	executedVts, err := b.VtxBlocked.ExecuteAll(b.Ctx, b, b.Restarted, b.Ctx.ConsensusDispatcher)
 	if err != nil || b.Halted() {
 		return err
 	}
@@ -415,6 +458,7 @@ func (b *Bootstrapper) checkFinish() error {
 
 	// Notify the subnet that this chain is synced
 	b.Subnet.Bootstrapped(b.Ctx.ChainID)
+	b.processedCache.Flush()
 
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
@@ -424,14 +468,11 @@ func (b *Bootstrapper) checkFinish() error {
 		} else {
 			b.Ctx.Log.Debug("waiting for the remaining chains in this subnet to finish syncing")
 		}
-		// Delay new incoming messages to avoid consuming unnecessary resources
-		// while keeping up to date on the latest tip.
-		b.Config.Delay.Delay(b.delayAmount)
-		b.delayAmount *= 2
-		if b.delayAmount > maxBootstrappingDelay {
-			b.delayAmount = maxBootstrappingDelay
-		}
-		return b.RestartBootstrap(true)
+		// Restart bootstrapping after [bootstrappingDelay] to keep up to date
+		// on the latest tip.
+		b.Timer.RegisterTimeout(bootstrappingDelay)
+		b.awaitingTimeout = true
+		return nil
 	}
 
 	return b.finish()
@@ -443,7 +484,6 @@ func (b *Bootstrapper) finish() error {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}
-	b.processedCache.Flush()
 
 	// Start consensus
 	if err := b.OnFinished(); err != nil {
@@ -454,48 +494,12 @@ func (b *Bootstrapper) finish() error {
 	return nil
 }
 
-func (b *Bootstrapper) executeAll(jobs *queue.Jobs, events snow.EventDispatcher) (int, error) {
-	numExecuted := 0
-
-	for job, err := jobs.Pop(); err == nil; job, err = jobs.Pop() {
-		b.Ctx.Log.Debug("Executing: %s", job.ID())
-		// Note that events.Accept must be called before
-		// job.Execute to honor EventDispatcher.Accept's invariant.
-		if err := events.Accept(b.Ctx, job.ID(), job.Bytes()); err != nil {
-			return numExecuted, err
-		}
-		if err := jobs.Execute(job); err != nil {
-			b.Ctx.Log.Error("Error executing: %s", err)
-			return numExecuted, err
-		}
-		if err := jobs.Commit(); err != nil {
-			return numExecuted, err
-		}
-		numExecuted++
-		if numExecuted%common.StatusUpdateFrequency == 0 { // Periodically print progress
-			if !b.Restarted {
-				b.Ctx.Log.Info("executed %d operations", numExecuted)
-			} else {
-				b.Ctx.Log.Debug("executed %d operations", numExecuted)
-			}
-		}
-
-		if b.Halted() {
-			break
-		}
-	}
-	if !b.Restarted {
-		b.Ctx.Log.Info("executed %d operations", numExecuted)
-	} else {
-		b.Ctx.Log.Debug("executed %d operations", numExecuted)
-	}
-	return numExecuted, nil
-}
-
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Connected(validatorID)
+		if err := connector.Connected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Connected(validatorID)
 }
@@ -503,7 +507,9 @@ func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
 	if connector, ok := b.VM.(validators.Connector); ok {
-		connector.Disconnected(validatorID)
+		if err := connector.Disconnected(validatorID); err != nil {
+			return err
+		}
 	}
 	return b.Bootstrapper.Disconnected(validatorID)
 }

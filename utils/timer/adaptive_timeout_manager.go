@@ -18,9 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	errNonPositiveHalflife = errors.New("timeout halflife must be positive")
-)
+var errNonPositiveHalflife = errors.New("timeout halflife must be positive")
 
 type adaptiveTimeout struct {
 	index    int               // Index in the wait queue

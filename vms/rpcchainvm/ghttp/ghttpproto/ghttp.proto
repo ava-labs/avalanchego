@@ -1,5 +1,6 @@
 syntax = "proto3";
 package ghttpproto;
+option go_package = "github.com/ava-labs/avalanchego/rpcchainvm/ghttp/ghttpproto";
 
 message Userinfo {
     string username = 1;

@@ -103,7 +103,7 @@ func (t *OperationTx) SyntacticVerify(
 		return err
 	}
 
-	inputs := ids.Set{}
+	inputs := ids.NewSet(len(t.Ins))
 	for _, in := range t.Ins {
 		inputs.Add(in.InputID())
 	}

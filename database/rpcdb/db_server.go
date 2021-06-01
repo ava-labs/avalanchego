@@ -13,12 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 )
 
-var (
-	errUnknownIterator = errors.New("unknown iterator")
-)
+var errUnknownIterator = errors.New("unknown iterator")
 
 // DatabaseServer is a database that is managed over RPC.
 type DatabaseServer struct {
+	rpcdbproto.UnimplementedDatabaseServer
 	lock    sync.Mutex
 	db      database.Database
 	batches map[int64]database.Batch

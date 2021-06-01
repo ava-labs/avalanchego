@@ -8,10 +8,15 @@ OK=`cp ./build/avalanchego $AVALANCHE_ROOT`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
-OK=`cp -r ./build/plugins $AVALANCHE_ROOT`
+OK=`cp -r ./build/avalanchego-preupgrade $AVALANCHE_ROOT`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
+OK=`cp -r ./build/avalanchego-latest $AVALANCHE_ROOT`
+if [[ $OK -ne 0 ]]; then
+  exit $OK;
+fi
+
 
 echo "Build tgz package..."
 cd $PKG_ROOT

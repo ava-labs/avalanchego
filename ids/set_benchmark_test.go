@@ -5,6 +5,7 @@ package ids
 
 import (
 	"crypto/rand"
+	"strconv"
 	"testing"
 )
 
@@ -54,5 +55,17 @@ func BenchmarkSetListLarge(b *testing.B) {
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
 		set.List()
+	}
+}
+
+func BenchmarkSetClear(b *testing.B) {
+	for _, numElts := range []int{10, 25, 50, 100, 250, 500, 1000} {
+		b.Run(strconv.Itoa(numElts), func(b *testing.B) {
+			set := NewSet(numElts)
+			for n := 0; n < b.N; n++ {
+				set.Add(make([]ID, numElts)...)
+				set.Clear()
+			}
+		})
 	}
 }

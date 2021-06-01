@@ -68,6 +68,7 @@ func (ops *innerSortOperation) Swap(i, j int) { o := ops.ops; o[j], o[i] = o[i],
 func sortOperations(ops []*Operation, c codec.Manager) {
 	sort.Sort(&innerSortOperation{ops: ops, codec: c})
 }
+
 func isSortedAndUniqueOperations(ops []*Operation, c codec.Manager) bool {
 	return utils.IsSortedAndUnique(&innerSortOperation{ops: ops, codec: c})
 }

@@ -51,6 +51,10 @@ type peer struct {
 	// modified on the connection's reader routine.
 	gotPeerList utils.AtomicBool
 
+	// only send the version to this peer on handling a getVersion message if
+	// a version hasn't already been sent.
+	versionSent utils.AtomicBool
+
 	// only send the peerlist to this peer on handling a getPeerlist message if
 	// a peerlist hasn't already been sent.
 	peerListSent utils.AtomicBool
@@ -118,10 +122,17 @@ type peer struct {
 	cert *x509.Certificate
 
 	// sigAndTime contains a struct of type sigAndTime.
-	// The signature is [cert]'s signature on the peer's IP, concatenated with the peer's local time when it
-	// sent a SignedVersion.
+	// The signature is [cert]'s signature on the peer's IP, concatenated with
+	// the peer's local time when it sent a Version.
 	// The time in [sigAndTime] is the one mentioned above.
 	sigAndTime utils.AtomicInterface
+
+	// Used in [handleAcceptedFrontier], [handleAccepted],
+	// [handleGetAccepted], [handleChits].
+	// We use this one ids.Set rather than allocating one per method call.
+	// Should be cleared before use.
+	// Should only be used in peer's reader goroutine.
+	idSet ids.Set
 }
 
 // newPeer returns a properly initialized *peer.
@@ -271,7 +282,7 @@ func (p *peer) ReadMessages() {
 
 		msg, err := p.net.b.Parse(msgBytes)
 		if err != nil {
-			p.net.log.Debug("failed to parse new message from %s:\n%s\n%s",
+			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
 				p.id,
 				formatting.DumpBytes{Bytes: msgBytes},
 				err)
@@ -286,7 +297,6 @@ func (p *peer) ReadMessages() {
 func (p *peer) WriteMessages() {
 	defer p.Close()
 
-	p.sendSignedVersion()
 	p.sendVersion()
 
 	for msg := range p.sender {
@@ -393,9 +403,6 @@ func (p *peer) handle(msg Msg) {
 	case Version:
 		p.handleVersion(msg)
 		return
-	case SignedVersion:
-		p.handleSignedVersion(msg)
-		return
 	case GetVersion:
 		p.handleGetVersion(msg)
 		return
@@ -411,9 +418,6 @@ func (p *peer) handle(msg Msg) {
 	case PeerList:
 		p.handlePeerList(msg)
 		return
-	case SignedPeerList:
-		p.handleSignedPeerList(msg)
-		return
 	}
 	if !p.connected.GetValue() {
 		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
@@ -428,7 +432,7 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 
-	peerVersion := p.versionStruct.GetValue().(version.Version)
+	peerVersion := p.versionStruct.GetValue().(version.Application)
 	if p.net.versionCompatibility.Compatible(peerVersion) != nil {
 		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
 
@@ -514,11 +518,11 @@ func (p *peer) sendGetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	if p.Send(msg) {
-		p.net.getVersion.numSent.Inc()
-		p.net.getVersion.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.metrics.getVersion.numSent.Inc()
+		p.net.metrics.getVersion.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
-		p.net.getVersion.numFailed.Inc()
+		p.net.metrics.getVersion.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -526,35 +530,13 @@ func (p *peer) sendGetVersion() {
 // assumes the [stateLock] is not held
 func (p *peer) sendVersion() {
 	p.net.stateLock.RLock()
-	msg, err := p.net.b.Version(
-		p.net.networkID,
-		p.net.nodeID,
-		p.net.clock.Unix(),
-		p.net.ip.IP(),
-		p.net.versionCompatibility.Version().String(),
-	)
-	p.net.stateLock.RUnlock()
-	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
-		p.net.metrics.version.numSent.Inc()
-		p.net.metrics.version.sentBytes.Add(float64(len(msg.Bytes())))
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-	} else {
-		p.net.metrics.version.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) sendSignedVersion() {
-	p.net.stateLock.RLock()
 	myIP := p.net.ip.IP()
-	myVersionTime, myVersionSig, err := p.net.getSignedVersion(myIP)
+	myVersionTime, myVersionSig, err := p.net.getVersion(myIP)
 	if err != nil {
 		p.net.stateLock.RUnlock()
 		return
 	}
-	msg, err := p.net.b.SignedVersion(
+	msg, err := p.net.b.Version(
 		p.net.networkID,
 		p.net.nodeID,
 		p.net.clock.Unix(),
@@ -565,12 +547,15 @@ func (p *peer) sendSignedVersion() {
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
-		p.net.metrics.signedVersion.numSent.Inc()
-		p.net.metrics.signedVersion.sentBytes.Add(float64(len(msg.Bytes())))
+
+	sent := p.Send(msg)
+	if sent {
+		p.net.metrics.version.numSent.Inc()
+		p.net.metrics.version.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
+		p.versionSent.SetValue(true)
 	} else {
-		p.net.metrics.signedVersion.numFailed.Inc()
+		p.net.metrics.version.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
 }
@@ -591,56 +576,27 @@ func (p *peer) sendGetPeerList() {
 
 // assumes the stateLock is not held
 func (p *peer) sendPeerList() {
-	validatorIPs, ips, err := p.net.validatorIPs()
+	peers, err := p.net.validatorIPs()
 	if err != nil {
 		return
 	}
-	sentSigned := p.sendSignedPeerList(validatorIPs)
-	sentUnsigned := p.sendUnsignedPeerList(ips)
-	if sentSigned && sentUnsigned {
-		p.peerListSent.SetValue(true)
-	}
-}
 
-// assumes the [stateLock] is not held
-// returns true if an unsigned peer list was sent to [p]
-func (p *peer) sendUnsignedPeerList(peers []utils.IPDesc) bool {
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
-		return false
-	}
-	sent := p.Send(msg)
-	if sent {
-		p.net.peerlist.numSent.Inc()
-		p.net.peerlist.sentBytes.Add(float64(len(msg.Bytes())))
-		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
-	} else {
-		p.net.peerlist.numFailed.Inc()
-		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
-	}
-	return sent
-}
-
-// assumes the [stateLock] is not held
-// returns true if a signed peer list was sent to [p]
-func (p *peer) sendSignedPeerList(peers []utils.IPCertDesc) bool {
-	msg, err := p.net.b.SignedPeerList(peers)
-	if err != nil {
-		p.net.log.Warn("failed to send PeerList message due to %s", err)
-		return false
+		return
 	}
 
 	sent := p.Send(msg)
 	if sent {
-		p.net.signedPeerList.numSent.Inc()
-		p.net.signedPeerList.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.peerList.numSent.Inc()
+		p.net.peerList.sentBytes.Add(float64(len(msg.Bytes())))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
+		p.peerListSent.SetValue(true)
 	} else {
-		p.net.signedPeerList.numFailed.Inc()
+		p.net.peerList.numFailed.Inc()
 		p.net.sendFailRateCalculator.Observe(1, p.net.clock.Time())
 	}
-	return sent
 }
 
 // assumes the [stateLock] is not held
@@ -672,14 +628,14 @@ func (p *peer) sendPong() {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetVersion(msg Msg) {
-	p.sendSignedVersion()
-	p.sendVersion()
+func (p *peer) handleGetVersion(_ Msg) {
+	if !p.versionSent.GetValue() {
+		p.sendVersion()
+	}
 }
 
-// If [isSignedVersion], [msg] is a SignedVersion message.
-// Otherwise, [msg] is a Version message.
-func (p *peer) versionCheck(msg Msg, isSignedVersion bool) {
+// assumes the [stateLock] is not held
+func (p *peer) handleVersion(msg Msg) {
 	switch {
 	case p.gotVersion.GetValue():
 		p.net.log.Verbo("dropping duplicated version message from %s", p.id)
@@ -748,45 +704,43 @@ func (p *peer) versionCheck(msg Msg, isSignedVersion bool) {
 
 	peerIP := msg.Get(IP).(utils.IPDesc)
 
-	if isSignedVersion {
-		versionTime := msg.Get(VersionTime).(uint64)
-		p.net.stateLock.RLock()
-		latestPeerIP := p.net.latestPeerIP[p.id]
-		p.net.stateLock.RUnlock()
-		if latestPeerIP.time > versionTime {
-			p.discardIP()
-			return
-		}
-		if float64(versionTime)-myTime > p.net.maxClockDifference.Seconds() {
-			p.net.log.Debug("peer %s attempting to connect with version timestamp (%d) too far in the future",
-				p.id,
-				latestPeerIP.time,
-			)
-			p.discardIP()
-			return
-		}
-
-		sig := msg.Get(SigBytes).([]byte)
-		signed := ipAndTimeBytes(peerIP, versionTime)
-		err := p.cert.CheckSignature(p.cert.SignatureAlgorithm, signed, sig)
-		if err != nil {
-			p.net.log.Debug("signature verification failed for peer at %s: %s", peerIP, err)
-			p.discardIP()
-			return
-		}
-
-		signedPeerIP := signedPeerIP{
-			ip:        peerIP,
-			time:      versionTime,
-			signature: sig,
-		}
-
-		p.net.stateLock.Lock()
-		p.net.latestPeerIP[p.id] = signedPeerIP
-		p.net.stateLock.Unlock()
-
-		p.sigAndTime.SetValue(signedPeerIP)
+	versionTime := msg.Get(VersionTime).(uint64)
+	p.net.stateLock.RLock()
+	latestPeerIP := p.net.latestPeerIP[p.id]
+	p.net.stateLock.RUnlock()
+	if latestPeerIP.time > versionTime {
+		p.discardIP()
+		return
 	}
+	if float64(versionTime)-myTime > p.net.maxClockDifference.Seconds() {
+		p.net.log.Debug("peer %s attempting to connect with version timestamp (%d) too far in the future",
+			p.id,
+			latestPeerIP.time,
+		)
+		p.discardIP()
+		return
+	}
+
+	sig := msg.Get(SigBytes).([]byte)
+	signed := ipAndTimeBytes(peerIP, versionTime)
+	err = p.cert.CheckSignature(p.cert.SignatureAlgorithm, signed, sig)
+	if err != nil {
+		p.net.log.Debug("signature verification failed for peer at %s: %s", peerIP, err)
+		p.discardIP()
+		return
+	}
+
+	signedPeerIP := signedPeerIP{
+		ip:        peerIP,
+		time:      versionTime,
+		signature: sig,
+	}
+
+	p.net.stateLock.Lock()
+	p.net.latestPeerIP[p.id] = signedPeerIP
+	p.net.stateLock.Unlock()
+
+	p.sigAndTime.SetValue(signedPeerIP)
 
 	if ip := p.getIP(); ip.IsZero() {
 		addr := p.conn.RemoteAddr()
@@ -811,39 +765,9 @@ func (p *peer) versionCheck(msg Msg, isSignedVersion bool) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleVersion(msg Msg) {
-	p.versionCheck(msg, false)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleSignedVersion(msg Msg) {
-	p.versionCheck(msg, true)
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handleGetPeerList(msg Msg) {
+func (p *peer) handleGetPeerList(_ Msg) {
 	if p.gotVersion.GetValue() && !p.peerListSent.GetValue() {
 		p.sendPeerList()
-	}
-}
-
-// assumes the [stateLock] is not held
-func (p *peer) handlePeerList(msg Msg) {
-	ips := msg.Get(Peers).([]utils.IPDesc)
-
-	p.gotPeerList.SetValue(true)
-	p.tryMarkConnected()
-
-	for _, ip := range ips {
-		p.net.stateLock.Lock()
-		switch {
-		case ip.Equal(p.net.ip.IP()):
-		case ip.IsZero():
-		case !p.net.allowPrivateIPs && ip.IsPrivate():
-		default:
-			p.net.track(ip, ids.ShortEmpty)
-		}
-		p.net.stateLock.Unlock()
 	}
 }
 
@@ -867,7 +791,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 
 	nodeID := certToID(peer.Cert)
 	if !p.net.vdrs.Contains(nodeID) {
-		p.net.log.Debug(
+		p.net.log.Verbo(
 			"not peering to %s at %s because they are not a validator",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			peer.IPDesc,
@@ -876,9 +800,9 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	// Am I already peered to them? (safe because [p.net.stateLock] is held)
-	foundPeer, ok := p.net.peers[nodeID]
-	if ok && !foundPeer.closed.GetValue() {
-		p.net.log.Debug(
+
+	if foundPeer, ok := p.net.peers.getByID(nodeID); ok && !foundPeer.closed.GetValue() {
+		p.net.log.Verbo(
 			"not peering to %s because we are already connected to %s",
 			peer.IPDesc,
 			nodeID.PrefixedString(constants.NodeIDPrefix),
@@ -887,7 +811,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	if p.net.latestPeerIP[nodeID].time > peer.Time {
-		p.net.log.Debug(
+		p.net.log.Verbo(
 			"not peering to %s at %s: the given timestamp (%d) < latest (%d)",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			peer.IPDesc,
@@ -918,12 +842,16 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleSignedPeerList(msg Msg) {
-	ips := msg.Get(SignedPeers).([]utils.IPCertDesc)
-
+func (p *peer) handlePeerList(msg Msg) {
 	p.gotPeerList.SetValue(true)
 	p.tryMarkConnected()
 
+	if p.net.isFetchOnly {
+		// If the node is in fetch only mode, drop all incoming peers
+		return
+	}
+
+	ips := msg.Get(SignedPeers).([]utils.IPCertDesc)
 	for _, ip := range ips {
 		p.trackSignedPeer(ip)
 	}
@@ -955,19 +883,19 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.AcceptedFrontier(p.id, chainID, requestID, containerIDs)
@@ -982,19 +910,19 @@ func (p *peer) handleGetAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
@@ -1008,19 +936,19 @@ func (p *peer) handleAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.Accepted(p.id, chainID, requestID, containerIDs)
@@ -1104,19 +1032,19 @@ func (p *peer) handleChits(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.Set{} // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)

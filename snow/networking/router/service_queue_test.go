@@ -427,7 +427,6 @@ func TestMultiLevelQueueFreesSpace(t *testing.T) {
 		if _, err := queue.PopMessage(); err != nil {
 			t.Fatalf("Failed to pop message on iteration %d due to: %s", i, err)
 		}
-
 	}
 
 	// Fill up message pool again to ensure

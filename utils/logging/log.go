@@ -5,6 +5,7 @@ package logging
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,11 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
 
-var (
-	filePrefix = fmt.Sprintf("%s/", constants.AppName)
-)
+var filePrefix = fmt.Sprintf("%s/", constants.AppName)
 
-// Log ...
+// Log implements the Logger interface
 type Log struct {
 	config Config
 
@@ -37,7 +36,7 @@ type Log struct {
 	writer RotatingWriter
 }
 
-// New ...
+// New returns a new logger set up according to [config]
 func New(config Config) (*Log, error) {
 	if err := os.MkdirAll(config.Directory, perms.ReadWriteExecute); err != nil {
 		return nil, err
@@ -61,13 +60,14 @@ func (l *Log) run() {
 	l.writeLock.Lock()
 	defer l.writeLock.Unlock()
 
-	if err := l.writer.Initialize(l.config); err != nil {
+	currentSize, err := l.writer.Initialize(l.config)
+	if err != nil {
 		panic(err)
 	}
 
 	closed := false
 	nextRotation := time.Now().Add(l.config.RotationInterval)
-	currentSize := 0
+
 	for !closed {
 		l.writeLock.Unlock()
 		l.flushLock.Lock()
@@ -129,7 +129,7 @@ func (l *Log) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Stop ...
+// Stop implements the Logger interface
 func (l *Log) Stop() {
 	l.flushLock.Lock()
 	l.closed = true
@@ -201,25 +201,25 @@ func (l *Log) format(level Level, format string, args ...interface{}) string {
 		text)
 }
 
-// Fatal ...
+// Fatal implements the Logger interface
 func (l *Log) Fatal(format string, args ...interface{}) { l.log(Fatal, format, args...) }
 
-// Error ...
+// Error implements the Logger interface
 func (l *Log) Error(format string, args ...interface{}) { l.log(Error, format, args...) }
 
-// Warn ...
+// Warn implements the Logger interface
 func (l *Log) Warn(format string, args ...interface{}) { l.log(Warn, format, args...) }
 
-// Info ...
+// Info implements the Logger interface
 func (l *Log) Info(format string, args ...interface{}) { l.log(Info, format, args...) }
 
-// Debug ...
+// Debug implements the Logger interface
 func (l *Log) Debug(format string, args ...interface{}) { l.log(Debug, format, args...) }
 
-// Verbo ...
+// Verbo implements the Logger interface
 func (l *Log) Verbo(format string, args ...interface{}) { l.log(Verbo, format, args...) }
 
-// AssertNoError ...
+// AssertNoError implements the Logger interface
 func (l *Log) AssertNoError(err error) {
 	if err != nil {
 		l.log(Fatal, "%s", err)
@@ -230,7 +230,7 @@ func (l *Log) AssertNoError(err error) {
 	}
 }
 
-// AssertTrue ...
+// AssertTrue implements the Logger interface
 func (l *Log) AssertTrue(b bool, format string, args ...interface{}) {
 	if !b {
 		l.log(Fatal, format, args...)
@@ -241,7 +241,7 @@ func (l *Log) AssertTrue(b bool, format string, args ...interface{}) {
 	}
 }
 
-// AssertDeferredTrue ...
+// AssertDeferredTrue implements the Logger interface
 func (l *Log) AssertDeferredTrue(f func() bool, format string, args ...interface{}) {
 	// Note, the logger will only be notified here if assertions are enabled
 	if l.config.Assertions && !f() {
@@ -252,7 +252,7 @@ func (l *Log) AssertDeferredTrue(f func() bool, format string, args ...interface
 	}
 }
 
-// AssertDeferredNoError ...
+// AssertDeferredNoError implements the Logger interface
 func (l *Log) AssertDeferredNoError(f func() error) {
 	if l.config.Assertions {
 		err := f()
@@ -266,27 +266,27 @@ func (l *Log) AssertDeferredNoError(f func() error) {
 	}
 }
 
-// StopOnPanic ...
+// StopOnPanic implements the Logger interface
 func (l *Log) StopOnPanic() {
 	if r := recover(); r != nil {
-		l.Fatal("Panicing due to:\n%s\nFrom:\n%s", r, Stacktrace{})
+		l.Fatal("Panicking due to:\n%s\nFrom:\n%s", r, Stacktrace{})
 		l.Stop()
 		panic(r)
 	}
 }
 
-// RecoverAndPanic ...
+// RecoverAndPanic implements the Logger interface
 func (l *Log) RecoverAndPanic(f func()) { defer l.StopOnPanic(); f() }
 
 func (l *Log) stopAndExit(exit func()) {
 	if r := recover(); r != nil {
-		l.Fatal("Panicing due to:\n%s\nFrom:\n%s", r, Stacktrace{})
+		l.Fatal("Panicking due to:\n%s\nFrom:\n%s", r, Stacktrace{})
 		l.Stop()
 		exit()
 	}
 }
 
-// RecoverAndExit ...
+// RecoverAndExit implements the Logger interface
 func (l *Log) RecoverAndExit(f, exit func()) { defer l.stopAndExit(exit); f() }
 
 // SetLogLevel ...
@@ -297,7 +297,7 @@ func (l *Log) SetLogLevel(lvl Level) {
 	l.config.LogLevel = lvl
 }
 
-// SetDisplayLevel ...
+// SetDisplayLevel implements the Logger interface
 func (l *Log) SetDisplayLevel(lvl Level) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -305,7 +305,7 @@ func (l *Log) SetDisplayLevel(lvl Level) {
 	l.config.DisplayLevel = lvl
 }
 
-// SetPrefix ...
+// SetPrefix implements the Logger interface
 func (l *Log) SetPrefix(prefix string) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -313,7 +313,7 @@ func (l *Log) SetPrefix(prefix string) {
 	l.config.MsgPrefix = prefix
 }
 
-// SetLoggingEnabled ...
+// SetLoggingEnabled implements the Logger interface
 func (l *Log) SetLoggingEnabled(enabled bool) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -321,7 +321,7 @@ func (l *Log) SetLoggingEnabled(enabled bool) {
 	l.config.DisableLogging = !enabled
 }
 
-// SetDisplayingEnabled ...
+// SetDisplayingEnabled implements the Logger interface
 func (l *Log) SetDisplayingEnabled(enabled bool) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -329,7 +329,7 @@ func (l *Log) SetDisplayingEnabled(enabled bool) {
 	l.config.DisableDisplaying = !enabled
 }
 
-// SetContextualDisplayingEnabled ...
+// SetContextualDisplayingEnabled implements the Logger interface
 func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
@@ -337,32 +337,50 @@ func (l *Log) SetContextualDisplayingEnabled(enabled bool) {
 	l.config.DisableContextualDisplaying = !enabled
 }
 
+// fileWriter implements the RotatingWriter interface
 type fileWriter struct {
 	writer *bufio.Writer
 	file   *os.File
 
-	config    Config
-	fileIndex int
+	config Config
 }
 
+// Flush implements the RotatingWriter interface
 func (fw *fileWriter) Flush() error {
 	return fw.writer.Flush()
 }
 
+// Write implements the RotatingWriter interface
 func (fw *fileWriter) Write(b []byte) (int, error) {
 	return fw.writer.Write(b)
 }
 
+// WriteString implements the RotatingWriter interface
 func (fw *fileWriter) WriteString(s string) (int, error) {
 	return fw.writer.WriteString(s)
 }
 
+// Close implements the RotatingWriter interface
 func (fw *fileWriter) Close() error {
 	return fw.file.Close()
 }
 
+// Rotate implements the RotatingWriter interface
 func (fw *fileWriter) Rotate() error {
-	fw.fileIndex = (fw.fileIndex + 1) % fw.config.RotationSize
+	for i := fw.config.RotationSize - 1; i > 0; i-- {
+		sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i))
+		destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.%d", fw.config.LoggerName, i+1))
+		if _, err := os.Stat(sourceFilename); !errors.Is(err, os.ErrNotExist) {
+			if err := os.Rename(sourceFilename, destFilename); err != nil {
+				return err
+			}
+		}
+	}
+	sourceFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
+	destFilename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log.1", fw.config.LoggerName))
+	if err := os.Rename(sourceFilename, destFilename); err != nil {
+		return err
+	}
 	writer, file, err := fw.create()
 	if err != nil {
 		return err
@@ -372,9 +390,10 @@ func (fw *fileWriter) Rotate() error {
 	return nil
 }
 
+// Creates a file if it does not exist or opens it in append mode if it does
 func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
-	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%d.log", fw.fileIndex))
-	file, err := perms.Create(filename, perms.ReadWrite)
+	filename := filepath.Join(fw.config.Directory, fmt.Sprintf("%s.log", fw.config.LoggerName))
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, perms.ReadWrite)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -382,13 +401,19 @@ func (fw *fileWriter) create() (*bufio.Writer, *os.File, error) {
 	return writer, file, nil
 }
 
-func (fw *fileWriter) Initialize(config Config) error {
+// Initialize implements the RotatingWriter interface
+func (fw *fileWriter) Initialize(config Config) (int, error) {
 	fw.config = config
 	writer, file, err := fw.create()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	fw.writer = writer
 	fw.file = file
-	return nil
+	fileinfo, err := file.Stat()
+	if err != nil {
+		return 0, err
+	}
+	fileSize := fileinfo.Size()
+	return int(fileSize), nil
 }

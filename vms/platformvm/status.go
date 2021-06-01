@@ -7,9 +7,7 @@ import (
 	"errors"
 )
 
-var (
-	errUnknownStatus = errors.New("unknown status")
-)
+var errUnknownStatus = errors.New("unknown status")
 
 // Status ...
 type Status uint32

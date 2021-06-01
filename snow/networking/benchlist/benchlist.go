@@ -7,11 +7,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/prometheus/client_golang/prometheus"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -79,7 +80,9 @@ type failureStreak struct {
 }
 
 type benchlist struct {
-	lock    sync.RWMutex
+	lock sync.RWMutex
+	// This is the benchlist for chain [chainID]
+	chainID ids.ID
 	log     logging.Logger
 	metrics metrics
 
@@ -90,10 +93,15 @@ type benchlist struct {
 	// Tells the time. Can be faked for testing.
 	clock timer.Clock
 
+	// notified when a node is benched or unbenched
+	benchable Benchable
+
 	// Validator set of the network
 	vdrs validators.Set
 
 	// Validator ID --> Consecutive failure information
+	// [streaklock] must be held when touching [failureStreaks]
+	streaklock     sync.Mutex
 	failureStreaks map[ids.ShortID]failureStreak
 
 	// IDs of validators that are currently benched
@@ -119,7 +127,9 @@ type benchlist struct {
 
 // NewBenchlist returns a new Benchlist
 func NewBenchlist(
+	chainID ids.ID,
 	log logging.Logger,
+	benchable Benchable,
 	validators validators.Set,
 	threshold int,
 	minimumFailingDuration,
@@ -132,9 +142,11 @@ func NewBenchlist(
 		return nil, fmt.Errorf("max portion of benched stake must be in [0,1) but got %f", maxPortion)
 	}
 	benchlist := &benchlist{
+		chainID:                chainID,
 		log:                    log,
 		failureStreaks:         make(map[ids.ShortID]failureStreak),
 		benchlistSet:           ids.ShortSet{},
+		benchable:              benchable,
 		vdrs:                   validators,
 		threshold:              threshold,
 		minimumFailingDuration: minimumFailingDuration,
@@ -173,6 +185,7 @@ func (b *benchlist) remove(validator *benchData) {
 	b.log.Debug("removing validator %s from benchlist", id)
 	heap.Remove(&b.benchedQueue, validator.index)
 	b.benchlistSet.Remove(id)
+	b.benchable.Unbenched(b.chainID, id)
 
 	// Update metrics
 	b.metrics.numBenched.Set(float64(b.benchedQueue.Len()))
@@ -232,8 +245,8 @@ func (b *benchlist) isBenched(validatorID ids.ShortID) bool {
 
 // RegisterResponse notes that we received a response from validator [validatorID]
 func (b *benchlist) RegisterResponse(validatorID ids.ShortID) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
+	b.streaklock.Lock()
+	defer b.streaklock.Unlock()
 	delete(b.failureStreaks, validatorID)
 }
 
@@ -247,6 +260,7 @@ func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 		return
 	}
 
+	b.streaklock.Lock()
 	failureStreak := b.failureStreaks[validatorID]
 	// Increment consecutive failures
 	failureStreak.consecutive++
@@ -257,11 +271,11 @@ func (b *benchlist) RegisterFailure(validatorID ids.ShortID) {
 		failureStreak.firstFailure = now
 	}
 	b.failureStreaks[validatorID] = failureStreak
+	b.streaklock.Unlock()
 
 	if failureStreak.consecutive >= b.threshold && now.After(failureStreak.firstFailure.Add(b.minimumFailingDuration)) {
 		b.bench(validatorID)
 	}
-
 }
 
 // Assumes [b.lock] is held
@@ -311,7 +325,12 @@ func (b *benchlist) bench(validatorID ids.ShortID) {
 
 	// Add to benchlist times with randomized delay
 	b.benchlistSet.Add(validatorID)
+	b.benchable.Benched(b.chainID, validatorID)
+
+	b.streaklock.Lock()
 	delete(b.failureStreaks, validatorID)
+	b.streaklock.Unlock()
+
 	heap.Push(
 		&b.benchedQueue,
 		&benchData{validatorID: validatorID, benchedUntil: benchedUntil},

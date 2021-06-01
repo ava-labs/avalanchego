@@ -4,6 +4,7 @@
 package router
 
 import (
+	"encoding/binary"
 	"errors"
 	"sync"
 	"time"
@@ -44,18 +45,26 @@ type requestEntry struct {
 // Note that consensus engines are uniquely identified by the ID of the chain
 // that they are working on.
 type ChainRouter struct {
-	clock            timer.Clock
-	log              logging.Logger
-	lock             sync.Mutex
-	chains           map[ids.ID]*Handler
-	timeoutManager   *timeout.Manager
+	clock  timer.Clock
+	log    logging.Logger
+	lock   sync.Mutex
+	chains map[ids.ID]*Handler
+
+	// It is only safe to call [RegisterResponse] with the router lock held. Any
+	// other calls to the timeout manager with the router lock held could cause
+	// a deadlock because the timeout manager will call Benched and Unbenched.
+	timeoutManager *timeout.Manager
+
 	gossiper         *timer.Repeater
 	intervalNotifier *timer.Repeater
 	closeTimeout     time.Duration
 	peers            ids.ShortSet
-	criticalChains   ids.Set
-	onFatal          func()
-	metrics          *routerMetrics
+	// node ID --> chains that node is benched on
+	// invariant: if a node is benched on any chain, it is treated as disconnected on all chains
+	benched        map[ids.ShortID]ids.Set
+	criticalChains ids.Set
+	onFatal        func(exitCode int)
+	metrics        *routerMetrics
 	// Parameters for doing health checks
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
@@ -64,6 +73,10 @@ type ChainRouter struct {
 	dropRateCalculator math.Averager
 	// Last time at which there were no outstanding requests
 	lastTimeNoOutstanding time.Time
+	// Used in [createRequestID].
+	// Should only be accessed in that method.
+	// [lock] should be held when [requestIDBytes] is accessed.
+	requestIDBytes []byte
 }
 
 // Initialize the router.
@@ -81,7 +94,7 @@ func (cr *ChainRouter) Initialize(
 	gossipFrequency time.Duration,
 	closeTimeout time.Duration,
 	criticalChains ids.Set,
-	onFatal func(),
+	onFatal func(exitCode int),
 	healthConfig HealthConfig,
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
@@ -92,6 +105,7 @@ func (cr *ChainRouter) Initialize(
 	cr.gossiper = timer.NewRepeater(cr.Gossip, gossipFrequency)
 	cr.intervalNotifier = timer.NewRepeater(cr.EndInterval, defaultCPUInterval)
 	cr.closeTimeout = closeTimeout
+	cr.benched = make(map[ids.ShortID]ids.Set)
 	cr.criticalChains = criticalChains
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
@@ -99,6 +113,7 @@ func (cr *ChainRouter) Initialize(
 	// Set up meter to count dropped messages
 	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
 	cr.healthConfig = healthConfig
+	cr.requestIDBytes = make([]byte, 2*hashing.HashLen+wrappers.IntLen) // Validator ID, Chain ID, Request ID
 
 	// Register metrics
 	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
@@ -131,8 +146,8 @@ func (cr *ChainRouter) RegisterRequest(
 	requestID uint32,
 	msgType constants.MsgType,
 ) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 	if cr.timedRequests.Len() == 0 {
 		cr.lastTimeNoOutstanding = cr.clock.Time()
 	}
@@ -206,7 +221,10 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 	cr.chains[chainID] = chain
 
 	for validatorID := range cr.peers {
-		chain.Connected(validatorID)
+		// If this validator is benched on any chain, treat them as disconnected on all chains
+		if _, benched := cr.benched[validatorID]; !benched {
+			chain.Connected(validatorID)
+		}
 	}
 }
 
@@ -234,7 +252,7 @@ func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
 	ticker.Stop()
 
 	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
-		go cr.onFatal()
+		go cr.onFatal(1)
 	}
 }
 
@@ -275,7 +293,7 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -311,9 +329,10 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 // request from the validator with ID [validatorID] to the consensus engine
 // working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -366,7 +385,7 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -402,9 +421,10 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
 func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -457,7 +477,7 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -492,9 +512,10 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 // GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -565,7 +586,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -595,15 +616,15 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
 	}
-
 }
 
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -675,7 +696,7 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 		return
 	}
 
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -710,9 +731,10 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
-	uniqueRequestID := createRequestID(validatorID, chainID, requestID)
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -733,6 +755,11 @@ func (cr *ChainRouter) Connected(validatorID ids.ShortID) {
 	defer cr.lock.Unlock()
 
 	cr.peers.Add(validatorID)
+	// If this validator is benched on any chain, treat them as disconnected on all chains
+	if _, benched := cr.benched[validatorID]; benched {
+		return
+	}
+
 	for _, chain := range cr.chains {
 		chain.Connected(validatorID)
 	}
@@ -744,8 +771,53 @@ func (cr *ChainRouter) Disconnected(validatorID ids.ShortID) {
 	defer cr.lock.Unlock()
 
 	cr.peers.Remove(validatorID)
+	if _, benched := cr.benched[validatorID]; benched {
+		return
+	}
+
 	for _, chain := range cr.chains {
 		chain.Disconnected(validatorID)
+	}
+}
+
+// Benched routes an incoming notification that a validator was benched
+func (cr *ChainRouter) Benched(chainID ids.ID, validatorID ids.ShortID) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	benchedChains, exists := cr.benched[validatorID]
+	benchedChains.Add(chainID)
+	cr.benched[validatorID] = benchedChains
+	if exists || !cr.peers.Contains(validatorID) {
+		// If the set already existed, then the node was previously benched.
+		return
+	}
+
+	for _, chain := range cr.chains {
+		chain.Disconnected(validatorID)
+	}
+}
+
+// Unbenched routes an incoming notification that a validator was just unbenched
+func (cr *ChainRouter) Unbenched(chainID ids.ID, validatorID ids.ShortID) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	benchedChains := cr.benched[validatorID]
+	benchedChains.Remove(chainID)
+	if benchedChains.Len() == 0 {
+		delete(cr.benched, validatorID)
+	} else {
+		cr.benched[validatorID] = benchedChains
+		return // This node is still benched
+	}
+
+	if !cr.peers.Contains(validatorID) {
+		return
+	}
+
+	for _, chain := range cr.chains {
+		chain.Connected(validatorID)
 	}
 }
 
@@ -817,8 +889,10 @@ func (cr *ChainRouter) registerMsgSuccess(isBootstrapped bool) {
 	}
 }
 
-func createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
-	p := wrappers.Packer{Bytes: make([]byte, wrappers.IntLen)}
-	p.PackInt(requestID)
-	return hashing.ByteArraysToHash256Array(validatorID[:], chainID[:], p.Bytes)
+// Assumes [cr.lock] is held
+func (cr *ChainRouter) createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
+	copy(cr.requestIDBytes, validatorID[:])
+	copy(cr.requestIDBytes[hashing.HashLen:], chainID[:])
+	binary.BigEndian.PutUint32(cr.requestIDBytes[2*hashing.HashLen:], requestID)
+	return hashing.ComputeHash256Array(cr.requestIDBytes)
 }

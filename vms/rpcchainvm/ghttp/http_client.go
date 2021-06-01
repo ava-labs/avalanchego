@@ -18,9 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
-var (
-	_ http.Handler = &Client{}
-)
+var _ http.Handler = &Client{}
 
 // Client is an http.Handler that talks over RPC.
 type Client struct {
