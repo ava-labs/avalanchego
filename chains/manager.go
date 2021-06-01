@@ -159,6 +159,7 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
+	MeterVMEnabled            bool // Should each VM be wrapped with a MeterVM
 }
 
 type manager struct {
@@ -472,11 +473,13 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	vm = vertex.NewMeterVM(vm)
+
+	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
+	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
 	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
 	db := dbManager.Current()
@@ -606,11 +609,14 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+
+	vm = block.NewMeterVM(vm)
+
+	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
+	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
 	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
 
 	db := dbManager.Current()
