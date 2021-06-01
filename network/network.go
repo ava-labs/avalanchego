@@ -1217,27 +1217,21 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 }
 
 // Attempt to connect to the peer at [ip].
-// If [ctx] is cancelled, stops trying to connect.
+// If [ctx] is canceled, stops trying to connect.
 // Returns nil if:
 // * A connection was established
 // * The network is closed.
-// * [ctx] is cancelled.
+// * [ctx] is canceled.
 // Assumes [n.stateLock] is not held when this method is called.
 func (n *network) attemptConnect(ctx context.Context, ip utils.IPDesc) error {
 	n.log.Verbo("attempting to connect to %s", ip)
 	conn, err := n.dialer.Dial(ctx, ip)
 	if err != nil {
-		// Return nil if connection attempt was cancelled
-		cancelled := false
-		select {
-		case <-ctx.Done():
-			cancelled = true
-		default:
-		}
-		if cancelled {
+		// If [ctx] was canceled, return nil so we don't try to connect again
+		if ctx.Err() != nil {
 			return nil
 		}
-		// Error wasn't because connection attempt was cancelled
+		// Error wasn't because connection attempt was canceled
 		return err
 	}
 

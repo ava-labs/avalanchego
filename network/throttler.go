@@ -9,7 +9,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-var errConnAttemptCancelled = errors.New("connection attempt cancelled")
+var errConnAttemptCanceled = errors.New("connection attempt canceled")
 
 type backoffPolicy interface {
 	backoff(attempt int)
@@ -66,7 +66,7 @@ func (r randomisedBackoffPolicy) backoff(_ int) {
 
 type Throttler interface {
 	// Block until the event associated with this Acquire can happen.
-	// If [ctx] is cancelled, gives up and returns an error.
+	// If [ctx] is canceled, gives up and returns an error.
 	Acquire(ctx context.Context) error
 }
 
@@ -88,16 +88,13 @@ func (w waitingThrottler) Acquire(ctx context.Context) error {
 func (t backoffThrottler) Acquire(ctx context.Context) error {
 	attempt := 0
 	for {
-		select {
-		case <-ctx.Done():
-			return errConnAttemptCancelled
-		default:
+		if ctx.Err() != nil {
+			return errConnAttemptCanceled
 		}
 		if t.limiter.Allow() {
 			break
 		}
-
-		// TODO: Stop sleeping if [ctx] is cancelled
+		// TODO: Stop sleeping if [ctx] is canceled
 		t.backoffPolicy.backoff(attempt)
 		attempt += 1
 	}

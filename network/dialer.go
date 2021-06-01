@@ -16,7 +16,7 @@ var dialTimeout = 30 * time.Second
 
 // Dialer attempts to create a connection with the provided IP/port pair
 type Dialer interface {
-	// If [ctx] is cancelled, gives up trying to connect to [ip]
+	// If [ctx] is canceled, gives up trying to connect to [ip]
 	// and returns an error.
 	Dial(ctx context.Context, ip utils.IPDesc) (net.Conn, error)
 }
