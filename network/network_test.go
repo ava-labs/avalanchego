@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
@@ -80,41 +81,56 @@ type testDialer struct {
 	closer func(net.Addr, net.Addr)
 }
 
-func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
-	d.outboundsLock.Lock()
-	defer d.outboundsLock.Unlock()
+func (d *testDialer) Dial(ctx context.Context, ip utils.IPDesc) (<-chan net.Conn, <-chan error, error) {
+	cch := make(chan net.Conn)
+	ech := make(chan error)
 
-	outbound, ok := d.outbounds[ip.String()]
-	if !ok {
-		return nil, errRefused
-	}
-	server := &testConn{
-		pendingReads:  make(chan []byte, 1<<10),
-		pendingWrites: make(chan []byte, 1<<10),
-		closed:        make(chan struct{}),
-		local:         outbound.addr,
-		remote:        d.addr,
-		closer:        d.closer,
-	}
-	client := &testConn{
-		pendingReads:  server.pendingWrites,
-		pendingWrites: server.pendingReads,
-		closed:        make(chan struct{}),
-		local:         d.addr,
-		remote:        outbound.addr,
-		closer:        d.closer,
-	}
+	go func() {
+		d.outboundsLock.Lock()
+		defer d.outboundsLock.Unlock()
 
-	select {
-	case outbound.inbound <- server:
-		if d.clients == nil {
-			d.clients = make(map[string]*testConn)
+		outbound, ok := d.outbounds[ip.String()]
+		if !ok {
+			ech <- errRefused
+			close(cch)
+			close(ech)
+			return
 		}
-		d.clients[ip.String()] = client
-		return client, nil
-	default:
-		return nil, errRefused
-	}
+		server := &testConn{
+			pendingReads:  make(chan []byte, 1<<10),
+			pendingWrites: make(chan []byte, 1<<10),
+			closed:        make(chan struct{}),
+			local:         outbound.addr,
+			remote:        d.addr,
+			closer:        d.closer,
+		}
+		client := &testConn{
+			pendingReads:  server.pendingWrites,
+			pendingWrites: server.pendingReads,
+			closed:        make(chan struct{}),
+			local:         d.addr,
+			remote:        outbound.addr,
+			closer:        d.closer,
+		}
+
+		select {
+		case outbound.inbound <- server:
+			if d.clients == nil {
+				d.clients = make(map[string]*testConn)
+			}
+			d.clients[ip.String()] = client
+			cch <- client
+			close(cch)
+			close(ech)
+			return
+		default:
+			ech <- errRefused
+			close(cch)
+			close(ech)
+			return
+		}
+	}()
+	return cch, ech, nil
 }
 
 func (d *testDialer) Update(ip utils.DynamicIPDesc, listener *testListener) {
@@ -261,6 +277,10 @@ func initCerts(t *testing.T) {
 }
 
 var dialerConfig = NewDialerConfig(0, time.Duration(100), time.Duration(100))
+
+func TestPeerUpdate(t *testing.T) {
+	// sync test to check if cancel is being called
+}
 
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)

@@ -1,6 +1,8 @@
 package network
 
 import (
+	"context"
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
@@ -26,9 +28,9 @@ func TestIncrementalBackoffPolicy(t *testing.T) {
 	assert.Equal(t, (3*time.Second)+(10*time.Second), attempt2Duration)
 }
 
-func submitConcurrentlyAndWait(fn func() error, times int) {
+func submitConcurrentlyAndWait(fn func(ctx context.Context) error, times int) {
 	goFn := func(w *sync.WaitGroup) {
-		_ = fn()
+		_ = fn(context.Background())
 		w.Done()
 	}
 
@@ -53,6 +55,36 @@ func TestBackoffThrottler_Acquire(t *testing.T) {
 	thr := NewStaticBackoffThrottler(throttleLimit, backoffDuration)
 
 	assertAcquire(t, thr, throttleLimit, backoffDuration)
+}
+
+func TestConcurrency(t *testing.T) {
+	called := 0
+	thr := NewWaitingThrottler(1)
+	throttlingFn := func(ctx context.Context) {
+		_ = thr.Acquire(ctx)
+		if ctx.Err() == context.Canceled {
+			fmt.Println(ctx.Err())
+			return
+		}
+		called++
+	}
+
+	rootCtx := context.Background()
+	var cancels []func()
+	for i := 0; i < 5; i++ {
+		ctx, cancel := context.WithCancel(rootCtx)
+		cancels = append(cancels, cancel)
+		go throttlingFn(ctx)
+	}
+
+	time.Sleep(500 * time.Millisecond)
+
+	for _, cancelFn := range cancels {
+		cancelFn()
+	}
+
+	assert.Equal(t, 1, called)
+
 }
 
 func assertAcquire(t *testing.T, thr Throttler, throttleLimit int, backoffDuration time.Duration) {

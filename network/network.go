@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"errors"
 	"fmt"
@@ -1133,6 +1134,8 @@ func (n *network) gossipPeerList() {
 	}
 }
 
+var nodeCancelMap sync.Map
+
 // assumes the stateLock is not held. Only returns if the ip is connected to or
 // the network is closed
 func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
@@ -1188,7 +1191,18 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 		n.retryDelay[str] = delay
 		n.stateLock.Unlock()
 
-		err := n.attemptConnect(ip)
+		existingCancelFn, exists := nodeCancelMap.LoadAndDelete(nodeID)
+		if exists {
+			existingCancelFn.(func())()
+		}
+
+		ctx, cancelFn := context.WithCancel(context.Background())
+		nodeCancelMap.Store(nodeID, cancelFn)
+
+		err := n.attemptConnect(ctx, ip)
+
+		nodeCancelMap.Delete(nodeID)
+
 		if err == nil {
 			return
 		}
@@ -1199,13 +1213,22 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 
 // assumes the stateLock is not held. Returns nil if a connection was able to be
 // established, or the network is closed.
-func (n *network) attemptConnect(ip utils.IPDesc) error {
+func (n *network) attemptConnect(ctx context.Context, ip utils.IPDesc) error {
 	n.log.Verbo("attempting to connect to %s", ip)
 
-	conn, err := n.dialer.Dial(ip)
+	cch, ech, err := n.dialer.Dial(ctx, ip)
 	if err != nil {
 		return err
 	}
+
+	var conn net.Conn
+	select {
+	case <-ctx.Done():
+	case conn = <-cch:
+	case err = <-ech:
+		return err
+	}
+
 	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
 			n.log.Warn("failed to set no linger due to: %s", err)

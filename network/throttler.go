@@ -61,7 +61,7 @@ func (r randomisedBackoffPolicy) backoff(_ int) {
 }
 
 type Throttler interface {
-	Acquire() error
+	Acquire(ctx context.Context) error
 }
 
 type waitingThrottler struct {
@@ -77,11 +77,11 @@ type noThrottler struct {
 	// empty
 }
 
-func (w waitingThrottler) Acquire() error {
-	return w.limiter.Wait(context.Background())
+func (w waitingThrottler) Acquire(ctx context.Context) error {
+	return w.limiter.Wait(ctx)
 }
 
-func (t backoffThrottler) Acquire() error {
+func (t backoffThrottler) Acquire(_ context.Context) error {
 	attempt := 0
 	for {
 		if t.limiter.Allow() {
@@ -95,7 +95,7 @@ func (t backoffThrottler) Acquire() error {
 	return nil
 }
 
-func (t noThrottler) Acquire() error {
+func (t noThrottler) Acquire(_ context.Context) error {
 	return nil
 }
 

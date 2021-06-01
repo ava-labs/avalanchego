@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"net"
 	"testing"
@@ -117,7 +118,12 @@ func TestPeer_Close(t *testing.T) {
 		1,
 	)
 	caller.outbounds[ip1.IP().String()] = listener
-	conn, _ := caller.Dial(ip1.IP())
+	cch, ech, _ := caller.Dial(context.Background(), ip1.IP())
+	var conn net.Conn
+	select {
+	case conn = <-cch:
+	case <-ech: // ignore
+	}
 
 	basenetwork := netwrk.(*network)
 
