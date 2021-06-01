@@ -276,7 +276,7 @@ func initCerts(t *testing.T) {
 	tlsConfig2 = TLSConfig(*cert2)
 }
 
-var dialerConfig = NewDialerConfig(0, time.Duration(100), time.Duration(100))
+var dialerConfig = NewDialerConfig(0)
 
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)

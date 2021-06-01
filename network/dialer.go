@@ -28,15 +28,11 @@ type dialer struct {
 
 type DialerConfig struct {
 	throttleAps uint32
-	minBackoff  time.Duration
-	maxBackoff  time.Duration
 }
 
-func NewDialerConfig(throttleAps uint32, minBackoff, maxBackoff time.Duration) DialerConfig {
+func NewDialerConfig(throttleAps uint32) DialerConfig {
 	return DialerConfig{
 		throttleAps,
-		minBackoff,
-		maxBackoff,
 	}
 }
 
