@@ -475,14 +475,14 @@ func (m *manager) createAvalancheChain(
 
 	vm = vertex.NewMeterVM(vm)
 
-	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db.Database)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
