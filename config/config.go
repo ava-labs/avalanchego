@@ -246,7 +246,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
-	fs.Duration(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
+	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
 
 	return fs
 }
