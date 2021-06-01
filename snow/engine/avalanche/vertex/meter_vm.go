@@ -17,9 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var (
-	_ DAGVM = &MeterVM{}
-)
+var _ DAGVM = &MeterVM{}
 
 func NewMeterVM(vm DAGVM) DAGVM {
 	return &MeterVM{

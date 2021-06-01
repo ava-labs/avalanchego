@@ -13,15 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func newLatencyMetric(namespace, name string) prometheus.Histogram {
-	return prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_latency", name),
-		Help:      fmt.Sprintf("Latency of a %s call in nanoseconds", name),
-		Buckets:   utils.NanosecondsBuckets,
-	})
-}
-
 func newSizeMetric(namespace, name string) prometheus.Histogram {
 	return prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,

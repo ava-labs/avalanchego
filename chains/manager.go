@@ -159,7 +159,7 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
-	MeterVMEnabled            bool // Should each VM be wrapped with a MeterVM
+	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 }
 
 type manager struct {
@@ -608,7 +608,6 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-
 
 	vm = block.NewMeterVM(vm)
 
