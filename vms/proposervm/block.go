@@ -1,10 +1,14 @@
 package proposervm
 
 import (
+	"errors"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
+
+var ErrNotOracleBlock = errors.New("snowmanBlock wrapped in proposerBlock does not implement snowman.OracleBlock")
 
 type ProposerBlock struct {
 	wrappedBlock snowman.Block
@@ -14,10 +18,6 @@ func NewProBlock(sb snowman.Block) ProposerBlock {
 	return ProposerBlock{
 		wrappedBlock: sb,
 	}
-}
-
-func (pb *ProposerBlock) GetWrappedBlock() snowman.Block {
-	return pb.wrappedBlock
 }
 
 //////// choices.Decidable interface implementation
@@ -53,4 +53,13 @@ func (pb *ProposerBlock) Bytes() []byte {
 
 func (pb *ProposerBlock) Height() uint64 {
 	return pb.wrappedBlock.Height()
+}
+
+//////// snowman.OracleBlock interface implementation
+func (pb *ProposerBlock) Options() ([2]snowman.Block, error) {
+	if oracleBlk, ok := pb.wrappedBlock.(snowman.OracleBlock); ok {
+		return oracleBlk.Options()
+	}
+
+	return [2]snowman.Block{}, ErrNotOracleBlock
 }
