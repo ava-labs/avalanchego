@@ -47,7 +47,7 @@ func NewDialer(network string, dialerConfig DialerConfig) Dialer {
 	if dialerConfig.throttleAps <= 0 {
 		throttler = NewNoThrottler()
 	} else {
-		throttler = NewWaitingThrottler(int(dialerConfig.throttleAps))
+		throttler = NewThrottler(int(dialerConfig.throttleAps))
 	}
 
 	return &dialer{
