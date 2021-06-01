@@ -25,7 +25,8 @@ TEST_SUITE_IMAGE="$DOCKER_REPO/avalanche-testing:apricot-phase2-db-upgrade"
 KURTOSIS_CORE_CHANNEL="1.0.3"
 INITIALIZER_IMAGE="kurtosistech/kurtosis-core_initializer:${KURTOSIS_CORE_CHANNEL}"
 API_IMAGE="kurtosistech/kurtosis-core_api:${KURTOSIS_CORE_CHANNEL}"
-PARALLELISM=4
+PARALLELISM=${PARALLELISM_OVERRIDE:-4} #export PARALLELISM_OVERRIDE=1 for underpowered machines
+
 
 docker pull "${BYZANTINE_IMAGE}"
 docker pull "$TEST_SUITE_IMAGE"
