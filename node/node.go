@@ -150,6 +150,18 @@ func (n *Node) initNetworking() error {
 	if err != nil {
 		return err
 	}
+
+	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
+	if err != nil {
+		n.Log.Info("this node's IP is set to: %q", n.Config.StakingIP.IP())
+	} else {
+		ipDesc = utils.IPDesc{
+			IP:   n.Config.StakingIP.IP().IP,
+			Port: ipDesc.Port,
+		}
+		n.Log.Info("this node's IP is set to: %q", ipDesc)
+	}
+
 	dialer := network.NewDialer(TCP)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
@@ -212,15 +224,7 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	versionManager := version.NewCompatibility(
-		Version,
-		MinimumCompatibleVersion,
-		GetApricotPhase2Time(n.Config.NetworkID),
-		PrevMinimumCompatibleVersion,
-		MinimumUnmaskedVersion,
-		GetApricotPhase0Time(n.Config.NetworkID),
-		PrevMinimumUnmaskedVersion,
-	)
+	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
@@ -229,7 +233,7 @@ func (n *Node) initNetworking() error {
 		n.Config.StakingIP,
 		n.Config.NetworkID,
 		versionManager,
-		VersionParser,
+		version.NewDefaultApplicationParser(),
 		listener,
 		dialer,
 		serverUpgrader,
@@ -247,6 +251,7 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
+		n.Config.FetchOnly,
 	)
 
 	return nil
@@ -335,9 +340,9 @@ func (n *Node) Dispatch() error {
 	})
 
 	// Add bootstrap nodes to the peer network
-	for _, peer := range n.Config.BootstrapPeers {
-		if !peer.IP.Equal(n.Config.StakingIP.IP()) {
-			n.Net.Track(peer.IP, peer.ID)
+	for _, peerIP := range n.Config.BootstrapIPs {
+		if !peerIP.Equal(n.Config.StakingIP.IP()) {
+			n.Net.TrackIP(peerIP)
 		} else {
 			n.Log.Error("can't add self as a bootstrapper")
 		}
@@ -394,8 +399,8 @@ func (n *Node) initDatabase(dbManager manager.Manager) error {
 // Set the node IDs of the peers this node should first connect to
 func (n *Node) initBeacons() error {
 	n.beacons = validators.NewSet()
-	for _, peer := range n.Config.BootstrapPeers {
-		if err := n.beacons.AddWeight(peer.ID, 1); err != nil {
+	for _, peerID := range n.Config.BootstrapIDs {
+		if err := n.beacons.AddWeight(peerID, 1); err != nil {
 			return err
 		}
 	}
@@ -563,8 +568,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	fetchOnlyFrom := validators.NewSet()
-	for _, peer := range n.Config.BootstrapPeers {
-		if err := fetchOnlyFrom.AddWeight(peer.ID, 1); err != nil {
+	for _, peerID := range n.Config.BootstrapIDs {
+		if err := fetchOnlyFrom.AddWeight(peerID, 1); err != nil {
 			return fmt.Errorf("couldn't initialize fetch from set: %w", err)
 		}
 	}
@@ -738,7 +743,7 @@ func (n *Node) initInfoAPI() error {
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
 		n.Log,
-		Version,
+		version.Current,
 		n.ID,
 		n.Config.NetworkID,
 		n.chainManager,
@@ -868,11 +873,11 @@ func (n *Node) Initialize(
 	}
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
-	n.Log.Info("node version is: %s", Version)
+	n.Log.Info("node version is: %s", version.Current)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 
-	httpLog, err := logFactory.MakeSubdir("http")
+	httpLog, err := logFactory.Make("http")
 	if err != nil {
 		return fmt.Errorf("problem initializing HTTP logger: %w", err)
 	}

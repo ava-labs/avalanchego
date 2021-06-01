@@ -12,6 +12,7 @@ import (
 
 // Server wraps a node so it can be served with the hashicorp plugin harness
 type Server struct {
+	appproto.UnimplementedNodeServer
 	app *process.App
 }
 

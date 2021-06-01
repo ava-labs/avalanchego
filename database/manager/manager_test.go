@@ -108,11 +108,17 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	err = db1.Close()
 	assert.NoError(t, err)
 
-	_, err = os.Create(path.Join(dir, "dummy"))
+	f, err := os.Create(path.Join(dir, "dummy"))
 	assert.NoError(t, err)
 
-	_, err = New(dir, logging.NoLog{}, v1, true)
-	assert.Error(t, err, "expected to error due to non-directory file being present")
+	err = f.Close()
+	assert.NoError(t, err)
+
+	db, err := New(dir, logging.NoLog{}, v1, true)
+	assert.NoError(t, err, "expected not to error with a non-directory file being present")
+
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestNewSortsDatabases(t *testing.T) {

@@ -219,7 +219,8 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		return
 	}
 	// Assert that there isn't already a chain with an alias in [chain].Aliases
-	// (Recall that the string repr. of a chain's ID is also an alias for a chain)
+	// (Recall that the string representation of a chain's ID is also an alias
+	//  for a chain)
 	if alias, isRepeat := m.isChainWithAlias(chainParams.ID.String()); isRepeat {
 		m.Log.Debug("there is already a chain with alias '%s'. Chain not created.",
 			alias)
@@ -234,26 +235,26 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
+		var onBootstrapped func()
 		if chainParams.SubnetID == constants.PrimaryNetworkID {
-			sb = &subnet{
-				onFinish: func() {
-					// When this subnet is done bootstrapping, mark that we have bootstrapped this database version.
-					// If running in fetch only mode, shut down node since fetching is complete.
-					if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
-						m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
-						go m.ShutdownNodeFunc(1)
-					}
-					if m.ManagerConfig.FetchOnly {
-						m.Log.Info("done with fetch only mode. Starting node shutdown")
-						go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
-					}
-				},
+			onBootstrapped = func() {
+				// When this subnet is done bootstrapping, mark that we have
+				// bootstrapped this database version. If running in fetch only
+				// mode, shut down node since fetching is complete.
+				if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
+					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
+					go m.ShutdownNodeFunc(1)
+				}
+				if m.ManagerConfig.FetchOnly {
+					m.Log.Info("done with fetch only mode. Starting node shutdown")
+					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
+				}
 			}
-		} else {
-			sb = &subnet{}
 		}
+		sb = newSubnet(onBootstrapped, chainParams.ID)
+	} else {
+		sb.addChain(chainParams.ID)
 	}
-	sb.addChain(chainParams.ID)
 
 	// In fetch-only mode, use custom bootstrap beacons
 	if m.FetchOnly {
@@ -263,8 +264,13 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
 		sb.removeChain(chainParams.ID)
-
-		m.Log.Error("Error while creating new chain: %s", err)
+		if m.CriticalChains.Contains(chainParams.ID) {
+			// Shut down if we fail to create a required chain (i.e. X, P or C)
+			m.Log.Fatal("error creating required chain %s: %s", chainParams.ID, err)
+			go m.ShutdownNodeFunc(1)
+			return
+		}
+		m.Log.Error("error creating chain %s: %s", chainParams.ID, err)
 		return
 	}
 
@@ -309,7 +315,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Create the log and context of the chain
-	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
+	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
@@ -512,7 +518,13 @@ func (m *manager) createAvalancheChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	delay := &router.Delay{}
+	// Asynchronously passes messages from the network to the consensus engine
+	handler := &router.Handler{}
+
+	timer := &router.Timer{
+		Handler: handler,
+		Preempt: sb.afterBootstrapped(),
+	}
 
 	// The engine handles consensus
 	engine := &aveng.Transitive{}
@@ -527,7 +539,7 @@ func (m *manager) createAvalancheChain(
 				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
 				Sender:                    &sender,
 				Subnet:                    sb,
-				Delay:                     delay,
+				Timer:                     timer,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -557,8 +569,6 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", chainAlias, err)
 	}
 
-	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
 	err = handler.Initialize(
 		engine,
 		validators,
@@ -569,7 +579,6 @@ func (m *manager) createAvalancheChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
-		delay,
 	)
 
 	return &chain{
@@ -639,7 +648,13 @@ func (m *manager) createSnowmanChain(
 		sampleK = int(bootstrapWeight)
 	}
 
-	delay := &router.Delay{}
+	// Asynchronously passes messages from the network to the consensus engine
+	handler := &router.Handler{}
+
+	timer := &router.Timer{
+		Handler: handler,
+		Preempt: sb.afterBootstrapped(),
+	}
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
@@ -654,7 +669,7 @@ func (m *manager) createSnowmanChain(
 				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
 				Sender:                    &sender,
 				Subnet:                    sb,
-				Delay:                     delay,
+				Timer:                     timer,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
@@ -668,8 +683,6 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error initializing snowman engine: %w", err)
 	}
 
-	// Asynchronously passes messages from the network to the consensus engine
-	handler := &router.Handler{}
 	err = handler.Initialize(
 		engine,
 		validators,
@@ -680,7 +693,6 @@ func (m *manager) createSnowmanChain(
 		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
-		delay,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message handler: %s", err)

@@ -80,7 +80,8 @@ type Config struct {
 	BenchlistConfig benchlist.Config
 
 	// Bootstrapping configuration
-	BootstrapPeers []*Peer
+	BootstrapIDs []ids.ShortID
+	BootstrapIPs []utils.IPDesc
 
 	// HTTP configuration
 	HTTPHost string

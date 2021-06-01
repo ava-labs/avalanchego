@@ -186,7 +186,7 @@ func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
 	args = append(
 		args,
 		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
-		fmt.Sprintf("--%s=%s", config.PluginDirKey, filepath.Join(nm.buildDirPath, preupgradeVersionDir, "plugins")),
+		fmt.Sprintf("--%s=%s", config.BuildDirKey, nm.buildDirPath),
 	)
 
 	binaryPath := filepath.Join(nm.buildDirPath, preupgradeVersionDir, "avalanchego-process")
@@ -210,7 +210,7 @@ func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*node
 		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0), // use any available port for staking port
 		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),    // use any available port for HTTP port
 		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
-		fmt.Sprintf("--%s=%s", config.LogsDirKey, filepath.Join(rootConfig.LoggingConfig.Directory, "fetch-only")),
+		fmt.Sprintf("--%s=%s", config.LogsDirKey, rootConfig.LoggingConfig.Directory+"-fetch-only"),
 		fmt.Sprintf("--%s=%s", config.RetryBootstrapKey, "true"),
 		fmt.Sprintf("--%s=%d", config.RetryBootstrapMaxAttemptsKey, 1000),
 		fmt.Sprintf("--%s=%s", config.BenchlistMinFailingDurationKey, "1000h"),

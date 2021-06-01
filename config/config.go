@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/kardianos/osext"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -62,6 +63,8 @@ var (
 	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs", "chains")
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
+
+	errInvalidStakerWeights = errors.New("staking weights must be positive")
 )
 
 func init() {
@@ -81,11 +84,6 @@ func init() {
 	)
 }
 
-var (
-	errBootstrapMismatch    = errors.New("more bootstrap IDs provided than bootstrap IPs")
-	errInvalidStakerWeights = errors.New("staking weights must be positive")
-)
-
 // avalancheFlagSet returns the complete set of flags for avalanchego
 func avalancheFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
@@ -103,8 +101,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.String(ConfigFileKey, "", "Specifies a config file")
 	// Genesis config File
 	fs.String(GenesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
-	// Plugins
-	fs.String(PluginDirKey, "", "Plugin directory for Avalanche VMs")
 	// Network ID
 	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
 	// AVAX fees
@@ -156,7 +152,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(NetworkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
-	fs.Uint(SendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
+	fs.Uint(SendQueueSizeKey, 512, "Max number of messages waiting to be sent to a given peer.")
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
@@ -298,6 +294,17 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	processConfig := process.Config{}
 	processConfig.DisplayVersionAndExit = v.GetBool(VersionKey)
 	processConfig.PluginMode = v.GetBool(PluginModeKey)
+
+	// Build directory should have this structure:
+	// build
+	// |_avalanchego-latest
+	//   |_avalanchego-process (the binary from compiling the app directory)
+	//   |_plugins
+	//     |_evm
+	// |_avalanchego-preupgrade
+	//   |_avalanchego-process (the binary from compiling the app directory)
+	//   |_plugins
+	//     |_evm
 	processConfig.BuildDir = os.ExpandEnv(v.GetString(BuildDirKey))
 	validBuildDir := func(dir string) bool {
 		info, err := os.Stat(dir)
@@ -329,6 +336,10 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// Then, get the node config
 	nodeConfig := node.Config{}
+
+	// Plugin directory defaults to [buildDirectory]/avalanchego-latest/plugins
+	nodeConfig.PluginDir = filepath.Join(processConfig.BuildDir, avalanchegoLatest, "plugins")
+
 	nodeConfig.FetchOnly = v.GetBool(FetchOnlyKey)
 
 	// Consensus Parameters
@@ -487,25 +498,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 			}
 			nodeConfig.WhitelistedSubnets.Add(subnetID)
 		}
-	}
-
-	// Build directory
-	// The directory should have this structure:
-	// build
-	// |_avalanchego-latest
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-	// |_avalanchego-preupgrade
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-
-	// Plugin directory. Defaults to [buildDirectory]/plugins
-	if !v.IsSet(PluginDirKey) {
-		nodeConfig.PluginDir = filepath.Join(processConfig.BuildDir, avalanchegoLatest, "plugins")
-	} else {
-		nodeConfig.PluginDir = v.GetString(PluginDirKey)
 	}
 
 	// HTTP:
@@ -788,16 +780,12 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 		if err != nil {
 			return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
 		}
-		config.BootstrapPeers = append(config.BootstrapPeers, &node.Peer{
-			IP: addr,
-		})
+		config.BootstrapIPs = append(config.BootstrapIPs, addr)
 	}
 
 	if v.IsSet(BootstrapIDsKey) {
 		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
 	}
-
-	i := 0
 	for _, id := range bootstrapIDs {
 		if id == "" {
 			continue
@@ -806,14 +794,7 @@ func initBootstrapPeers(v *viper.Viper, config *node.Config) error {
 		if err != nil {
 			return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 		}
-		if len(config.BootstrapPeers) <= i {
-			return errBootstrapMismatch
-		}
-		config.BootstrapPeers[i].ID = nodeID
-		i++
-	}
-	if len(config.BootstrapPeers) != i {
-		return fmt.Errorf("got %d bootstrap IPs but %d bootstrap IDs", len(config.BootstrapPeers), i)
+		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
 	}
 	return nil
 }
@@ -831,7 +812,7 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 	if processConfig.DisplayVersionAndExit {
 		format := "%s ["
 		args := []interface{}{
-			node.Version,
+			version.Current,
 		}
 
 		networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
@@ -847,7 +828,7 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 		args = append(args, networkGeneration)
 
 		format += ", database=%s"
-		args = append(args, node.DatabaseVersion)
+		args = append(args, version.CurrentDatabase)
 
 		if commit != "" {
 			format += ", commit=%s"

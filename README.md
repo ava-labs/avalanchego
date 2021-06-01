@@ -10,11 +10,14 @@ a blockchains platform with high throughput, and blazing fast transactions.
 ## Installation
 
 Avalanche is an incredibly lightweight protocol, so the minimum computer requirements are quite modest.
+Note that as network usage increases, hardware requirements may change.
 
-- Hardware: 2 GHz or faster CPU, 4 GB RAM, 20 GB hard disk.
+- Hardware: 2 GHz or faster CPU, 6 GB RAM, >= 200 GB storage.
 - OS: Ubuntu >= 18.04 or Mac OS X >= Catalina.
-- Software: [Go](https://golang.org/doc/install) version >= 1.15.5 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
 - Network: IPv4 or IPv6 network connection, with an open public port.
+- Software Dependencies:
+  - [Go](https://golang.org/doc/install) version >= 1.15.5 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
+  - [gcc](https://gcc.gnu.org/)
 
 ### Native Install
 
@@ -88,3 +91,19 @@ To create a single node testnet, run:
 ```
 
 This launches an Avalanche network with one node.
+
+### Running protobuf codegen
+
+To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the root of the repo
+
+This should only be necessary when upgrading protobuf versions or modifying .proto definition files
+
+To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) and protoc-gen-go installed. protoc must be on your $PATH.
+
+If you extract protoc to ~/software/protobuf/, the following should work:
+
+```sh
+export PATH=$PATH:~/software/protobuf/bin/:~/go/bin
+go get google.golang.org/protobuf/cmd/protoc-gen-go
+scripts/protobuf_codegen.sh
+```

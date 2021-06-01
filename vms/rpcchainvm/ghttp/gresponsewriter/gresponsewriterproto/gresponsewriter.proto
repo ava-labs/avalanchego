@@ -1,6 +1,6 @@
 syntax = "proto3";
 package gresponsewriterproto;
-option go_package = "gresponsewriterproto";
+option go_package = "github.com/ava-labs/avalanchego/rpcchainvm/ghttp/gresponsewriter/gresponsewriterproto";
 
 message Header {
     string key = 1;

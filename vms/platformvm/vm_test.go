@@ -807,6 +807,52 @@ func TestAddValidatorReject(t *testing.T) {
 	}
 }
 
+// Reject proposal to add validator to primary network
+func TestAddValidatorInvalidNotReissued(t *testing.T) {
+	vm, _ := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+
+	// Use nodeID that is already in the genesis
+	repeatNodeID := keys[0].PublicKey().Address()
+
+	startTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	endTime := startTime.Add(defaultMinStakingDuration)
+
+	// create valid tx
+	tx, err := vm.newAddValidatorTx(
+		vm.MinValidatorStake,
+		uint64(startTime.Unix()),
+		uint64(endTime.Unix()),
+		repeatNodeID,
+		repeatNodeID,
+		PercentDenominator,
+		[]*crypto.PrivateKeySECP256K1R{keys[0]},
+		ids.ShortEmpty, // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// trigger block creation
+	if err := vm.mempool.IssueTx(tx); err != nil {
+		t.Fatal(err)
+	}
+	_, err = vm.BuildBlock()
+	if err == nil {
+		t.Fatal("Expected BuildBlock to error due to adding a validator with a nodeID that is already in the validator set.")
+	}
+
+	if vm.mempool.unissuedProposalTxs.Len() > 0 {
+		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
+	}
+}
+
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
 	vm, _ := defaultVM()
@@ -2115,7 +2161,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&router.Delay{},
 	)
 	assert.NoError(t, err)
 

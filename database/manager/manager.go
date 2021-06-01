@@ -114,14 +114,16 @@ func New(
 			return nil
 		}
 
-		// The database directory should only contain database directories, no files.
+		// If the database directory contains any files, ignore them.
 		if !info.IsDir() {
-			return fmt.Errorf("unexpectedly found non-directory at %s", path)
+			return nil
 		}
 		_, dbName := filepath.Split(path)
 		version, err := parser.Parse(dbName)
 		if err != nil {
-			return err
+			// If the database directory contains any directories that don't
+			// match the expected version format, ignore them.
+			return filepath.SkipDir
 		}
 
 		// If [version] is greater than or equal to the specified version

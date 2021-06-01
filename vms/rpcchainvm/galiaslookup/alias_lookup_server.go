@@ -15,6 +15,7 @@ var _ galiaslookupproto.AliasLookupServer = &Server{}
 
 // Server enables alias lookups over RPC.
 type Server struct {
+	galiaslookupproto.UnimplementedAliasLookupServer
 	aliaser snow.AliasLookup
 }
 

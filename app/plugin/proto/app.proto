@@ -1,5 +1,6 @@
 syntax = "proto3";
 package appproto;
+option go_package = "github.com/ava-labs/avalanchego/main/plugin/proto";
 
 // To compile: protoc --go_out=plugins=grpc:. app.proto
 
