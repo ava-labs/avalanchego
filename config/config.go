@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -51,7 +52,6 @@ var (
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
-	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	// Places to look for the build directory
@@ -136,10 +136,7 @@ func avalancheFlagSet() *flag.FlagSet {
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
 	// Outgoing Connection Throttling
-	// When we make an outgoing connection we check the throttling configuration for the allowed
-	// number of actions per second. If the outgoing connection is within the limit we make that
-	// connection instantly, else we sleep for a randomised period to try again.
-	fs.Uint(OutboundConnectionThrottlingRps, 50, "Throttle outgoing connections to this number of requests per second.")
+	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
 	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Maximum amount of time to wait for the connection to be established.")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
@@ -248,13 +245,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 	// Build directory
-	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
-
-	// Profiles
-	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
-	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
-	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
-	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
+	fs.String(BuildDirKey, defaultBuildDirs[0], "path to the build directory")
 
 	return fs
 }
@@ -385,7 +376,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// DB:
 	nodeConfig.DBEnabled = v.GetBool(DBEnabledKey)
-	nodeConfig.DBPath = filepath.Join(
+	nodeConfig.DBPath = path.Join(
 		os.ExpandEnv(v.GetString(DBPathKey)),
 		constants.NetworkName(nodeConfig.NetworkID),
 	)
@@ -717,12 +708,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// Peer alias
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
-
-	// Profile config
-	nodeConfig.ProfilerConfig.Dir = os.ExpandEnv(v.GetString(ProfileDirKey))
-	nodeConfig.ProfilerConfig.Enabled = v.GetBool(ProfileContinuousEnabledKey)
-	nodeConfig.ProfilerConfig.Freq = v.GetDuration(ProfileContinuousFreqKey)
-	nodeConfig.ProfilerConfig.MaxNumFiles = v.GetInt(ProfileContinuousMaxFilesKey)
 
 	return nodeConfig, processConfig, nil
 }
