@@ -116,12 +116,8 @@ func TestPeer_Close(t *testing.T) {
 		1,
 	)
 	caller.outbounds[ip1.IP().String()] = listener
-	cch, ech, _ := caller.Dial(context.Background(), ip1.IP())
-	var conn net.Conn
-	select {
-	case conn = <-cch:
-	case <-ech: // ignore
-	}
+	conn, err := caller.Dial(context.Background(), ip1.IP())
+	assert.NoError(t, err)
 
 	basenetwork := netwrk.(*network)
 
