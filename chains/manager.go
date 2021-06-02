@@ -611,14 +611,14 @@ func (m *manager) createSnowmanChain(
 
 	vm = block.NewMeterVM(vm)
 
-	metricsManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := metricsManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
