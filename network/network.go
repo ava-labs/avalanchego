@@ -1139,8 +1139,15 @@ func (n *network) gossipPeerList() {
 	}
 }
 
-// assumes the stateLock is not held. Only returns if the ip is connected to or
-// the network is closed
+// Returns when:
+// * We connected to [ip]
+// * The network is closed
+// * We gave up connecting to [ip] because the IP is stale
+// If [nodeID] == ids.ShortEmpty, won't cancel an existing
+// attempt to connect to the peer with that IP.
+// We do this so we don't cancel attempted to connect to bootstrap beacons.
+// See method TrackIP.
+// Assumes [n.stateLock] isn't held when this method is called.
 func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	str := ip.String()
 	n.stateLock.RLock()
@@ -1196,8 +1203,12 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 
 		// If we are already trying to connect to this node ID,
 		// cancel the existing attempt.
-		if cancel, exists := n.connAttempts.Load(nodeID); exists {
-			cancel.(context.CancelFunc)()
+		// If [nodeID] is the empty ID, [ip] is a bootstrap beacon.
+		// In that case, don't cancel existing connection attempt.
+		if nodeID != ids.ShortEmpty {
+			if cancel, exists := n.connAttempts.Load(nodeID); exists {
+				cancel.(context.CancelFunc)()
+			}
 		}
 
 		// When [cancel] is called, we give up on this attempt to connect

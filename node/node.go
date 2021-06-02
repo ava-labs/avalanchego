@@ -212,7 +212,7 @@ func (n *Node) initNetworking() error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Warn("Failed to connect to bootstrap nodes. Node shutting down...")
+				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
 		})
