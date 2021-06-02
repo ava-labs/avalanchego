@@ -4,26 +4,15 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
-	"fmt"
-	"os"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
-	"github.com/ava-labs/coreth/plugin/evm"
-)
-
-var (
-	cliConfig evm.CommandLineConfig
-	version   bool
 )
 
 func corethFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet("coreth", flag.ContinueOnError)
 
-	fs.String(configKey, "", "Pass in CLI Config to set runtime attributes for Coreth")
 	fs.Bool(versionKey, false, "If true, print version and quit")
 
 	return fs
@@ -43,28 +32,14 @@ func getViper() (*viper.Viper, error) {
 	return v, nil
 }
 
-func init() {
+func PrintVersion() (bool, error) {
 	v, err := getViper()
 	if err != nil {
-		cliConfig.FlagError = err
-		return
+		return false, err
 	}
 
 	if v.GetBool(versionKey) {
-		fmt.Println(evm.Version)
-		os.Exit(0)
+		return true, nil
 	}
-
-	if v.IsSet(configKey) {
-		config := v.GetString(configKey)
-		cliConfig.FlagError = json.Unmarshal([]byte(config), &cliConfig)
-	} else {
-		cliConfig.EthAPIEnabled = true
-		cliConfig.NetAPIEnabled = true
-		cliConfig.Web3APIEnabled = true
-		cliConfig.RPCGasCap = 2500000000  // 25000000 x 100
-		cliConfig.RPCTxFeeCap = 100       // 100 AVAX
-		cliConfig.APIMaxDuration = 0      // Default to no maximum API Call duration
-		cliConfig.MaxBlocksPerRequest = 0 // Default to no maximum on the number of blocks per getLogs request
-	}
+	return false, nil
 }
