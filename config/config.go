@@ -139,7 +139,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	// When we make an outgoing connection we check the throttling configuration for the allowed
 	// number of actions per second. If the outgoing connection is within the limit we make that
 	// connection instantly, else we sleep for a randomised period to try again.
-	fs.Uint(OutConnThrottlingAps, 50, "Throttle outgoing connections to this number of actions per second.")
+	fs.Uint(OutboundConnectionThrottlingRps, 50, "Throttle outgoing connections to this number of requests per second.")
+	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Maximum amount of time to wait for the connection to be established.")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
@@ -610,8 +611,9 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Outbound connection throttling
-	outConnThrottleAps := v.GetUint32(OutConnThrottlingAps)
-	nodeConfig.DialerConfig = network.NewDialerConfig(outConnThrottleAps)
+	outboundConnectionThrottlingRps := v.GetUint32(OutboundConnectionThrottlingRps)
+	dialTimeout := v.GetDuration(OutboundConnectionTimeout)
+	nodeConfig.DialerConfig = network.NewDialerConfig(outboundConnectionThrottlingRps, dialTimeout)
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)

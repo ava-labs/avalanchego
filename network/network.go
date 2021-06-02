@@ -1234,7 +1234,7 @@ func (n *network) attemptConnect(ctx context.Context, ip utils.IPDesc) error {
 	conn, err := n.dialer.Dial(ctx, ip)
 	if err != nil {
 		// If [ctx] was canceled, return nil so we don't try to connect again
-		if ctx.Err() != nil {
+		if ctx.Err() == context.Canceled {
 			return nil
 		}
 		// Error wasn't because connection attempt was canceled
