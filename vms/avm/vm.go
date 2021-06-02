@@ -88,6 +88,8 @@ type VM struct {
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
+	// asset id that will be used for fees
+	feeAssetID ids.ID
 	// fee that must be burned by every state creating transaction
 	creationTxFee uint64
 	// fee that must be burned by every non-state creating transaction
@@ -527,12 +529,12 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 		return err
 	}
 
-	initialized, err := vm.state.IsInitialized()
+	stateInitialized, err := vm.state.IsInitialized()
 	if err != nil {
 		return err
 	}
 
-	for _, genesisTx := range genesis.Txs {
+	for index, genesisTx := range genesis.Txs {
 		if len(genesisTx.Outs) != 0 {
 			return errGenesisAssetMustHaveState
 		}
@@ -550,13 +552,16 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 			return err
 		}
 
-		if !initialized {
+		if !stateInitialized {
 			if err := vm.initState(tx); err != nil {
 				return err
 			}
 		}
+		if index == 0 {
+			vm.initFeeAsset(tx)
+		}
 	}
-	if !initialized {
+	if !stateInitialized {
 		return vm.state.SetInitialized()
 	}
 	return nil
@@ -577,6 +582,13 @@ func (vm *VM) initState(tx Tx) error {
 		}
 	}
 	return nil
+}
+
+func (vm *VM) initFeeAsset(tx Tx) {
+	txID := tx.ID()
+	alias, _ := vm.PrimaryAlias(txID)
+	vm.ctx.Log.Info("Fee payments are using Asset with Alias: %s, AssetID: %s", alias, txID)
+	vm.feeAssetID = txID
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
