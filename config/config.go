@@ -245,7 +245,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 	// Build directory
-	fs.String(BuildDirKey, defaultBuildDirs[0], "Path. to the build directory")
+	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Profiles
 	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
