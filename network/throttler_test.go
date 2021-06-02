@@ -40,7 +40,7 @@ func TestThrottler(t *testing.T) {
 
 	select {
 	case <-time.After(25 * time.Millisecond):
-		return
+		break
 	case <-acquiredChan:
 		t.Fatal("should not have been able to acquire immediately")
 	}
