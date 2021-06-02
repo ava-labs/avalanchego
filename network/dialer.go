@@ -42,10 +42,14 @@ func NewDialerConfig(throttleRps uint32, dialTimeout time.Duration) DialerConfig
 func NewDialer(network string, dialerConfig DialerConfig) Dialer {
 	var throttler Throttler
 	if dialerConfig.throttleRps <= 0 {
+		fmt.Println("Throttling is turned off")
 		throttler = NewNoThrottler()
 	} else {
+		fmt.Printf("Throttling %d rps\n", dialerConfig.throttleRps)
 		throttler = NewThrottler(int(dialerConfig.throttleRps))
 	}
+
+	fmt.Println("Connection timeout", dialerConfig.connectionTimeout)
 
 	return &dialer{
 		network:           network,
