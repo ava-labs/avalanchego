@@ -2352,7 +2352,7 @@ func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtAr
 
 	validators, err := service.vm.GetValidatorSet(uint64(args.Height), args.SubnetID)
 	if err != nil {
-		return fmt.Errorf("couldn't get reward UTXOs: %w", err)
+		return fmt.Errorf("couldn't get validator set: %w", err)
 	}
 
 	reply.Validators = make(map[string]uint64, len(validators))
