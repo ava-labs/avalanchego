@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,7 +64,7 @@ func TestDialerCancelDial(t *testing.T) {
 	}
 
 	// Create a dialer that should allow 10 outgoing connections per second
-	dialer := NewDialer("tcp", NewDialerConfig(10, 30*time.Second))
+	dialer := NewDialer("tcp", NewDialerConfig(10, 30*time.Second), logging.NoLog{})
 	// Make 5 outgoing connections. Should not be throttled.
 	for i := 0; i < 5; i++ {
 		startTime := time.Now()

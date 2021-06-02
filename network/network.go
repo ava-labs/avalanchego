@@ -1207,6 +1207,7 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 		// In that case, don't cancel existing connection attempt.
 		if nodeID != ids.ShortEmpty {
 			if cancel, exists := n.connAttempts.Load(nodeID); exists {
+				n.log.Verbo("canceling attempt to connect to stale IP of %s%s", constants.NodeIDPrefix, nodeID)
 				cancel.(context.CancelFunc)()
 			}
 		}
