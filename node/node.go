@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -82,6 +83,9 @@ type Node struct {
 	// Storage for this node
 	DBManager manager.Manager
 	DB        database.Database
+
+	// Profiles the process. Nil if continuous profiling is disabled.
+	profiler profiler.ContinuousProfiler
 
 	// Indexes blocks, transactions and blocks
 	indexer indexer.Indexer
@@ -728,11 +732,33 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir)
 	if err != nil {
 		return err
 	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+}
+
+// initProfiler initializes the continuous profiling
+func (n *Node) initProfiler() {
+	if !n.Config.ProfilerConfig.Enabled {
+		n.Log.Info("skipping profiler initialization because it has been disabled")
+		return
+	}
+
+	n.Log.Info("initializing continuous profiler")
+	n.profiler = profiler.NewContinuous(
+		filepath.Join(n.Config.ProfilerConfig.Dir, "continuous"),
+		n.Config.ProfilerConfig.Freq,
+		n.Config.ProfilerConfig.MaxNumFiles,
+	)
+	go n.Log.RecoverAndPanic(func() {
+		err := n.profiler.Dispatch()
+		if err != nil {
+			n.Log.Fatal("continuous profiler failed with %s", err)
+		}
+		n.Shutdown(1)
+	})
 }
 
 func (n *Node) initInfoAPI() error {
@@ -939,6 +965,9 @@ func (n *Node) Initialize(
 	if err := n.initIndexer(); err != nil {
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
+
+	n.initProfiler()
+
 	// Start the Platform chain
 	n.initChains(n.Config.GenesisBytes)
 	return nil
@@ -963,6 +992,9 @@ func (n *Node) shutdown() {
 	}
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
+	}
+	if n.profiler != nil {
+		n.profiler.Shutdown()
 	}
 	if n.Net != nil {
 		// Close already logs its own error if one occurs, so the error is ignored here

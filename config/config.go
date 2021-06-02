@@ -58,6 +58,7 @@ var (
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
+	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs", "chains")
@@ -250,12 +251,21 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Indexer
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
+
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 	// Build directory
-	fs.String(BuildDirKey, defaultBuildDirs[0], "path to the build directory")
+	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
+
 	// Chain Config Dir
-	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Chain specific configurations parent directory. Defaults to $HOME/.avalancego/configs/chains/")
+	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Chain specific configurations parent directory. Defaults to $HOME/.avalanchego/configs/chains/")
+
+	// Profiles
+	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
+	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
+	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
+	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
+
 	return fs
 }
 
@@ -394,7 +404,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// DB:
 	nodeConfig.DBEnabled = v.GetBool(DBEnabledKey)
-	nodeConfig.DBPath = path.Join(
+	nodeConfig.DBPath = filepath.Join(
 		os.ExpandEnv(v.GetString(DBPathKey)),
 		constants.NetworkName(nodeConfig.NetworkID),
 	)
@@ -713,6 +723,12 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 		return node.Config{}, process.Config{}, err
 	}
 	nodeConfig.ChainConfigs = chainConfigs
+
+	// Profile config
+	nodeConfig.ProfilerConfig.Dir = os.ExpandEnv(v.GetString(ProfileDirKey))
+	nodeConfig.ProfilerConfig.Enabled = v.GetBool(ProfileContinuousEnabledKey)
+	nodeConfig.ProfilerConfig.Freq = v.GetDuration(ProfileContinuousFreqKey)
+	nodeConfig.ProfilerConfig.MaxNumFiles = v.GetInt(ProfileContinuousMaxFilesKey)
 
 	return nodeConfig, processConfig, nil
 }
