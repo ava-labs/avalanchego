@@ -1941,23 +1941,6 @@ func TestRestartFullyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	/*
-		//This code, when uncommented, prints [secondAdvanceTimeBlkBytes]
-		secondAdvanceTimeTx, err := firstVM.newAdvanceTimeTx(defaultGenesisTime.Add(2 * time.Second))
-		if err != nil {
-			t.Fatal(err)
-		}
-		preferredHeight, err = firstVM.preferredHeight()
-		if err != nil {
-			t.Fatal(err)
-		}
-		secondAdvanceTimeBlk, err := firstVM.newProposalBlock(firstVM.Preferred(), preferredHeight+1, *secondAdvanceTimeTx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Fatal(secondAdvanceTimeBlk.Bytes())
-	*/
-
 	// Byte representation of block that proposes advancing time to defaultGenesisTime + 2 seconds
 	secondAdvanceTimeBlkBytes := []byte{
 		0, 0,
