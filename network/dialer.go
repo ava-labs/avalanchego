@@ -30,9 +30,9 @@ type DialerConfig struct {
 	connectionTimeout time.Duration
 }
 
-func NewDialerConfig(throttleAps uint32, dialTimeout time.Duration) DialerConfig {
+func NewDialerConfig(throttleRps uint32, dialTimeout time.Duration) DialerConfig {
 	return DialerConfig{
-		throttleAps,
+		throttleRps,
 		dialTimeout,
 	}
 }
