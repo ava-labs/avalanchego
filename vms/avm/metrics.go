@@ -20,8 +20,6 @@ func newCallsMetric(namespace, name string) prometheus.Counter {
 }
 
 type metrics struct {
-	numBootstrappingCalls, numBootstrappedCalls, numCreateHandlersCalls,
-
 	numTxRefreshes, numTxRefreshHits, numTxRefreshMisses prometheus.Counter
 
 	apiRequestMetric metricutils.APIRequestMetrics
@@ -31,9 +29,6 @@ func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
-	m.numBootstrappingCalls = newCallsMetric(namespace, "bootstrapping")
-	m.numBootstrappedCalls = newCallsMetric(namespace, "bootstrapped")
-	m.numCreateHandlersCalls = newCallsMetric(namespace, "create_handlers")
 
 	m.numTxRefreshes = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
@@ -54,9 +49,6 @@ func (m *metrics) Initialize(
 	m.apiRequestMetric = metricutils.NewAPIMetrics(namespace)
 	errs := wrappers.Errs{}
 	errs.Add(
-		registerer.Register(m.numBootstrappingCalls),
-		registerer.Register(m.numBootstrappedCalls),
-		registerer.Register(m.numCreateHandlersCalls),
 		registerer.Register(m.numTxRefreshes),
 		registerer.Register(m.numTxRefreshHits),
 		registerer.Register(m.numTxRefreshMisses),
