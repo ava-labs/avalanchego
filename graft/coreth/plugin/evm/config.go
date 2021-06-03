@@ -3,16 +3,22 @@
 
 package evm
 
-import "github.com/ava-labs/coreth/eth"
+import (
+	"time"
+
+	"github.com/ava-labs/coreth/eth"
+)
 
 const (
-	defaultEthApiEnabled       = true
-	defaultNetApiEnabled       = true
-	defaultWeb3ApiEnabled      = true
-	defaultRpcGasCap           = 2500000000 // 25000000 X 100
-	defaultRpcTxFeeCap         = 100        // 100 AVAX
-	defaultApiMaxDuration      = 0          // Default to no maximum API Call duration
-	defaultMaxBlocksPerRequest = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultEthApiEnabled               = true
+	defaultNetApiEnabled               = true
+	defaultWeb3ApiEnabled              = true
+	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
+	defaultRpcTxFeeCap                 = 100        // 100 AVAX
+	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
+	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultContinuousProfilerFrequency = 15 * time.Minute
+	defaultContinuousProfilerMaxFiles  = 5
 )
 
 // Config ...
@@ -21,6 +27,11 @@ type Config struct {
 	SnowmanAPIEnabled     bool `json:"snowman-api-enabled"`
 	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
 	NetAPIEnabled         bool `json:"net-api-enabled"`
+
+	// Continuous Profiler
+	ContinuousProfilerDir       string        `json:"continuous-profiler-dir"`       // If set to non-empty string creates a continuous profiler
+	ContinuousProfilerFrequency time.Duration `json:"continuous-profiler-frequency"` // Frequency to run continuous profiler if enabled
+	ContinuousProfilerMaxFiles  int           `json:"continuous-profiler-max-files"` // Maximum number of files to maintain
 
 	// Coreth API Gas/Price Caps
 	RPCGasCap   uint64  `json:"rpc-gas-cap"`
@@ -77,4 +88,6 @@ func (c *Config) SetDefaults() {
 	c.RPCTxFeeCap = defaultRpcTxFeeCap
 	c.APIMaxDuration = defaultApiMaxDuration
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
+	c.ContinuousProfilerFrequency = defaultContinuousProfilerFrequency
+	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
 }
