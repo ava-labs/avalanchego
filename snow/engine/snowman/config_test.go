@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/bootstrap"
-	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 func DefaultConfig() Config {
@@ -22,7 +21,7 @@ func DefaultConfig() Config {
 		Config: bootstrap.Config{
 			Config:  common.DefaultConfigTest(),
 			Blocked: blocked,
-			ProVM:   proposervm.NewProVM(&block.TestVM{}),
+			VM:      &block.TestVM{},
 		},
 		Params: snowball.Parameters{
 			Metrics:               prometheus.NewRegistry(),

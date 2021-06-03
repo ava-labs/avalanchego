@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
@@ -89,11 +88,11 @@ func (t *Transitive) Initialize(config Config) error {
 // When bootstrapping is finished, this will be called.
 // This initializes the consensus engine with the last accepted block.
 func (t *Transitive) finishBootstrapping() error {
-	lastAcceptedID, err := t.ProVM.LastAccepted()
+	lastAcceptedID, err := t.VM.LastAccepted()
 	if err != nil {
 		return err
 	}
-	lastAccepted, err := t.ProVM.GetBlock(lastAcceptedID)
+	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
 		return err
@@ -106,24 +105,23 @@ func (t *Transitive) finishBootstrapping() error {
 
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
-		options, err := oracleBlk.Options()
-		switch {
-		case err == proposervm.ErrNotOracleBlock:
-			// if there aren't blocks we need to deliver on startup, we need to set
-			// the preference to the last accepted block
-			if err := t.ProVM.SetPreference(lastAcceptedID); err != nil {
+	switch blk := lastAccepted.(type) {
+	case snowman.OracleBlock:
+		options, err := blk.Options()
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
+			// note that deliver will set the VM's preference
+			if err := t.deliver(blk); err != nil {
 				return err
 			}
-		case err != nil:
+		}
+	default:
+		// if there aren't blocks we need to deliver on startup, we need to set
+		// the preference to the last accepted block
+		if err := t.VM.SetPreference(lastAcceptedID); err != nil {
 			return err
-		default:
-			for _, blk := range options {
-				// note that deliver will set the VM's preference
-				if err := t.deliver(blk); err != nil {
-					return err
-				}
-			}
 		}
 	}
 
@@ -133,11 +131,11 @@ func (t *Transitive) finishBootstrapping() error {
 
 // Gossip implements the Engine interface
 func (t *Transitive) Gossip() error {
-	blkID, err := t.ProVM.LastAccepted()
+	blkID, err := t.VM.LastAccepted()
 	if err != nil {
 		return err
 	}
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
 		return nil
@@ -150,12 +148,12 @@ func (t *Transitive) Gossip() error {
 // Shutdown implements the Engine interface
 func (t *Transitive) Shutdown() error {
 	t.Ctx.Log.Info("shutting down consensus engine")
-	return t.ProVM.Shutdown()
+	return t.VM.Shutdown()
 }
 
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
@@ -172,7 +170,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	startTime := time.Now()
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.VM.GetBlock(blkID)
 	if err != nil { // Don't have the block. Drop this request.
 		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)", blkID, vdr, requestID, blkID)
 		return nil
@@ -216,7 +214,7 @@ func (t *Transitive) Put(vdr ids.ShortID, requestID uint32, blkID ids.ID, blkByt
 		return nil
 	}
 
-	blk, err := t.ProVM.ParseBlock(blkBytes)
+	blk, err := t.VM.ParseBlock(blkBytes)
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
 		t.Ctx.Log.Verbo("block:\n%s", formatting.DumpBytes{Bytes: blkBytes})
@@ -299,7 +297,7 @@ func (t *Transitive) PushQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID, 
 		return nil
 	}
 
-	blk, err := t.ProVM.ParseBlock(blkBytes)
+	blk, err := t.VM.ParseBlock(blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
 	if err != nil {
 		t.Ctx.Log.Debug("failed to parse block %s: %s", blkID, err)
@@ -407,7 +405,7 @@ func (t *Transitive) buildBlocks() error {
 	for t.pendingBuildBlocks > 0 && t.Consensus.NumProcessing() < t.Params.OptimalProcessing {
 		t.pendingBuildBlocks--
 
-		blk, err := t.ProVM.BuildBlock()
+		blk, err := t.VM.BuildBlock()
 		if err != nil {
 			t.Ctx.Log.Debug("VM.BuildBlock errored with: %s", err)
 			return nil
@@ -457,7 +455,7 @@ func (t *Transitive) repoll() {
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
 func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
-	blk, err := t.ProVM.GetBlock(blkID)
+	blk, err := t.VM.GetBlock(blkID)
 	if err != nil {
 		t.sendRequest(vdr, blkID)
 		return false, nil
@@ -668,28 +666,25 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// any potential reentrant bugs.
 	added := []snowman.Block{}
 	dropped := []snowman.Block{}
-
 	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options()
-		if err != proposervm.ErrNotOracleBlock {
-			if err != nil {
-				return err
-			}
-			for _, blk := range options {
-				if err := blk.Verify(); err != nil {
-					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
-					dropped = append(dropped, blk)
-				} else {
-					if err := t.Consensus.Add(blk); err != nil {
-						return err
-					}
-					added = append(added, blk)
+		if err != nil {
+			return err
+		}
+		for _, blk := range options {
+			if err := blk.Verify(); err != nil {
+				t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+				dropped = append(dropped, blk)
+			} else {
+				if err := t.Consensus.Add(blk); err != nil {
+					return err
 				}
+				added = append(added, blk)
 			}
 		}
 	}
 
-	if err := t.ProVM.SetPreference(t.Consensus.Preference()); err != nil {
+	if err := t.VM.SetPreference(t.Consensus.Preference()); err != nil {
 		return err
 	}
 
@@ -740,7 +735,7 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 	if t.Ctx.IsBootstrapped() {
 		consensusIntf, consensusErr = t.Consensus.HealthCheck()
 	}
-	vmIntf, vmErr := t.ProVM.HealthCheck()
+	vmIntf, vmErr := t.VM.HealthCheck()
 	intf := map[string]interface{}{
 		"consensus": consensusIntf,
 		"vm":        vmIntf,
@@ -756,10 +751,10 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 
 // GetBlock implements the snowman.Engine interface
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
-	return t.ProVM.GetBlock(blkID)
+	return t.VM.GetBlock(blkID)
 }
 
 // GetVM implements the snowman.Engine interface
 func (t *Transitive) GetVM() common.VM {
-	return &t.ProVM
+	return t.VM
 }

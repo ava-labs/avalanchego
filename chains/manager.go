@@ -678,7 +678,7 @@ func (m *manager) createSnowmanChain(
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
 			},
 			Blocked:      blocked,
-			ProVM:        proposerVM,
+			VM:           &proposerVM,
 			Bootstrapped: m.unblockChains,
 		},
 		Params:    consensusParams,

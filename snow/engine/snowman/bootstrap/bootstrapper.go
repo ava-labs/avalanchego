@@ -16,8 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -32,7 +33,7 @@ type Config struct {
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing
 
-	ProVM proposervm.VM
+	VM block.ChainVM
 
 	Bootstrapped func()
 }
@@ -53,7 +54,7 @@ type Bootstrapper struct {
 	// Blocked tracks operations that are blocked on blocks
 	Blocked *queue.JobsWithMissing
 
-	ProVM proposervm.VM
+	VM block.ChainVM
 
 	Bootstrapped func()
 
@@ -73,16 +74,16 @@ func (b *Bootstrapper) Initialize(
 	registerer prometheus.Registerer,
 ) error {
 	b.Blocked = config.Blocked
-	b.ProVM = config.ProVM
+	b.VM = config.VM
 	b.Bootstrapped = config.Bootstrapped
 	b.OnFinished = onFinished
 	b.executedStateTransitions = math.MaxInt32
 	b.startingAcceptedFrontier = ids.Set{}
-	lastAcceptedID, err := b.ProVM.LastAccepted()
+	lastAcceptedID, err := b.VM.LastAccepted()
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted ID: %s", err)
 	}
-	lastAccepted, err := b.ProVM.GetBlock(lastAcceptedID)
+	lastAccepted, err := b.VM.GetBlock(lastAcceptedID)
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block: %s", err)
 	}
@@ -96,7 +97,7 @@ func (b *Bootstrapper) Initialize(
 		log:         config.Ctx.Log,
 		numAccepted: b.numAccepted,
 		numDropped:  b.numDropped,
-		proVM:       b.ProVM,
+		vm:          b.VM,
 	}
 	if err := b.Blocked.SetParser(b.parser); err != nil {
 		return err
@@ -108,7 +109,7 @@ func (b *Bootstrapper) Initialize(
 
 // CurrentAcceptedFrontier returns the last accepted block
 func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
-	lastAccepted, err := b.ProVM.LastAccepted()
+	lastAccepted, err := b.VM.LastAccepted()
 	return []ids.ID{lastAccepted}, err
 }
 
@@ -116,7 +117,7 @@ func (b *Bootstrapper) CurrentAcceptedFrontier() ([]ids.ID, error) {
 func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	acceptedIDs := make([]ids.ID, 0, len(containerIDs))
 	for _, blkID := range containerIDs {
-		if blk, err := b.ProVM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
+		if blk, err := b.VM.GetBlock(blkID); err == nil && blk.Status() == choices.Accepted {
 			acceptedIDs = append(acceptedIDs, blkID)
 		}
 	}
@@ -125,7 +126,7 @@ func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 
 // ForceAccepted ...
 func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
-	if err := b.ProVM.Bootstrapping(); err != nil {
+	if err := b.VM.Bootstrapping(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",
 			err)
 	}
@@ -141,7 +142,7 @@ func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	b.Ctx.Log.Debug("Starting bootstrapping with %d pending blocks and %d from the accepted frontier", len(pendingContainerIDs), len(acceptedContainerIDs))
 	for _, blkID := range pendingContainerIDs {
 		b.startingAcceptedFrontier.Add(blkID)
-		if blk, err := b.ProVM.GetBlock(blkID); err == nil {
+		if blk, err := b.VM.GetBlock(blkID); err == nil {
 			if height := blk.Height(); height > b.tipHeight {
 				b.tipHeight = height
 			}
@@ -179,7 +180,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	}
 
 	// Make sure we don't already have this block
-	if _, err := b.ProVM.GetBlock(blkID); err == nil {
+	if _, err := b.VM.GetBlock(blkID); err == nil {
 		if numPending := b.Blocked.NumMissingIDs(); numPending == 0 {
 			return b.checkFinish()
 		}
@@ -218,7 +219,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		return nil
 	}
 
-	wantedBlk, err := b.ProVM.ParseBlock(blks[0]) // the block we requested
+	wantedBlk, err := b.VM.ParseBlock(blks[0]) // the block we requested
 	if err != nil {
 		b.Ctx.Log.Debug("Failed to parse requested block %s: %s", wantedBlkID, err)
 		return b.fetch(wantedBlkID)
@@ -229,7 +230,7 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 	}
 
 	for _, blkBytes := range blks[1:] {
-		if _, err := b.ProVM.ParseBlock(blkBytes); err != nil { // persists the block
+		if _, err := b.VM.ParseBlock(blkBytes); err != nil { // persists the block
 			b.Ctx.Log.Debug("Failed to parse block: %s", err)
 			b.Ctx.Log.Verbo("block: %s", formatting.DumpBytes{Bytes: blkBytes})
 		}
@@ -385,7 +386,7 @@ func (b *Bootstrapper) checkFinish() error {
 }
 
 func (b *Bootstrapper) finish() error {
-	if err := b.ProVM.Bootstrapped(); err != nil {
+	if err := b.VM.Bootstrapped(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has finished: %w",
 			err)
 	}
@@ -400,20 +401,20 @@ func (b *Bootstrapper) finish() error {
 
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
-	ok, err := b.ProVM.Connected(validatorID)
-	if ok && err != nil {
-		return nil
+	if connector, ok := b.VM.(validators.Connector); ok {
+		if err := connector.Connected(validatorID); err != nil {
+			return err
+		}
 	}
-
 	return b.Bootstrapper.Connected(validatorID)
 }
 
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
-	ok, err := b.ProVM.Disconnected(validatorID)
-	if ok && err != nil {
-		return nil
+	if connector, ok := b.VM.(validators.Connector); ok {
+		if err := connector.Disconnected(validatorID); err != nil {
+			return err
+		}
 	}
-
 	return b.Bootstrapper.Disconnected(validatorID)
 }

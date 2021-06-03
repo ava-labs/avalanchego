@@ -54,7 +54,7 @@ func (v *voter) Update() {
 		return
 	}
 
-	if err := v.t.ProVM.SetPreference(v.t.Consensus.Preference()); err != nil {
+	if err := v.t.VM.SetPreference(v.t.Consensus.Preference()); err != nil {
 		v.t.errs.Add(err)
 		return
 	}
@@ -72,7 +72,7 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.ProVM.GetBlock(vote)
+		blk, err := v.t.VM.GetBlock(vote)
 		if err != nil {
 			continue
 		}

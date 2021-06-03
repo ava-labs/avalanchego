@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 var errUnknownBlock = errors.New("unknown block")
@@ -32,15 +31,14 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 
 	peers := validators.NewSet()
 	db := memdb.New()
-
 	sender := &common.SenderTest{}
-	sender.T = t
-	sender.Default(true)
-
 	vm := &block.TestVM{}
+
+	sender.T = t
 	vm.T = t
+
+	sender.Default(true)
 	vm.Default(true)
-	proVM := proposervm.NewProVM(vm)
 
 	isBootstrapped := false
 	subnet := &common.SubnetTest{
@@ -71,7 +69,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 	return Config{
 		Config:  commonConfig,
 		Blocked: blocker,
-		ProVM:   proVM,
+		VM:      vm,
 	}, peer, sender, vm
 }
 
