@@ -15,6 +15,38 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
+type TestOptionsBlock struct {
+	snowman.TestBlock
+}
+
+func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
+	return [2]snowman.Block{}, nil
+}
+
+func TestProposerBlockOptionsHandling(t *testing.T) {
+	// setup
+	noOptionBlock := snowman.TestBlock{}
+	proBlk := ProposerBlock{
+		Block: &noOptionBlock,
+	}
+
+	// test
+	_, err := proBlk.Options()
+	if err != ErrNotOracleBlock {
+		t.Fatal("Proposer block should signal that it wraps a block not implementing Options interface with ErrNotOracleBlock error")
+	}
+
+	proBlk = ProposerBlock{
+		Block: &TestOptionsBlock{},
+	}
+
+	// test
+	_, err = proBlk.Options()
+	if err != nil {
+		t.Fatal("Proposer block should forward wrapped block options if this implements Option interface")
+	}
+}
+
 func TestProposerVmInitializeRecordsGenesis(t *testing.T) {
 	// setup
 	genesisBlk := &snowman.TestBlock{
