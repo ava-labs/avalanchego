@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -275,7 +276,6 @@ func getViper() (*viper.Viper, error) {
 	v := viper.New()
 	fs := avalancheFlagSet()
 	pflag.CommandLine.AddGoFlagSet(fs)
-
 	// Flag deprecations must be before parse
 	if err := deprecateFlags(); err != nil {
 		return nil, err
@@ -291,8 +291,9 @@ func getViper() (*viper.Viper, error) {
 			return nil, err
 		}
 	}
+
 	// Config deprecations must be after v.ReadInConfig
-	deprecateConfigs(v)
+	deprecateConfigs(v, fs.Output())
 	return v, nil
 }
 
@@ -945,10 +946,10 @@ func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
 	return false
 }
 
-func deprecateConfigs(v *viper.Viper) {
+func deprecateConfigs(v *viper.Viper, output io.Writer) {
 	for key, message := range deprecatedKeys {
 		if v.InConfig(key) {
-			fmt.Printf("Config %s has been deprecated, %s\n", key, message)
+			fmt.Fprintf(output, "Config %s has been deprecated, %s\n", key, message)
 		}
 	}
 }
