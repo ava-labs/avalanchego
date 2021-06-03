@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -173,49 +175,54 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, confi
 func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
 	netApiEnabled := true
-	configJson := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"net-api-enabled\": %t}", txFeeCap, netApiEnabled)
-	_, vm, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJson, "")
-	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "they should be equal")
-	assert.Equal(t, vm.config.NetAPIEnabled, netApiEnabled, "they should be equal")
+	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"net-api-enabled\": %t}", txFeeCap, netApiEnabled)
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
+	assert.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
+	assert.Equal(t, vm.config.NetAPIEnabled, netApiEnabled, "Net API Enabled should be set")
+	assert.NoError(t, vm.Shutdown())
 }
 
 func TestVMConfigDefaults(t *testing.T) {
 	txFeeCap := float64(11)
 	netApiEnabled := true
-	configJson := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"net-api-enabled\": %t}", txFeeCap, netApiEnabled)
-	vm, ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, genesisJSONApricotPhase0)
-	assert.NoError(t, vm.Initialize(
-		ctx,
-		dbManager,
-		genesisBytes,
-		nil,
-		[]byte(configJson),
-		issuer,
-		[]*engCommon.Fx{},
-	))
+	configJSON := fmt.Sprintf("{\"rpc-tx-fee-cap\": %g,\"net-api-enabled\": %t}", txFeeCap, netApiEnabled)
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
 
 	var vmConfig Config
 	vmConfig.SetDefaults()
 	vmConfig.RPCTxFeeCap = txFeeCap
 	vmConfig.NetAPIEnabled = netApiEnabled
-	assert.Equal(t, vmConfig, vm.config, "they should be equal")
+	assert.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
+	assert.NoError(t, vm.Shutdown())
 }
 
 func TestVMNilConfig(t *testing.T) {
-	vm, ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, genesisJSONApricotPhase0)
-	assert.NoError(t, vm.Initialize(
-		ctx,
-		dbManager,
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*engCommon.Fx{},
-	))
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, "", "")
+
+	// VM Config should match defaults if no config is passed in
 	var vmConfig Config
 	vmConfig.SetDefaults()
-	// it should not be set nil by configJson
-	assert.Equal(t, vmConfig, vm.config, "they should be equal")
+	assert.Equal(t, vmConfig, vm.config, "VM Config should match default config")
+	assert.NoError(t, vm.Shutdown())
+}
+
+func TestVMContinuosProfiler(t *testing.T) {
+	profilerDir := t.TempDir()
+	profilerFrequency := 500 * time.Millisecond
+	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": %v}", profilerDir, int64(profilerFrequency))
+	_, vm, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
+	assert.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
+	assert.Equal(t, vm.config.ContinuousProfilerFrequency, profilerFrequency, "profiler frequency should be set")
+
+	// Sleep for twice the frequency of the profiler to give it time
+	// to generate the first profile.
+	time.Sleep(2 * time.Second)
+	assert.NoError(t, vm.Shutdown())
+
+	// Check that the first profile was generated
+	expectedFileName := filepath.Join(profilerDir, "cpu.profile.1")
+	_, err := os.Stat(expectedFileName)
+	assert.NoError(t, err, "Expected continuous profiler to generate the first CPU profile at %s", expectedFileName)
 }
 
 func TestVMGenesis(t *testing.T) {
