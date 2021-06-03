@@ -34,6 +34,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -788,4 +789,18 @@ func (t *Tree) DiskRoot() common.Hash {
 	defer t.lock.Unlock()
 
 	return t.diskRoot()
+}
+
+// NewTestTree creates a *Tree with a pre-populated diskLayer
+func NewTestTree(diskdb ethdb.KeyValueStore, root common.Hash) *Tree {
+	base := &diskLayer{
+		diskdb: diskdb,
+		root:   root,
+		cache:  fastcache.New(128 * 256),
+	}
+	return &Tree{
+		layers: map[common.Hash]snapshot{
+			root: base,
+		},
+	}
 }

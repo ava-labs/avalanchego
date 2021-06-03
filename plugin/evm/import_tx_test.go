@@ -517,6 +517,8 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 		t.Fatalf("Accept failed due to: %s", err)
 	}
 
+	vm.db.EndBatch()
+
 	if err := unsignedImportTx.EVMStateTransfer(vm, state); err != nil {
 		t.Fatalf("EVM State Transfer failed due to: %s", err)
 	}

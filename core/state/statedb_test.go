@@ -40,6 +40,7 @@ import (
 	"testing/quick"
 
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -924,4 +925,94 @@ func TestStateDBAccessList(t *testing.T) {
 	if got, exp := len(state.accessList.slots), 1; got != exp {
 		t.Fatalf("expected empty, got %d", got)
 	}
+}
+
+func TestMultiCoinOperations(t *testing.T) {
+	s := newStateTest()
+	addr := common.Address{1}
+	assetID := common.Hash{2}
+
+	s.state.GetOrNewStateObject(addr)
+	root, _ := s.state.Commit(false)
+	s.state, _ = New(root, s.state.db, s.state.snaps)
+
+	s.state.AddBalance(addr, new(big.Int))
+
+	balance := s.state.GetBalanceMultiCoin(addr, assetID)
+	if balance.Cmp(big.NewInt(0)) != 0 {
+		t.Fatal("expected zero multicoin balance")
+	}
+
+	s.state.SetBalanceMultiCoin(addr, assetID, big.NewInt(10))
+	s.state.SubBalanceMultiCoin(addr, assetID, big.NewInt(5))
+	s.state.AddBalanceMultiCoin(addr, assetID, big.NewInt(3))
+
+	balance = s.state.GetBalanceMultiCoin(addr, assetID)
+	if balance.Cmp(big.NewInt(8)) != 0 {
+		t.Fatal("expected multicoin balance to be 8")
+	}
+}
+
+func TestMultiCoinSnapshot(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	sdb := NewDatabase(db)
+
+	// Create empty snapshot.Tree and StateDB
+	root := common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	snapTree := snapshot.NewTestTree(db, root)
+
+	addr := common.Address{1}
+	assetID1 := common.Hash{1}
+	assetID2 := common.Hash{2}
+
+	var stateDB *StateDB
+	assertBalances := func(regular, multicoin1, multicoin2 int64) {
+		balance := stateDB.GetBalance(addr)
+		if balance.Cmp(big.NewInt(regular)) != 0 {
+			t.Fatal("incorrect non-multicoin balance")
+		}
+		balance = stateDB.GetBalanceMultiCoin(addr, assetID1)
+		if balance.Cmp(big.NewInt(multicoin1)) != 0 {
+			t.Fatal("incorrect multicoin1 balance")
+		}
+		balance = stateDB.GetBalanceMultiCoin(addr, assetID2)
+		if balance.Cmp(big.NewInt(multicoin2)) != 0 {
+			t.Fatal("incorrect multicoin2 balance")
+		}
+	}
+
+	// Create new state
+	stateDB, _ = New(root, sdb, snapTree)
+	assertBalances(0, 0, 0)
+
+	stateDB.AddBalance(addr, big.NewInt(10))
+	assertBalances(10, 0, 0)
+
+	// Commit and get the new root
+	root, _ = stateDB.Commit(false)
+	assertBalances(10, 0, 0)
+
+	// Create a new state from the latest root, add a multicoin balance, and
+	// commit it to the tree.
+	stateDB, _ = New(root, sdb, snapTree)
+	stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(10))
+	root, _ = stateDB.Commit(false)
+	assertBalances(10, 10, 0)
+
+	// Add more layers than the cap and ensure the balances and layers are correct
+	for i := 0; i < 256; i++ {
+		stateDB, _ = New(root, sdb, snapTree)
+		stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(1))
+		stateDB.AddBalanceMultiCoin(addr, assetID2, big.NewInt(2))
+		root, _ = stateDB.Commit(false)
+	}
+	assertBalances(10, 266, 512)
+
+	// Do one more add, including the regular balance which is now in the
+	// collapsed snapshot
+	stateDB, _ = New(root, sdb, snapTree)
+	stateDB.AddBalance(addr, big.NewInt(1))
+	stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(1))
+	_, _ = stateDB.Commit(false)
+	assertBalances(11, 267, 512)
 }

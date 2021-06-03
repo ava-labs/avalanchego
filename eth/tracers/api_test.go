@@ -84,11 +84,10 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i i
 	// Import the canonical chain
 	gspec.MustCommit(backend.chaindb)
 	cacheConfig := &core.CacheConfig{
-		TrieCleanLimit: 256,
-		TrieDirtyLimit: 256,
-		TrieTimeLimit:  5 * time.Minute,
-		// FIXME
-		// SnapshotLimit:     0,
+		TrieCleanLimit:    256,
+		TrieDirtyLimit:    256,
+		TrieTimeLimit:     5 * time.Minute,
+		SnapshotLimit:     128,
 		TrieDirtyDisabled: true, // Archive mode
 	}
 	chain, err := core.NewBlockChain(backend.chaindb, cacheConfig, backend.chainConfig, backend.engine, vm.Config{}, nil, nil, true)
