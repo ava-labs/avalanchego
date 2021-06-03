@@ -92,7 +92,7 @@ const (
 	IpcAPIEnabledKey                        = "api-ipcs-enabled"
 	IpcsChainIDsKey                         = "ipcs-chain-ids"
 	IpcsPathKey                             = "ipcs-path"
-	meterVMsEnabledKey                      = "meter-vm-enabled"
+	MeterVMsEnabledKey                      = "meter-vms-enabled"
 	ConsensusGossipFrequencyKey             = "consensus-gossip-frequency"
 	ConsensusShutdownTimeoutKey             = "consensus-shutdown-timeout"
 	FdLimitKey                              = "fd-limit"

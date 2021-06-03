@@ -231,7 +231,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(SnowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
 	// Metrics
-	fs.Bool(meterVMsEnabledKey, false, "Enable Meter VMs to track VM performance with more granularity")
+	fs.Bool(MeterVMsEnabledKey, false, "Enable Meter VMs to track VM performance with more granularity")
 
 	// IPC
 	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
@@ -250,7 +250,6 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
-
 	return fs
 }
 
