@@ -5,6 +5,7 @@ package vertex
 
 import (
 	"fmt"
+	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,9 +18,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ DAGVM = &MeterVM{}
+var _ vertex.DAGVM = &MeterVM{}
 
-func NewMeterVM(vm DAGVM) DAGVM {
+func NewMeterVM(vm vertex.DAGVM) vertex.DAGVM {
 	return &MeterVM{
 		DAGVM: vm,
 	}
@@ -49,7 +50,7 @@ func (m *metrics) Initialize(
 }
 
 type MeterVM struct {
-	DAGVM
+	vertex.DAGVM
 	metrics
 	clock timer.Clock
 }

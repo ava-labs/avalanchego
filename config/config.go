@@ -548,7 +548,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	}
 
 	// Metrics
-	nodeConfig.MeterVMEnabled = v.GetBool(meterVMsEnabledKey)
+	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
 
 	// Throttling
 	nodeConfig.MaxNonStakerPendingMsgs = v.GetUint32(MaxNonStakerPendingMsgsKey)

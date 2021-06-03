@@ -6,6 +6,8 @@ package chains
 import (
 	"errors"
 	"fmt"
+	block2 "github.com/ava-labs/avalanchego/vms/metervm/block"
+	vertex2 "github.com/ava-labs/avalanchego/vms/metervm/vertex"
 	"sync"
 	"time"
 
@@ -473,7 +475,7 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	vm = vertex.NewMeterVM(vm)
+	vm = vertex2.NewMeterVM(vm)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
@@ -609,7 +611,7 @@ func (m *manager) createSnowmanChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	vm = block.NewMeterVM(vm)
+	vm = block2.NewMeterVM(vm)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {

@@ -5,6 +5,7 @@ package block
 
 import (
 	"fmt"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,9 +18,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var _ ChainVM = &MeterVM{}
+var _ block.ChainVM = &MeterVM{}
 
-func NewMeterVM(vm ChainVM) ChainVM {
+func NewMeterVM(vm block.ChainVM) block.ChainVM {
 	return &MeterVM{
 		ChainVM: vm,
 	}
@@ -55,7 +56,7 @@ func (m *metrics) Initialize(
 }
 
 type MeterVM struct {
-	ChainVM
+	block.ChainVM
 	metrics
 	clock timer.Clock
 }
@@ -76,7 +77,6 @@ func (vm *MeterVM) Initialize(
 	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs)
 }
 
-// BuildBlock ...
 func (vm *MeterVM) BuildBlock() (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.BuildBlock()
@@ -85,7 +85,6 @@ func (vm *MeterVM) BuildBlock() (snowman.Block, error) {
 	return blk, err
 }
 
-// ParseBlock ...
 func (vm *MeterVM) ParseBlock(b []byte) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.ParseBlock(b)
@@ -94,7 +93,6 @@ func (vm *MeterVM) ParseBlock(b []byte) (snowman.Block, error) {
 	return blk, err
 }
 
-// GetBlock ...
 func (vm *MeterVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.GetBlock(id)
@@ -103,7 +101,6 @@ func (vm *MeterVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	return blk, err
 }
 
-// SetPreference ...
 func (vm *MeterVM) SetPreference(id ids.ID) error {
 	start := vm.clock.Time()
 	err := vm.ChainVM.SetPreference(id)
@@ -112,7 +109,6 @@ func (vm *MeterVM) SetPreference(id ids.ID) error {
 	return err
 }
 
-// LastAccepted ...
 func (vm *MeterVM) LastAccepted() (ids.ID, error) {
 	start := vm.clock.Time()
 	lastAcceptedID, err := vm.ChainVM.LastAccepted()
