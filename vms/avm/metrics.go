@@ -4,20 +4,10 @@
 package avm
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/utils/metricutils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
 )
-
-func newCallsMetric(namespace, name string) prometheus.Counter {
-	return prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_calls", name),
-		Help:      fmt.Sprintf("Number of times %s has been called", name),
-	})
-}
 
 type metrics struct {
 	numTxRefreshes, numTxRefreshHits, numTxRefreshMisses prometheus.Counter
@@ -29,7 +19,6 @@ func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
-
 	m.numTxRefreshes = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "tx_refreshes",
