@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
@@ -105,23 +106,24 @@ func (t *Transitive) finishBootstrapping() error {
 
 	// to maintain the invariant that oracle blocks are issued in the correct
 	// preferences, we need to handle the case that we are bootstrapping into an oracle block
-	switch blk := lastAccepted.(type) {
-	case snowman.OracleBlock:
-		options, err := blk.Options()
-		if err != nil {
-			return err
-		}
-		for _, blk := range options {
-			// note that deliver will set the VM's preference
-			if err := t.deliver(blk); err != nil {
+	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
+		options, err := oracleBlk.Options()
+		switch {
+		case err == proposervm.ErrNotOracleBlock:
+			// if there aren't blocks we need to deliver on startup, we need to set
+			// the preference to the last accepted block
+			if err := t.VM.SetPreference(lastAcceptedID); err != nil {
 				return err
 			}
-		}
-	default:
-		// if there aren't blocks we need to deliver on startup, we need to set
-		// the preference to the last accepted block
-		if err := t.VM.SetPreference(lastAcceptedID); err != nil {
+		case err != nil:
 			return err
+		default:
+			for _, blk := range options {
+				// note that deliver will set the VM's preference
+				if err := t.deliver(blk); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
@@ -668,18 +670,21 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	dropped := []snowman.Block{}
 	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options()
-		if err != nil {
-			return err
-		}
-		for _, blk := range options {
-			if err := blk.Verify(); err != nil {
-				t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
-				dropped = append(dropped, blk)
-			} else {
-				if err := t.Consensus.Add(blk); err != nil {
-					return err
+		if err != proposervm.ErrNotOracleBlock {
+			if err != nil {
+				return err
+			}
+
+			for _, blk := range options {
+				if err := blk.Verify(); err != nil {
+					t.Ctx.Log.Debug("block failed verification due to %s, dropping block", err)
+					dropped = append(dropped, blk)
+				} else {
+					if err := t.Consensus.Add(blk); err != nil {
+						return err
+					}
+					added = append(added, blk)
 				}
-				added = append(added, blk)
 			}
 		}
 	}
