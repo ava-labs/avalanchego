@@ -5,6 +5,7 @@ package meterdb
 
 import (
 	"fmt"
+
 	metricsHelper "github.com/ava-labs/avalanchego/utils/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"

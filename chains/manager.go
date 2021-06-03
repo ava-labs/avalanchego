@@ -6,10 +6,11 @@ package chains
 import (
 	"errors"
 	"fmt"
-	block2 "github.com/ava-labs/avalanchego/vms/metervm/block"
-	vertex2 "github.com/ava-labs/avalanchego/vms/metervm/vertex"
 	"sync"
 	"time"
+
+	block2 "github.com/ava-labs/avalanchego/vms/metervm/block"
+	vertex2 "github.com/ava-labs/avalanchego/vms/metervm/vertex"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"

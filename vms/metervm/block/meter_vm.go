@@ -5,6 +5,7 @@ package block
 
 import (
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	"github.com/ava-labs/avalanchego/database/manager"

@@ -5,6 +5,7 @@ package vertex
 
 import (
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 
 	"github.com/ava-labs/avalanchego/database/manager"
