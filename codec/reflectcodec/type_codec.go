@@ -22,7 +22,7 @@ var (
 	errMarshalNil   = errors.New("can't marshal nil pointer or interface")
 	errUnmarshalNil = errors.New("can't unmarshal nil")
 	errNeedPointer  = errors.New("argument to unmarshal must be a pointer")
-	errExtraSpace   = errors.New("trailing buffer space")
+	ErrExtraSpace   = errors.New("trailing buffer space")
 )
 
 type TypeCodec interface {
@@ -206,7 +206,7 @@ func (c *genericCodec) Unmarshal(bytes []byte, dest interface{}) error {
 		return err
 	}
 	if p.Offset != len(bytes) {
-		return errExtraSpace
+		return ErrExtraSpace
 	}
 	return nil
 }
