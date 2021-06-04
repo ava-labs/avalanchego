@@ -1,5 +1,10 @@
 package proposervm
 
+// VM is a decorator for a snowman.ChainVM struct,
+// overriding the relevant methods to handle block headers introduced with snowman++
+// Design guidelines:
+// Calls to wrapped VM can be expensive (e.g. sent over gRPC); be frugal
+
 import (
 	"errors"
 	"fmt"
@@ -41,9 +46,6 @@ func init() {
 		panic(errs.Err)
 	}
 }
-
-// VM is a decorator for a snowman.ChainVM struct,
-// overriding the relevant methods to handle new block fields in snowman++
 
 type VM struct {
 	block.ChainVM

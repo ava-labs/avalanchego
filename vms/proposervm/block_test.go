@@ -6,12 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
@@ -48,74 +45,9 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 	}
 }
 
-func TestProposerVmInitializeRecordsGenesis(t *testing.T) {
-	// setup
-	genesisBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2021),
-			StatusV: choices.Unknown,
-		},
-		BytesV: []byte{1},
-	}
-
-	coreVM := &block.TestVM{}
-	coreVM.CantInitialize = true
-	coreVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
-		return nil
-	}
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return genesisBlk.ID(), nil }
-	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return genesisBlk, nil }
-
-	proVM := NewProVM(coreVM)
-
-	// test
-	if err := proVM.Initialize(nil, nil, genesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
-		t.Fatal("failed to initialize proposerVM")
-	}
-
-	// checks
-	blkID, err := proVM.LastAccepted()
-	if err != nil {
-		t.Fatal("failed to retrieve last accepted block")
-	}
-
-	rtvdBlk, err := proVM.GetBlock(blkID)
-	if err != nil {
-		t.Fatal("failed to retrieve last accepted block")
-	}
-
-	proRtvdBlk, ok := rtvdBlk.(*ProposerBlock)
-	if !ok {
-		t.Fatal("retrieved block is not a proposer block")
-	}
-
-	if !bytes.Equal(proRtvdBlk.Block.Bytes(), genesisBlk.Bytes()) {
-		t.Fatal("Stored block is not genesis")
-	}
-}
-
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	// setup
-	genesisBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2021),
-			StatusV: choices.Unknown,
-		},
-		BytesV: []byte{1},
-	}
-
-	coreVM := &block.TestVM{}
-	coreVM.CantInitialize = true
-	coreVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
-		return nil
-	}
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return genesisBlk.ID(), nil }
-	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return genesisBlk, nil }
-
-	proVM := NewProVM(coreVM)
-	if err := proVM.Initialize(nil, nil, genesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
-		t.Fatal("failed to initialize proposerVM")
-	}
+	coreVM, proVM, genesisBlk := initTestProposerVM(t)
 
 	newBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
