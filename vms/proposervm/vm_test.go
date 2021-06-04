@@ -90,7 +90,7 @@ func TestInitializeRecordsGenesis(t *testing.T) {
 ///////////////////////////////////////////////////////////////////////////////
 func initTestProposerVM(t *testing.T) (*block.TestVM, VM, *snowman.TestBlock) {
 	// setup
-	genesisBlk := &snowman.TestBlock{
+	coreGenesisBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2021),
 			StatusV: choices.Unknown,
@@ -103,26 +103,26 @@ func initTestProposerVM(t *testing.T) (*block.TestVM, VM, *snowman.TestBlock) {
 	coreVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
 		return nil
 	}
-	coreVM.LastAcceptedF = func() (ids.ID, error) { return genesisBlk.ID(), nil }
-	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return genesisBlk, nil }
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenesisBlk.ID(), nil }
+	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return coreGenesisBlk, nil }
 
 	proVM := NewProVM(coreVM)
-	if err := proVM.Initialize(nil, nil, genesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
+	if err := proVM.Initialize(nil, nil, coreGenesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
 		t.Fatal("failed to initialize proposerVM")
 	}
-	return coreVM, proVM, genesisBlk
+	return coreVM, proVM, coreGenesisBlk
 }
 
 func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	// setup
-	coreVM, proVM, genBlk := initTestProposerVM(t)
+	coreVM, proVM, coreGenBlk := initTestProposerVM(t)
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2021),
 			StatusV: choices.Processing,
 		},
-		ParentV: genBlk,
+		ParentV: coreGenBlk,
 		VerifyV: nil,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
@@ -137,7 +137,7 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	}
 
 	// test
-	coreVM.CantGetBlock = false // forbid calls to coreVM
+	coreVM.CantGetBlock = false // forbid calls to coreVM to show caching
 	storedBlk, err := proVM.GetBlock(builtBlk.ID())
 	if err != nil {
 		t.Fatal("proposerVM has not cached built block")
@@ -147,10 +147,48 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	}
 }
 
+func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
+	// setup
+	coreVM, proVM, genesisBlk := initTestProposerVM(t)
+
+	newBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		ParentV: genesisBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
+
+	// test
+	snowBlock, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build block")
+	}
+
+	// checks
+	proBlock, ok := snowBlock.(*ProposerBlock)
+	if !ok {
+		t.Fatal("proposerVM.BuildBlock() does not return a proposervm.Block")
+	}
+
+	if proBlock.Block != newBlk {
+		t.Fatal("different block was expected to be built")
+	}
+
+	if proBlock.Parent().ID() == genesisBlk.ID() {
+		t.Fatal("first block not built on genesis")
+	}
+}
+
 func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
-	coreVM := &block.TestVM{}
+	coreVM, proVM, coreGenBlk := initTestProposerVM(t)
+
 	coreBlk := &snowman.TestBlock{
-		BytesV: []byte{1},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -160,8 +198,11 @@ func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
 		return coreBlk, nil
 	}
 
-	proVM := NewProVM(coreVM)
-	proHdr := ProposerBlockHeader{Timestamp: time.Now().AddDate(0, 0, -1).Unix()}
+	proGenBlkID, _ := proVM.LastAccepted()
+	proHdr := ProposerBlockHeader{
+		PrntID:    proGenBlkID,
+		Timestamp: time.Now().AddDate(0, 0, -1).Unix(),
+	}
 	proBlk := NewProBlock(&proVM, proHdr, coreBlk)
 
 	// test
@@ -174,7 +215,7 @@ func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
 	}
 
 	// test
-	coreVM.CantGetBlock = false // forbid calls to coreVM
+	coreVM.CantGetBlock = false // forbid calls to coreVM to show caching
 	storedBlk, err := proVM.GetBlock(parsedBlk.ID())
 	if err != nil {
 		t.Fatal("proposerVM has not cached parsed block")

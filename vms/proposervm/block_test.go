@@ -45,7 +45,10 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 	}
 }
 
-func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	// setup
 	coreVM, proVM, genesisBlk := initTestProposerVM(t)
 
@@ -60,69 +63,17 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
 
-	// test
-	snowBlock, err := proVM.BuildBlock()
+	proBlk, err := proVM.BuildBlock()
 	if err != nil {
-		t.Fatal("Could not build block")
+		t.Fatal("could not build proposer block")
 	}
-
-	// checks
-	proBlock, ok := snowBlock.(*ProposerBlock)
-	if !ok {
-		t.Fatal("proposerVM.BuildBlock() does not return a proposervm.Block")
-	}
-
-	if proBlock.Block != newBlk {
-		t.Fatal("different block was expected to be built")
-	}
-
-	if proBlock.Parent().ID() == genesisBlk.ID() {
-		t.Fatal("first block not built on genesis")
-	}
-}
-
-func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
-	// setup
-	genesisBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2021),
-			StatusV: choices.Unknown,
-		},
-		BytesV: []byte{1},
-	}
-
-	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM)
-
-	newBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: genesisBlk,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
-
-	proHdr := ProposerBlockHeader{Timestamp: time.Now().AddDate(0, 0, -1).Unix()}
-	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: genesisBlk,
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	proBlk := NewProBlock(&proVM, proHdr, coreBlk)
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, coreBlk.Bytes()) {
+		if !bytes.Equal(b, newBlk.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
-		return coreBlk, nil
+		return newBlk, nil
 	}
 
 	// test

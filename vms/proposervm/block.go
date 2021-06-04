@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
-var ErrInnerBlockNotOracle = errors.New("snowmanBlock wrapped in proposerBlock does not implement snowman.OracleBlock")
+var (
+	ErrInnerBlockNotOracle = errors.New("snowmanBlock wrapped in proposerBlock does not implement snowman.OracleBlock")
+	ErrProBlkNotFound      = errors.New("snowmanBlock not found")
+)
 
 type ProposerBlockHeader struct {
 	PrntID    ids.ID `serialize:"true" json:"parentID"`
@@ -71,7 +74,14 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 }
 
 func (pb *ProposerBlock) Verify() error {
-	return pb.Block.Verify() // here new block fields will be handled
+	if err := pb.Block.Verify(); err != nil {
+		return err
+	}
+	if _, ok := pb.vm.knownProBlocks[pb.Parent().ID()]; !ok {
+		return ErrProBlkNotFound
+	}
+
+	return nil
 }
 
 func (pb *ProposerBlock) Bytes() []byte {

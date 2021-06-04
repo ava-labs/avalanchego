@@ -29,7 +29,6 @@ const (
 
 var (
 	cdc                    = codec.NewDefaultManager()
-	ErrProBlkNotFound      = errors.New("snowmanBlock not found")
 	ErrInnerVMNotConnector = errors.New("chainVM wrapped in proposerVM does not implement snowman.Connector")
 )
 
@@ -88,15 +87,18 @@ func (vm *VM) Initialize(
 
 	hdr := NewProHeader(ids.ID{}, 0)
 	proGenBlk := NewProBlock(vm, hdr, genesisBlk)
-	vm.AddProBlk(&proGenBlk)
+	if err := vm.addProBlk(&proGenBlk); err != nil {
+		return err
+	}
 	return nil
 }
 
 //////// block.ChainVM interface implementation
-func (vm *VM) AddProBlk(blk *ProposerBlock) { // exported for UTs
+func (vm *VM) addProBlk(blk *ProposerBlock) error { // exported for UTs
 	// TODO: handle update/create
 	vm.knownProBlocks[blk.ID()] = blk
 	vm.wrpdToProID[blk.Block.ID()] = blk.ID()
+	return nil
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
@@ -110,7 +112,16 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 	hdr := NewProHeader(prntID, time.Now().Unix())
 	proBlk := NewProBlock(vm, hdr, sb)
-	vm.AddProBlk(&proBlk)
+
+	if err := proBlk.Verify(); err != nil {
+		return nil, err
+	}
+
+	// Skipping verification for genesis block.
+	// Should we instead check that genesis state is accepted && skip verification for accepted blocks?
+	if err := vm.addProBlk(&proBlk); err != nil {
+		return nil, err
+	}
 	return &proBlk, nil
 }
 
@@ -132,7 +143,14 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 	proBlk := NewProBlock(vm, hdr, sb)
-	vm.AddProBlk(&proBlk)
+
+	if err := proBlk.Verify(); err != nil {
+		return nil, err
+	}
+
+	if err := vm.addProBlk(&proBlk); err != nil {
+		return nil, err
+	}
 	return &proBlk, nil
 }
 
