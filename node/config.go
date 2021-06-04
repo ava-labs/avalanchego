@@ -123,10 +123,12 @@ type Config struct {
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
 	RouterHealthConfig       router.HealthConfig
-	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
+	ConsensusGossipFrequency time.Duration
 	// Number of peers to gossip to when gossiping accepted frontier
-	ConsensusGossipSize uint
+	ConsensusGossipAcceptedFrontierSize uint
+	// Number of peers to gossip each accepted container to
+	ConsensusGossipOnAcceptSize uint
 
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration

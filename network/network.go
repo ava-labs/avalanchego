@@ -147,7 +147,8 @@ type network struct {
 	peerListStakerGossipFraction int
 	getVersionTimeout            time.Duration
 	allowPrivateIPs              bool
-	gossipSize                   uint
+	gossipAcceptedFrontierSize   uint
+	gossipOnAcceptSize           uint
 	pingPongTimeout              time.Duration
 	pingFrequency                time.Duration
 	readBufferSize               uint32
@@ -245,6 +246,7 @@ func NewDefaultNetwork(
 	peerListGossipFreq time.Duration,
 	isFetchOnly bool,
 	gossipSize uint,
+	gossipOnAcceptSize uint,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -275,6 +277,7 @@ func NewDefaultNetwork(
 		defaultGetVersionTimeout,
 		defaultAllowPrivateIPs,
 		gossipSize,
+		gossipOnAcceptSize,
 		defaultPingPongTimeout,
 		defaultPingFrequency,
 		defaultReadBufferSize,
@@ -320,6 +323,7 @@ func NewNetwork(
 	getVersionTimeout time.Duration,
 	allowPrivateIPs bool,
 	gossipSize uint,
+	gossipOnAcceptSize uint,
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 	readBufferSize uint32,
@@ -365,7 +369,8 @@ func NewNetwork(
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
-		gossipSize:                         gossipSize,
+		gossipAcceptedFrontierSize:         gossipSize,
+		gossipOnAcceptSize:                 gossipOnAcceptSize,
 		pingPongTimeout:                    pingPongTimeout,
 		pingFrequency:                      pingFrequency,
 		disconnectedIPs:                    make(map[string]struct{}),
@@ -766,7 +771,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 // Gossip attempts to gossip the container to the network
 // assumes the stateLock is not held.
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(chainID, containerID, container); err != nil {
+	if err := n.gossipContainer(chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -779,7 +784,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.ChainID, containerID, container)
+	return n.gossipContainer(ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
 }
 
 // upgradeIncoming returns a boolean indicating if we should
@@ -995,7 +1000,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // assumes the stateLock is not held.
-func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
+func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
 	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
@@ -1006,8 +1011,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 
 	allPeers := n.getAllPeers()
 
-	numToGossip := n.gossipSize
-	if numToGossip > uint(len(allPeers)) {
+	if int(numToGossip) > len(allPeers) {
 		numToGossip = uint(len(allPeers))
 	}
 
