@@ -32,10 +32,11 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 
 	// test
 	_, err := proBlk.Options()
-	if err != ErrNotOracleBlock {
+	if err != ErrInnerBlockNotOracle {
 		t.Fatal("Proposer block should signal that it wraps a block not implementing Options interface with ErrNotOracleBlock error")
 	}
 
+	// setup
 	proBlk = ProposerBlock{
 		Block: &TestOptionsBlock{},
 	}

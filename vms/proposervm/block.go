@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
-var ErrNotOracleBlock = errors.New("snowmanBlock wrapped in proposerBlock does not implement snowman.OracleBlock")
+var ErrInnerBlockNotOracle = errors.New("snowmanBlock wrapped in proposerBlock does not implement snowman.OracleBlock")
 
 type ProposerBlockHeader struct {
 	PrntID    ids.ID `serialize:"true" json:"parentID"`
@@ -100,5 +100,5 @@ func (pb *ProposerBlock) Options() ([2]snowman.Block, error) {
 		return oracleBlk.Options()
 	}
 
-	return [2]snowman.Block{}, ErrNotOracleBlock
+	return [2]snowman.Block{}, ErrInnerBlockNotOracle
 }

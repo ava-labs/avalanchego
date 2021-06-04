@@ -23,14 +23,12 @@ const (
 )
 
 var (
-	cdc               codec.Manager
-	ErrProBlkNotFound error
+	cdc                    = codec.NewDefaultManager()
+	ErrProBlkNotFound      = errors.New("snowmanBlock not found")
+	ErrInnerVMNotConnector = errors.New("chainVM wrapped in proposerVM does not implement snowman.Connector")
 )
 
 func init() {
-	ErrProBlkNotFound = errors.New("snowmanBlock not found")
-
-	cdc = codec.NewDefaultManager()
 	c := linearcodec.NewDefault()
 
 	errs := wrappers.Errs{}
@@ -172,7 +170,7 @@ func (vm *VM) Connected(validatorID ids.ShortID) (bool, error) {
 			return ok, err
 		}
 	}
-	return false, nil
+	return false, ErrInnerVMNotConnector
 }
 
 func (vm *VM) Disconnected(validatorID ids.ShortID) (bool, error) {
@@ -181,5 +179,5 @@ func (vm *VM) Disconnected(validatorID ids.ShortID) (bool, error) {
 			return ok, err
 		}
 	}
-	return false, nil
+	return false, ErrInnerVMNotConnector
 }

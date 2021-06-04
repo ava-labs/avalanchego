@@ -109,7 +109,7 @@ func (t *Transitive) finishBootstrapping() error {
 	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
 		options, err := oracleBlk.Options()
 		switch {
-		case err == proposervm.ErrNotOracleBlock:
+		case err == proposervm.ErrInnerBlockNotOracle:
 			// if there aren't blocks we need to deliver on startup, we need to set
 			// the preference to the last accepted block
 			if err := t.VM.SetPreference(lastAcceptedID); err != nil {
@@ -670,7 +670,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	dropped := []snowman.Block{}
 	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options()
-		if err != proposervm.ErrNotOracleBlock {
+		if err != proposervm.ErrInnerBlockNotOracle {
 			if err != nil {
 				return err
 			}
