@@ -558,7 +558,8 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 			}
 		}
 		if index == 0 {
-			vm.initFeeAsset(tx)
+			vm.ctx.Log.Info("Fee payments are using Asset with Alias: %s, AssetID: %s", genesisTx.Alias, txID)
+			vm.feeAssetID = txID
 		}
 	}
 	if !stateInitialized {
@@ -582,13 +583,6 @@ func (vm *VM) initState(tx Tx) error {
 		}
 	}
 	return nil
-}
-
-func (vm *VM) initFeeAsset(tx Tx) {
-	txID := tx.ID()
-	alias, _ := vm.PrimaryAlias(txID)
-	vm.ctx.Log.Info("Fee payments are using Asset with Alias: %s, AssetID: %s", alias, txID)
-	vm.feeAssetID = txID
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
