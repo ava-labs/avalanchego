@@ -100,3 +100,9 @@ func (b *UniqueBag) String() string {
 
 	return sb.String()
 }
+
+func (b *UniqueBag) Clear() {
+	for id := range *b {
+		delete(*b, id)
+	}
+}

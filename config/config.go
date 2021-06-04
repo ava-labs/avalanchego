@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -50,6 +49,7 @@ var (
 	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
+	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
 	// Places to look for the build directory
@@ -139,7 +139,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(NetworkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
-	fs.Uint(SendQueueSizeKey, 4096, "Max number of messages waiting to be sent to peers.")
+	fs.Uint(SendQueueSizeKey, 512, "Max number of messages waiting to be sent to a given peer.")
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
@@ -240,7 +240,13 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 	// Build directory
-	fs.String(BuildDirKey, defaultBuildDirs[0], "path to the build directory")
+	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
+
+	// Profiles
+	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
+	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
+	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
+	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
 
 	return fs
 }
@@ -371,7 +377,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// DB:
 	nodeConfig.DBEnabled = v.GetBool(DBEnabledKey)
-	nodeConfig.DBPath = path.Join(
+	nodeConfig.DBPath = filepath.Join(
 		os.ExpandEnv(v.GetString(DBPathKey)),
 		constants.NetworkName(nodeConfig.NetworkID),
 	)
@@ -698,6 +704,12 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 
 	// Peer alias
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
+
+	// Profile config
+	nodeConfig.ProfilerConfig.Dir = os.ExpandEnv(v.GetString(ProfileDirKey))
+	nodeConfig.ProfilerConfig.Enabled = v.GetBool(ProfileContinuousEnabledKey)
+	nodeConfig.ProfilerConfig.Freq = v.GetDuration(ProfileContinuousFreqKey)
+	nodeConfig.ProfilerConfig.MaxNumFiles = v.GetInt(ProfileContinuousMaxFilesKey)
 
 	return nodeConfig, processConfig, nil
 }

@@ -265,7 +265,13 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 	chain, err := m.buildChain(chainParams, sb)
 	if err != nil {
 		sb.removeChain(chainParams.ID)
-		m.Log.Error("Error while creating new chain: %s", err)
+		if m.CriticalChains.Contains(chainParams.ID) {
+			// Shut down if we fail to create a required chain (i.e. X, P or C)
+			m.Log.Fatal("error creating required chain %s: %s", chainParams.ID, err)
+			go m.ShutdownNodeFunc(1)
+			return
+		}
+		m.Log.Error("error creating chain %s: %s", chainParams.ID, err)
 		return
 	}
 
@@ -310,7 +316,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Create the log and context of the chain
-	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
+	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}

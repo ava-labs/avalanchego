@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -32,13 +33,13 @@ var errAliasTooLong = errors.New("alias length is too long")
 // Admin is the API service for node admin management
 type Admin struct {
 	log          logging.Logger
-	performance  *Performance
+	profiler     profiler.Profiler
 	chainManager chains.Manager
 	httpServer   *server.Server
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server, profileDir string) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -47,7 +48,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 		log:          log,
 		chainManager: chainManager,
 		httpServer:   httpServer,
-		performance:  NewDefaultPerformanceService(),
+		profiler:     profiler.New(profileDir),
 	}, "admin"); err != nil {
 		return nil, err
 	}
@@ -58,7 +59,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 func (service *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: StartCPUProfiler called")
 	reply.Success = true
-	return service.performance.StartCPUProfiler()
+	return service.profiler.StartCPUProfiler()
 }
 
 // StopCPUProfiler stops the cpu profile
@@ -66,7 +67,7 @@ func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *api.S
 	service.log.Info("Admin: StopCPUProfiler called")
 
 	reply.Success = true
-	return service.performance.StopCPUProfiler()
+	return service.profiler.StopCPUProfiler()
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
@@ -74,7 +75,7 @@ func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *api.Suc
 	service.log.Info("Admin: MemoryProfile called")
 
 	reply.Success = true
-	return service.performance.MemoryProfile()
+	return service.profiler.MemoryProfile()
 }
 
 // LockProfile runs a mutex profile writing to the specified file
@@ -82,7 +83,7 @@ func (service *Admin) LockProfile(_ *http.Request, _ *struct{}, reply *api.Succe
 	service.log.Info("Admin: LockProfile called")
 
 	reply.Success = true
-	return service.performance.LockProfile()
+	return service.profiler.LockProfile()
 }
 
 // AliasArgs are the arguments for calling Alias

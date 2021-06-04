@@ -1934,6 +1934,24 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 			})
 		}
 	}
+
+	chains, err := service.vm.internalState.GetChains(constants.PrimaryNetworkID)
+	if err != nil {
+		return fmt.Errorf("couldn't retrieve subnets: %w", err)
+	}
+	for _, chainTx := range chains {
+		chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
+		if !ok {
+			return errWrongTxType
+		}
+		response.Blockchains = append(response.Blockchains, APIBlockchain{
+			ID:       chain.ID(),
+			Name:     chain.ChainName,
+			SubnetID: constants.PrimaryNetworkID,
+			VMID:     chain.VMID,
+		})
+	}
+
 	return nil
 }
 
@@ -2089,8 +2107,12 @@ func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []av
 		outs = staker.Stake
 	case *UnsignedAddValidatorTx:
 		outs = staker.Stake
+	case *UnsignedAddSubnetValidatorTx:
+		return 0, nil, nil
 	default:
-		service.vm.ctx.Log.Warn("expected *UnsignedAddDelegatorTx or *UnsignedAddValidatorTx but got %T", tx.UnsignedTx)
+		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
+		service.vm.ctx.Log.Error("invalid tx type provided from validator set %s", err)
+		return 0, nil, err
 	}
 
 	var (

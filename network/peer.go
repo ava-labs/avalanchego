@@ -126,6 +126,13 @@ type peer struct {
 	// the peer's local time when it sent a Version.
 	// The time in [sigAndTime] is the one mentioned above.
 	sigAndTime utils.AtomicInterface
+
+	// Used in [handleAcceptedFrontier], [handleAccepted],
+	// [handleGetAccepted], [handleChits].
+	// We use this one ids.Set rather than allocating one per method call.
+	// Should be cleared before use.
+	// Should only be used in peer's reader goroutine.
+	idSet ids.Set
 }
 
 // newPeer returns a properly initialized *peer.
@@ -817,8 +824,8 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	// Am I already peered to them? (safe because [p.net.stateLock] is held)
-	foundPeer, ok := p.net.peers[nodeID]
-	if ok && !foundPeer.closed.GetValue() {
+
+	if foundPeer, ok := p.net.peers.getByID(nodeID); ok && !foundPeer.closed.GetValue() {
 		p.net.log.Verbo(
 			"not peering to %s because we are already connected to %s",
 			peer.IPDesc,
@@ -900,19 +907,19 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.AcceptedFrontier(p.id, chainID, requestID, containerIDs)
@@ -927,19 +934,19 @@ func (p *peer) handleGetAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
@@ -953,19 +960,19 @@ func (p *peer) handleAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.Accepted(p.id, chainID, requestID, containerIDs)
@@ -1049,19 +1056,19 @@ func (p *peer) handleChits(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)

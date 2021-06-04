@@ -1,5 +1,6 @@
 syntax = "proto3";
 package messengerproto;
+option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger/messengerproto";
 
 message NotifyRequest {
     uint32 message = 1;

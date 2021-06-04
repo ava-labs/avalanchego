@@ -22,6 +22,7 @@ var _ gkeystoreproto.KeystoreServer = &Server{}
 
 // Server is a snow.Keystore that is managed over RPC.
 type Server struct {
+	gkeystoreproto.UnimplementedKeystoreServer
 	ks     keystore.BlockchainKeystore
 	broker *plugin.GRPCBroker
 }
