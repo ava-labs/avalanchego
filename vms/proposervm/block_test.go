@@ -121,3 +121,80 @@ func TestProposerBlockParseFailure(t *testing.T) {
 		t.Fatal("upon failure proposervm.VM.ParseBlock should return nil snowman.Block")
 	}
 }
+
+func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
+	coreVM := &block.TestVM{}
+	proVM := NewProVM(coreVM)
+
+	ParentProBlk := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{})
+
+	childHdr := ProposerBlockHeader{
+		PrntID: ParentProBlk.ID(),
+	}
+	childCoreBlk := &snowman.TestBlock{
+		VerifyV: nil,
+	}
+	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
+
+	// Parent block not store yet
+	err := childProBlk.Verify()
+	if err == nil {
+		t.Fatal("Block with unknown parent should not verify")
+	} else if err != ErrProBlkNotFound {
+		t.Fatal("Block with unknown parent should have different error")
+	}
+
+	// now store parentBlock
+	if err := proVM.addProBlk(&ParentProBlk); err != nil {
+		t.Fatal("Could not store proposer block")
+	}
+
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("Block with known parent should not verify")
+	}
+}
+
+func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
+	coreVM := &block.TestVM{}
+	proVM := NewProVM(coreVM)
+
+	parentHdr := ProposerBlockHeader{
+		Timestamp: time.Now().Unix(),
+	}
+	ParentProBlk := NewProBlock(&proVM, parentHdr, &snowman.TestBlock{})
+	if err := proVM.addProBlk(&ParentProBlk); err != nil {
+		t.Fatal("Could not store proposer block")
+	}
+
+	childHdr := ProposerBlockHeader{
+		PrntID: ParentProBlk.ID(),
+	}
+	childCoreBlk := &snowman.TestBlock{
+		VerifyV: nil,
+	}
+	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
+
+	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(-1 * time.Microsecond).Unix()
+	err := childProBlk.Verify()
+	if err == nil {
+		t.Fatal("Proposer block timestamp too old should not verify")
+	} else if err != ErrProBlkBadTimestamp {
+		t.Fatal("Old proposer block timestamp should have different error")
+	}
+
+	childProBlk.header.Timestamp = ParentProBlk.header.Timestamp
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("Proposer block timestamp equal to parent block timestamp should verify")
+	}
+
+	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(BlkSubmissionTolerance).Unix()
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("Proposer block timestamp within submission window should verify")
+	}
+
+	// TODO: there is an alea related to use ot time.Now; refactor to be able to inject clock
+	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(BlkSubmissionTolerance + time.Second).Unix()
+	if err := childProBlk.Verify(); err == nil {
+		t.Fatal("Proposer block timestamp after submission window should not verify")
+	}
+}

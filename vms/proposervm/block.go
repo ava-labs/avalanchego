@@ -2,6 +2,7 @@ package proposervm
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -10,9 +11,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
+const BlkSubmissionTolerance = 10 * time.Second // Todo: move to consensus?
+
 var (
 	ErrInnerBlockNotOracle = errors.New("snowmanBlock wrapped in proposerBlock does not implement snowman.OracleBlock")
 	ErrProBlkNotFound      = errors.New("snowmanBlock not found")
+	ErrProBlkBadTimestamp  = errors.New("snowman block timestamp outside tolerance window")
 )
 
 type ProposerBlockHeader struct {
@@ -77,8 +81,18 @@ func (pb *ProposerBlock) Verify() error {
 	if err := pb.Block.Verify(); err != nil {
 		return err
 	}
-	if _, ok := pb.vm.knownProBlocks[pb.Parent().ID()]; !ok {
+
+	prntBlk, ok := pb.vm.knownProBlocks[pb.header.PrntID]
+	if !ok {
 		return ErrProBlkNotFound
+	}
+
+	if pb.header.Timestamp < prntBlk.header.Timestamp {
+		return ErrProBlkBadTimestamp
+	}
+
+	if time.Unix(pb.header.Timestamp, 0).After(time.Now().Add(BlkSubmissionTolerance)) {
+		return ErrProBlkBadTimestamp
 	}
 
 	return nil
