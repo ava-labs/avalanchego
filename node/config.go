@@ -125,6 +125,8 @@ type Config struct {
 	RouterHealthConfig       router.HealthConfig
 	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
+	// Number of peers to gossip to when gossiping accepted frontier
+	ConsensusGossipSize uint
 
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration

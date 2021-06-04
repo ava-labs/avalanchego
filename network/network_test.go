@@ -36,6 +36,7 @@ const (
 	defaultGossipPeerListFreq = time.Minute
 	defaultPeerListSize       = 50
 	defaultGossipPeerListTo   = 100
+	defaultGossipSize         = 50
 )
 
 var (
@@ -330,6 +331,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net)
 
@@ -461,6 +463,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -490,6 +493,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -632,6 +636,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -661,6 +666,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -804,6 +810,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -833,6 +840,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -981,6 +989,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1010,6 +1019,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1132,6 +1142,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1161,6 +1172,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1414,6 +1426,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1443,6 +1456,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1472,6 +1486,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net2)
 
@@ -1501,6 +1516,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net3)
 
@@ -1851,6 +1867,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1880,6 +1897,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1909,6 +1927,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net2)
 
@@ -1938,6 +1957,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net3)
 
@@ -2204,6 +2224,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -2233,6 +2254,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -2262,6 +2284,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipSize,
 	)
 	assert.NotNil(t, net2)
 

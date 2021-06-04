@@ -170,6 +170,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(MaxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
 	fs.Duration(ConsensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
+	fs.Uint(ConsensusGossipSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
 
 	// HTTP API
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
@@ -366,6 +367,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.ConsensusParams.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
 	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
+	nodeConfig.ConsensusGossipSize = uint(v.GetUint32(ConsensusGossipSizeKey))
 
 	// Logging:
 	loggingConfig, err := logging.DefaultConfig()

@@ -46,7 +46,6 @@ const (
 	defaultPeerListStakerGossipFraction              = 2
 	defaultGetVersionTimeout                         = 10 * time.Second
 	defaultAllowPrivateIPs                           = true
-	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = 30 * time.Second
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024 // 16 KB
@@ -148,7 +147,7 @@ type network struct {
 	peerListStakerGossipFraction int
 	getVersionTimeout            time.Duration
 	allowPrivateIPs              bool
-	gossipSize                   int
+	gossipSize                   uint
 	pingPongTimeout              time.Duration
 	pingFrequency                time.Duration
 	readBufferSize               uint32
@@ -245,6 +244,7 @@ func NewDefaultNetwork(
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
 	isFetchOnly bool,
+	gossipSize uint,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -274,7 +274,7 @@ func NewDefaultNetwork(
 		defaultPeerListStakerGossipFraction,
 		defaultGetVersionTimeout,
 		defaultAllowPrivateIPs,
-		defaultGossipSize,
+		gossipSize,
 		defaultPingPongTimeout,
 		defaultPingFrequency,
 		defaultReadBufferSize,
@@ -319,7 +319,7 @@ func NewNetwork(
 	peerListStakerGossipFraction int,
 	getVersionTimeout time.Duration,
 	allowPrivateIPs bool,
-	gossipSize int,
+	gossipSize uint,
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 	readBufferSize uint32,
@@ -1007,15 +1007,15 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 	allPeers := n.getAllPeers()
 
 	numToGossip := n.gossipSize
-	if numToGossip > len(allPeers) {
-		numToGossip = len(allPeers)
+	if numToGossip > uint(len(allPeers)) {
+		numToGossip = uint(len(allPeers))
 	}
 
 	s := sampler.NewUniform()
 	if err := s.Initialize(uint64(len(allPeers))); err != nil {
 		return err
 	}
-	indices, err := s.Sample(numToGossip)
+	indices, err := s.Sample(int(numToGossip))
 	if err != nil {
 		return err
 	}

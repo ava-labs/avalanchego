@@ -93,6 +93,7 @@ const (
 	IpcsChainIDsKey                         = "ipcs-chain-ids"
 	IpcsPathKey                             = "ipcs-path"
 	ConsensusGossipFrequencyKey             = "consensus-gossip-frequency"
+	ConsensusGossipSizeKey                  = "consensus-gossip-size"
 	ConsensusShutdownTimeoutKey             = "consensus-shutdown-timeout"
 	FdLimitKey                              = "fd-limit"
 	CorethConfigKey                         = "coreth-config"
