@@ -86,7 +86,7 @@ func (a *App) Start() int {
 	defer logFactory.Close()
 
 	var err error
-	a.log, err = logFactory.Make()
+	a.log, err = logFactory.Make("main")
 	if err != nil {
 		fmt.Printf("starting logger failed with: %s\n", err)
 		return 1

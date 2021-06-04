@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -102,6 +103,9 @@ type Config struct {
 	HealthAPIEnabled   bool
 	IndexAPIEnabled    bool
 
+	// Profiling configurations
+	ProfilerConfig profiler.Config
+
 	// Logging configuration
 	LoggingConfig logging.Config
 
@@ -134,9 +138,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Coreth
-	CorethConfig string
-
 	IndexAllowIncomplete bool
 
 	// Should Bootstrap be retried
@@ -152,5 +153,5 @@ type Config struct {
 	PeerAliasTimeout time.Duration
 
 	// ChainConfigs
-	ChainConfigs map[ids.ID]chains.ChainConfig
+	ChainConfigs map[string]chains.ChainConfig
 }

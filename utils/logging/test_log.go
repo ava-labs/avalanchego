@@ -79,7 +79,7 @@ func (NoLog) SetContextualDisplayingEnabled(bool) {}
 type NoIOWriter struct{}
 
 // Initialize ...
-func (nw *NoIOWriter) Initialize(Config) error { return nil }
+func (nw *NoIOWriter) Initialize(Config) (int, error) { return 0, nil }
 
 // Flush ...
 func (nw *NoIOWriter) Flush() error { return nil }

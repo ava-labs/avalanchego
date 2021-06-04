@@ -5,7 +5,7 @@ package genesis
 
 import (
 	"fmt"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -306,7 +306,7 @@ func TestGenesis(t *testing.T) {
 
 			var customFile string
 			if len(test.customConfig) > 0 {
-				customFile = path.Join(t.TempDir(), "config.json")
+				customFile = filepath.Join(t.TempDir(), "config.json")
 				assert.NoError(perms.WriteFile(customFile, []byte(test.customConfig), perms.ReadWrite))
 			}
 

@@ -107,4 +107,9 @@ const (
 	PeerAliasTimeoutKey                     = "peer-alias-timeout"
 	PluginModeKey                           = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey     = "bootstrap-beacon-connection-timeout"
+	ChainConfigDirKey                       = "chain-config-dir"
+	ProfileDirKey                           = "profile-dir"
+	ProfileContinuousEnabledKey             = "profile-continuous-enabled"
+	ProfileContinuousFreqKey                = "profile-continuous-freq"
+	ProfileContinuousMaxFilesKey            = "profile-continuous-max-files"
 )
