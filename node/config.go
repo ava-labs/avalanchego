@@ -139,9 +139,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Coreth
-	CorethConfig string
-
 	IndexAllowIncomplete bool
 
 	// Should Bootstrap be retried
@@ -157,5 +154,5 @@ type Config struct {
 	PeerAliasTimeout time.Duration
 
 	// ChainConfigs
-	ChainConfigs map[ids.ID]chains.ChainConfig
+	ChainConfigs map[string]chains.ChainConfig
 }

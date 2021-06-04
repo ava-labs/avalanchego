@@ -68,7 +68,7 @@ func main() {
 	// Run normally
 	exitCode, err := nodeManager.runNormal()
 	if err != nil {
-		log.Debug("running node returned error: %s", err)
+		log.Error("running node returned error: %s", err)
 	} else {
 		log.Debug("node returned exit code %d", exitCode)
 	}
