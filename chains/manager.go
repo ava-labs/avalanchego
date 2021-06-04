@@ -159,6 +159,10 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
+
+	// Max Time to spend fetching a container and its
+	// ancestors when responding to a GetAncestors
+	MaxTimeGetAncestors time.Duration
 }
 
 type manager struct {
@@ -542,6 +546,7 @@ func (m *manager) createAvalancheChain(
 				Timer:                     timer,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
+				MaxTimeGetAncestors:       m.MaxTimeGetAncestors,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -672,6 +677,7 @@ func (m *manager) createSnowmanChain(
 				Timer:                     timer,
 				RetryBootstrap:            m.RetryBootstrap,
 				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
+				MaxTimeGetAncestors:       m.MaxTimeGetAncestors,
 			},
 			Blocked:      blocked,
 			VM:           vm,

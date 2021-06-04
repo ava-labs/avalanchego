@@ -4,6 +4,8 @@
 package common
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
@@ -27,6 +29,10 @@ type Config struct {
 	RetryBootstrap bool
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
+
+	// Max Time to spend fetching a container and
+	// its ancestors when responding to a GetAncestors
+	MaxTimeGetAncestors time.Duration
 }
 
 // Context implements the Engine interface
