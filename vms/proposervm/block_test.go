@@ -58,7 +58,7 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: genesisBlk,
-		HeightV: 1,
+		HeightV: genesisBlk.HeightV + 1,
 		BytesV:  []byte{1},
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
@@ -130,9 +130,11 @@ func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 
 	childHdr := ProposerBlockHeader{
 		PrntID: ParentProBlk.ID(),
+		Height: ParentProBlk.Height() + 1,
 	}
 	childCoreBlk := &snowman.TestBlock{
 		VerifyV: nil,
+		HeightV: childHdr.Height,
 	}
 	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
 
@@ -168,9 +170,11 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 
 	childHdr := ProposerBlockHeader{
 		PrntID: ParentProBlk.ID(),
+		Height: ParentProBlk.Height() + 1,
 	}
 	childCoreBlk := &snowman.TestBlock{
 		VerifyV: nil,
+		HeightV: childHdr.Height,
 	}
 	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
 
@@ -196,5 +200,59 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(BlkSubmissionTolerance + time.Second).Unix()
 	if err := childProBlk.Verify(); err == nil {
 		t.Fatal("Proposer block timestamp after submission window should not verify")
+	} else if err != ErrProBlkBadTimestamp {
+		t.Fatal("Proposer block timestamp after submission window should have different error")
+	}
+}
+
+func TestProposerBlockWithWrongHeightDoesNotVerify(t *testing.T) {
+	coreVM := &block.TestVM{}
+	proVM := NewProVM(coreVM)
+
+	ParentProBlk := NewProBlock(&proVM,
+		ProposerBlockHeader{
+			Height: 200,
+		},
+		&snowman.TestBlock{
+			HeightV: 200,
+		})
+	if err := proVM.addProBlk(&ParentProBlk); err != nil {
+		t.Fatal("Could not store proposer block")
+	}
+
+	childHdr := ProposerBlockHeader{
+		PrntID: ParentProBlk.ID(),
+	}
+	childCoreBlk := &snowman.TestBlock{
+		VerifyV: nil,
+		HeightV: ParentProBlk.Height() + 1,
+	}
+	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
+
+	// child block must strictly follow parent block height
+	childProBlk.header.Height = ParentProBlk.Height() - 1
+	if err := childProBlk.Verify(); err == nil {
+		t.Fatal("Proposer block has wrong height")
+	} else if err != ErrProBlkWrongHeight {
+		t.Fatal("Proposer block has wrong height should have different error")
+	}
+
+	childProBlk.header.Height = ParentProBlk.Height()
+	if err := childProBlk.Verify(); err == nil {
+		t.Fatal("Proposer block has wrong height")
+	} else if err != ErrProBlkWrongHeight {
+		t.Fatal("Proposer block has wrong height should have different error")
+	}
+
+	childProBlk.header.Height = ParentProBlk.Height() + 1
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("Proposer block height should follow parent height")
+	}
+
+	childProBlk.header.Height = ParentProBlk.Height() + 2
+	if err := childProBlk.Verify(); err == nil {
+		t.Fatal("Proposer block has wrong height")
+	} else if err != ErrProBlkWrongHeight {
+		t.Fatal("Proposer block has wrong height should have different error")
 	}
 }

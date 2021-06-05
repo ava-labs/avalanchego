@@ -95,7 +95,8 @@ func initTestProposerVM(t *testing.T) (*block.TestVM, VM, *snowman.TestBlock) {
 			IDV:     ids.Empty.Prefix(2021),
 			StatusV: choices.Unknown,
 		},
-		BytesV: []byte{1},
+		BytesV:  []byte{1},
+		HeightV: 0,
 	}
 
 	coreVM := &block.TestVM{}
@@ -123,6 +124,7 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: coreGenBlk,
+		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
@@ -189,6 +191,7 @@ func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
 	coreBlk := &snowman.TestBlock{
 		BytesV:  []byte{1},
 		ParentV: coreGenBlk,
+		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -202,6 +205,7 @@ func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
 	proHdr := ProposerBlockHeader{
 		PrntID:    proGenBlkID,
 		Timestamp: time.Now().AddDate(0, 0, -1).Unix(),
+		Height:    coreBlk.Height(),
 	}
 	proBlk := NewProBlock(&proVM, proHdr, coreBlk)
 

@@ -14,20 +14,23 @@ import (
 const BlkSubmissionTolerance = 10 * time.Second // Todo: move to consensus?
 
 var (
-	ErrInnerBlockNotOracle = errors.New("snowmanBlock wrapped in proposerBlock does not implement snowman.OracleBlock")
-	ErrProBlkNotFound      = errors.New("snowmanBlock not found")
-	ErrProBlkBadTimestamp  = errors.New("snowman block timestamp outside tolerance window")
+	ErrInnerBlockNotOracle = errors.New("snowman block wrapped in proposer block does not implement snowman.OracleBlock")
+	ErrProBlkNotFound      = errors.New("proposer block not found")
+	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
+	ErrProBlkWrongHeight   = errors.New("proposer block has wrong height")
 )
 
 type ProposerBlockHeader struct {
 	PrntID    ids.ID `serialize:"true" json:"parentID"`
 	Timestamp int64  `serialize:"true"`
+	Height    uint64 `serialize:"true"`
 }
 
-func NewProHeader(prntID ids.ID, unixTime int64) ProposerBlockHeader {
+func NewProHeader(prntID ids.ID, unixTime int64, height uint64) ProposerBlockHeader {
 	return ProposerBlockHeader{
 		PrntID:    prntID,
 		Timestamp: unixTime,
+		Height:    height,
 	}
 }
 
@@ -87,6 +90,14 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkNotFound
 	}
 
+	if pb.header.Height != prntBlk.header.Height+1 {
+		return ErrProBlkWrongHeight
+	}
+
+	if pb.header.Height != pb.Block.Height() {
+		return ErrProBlkWrongHeight
+	}
+
 	if pb.header.Timestamp < prntBlk.header.Timestamp {
 		return ErrProBlkBadTimestamp
 	}
@@ -115,7 +126,7 @@ func (pb *ProposerBlock) Bytes() []byte {
 }
 
 func (pb *ProposerBlock) Height() uint64 {
-	return pb.Block.Height()
+	return pb.header.Height
 }
 
 //////// snowman.OracleBlock interface implementation

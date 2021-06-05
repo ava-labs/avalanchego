@@ -85,7 +85,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	hdr := NewProHeader(ids.ID{}, 0)
+	hdr := NewProHeader(ids.ID{}, 0, 0)
 	proGenBlk := NewProBlock(vm, hdr, genesisBlk)
 	if err := vm.addProBlk(&proGenBlk); err != nil {
 		return err
@@ -110,7 +110,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if !ok {
 		return nil, ErrProBlkNotFound
 	}
-	hdr := NewProHeader(prntID, time.Now().Unix())
+	hdr := NewProHeader(prntID, time.Now().Unix(), vm.knownProBlocks[prntID].Height()+1)
 	proBlk := NewProBlock(vm, hdr, sb)
 
 	if err := proBlk.Verify(); err != nil {
