@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -37,7 +36,7 @@ func init() {
 
 	errs := wrappers.Errs{}
 	errs.Add(
-		c.RegisterType(&ProposerBlockHeader{}),
+		c.RegisterType(&marshallingProposerBLock{}),
 		cdc.RegisterCodec(codecVersion, c),
 	)
 
@@ -46,10 +45,21 @@ func init() {
 	}
 }
 
+type clock interface {
+	now() time.Time
+}
+
+type clockImpl struct{}
+
+func (c clockImpl) now() time.Time {
+	return time.Now()
+}
+
 type VM struct {
 	block.ChainVM
 	knownProBlocks map[ids.ID]*ProposerBlock
 	wrpdToProID    map[ids.ID]ids.ID
+	clk            clock
 }
 
 func NewProVM(vm block.ChainVM) VM {
@@ -57,6 +67,7 @@ func NewProVM(vm block.ChainVM) VM {
 		ChainVM:        vm,
 		knownProBlocks: make(map[ids.ID]*ProposerBlock),
 		wrpdToProID:    make(map[ids.ID]ids.ID),
+		clk:            clockImpl{},
 	}
 }
 
@@ -86,7 +97,7 @@ func (vm *VM) Initialize(
 	}
 
 	hdr := NewProHeader(ids.ID{}, 0, 0)
-	proGenBlk := NewProBlock(vm, hdr, genesisBlk)
+	proGenBlk := NewProBlock(vm, hdr, genesisBlk, nil)
 	if err := vm.addProBlk(&proGenBlk); err != nil {
 		return err
 	}
@@ -110,8 +121,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	if !ok {
 		return nil, ErrProBlkNotFound
 	}
-	hdr := NewProHeader(prntID, time.Now().Unix(), vm.knownProBlocks[prntID].Height()+1)
-	proBlk := NewProBlock(vm, hdr, sb)
+	hdr := NewProHeader(prntID, vm.clk.now().Unix(), vm.knownProBlocks[prntID].Height()+1)
+	proBlk := NewProBlock(vm, hdr, sb, nil)
 
 	if err := proBlk.Verify(); err != nil {
 		return nil, err
@@ -126,23 +137,21 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	var hdr ProposerBlockHeader
-	cdcVer, err := cdc.Unmarshal(b, &hdr)
+	var mPb marshallingProposerBLock
+	cdcVer, err := cdc.Unmarshal(b, &mPb)
 
-	if err != reflectcodec.ErrExtraSpace {
+	if err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal proposerBlockHeader: %s", err)
 	} else if cdcVer != codecVersion {
 		return nil, fmt.Errorf("codecVersion not matching")
 	}
 
-	// UGLY way to recover current header length
-	dummyB, _ := cdc.Marshal(codecVersion, &hdr)
-
-	sb, err := vm.ChainVM.ParseBlock(b[len(dummyB):])
+	sb, err := vm.ChainVM.ParseBlock(mPb.WrpdBytes)
 	if err != nil {
 		return nil, err
 	}
-	proBlk := NewProBlock(vm, hdr, sb)
+
+	proBlk := NewProBlock(vm, mPb.Header, sb, b)
 
 	if err := proBlk.Verify(); err != nil {
 		return nil, err
@@ -151,6 +160,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if err := vm.addProBlk(&proBlk); err != nil {
 		return nil, err
 	}
+
 	return &proBlk, nil
 }
 

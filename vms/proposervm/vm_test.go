@@ -107,7 +107,12 @@ func initTestProposerVM(t *testing.T) (*block.TestVM, VM, *snowman.TestBlock) {
 	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenesisBlk.ID(), nil }
 	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return coreGenesisBlk, nil }
 
+	tc := &testClock{
+		setTime: time.Now(),
+	}
 	proVM := NewProVM(coreVM)
+	proVM.clk = tc
+
 	if err := proVM.Initialize(nil, nil, coreGenesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
 		t.Fatal("failed to initialize proposerVM")
 	}
@@ -207,7 +212,7 @@ func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
 		Timestamp: time.Now().AddDate(0, 0, -1).Unix(),
 		Height:    coreBlk.Height(),
 	}
-	proBlk := NewProBlock(&proVM, proHdr, coreBlk)
+	proBlk := NewProBlock(&proVM, proHdr, coreBlk, nil)
 
 	// test
 	parsedBlk, err := proVM.ParseBlock(proBlk.Bytes())

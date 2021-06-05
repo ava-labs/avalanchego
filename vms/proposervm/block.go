@@ -34,6 +34,11 @@ func NewProHeader(prntID ids.ID, unixTime int64, height uint64) ProposerBlockHea
 	}
 }
 
+type marshallingProposerBLock struct {
+	Header    ProposerBlockHeader `serialize:"true"`
+	WrpdBytes []byte              `serialize:"true"`
+}
+
 type ProposerBlock struct {
 	header ProposerBlockHeader
 	snowman.Block
@@ -42,14 +47,17 @@ type ProposerBlock struct {
 	vm    *VM
 }
 
-func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block) ProposerBlock {
+func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block, bytes []byte) ProposerBlock {
 	res := ProposerBlock{
 		header: hdr,
 		Block:  sb,
-		bytes:  nil,
+		bytes:  bytes,
 		vm:     vm,
 	}
-	res.bytes = res.Bytes()
+	if bytes == nil {
+		res.bytes = res.Bytes()
+	}
+
 	res.id = hashing.ComputeHash256Array(res.bytes)
 	return res
 }
@@ -102,7 +110,7 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkBadTimestamp
 	}
 
-	if time.Unix(pb.header.Timestamp, 0).After(time.Now().Add(BlkSubmissionTolerance)) {
+	if time.Unix(pb.header.Timestamp, 0).After(pb.vm.clk.now().Add(BlkSubmissionTolerance)) {
 		return ErrProBlkBadTimestamp
 	}
 
@@ -110,19 +118,19 @@ func (pb *ProposerBlock) Verify() error {
 }
 
 func (pb *ProposerBlock) Bytes() []byte {
-	if pb.bytes != nil {
-		return pb.bytes
-	}
+	if pb.bytes == nil {
+		var mPb marshallingProposerBLock
+		mPb.Header = pb.header
+		mPb.WrpdBytes = pb.Block.Bytes()
 
-	hdrBytes, err := cdc.Marshal(codecVersion, &pb.header)
-	if err != nil {
-		pb.bytes = make([]byte, 0)
-		return pb.bytes
+		var err error
+		pb.bytes, err = cdc.Marshal(codecVersion, &mPb)
+		if err != nil {
+			pb.bytes = make([]byte, 0)
+			return pb.bytes
+		}
 	}
-
-	wrpdBytes := pb.Block.Bytes()
-	hdrBytes = append(hdrBytes, wrpdBytes...)
-	return hdrBytes
+	return pb.bytes
 }
 
 func (pb *ProposerBlock) Height() uint64 {

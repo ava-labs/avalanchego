@@ -48,6 +48,14 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+type testClock struct {
+	setTime time.Time
+}
+
+func (tC testClock) now() time.Time {
+	return tC.setTime
+}
+
 func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	// setup
 	coreVM, proVM, genesisBlk := initTestProposerVM(t)
@@ -93,7 +101,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 
 	proHdr := ProposerBlockHeader{
 		PrntID:    ids.Empty.Prefix(8),
-		Timestamp: time.Now().Unix(),
+		Timestamp: proVM.clk.now().Unix(),
 	}
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -104,7 +112,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
-	proBlk := NewProBlock(&proVM, proHdr, coreBlk)
+	proBlk := NewProBlock(&proVM, proHdr, coreBlk, nil)
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -126,7 +134,7 @@ func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
 	proVM := NewProVM(coreVM)
 
-	ParentProBlk := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{})
+	ParentProBlk := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{}, nil)
 
 	childHdr := ProposerBlockHeader{
 		PrntID: ParentProBlk.ID(),
@@ -136,7 +144,7 @@ func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 		VerifyV: nil,
 		HeightV: childHdr.Height,
 	}
-	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
+	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk, nil)
 
 	// Parent block not store yet
 	err := childProBlk.Verify()
@@ -161,9 +169,9 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 	proVM := NewProVM(coreVM)
 
 	parentHdr := ProposerBlockHeader{
-		Timestamp: time.Now().Unix(),
+		Timestamp: proVM.clk.now().Unix(),
 	}
-	ParentProBlk := NewProBlock(&proVM, parentHdr, &snowman.TestBlock{})
+	ParentProBlk := NewProBlock(&proVM, parentHdr, &snowman.TestBlock{}, nil)
 	if err := proVM.addProBlk(&ParentProBlk); err != nil {
 		t.Fatal("Could not store proposer block")
 	}
@@ -176,9 +184,9 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 		VerifyV: nil,
 		HeightV: childHdr.Height,
 	}
-	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
+	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk, nil)
 
-	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(-1 * time.Microsecond).Unix()
+	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(-1 * time.Second).Unix()
 	err := childProBlk.Verify()
 	if err == nil {
 		t.Fatal("Proposer block timestamp too old should not verify")
@@ -196,7 +204,6 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 		t.Fatal("Proposer block timestamp within submission window should verify")
 	}
 
-	// TODO: there is an alea related to use ot time.Now; refactor to be able to inject clock
 	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(BlkSubmissionTolerance + time.Second).Unix()
 	if err := childProBlk.Verify(); err == nil {
 		t.Fatal("Proposer block timestamp after submission window should not verify")
@@ -215,7 +222,7 @@ func TestProposerBlockWithWrongHeightDoesNotVerify(t *testing.T) {
 		},
 		&snowman.TestBlock{
 			HeightV: 200,
-		})
+		}, nil)
 	if err := proVM.addProBlk(&ParentProBlk); err != nil {
 		t.Fatal("Could not store proposer block")
 	}
@@ -227,7 +234,7 @@ func TestProposerBlockWithWrongHeightDoesNotVerify(t *testing.T) {
 		VerifyV: nil,
 		HeightV: ParentProBlk.Height() + 1,
 	}
-	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk)
+	childProBlk := NewProBlock(&proVM, childHdr, childCoreBlk, nil)
 
 	// child block must strictly follow parent block height
 	childProBlk.header.Height = ParentProBlk.Height() - 1
