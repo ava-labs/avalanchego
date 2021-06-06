@@ -60,6 +60,8 @@ type VM struct {
 	knownProBlocks map[ids.ID]*ProposerBlock
 	wrpdToProID    map[ids.ID]ids.ID
 	clk            clock
+	fromWrappedVM  chan common.Message
+	toEngine       chan<- common.Message
 }
 
 func NewProVM(vm block.ChainVM) VM {
@@ -68,7 +70,14 @@ func NewProVM(vm block.ChainVM) VM {
 		knownProBlocks: make(map[ids.ID]*ProposerBlock),
 		wrpdToProID:    make(map[ids.ID]ids.ID),
 		clk:            clockImpl{},
+		fromWrappedVM:  nil,
+		toEngine:       nil,
 	}
+}
+
+func (vm *VM) handleBlockTiming() {
+	msg := <-vm.fromWrappedVM
+	vm.toEngine <- msg
 }
 
 //////// common.VM interface implementation
@@ -81,7 +90,11 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
-	if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes, configBytes, toEngine, fxs); err != nil {
+	// proposerVM intercepts VM events for blocks and times event relay to consensus
+	vm.toEngine = toEngine
+	vm.fromWrappedVM = make(chan common.Message, len(toEngine))
+
+	if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes, configBytes, vm.fromWrappedVM, fxs); err != nil {
 		return err
 	}
 
@@ -101,6 +114,8 @@ func (vm *VM) Initialize(
 	if err := vm.addProBlk(&proGenBlk); err != nil {
 		return err
 	}
+
+	go vm.handleBlockTiming()
 	return nil
 }
 
