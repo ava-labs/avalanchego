@@ -614,7 +614,6 @@ func (m *manager) createSnowmanChain(
 	vm = block2.NewMeterVM(vm)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
-
 	if err != nil {
 		return nil, err
 	}
