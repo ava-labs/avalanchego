@@ -1559,7 +1559,6 @@ func TestImport(t *testing.T) {
 			assetID := genesisTx.ID()
 			addr0 := keys[0].PublicKey().Address()
 
-			// Must set AVAX assetID to be the correct asset since only AVAX can be imported
 			utxo := &avax.UTXO{
 				UTXOID: avax.UTXOID{TxID: ids.Empty},
 				Asset:  avax.Asset{ID: assetID},

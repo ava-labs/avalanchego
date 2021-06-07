@@ -562,6 +562,10 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 			vm.feeAssetID = txID
 		}
 	}
+	// not quite possible. but if it's still null, default to avaxAsset
+	if len(vm.feeAssetID) == 0 {
+		vm.feeAssetID = vm.ctx.AVAXAssetID
+	}
 	if !stateInitialized {
 		return vm.state.SetInitialized()
 	}
