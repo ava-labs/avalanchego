@@ -52,6 +52,7 @@ const (
 	defaultReadBufferSize                            = 16 * 1024 // 16 KB
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultConnMeterCacheSize                        = 1000
+	defaultByteSliceCap                              = 128
 )
 
 var (
@@ -210,6 +211,10 @@ type network struct {
 	// A peer is removed from this map when [connected] is called with the peer as the argument
 	// TODO also remove from this map when the peer leaves the validator set
 	latestPeerIP map[ids.ShortID]signedPeerIP
+
+	// Contains []byte. Used as an optimization.
+	// Can be accessed by multiple goroutines concurrently.
+	byteSlicePool sync.Pool
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -378,6 +383,16 @@ func NewNetwork(
 		tlsKey:                             tlsKey,
 		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
 		isFetchOnly:                        isFetchOnly,
+		byteSlicePool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, 0, defaultByteSliceCap)
+			},
+		},
+	}
+	netw.b = Builder{
+		getByteSlice: func() []byte {
+			return netw.byteSlicePool.Get().([]byte)
+		},
 	}
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
@@ -399,7 +414,8 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -410,7 +426,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			n.getAcceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
+			n.getAcceptedFrontier.sentBytes.Add(float64(lenMsg))
 		}
 	}
 	return sentTo
@@ -433,7 +449,8 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -444,7 +461,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	} else {
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
-		n.acceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
+		n.acceptedFrontier.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -468,7 +485,8 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -479,7 +497,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		} else {
 			n.getAccepted.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			n.getAccepted.sentBytes.Add(float64(len(msg.Bytes())))
+			n.getAccepted.sentBytes.Add(float64(lenMsg))
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -503,7 +521,8 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -514,7 +533,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
-		n.accepted.sentBytes.Add(float64(len(msg.Bytes())))
+		n.accepted.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -531,7 +550,8 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -543,7 +563,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 	n.getAncestors.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
-	n.getAncestors.sentBytes.Add(float64(len(msg.Bytes())))
+	n.getAncestors.sentBytes.Add(float64(lenMsg))
 	return true
 }
 
@@ -560,7 +580,8 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -571,7 +592,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.multiPut.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
-		n.multiPut.sentBytes.Add(float64(len(msg.Bytes())))
+		n.multiPut.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -584,7 +605,8 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.log.AssertNoError(err)
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -596,7 +618,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 	n.get.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
-	n.get.sentBytes.Add(float64(len(msg.Bytes())))
+	n.get.sentBytes.Add(float64(lenMsg))
 	return true
 }
 
@@ -618,7 +640,8 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -630,7 +653,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	} else {
 		n.put.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
-		n.put.sentBytes.Add(float64(len(msg.Bytes())))
+		n.put.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -656,7 +679,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -669,7 +693,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
 			n.sendFailRateCalculator.Observe(0, now)
-			n.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
+			n.pushQuery.sentBytes.Add(float64(lenMsg))
 		}
 	}
 	return sentTo
@@ -687,7 +711,8 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -699,7 +724,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			sentTo = append(sentTo, vID)
-			n.pullQuery.sentBytes.Add(float64(len(msg.Bytes())))
+			n.pullQuery.sentBytes.Add(float64(lenMsg))
 		}
 	}
 	return sentTo
@@ -722,7 +747,8 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -733,7 +759,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
-		n.chits.sentBytes.Add(float64(len(msg.Bytes())))
+		n.chits.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -994,7 +1020,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 		return err
 	}
 	for _, index := range indices {
-		if allPeers[int(index)].Send(msg) {
+		if allPeers[int(index)].Send(msg, false) {
 			n.put.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 		} else {
@@ -1120,10 +1146,10 @@ func (n *network) gossipPeerList() {
 		}
 
 		for _, index := range stakerIndices {
-			stakers[int(index)].Send(msg)
+			stakers[int(index)].Send(msg, false)
 		}
 		for _, index := range nonStakerIndices {
-			nonStakers[int(index)].Send(msg)
+			nonStakers[int(index)].Send(msg, false)
 		}
 	}
 }
