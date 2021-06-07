@@ -37,6 +37,8 @@ type TestVM struct {
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF                    func() (map[string]*HTTPHandler, error)
+	ConnectedF                               func(ids.ShortID) error
+	DisconnectedF                            func(ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
 }
 
@@ -130,9 +132,15 @@ func (vm *TestVM) HealthCheck() (interface{}, error) {
 }
 
 func (vm *TestVM) Connected(id ids.ShortID) error {
+	if vm.ConnectedF != nil {
+		return vm.ConnectedF(id)
+	}
 	return nil // noop
 }
 
 func (vm *TestVM) Disconnected(id ids.ShortID) error {
+	if vm.DisconnectedF != nil {
+		return vm.DisconnectedF(id)
+	}
 	return nil // noop
 }
