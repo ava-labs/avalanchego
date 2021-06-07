@@ -4,11 +4,12 @@
 package health
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
 	stdjson "encoding/json"
-
+	"github.com/NYTimes/gziphandler"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -59,6 +60,7 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 	// If a GET request is sent, we respond with a 200 if the node is healthy or
 	// a 503 if the node isn't healthy.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println("Getting called through gzipped!")
 		if r.Method != http.MethodGet {
 			newServer.ServeHTTP(w, r)
 			return
@@ -82,7 +84,8 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 			as.log.Debug("failed to encode the health check response due to %s", err)
 		}
 	})
-	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}, nil
+	gzHandler := gziphandler.GzipHandler(handler)
+	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: gzHandler}, nil
 }
 
 // APIHealthArgs are the arguments for Health
