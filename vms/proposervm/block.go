@@ -68,11 +68,20 @@ func (pb *ProposerBlock) ID() ids.ID {
 }
 
 func (pb *ProposerBlock) Accept() error {
-	return pb.Block.Accept()
+	err := pb.Block.Accept()
+	if err == nil {
+		// pb parent block should not be needed anymore.
+		pb.vm.state.wipeFromCache(pb.header.PrntID)
+	}
+	return err
 }
 
 func (pb *ProposerBlock) Reject() error {
-	return pb.Block.Reject()
+	err := pb.Block.Reject()
+	if err == nil {
+		pb.vm.state.wipeFromCache(pb.id)
+	}
+	return err
 }
 
 func (pb *ProposerBlock) Status() choices.Status {

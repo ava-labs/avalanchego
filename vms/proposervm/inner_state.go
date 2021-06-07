@@ -75,7 +75,14 @@ func (is *innerState) getBlockFromWrappedBlkID(wrappedID ids.ID) (*ProposerBlock
 	return is.knownProBlocks[proID], nil
 }
 
-func (is *innerState) wipeCache() {
+func (is *innerState) wipeFromCache(id ids.ID) {
+	if blk, ok := is.knownProBlocks[id]; ok {
+		delete(is.wrpdToProID, blk.Block.ID())
+		delete(is.knownProBlocks, id)
+	}
+}
+
+func (is *innerState) wipeCache() { // useful for UTs
 	is.knownProBlocks = make(map[ids.ID]*ProposerBlock)
 	is.wrpdToProID = make(map[ids.ID]ids.ID)
 }
