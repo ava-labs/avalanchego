@@ -2,6 +2,7 @@ package proposervm
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -190,13 +191,13 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	}
 }
 
-func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
-	coreVM, proVM, coreGenBlk := initTestProposerVM(t)
+func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
+	coreVM, proVM, _ := initTestProposerVM(t)
 
+	coreBlkDoesNotVerify := errors.New("coreBlk should not verify in this test")
 	coreBlk := &snowman.TestBlock{
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk,
-		HeightV: coreGenBlk.Height() + 1,
+		VerifyV: coreBlkDoesNotVerify,
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -219,8 +220,8 @@ func TestParseBlockRecordsAndVerifiesParsedBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("proposerVM could not parse block")
 	}
-	if err := parsedBlk.Verify(); err != nil {
-		t.Fatal("parsed block should be verified")
+	if err := parsedBlk.Verify(); err == nil {
+		t.Fatal("parsed block should not necessarily verify upon parse")
 	}
 
 	// test

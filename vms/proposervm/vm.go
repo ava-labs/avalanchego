@@ -168,10 +168,6 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 
 	proBlk := NewProBlock(vm, mPb.Header, sb, b)
 
-	if err := proBlk.Verify(); err != nil {
-		return nil, err
-	}
-
 	if err := vm.addProBlk(&proBlk); err != nil {
 		return nil, err
 	}
