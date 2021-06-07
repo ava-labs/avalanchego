@@ -115,11 +115,11 @@ type chain struct {
 }
 
 // ChainConfig is configuration settings for the current execution.
-// [Settings] is the user-provided settings blob for the chain.
-// [Upgrades] is a chain-specific blob for coordinating upgrades.
+// [Config] is the user-provided config blob for the chain.
+// [Upgrade] is a chain-specific blob for coordinating upgrades.
 type ChainConfig struct {
-	Settings []byte
-	Upgrades []byte
+	Config  []byte
+	Upgrade []byte
 }
 
 // ManagerConfig ...
@@ -152,9 +152,9 @@ type ManagerConfig struct {
 	WhitelistedSubnets        ids.Set          // Subnets to validate
 	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService             health.Service
-	RetryBootstrap            bool // Should Bootstrap be retried
-	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
-	ChainConfigs              map[ids.ID]ChainConfig
+	RetryBootstrap            bool                   // Should Bootstrap be retried
+	RetryBootstrapMaxAttempts int                    // Max number of times to retry bootstrap
+	ChainConfigs              map[string]ChainConfig // alias -> ChainConfig
 	// If true, shut down the node after the Primary Network has bootstrapped
 	// and use [FetchOnlyFrom] as beacons
 	FetchOnly bool
@@ -230,7 +230,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			alias)
 		return
 	}
-
 	m.Log.Info("creating chain:\n"+
 		"    ID: %s\n"+
 		"    VMID:%s",
@@ -503,8 +502,8 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	chainConfig := m.ChainConfigs[ctx.ChainID]
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
+	chainConfig := m.getChainConfig(ctx.ChainID)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -615,6 +614,7 @@ func (m *manager) createSnowmanChain(
 	vm = block2.NewMeterVM(vm)
 
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+
 	if err != nil {
 		return nil, err
 	}
@@ -634,8 +634,8 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	chainConfig := m.ChainConfigs[ctx.ChainID]
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
+	chainConfig := m.getChainConfig(ctx.ChainID)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
@@ -781,4 +781,20 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// getChainConfig returns value of a entry by looking at ID key and alias key
+// it first searches ID key, then falls back to it's corresponding primary alias
+func (m *manager) getChainConfig(id ids.ID) ChainConfig {
+	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
+		return val
+	}
+	aliases := m.Aliases(id)
+	for _, alias := range aliases {
+		if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
+			return val
+		}
+	}
+
+	return ChainConfig{}
 }

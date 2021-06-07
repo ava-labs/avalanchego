@@ -11,7 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var TestBuilder Builder
+var TestBuilder Builder = Builder{
+	getByteSlice: func() []byte { return nil },
+}
 
 func TestBuildGetVersion(t *testing.T) {
 	msg, err := TestBuilder.GetVersion()
