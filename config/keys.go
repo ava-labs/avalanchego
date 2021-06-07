@@ -93,7 +93,7 @@ const (
 	IpcsChainIDsKey                         = "ipcs-chain-ids"
 	IpcsPathKey                             = "ipcs-path"
 	ConsensusGossipFrequencyKey             = "consensus-gossip-frequency"
-	ConsensusGossipAcceptedFrontierSizeKey  = "consensus-accept-frontier-gossip-size"
+	ConsensusGossipAcceptedFrontierSizeKey  = "consensus-accepted-frontier-gossip-size"
 	ConsensusGossipOnAcceptSizeKey          = "consensus-on-accept-gossip-size"
 	ConsensusShutdownTimeoutKey             = "consensus-shutdown-timeout"
 	FdLimitKey                              = "fd-limit"
