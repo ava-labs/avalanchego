@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -80,7 +79,7 @@ func New(
 	includePreviousVersions bool,
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
-	currentDBPath := path.Join(dbDirPath, currentVersion.String())
+	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
 	currentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
