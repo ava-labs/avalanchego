@@ -45,6 +45,7 @@ func init() {
 	}
 }
 
+//////// clock interface and implementation, to ease up UTs
 type clock interface {
 	now() time.Time
 }
@@ -57,22 +58,21 @@ func (c clockImpl) now() time.Time {
 
 type VM struct {
 	block.ChainVM
-	knownProBlocks map[ids.ID]*ProposerBlock
-	wrpdToProID    map[ids.ID]ids.ID
-	clk            clock
-	fromWrappedVM  chan common.Message
-	toEngine       chan<- common.Message
+	state         *innerState
+	clk           clock
+	fromWrappedVM chan common.Message
+	toEngine      chan<- common.Message
 }
 
 func NewProVM(vm block.ChainVM) VM {
-	return VM{
-		ChainVM:        vm,
-		knownProBlocks: make(map[ids.ID]*ProposerBlock),
-		wrpdToProID:    make(map[ids.ID]ids.ID),
-		clk:            clockImpl{},
-		fromWrappedVM:  nil,
-		toEngine:       nil,
+	res := VM{
+		ChainVM:       vm,
+		clk:           clockImpl{},
+		fromWrappedVM: nil,
+		toEngine:      nil,
 	}
+	res.state = newState(&res)
+	return res
 }
 
 func (vm *VM) handleBlockTiming() {
@@ -90,10 +90,13 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	vm.state.init(dbManager.Current().Database) // TODO: keep VM state synced with wrappedVM's one
+
 	// proposerVM intercepts VM events for blocks and times event relay to consensus
 	vm.toEngine = toEngine
 	vm.fromWrappedVM = make(chan common.Message, len(toEngine))
 
+	// Assuming genesisBytes has not proposerBlockHeader
 	if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes, configBytes, vm.fromWrappedVM, fxs); err != nil {
 		return err
 	}
@@ -111,7 +114,12 @@ func (vm *VM) Initialize(
 
 	hdr := NewProHeader(ids.ID{}, 0, 0)
 	proGenBlk := NewProBlock(vm, hdr, genesisBlk, nil)
-	if err := vm.addProBlk(&proGenBlk); err != nil {
+
+	// Skipping verification for genesis block.
+	// Should we instead check that genesis state is accepted && skip verification for accepted blocks?
+	vm.state.cacheProBlk(&proGenBlk)
+	if err := vm.state.storeBlk(&proGenBlk); err != nil {
+		// TODO: remove blk from cache??
 		return err
 	}
 
@@ -120,32 +128,27 @@ func (vm *VM) Initialize(
 }
 
 //////// block.ChainVM interface implementation
-func (vm *VM) addProBlk(blk *ProposerBlock) error { // exported for UTs
-	// TODO: handle update/create
-	vm.knownProBlocks[blk.ID()] = blk
-	vm.wrpdToProID[blk.Block.ID()] = blk.ID()
-	return nil
-}
-
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	sb, err := vm.ChainVM.BuildBlock()
 	if err != nil {
 		return nil, err
 	}
-	prntID, ok := vm.wrpdToProID[sb.Parent().ID()]
-	if !ok {
-		return nil, ErrProBlkNotFound
+
+	proParent, err := vm.state.getBlockFromWrappedBlkID(sb.Parent().ID())
+	if err != nil {
+		return nil, err
 	}
-	hdr := NewProHeader(prntID, vm.clk.now().Unix(), vm.knownProBlocks[prntID].Height()+1)
+
+	hdr := NewProHeader(proParent.ID(), vm.clk.now().Unix(), proParent.Height()+1)
 	proBlk := NewProBlock(vm, hdr, sb, nil)
 
 	if err := proBlk.Verify(); err != nil {
 		return nil, err
 	}
 
-	// Skipping verification for genesis block.
-	// Should we instead check that genesis state is accepted && skip verification for accepted blocks?
-	if err := vm.addProBlk(&proBlk); err != nil {
+	vm.state.cacheProBlk(&proBlk)
+	if err := vm.state.storeBlk(&proBlk); err != nil {
+		// TODO: remove blk from cache??
 		return nil, err
 	}
 	return &proBlk, nil
@@ -168,7 +171,9 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 
 	proBlk := NewProBlock(vm, mPb.Header, sb, b)
 
-	if err := vm.addProBlk(&proBlk); err != nil {
+	vm.state.cacheProBlk(&proBlk)
+	if err := vm.state.storeBlk(&proBlk); err != nil {
+		// TODO: remove blk from cache??
 		return nil, err
 	}
 
@@ -176,18 +181,17 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	if proBlk, ok := vm.knownProBlocks[id]; ok {
-		return proBlk, nil
-	}
-	return nil, ErrProBlkNotFound
+	return vm.state.getBlock(id)
 }
 
 func (vm *VM) SetPreference(id ids.ID) error {
-	if _, ok := vm.knownProBlocks[id]; !ok {
-		return ErrProBlkNotFound // ASSERT THAT wrpdToProID has not key for value id??
+	proBlk, err := vm.state.getBlock(id)
+	if err != nil {
+		// TODO: log error
+		return ErrProBlkNotFound
 	}
 
-	err := vm.ChainVM.SetPreference(vm.knownProBlocks[id].Block.ID())
+	err = vm.ChainVM.SetPreference(proBlk.Block.ID())
 	return err
 }
 
@@ -197,11 +201,12 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 		return ids.ID{}, err
 	}
 
-	proID, ok := vm.wrpdToProID[wrpdID]
-	if !ok {
+	proBlk, err := vm.state.getBlockFromWrappedBlkID(wrpdID)
+	if err != nil {
 		return ids.ID{}, ErrProBlkNotFound // Is this possible at all??
 	}
-	return proID, nil
+
+	return proBlk.ID(), nil
 }
 
 //////// Connector VMs handling

@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -133,6 +135,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
 	proVM := NewProVM(coreVM)
+	proVM.state.proBlkDB = versiondb.New(memdb.New())
 
 	ParentProBlk := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{}, nil)
 
@@ -155,9 +158,7 @@ func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 	}
 
 	// now store parentBlock
-	if err := proVM.addProBlk(&ParentProBlk); err != nil {
-		t.Fatal("Could not store proposer block")
-	}
+	proVM.state.cacheProBlk(&ParentProBlk)
 
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Block with known parent should not verify")
@@ -172,9 +173,7 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 		Timestamp: proVM.clk.now().Unix(),
 	}
 	ParentProBlk := NewProBlock(&proVM, parentHdr, &snowman.TestBlock{}, nil)
-	if err := proVM.addProBlk(&ParentProBlk); err != nil {
-		t.Fatal("Could not store proposer block")
-	}
+	proVM.state.cacheProBlk(&ParentProBlk)
 
 	childHdr := ProposerBlockHeader{
 		PrntID: ParentProBlk.ID(),
@@ -223,9 +222,7 @@ func TestProposerBlockWithWrongHeightDoesNotVerify(t *testing.T) {
 		&snowman.TestBlock{
 			HeightV: 200,
 		}, nil)
-	if err := proVM.addProBlk(&ParentProBlk); err != nil {
-		t.Fatal("Could not store proposer block")
-	}
+	proVM.state.cacheProBlk(&ParentProBlk)
 
 	childHdr := ProposerBlockHeader{
 		PrntID: ParentProBlk.ID(),

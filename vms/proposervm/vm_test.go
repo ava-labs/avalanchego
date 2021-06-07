@@ -114,7 +114,8 @@ func initTestProposerVM(t *testing.T) (*block.TestVM, VM, *snowman.TestBlock) {
 	proVM := NewProVM(coreVM)
 	proVM.clk = tc
 
-	if err := proVM.Initialize(nil, nil, coreGenesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
+	dummyDBManager := manager.NewDefaultMemDBManager()
+	if err := proVM.Initialize(nil, dummyDBManager, coreGenesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
 		t.Fatal("failed to initialize proposerVM")
 	}
 	return coreVM, proVM, coreGenesisBlk
@@ -232,5 +233,89 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 	}
 	if storedBlk != parsedBlk {
 		t.Fatal("proposerVM retrieved wrong block")
+	}
+}
+
+func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
+	coreVM, proVM, genesisBlk := initTestProposerVM(t)
+
+	// build two blocks on top of genesis
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.GenerateTestID(),
+		},
+		ParentV: genesisBlk,
+		HeightV: 1,
+		BytesV:  []byte{1},
+		VerifyV: nil,
+	}
+	coreBlk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.GenerateTestID(),
+		},
+		ParentV: coreBlk1,
+		HeightV: 2,
+		BytesV:  []byte{2},
+		VerifyV: nil,
+	}
+	coreBuildCalls := 0
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		switch coreBuildCalls {
+		case 0:
+			coreBuildCalls++
+			return coreBlk1, nil
+		case 1:
+			coreBuildCalls++
+			return coreBlk2, nil
+		default:
+			t.Fatal("BuildBlock of coreVM called too many times")
+		}
+		return nil, nil // should never be called
+	}
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build block")
+	}
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build block")
+	}
+
+	// while inner cache, as it would happen upon node shutdown
+	proVM.state.wipeCache()
+
+	// check that getBlock still works
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.BytesV):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.BytesV):
+			return coreBlk2, nil
+		default:
+			t.Fatal("ParseBlock of coreVM called with unknown block")
+		}
+		return nil, nil // should never be called
+	}
+
+	rtrvdProBlk1, err := proVM.GetBlock(proBlk1.ID())
+	if err != nil {
+		t.Fatal("Could not get block after whiping off proposerVM cache")
+	}
+	if rtrvdProBlk1.ID() != proBlk1.ID() {
+		t.Fatal("blocks do not match following cache whiping")
+	}
+	if err = rtrvdProBlk1.Verify(); err != nil {
+		t.Fatal("block retrieved after cache whiping does not verify")
+	}
+
+	rtrvdProBlk2, err := proVM.GetBlock(proBlk2.ID())
+	if err != nil {
+		t.Fatal("Could not get block after whiping off proposerVM cache")
+	}
+	if rtrvdProBlk2.ID() != proBlk2.ID() {
+		t.Fatal("blocks do not match following cache whiping")
+	}
+	if err = rtrvdProBlk2.Verify(); err != nil {
+		t.Fatal("block retrieved after cache whiping does not verify")
 	}
 }

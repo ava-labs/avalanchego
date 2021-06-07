@@ -81,8 +81,9 @@ func (pb *ProposerBlock) Status() choices.Status {
 
 //////// snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
-	res, ok := pb.vm.knownProBlocks[pb.header.PrntID]
-	if !ok {
+	res, err := pb.vm.state.getBlock(pb.header.PrntID)
+	if err != nil {
+		// TODO: log error
 		return &missing.Block{BlkID: pb.header.PrntID}
 	}
 	return res
@@ -93,8 +94,9 @@ func (pb *ProposerBlock) Verify() error {
 		return err
 	}
 
-	prntBlk, ok := pb.vm.knownProBlocks[pb.header.PrntID]
-	if !ok {
+	prntBlk, err := pb.vm.state.getBlock(pb.header.PrntID)
+	if err != nil {
+		// TODO: log error
 		return ErrProBlkNotFound
 	}
 
