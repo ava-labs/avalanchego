@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -135,7 +134,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
 	proVM := NewProVM(coreVM)
-	proVM.state.proBlkDB = versiondb.New(memdb.New())
+	proVM.state.init(memdb.New())
 
 	ParentProBlk := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{}, nil)
 

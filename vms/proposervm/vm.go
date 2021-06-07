@@ -1,9 +1,14 @@
 package proposervm
 
-// VM is a decorator for a snowman.ChainVM struct,
-// overriding the relevant methods to handle block headers introduced with snowman++
-// Design guidelines:
-// Calls to wrapped VM can be expensive (e.g. sent over gRPC); be frugal
+// VM is a decorator for a snowman.ChainVM struct, created to handle block headers introduced with snowman++
+
+// Contract
+// * After initialization. full ProposerBlocks (proHeader + wrapped block ) are stored in proposervm.VM's db
+// on Build/ParseBlock, AFTER calls to wrapped vm's Build/ParseBlock, which we ASSUME
+//  would store wrapped block on wrappedVm'db.
+// * ProposerVM do not track ProposerBlock state; instead state relate calls (Accept/Reject/Status) are
+// forwarded to the wrappedVM. Since block registration HAPPENS BEFORE block status settings,
+// proposerVM is guaranteed not to lose the last accepted block
 
 import (
 	"errors"
@@ -37,6 +42,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(&marshallingProposerBLock{}),
+		c.RegisterType(&ids.ID{}),
 		cdc.RegisterCodec(codecVersion, c),
 	)
 
@@ -90,7 +96,7 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
-	vm.state.init(dbManager.Current().Database) // TODO: keep VM state synced with wrappedVM's one
+	vm.state.init(dbManager.Current().Database)
 
 	// proposerVM intercepts VM events for blocks and times event relay to consensus
 	vm.toEngine = toEngine
@@ -107,20 +113,22 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	genesisBlk, err := vm.ChainVM.GetBlock(genesisID)
-	if err != nil {
-		return err
-	}
+	if _, err := vm.state.getBlockFromWrappedBlkID(genesisID); err != nil {
+		// genesis not stored
+		genesisBlk, err := vm.ChainVM.GetBlock(genesisID)
+		if err != nil {
+			return err
+		}
 
-	hdr := NewProHeader(ids.ID{}, 0, 0)
-	proGenBlk := NewProBlock(vm, hdr, genesisBlk, nil)
+		hdr := NewProHeader(ids.ID{}, 0, 0)
+		proGenBlk := NewProBlock(vm, hdr, genesisBlk, nil)
 
-	// Skipping verification for genesis block.
-	// Should we instead check that genesis state is accepted && skip verification for accepted blocks?
-	vm.state.cacheProBlk(&proGenBlk)
-	if err := vm.state.storeBlk(&proGenBlk); err != nil {
-		// TODO: remove blk from cache??
-		return err
+		// Skipping verification for genesis block.
+		// TODO: Should we instead check that genesis state is accepted && skip verification for accepted blocks?
+		vm.state.cacheProBlk(&proGenBlk)
+		if err := vm.state.commitBlk(&proGenBlk); err != nil {
+			return err
+		}
 	}
 
 	go vm.handleBlockTiming()
@@ -147,8 +155,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 
 	vm.state.cacheProBlk(&proBlk)
-	if err := vm.state.storeBlk(&proBlk); err != nil {
-		// TODO: remove blk from cache??
+	if err := vm.state.commitBlk(&proBlk); err != nil {
 		return nil, err
 	}
 	return &proBlk, nil
@@ -172,8 +179,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	proBlk := NewProBlock(vm, mPb.Header, sb, b)
 
 	vm.state.cacheProBlk(&proBlk)
-	if err := vm.state.storeBlk(&proBlk); err != nil {
-		// TODO: remove blk from cache??
+	if err := vm.state.commitBlk(&proBlk); err != nil {
 		return nil, err
 	}
 

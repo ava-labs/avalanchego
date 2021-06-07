@@ -270,7 +270,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		default:
 			t.Fatal("BuildBlock of coreVM called too many times")
 		}
-		return nil, nil // should never be called
+		return nil, nil
 	}
 	proBlk1, err := proVM.BuildBlock()
 	if err != nil {
@@ -284,7 +284,19 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 	// while inner cache, as it would happen upon node shutdown
 	proVM.state.wipeCache()
 
-	// check that getBlock still works
+	// build a new block to show ops can resume smoothly
+	coreBlk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.GenerateTestID(),
+		},
+		ParentV: coreBlk2,
+		HeightV: 3,
+		BytesV:  []byte{3},
+		VerifyV: nil,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreBlk1.BytesV):
@@ -294,7 +306,28 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		default:
 			t.Fatal("ParseBlock of coreVM called with unknown block")
 		}
-		return nil, nil // should never be called
+		return nil, nil
+	}
+
+	proBlk3, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build block")
+	}
+
+	if proBlk3.Parent().ID() != proBlk2.ID() {
+		t.Fatal("Error in building Block")
+	}
+
+	// check that getBlock still works on older blocks
+	rtrvdProBlk2, err := proVM.GetBlock(proBlk2.ID())
+	if err != nil {
+		t.Fatal("Could not get block after whiping off proposerVM cache")
+	}
+	if rtrvdProBlk2.ID() != proBlk2.ID() {
+		t.Fatal("blocks do not match following cache whiping")
+	}
+	if err = rtrvdProBlk2.Verify(); err != nil {
+		t.Fatal("block retrieved after cache whiping does not verify")
 	}
 
 	rtrvdProBlk1, err := proVM.GetBlock(proBlk1.ID())
@@ -305,17 +338,6 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		t.Fatal("blocks do not match following cache whiping")
 	}
 	if err = rtrvdProBlk1.Verify(); err != nil {
-		t.Fatal("block retrieved after cache whiping does not verify")
-	}
-
-	rtrvdProBlk2, err := proVM.GetBlock(proBlk2.ID())
-	if err != nil {
-		t.Fatal("Could not get block after whiping off proposerVM cache")
-	}
-	if rtrvdProBlk2.ID() != proBlk2.ID() {
-		t.Fatal("blocks do not match following cache whiping")
-	}
-	if err = rtrvdProBlk2.Verify(); err != nil {
 		t.Fatal("block retrieved after cache whiping does not verify")
 	}
 }

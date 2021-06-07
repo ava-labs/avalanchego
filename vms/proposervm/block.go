@@ -71,7 +71,7 @@ func (pb *ProposerBlock) Accept() error {
 	err := pb.Block.Accept()
 	if err == nil {
 		// pb parent block should not be needed anymore.
-		pb.vm.state.wipeFromCache(pb.header.PrntID)
+		pb.vm.state.wipeFromCacheProBlk(pb.header.PrntID)
 	}
 	return err
 }
@@ -79,7 +79,7 @@ func (pb *ProposerBlock) Accept() error {
 func (pb *ProposerBlock) Reject() error {
 	err := pb.Block.Reject()
 	if err == nil {
-		pb.vm.state.wipeFromCache(pb.id)
+		pb.vm.state.wipeFromCacheProBlk(pb.id)
 	}
 	return err
 }
