@@ -286,12 +286,14 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 // MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
-	if lenVtxs := len(vtxs); lenVtxs > common.MaxContainersPerMultiPut {
-		b.Ctx.Log.Debug("MultiPut(%s, %d) contains more than maximum number of vertices", vdr, requestID)
-		return b.GetAncestorsFailed(vdr, requestID)
-	} else if lenVtxs == 0 {
+	lenVtxs := len(vtxs)
+	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
+	}
+	if lenVtxs > b.MultiputMaxContainers {
+		vtxs = vtxs[:b.MultiputMaxContainers]
+		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenVtxs-b.MultiputMaxContainers, vdr, requestID)
 	}
 
 	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
@@ -301,7 +303,6 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 			b.Ctx.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
 			return nil
 		}
-
 		b.Ctx.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
 		b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
 		return b.fetch(requestedVtxID)

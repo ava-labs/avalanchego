@@ -153,6 +153,11 @@ type Config struct {
 	// Timeout when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration
 
+	// Max number of containers in a multiput message sent by this node.
+	// This node will only consider the first [MultiputMaxContainers]
+	// containers in a multiput it receives.
+	BootstrapMultiputMaxContainers int
+
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
 

@@ -615,6 +615,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		RetryBootstrapMaxAttempts: n.Config.RetryBootstrapMaxAttempts,
 		ShutdownNodeFunc:          n.Shutdown,
 		ChainConfigs:              n.Config.ChainConfigs,
+		MultiputMaxContainers:     n.Config.BootstrapMultiputMaxContainers,
 	})
 
 	vdrs := n.vdrs

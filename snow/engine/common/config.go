@@ -25,8 +25,14 @@ type Config struct {
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
+
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
+
+	// Max number of containers in a multiput message sent by this node.
+	// This node will only consider the first [MultiputMaxContainers]
+	// containers in a multiput it receives.
+	MultiputMaxContainers int
 }
 
 // Context implements the Engine interface
