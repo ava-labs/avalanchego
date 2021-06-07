@@ -471,6 +471,8 @@ func (b *BlockClient) Verify() error {
 func (b *BlockClient) Bytes() []byte  { return b.bytes }
 func (b *BlockClient) Height() uint64 { return b.height }
 
+// AV-590, quantify overhead of passing these over RPC
+
 func (vm *VMClient) Connected(id ids.ShortID) error {
 	return nil // noop
 }
