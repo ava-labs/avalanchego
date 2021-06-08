@@ -534,6 +534,9 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 		return err
 	}
 
+	// secure this by defaulting to avaxAsset
+	vm.feeAssetID = vm.ctx.AVAXAssetID
+
 	for index, genesisTx := range genesis.Txs {
 		if len(genesisTx.Outs) != 0 {
 			return errGenesisAssetMustHaveState
@@ -562,13 +565,11 @@ func (vm *VM) initGenesis(genesisBytes []byte) error {
 			vm.feeAssetID = txID
 		}
 	}
-	// not quite possible. but if it's still null, default to avaxAsset
-	if len(vm.feeAssetID) == 0 {
-		vm.feeAssetID = vm.ctx.AVAXAssetID
-	}
+
 	if !stateInitialized {
 		return vm.state.SetInitialized()
 	}
+
 	return nil
 }
 
