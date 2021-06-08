@@ -100,7 +100,7 @@ func initTestProposerVM(t *testing.T) (*block.TestVM, VM, *snowman.TestBlock) {
 			IDV:     ids.Empty.Prefix(2021),
 			StatusV: choices.Unknown,
 		},
-		BytesV:  []byte{1},
+		BytesV:  []byte{0},
 		HeightV: 0,
 	}
 
@@ -252,14 +252,14 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 }
 
 func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
-	coreVM, proVM, genesisBlk := initTestProposerVM(t)
+	coreVM, proVM, coreGenBlk := initTestProposerVM(t)
 
 	// build two blocks on top of genesis
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.GenerateTestID(),
 		},
-		ParentV: genesisBlk,
+		ParentV: coreGenBlk,
 		HeightV: 1,
 		BytesV:  []byte{1},
 		VerifyV: nil,
@@ -314,6 +314,8 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.BytesV):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk1.BytesV):
 			return coreBlk1, nil
 		case bytes.Equal(b, coreBlk2.BytesV):
