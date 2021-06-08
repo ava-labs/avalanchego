@@ -789,12 +789,19 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	defer n.stateLock.RUnlock()
 
 	if _, ok := n.connectedIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's connected", ipStr)
 		return false
 	}
 	if _, ok := n.myIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's myself", ipStr)
 		return false
 	}
 	if _, ok := n.peerAliasIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
+		return false
+	}
+	if !n.connMeter.Allow(ipStr) {
+		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
 		return false
 	}
 
@@ -860,13 +867,6 @@ func (n *network) Dispatch() error {
 		ipStr := ip.IP.String()
 		upgrade := n.shouldUpgradeIncoming(ipStr)
 		if !upgrade {
-			n.log.Debug("dropping duplicate connection from %s", remoteAddr)
-			_ = conn.Close()
-			continue
-		}
-
-		if !n.connMeter.Allow(ipStr) {
-			n.log.Debug("connection from %s dropped due to rate-limiting", remoteAddr)
 			_ = conn.Close()
 			continue
 		}
