@@ -4,6 +4,5 @@
 package main
 
 const (
-	configKey  = "config"
 	versionKey = "version"
 )

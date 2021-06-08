@@ -3,14 +3,35 @@
 
 package evm
 
-import "github.com/ava-labs/coreth/eth"
+import (
+	"time"
 
-// CommandLineConfig ...
-type CommandLineConfig struct {
+	"github.com/ava-labs/coreth/eth"
+)
+
+const (
+	defaultEthApiEnabled               = true
+	defaultNetApiEnabled               = true
+	defaultWeb3ApiEnabled              = true
+	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
+	defaultRpcTxFeeCap                 = 100        // 100 AVAX
+	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
+	defaultMaxBlocksPerRequest         = 0          // Default to no maximum on the number of blocks per getLogs request
+	defaultContinuousProfilerFrequency = 15 * time.Minute
+	defaultContinuousProfilerMaxFiles  = 5
+)
+
+// Config ...
+type Config struct {
 	// Coreth APIs
 	SnowmanAPIEnabled     bool `json:"snowman-api-enabled"`
 	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
 	NetAPIEnabled         bool `json:"net-api-enabled"`
+
+	// Continuous Profiler
+	ContinuousProfilerDir       string        `json:"continuous-profiler-dir"`       // If set to non-empty string creates a continuous profiler
+	ContinuousProfilerFrequency time.Duration `json:"continuous-profiler-frequency"` // Frequency to run continuous profiler if enabled
+	ContinuousProfilerMaxFiles  int           `json:"continuous-profiler-max-files"` // Maximum number of files to maintain
 
 	// Coreth API Gas/Price Caps
 	RPCGasCap   uint64  `json:"rpc-gas-cap"`
@@ -33,12 +54,10 @@ type CommandLineConfig struct {
 	KeystoreDirectory             string `json:"keystore-directory"` // both absolute and relative supported
 	KeystoreExternalSigner        string `json:"keystore-external-signer"`
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
-
-	FlagError error
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
-func (c CommandLineConfig) EthAPIs() []string {
+func (c Config) EthAPIs() []string {
 	ethAPIs := make([]string, 0)
 
 	if c.EthAPIEnabled {
@@ -57,6 +76,18 @@ func (c CommandLineConfig) EthAPIs() []string {
 	return ethAPIs
 }
 
-func (c CommandLineConfig) EthBackendSettings() eth.Settings {
+func (c Config) EthBackendSettings() eth.Settings {
 	return eth.Settings{MaxBlocksPerRequest: c.MaxBlocksPerRequest}
+}
+
+func (c *Config) SetDefaults() {
+	c.EthAPIEnabled = defaultEthApiEnabled
+	c.NetAPIEnabled = defaultNetApiEnabled
+	c.Web3APIEnabled = defaultWeb3ApiEnabled
+	c.RPCGasCap = defaultRpcGasCap
+	c.RPCTxFeeCap = defaultRpcTxFeeCap
+	c.APIMaxDuration = defaultApiMaxDuration
+	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
+	c.ContinuousProfilerFrequency = defaultContinuousProfilerFrequency
+	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
 }
