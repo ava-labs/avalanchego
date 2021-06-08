@@ -11,29 +11,30 @@ import (
 // ConnMeter keeps track of how many times a peer from a given address
 // have attempted to connect to us in a given time period.
 type ConnMeter interface {
-	// Mark that the remote address [ipStr] made an incoming connection.
-	// Returns the number of times in the [reset duration]
-	// that we've received an incoming connection from this address,
-	// including this attempt.
-	Tick(ipStr string) int
+	// Returns whether we should allow an incoming connection from [ipStr]
+	Allow(ipStr string) bool
 }
 
-// Return a new connection counter
-// If [resetDuration] is zero, returns a ConnMeter that always returns 0
-func NewConnMeter(resetDuration time.Duration, size int) ConnMeter {
-	if resetDuration == 0 {
+// Return a new connection meter that allows an incoming connection
+// if the number of incoming connections from that address <= [maxConns]
+// in the last [resetDuration].
+// If [resetDuration] or [maxConns] is 0, returns a ConnMeter that
+// allows all incoming connections.
+func NewConnMeter(resetDuration time.Duration, size, maxConns int) ConnMeter {
+	if resetDuration == 0 || maxConns == 0 {
 		return &noConnMeter{}
 	}
 	return &connMeter{
 		cache:         &cache.LRU{Size: size},
 		resetDuration: resetDuration,
+		maxConns:      maxConns,
 	}
 }
 
 type noConnMeter struct{}
 
-func (n *noConnMeter) Tick(ipStr string) int {
-	return 0
+func (n *noConnMeter) Allow(ipStr string) bool {
+	return true
 }
 
 // connMeter implements ConnMeter
@@ -41,16 +42,14 @@ type connMeter struct {
 	lock          sync.RWMutex
 	cache         *cache.LRU
 	resetDuration time.Duration
+	maxConns      int
 }
 
-// Mark that the remote address [ipStr] made an incoming connection.
-// Returns the number of times in the last [n.resetDuration]
-// that we've received an incoming connection from this address,
-// including this attempt.
-func (n *connMeter) Tick(ipStr string) int {
+// Returns whether we should allow an incoming connection from [ipStr]
+func (n *connMeter) Allow(ipStr string) bool {
 	meter := n.getMeter(ipStr)
 	meter.Tick()
-	return meter.Ticks()
+	return meter.Ticks() <= n.maxConns
 }
 
 func (n *connMeter) getMeter(ipStr string) *timer.TimedMeter {

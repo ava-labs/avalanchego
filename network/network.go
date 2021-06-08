@@ -153,7 +153,6 @@ type network struct {
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	connMeterMaxConns            int
 	connMeter                    ConnMeter
 	b                            Builder
 	isFetchOnly                  bool
@@ -376,8 +375,7 @@ func NewNetwork(
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
-		connMeterMaxConns:                  connMeterMaxConns,
+		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
@@ -862,7 +860,13 @@ func (n *network) Dispatch() error {
 		ipStr := ip.IP.String()
 		upgrade := n.shouldUpgradeIncoming(ipStr)
 		if !upgrade {
-			n.log.Debug("dropping duplicate connection from %s", ipStr)
+			n.log.Debug("dropping duplicate connection from %s", remoteAddr)
+			_ = conn.Close()
+			continue
+		}
+
+		if !n.connMeter.Allow(ipStr) {
+			n.log.Debug("connection from %s dropped due to rate-limiting", remoteAddr)
 			_ = conn.Close()
 			continue
 		}
@@ -874,14 +878,6 @@ func (n *network) Dispatch() error {
 			if err := conn.SetNoDelay(true); err != nil {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
-		}
-
-		numnRecentConnAttempts := n.connMeter.Tick(ipStr)
-		// looking for > n.connMeterMaxConns indicating the second tick
-		if numnRecentConnAttempts > n.connMeterMaxConns {
-			n.log.Debug("connection from %s temporarily dropped", ipStr)
-			_ = conn.Close()
-			continue
 		}
 
 		go func() {

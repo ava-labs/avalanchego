@@ -15,39 +15,48 @@ const (
 )
 
 func TestNoConnMeter(t *testing.T) {
-	m := NewConnMeter(0, 1)
+	m := NewConnMeter(0, 1, 1)
 
-	count := m.Tick(localhost)
-	assert.Equal(t, 0, count)
+	allow := m.Allow(localhost)
+	assert.True(t, allow)
 
-	count = m.Tick(localhost)
-	assert.Equal(t, 0, count)
+	allow = m.Allow(localhost)
+	assert.True(t, allow)
+
+	allow = m.Allow(localhost)
+	assert.True(t, allow)
 }
 
 func TestConnMeter(t *testing.T) {
-	m := NewConnMeter(time.Hour, 1)
+	m := NewConnMeter(time.Hour, 1, 3)
 
-	count := m.Tick(localhost)
-	assert.Equal(t, 1, count)
+	allow := m.Allow(localhost)
+	assert.True(t, allow)
 
-	count = m.Tick(localhost)
-	assert.Equal(t, 2, count)
+	allow = m.Allow(localhost)
+	assert.True(t, allow)
+
+	allow = m.Allow(localhost)
+	assert.True(t, allow)
+
+	allow = m.Allow(localhost)
+	assert.False(t, allow)
 }
 
 func TestConnMeterReplace(t *testing.T) {
 	remote := "127.0.0.2:9651"
 	differentPort := "127.0.0.1:9650"
-	m := NewConnMeter(time.Hour, 1)
+	m := NewConnMeter(time.Hour, 1, 1)
 
-	count := m.Tick(localhost)
-	assert.Equal(t, 1, count)
+	allow := m.Allow(localhost)
+	assert.True(t, allow)
 
-	count = m.Tick(differentPort)
-	assert.Equal(t, 1, count)
+	allow = m.Allow(differentPort)
+	assert.True(t, allow)
 
-	count = m.Tick(remote)
-	assert.Equal(t, 1, count)
+	allow = m.Allow(remote)
+	assert.True(t, allow)
 
-	count = m.Tick(localhost)
-	assert.Equal(t, 1, count)
+	allow = m.Allow(localhost)
+	assert.True(t, allow)
 }
