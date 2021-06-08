@@ -25,7 +25,7 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 	// setup
 	noOptionBlock := snowman.TestBlock{}
 	proBlk := ProposerBlock{
-		Block: &noOptionBlock,
+		coreBlk: &noOptionBlock,
 	}
 
 	// test
@@ -36,7 +36,7 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 
 	// setup
 	proBlk = ProposerBlock{
-		Block: &TestOptionsBlock{},
+		coreBlk: &TestOptionsBlock{},
 	}
 
 	// test
@@ -58,24 +58,21 @@ func (tC testClock) now() time.Time {
 }
 
 func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
-	// setup
-	coreVM, proVM, genesisBlk := initTestProposerVM(t)
+	coreVM := &block.TestVM{}
+	proVM := NewProVM(coreVM, true)
+	proVM.state.init(memdb.New())
 
+	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.clk.now().Unix(), 100)
 	newBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: genesisBlk,
-		HeightV: genesisBlk.HeightV + 1,
+		ParentV: nil, // could be genesis
+		HeightV: 1,
 		BytesV:  []byte{1},
 	}
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
-
-	proBlk, err := proVM.BuildBlock()
-	if err != nil {
-		t.Fatal("could not build proposer block")
-	}
+	proBlk, _ := NewProBlock(&proVM, proHdr, newBlk, nil, false)
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -98,12 +95,9 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 
 func TestProposerBlockParseFailure(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM)
+	proVM := NewProVM(coreVM, true)
 
-	proHdr := ProposerBlockHeader{
-		PrntID:    ids.Empty.Prefix(8),
-		Timestamp: proVM.clk.now().Unix(),
-	}
+	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.clk.now().Unix(), 0)
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -133,21 +127,19 @@ func TestProposerBlockParseFailure(t *testing.T) {
 
 func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM)
+	proVM := NewProVM(coreVM, true)
 	proVM.state.init(memdb.New())
 
 	ParentProBlk, _ := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{}, nil,
 		false) // not signing block, cannot err
 
-	childHdr := ProposerBlockHeader{
-		PrntID: ParentProBlk.ID(),
-		Height: ParentProBlk.Height() + 1,
-	}
+	childHdr := NewProHeader(ParentProBlk.ID(), 0, ParentProBlk.Height()+1)
 	childCoreBlk := &snowman.TestBlock{
 		VerifyV: nil,
 		HeightV: childHdr.Height,
 	}
-	childProBlk, _ := NewProBlock(&proVM, childHdr, childCoreBlk, nil, false) // not signing block, cannot err
+	childProBlk, _ := NewProBlock(&proVM, childHdr, childCoreBlk, nil,
+		false) // not signing block, cannot err
 
 	// Parent block not store yet
 	err := childProBlk.Verify()
@@ -167,18 +159,13 @@ func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 
 func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM)
+	proVM := NewProVM(coreVM, true)
 
-	parentHdr := ProposerBlockHeader{
-		Timestamp: proVM.clk.now().Unix(),
-	}
+	parentHdr := NewProHeader(ids.ID{}, proVM.clk.now().Unix(), 0)
 	ParentProBlk, _ := NewProBlock(&proVM, parentHdr, &snowman.TestBlock{}, nil, false) // not signing block, cannot err
 	proVM.state.cacheProBlk(&ParentProBlk)
 
-	childHdr := ProposerBlockHeader{
-		PrntID: ParentProBlk.ID(),
-		Height: ParentProBlk.Height() + 1,
-	}
+	childHdr := NewProHeader(ParentProBlk.ID(), 0, ParentProBlk.Height()+1)
 	childCoreBlk := &snowman.TestBlock{
 		VerifyV: nil,
 		HeightV: childHdr.Height,
@@ -213,20 +200,16 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 
 func TestProposerBlockWithWrongHeightDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM)
+	proVM := NewProVM(coreVM, true)
 
 	ParentProBlk, _ := NewProBlock(&proVM,
-		ProposerBlockHeader{
-			Height: 200,
-		},
+		NewProHeader(ids.ID{}, 0, 200),
 		&snowman.TestBlock{
 			HeightV: 200,
 		}, nil, false) // not signing block, cannot err
 	proVM.state.cacheProBlk(&ParentProBlk)
 
-	childHdr := ProposerBlockHeader{
-		PrntID: ParentProBlk.ID(),
-	}
+	childHdr := NewProHeader(ParentProBlk.ID(), 0, 0)
 	childCoreBlk := &snowman.TestBlock{
 		VerifyV: nil,
 		HeightV: ParentProBlk.Height() + 1,

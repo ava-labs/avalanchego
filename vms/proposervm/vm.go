@@ -3,12 +3,15 @@ package proposervm
 // VM is a decorator for a snowman.ChainVM struct, created to handle block headers introduced with snowman++
 
 // Contract
-// * After initialization. full ProposerBlocks (proHeader + wrapped block ) are stored in proposervm.VM's db
-// on Build/ParseBlock, AFTER calls to wrapped vm's Build/ParseBlock, which we ASSUME
-//  would store wrapped block on wrappedVm'db.
+// * After initialization. full ProposerBlocks (proHeader + core block ) are stored in proposervm.VM's db
+// on Build/ParseBlock, AFTER calls to core vm's Build/ParseBlock, which we ASSUME
+//  would store core block on core VM's db.
 // * ProposerVM do not track ProposerBlock state; instead state relate calls (Accept/Reject/Status) are
-// forwarded to the wrappedVM. Since block registration HAPPENS BEFORE block status settings,
+// forwarded to the core VM. Since block registration HAPPENS BEFORE block status settings,
 // proposerVM is guaranteed not to lose the last accepted block
+// * ProposerVM can handle both ProposerVM blocks AND generic snowman.Block not wrapped with a ProposerBlocHeader
+// This allows all snowman-like VM freedom to select a time after which introduce the congestion control mechanism
+// implemented via the proposer block header
 
 import (
 	"crypto"
@@ -71,15 +74,17 @@ type VM struct {
 	stakingKey    crypto.Signer
 	fromWrappedVM chan common.Message
 	toEngine      chan<- common.Message
+	UseProHeader  bool
 }
 
-func NewProVM(vm block.ChainVM) VM {
+func NewProVM(vm block.ChainVM, useProHdr bool) VM {
 	res := VM{
 		ChainVM:       vm,
 		clk:           clockImpl{},
 		stakingKey:    nil,
 		fromWrappedVM: nil,
 		toEngine:      nil,
+		UseProHeader:  useProHdr,
 	}
 	res.state = newState(&res)
 	return res
@@ -119,27 +124,28 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Store genesis
-	genesisID, err := vm.ChainVM.LastAccepted()
-	if err != nil {
-		return err
-	}
-
-	if _, err := vm.state.getBlockFromWrappedBlkID(genesisID); err != nil {
-		// genesis not stored
-		genesisBlk, err := vm.ChainVM.GetBlock(genesisID)
+	if vm.UseProHeader {
+		// Store genesis
+		genesisID, err := vm.ChainVM.LastAccepted()
 		if err != nil {
 			return err
 		}
 
-		hdr := NewProHeader(ids.ID{}, 0, 0)
-		proGenBlk, _ := NewProBlock(vm, hdr, genesisBlk, nil, false) // not signing block, cannot err
+		if _, err := vm.state.getBlockFromWrappedBlkID(genesisID); err != nil {
+			// genesis not stored
+			genesisBlk, err := vm.ChainVM.GetBlock(genesisID)
+			if err != nil {
+				return err
+			}
 
-		// Skipping verification for genesis block.
-		// TODO: Should we instead check that genesis state is accepted && skip verification for accepted blocks?
-		vm.state.cacheProBlk(&proGenBlk)
-		if err := vm.state.commitBlk(&proGenBlk); err != nil {
-			return err
+			hdr := NewProHeader(ids.ID{}, 0, 0)
+			proGenBlk, _ := NewProBlock(vm, hdr, genesisBlk, nil, false) // not signing block, cannot err
+
+			// Skipping verification for genesis block.
+			vm.state.cacheProBlk(&proGenBlk)
+			if err := vm.state.commitBlk(&proGenBlk); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -154,29 +160,32 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	proParent, err := vm.state.getBlockFromWrappedBlkID(sb.Parent().ID())
-	if err != nil {
-		return nil, err
-	}
+	if vm.UseProHeader {
+		proParent, err := vm.state.getBlockFromWrappedBlkID(sb.Parent().ID())
+		if err != nil {
+			return nil, err
+		}
 
-	hdr := NewProHeader(proParent.ID(), vm.clk.now().Unix(), proParent.Height()+1)
-	proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
-	if err != nil {
-		return nil, err
-	}
+		hdr := NewProHeader(proParent.ID(), vm.clk.now().Unix(), proParent.Height()+1)
+		proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
+		if err != nil {
+			return nil, err
+		}
 
-	if err := proBlk.Verify(); err != nil {
-		return nil, err
-	}
+		if err := proBlk.Verify(); err != nil {
+			return nil, err
+		}
 
-	vm.state.cacheProBlk(&proBlk)
-	if err := vm.state.commitBlk(&proBlk); err != nil {
-		return nil, err
+		vm.state.cacheProBlk(&proBlk)
+		if err := vm.state.commitBlk(&proBlk); err != nil {
+			return nil, err
+		}
+		return &proBlk, nil
 	}
-	return &proBlk, nil
+	return sb, nil
 }
 
-func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
+func (vm *VM) tryParseAsProposerBlock(b []byte) (*marshallingProposerBLock, error) {
 	var mPb marshallingProposerBLock
 	cdcVer, err := cdc.Unmarshal(b, &mPb)
 
@@ -185,49 +194,70 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	} else if cdcVer != codecVersion {
 		return nil, fmt.Errorf("codecVersion not matching")
 	}
+	return &mPb, nil
+}
 
-	sb, err := vm.ChainVM.ParseBlock(mPb.WrpdBytes)
+func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
+	mPb, err := vm.tryParseAsProposerBlock(b)
+	if err == nil {
+		sb, err := vm.ChainVM.ParseBlock(mPb.WrpdBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		proBlk, _ := NewProBlock(vm, mPb.Header, sb, b, false) // not signing block, cannot err
+
+		vm.state.cacheProBlk(&proBlk)
+		if err := vm.state.commitBlk(&proBlk); err != nil {
+			return nil, err
+		}
+
+		return &proBlk, nil
+	}
+
+	// try parse it as a core block
+	sb, err := vm.ChainVM.ParseBlock(b)
 	if err != nil {
 		return nil, err
 	}
-
-	proBlk, _ := NewProBlock(vm, mPb.Header, sb, b, false) // not signing block, cannot err
-
-	vm.state.cacheProBlk(&proBlk)
-	if err := vm.state.commitBlk(&proBlk); err != nil {
-		return nil, err
-	}
-
-	return &proBlk, nil
+	// no caching of core blocks into ProposerVM
+	return sb, nil
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	return vm.state.getBlock(id)
+	if res, err := vm.state.getProBlock(id); err == nil {
+		return res, nil
+	}
+
+	// check whether block is core one, with no proposerBlockHeader
+	if coreBlk, err := vm.ChainVM.GetBlock(id); err == nil {
+		return coreBlk, nil
+	}
+
+	return nil, ErrProBlkNotFound
 }
 
 func (vm *VM) SetPreference(id ids.ID) error {
-	proBlk, err := vm.state.getBlock(id)
-	if err != nil {
-		// TODO: log error
-		return ErrProBlkNotFound
+	if proBlk, err := vm.state.getProBlock(id); err == nil {
+		return vm.ChainVM.SetPreference(proBlk.coreBlk.ID())
 	}
 
-	err = vm.ChainVM.SetPreference(proBlk.Block.ID())
-	return err
+	// check whether block is core one, with no proposerBlockHeader
+	return vm.ChainVM.SetPreference(id)
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	wrpdID, err := vm.ChainVM.LastAccepted()
+	coreID, err := vm.ChainVM.LastAccepted()
 	if err != nil {
 		return ids.ID{}, err
 	}
 
-	proBlk, err := vm.state.getBlockFromWrappedBlkID(wrpdID)
-	if err != nil {
-		return ids.ID{}, ErrProBlkNotFound // Is this possible at all??
+	if proBlk, err := vm.state.getBlockFromWrappedBlkID(coreID); err == nil {
+		return proBlk.ID(), nil
 	}
 
-	return proBlk.ID(), nil
+	// no proposerBlock wrapping core block; return coreID
+	return coreID, nil
 }
 
 //////// Connector VMs handling

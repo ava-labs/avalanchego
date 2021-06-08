@@ -46,12 +46,12 @@ func (is *innerState) init(db database.Database) {
 
 func (is *innerState) cacheProBlk(blk *ProposerBlock) {
 	is.knownProBlocks[blk.ID()] = blk
-	is.wrpdToProID[blk.Block.ID()] = blk.ID()
+	is.wrpdToProID[blk.coreBlk.ID()] = blk.ID()
 }
 
 func (is *innerState) wipeFromCacheProBlk(id ids.ID) {
 	if blk, ok := is.knownProBlocks[id]; ok {
-		delete(is.wrpdToProID, blk.Block.ID())
+		delete(is.wrpdToProID, blk.coreBlk.ID())
 		delete(is.knownProBlocks, id)
 	}
 }
@@ -63,7 +63,7 @@ func (is *innerState) commitBlk(blk *ProposerBlock) error {
 		return err
 	}
 
-	wrpdID := blk.Block.ID()
+	wrpdID := blk.coreBlk.ID()
 	proID, err := cdc.Marshal(codecVersion, is.wrpdToProID[wrpdID])
 	if err != nil {
 		is.wipeFromCacheProBlk(blk.ID())
@@ -83,7 +83,7 @@ func (is *innerState) commitBlk(blk *ProposerBlock) error {
 	return batch.Write()
 }
 
-func (is *innerState) getBlock(id ids.ID) (*ProposerBlock, error) {
+func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
 	if proBlk, ok := is.knownProBlocks[id]; ok {
 		return proBlk, nil
 	}
@@ -124,7 +124,7 @@ func (is *innerState) getBlockFromWrappedBlkID(wrappedID ids.ID) (*ProposerBlock
 		return nil, fmt.Errorf("couldn't unmarshal proposerBlockID: %s", err)
 	}
 
-	return is.getBlock(proID)
+	return is.getProBlock(proID)
 }
 
 func (is *innerState) wipeCache() { // useful for UTs

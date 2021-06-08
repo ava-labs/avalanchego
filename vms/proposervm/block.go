@@ -16,7 +16,7 @@ import (
 const BlkSubmissionTolerance = 10 * time.Second // Todo: move to consensus?
 
 var (
-	ErrInnerBlockNotOracle = errors.New("snowman block wrapped in proposer block does not implement snowman.OracleBlock")
+	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
 	ErrProBlkNotFound      = errors.New("proposer block not found")
 	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
 	ErrProBlkWrongHeight   = errors.New("proposer block has wrong height")
@@ -43,19 +43,19 @@ type marshallingProposerBLock struct {
 }
 
 type ProposerBlock struct {
-	header ProposerBlockHeader
-	snowman.Block
-	id    ids.ID
-	bytes []byte
-	vm    *VM
+	header  ProposerBlockHeader
+	coreBlk snowman.Block
+	id      ids.ID
+	bytes   []byte
+	vm      *VM
 }
 
 func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block, bytes []byte, signBlk bool) (ProposerBlock, error) {
 	res := ProposerBlock{
-		header: hdr,
-		Block:  sb,
-		bytes:  bytes,
-		vm:     vm,
+		header:  hdr,
+		coreBlk: sb,
+		bytes:   bytes,
+		vm:      vm,
 	}
 
 	if signBlk { // should be done before calling Bytes()
@@ -89,7 +89,7 @@ func (pb *ProposerBlock) ID() ids.ID {
 }
 
 func (pb *ProposerBlock) Accept() error {
-	err := pb.Block.Accept()
+	err := pb.coreBlk.Accept()
 	if err == nil {
 		// pb parent block should not be needed anymore.
 		pb.vm.state.wipeFromCacheProBlk(pb.header.PrntID)
@@ -98,7 +98,7 @@ func (pb *ProposerBlock) Accept() error {
 }
 
 func (pb *ProposerBlock) Reject() error {
-	err := pb.Block.Reject()
+	err := pb.coreBlk.Reject()
 	if err == nil {
 		pb.vm.state.wipeFromCacheProBlk(pb.id)
 	}
@@ -106,25 +106,24 @@ func (pb *ProposerBlock) Reject() error {
 }
 
 func (pb *ProposerBlock) Status() choices.Status {
-	return pb.Block.Status()
+	return pb.coreBlk.Status()
 }
 
 //////// snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
-	res, err := pb.vm.state.getBlock(pb.header.PrntID)
-	if err != nil {
-		// TODO: log error
-		return &missing.Block{BlkID: pb.header.PrntID}
+	if res, err := pb.vm.state.getProBlock(pb.header.PrntID); err == nil {
+		return res
 	}
-	return res
+
+	return &missing.Block{BlkID: pb.header.PrntID}
 }
 
 func (pb *ProposerBlock) Verify() error {
-	if err := pb.Block.Verify(); err != nil {
+	if err := pb.coreBlk.Verify(); err != nil {
 		return err
 	}
 
-	prntBlk, err := pb.vm.state.getBlock(pb.header.PrntID)
+	prntBlk, err := pb.vm.state.getProBlock(pb.header.PrntID)
 	if err != nil {
 		// TODO: log error
 		return ErrProBlkNotFound
@@ -134,7 +133,7 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkWrongHeight
 	}
 
-	if pb.header.Height != pb.Block.Height() {
+	if pb.header.Height != pb.coreBlk.Height() {
 		return ErrProBlkWrongHeight
 	}
 
@@ -152,7 +151,7 @@ func (pb *ProposerBlock) Verify() error {
 func (pb *ProposerBlock) getBytes() []byte {
 	var mPb marshallingProposerBLock
 	mPb.Header = pb.header
-	mPb.WrpdBytes = pb.Block.Bytes()
+	mPb.WrpdBytes = pb.coreBlk.Bytes()
 
 	var err error
 	var res []byte
@@ -176,7 +175,7 @@ func (pb *ProposerBlock) Height() uint64 {
 
 //////// snowman.OracleBlock interface implementation
 func (pb *ProposerBlock) Options() ([2]snowman.Block, error) {
-	if oracleBlk, ok := pb.Block.(snowman.OracleBlock); ok {
+	if oracleBlk, ok := pb.coreBlk.(snowman.OracleBlock); ok {
 		return oracleBlk.Options()
 	}
 
