@@ -20,6 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+const IsNotExistErr = "IsNotExist"
+
 func TestSetChainConfigs(t *testing.T) {
 	tests := map[string]struct {
 		configs      map[string]string
@@ -145,7 +147,7 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 		"cdir not exist": {
 			structure:  "/",
 			file:       map[string]string{"config.ex": "noeffect"},
-			errMessage: "no such file or directory",
+			errMessage: IsNotExistErr, // this is not an actual error message,
 			flagSet:    true,
 			expected:   nil,
 		},
@@ -208,7 +210,9 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			chainConfigs, err := getChainConfigs(v)
 			if len(test.errMessage) > 0 {
 				assert.Error(err)
-				if err != nil {
+				if test.errMessage == IsNotExistErr {
+					assert.True(os.IsNotExist(err))
+				} else {
 					assert.Contains(err.Error(), test.errMessage)
 				}
 			} else {
