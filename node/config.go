@@ -157,5 +157,5 @@ type Config struct {
 
 	// Max time to spend fetching a container and its
 	// ancestors while responding to a GetAncestors message
-	MaxTimeGetAncestors time.Duration
+	BootstrapMaxTimeGetAncestors time.Duration
 }

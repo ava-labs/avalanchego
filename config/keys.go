@@ -112,5 +112,5 @@ const (
 	ProfileContinuousEnabledKey             = "profile-continuous-enabled"
 	ProfileContinuousFreqKey                = "profile-continuous-freq"
 	ProfileContinuousMaxFilesKey            = "profile-continuous-max-files"
-	MaxTimeGetAncestorsKey                  = "max-time-get-ancestors"
+	BootstrapMaxTimeGetAncestorsKey         = "boostrap-max-time-get-ancestors"
 )

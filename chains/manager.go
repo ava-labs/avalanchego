@@ -162,7 +162,7 @@ type ManagerConfig struct {
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
-	MaxTimeGetAncestors time.Duration
+	BootstrapMaxTimeGetAncestors time.Duration
 }
 
 type manager struct {
@@ -535,18 +535,18 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:                       ctx,
-				Validators:                validators,
-				Beacons:                   beacons,
-				SampleK:                   sampleK,
-				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
-				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                    &sender,
-				Subnet:                    sb,
-				Timer:                     timer,
-				RetryBootstrap:            m.RetryBootstrap,
-				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
-				MaxTimeGetAncestors:       m.MaxTimeGetAncestors,
+				Ctx:                          ctx,
+				Validators:                   validators,
+				Beacons:                      beacons,
+				SampleK:                      sampleK,
+				StartupAlpha:                 (3*bootstrapWeight + 3) / 4,
+				Alpha:                        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                       &sender,
+				Subnet:                       sb,
+				Timer:                        timer,
+				RetryBootstrap:               m.RetryBootstrap,
+				RetryBootstrapMaxAttempts:    m.RetryBootstrapMaxAttempts,
+				BootstrapMaxTimeGetAncestors: m.BootstrapMaxTimeGetAncestors,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -666,18 +666,18 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:                       ctx,
-				Validators:                validators,
-				Beacons:                   beacons,
-				SampleK:                   sampleK,
-				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
-				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                    &sender,
-				Subnet:                    sb,
-				Timer:                     timer,
-				RetryBootstrap:            m.RetryBootstrap,
-				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
-				MaxTimeGetAncestors:       m.MaxTimeGetAncestors,
+				Ctx:                          ctx,
+				Validators:                   validators,
+				Beacons:                      beacons,
+				SampleK:                      sampleK,
+				StartupAlpha:                 (3*bootstrapWeight + 3) / 4,
+				Alpha:                        bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                       &sender,
+				Subnet:                       sb,
+				Timer:                        timer,
+				RetryBootstrap:               m.RetryBootstrap,
+				RetryBootstrapMaxAttempts:    m.RetryBootstrapMaxAttempts,
+				BootstrapMaxTimeGetAncestors: m.BootstrapMaxTimeGetAncestors,
 			},
 			Blocked:      blocked,
 			VM:           vm,

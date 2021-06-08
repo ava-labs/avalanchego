@@ -30,9 +30,9 @@ type Config struct {
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
 
-	// Max Time to spend fetching a container and
+	// Max time to spend fetching a container and
 	// its ancestors when responding to a GetAncestors
-	MaxTimeGetAncestors time.Duration
+	BootstrapMaxTimeGetAncestors time.Duration
 }
 
 // Context implements the Engine interface
