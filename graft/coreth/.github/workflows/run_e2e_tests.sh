@@ -10,6 +10,7 @@ fi
 
 # Testing specific variables
 avalanche_testing_repo="avaplatform/avalanche-testing"
+avalanchego_repo="avaplatform/avalanchego"
 # Define default avalanche testing version to use
 avalanche_testing_image="${avalanche_testing_repo}:master"
 
@@ -42,6 +43,15 @@ fi
 
 echo "Using $avalanche_testing_image for e2e tests"
 
+# Defines the avalanchego tag to use
+# Either uses the same tag as the current branch or uses the default
+if docker_tag_exists $avalanchego_repo $current_branch; then
+    echo "$avalanchego_repo:$current_branch exists; using this avalanchego image to run e2e tests"
+    AVALANCHE_VERSION=$current_branch
+else
+    echo "$avalanchego_repo $current_branch does NOT exist; using the default image to run e2e tests"
+fi
+
 # pulling the avalanche-testing image
 docker pull $avalanche_testing_image
 
@@ -49,7 +59,7 @@ docker pull $avalanche_testing_image
 git_commit_id=$( git rev-list -1 HEAD )
 
 # Build current avalanchego
-"$AVALANCHE_PATH"/scripts/build_image.sh
+source "$AVALANCHE_PATH"/scripts/build_image.sh
 
 # Target built version to use in avalanche-testing
 avalanche_image="avaplatform/avalanchego:$build_image_id"

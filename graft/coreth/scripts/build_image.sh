@@ -13,7 +13,7 @@ source "$AVALANCHE_PATH"/scripts/versions.sh
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
-echo "Building Docker Image: $dockerhub_repo:$build_image_id"
+echo "Building Docker Image: $dockerhub_repo:$build_image_id based of $avalanche_version"
 docker build -t "$dockerhub_repo:$build_image_id" "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile" \
   --build-arg AVALANCHE_VERSION="$avalanche_version" \
   --build-arg CORETH_COMMIT="$coreth_commit" \
