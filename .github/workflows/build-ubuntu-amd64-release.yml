@@ -7,6 +7,8 @@ on:
 
 jobs:
   build-bionic-amd64-package:
+    # Ensure this only runs on avalanchego repo
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
     runs-on: ubuntu-18.04 
 
     steps:
@@ -45,6 +47,8 @@ jobs:
         RELEASE: "bionic"
 
   build-focal-amd64-package:
+    # Ensure this only runs on avalanchego repo
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
     runs-on: ubuntu-20.04
 
     steps:
