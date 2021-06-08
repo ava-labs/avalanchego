@@ -20,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const IsNotExistErr = "IsNotExist"
-
 func TestSetChainConfigs(t *testing.T) {
 	tests := map[string]struct {
 		configs      map[string]string
