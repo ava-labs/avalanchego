@@ -2,23 +2,20 @@ name: Branch Push CI
 on: [push]
 
 jobs:
-  lint:
-    name: Lint Golang v${{ matrix.go }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        go: ['1.15']
-        os: [ubuntu-18.04]
+  run_lint:
+    name: lint
+    runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v1
-      with:
-        go-version: ${{ matrix.go }}
-    - run: .github/workflows/lint.sh
-      shell: bash
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          working-directory: .
+          args: --timeout 10m
   e2e:
     name: Golang E2E Tests v${{ matrix.go }} (${{ matrix.os }})
-    needs: lint
+    needs: run_lint
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
