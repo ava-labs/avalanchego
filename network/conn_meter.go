@@ -29,12 +29,13 @@ func NewConnMeter(resetDuration time.Duration, connCacheSize, maxConns int) Conn
 		cache:         &cache.LRU{Size: connCacheSize},
 		resetDuration: resetDuration,
 		maxConns:      maxConns,
+		Clock:         &timer.Clock{},
 	}
 }
 
 type noConnMeter struct{}
 
-func (n *noConnMeter) Allow(ipStr string) bool { return true }
+func (n *noConnMeter) Allow(string) bool { return true }
 
 // connMeter implements ConnMeter
 type connMeter struct {
@@ -42,6 +43,7 @@ type connMeter struct {
 	cache         *cache.LRU
 	resetDuration time.Duration
 	maxConns      int
+	Clock         *timer.Clock
 }
 
 // Returns whether we should allow an incoming connection from [ipStr].
@@ -64,7 +66,10 @@ func (n *connMeter) getMeter(ipStr string) *timer.TimedMeter {
 	}
 
 	// create the meter if one meter doesn't exist
-	meter := &timer.TimedMeter{Duration: n.resetDuration}
+	meter := &timer.TimedMeter{
+		Duration: n.resetDuration,
+		Clock:    n.Clock,
+	}
 	n.cache.Put(ipStr, meter)
 	return meter
 }

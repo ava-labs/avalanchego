@@ -7,13 +7,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	host1 = "127.0.0.1:9651"
-	host2 = "127.0.0.1:9653"
-	host3 = "127.0.0.1:9655"
+	host1 = "127.0.0.1"
+	host2 = "127.0.0.2"
+	host3 = "127.0.0.3"
 )
 
 func TestNoConnMeter(t *testing.T) {
@@ -43,27 +44,41 @@ func TestConnMeterMaxConnsMet(t *testing.T) {
 }
 
 // Test that old connections are dropped from the connection
-// counter. This test assumes that calling Allow 3 times takes
-// less than 250 ms.
+// counter.
 func TestConnMeterOldConnsCleared(t *testing.T) {
-	meter := NewConnMeter(250*time.Millisecond, 1, 3)
+	now := time.Now()
+	resetDuration := 5 * time.Second
+	meterIntf := NewConnMeter(resetDuration, 1, 3)
+	meter := meterIntf.(*connMeter)
+	meter.Clock = &timer.Clock{}
+	meter.Clock.Set(now)
 
-	// Allow 3 within 250 ms
+	// Allow 3 within resetDuration
 	for i := 0; i < 3; i++ {
 		allow := meter.Allow(host1)
 		assert.True(t, allow)
 	}
+
 	// 4th isn't allowed
 	allow := meter.Allow(host1)
 	assert.False(t, allow)
 
-	// Sleep 250 ms. Connections should be cleared.
-	time.Sleep(250 * time.Millisecond)
-	// Allow 3 within 250 ms
+	// Sleep until right before connections should be cleared.
+	meter.Clock.Set(now.Add(resetDuration).Add(-5 * time.Millisecond))
+
+	// Shouldn't have cleared yet
+	allow = meter.Allow(host1)
+	assert.False(t, allow)
+
+	// Sleep until right after connections should be cleared.
+	meter.Clock.Set(now.Add(resetDuration).Add(5 * time.Millisecond))
+
+	// Allow 3 within resetDuration
 	for i := 0; i < 3; i++ {
 		allow := meter.Allow(host1)
 		assert.True(t, allow)
 	}
+
 	// 4th isn't allowed
 	allow = meter.Allow(host1)
 	assert.False(t, allow)
