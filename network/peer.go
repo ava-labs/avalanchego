@@ -306,25 +306,30 @@ func (p *peer) WriteMessages() {
 
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
+		msgLen := len(msg)
 		var compMsgSize = -1
 
-		var b bytes.Buffer
-		gWriter := gzip.NewWriter(&b)
-		_, gErr := gWriter.Write(msg)
-		if gErr != nil {
-			fmt.Println(gErr)
-		} else {
-			gErr = gWriter.Flush()
+		if msgLen >= 128 {
+			// only enable gzip if msg size is > 128 bytes
+			// because otherwise its not worth it
+			var b bytes.Buffer
+			gWriter := gzip.NewWriter(&b)
+			_, gErr := gWriter.Write(msg)
 			if gErr != nil {
 				fmt.Println(gErr)
 			} else {
-				compMsgSize = b.Len()
+				gErr = gWriter.Flush()
+				if gErr != nil {
+					fmt.Println(gErr)
+				} else {
+					compMsgSize = b.Len()
+				}
 			}
 		}
 
 		p.net.log.Debug("sending new message to %s, len:%d, compLen:%d",
 			p.id,
-			len(msg),
+			msgLen,
 			compMsgSize)
 
 		msgb := [wrappers.IntLen]byte{}
