@@ -5,8 +5,11 @@ package network
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"crypto/x509"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"net"
 	"sync"
@@ -303,11 +306,29 @@ func (p *peer) WriteMessages() {
 
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
-		p.net.log.Verbo("sending new message to %s:\n%s",
+		var compMsgSize = -1
+
+		var b bytes.Buffer
+		gWriter := gzip.NewWriter(&b)
+		_, gErr := gWriter.Write(msg)
+		if gErr != nil {
+			fmt.Println(gErr)
+		} else {
+			gErr = gWriter.Flush()
+			if gErr != nil {
+				fmt.Println(gErr)
+			} else {
+				compMsgSize = b.Len()
+			}
+		}
+
+		p.net.log.Debug("sending new message to %s, len:%d, compLen:%d",
 			p.id,
-			formatting.DumpBytes{Bytes: msg})
+			len(msg),
+			compMsgSize)
 
 		msgb := [wrappers.IntLen]byte{}
+
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
 			for len(byteSlice) > 0 {
