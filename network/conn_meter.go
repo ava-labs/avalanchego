@@ -16,16 +16,17 @@ type ConnMeter interface {
 }
 
 // Return a new connection meter that allows an incoming connection
-// if the number of incoming connections from that address <= [maxConns]
-// in the last [resetDuration].
-// If [resetDuration] or [maxConns] is 0, returns a ConnMeter that
-// allows all incoming connections.
-func NewConnMeter(resetDuration time.Duration, size, maxConns int) ConnMeter {
-	if resetDuration == 0 || maxConns == 0 {
+// if we've allowed <= [maxConns] incoming connections from that address
+// in the last [resetDuration]. Keeps the counters in a cache of
+// size [connCacheSize].
+// If any argument is 0, returns a ConnMeter that allows all
+// incoming connections.
+func NewConnMeter(resetDuration time.Duration, connCacheSize, maxConns int) ConnMeter {
+	if resetDuration == 0 || maxConns == 0 || connCacheSize == 0 {
 		return &noConnMeter{}
 	}
 	return &connMeter{
-		cache:         &cache.LRU{Size: size},
+		cache:         &cache.LRU{Size: connCacheSize},
 		resetDuration: resetDuration,
 		maxConns:      maxConns,
 	}
@@ -33,29 +34,31 @@ func NewConnMeter(resetDuration time.Duration, size, maxConns int) ConnMeter {
 
 type noConnMeter struct{}
 
-func (n *noConnMeter) Allow(ipStr string) bool {
-	return true
-}
+func (n *noConnMeter) Allow(ipStr string) bool { return true }
 
 // connMeter implements ConnMeter
 type connMeter struct {
-	lock          sync.RWMutex
+	lock          sync.Mutex
 	cache         *cache.LRU
 	resetDuration time.Duration
 	maxConns      int
 }
 
-// Returns whether we should allow an incoming connection from [ipStr]
+// Returns whether we should allow an incoming connection from [ipStr].
 func (n *connMeter) Allow(ipStr string) bool {
-	meter := n.getMeter(ipStr)
-	meter.Tick()
-	return meter.Ticks() <= n.maxConns
-}
-
-func (n *connMeter) getMeter(ipStr string) *timer.TimedMeter {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
+	meter := n.getMeter(ipStr)
+	if meter.Ticks()+1 <= n.maxConns {
+		meter.Tick()
+		return true
+	}
+	return false
+}
+
+// Assumes [n.lock] is held
+func (n *connMeter) getMeter(ipStr string) *timer.TimedMeter {
 	if meterIntf, exists := n.cache.Get(ipStr); exists {
 		return meterIntf.(*timer.TimedMeter)
 	}
