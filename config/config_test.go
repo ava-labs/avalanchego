@@ -140,16 +140,17 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 	tests := map[string]struct {
 		structure  string
 		file       map[string]string
+		err        error
 		errMessage string
 		flagSet    bool
 		expected   map[string]chains.ChainConfig
 	}{
 		"cdir not exist": {
-			structure:  "/",
-			file:       map[string]string{"config.ex": "noeffect"},
-			errMessage: IsNotExistErr, // this is not an actual error message,
-			flagSet:    true,
-			expected:   nil,
+			structure: "/",
+			file:      map[string]string{"config.ex": "noeffect"},
+			err:       os.ErrNotExist,
+			flagSet:   true,
+			expected:  nil,
 		},
 		"cdir is file ": {
 			structure:  "/",
@@ -159,25 +160,22 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			expected:   nil,
 		},
 		"cdir not exist flag not set": {
-			structure:  "/",
-			file:       map[string]string{"config.ex": "noeffect"},
-			errMessage: "",
-			flagSet:    false,
-			expected:   map[string]chains.ChainConfig{},
+			structure: "/",
+			file:      map[string]string{"config.ex": "noeffect"},
+			flagSet:   false,
+			expected:  map[string]chains.ChainConfig{},
 		},
 		"chain subdir not exist": {
-			structure:  "/cdir/",
-			file:       map[string]string{"config.ex": "noeffect"},
-			errMessage: "",
-			flagSet:    true,
-			expected:   map[string]chains.ChainConfig{},
+			structure: "/cdir/",
+			file:      map[string]string{"config.ex": "noeffect"},
+			flagSet:   true,
+			expected:  map[string]chains.ChainConfig{},
 		},
 		"full structure": {
-			structure:  "/cdir/C/",
-			file:       map[string]string{"config.ex": "hello"},
-			errMessage: "",
-			flagSet:    true,
-			expected:   map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
+			structure: "/cdir/C/",
+			file:      map[string]string{"config.ex": "hello"},
+			flagSet:   true,
+			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
 
@@ -208,14 +206,13 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			}
 			// don't read with getConfigFromViper since it's very slow.
 			chainConfigs, err := getChainConfigs(v)
-			if len(test.errMessage) > 0 {
+			switch {
+			case test.err != nil:
+				assert.ErrorIs(err, test.err)
+			case len(test.errMessage) > 0:
 				assert.Error(err)
-				if test.errMessage == IsNotExistErr {
-					assert.True(os.IsNotExist(err))
-				} else {
-					assert.Contains(err.Error(), test.errMessage)
-				}
-			} else {
+				assert.Contains(err.Error(), test.errMessage)
+			default:
 				assert.NoError(err)
 				assert.Equal(test.expected, chainConfigs)
 			}
