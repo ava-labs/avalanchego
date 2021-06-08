@@ -157,7 +157,7 @@ func TestImportTxVerify(t *testing.T) {
 }
 
 func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
-	_, vm, _, sharedMemory := GenesisVM(t, false, genesisJSONApricotPhase0)
+	_, vm, _, sharedMemory := GenesisVM(t, false, genesisJSONApricotPhase0, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -338,7 +338,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 }
 
 func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
-	_, vm, _, sharedMemory := GenesisVM(t, false, genesisJSONApricotPhase2)
+	_, vm, _, sharedMemory := GenesisVM(t, false, genesisJSONApricotPhase2, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -517,6 +517,8 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 		t.Fatalf("Accept failed due to: %s", err)
 	}
 
+	vm.db.EndBatch()
+
 	if err := unsignedImportTx.EVMStateTransfer(vm, state); err != nil {
 		t.Fatalf("EVM State Transfer failed due to: %s", err)
 	}
@@ -554,7 +556,7 @@ func TestNewImportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2)
+			_, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "", "")
 
 			defer func() {
 				if err := vm.Shutdown(); err != nil {

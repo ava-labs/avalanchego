@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -65,7 +67,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
-	Version = "coreth-v0.5.3"
+	Version = "coreth-v0.5.4"
 
 	_ block.ChainVM = &VM{}
 )
@@ -178,7 +180,7 @@ type VM struct {
 	// with an efficient caching layer.
 	*chain.State
 
-	CLIConfig CommandLineConfig
+	config Config
 
 	chainID     *big.Int
 	networkID   uint64
@@ -223,6 +225,17 @@ type VM struct {
 
 	fx          secp256k1fx.Fx
 	secpFactory crypto.FactorySECP256K1R
+
+	// Continuous Profiler
+	profiler profiler.ContinuousProfiler
+}
+
+func (vm *VM) Connected(id ids.ShortID) error {
+	return nil // noop
+}
+
+func (vm *VM) Disconnected(id ids.ShortID) error {
+	return nil // noop
 }
 
 // Codec implements the secp256k1fx interface
@@ -254,8 +267,11 @@ func (vm *VM) Initialize(
 	fxs []*commonEng.Fx,
 ) error {
 	log.Info("Initializing Coreth VM", "Version", Version)
-	if vm.CLIConfig.FlagError != nil {
-		return vm.CLIConfig.FlagError
+	vm.config.SetDefaults()
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
+			return err
+		}
 	}
 
 	if len(fxs) > 0 {
@@ -291,54 +307,54 @@ func (vm *VM) Initialize(
 	vm.chainID = g.Config.ChainID
 	vm.txFee = txFee
 
-	config := ethconfig.NewDefaultConfig()
-	config.Genesis = g
+	ethConfig := ethconfig.NewDefaultConfig()
+	ethConfig.Genesis = g
 
 	// Set minimum gas price and launch goroutine to sleep until
 	// network upgrade when the gas price must be changed
 	var gasPriceUpdate func() // must call after coreth.NewETHChain to avoid race
 	if g.Config.ApricotPhase1BlockTimestamp == nil {
-		config.Miner.GasPrice = params.LaunchMinGasPrice
-		config.GPO.Default = params.LaunchMinGasPrice
-		config.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
+		ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
+		ethConfig.GPO.Default = params.LaunchMinGasPrice
+		ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
 	} else {
 		apricotTime := time.Unix(g.Config.ApricotPhase1BlockTimestamp.Int64(), 0)
 		log.Info(fmt.Sprintf("Apricot Upgrade Time %v.", apricotTime))
 		if time.Now().Before(apricotTime) {
 			untilApricot := time.Until(apricotTime)
 			log.Info(fmt.Sprintf("Upgrade will occur in %v", untilApricot))
-			config.Miner.GasPrice = params.LaunchMinGasPrice
-			config.GPO.Default = params.LaunchMinGasPrice
-			config.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
+			ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
+			ethConfig.GPO.Default = params.LaunchMinGasPrice
+			ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
 			gasPriceUpdate = func() {
 				time.Sleep(untilApricot)
 				vm.chain.SetGasPrice(params.ApricotPhase1MinGasPrice)
 			}
 		} else {
-			config.Miner.GasPrice = params.ApricotPhase1MinGasPrice
-			config.GPO.Default = params.ApricotPhase1MinGasPrice
-			config.TxPool.PriceLimit = params.ApricotPhase1MinGasPrice.Uint64()
+			ethConfig.Miner.GasPrice = params.ApricotPhase1MinGasPrice
+			ethConfig.GPO.Default = params.ApricotPhase1MinGasPrice
+			ethConfig.TxPool.PriceLimit = params.ApricotPhase1MinGasPrice.Uint64()
 		}
 	}
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
-	config.RPCGasCap = vm.CLIConfig.RPCGasCap
-	config.RPCTxFeeCap = vm.CLIConfig.RPCTxFeeCap
-	config.TxPool.NoLocals = !vm.CLIConfig.LocalTxsEnabled
-	config.AllowUnfinalizedQueries = vm.CLIConfig.AllowUnfinalizedQueries
+	ethConfig.RPCGasCap = vm.config.RPCGasCap
+	ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
+	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
+	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	vm.chainConfig = g.Config
-	vm.networkID = config.NetworkId
+	vm.networkID = ethConfig.NetworkId
 	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
 
-	if err := config.SetGCMode("archive"); err != nil {
+	if err := ethConfig.SetGCMode("archive"); err != nil {
 		panic(err)
 	}
 	nodecfg := node.Config{
 		CorethVersion:         Version,
-		KeyStoreDir:           vm.CLIConfig.KeystoreDirectory,
-		ExternalSigner:        vm.CLIConfig.KeystoreExternalSigner,
-		InsecureUnlockAllowed: vm.CLIConfig.KeystoreInsecureUnlockAllowed,
+		KeyStoreDir:           vm.config.KeystoreDirectory,
+		ExternalSigner:        vm.config.KeystoreExternalSigner,
+		InsecureUnlockAllowed: vm.config.KeystoreInsecureUnlockAllowed,
 	}
 
 	// Attempt to load last accepted block to determine if it is necessary to
@@ -348,7 +364,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
 	}
 	initGenesis := lastAcceptedErr == database.ErrNotFound
-	vm.chain = coreth.NewETHChain(&config, &nodecfg, vm.chaindb, vm.CLIConfig.EthBackendSettings(), initGenesis)
+	vm.chain = coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), initGenesis)
 
 	var lastAccepted *types.Block
 	if lastAcceptedErr == nil {
@@ -478,6 +494,8 @@ func (vm *VM) Initialize(
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
 	vm.codec = Codec
+
+	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
 	// so [vm.baseCodec] is a dummy codec use to fulfill the secp256k1fx VM
@@ -648,28 +666,28 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
-	handler := vm.chain.NewRPCHandler(time.Duration(vm.CLIConfig.APIMaxDuration))
-	enabledAPIs := vm.CLIConfig.EthAPIs()
+	handler := vm.chain.NewRPCHandler(time.Duration(vm.config.APIMaxDuration))
+	enabledAPIs := vm.config.EthAPIs()
 	vm.chain.AttachEthService(handler, enabledAPIs)
 
 	errs := wrappers.Errs{}
-	if vm.CLIConfig.SnowmanAPIEnabled {
+	if vm.config.SnowmanAPIEnabled {
 		errs.Add(handler.RegisterName("snowman", &SnowmanAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "snowman")
 	}
-	if vm.CLIConfig.CorethAdminAPIEnabled {
+	if vm.config.CorethAdminAPIEnabled {
 		primaryAlias, err := vm.ctx.BCLookup.PrimaryAlias(vm.ctx.ChainID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get primary alias for chain due to %w", err)
 		}
-		errs.Add(handler.RegisterName("admin", NewPerformanceService(fmt.Sprintf("coreth_%s_", primaryAlias))))
+		errs.Add(handler.RegisterName("performance", NewPerformanceService(fmt.Sprintf("coreth_performance_%s", primaryAlias))))
 		enabledAPIs = append(enabledAPIs, "coreth-admin")
 	}
-	if vm.CLIConfig.NetAPIEnabled {
+	if vm.config.NetAPIEnabled {
 		errs.Add(handler.RegisterName("net", &NetAPI{vm}))
 		enabledAPIs = append(enabledAPIs, "net")
 	}
-	if vm.CLIConfig.Web3APIEnabled {
+	if vm.config.Web3APIEnabled {
 		errs.Add(handler.RegisterName("web3", &Web3API{}))
 		enabledAPIs = append(enabledAPIs, "web3")
 	}
@@ -1081,6 +1099,32 @@ func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
 	default:
 		return phase0BlockValidator
 	}
+}
+
+func (vm *VM) startContinuousProfiler() {
+	// If the profiler directory is empty, return immediately
+	// without creating or starting a continuous profiler.
+	if vm.config.ContinuousProfilerDir == "" {
+		return
+	}
+	vm.profiler = profiler.NewContinuous(
+		filepath.Join(vm.config.ContinuousProfilerDir),
+		vm.config.ContinuousProfilerFrequency,
+		vm.config.ContinuousProfilerMaxFiles,
+	)
+	defer vm.profiler.Shutdown()
+
+	vm.shutdownWg.Add(1)
+	go func() {
+		defer vm.shutdownWg.Done()
+		log.Info("Dispatching continuous profiler", "dir", vm.config.ContinuousProfilerDir, "freq", vm.config.ContinuousProfilerFrequency, "maxFiles", vm.config.ContinuousProfilerMaxFiles)
+		err := vm.profiler.Dispatch()
+		if err != nil {
+			log.Error("continuous profiler failed", "err", err)
+		}
+	}()
+	// Wait for shutdownChan to be closed
+	<-vm.shutdownChan
 }
 
 // ParseLocalAddress takes in an address for this chain and produces the ID
