@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"github.com/NYTimes/gziphandler"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
@@ -417,9 +418,10 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 		return nil, err
 	}
 
+	gzipHandler := gziphandler.GzipHandler(server)
 	return map[string]*common.HTTPHandler{
 		"": {
-			Handler: server,
+			Handler: gzipHandler,
 		},
 	}, nil
 }
