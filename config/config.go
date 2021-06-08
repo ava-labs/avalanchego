@@ -232,7 +232,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
 	fs.Int(RetryBootstrapMaxAttemptsKey, 50, "Specifies how many times bootstrap should be retried")
 	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
-	fs.Uint(BootstrapMultiputMaxContainersKey, 2000, "Max number of containers in a Multiput message")
+	fs.Uint(BootstrapMultiputMaxContainersSentKey, 2000, "Max number of containers in a Multiput message sent by this node")
+	fs.Uint(BootstrapMultiputMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Multiput message")
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -719,7 +720,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.RetryBootstrap = v.GetBool(RetryBootstrapKey)
 	nodeConfig.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
 	nodeConfig.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
-	nodeConfig.BootstrapMultiputMaxContainers = int(v.GetUint(BootstrapMultiputMaxContainersKey))
+	nodeConfig.BootstrapMultiputMaxContainersSent = int(v.GetUint(BootstrapMultiputMaxContainersSentKey))
+	nodeConfig.BootstrapMultiputMaxContainersReceived = int(v.GetUint(BootstrapMultiputMaxContainersReceivedKey))
 
 	// Peer alias
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)

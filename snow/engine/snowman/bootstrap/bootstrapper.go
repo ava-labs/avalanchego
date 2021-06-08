@@ -207,9 +207,9 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte
 		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
-	if lenBlks > b.MultiputMaxContainers {
-		blks = blks[:b.MultiputMaxContainers]
-		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenBlks-b.MultiputMaxContainers, vdr, requestID)
+	if lenBlks > b.MultiputMaxContainersReceived {
+		blks = blks[:b.MultiputMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenBlks-b.MultiputMaxContainersReceived, vdr, requestID)
 	}
 
 	// Make sure this is in response to a request we made

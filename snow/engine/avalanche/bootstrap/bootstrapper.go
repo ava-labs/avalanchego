@@ -291,9 +291,9 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
 	}
-	if lenVtxs > b.MultiputMaxContainers {
-		vtxs = vtxs[:b.MultiputMaxContainers]
-		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenVtxs-b.MultiputMaxContainers, vdr, requestID)
+	if lenVtxs > b.MultiputMaxContainersReceived {
+		vtxs = vtxs[:b.MultiputMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenVtxs-b.MultiputMaxContainersReceived, vdr, requestID)
 	}
 
 	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)

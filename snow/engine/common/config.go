@@ -30,9 +30,11 @@ type Config struct {
 	RetryBootstrapMaxAttempts int
 
 	// Max number of containers in a multiput message sent by this node.
-	// This node will only consider the first [MultiputMaxContainers]
+	MultiputMaxContainersSent int
+
+	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
-	MultiputMaxContainers int
+	MultiputMaxContainersReceived int
 }
 
 // Context implements the Engine interface
