@@ -4,6 +4,7 @@
 package snow
 
 import (
+	"crypto"
 	"sync"
 	"time"
 
@@ -70,6 +71,9 @@ type Context struct {
 
 	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
 	bootstrapped uint32
+
+	// Staking signer for snoman++ blocks
+	StakingKey *crypto.PrivateKey
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

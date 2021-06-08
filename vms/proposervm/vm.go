@@ -11,6 +11,7 @@ package proposervm
 // proposerVM is guaranteed not to lose the last accepted block
 
 import (
+	"crypto"
 	"errors"
 	"fmt"
 	"time"
@@ -34,6 +35,7 @@ const (
 var (
 	cdc                    = codec.NewDefaultManager()
 	ErrInnerVMNotConnector = errors.New("chainVM wrapped in proposerVM does not implement snowman.Connector")
+	ErrCannotSignWithKey   = errors.New("unable to use key to sign proposer blocks")
 )
 
 func init() {
@@ -66,6 +68,7 @@ type VM struct {
 	block.ChainVM
 	state         *innerState
 	clk           clock
+	stakingKey    crypto.Signer
 	fromWrappedVM chan common.Message
 	toEngine      chan<- common.Message
 }
@@ -74,6 +77,7 @@ func NewProVM(vm block.ChainVM) VM {
 	res := VM{
 		ChainVM:       vm,
 		clk:           clockImpl{},
+		stakingKey:    nil,
 		fromWrappedVM: nil,
 		toEngine:      nil,
 	}
@@ -98,6 +102,14 @@ func (vm *VM) Initialize(
 ) error {
 	vm.state.init(dbManager.Current().Database)
 
+	pKey := *ctx.StakingKey
+	signer, ok := pKey.(crypto.Signer)
+	if !ok {
+		return ErrCannotSignWithKey
+	}
+
+	vm.stakingKey = signer
+
 	// proposerVM intercepts VM events for blocks and times event relay to consensus
 	vm.toEngine = toEngine
 	vm.fromWrappedVM = make(chan common.Message, len(toEngine))
@@ -121,7 +133,7 @@ func (vm *VM) Initialize(
 		}
 
 		hdr := NewProHeader(ids.ID{}, 0, 0)
-		proGenBlk := NewProBlock(vm, hdr, genesisBlk, nil)
+		proGenBlk, _ := NewProBlock(vm, hdr, genesisBlk, nil, false) // not signing block, cannot err
 
 		// Skipping verification for genesis block.
 		// TODO: Should we instead check that genesis state is accepted && skip verification for accepted blocks?
@@ -148,7 +160,10 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 
 	hdr := NewProHeader(proParent.ID(), vm.clk.now().Unix(), proParent.Height()+1)
-	proBlk := NewProBlock(vm, hdr, sb, nil)
+	proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := proBlk.Verify(); err != nil {
 		return nil, err
@@ -176,7 +191,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 
-	proBlk := NewProBlock(vm, mPb.Header, sb, b)
+	proBlk, _ := NewProBlock(vm, mPb.Header, sb, b, false) // not signing block, cannot err
 
 	vm.state.cacheProBlk(&proBlk)
 	if err := vm.state.commitBlk(&proBlk); err != nil {

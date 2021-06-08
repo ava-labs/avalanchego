@@ -582,6 +582,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		FetchOnly:                 n.Config.FetchOnly,
 		FetchOnlyFrom:             fetchOnlyFrom,
 		StakingEnabled:            n.Config.EnableStaking,
+		StakingKey:                &n.Config.StakingTLSCert.PrivateKey,
 		MaxPendingMsgs:            n.Config.MaxPendingMsgs,
 		MaxNonStakerPendingMsgs:   n.Config.MaxNonStakerPendingMsgs,
 		StakerMSGPortion:          n.Config.StakerMSGPortion,

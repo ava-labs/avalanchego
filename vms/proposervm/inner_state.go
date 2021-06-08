@@ -103,7 +103,7 @@ func (is *innerState) getBlock(id ids.ID) (*ProposerBlock, error) {
 		return nil, err
 	}
 
-	proBlk := NewProBlock(is.vm, mPb.Header, sb, proBytes)
+	proBlk, _ := NewProBlock(is.vm, mPb.Header, sb, proBytes, false) // not signing block, cannot err
 	is.cacheProBlk(&proBlk)
 
 	return &proBlk, nil

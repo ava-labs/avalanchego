@@ -1,6 +1,8 @@
 package proposervm
 
 import (
+	"crypto"
+	cryptorand "crypto/rand"
 	"errors"
 	"time"
 
@@ -24,6 +26,7 @@ type ProposerBlockHeader struct {
 	PrntID    ids.ID `serialize:"true" json:"parentID"`
 	Timestamp int64  `serialize:"true"`
 	Height    uint64 `serialize:"true"`
+	Signature []byte `serialize:"true"`
 }
 
 func NewProHeader(prntID ids.ID, unixTime int64, height uint64) ProposerBlockHeader {
@@ -47,19 +50,37 @@ type ProposerBlock struct {
 	vm    *VM
 }
 
-func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block, bytes []byte) ProposerBlock {
+func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block, bytes []byte, signBlk bool) (ProposerBlock, error) {
 	res := ProposerBlock{
 		header: hdr,
 		Block:  sb,
 		bytes:  bytes,
 		vm:     vm,
 	}
+
+	if signBlk { // should be done before calling Bytes()
+		if err := res.sign(); err != nil {
+			return ProposerBlock{}, err
+		}
+	}
+
 	if bytes == nil {
 		res.bytes = res.Bytes()
 	}
 
 	res.id = hashing.ComputeHash256Array(res.bytes)
-	return res
+	return res, nil
+}
+
+func (pb *ProposerBlock) sign() error {
+	pb.header.Signature = nil
+	msgHash := hashing.ComputeHash256Array(pb.getBytes())
+	sig, err := pb.vm.stakingKey.Sign(cryptorand.Reader, msgHash[:], crypto.SHA256)
+	if err != nil {
+		return err
+	}
+	pb.header.Signature = sig
+	return nil
 }
 
 //////// choices.Decidable interface implementation
@@ -128,18 +149,23 @@ func (pb *ProposerBlock) Verify() error {
 	return nil
 }
 
+func (pb *ProposerBlock) getBytes() []byte {
+	var mPb marshallingProposerBLock
+	mPb.Header = pb.header
+	mPb.WrpdBytes = pb.Block.Bytes()
+
+	var err error
+	var res []byte
+	res, err = cdc.Marshal(codecVersion, &mPb)
+	if err != nil {
+		res = make([]byte, 0)
+	}
+	return res
+}
+
 func (pb *ProposerBlock) Bytes() []byte {
 	if pb.bytes == nil {
-		var mPb marshallingProposerBLock
-		mPb.Header = pb.header
-		mPb.WrpdBytes = pb.Block.Bytes()
-
-		var err error
-		pb.bytes, err = cdc.Marshal(codecVersion, &mPb)
-		if err != nil {
-			pb.bytes = make([]byte, 0)
-			return pb.bytes
-		}
+		pb.bytes = pb.getBytes()
 	}
 	return pb.bytes
 }

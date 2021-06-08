@@ -2,6 +2,7 @@ package proposervm
 
 import (
 	"bytes"
+	"crypto/tls"
 	"errors"
 	"testing"
 	"time"
@@ -13,7 +14,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/staking"
 )
+
+var pTestCert *tls.Certificate = nil // package variable to init it only once
 
 type TestConnectorProVM struct {
 	block.TestVM
@@ -114,8 +118,19 @@ func initTestProposerVM(t *testing.T) (*block.TestVM, VM, *snowman.TestBlock) {
 	proVM := NewProVM(coreVM)
 	proVM.clk = tc
 
+	if pTestCert == nil {
+		var err error
+		pTestCert, _ = staking.NewTLSCert()
+		if err != nil {
+			t.Fatal("Could not generate dummy StakerCert")
+		}
+	}
+
+	dummyCtx := &snow.Context{
+		StakingKey: &pTestCert.PrivateKey,
+	}
 	dummyDBManager := manager.NewDefaultMemDBManager()
-	if err := proVM.Initialize(nil, dummyDBManager, coreGenesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
+	if err := proVM.Initialize(dummyCtx, dummyDBManager, coreGenesisBlk.Bytes(), nil, nil, nil, nil); err != nil {
 		t.Fatal("failed to initialize proposerVM")
 	}
 	return coreVM, proVM, coreGenesisBlk
@@ -214,7 +229,7 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 		Timestamp: time.Now().AddDate(0, 0, -1).Unix(),
 		Height:    coreBlk.Height(),
 	}
-	proBlk := NewProBlock(&proVM, proHdr, coreBlk, nil)
+	proBlk, _ := NewProBlock(&proVM, proHdr, coreBlk, nil, false) // not signing block, cannot err
 
 	// test
 	parsedBlk, err := proVM.ParseBlock(proBlk.Bytes())
