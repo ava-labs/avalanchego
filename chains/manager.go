@@ -659,7 +659,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// wrap vm to handle extra fields introduced with leader-ed snowman
-	proposerVM := proposervm.NewProVM(vm, true)
+	proposerVM := proposervm.NewProVM(vm, proposervm.NoProposerBlocks) // Todo: handle on VM basis
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}

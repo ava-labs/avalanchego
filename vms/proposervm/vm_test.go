@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -68,7 +67,7 @@ func TestProposerVMConnectorHandling(t *testing.T) {
 }
 
 func TestInitializeRecordsGenesis(t *testing.T) {
-	ChainVM, proVM, genesisBlk := initTestProposerVM(t, true)
+	coreVM, proVM, genesisBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// checks
 	blkID, err := proVM.LastAccepted()
@@ -76,7 +75,7 @@ func TestInitializeRecordsGenesis(t *testing.T) {
 		t.Fatal("failed to retrieve last accepted block")
 	}
 
-	ChainVM.CantGetBlock = false
+	coreVM.CantGetBlock = false
 	rtvdBlk, err := proVM.GetBlock(blkID)
 	if err != nil {
 		t.Fatal("Block should be returned without calling core vm")
@@ -93,7 +92,7 @@ func TestInitializeRecordsGenesis(t *testing.T) {
 }
 
 func TestInitializeCanRecordsCoreGenesis(t *testing.T) {
-	_, proVM, genesisBlk := initTestProposerVM(t, false)
+	_, proVM, genesisBlk := initTestProposerVM(t, NoProposerBlocks) // disable ProBlks
 
 	// checks
 	blkID, err := proVM.LastAccepted()
@@ -117,7 +116,7 @@ func TestInitializeCanRecordsCoreGenesis(t *testing.T) {
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-func initTestProposerVM(t *testing.T, useProHdr bool) (*block.TestVM, *VM, *snowman.TestBlock) {
+func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *VM, *snowman.TestBlock) {
 	// setup
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -128,18 +127,18 @@ func initTestProposerVM(t *testing.T, useProHdr bool) (*block.TestVM, *VM, *snow
 		HeightV: 0,
 	}
 
-	ChainVM := &block.TestVM{}
-	ChainVM.CantInitialize = true
-	ChainVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
+	coreVM := &block.TestVM{}
+	coreVM.CantInitialize = true
+	coreVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
 		return nil
 	}
-	ChainVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
-	ChainVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return coreGenBlk, nil }
+	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
+	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return coreGenBlk, nil }
 
 	tc := &testClock{
 		setTime: time.Now(),
 	}
-	proVM := NewProVM(ChainVM, useProHdr)
+	proVM := NewProVM(coreVM, proBlkStartTime)
 	proVM.clk = tc
 
 	if pTestCert == nil {
@@ -157,13 +156,13 @@ func initTestProposerVM(t *testing.T, useProHdr bool) (*block.TestVM, *VM, *snow
 	if err := proVM.Initialize(dummyCtx, dummyDBManager, coreGenBlk.Bytes(), nil, nil, nil, nil); err != nil {
 		t.Fatal("failed to initialize proposerVM")
 	}
-	return ChainVM, &proVM, coreGenBlk
+	return coreVM, &proVM, coreGenBlk
 }
 
 func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	// setup
-	ChainVM, proVM, coreGenBlk := initTestProposerVM(t, true)
-	ChainVM.CantBuildBlock = true
+	coreVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2021),
@@ -173,7 +172,7 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
-	ChainVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
 
 	// test
 	builtBlk, err := proVM.BuildBlock()
@@ -185,7 +184,7 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	}
 
 	// test
-	ChainVM.CantGetBlock = false // forbid calls to ChainVM to show caching
+	coreVM.CantGetBlock = false // forbid calls to coreVM to show caching
 	storedBlk, err := proVM.GetBlock(builtBlk.ID())
 	if err != nil {
 		t.Fatal("proposerVM has not cached built block")
@@ -197,7 +196,7 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	// setup
-	ChainVM, proVM, genesisBlk := initTestProposerVM(t, true)
+	coreVM, proVM, genesisBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	newBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -208,7 +207,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 		HeightV: 1,
 		BytesV:  []byte{1},
 	}
-	ChainVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
 
 	// test
 	snowBlock, err := proVM.BuildBlock()
@@ -232,15 +231,15 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 }
 
 func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
-	ChainVM, proVM, _ := initTestProposerVM(t, true)
+	coreVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreBlkDoesNotVerify := errors.New("coreBlk should not verify in this test")
 	coreBlk := &snowman.TestBlock{
 		BytesV:  []byte{1},
 		VerifyV: coreBlkDoesNotVerify,
 	}
-	ChainVM.CantParseBlock = true
-	ChainVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		if !bytes.Equal(b, coreBlk.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
@@ -261,7 +260,7 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 	}
 
 	// test
-	ChainVM.CantGetBlock = false // forbid calls to ChainVM to show caching
+	coreVM.CantGetBlock = false // forbid calls to coreVM to show caching
 	storedBlk, err := proVM.GetBlock(parsedBlk.ID())
 	if err != nil {
 		t.Fatal("proposerVM has not cached parsed block")
@@ -272,7 +271,7 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 }
 
 func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
-	ChainVM, proVM, coreGenBlk := initTestProposerVM(t, true)
+	coreVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// build two blocks on top of genesis
 	coreBlk1 := &snowman.TestBlock{
@@ -294,7 +293,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		VerifyV: nil,
 	}
 	coreBuildCalls := 0
-	ChainVM.BuildBlockF = func() (snowman.Block, error) {
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
 		switch coreBuildCalls {
 		case 0:
 			coreBuildCalls++
@@ -303,7 +302,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 			coreBuildCalls++
 			return coreBlk2, nil
 		default:
-			t.Fatal("BuildBlock of ChainVM called too many times")
+			t.Fatal("BuildBlock of coreVM called too many times")
 		}
 		return nil, nil
 	}
@@ -329,10 +328,10 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		BytesV:  []byte{3},
 		VerifyV: nil,
 	}
-	ChainVM.BuildBlockF = func() (snowman.Block, error) {
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
 		return coreBlk3, nil
 	}
-	ChainVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.BytesV):
 			return coreGenBlk, nil
@@ -341,7 +340,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		case bytes.Equal(b, coreBlk2.BytesV):
 			return coreBlk2, nil
 		default:
-			t.Fatal("ParseBlock of ChainVM called with unknown block")
+			t.Fatal("ParseBlock of coreVM called with unknown block")
 		}
 		return nil, nil
 	}
@@ -381,6 +380,8 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 
 func TestProposerVMCanParseAndCacheCoreBlocksWithNoHeader(t *testing.T) {
 	// setup
+	coreVM, proVM, _ := initTestProposerVM(t, NoProposerBlocks) // disable ProBlks
+
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2021),
@@ -390,17 +391,13 @@ func TestProposerVMCanParseAndCacheCoreBlocksWithNoHeader(t *testing.T) {
 		HeightV: 0,
 	}
 
-	ChainVM := &block.TestVM{}
-	ChainVM.CantParseBlock = true
-	ChainVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		if !bytes.Equal(b, coreBlk.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
 		return coreBlk, nil
 	}
-
-	proVM := NewProVM(ChainVM, true) // TODO: FIX AND USE ordinary INIT
-	proVM.state.init(memdb.New())
 
 	parsedBlk, err := proVM.ParseBlock(coreBlk.Bytes())
 	if err != nil {
@@ -410,8 +407,8 @@ func TestProposerVMCanParseAndCacheCoreBlocksWithNoHeader(t *testing.T) {
 		t.Fatal("Parsed block does not match expected block")
 	}
 
-	ChainVM.CantGetBlock = true
-	ChainVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		if id != coreBlk.ID() {
 			t.Fatalf("Unknown core block")
 		}
@@ -427,9 +424,9 @@ func TestProposerVMCanParseAndCacheCoreBlocksWithNoHeader(t *testing.T) {
 }
 
 func TestSetPreferenceWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
-	ChainVM, proVM, coreGenBlk := initTestProposerVM(t, true)
+	coreVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
-	ChainVM.CantBuildBlock = true
+	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(10),
@@ -439,7 +436,7 @@ func TestSetPreferenceWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
-	ChainVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
 	proBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -450,7 +447,7 @@ func TestSetPreferenceWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 		t.Fatal("Could not set preference on proposer Block")
 	}
 
-	ChainVM.CantGetBlock = true
+	coreVM.CantGetBlock = true
 	nakedCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(999),
@@ -460,7 +457,7 @@ func TestSetPreferenceWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
-	ChainVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
+	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		if id == nakedCoreBlk.ID() {
 			return nakedCoreBlk, nil
 		}
@@ -475,7 +472,7 @@ func TestSetPreferenceWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 }
 
 func TestLastAcceptedWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
-	ChainVM, proVM, _ := initTestProposerVM(t, true)
+	coreVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -484,8 +481,8 @@ func TestLastAcceptedWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 		},
 	}
 
-	ChainVM.CantLastAccepted = true
-	ChainVM.LastAcceptedF = func() (ids.ID, error) {
+	coreVM.CantLastAccepted = true
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
 		return coreBlk.ID(), nil
 	}
 
@@ -516,8 +513,8 @@ func TestLastAcceptedWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 
 func TestBuildBlockCanReturnCoreBlocks(t *testing.T) {
 	// setup
-	ChainVM, proVM, coreGenBlk := initTestProposerVM(t, false)
-	ChainVM.CantBuildBlock = true
+	coreVM, proVM, coreGenBlk := initTestProposerVM(t, NoProposerBlocks) // disable ProBlks
+	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2021),
@@ -527,7 +524,7 @@ func TestBuildBlockCanReturnCoreBlocks(t *testing.T) {
 		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
-	ChainVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
 
 	// test
 	builtBlk, err := proVM.BuildBlock()
@@ -539,8 +536,8 @@ func TestBuildBlockCanReturnCoreBlocks(t *testing.T) {
 	}
 
 	// test
-	ChainVM.CantGetBlock = true
-	ChainVM.GetBlockF = func(id ids.ID) (snowman.Block, error) { return coreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) { return coreBlk, nil }
 	storedBlk, err := proVM.GetBlock(builtBlk.ID())
 	if err != nil {
 		t.Fatal("proposerVM has not cached built block")

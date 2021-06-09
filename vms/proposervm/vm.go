@@ -36,6 +36,7 @@ const (
 )
 
 var (
+	NoProposerBlocks       = time.Unix(1<<63-62135596801, 999999999)
 	cdc                    = codec.NewDefaultManager()
 	ErrInnerVMNotConnector = errors.New("chainVM wrapped in proposerVM does not implement snowman.Connector")
 	ErrCannotSignWithKey   = errors.New("unable to use key to sign proposer blocks")
@@ -69,22 +70,22 @@ func (c clockImpl) now() time.Time {
 
 type VM struct {
 	block.ChainVM
-	state         *innerState
-	clk           clock
-	stakingKey    crypto.Signer
-	fromWrappedVM chan common.Message
-	toEngine      chan<- common.Message
-	UseProHeader  bool
+	state           *innerState
+	clk             clock
+	stakingKey      crypto.Signer
+	fromWrappedVM   chan common.Message
+	toEngine        chan<- common.Message
+	proBlkStartTime time.Time
 }
 
-func NewProVM(vm block.ChainVM, useProHdr bool) VM {
+func NewProVM(vm block.ChainVM, proBlkStart time.Time) VM {
 	res := VM{
-		ChainVM:       vm,
-		clk:           clockImpl{},
-		stakingKey:    nil,
-		fromWrappedVM: nil,
-		toEngine:      nil,
-		UseProHeader:  useProHdr,
+		ChainVM:         vm,
+		clk:             clockImpl{},
+		stakingKey:      nil,
+		fromWrappedVM:   nil,
+		toEngine:        nil,
+		proBlkStartTime: proBlkStart,
 	}
 	res.state = newState(&res)
 	return res
@@ -115,16 +116,19 @@ func (vm *VM) Initialize(
 
 	vm.stakingKey = signer
 
-	// proposerVM intercepts VM events for blocks and times event relay to consensus
-	vm.toEngine = toEngine
-	vm.fromWrappedVM = make(chan common.Message, len(toEngine))
+	// TODO: comparison should be with genesis timestamp, not with Now()
+	if time.Now().After(vm.proBlkStartTime) {
 
-	// Assuming genesisBytes has not proposerBlockHeader
-	if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes, configBytes, vm.fromWrappedVM, fxs); err != nil {
-		return err
-	}
+		// proposerVM intercepts VM events for blocks and times event relay to consensus
+		vm.toEngine = toEngine
+		vm.fromWrappedVM = make(chan common.Message, len(toEngine))
 
-	if vm.UseProHeader {
+		// Assuming genesisBytes has not proposerBlockHeader
+		if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
+			configBytes, vm.fromWrappedVM, fxs); err != nil {
+			return err
+		}
+
 		// Store genesis
 		genesisID, err := vm.ChainVM.LastAccepted()
 		if err != nil {
@@ -146,10 +150,14 @@ func (vm *VM) Initialize(
 			if err := vm.state.commitBlk(&proGenBlk); err != nil {
 				return err
 			}
+
+			go vm.handleBlockTiming()
 		}
+	} else if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
+		configBytes, toEngine, fxs); err != nil {
+		return err
 	}
 
-	go vm.handleBlockTiming()
 	return nil
 }
 
@@ -160,7 +168,8 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	if vm.UseProHeader {
+	// TODO: comparison should be with genesis timestamp, not with Now()
+	if time.Now().After(vm.proBlkStartTime) {
 		proParent, err := vm.state.getBlockFromWrappedBlkID(sb.Parent().ID())
 		if err != nil {
 			return nil, err

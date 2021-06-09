@@ -59,7 +59,7 @@ func (tC testClock) now() time.Time {
 
 func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM, true)
+	proVM := NewProVM(coreVM, time.Unix(0, 0)) //enable ProBlks
 	proVM.state.init(memdb.New())
 
 	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.clk.now().Unix(), 100)
@@ -95,7 +95,7 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 
 func TestProposerBlockParseFailure(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM, true)
+	proVM := NewProVM(coreVM, time.Unix(0, 0)) //enable ProBlks
 
 	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.clk.now().Unix(), 0)
 	coreBlk := &snowman.TestBlock{
@@ -127,7 +127,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 
 func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM, true)
+	proVM := NewProVM(coreVM, time.Unix(0, 0)) //enable ProBlks
 	proVM.state.init(memdb.New())
 
 	ParentProBlk, _ := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{}, nil,
@@ -159,7 +159,7 @@ func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 
 func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM, true)
+	proVM := NewProVM(coreVM, time.Unix(0, 0)) //enable ProBlks
 
 	parentHdr := NewProHeader(ids.ID{}, proVM.clk.now().Unix(), 0)
 	ParentProBlk, _ := NewProBlock(&proVM, parentHdr, &snowman.TestBlock{}, nil, false) // not signing block, cannot err
@@ -200,7 +200,7 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 
 func TestProposerBlockWithWrongHeightDoesNotVerify(t *testing.T) {
 	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM, true)
+	proVM := NewProVM(coreVM, time.Unix(0, 0)) //enable ProBlks
 
 	ParentProBlk, _ := NewProBlock(&proVM,
 		NewProHeader(ids.ID{}, 0, 200),
