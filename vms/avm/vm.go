@@ -8,6 +8,7 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"math"
 	"reflect"
 	"time"
@@ -104,8 +105,9 @@ type VM struct {
 	txs          []snowstorm.Tx
 	toEngine     chan<- common.Message
 
-	baseDB database.Database
-	db     *versiondb.Database
+	baseDB      database.Database
+	db          *versiondb.Database
+	addressToTx linkeddb.LinkedDB
 
 	typeToFxIndex map[reflect.Type]int
 	fxs           []*parsedFx

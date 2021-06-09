@@ -113,8 +113,21 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
 func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
+func getAddress(tx *UniqueTx) string {
+	// todo: find how to reliably get address, for now we loop around the credentials
+	return "address-" + tx.txID.String()
+}
+
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {
+	// todo mark in db that tx.id gives money to address
+	//tx.vm.addressToTx.Put("address", tx.txID)
+	fmt.Println("Transaction got accepted!")
+	e := tx.vm.addressToTx.Put([]byte(getAddress(tx)), tx.Bytes())
+	if e != nil {
+		tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", e)
+	}
+
 	if s := tx.Status(); s != choices.Processing {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
 		return fmt.Errorf("transaction has invalid status: %s", s)

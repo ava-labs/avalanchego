@@ -79,6 +79,21 @@ type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
 
+type GetTxReply struct {
+	Tx string `json:"transaction"`
+}
+
+// todo AddressToTx service
+func (service *Service) AddressToTx(r *http.Request, args *api.JSONAddress, reply *GetTxReply) error {
+	v, e := service.vm.addressToTx.Get([]byte(args.Address))
+	if e != nil {
+		return errors.New("invalid address")
+	}
+
+	reply.Tx = string(v)
+	return nil
+}
+
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
 	service.vm.ctx.Log.Info("AVM: GetTxStatus called with %s", args.TxID)
