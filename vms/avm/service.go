@@ -6,6 +6,8 @@ package avm
 import (
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"math"
 	"net/http"
 	"strings"
@@ -79,18 +81,47 @@ type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
 
-type GetTxReply struct {
-	Tx string `json:"transaction"`
+type GetReceivedTxsArgs struct {
+	Address   string `json:"address"`
+	PageIndex uint   `json:"pageIndex"`
+	PageSize  uint   `json:"pageSize"`
+}
+type GetReceivedTxsReply struct {
+	Txs []string `json:"transactions"`
 }
 
-// todo AddressToTx service
-func (service *Service) AddressToTx(r *http.Request, args *api.JSONAddress, reply *GetTxReply) error {
-	v, e := service.vm.addressToTx.Get([]byte(args.Address))
-	if e != nil {
-		return errors.New("invalid address")
+// TODO: Remove static hardcoded limit of page size
+const MaxPageSize uint = 1000
+
+// GetReceivedTxs returns list of transactions received by given address
+func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs, reply *GetReceivedTxsReply) error {
+	if args.PageSize > MaxPageSize {
+		return fmt.Errorf("page_size must not exceed maximum allowed size of %d", MaxPageSize)
 	}
 
-	reply.Tx = string(v)
+	// Parse to address
+	address, err := service.vm.ParseLocalAddress(args.Address)
+	if err != nil {
+		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
+	}
+
+	addressTxDb := linkeddb.NewDefault(prefixdb.New(address.Bytes(), service.vm.db))
+
+	if empty, _ := addressTxDb.IsEmpty(); empty {
+		return nil
+	}
+
+	// todo replace with NewIteratorWithStart with args.PageIndex and args.PageSize parameters
+	txIterator := addressTxDb.NewIterator()
+	txs := make([]string, 10)
+
+	for txIterator.Next() {
+		// todo process txIterator.Value() to fetch the associated tx object too
+		txId := string(txIterator.Key())
+		txs = append(txs, txId)
+	}
+
+	reply.Txs = txs
 	return nil
 }
 
