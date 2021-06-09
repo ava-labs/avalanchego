@@ -20,11 +20,6 @@ type Compatibility interface {
 	// Returns the local version
 	Version() Application
 
-	// Returns nil if the provided version is able to connect with the local
-	// version. This means that the node will keep connections open with the
-	// peer.
-	Connectable(Application) error
-
 	// Returns nil if the provided version is compatible with the local version.
 	// This means that the version is connectable and that consensus messages
 	// can be made to them.
@@ -79,12 +74,8 @@ func NewCompatibility(
 
 func (c *compatibility) Version() Application { return c.version }
 
-func (c *compatibility) Connectable(peer Application) error {
-	return c.version.Compatible(peer)
-}
-
 func (c *compatibility) Compatible(peer Application) error {
-	if err := c.Connectable(peer); err != nil {
+	if err := c.version.Compatible(peer); err != nil {
 		return err
 	}
 
@@ -108,7 +99,7 @@ func (c *compatibility) Compatible(peer Application) error {
 }
 
 func (c *compatibility) Unmaskable(peer Application) error {
-	if err := c.Connectable(peer); err != nil {
+	if err := c.Compatible(peer); err != nil {
 		return err
 	}
 
@@ -132,7 +123,7 @@ func (c *compatibility) Unmaskable(peer Application) error {
 }
 
 func (c *compatibility) WontMask(peer Application) error {
-	if err := c.Connectable(peer); err != nil {
+	if err := c.Compatible(peer); err != nil {
 		return err
 	}
 

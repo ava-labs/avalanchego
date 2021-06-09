@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 // The signature of a peer's certificate on the byte representation
@@ -446,22 +445,6 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 
-	peerVersion := p.versionStruct.GetValue().(version.Application)
-	if p.net.versionCompatibility.Compatible(peerVersion) != nil {
-		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
-
-		if p.compatible.GetValue() {
-			p.net.stateLock.Lock()
-			defer p.net.stateLock.Unlock()
-
-			if p.compatible.GetValue() {
-				p.net.router.Disconnected(p.id)
-				p.compatible.SetValue(false)
-			}
-		}
-		return
-	}
-
 	switch op {
 	case GetAcceptedFrontier:
 		p.handleGetAcceptedFrontier(msg)
@@ -714,16 +697,10 @@ func (p *peer) handleVersion(msg Msg) {
 		}
 	}
 
-	if err := p.net.versionCompatibility.Connectable(peerVersion); err != nil {
-		p.net.log.Debug("peer version %s not compatible: %s", peerVersion, err)
-
-		if !p.net.beacons.Contains(p.id) {
-			p.discardIP()
-			return
-		}
-		p.net.log.Info("allowing beacon %s to connect with a lower version %s",
-			p.id,
-			peerVersion)
+	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
+		p.net.log.Info("peer version (%s) not compatible: %s", peerVersion, err)
+		p.discardIP()
+		return
 	}
 
 	peerIP := msg.Get(IP).(utils.IPDesc)
