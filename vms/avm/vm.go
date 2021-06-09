@@ -88,6 +88,8 @@ type VM struct {
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
+	// asset id that will be used for fees
+	feeAssetID ids.ID
 	// fee that must be burned by every state creating transaction
 	creationTxFee uint64
 	// fee that must be burned by every non-state creating transaction
@@ -199,18 +201,8 @@ func (vm *VM) Initialize(
 	}
 	vm.state = state
 
-	if err := vm.initAliases(genesisBytes); err != nil {
+	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
-	}
-
-	initialized, err := vm.state.IsInitialized()
-	if err != nil {
-		return err
-	}
-	if !initialized {
-		if err := vm.initState(genesisBytes); err != nil {
-			return err
-		}
 	}
 
 	vm.timer = timer.NewTimer(func() {
@@ -531,13 +523,21 @@ func (vm *VM) FlushTxs() {
  ******************************************************************************
  */
 
-func (vm *VM) initAliases(genesisBytes []byte) error {
+func (vm *VM) initGenesis(genesisBytes []byte) error {
 	genesis := Genesis{}
 	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
-	for _, genesisTx := range genesis.Txs {
+	stateInitialized, err := vm.state.IsInitialized()
+	if err != nil {
+		return err
+	}
+
+	// secure this by defaulting to avaxAsset
+	vm.feeAssetID = vm.ctx.AVAXAssetID
+
+	for index, genesisTx := range genesis.Txs {
 		if len(genesisTx.Outs) != 0 {
 			return errGenesisAssetMustHaveState
 		}
@@ -550,48 +550,44 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		}
 
 		txID := tx.ID()
+
 		if err := vm.Alias(txID, genesisTx.Alias); err != nil {
 			return err
 		}
+
+		if !stateInitialized {
+			if err := vm.initState(tx); err != nil {
+				return err
+			}
+		}
+		if index == 0 {
+			vm.ctx.Log.Info("Fee payments are using Asset with Alias: %s, AssetID: %s", genesisTx.Alias, txID)
+			vm.feeAssetID = txID
+		}
+	}
+
+	if !stateInitialized {
+		return vm.state.SetInitialized()
 	}
 
 	return nil
 }
 
-func (vm *VM) initState(genesisBytes []byte) error {
-	genesis := Genesis{}
-	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+func (vm *VM) initState(tx Tx) error {
+	txID := tx.ID()
+	vm.ctx.Log.Info("initializing with AssetID %s", txID)
+	if err := vm.state.PutTx(txID, &tx); err != nil {
 		return err
 	}
-
-	for _, genesisTx := range genesis.Txs {
-		if len(genesisTx.Outs) != 0 {
-			return errGenesisAssetMustHaveState
-		}
-
-		tx := Tx{
-			UnsignedTx: &genesisTx.CreateAssetTx,
-		}
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
+	if err := vm.state.PutStatus(txID, choices.Accepted); err != nil {
+		return err
+	}
+	for _, utxo := range tx.UTXOs() {
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			return err
-		}
-
-		txID := tx.ID()
-		vm.ctx.Log.Info("initializing with AssetID %s", txID)
-		if err := vm.state.PutTx(txID, &tx); err != nil {
-			return err
-		}
-		if err := vm.state.PutStatus(txID, choices.Accepted); err != nil {
-			return err
-		}
-		for _, utxo := range tx.UTXOs() {
-			if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
-				return err
-			}
 		}
 	}
-
-	return vm.state.SetInitialized()
+	return nil
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {
