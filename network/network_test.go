@@ -2401,7 +2401,7 @@ func TestValidatorIPs(t *testing.T) {
 		Port: 4,
 	}
 	disconnectedValidatorPeer := createPeer(ids.ShortID{0x01}, disconnectedValidatorIPDesc, appVersion)
-	disconnectedValidatorPeer.connected.SetValue(false)
+	disconnectedValidatorPeer.finishedHandshake.SetValue(false)
 	addPeerToNetwork(&dummyNetwork, disconnectedValidatorPeer, true)
 	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.id))
 
@@ -2525,7 +2525,7 @@ func createPeer(peerID ids.ShortID, peerIPDesc utils.IPDesc, peerVersion version
 		ip: peerIPDesc,
 		id: peerID,
 	}
-	newPeer.connected.SetValue(true)
+	newPeer.finishedHandshake.SetValue(true)
 	newPeer.versionStruct.SetValue(peerVersion)
 	newPeer.sigAndTime.SetValue(signedPeerIP{
 		ip:   newPeer.ip,

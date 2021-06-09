@@ -404,7 +404,7 @@ func NewNetwork(
 }
 
 // GetAcceptedFrontier implements the Sender interface.
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
 	n.log.AssertNoError(err)
@@ -415,7 +415,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, false) {
+		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -433,8 +433,8 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 }
 
 // AcceptedFrontier implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+// Assumes [n.stateLock] is not held.
+func (n *network) AcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
 	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
@@ -448,11 +448,11 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 		return // Packing message failed
 	}
 
-	peer := n.getPeer(validatorID)
+	peer := n.getPeer(nodeID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, true) {
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
-			validatorID,
+			nodeID,
 			chainID,
 			requestID,
 			containerIDs)
@@ -466,7 +466,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 }
 
 // GetAccepted implements the Sender interface.
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
 	now := n.clock.Time()
 
@@ -486,7 +486,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, false) {
+		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -505,8 +505,8 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 }
 
 // Accepted implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+// Assumes [n.stateLock] is not held.
+func (n *network) Accepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
 	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
@@ -520,11 +520,11 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return // Packing message failed
 	}
 
-	peer := n.getPeer(validatorID)
+	peer := n.getPeer(nodeID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, true) {
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
-			validatorID,
+			nodeID,
 			chainID,
 			requestID,
 			containerIDs)
@@ -538,7 +538,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 }
 
 // GetAncestors implements the Sender interface.
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
 	now := n.clock.Time()
 
@@ -551,7 +551,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, true) {
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -568,8 +568,8 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 }
 
 // MultiPut implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+// Assumes [n.stateLock] is not held.
+func (n *network) MultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
 	now := n.clock.Time()
 
 	msg, err := n.b.MultiPut(chainID, requestID, containers)
@@ -579,11 +579,11 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 		return
 	}
 
-	peer := n.getPeer(validatorID)
+	peer := n.getPeer(nodeID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, true) {
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
-			validatorID,
+			nodeID,
 			chainID,
 			requestID,
 			len(containers))
@@ -597,18 +597,18 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 }
 
 // Get implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+// Assumes [n.stateLock] is not held.
+func (n *network) Get(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
 	now := n.clock.Time()
 
 	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
-	peer := n.getPeer(validatorID)
+	peer := n.getPeer(nodeID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, true) {
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
-			validatorID,
+			nodeID,
 			chainID,
 			requestID,
 			containerID)
@@ -623,8 +623,8 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 }
 
 // Put implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+// Assumes [n.stateLock] is not held.
+func (n *network) Put(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	now := n.clock.Time()
 
 	msg, err := n.b.Put(chainID, requestID, containerID, container)
@@ -639,11 +639,11 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 		return
 	}
 
-	peer := n.getPeer(validatorID)
+	peer := n.getPeer(nodeID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, true) {
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
-			validatorID,
+			nodeID,
 			chainID,
 			requestID,
 			containerID)
@@ -658,7 +658,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 }
 
 // PushQuery implements the Sender interface.
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
 	now := n.clock.Time()
 
@@ -680,7 +680,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, false) {
+		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -700,7 +700,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 }
 
 // PullQuery implements the Sender interface.
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
 	now := n.clock.Time()
 
@@ -712,7 +712,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, false) {
+		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -731,8 +731,8 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 }
 
 // Chits implements the Sender interface.
-// assumes the stateLock is not held.
-func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
+// Assumes [n.stateLock] is not held.
+func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
 	now := n.clock.Time()
 
 	msg, err := n.b.Chits(chainID, requestID, votes)
@@ -746,11 +746,11 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 		return
 	}
 
-	peer := n.getPeer(validatorID)
+	peer := n.getPeer(nodeID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.Send(msg, true) {
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
-			validatorID,
+			nodeID,
 			chainID,
 			requestID,
 			votes)
@@ -764,7 +764,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 }
 
 // Gossip attempts to gossip the container to the network
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 	if err := n.gossipContainer(chainID, containerID, container); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
@@ -773,7 +773,7 @@ func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
 }
 
 // Accept is called after every consensus decision
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte) error {
 	if !ctx.IsBootstrapped() {
 		// don't gossip during bootstrapping
@@ -815,7 +815,7 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 
 // Dispatch starts accepting connections from other nodes attempting to connect
 // to this node.
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) Dispatch() error {
 	go n.gossipPeerList() // Periodically gossip peers
 	go func() {
@@ -902,7 +902,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 	if len(nodeIDs) == 0 { // Return info about all peers
 		peers := make([]PeerID, 0, n.peers.size())
 		for _, peer := range n.peers.peersList {
-			if peer.connected.GetValue() {
+			if peer.finishedHandshake.GetValue() {
 				peers = append(peers, PeerID{
 					IP:           peer.conn.RemoteAddr().String(),
 					PublicIP:     peer.getIP().String(),
@@ -919,7 +919,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 
 	peers := make([]PeerID, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs { // Return info about given peers
-		if peer, ok := n.peers.getByID(nodeID); ok && peer.connected.GetValue() {
+		if peer, ok := n.peers.getByID(nodeID); ok && peer.finishedHandshake.GetValue() {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.getIP().String(),
@@ -935,7 +935,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 }
 
 // Close implements the Network interface
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) Close() error {
 	n.closeOnce.Do(n.close)
 	return nil
@@ -970,13 +970,13 @@ func (n *network) close() {
 }
 
 // TrackIP implements the Network interface
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) TrackIP(ip utils.IPDesc) {
 	n.Track(ip, ids.ShortEmpty)
 }
 
 // Track implements the Network interface
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) Track(ip utils.IPDesc, nodeID ids.ShortID) {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
@@ -988,7 +988,7 @@ func (n *network) IP() utils.IPDesc {
 	return n.ip.IP()
 }
 
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
 	now := n.clock.Time()
 
@@ -1057,7 +1057,7 @@ func (n *network) track(ip utils.IPDesc, nodeID ids.ShortID) {
 	go n.connectTo(ip, nodeID)
 }
 
-// assumes the stateLock is not held. Only returns after the network is closed.
+// Assumes [n.stateLock] is not held. Only returns after the network is closed.
 func (n *network) gossipPeerList() {
 	t := time.NewTicker(n.peerListGossipFreq)
 	defer t.Stop()
@@ -1148,7 +1148,7 @@ func (n *network) gossipPeerList() {
 	}
 }
 
-// assumes the stateLock is not held. Only returns if the ip is connected to or
+// Assumes [n.stateLock] is not held. Only returns if the ip is connected to or
 // the network is closed
 func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	str := ip.String()
@@ -1212,7 +1212,7 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	}
 }
 
-// assumes the stateLock is not held. Returns nil if a connection was able to be
+// Assumes [n.stateLock] is not held. Returns nil if a connection was able to be
 // established, or the network is closed.
 func (n *network) attemptConnect(ip utils.IPDesc) error {
 	n.log.Verbo("attempting to connect to %s", ip)
@@ -1232,7 +1232,7 @@ func (n *network) attemptConnect(ip utils.IPDesc) error {
 	return n.upgrade(newPeer(n, conn, ip), n.clientUpgrader)
 }
 
-// assumes the stateLock is not held. Returns an error if the peer's connection
+// Assumes [n.stateLock] is not held. Returns an error if the peer's connection
 // wasn't able to be upgraded.
 func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	if err := p.conn.SetReadDeadline(time.Now().Add(n.readHandshakeTimeout)); err != nil {
@@ -1266,19 +1266,19 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	return nil
 }
 
-// assumes the stateLock is not held. Returns an error if the peer couldn't be
-// added.
+// Returns an error if the peer couldn't be added.
+// Assumes [n.stateLock] is not held.
 func (n *network) tryAddPeer(p *peer) error {
 	n.stateLock.Lock()
 	defer n.stateLock.Unlock()
-
-	ip := p.getIP()
 
 	if n.closed.GetValue() {
 		// the network is closing, so make sure that no further reconnect
 		// attempts are made.
 		return errNetworkClosed
 	}
+
+	ip := p.getIP()
 
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
@@ -1357,7 +1357,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 
 		peerIP := peer.getIP()
 		switch {
-		case !peer.connected.GetValue():
+		case !peer.finishedHandshake.GetValue():
 			continue
 		case peerIP.IsZero():
 			continue
@@ -1386,14 +1386,14 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	return res, nil
 }
 
-// should only be called after the peer is marked as connected. Should not be
-// called after disconnected is called with this peer.
-// assumes the stateLock is not held.
+// Should only be called after the peer finishes the handshake.
+// Should not be called after [disconnected] is called with this peer.
+// Assumes [n.stateLock] is not held.
 func (n *network) connected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
 
-	p.connected.SetValue(true)
+	p.finishedHandshake.SetValue(true)
 
 	peerVersion := p.versionStruct.GetValue().(version.Application)
 
@@ -1434,7 +1434,7 @@ func (n *network) connected(p *peer) {
 }
 
 // should only be called after the peer is marked as connected.
-// assumes the stateLock is not held.
+// Assumes [n.stateLock] is not held.
 func (n *network) disconnected(p *peer) {
 	p.net.stateLock.Lock()
 	defer p.net.stateLock.Unlock()
@@ -1472,8 +1472,8 @@ type PeerElement struct {
 }
 
 // Safe copy the peers dressed as a PeerElement
-// assumes the stateLock is not held.
-func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
+// Assumes [n.stateLock] is not held.
+func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1481,14 +1481,14 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 		return nil
 	}
 
-	peers := make([]*PeerElement, validatorIDs.Len())
+	peers := make([]*PeerElement, nodeIDs.Len())
 	i := 0
-	for validatorID := range validatorIDs {
-		vID := validatorID              // Prevent overwrite in next loop iteration
-		peer, _ := n.peers.getByID(vID) // note: peer may be nil
+	for nodeID := range nodeIDs {
+		nodeID := nodeID                   // Prevent overwrite in next loop iteration
+		peer, _ := n.peers.getByID(nodeID) // note: peer may be nil
 		peers[i] = &PeerElement{
 			peer: peer,
-			id:   vID,
+			id:   nodeID,
 		}
 		i++
 	}
@@ -1509,7 +1509,7 @@ func (n *network) getAllPeers() []*peer {
 
 	peers := make([]*peer, 0, n.peers.size())
 	for _, peer := range n.peers.peersList {
-		if peer.connected.GetValue() {
+		if peer.finishedHandshake.GetValue() {
 			peers = append(peers, peer)
 		}
 	}
@@ -1517,8 +1517,8 @@ func (n *network) getAllPeers() []*peer {
 }
 
 // Safe find a single peer
-// assumes the stateLock is not held.
-func (n *network) getPeer(validatorID ids.ShortID) *peer {
+// Assumes [n.stateLock] is not held.
+func (n *network) getPeer(nodeID ids.ShortID) *peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1526,7 +1526,7 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 		return nil
 	}
 
-	res, _ := n.peers.getByID(validatorID) // note: peer may be nil
+	res, _ := n.peers.getByID(nodeID) // note: peer may be nil
 	return res
 }
 
@@ -1539,7 +1539,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 	connectedTo := 0
 	n.stateLock.RLock()
 	for _, peer := range n.peers.peersList {
-		if peer != nil && peer.connected.GetValue() {
+		if peer != nil && peer.finishedHandshake.GetValue() {
 			connectedTo++
 		}
 	}

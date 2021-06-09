@@ -65,7 +65,7 @@ type peer struct {
 	// * Is a compatible version
 	// * Is not closed
 	// Only modified on the connection's reader routine.
-	connected utils.AtomicBool
+	finishedHandshake utils.AtomicBool
 
 	// only close the peer once
 	once sync.Once
@@ -189,10 +189,10 @@ func (p *peer) requestFinishHandshake() {
 	for {
 		select {
 		case <-finishHandshakeTicker.C:
-			connected := p.connected.GetValue()
+			finishedHandshake := p.finishedHandshake.GetValue()
 			closed := p.closed.GetValue()
 
-			if connected || closed {
+			if finishedHandshake || closed {
 				return
 			}
 
@@ -434,8 +434,8 @@ func (p *peer) handle(msg Msg) {
 		p.handlePeerList(msg)
 		return
 	}
-	if !p.connected.GetValue() {
-		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
+	if !p.finishedHandshake.GetValue() {
+		p.net.log.Debug("dropping message from %s%s because handshake isn't finished", constants.NodeIDPrefix, p.id)
 
 		// attempt to finish the handshake
 		if !p.gotVersion.GetValue() {
@@ -499,7 +499,6 @@ func (p *peer) close() {
 	close(p.tickerCloser)
 
 	p.closed.SetValue(true)
-	p.connected.SetValue(false)
 
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
@@ -766,7 +765,7 @@ func (p *peer) handleVersion(msg Msg) {
 	p.versionStr.SetValue(peerVersion.String())
 	p.gotVersion.SetValue(true)
 
-	p.tryMarkConnected()
+	p.tryMarkFinishedHandshake()
 }
 
 // assumes the [stateLock] is not held
@@ -849,7 +848,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 // assumes the [stateLock] is not held
 func (p *peer) handlePeerList(msg Msg) {
 	p.gotPeerList.SetValue(true)
-	p.tryMarkConnected()
+	p.tryMarkFinishedHandshake()
 
 	if p.net.isFetchOnly {
 		// If the node is in fetch only mode, drop all incoming peers
@@ -1056,11 +1055,11 @@ func (p *peer) handleChits(msg Msg) {
 }
 
 // assumes the [stateLock] is held
-func (p *peer) tryMarkConnected() {
-	if !p.connected.GetValue() && // not already connected
-		p.gotVersion.GetValue() && // not waiting for version
-		p.gotPeerList.GetValue() && // not waiting for peerlist
-		!p.closed.GetValue() { // and not already disconnected
+func (p *peer) tryMarkFinishedHandshake() {
+	if !p.finishedHandshake.GetValue() && // not already marked as finished with handshake
+		p.gotVersion.GetValue() && // not waiting for Version
+		p.gotPeerList.GetValue() && // not waiting for PeerList
+		!p.closed.GetValue() { // not already disconnected
 		p.net.connected(p)
 	}
 }
