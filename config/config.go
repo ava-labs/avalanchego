@@ -99,31 +99,38 @@ func avalancheFlagSet() *flag.FlagSet {
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
-	// config
+	// Config File
 	fs.String(ConfigFileKey, "", "Specifies a config file")
-	// Genesis config File
+
+	// Genesis Config File
 	fs.String(GenesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
+
 	// Network ID
 	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
+
 	// AVAX fees
 	fs.Uint64(TxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
 	fs.Uint64(CreationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
+
 	// Database
 	fs.Bool(DBEnabledKey, true, "Turn on persistent storage")
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
+
 	// Coreth config
 	fs.String(CorethConfigKey, "", "Specifies config to pass into coreth")
+
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	fs.String(LogDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+
 	// Assertions
 	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
+
 	// Signature Verification
 	fs.Bool(SignatureVerificationEnabledKey, true, "Turn on signature verification")
 
-	// Networking
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] peers to [%s] peers every [%s]",
@@ -134,20 +141,22 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
 	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
+
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
+
 	// Incoming Connection Throttling
-	// After we receive [conn-meter-max-conns] incoming connections from a given IP
-	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
-	// from the IP before upgrade.
+	// Upgrade at most [conn-meter-max-conns] incoming connections from a given IP
+	// in the last [conn-meter-reset-duration].
 	fs.Duration(ConnMeterResetDurationKey, 0*time.Second,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+			"If either is 0, incoming connections are not rate-limited.")
 	fs.Int(ConnMeterMaxConnsKey, 5,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+			"If either is 0, incoming connections are not rate-limited.")
+
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
@@ -155,14 +164,17 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
 	fs.Uint(SendQueueSizeKey, 512, "Max number of messages waiting to be sent to a given peer.")
+
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
+
 	// Benchlist
 	fs.Int(BenchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(BenchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
 	fs.Duration(BenchlistDurationKey, 30*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
 	fs.Duration(BenchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
+
 	// Router
 	fs.Uint(MaxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
 	fs.Float64(StakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
@@ -170,8 +182,10 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(MaxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
 	fs.Duration(ConsensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
+	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
 
-	// HTTP API
+	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
 	fs.Uint(HTTPPortKey, 9650, "Port of the HTTP server")
 	fs.Bool(HTTPSEnabledKey, false, "Upgrade the HTTP server to HTTPs")
@@ -187,7 +201,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
-	// Health
+
+	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")
 	fs.Duration(HealthCheckAveragerHalflifeKey, 10*time.Second, "Halflife of averager when calculating a running average in a health check")
 	// Network Layer Health
@@ -224,6 +239,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(StakeMintingPeriodKey, 365*24*time.Hour, "Consumption period of the staking function")
 	// Subnets
 	fs.String(WhitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
+
 	// Bootstrapping
 	fs.String(BootstrapIPsKey, "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
 	fs.String(BootstrapIDsKey, "", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
@@ -231,6 +247,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(RetryBootstrapMaxAttemptsKey, 50, "Specifies how many times bootstrap should be retried")
 	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
 	fs.Duration(BootstrapMaxTimeGetAncestorsKey, 50*time.Millisecond, "Max Time to spend fetching a container and its ancestors when responding to a GetAncestors")
+	fs.Uint(BootstrapMultiputMaxContainersSentKey, 2000, "Max number of containers in a Multiput message sent by this node")
+	fs.Uint(BootstrapMultiputMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Multiput message")
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -256,6 +274,7 @@ func avalancheFlagSet() *flag.FlagSet {
 
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
+
 	// Build directory
 	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
@@ -366,6 +385,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.ConsensusParams.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
 	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
+	nodeConfig.ConsensusGossipAcceptedFrontierSize = uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey))
+	nodeConfig.ConsensusGossipOnAcceptSize = uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey))
 
 	// Logging:
 	loggingConfig, err := logging.DefaultConfig()
@@ -715,6 +736,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
 	nodeConfig.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
 	nodeConfig.BootstrapMaxTimeGetAncestors = v.GetDuration(BootstrapMaxTimeGetAncestorsKey)
+	nodeConfig.BootstrapMultiputMaxContainersSent = int(v.GetUint(BootstrapMultiputMaxContainersSentKey))
+	nodeConfig.BootstrapMultiputMaxContainersReceived = int(v.GetUint(BootstrapMultiputMaxContainersReceivedKey))
 
 	// Peer alias
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)

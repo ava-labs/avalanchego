@@ -27,12 +27,20 @@ type Config struct {
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
+
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
 
-	// Max time to spend fetching a container and
-	// its ancestors when responding to a GetAncestors
-	BootstrapMaxTimeGetAncestors time.Duration
+	// Max time to spend fetching a container and its ancestors when responding
+	// to a GetAncestors
+	MaxTimeGetAncestors time.Duration
+
+	// Max number of containers in a multiput message sent by this node.
+	MultiputMaxContainersSent int
+
+	// This node will only consider the first [MultiputMaxContainersReceived]
+	// containers in a multiput it receives.
+	MultiputMaxContainersReceived int
 }
 
 // Context implements the Engine interface

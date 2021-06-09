@@ -162,14 +162,14 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 		return nil // Don't have the requested vertex. Drop message.
 	}
 
-	queue := make([]avalanche.Vertex, 1, common.MaxContainersPerMultiPut) // for BFS
+	queue := make([]avalanche.Vertex, 1, t.Config.MultiputMaxContainersSent) // for BFS
 	queue[0] = vertex
-	ancestorsBytesLen := 0                                               // length, in bytes, of vertex and its ancestors
-	ancestorsBytes := make([][]byte, 0, common.MaxContainersPerMultiPut) // vertex and its ancestors in BFS order
-	visited := ids.Set{}                                                 // IDs of vertices that have been in queue before
+	ancestorsBytesLen := 0                                                  // length, in bytes, of vertex and its ancestors
+	ancestorsBytes := make([][]byte, 0, t.Config.MultiputMaxContainersSent) // vertex and its ancestors in BFS order
+	visited := ids.Set{}                                                    // IDs of vertices that have been in queue before
 	visited.Add(vertex.ID())
 
-	for len(ancestorsBytes) < common.MaxContainersPerMultiPut && len(queue) > 0 && time.Since(startTime) < t.Config.BootstrapMaxTimeGetAncestors {
+	for len(ancestorsBytes) < t.Config.MultiputMaxContainersSent && len(queue) > 0 && time.Since(startTime) < t.Config.MaxTimeGetAncestors {
 		var vtx avalanche.Vertex
 		vtx, queue = queue[0], queue[1:] // pop
 		vtxBytes := vtx.Bytes()

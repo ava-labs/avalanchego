@@ -106,6 +106,8 @@ func TestPeer_Close(t *testing.T) {
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, netwrk)
 
