@@ -381,7 +381,7 @@ func (b *Bootstrapper) startup() error {
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their accepted frontier with the current accepted frontier
 func (b *Bootstrapper) sendGetAcceptedFrontiers() {
-	vdrs := ids.NewShortSet(MaxOutstandingBootstrapRequests)
+	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAcceptedFrontier.Len() > 0 && b.pendingReceiveAcceptedFrontier.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAcceptedFrontier.Pop()
 		// Add the validator to the set to send the messages to
@@ -398,7 +398,7 @@ func (b *Bootstrapper) sendGetAcceptedFrontiers() {
 // Ask up to [MaxOutstandingBootstrapRequests] bootstrap validators to send
 // their filtered accepted frontier
 func (b *Bootstrapper) sendGetAccepted() {
-	vdrs := ids.NewShortSet(MaxOutstandingBootstrapRequests)
+	vdrs := ids.NewShortSet(1)
 	for b.pendingSendAccepted.Len() > 0 && b.pendingReceiveAccepted.Len() < MaxOutstandingBootstrapRequests {
 		vdr, _ := b.pendingSendAccepted.Pop()
 		// Add the validator to the set to send the messages to
