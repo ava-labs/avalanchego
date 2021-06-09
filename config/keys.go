@@ -109,6 +109,7 @@ const (
 	PeerAliasTimeoutKey                       = "peer-alias-timeout"
 	PluginModeKey                             = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey       = "bootstrap-beacon-connection-timeout"
+	BootstrapMaxTimeGetAncestorsKey           = "boostrap-max-time-get-ancestors"
 	BootstrapMultiputMaxContainersSentKey     = "bootstrap-multiput-max-containers-sent"
 	BootstrapMultiputMaxContainersReceivedKey = "bootstrap-multiput-max-containers-received"
 	ChainConfigDirKey                         = "chain-config-dir"

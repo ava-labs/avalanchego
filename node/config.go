@@ -165,4 +165,8 @@ type Config struct {
 
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig
+
+	// Max time to spend fetching a container and its
+	// ancestors while responding to a GetAncestors message
+	BootstrapMaxTimeGetAncestors time.Duration
 }

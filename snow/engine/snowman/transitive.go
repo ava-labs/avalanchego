@@ -181,7 +181,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	ancestorsBytes[0] = blk.Bytes()
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
-	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < common.MaxTimeFetchingAncestors; numFetched++ {
+	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
 		blk = blk.Parent()
 		if blk.Status() == choices.Unknown {
 			break

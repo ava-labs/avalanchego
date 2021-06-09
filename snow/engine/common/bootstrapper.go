@@ -5,7 +5,6 @@ package common
 
 import (
 	"fmt"
-	"time"
 
 	stdmath "math"
 
@@ -22,10 +21,6 @@ const (
 	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not
 	// responded to/failed
 	MaxOutstandingRequests = 10
-
-	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
-	// vertices during a call to GetAncestors
-	MaxTimeFetchingAncestors = 50 * time.Millisecond
 )
 
 // Bootstrapper implements the Engine interface.

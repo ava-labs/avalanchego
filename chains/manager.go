@@ -159,11 +159,15 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
+
+	// Max Time to spend fetching a container and its
+	// ancestors when responding to a GetAncestors
+	BootstrapMaxTimeGetAncestors time.Duration
 	// Max number of containers in a multiput message sent by this node.
-	MultiputMaxContainersSent int
+	BootstrapMultiputMaxContainersSent int
 	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
-	MultiputMaxContainersReceived int
+	BootstrapMultiputMaxContainersReceived int
 }
 
 type manager struct {
@@ -547,8 +551,9 @@ func (m *manager) createAvalancheChain(
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
 				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
-				MultiputMaxContainersSent:     m.MultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.MultiputMaxContainersReceived,
+				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -679,8 +684,9 @@ func (m *manager) createSnowmanChain(
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
 				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
-				MultiputMaxContainersSent:     m.MultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.MultiputMaxContainersReceived,
+				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
 			VM:           vm,
