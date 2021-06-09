@@ -129,3 +129,13 @@ func (ids ShortSet) String() string {
 	sb.WriteString("}")
 	return sb.String()
 }
+
+// Removes and returns an element at random, if any exist.
+// If none exist, does nothing and returns false.
+func (ids *ShortSet) Pop() (ShortID, bool) {
+	for id := range *ids {
+		delete(*ids, id)
+		return id, true
+	}
+	return ShortID{}, false
+}
