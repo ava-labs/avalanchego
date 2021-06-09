@@ -159,6 +159,11 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
+	// Max number of containers in a multiput message sent by this node.
+	MultiputMaxContainersSent int
+	// This node will only consider the first [MultiputMaxContainersReceived]
+	// containers in a multiput it receives.
+	MultiputMaxContainersReceived int
 }
 
 type manager struct {
@@ -531,17 +536,19 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:                       ctx,
-				Validators:                validators,
-				Beacons:                   beacons,
-				SampleK:                   sampleK,
-				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
-				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                    &sender,
-				Subnet:                    sb,
-				Timer:                     timer,
-				RetryBootstrap:            m.RetryBootstrap,
-				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
+				Ctx:                           ctx,
+				Validators:                    validators,
+				Beacons:                       beacons,
+				SampleK:                       sampleK,
+				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                        &sender,
+				Subnet:                        sb,
+				Timer:                         timer,
+				RetryBootstrap:                m.RetryBootstrap,
+				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				MultiputMaxContainersSent:     m.MultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.MultiputMaxContainersReceived,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
@@ -661,17 +668,19 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:                       ctx,
-				Validators:                validators,
-				Beacons:                   beacons,
-				SampleK:                   sampleK,
-				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
-				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                    &sender,
-				Subnet:                    sb,
-				Timer:                     timer,
-				RetryBootstrap:            m.RetryBootstrap,
-				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
+				Ctx:                           ctx,
+				Validators:                    validators,
+				Beacons:                       beacons,
+				SampleK:                       sampleK,
+				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                        &sender,
+				Subnet:                        sb,
+				Timer:                         timer,
+				RetryBootstrap:                m.RetryBootstrap,
+				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				MultiputMaxContainersSent:     m.MultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.MultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
 			VM:           vm,
