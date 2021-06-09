@@ -15,10 +15,6 @@ import (
 )
 
 const (
-	// MaxContainersPerMultiPut is the maximum number of containers that can be
-	// sent in a MultiPut message
-	MaxContainersPerMultiPut = 2000
-
 	// StatusUpdateFrequency is how many containers should be processed between
 	// logs
 	StatusUpdateFrequency = 5000
