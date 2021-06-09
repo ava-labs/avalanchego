@@ -232,6 +232,7 @@ func (b *CommonBlock) Accept() error {
 	b.status = choices.Accepted
 	b.vm.internalState.AddBlock(b.self)
 	b.vm.internalState.SetLastAccepted(blkID)
+	b.vm.internalState.SetHeight(b.Hght)
 	b.vm.lastAcceptedID = blkID
 	return b.vm.metrics.AcceptBlock(b.self)
 }

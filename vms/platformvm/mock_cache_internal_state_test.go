@@ -35,6 +35,11 @@ func (_m *MockInternalState) AddChain(createChainTx *Tx) {
 	_m.Called(createChainTx)
 }
 
+// SetHeight provides a mock function with given fields: height
+func (_m *MockInternalState) SetHeight(height uint64) {
+	_m.Called(height)
+}
+
 // AddCurrentStaker provides a mock function with given fields: tx, potentialReward
 func (_m *MockInternalState) AddCurrentStaker(tx *Tx, potentialReward uint64) {
 	_m.Called(tx, potentialReward)
@@ -135,6 +140,29 @@ func (_m *MockInternalState) CurrentStakerChainState() currentStakerChainState {
 // DeleteCurrentStaker provides a mock function with given fields: tx
 func (_m *MockInternalState) DeleteCurrentStaker(tx *Tx) {
 	_m.Called(tx)
+}
+
+// GetValidatorWeightDiffs provides a mock function with given fields: height, subnetID
+func (_m *MockInternalState) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error) {
+	ret := _m.Called(height, subnetID)
+
+	var r0 map[ids.ShortID]*ValidatorWeightDiff
+	if rf, ok := ret.Get(0).(func() map[ids.ShortID]*ValidatorWeightDiff); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[ids.ShortID]*ValidatorWeightDiff)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // DeletePendingStaker provides a mock function with given fields: tx
