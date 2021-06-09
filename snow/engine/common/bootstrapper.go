@@ -23,12 +23,13 @@ const (
 	// logs
 	StatusUpdateFrequency = 5000
 
-	// MaxOutstandingRequests is the maximum number of GetAncestors sent but not
-	// responded to/failed
-	MaxOutstandingRequests = 10
+	// MaxOutstandingGetAncestorsRequests is the maximum number of GetAncestors
+	// sent but not responded to/failed
+	MaxOutstandingGetAncestorsRequests = 10
 
-	// MaxOutstandingRequests is the maximum number of GetAcceptedFrontier and
-	// GetAccepted messages sent but not responded to/failed
+	// MaxOutstandingBootstrapRequests is the maximum number of
+	// GetAcceptedFrontier and GetAccepted messages sent but not responded
+	// to/failed
 	MaxOutstandingBootstrapRequests = 50
 
 	// MaxTimeFetchingAncestors is the maximum amount of time to spend fetching
