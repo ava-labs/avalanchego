@@ -42,12 +42,13 @@ type alias struct {
 type peer struct {
 	net *network // network this peer is part of
 
-	// if the version message has been received and is valid. is only modified
-	// on the connection's reader routine.
+	// True if this peer has sent us a valid Version message and
+	// is running a compatible version.
+	// Only modified on the connection's reader routine.
 	gotVersion utils.AtomicBool
 
-	// if the gotPeerList message has been received and is valid. is only
-	// modified on the connection's reader routine.
+	// True if this peer has sent us a valid PeerList message.
+	// Only modified on the connection's reader routine.
 	gotPeerList utils.AtomicBool
 
 	// only send the version to this peer on handling a getVersion message if
@@ -58,13 +59,13 @@ type peer struct {
 	// a peerlist hasn't already been sent.
 	peerListSent utils.AtomicBool
 
-	// if the version message has been received and is valid and the peerlist
-	// has been returned. is only modified on the connection's reader routine.
+	// True if the peer:
+	// * Has sent us a Version message
+	// * Has sent us a PeerList message
+	// * Is a compatible version
+	// * Is not closed
+	// Only modified on the connection's reader routine.
 	connected utils.AtomicBool
-
-	// if the peer is connected and the peer is able to follow the protocol. is
-	// only modified on the connection's reader routine.
-	compatible utils.AtomicBool
 
 	// only close the peer once
 	once sync.Once
@@ -105,10 +106,11 @@ type peer struct {
 	// the connection object that is used to read/write messages from
 	conn net.Conn
 
-	// version that the peer reported during the handshake
+	// Version that this peer reported during the handshake.
+	// Set when we process the Version message from this peer.
 	versionStruct, versionStr utils.AtomicInterface
 
-	// unix time of the last message sent and received respectively
+	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
@@ -489,13 +491,15 @@ func (p *peer) dropMessage(connPendingLen, networkPendingLen int64) bool {
 // assumes the [stateLock] is not held
 func (p *peer) Close() { p.once.Do(p.close) }
 
-// assumes only `peer.Close` calls this
+// assumes only [peer.Close] calls this.
+// By the time this message returns, [p] has been removed from [p.net.peers]
 func (p *peer) close() {
 	// If the connection is closing, we can immediately cancel the ticker
 	// goroutines.
 	close(p.tickerCloser)
 
 	p.closed.SetValue(true)
+	p.connected.SetValue(false)
 
 	if err := p.conn.Close(); err != nil {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
