@@ -118,7 +118,6 @@ func (vm *VM) Initialize(
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
 	if time.Now().After(vm.proBlkStartTime) {
-
 		// proposerVM intercepts VM events for blocks and times event relay to consensus
 		vm.toEngine = toEngine
 		vm.fromWrappedVM = make(chan common.Message, len(toEngine))

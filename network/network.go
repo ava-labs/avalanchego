@@ -153,7 +153,6 @@ type network struct {
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	connMeterMaxConns            int
 	connMeter                    ConnMeter
 	b                            Builder
 	isFetchOnly                  bool
@@ -376,8 +375,7 @@ func NewNetwork(
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
-		connMeterMaxConns:                  connMeterMaxConns,
+		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
@@ -782,34 +780,35 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 	return n.gossipContainer(ctx.ChainID, containerID, container)
 }
 
-// upgradeIncoming returns a boolean indicating if we should
-// upgrade an incoming connection or drop it.
-//
+// shouldUpgradeIncoming returns whether we should
+// upgrade an incoming connection from a peer
+// at the IP whose string repr. is [ipStr].
 // Assumes stateLock is not held.
-func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
+func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	ip, err := utils.ToIPDesc(remoteAddr)
-	if err != nil {
-		return false, fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+	if _, ok := n.connectedIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's connected", ipStr)
+		return false
+	}
+	if _, ok := n.myIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's myself", ipStr)
+		return false
+	}
+	if _, ok := n.peerAliasIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
+		return false
+	}
+	if !n.connMeter.Allow(ipStr) {
+		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
+		return false
 	}
 
-	str := ip.String()
-	if _, ok := n.connectedIPs[str]; ok {
-		return false, nil
-	}
-	if _, ok := n.myIPs[str]; ok {
-		return false, nil
-	}
-	if _, ok := n.peerAliasIPs[str]; ok {
-		return false, nil
-	}
-
-	// Note that we attempt to upgrade remote addresses contained
-	// in disconnectedIPs to because that could allow us to initialize
+	// Note that we attempt to upgrade remote addresses in
+	// [n.disconnectedIPs] because that could allow us to initialize
 	// a connection with a peer we've been attempting to dial.
-	return true, nil
+	return true
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -860,13 +859,14 @@ func (n *network) Dispatch() error {
 		// Specifically, this can occur when one of our existing
 		// peers attempts to connect to one our IP aliases (that they
 		// aren't yet aware is an alias).
-		addr := conn.RemoteAddr().String()
-		if upgrade, err := n.upgradeIncoming(addr); err != nil {
-			n.log.Debug("error during upgrade incoming check: %s", err)
-			_ = conn.Close()
-			continue
-		} else if !upgrade {
-			n.log.Debug("dropping duplicate connection from %s", addr)
+		remoteAddr := conn.RemoteAddr().String()
+		ip, err := utils.ToIPDesc(remoteAddr)
+		if err != nil {
+			return fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+		}
+		ipStr := ip.IP.String()
+		upgrade := n.shouldUpgradeIncoming(ipStr)
+		if !upgrade {
 			_ = conn.Close()
 			continue
 		}
@@ -878,14 +878,6 @@ func (n *network) Dispatch() error {
 			if err := conn.SetNoDelay(true); err != nil {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
-		}
-
-		ticks, err := n.connMeter.Register(addr)
-		// looking for > n.connMeterMaxConns indicating the second tick
-		if err == nil && ticks > n.connMeterMaxConns {
-			n.log.Debug("connection from %s temporarily dropped", addr)
-			_ = conn.Close()
-			continue
 		}
 
 		go func() {

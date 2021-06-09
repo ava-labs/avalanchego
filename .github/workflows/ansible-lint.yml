@@ -4,7 +4,6 @@ on:
     tags:
       - '*' # Push events to every tag
     branches:
-      - dev
       - master
 
 jobs:
