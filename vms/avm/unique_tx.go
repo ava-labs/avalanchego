@@ -6,6 +6,9 @@ package avm
 import (
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
@@ -113,20 +116,33 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
 func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
-func getAddress(tx *UniqueTx) string {
-	// todo: find how to reliably get address, for now we loop around the credentials
-	return "address-" + tx.txID.String()
+// getAddress returns a ids.ShortID address given a transaction. This function returns either a
+// ids.ShortEmpty ID or an address from the transaction object. An address is returned if the
+// tx object has UTXO with a singular receiver.
+// Should we check if the value of funds is > 0 too? 🤔❓
+func getAddress(tx *UniqueTx) ids.ShortID {
+	// go through all transfer outputs, assert they are secp transfer outputs
+	// filter by threshold == 1 and address in the transfer output == 1
+	for _, utxo := range tx.UTXOs() {
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			continue
+		}
+
+		notSingularOutputReceiver := len(out.OutputOwners.Addrs) != 1 && out.OutputOwners.Threshold != 1
+		if notSingularOutputReceiver {
+			continue
+		}
+
+		return out.OutputOwners.Addrs[0]
+	}
+	// return empty
+	return ids.ShortEmpty
 }
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {
-	// todo mark in db that tx.id gives money to address
-	//tx.vm.addressToTx.Put("address", tx.txID)
 	fmt.Println("Transaction got accepted!")
-	e := tx.vm.addressToTx.Put([]byte(getAddress(tx)), tx.Bytes())
-	if e != nil {
-		tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", e)
-	}
 
 	if s := tx.Status(); s != choices.Processing {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
@@ -175,6 +191,19 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
+
+	// Get transaction address and proceed with indexing the transaction against the prefix DB
+	// associated with the address if the returned address is not empty
+	// should this be enabled on a config flag? Like indexing? 🤔❓
+	address := getAddress(tx)
+	if address != ids.ShortEmpty {
+		addressPrefixDb := linkeddb.NewDefault(prefixdb.New(address.Bytes(), tx.vm.db))
+		// []byte(txID.String()) as key vs []byte(txID.Hex()) 🤔❓
+		e := addressPrefixDb.Put([]byte(txID.String()), tx.Bytes())
+		if e != nil {
+			tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", e)
+		}
+	}
 
 	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)
