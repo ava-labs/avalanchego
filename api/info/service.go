@@ -5,6 +5,7 @@ package info
 
 import (
 	"fmt"
+	"github.com/NYTimes/gziphandler"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -58,7 +59,7 @@ func NewService(
 	}, "info"); err != nil {
 		return nil, err
 	}
-	return &common.HTTPHandler{Handler: newServer}, nil
+	return &common.HTTPHandler{Handler: gziphandler.GzipHandler(newServer)}, nil
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion

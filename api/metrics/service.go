@@ -4,6 +4,7 @@
 package metrics
 
 import (
+	"github.com/NYTimes/gziphandler"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
@@ -20,5 +21,5 @@ func NewService() (*prometheus.Registry, *common.HTTPHandler) {
 			promhttp.HandlerOpts{},
 		),
 	)
-	return registerer, &common.HTTPHandler{LockOptions: common.NoLock, Handler: handler}
+	return registerer, &common.HTTPHandler{LockOptions: common.NoLock, Handler: gziphandler.GzipHandler(handler)}
 }
