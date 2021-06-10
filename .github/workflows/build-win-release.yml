@@ -13,7 +13,9 @@ jobs:
   # This workflow contains a single job called "build"
   build-win:
     # The type of runner that the job will run on
-    runs-on: windows-2019 
+    runs-on: windows-2019
+    # Ensure this only runs on avalanchego repo
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:

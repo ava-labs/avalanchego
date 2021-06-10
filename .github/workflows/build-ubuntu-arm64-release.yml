@@ -7,6 +7,9 @@ on:
 
 jobs:
   build-bionic-arm64-package:
+    # Ensure this only runs on avalanchego repo
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
+
     runs-on: [self-hosted, linux, ARM64, bionic] 
 
     steps:
@@ -45,6 +48,8 @@ jobs:
         RELEASE: "bionic"
 
   build-focal-arm64-package:
+    # Ensure this only runs on avalanchego repo
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
     runs-on: [self-hosted, linux, ARM64, focal] 
 
     steps:

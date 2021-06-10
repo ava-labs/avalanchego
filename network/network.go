@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"errors"
 	"fmt"
@@ -46,7 +47,6 @@ const (
 	defaultPeerListStakerGossipFraction              = 2
 	defaultGetVersionTimeout                         = 10 * time.Second
 	defaultAllowPrivateIPs                           = true
-	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = 30 * time.Second
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024 // 16 KB
@@ -146,14 +146,15 @@ type network struct {
 	// Gossip a peer list to this many peers when gossiping
 	peerListGossipSize           int
 	peerListStakerGossipFraction int
+	dialerConfig                 DialerConfig
 	getVersionTimeout            time.Duration
 	allowPrivateIPs              bool
-	gossipSize                   int
+	gossipAcceptedFrontierSize   uint
+	gossipOnAcceptSize           uint
 	pingPongTimeout              time.Duration
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	connMeterMaxConns            int
 	connMeter                    ConnMeter
 	b                            Builder
 	isFetchOnly                  bool
@@ -212,6 +213,11 @@ type network struct {
 	// TODO also remove from this map when the peer leaves the validator set
 	latestPeerIP map[ids.ShortID]signedPeerIP
 
+	// Node ID --> Function to execute to stop trying to dial the node.
+	// A node is present in this map if and only if we are actively
+	// trying to dial the node.
+	connAttempts sync.Map
+
 	// Contains []byte. Used as an optimization.
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool sync.Pool
@@ -244,7 +250,10 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
+	dialerConfig DialerConfig,
 	isFetchOnly bool,
+	gossipAcceptedFrontierSize uint,
+	gossipOnAcceptSize uint,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -274,7 +283,8 @@ func NewDefaultNetwork(
 		defaultPeerListStakerGossipFraction,
 		defaultGetVersionTimeout,
 		defaultAllowPrivateIPs,
-		defaultGossipSize,
+		gossipAcceptedFrontierSize,
+		gossipOnAcceptSize,
 		defaultPingPongTimeout,
 		defaultPingFrequency,
 		defaultReadBufferSize,
@@ -285,6 +295,7 @@ func NewDefaultNetwork(
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
+		dialerConfig,
 		tlsKey,
 		isFetchOnly,
 	)
@@ -319,7 +330,8 @@ func NewNetwork(
 	peerListStakerGossipFraction int,
 	getVersionTimeout time.Duration,
 	allowPrivateIPs bool,
-	gossipSize int,
+	gossipAcceptedFrontierSize uint,
+	gossipOnAcceptSize uint,
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 	readBufferSize uint32,
@@ -330,6 +342,7 @@ func NewNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
+	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
 ) Network {
@@ -363,9 +376,11 @@ func NewNetwork(
 		peerListGossipFreq:                 peerListGossipFreq,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
+		dialerConfig:                       dialerConfig,
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
-		gossipSize:                         gossipSize,
+		gossipAcceptedFrontierSize:         gossipAcceptedFrontierSize,
+		gossipOnAcceptSize:                 gossipOnAcceptSize,
 		pingPongTimeout:                    pingPongTimeout,
 		pingFrequency:                      pingFrequency,
 		disconnectedIPs:                    make(map[string]struct{}),
@@ -376,8 +391,7 @@ func NewNetwork(
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
-		connMeterMaxConns:                  connMeterMaxConns,
+		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
@@ -766,7 +780,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 // Gossip attempts to gossip the container to the network
 // assumes the stateLock is not held.
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(chainID, containerID, container); err != nil {
+	if err := n.gossipContainer(chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -779,37 +793,38 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.ChainID, containerID, container)
+	return n.gossipContainer(ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
 }
 
-// upgradeIncoming returns a boolean indicating if we should
-// upgrade an incoming connection or drop it.
-//
+// shouldUpgradeIncoming returns whether we should
+// upgrade an incoming connection from a peer
+// at the IP whose string repr. is [ipStr].
 // Assumes stateLock is not held.
-func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
+func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	ip, err := utils.ToIPDesc(remoteAddr)
-	if err != nil {
-		return false, fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+	if _, ok := n.connectedIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's connected", ipStr)
+		return false
+	}
+	if _, ok := n.myIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's myself", ipStr)
+		return false
+	}
+	if _, ok := n.peerAliasIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
+		return false
+	}
+	if !n.connMeter.Allow(ipStr) {
+		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
+		return false
 	}
 
-	str := ip.String()
-	if _, ok := n.connectedIPs[str]; ok {
-		return false, nil
-	}
-	if _, ok := n.myIPs[str]; ok {
-		return false, nil
-	}
-	if _, ok := n.peerAliasIPs[str]; ok {
-		return false, nil
-	}
-
-	// Note that we attempt to upgrade remote addresses contained
-	// in disconnectedIPs to because that could allow us to initialize
+	// Note that we attempt to upgrade remote addresses in
+	// [n.disconnectedIPs] because that could allow us to initialize
 	// a connection with a peer we've been attempting to dial.
-	return true, nil
+	return true
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -860,13 +875,14 @@ func (n *network) Dispatch() error {
 		// Specifically, this can occur when one of our existing
 		// peers attempts to connect to one our IP aliases (that they
 		// aren't yet aware is an alias).
-		addr := conn.RemoteAddr().String()
-		if upgrade, err := n.upgradeIncoming(addr); err != nil {
-			n.log.Debug("error during upgrade incoming check: %s", err)
-			_ = conn.Close()
-			continue
-		} else if !upgrade {
-			n.log.Debug("dropping duplicate connection from %s", addr)
+		remoteAddr := conn.RemoteAddr().String()
+		ip, err := utils.ToIPDesc(remoteAddr)
+		if err != nil {
+			return fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+		}
+		ipStr := ip.IP.String()
+		upgrade := n.shouldUpgradeIncoming(ipStr)
+		if !upgrade {
 			_ = conn.Close()
 			continue
 		}
@@ -878,14 +894,6 @@ func (n *network) Dispatch() error {
 			if err := conn.SetNoDelay(true); err != nil {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
-		}
-
-		ticks, err := n.connMeter.Register(addr)
-		// looking for > n.connMeterMaxConns indicating the second tick
-		if err == nil && ticks > n.connMeterMaxConns {
-			n.log.Debug("connection from %s temporarily dropped", addr)
-			_ = conn.Close()
-			continue
 		}
 
 		go func() {
@@ -995,7 +1003,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // assumes the stateLock is not held.
-func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
+func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
 	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
@@ -1006,16 +1014,15 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 
 	allPeers := n.getAllPeers()
 
-	numToGossip := n.gossipSize
-	if numToGossip > len(allPeers) {
-		numToGossip = len(allPeers)
+	if int(numToGossip) > len(allPeers) {
+		numToGossip = uint(len(allPeers))
 	}
 
 	s := sampler.NewUniform()
 	if err := s.Initialize(uint64(len(allPeers))); err != nil {
 		return err
 	}
-	indices, err := s.Sample(numToGossip)
+	indices, err := s.Sample(int(numToGossip))
 	if err != nil {
 		return err
 	}
@@ -1154,8 +1161,15 @@ func (n *network) gossipPeerList() {
 	}
 }
 
-// assumes the stateLock is not held. Only returns if the ip is connected to or
-// the network is closed
+// Returns when:
+// * We connected to [ip]
+// * The network is closed
+// * We gave up connecting to [ip] because the IP is stale
+// If [nodeID] == ids.ShortEmpty, won't cancel an existing
+// attempt to connect to the peer with that IP.
+// We do this so we don't cancel attempted to connect to bootstrap beacons.
+// See method TrackIP.
+// Assumes [n.stateLock] isn't held when this method is called.
 func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	str := ip.String()
 	n.stateLock.RLock()
@@ -1209,7 +1223,31 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 		n.retryDelay[str] = delay
 		n.stateLock.Unlock()
 
-		err := n.attemptConnect(ip)
+		// If we are already trying to connect to this node ID,
+		// cancel the existing attempt.
+		// If [nodeID] is the empty ID, [ip] is a bootstrap beacon.
+		// In that case, don't cancel existing connection attempt.
+		if nodeID != ids.ShortEmpty {
+			if cancel, exists := n.connAttempts.Load(nodeID); exists {
+				n.log.Verbo("canceling attempt to connect to stale IP of %s%s", constants.NodeIDPrefix, nodeID)
+				cancel.(context.CancelFunc)()
+			}
+		}
+
+		// When [cancel] is called, we give up on this attempt to connect
+		// (if we have not yet connected.)
+		// This occurs at the sooner of:
+		// * [connectTo] is called again with the same node ID
+		// * The call to [attemptConnect] below returns
+		ctx, cancel := context.WithCancel(context.Background())
+		n.connAttempts.Store(nodeID, cancel)
+
+		// Attempt to connect
+		err := n.attemptConnect(ctx, ip)
+		cancel() // to avoid goroutine leak
+
+		n.connAttempts.Delete(nodeID)
+
 		if err == nil {
 			return
 		}
@@ -1218,15 +1256,25 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	}
 }
 
-// assumes the stateLock is not held. Returns nil if a connection was able to be
-// established, or the network is closed.
-func (n *network) attemptConnect(ip utils.IPDesc) error {
+// Attempt to connect to the peer at [ip].
+// If [ctx] is canceled, stops trying to connect.
+// Returns nil if:
+// * A connection was established
+// * The network is closed.
+// * [ctx] is canceled.
+// Assumes [n.stateLock] is not held when this method is called.
+func (n *network) attemptConnect(ctx context.Context, ip utils.IPDesc) error {
 	n.log.Verbo("attempting to connect to %s", ip)
-
-	conn, err := n.dialer.Dial(ip)
+	conn, err := n.dialer.Dial(ctx, ip)
 	if err != nil {
+		// If [ctx] was canceled, return nil so we don't try to connect again
+		if ctx.Err() == context.Canceled {
+			return nil
+		}
+		// Error wasn't because connection attempt was canceled
 		return err
 	}
+
 	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
 			n.log.Warn("failed to set no linger due to: %s", err)
