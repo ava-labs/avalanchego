@@ -169,6 +169,39 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
+func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...database.Batch) error {
+	for peerChainID, keys := range requests {
+		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
+		vdb, db := sm.m.GetDatabase(sharedID)
+		defer sm.m.ReleaseDatabase(sharedID)
+
+		s := state{
+			c: sm.m.codec,
+		}
+		if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
+			s.valueDB = prefixdb.New(smallerValuePrefix, db)
+			s.indexDB = prefixdb.New(smallerIndexPrefix, db)
+		} else {
+			s.valueDB = prefixdb.New(largerValuePrefix, db)
+			s.indexDB = prefixdb.New(largerIndexPrefix, db)
+		}
+
+		for _, key := range keys {
+			if err := s.RemoveValue(key); err != nil {
+				return err
+			}
+		}
+
+		myBatch, err := vdb.CommitBatch()
+		if err != nil {
+			return err
+		}
+
+		WriteAll(myBatch, batches...)
+	}
+	return nil
+}
+
 func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 	vdb, db := sm.m.GetDatabase(sharedID)
