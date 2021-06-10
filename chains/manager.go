@@ -564,6 +564,7 @@ func (m *manager) createAvalancheChain(
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
 			Manager:    vtxManager,
+
 			VM:         vm,
 		},
 		Params:    consensusParams,

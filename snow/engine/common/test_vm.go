@@ -21,6 +21,8 @@ var (
 	errCreateHandlers       = errors.New("unexpectedly called CreateHandlers")
 	errCreateStaticHandlers = errors.New("unexpectedly called CreateStaticHandlers")
 	errHealthCheck          = errors.New("unexpectedly called HealthCheck")
+	errConnected          = errors.New("unexpectedly called Connected")
+	errDisconnected          = errors.New("unexpectedly called Disconnected")
 
 	_ VM = &TestVM{}
 )
@@ -31,7 +33,7 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealthCheck bool
+	CantHealthCheck, CantConnected, CantDisconnected bool
 
 	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
@@ -135,12 +137,18 @@ func (vm *TestVM) Connected(id ids.ShortID) error {
 	if vm.ConnectedF != nil {
 		return vm.ConnectedF(id)
 	}
-	return nil // noop
+	if vm.CantConnected && vm.T != nil {
+		vm.T.Fatal(errConnected)
+	}
+	return nil
 }
 
 func (vm *TestVM) Disconnected(id ids.ShortID) error {
 	if vm.DisconnectedF != nil {
 		return vm.DisconnectedF(id)
 	}
-	return nil // noop
+	if vm.CantDisconnected && vm.T != nil {
+		vm.T.Fatal(errDisconnected)
+	}
+	return nil
 }
