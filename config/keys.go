@@ -28,6 +28,8 @@ const (
 	DynamicPublicIPResolverKey                = "dynamic-public-ip"
 	ConnMeterResetDurationKey                 = "conn-meter-reset-duration"
 	ConnMeterMaxConnsKey                      = "conn-meter-max-conns"
+	OutboundConnectionThrottlingRps           = "outbound-connection-throttling-rps"
+	OutboundConnectionTimeout                 = "outbound-connection-timeout"
 	HTTPHostKey                               = "http-host"
 	HTTPPortKey                               = "http-port"
 	HTTPSEnabledKey                           = "http-tls-enabled"

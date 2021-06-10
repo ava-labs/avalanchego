@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"net"
 	"testing"
@@ -105,6 +106,7 @@ func TestPeer_Close(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		NewDialerConfig(0, 30*time.Second),
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -116,7 +118,8 @@ func TestPeer_Close(t *testing.T) {
 		1,
 	)
 	caller.outbounds[ip1.IP().String()] = listener
-	conn, _ := caller.Dial(ip1.IP())
+	conn, err := caller.Dial(context.Background(), ip1.IP())
+	assert.NoError(t, err)
 
 	basenetwork := netwrk.(*network)
 

@@ -18,6 +18,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/network"
+
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -156,7 +158,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int(ConnMeterMaxConnsKey, 5,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If either is 0, incoming connections are not rate-limited.")
-
+	// Outgoing Connection Throttling
+	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
+	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer.")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
@@ -650,6 +654,12 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
 	nodeConfig.PeerListGossipFreq = v.GetDuration(NetworkPeerListGossipFreqKey)
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
+
+	// Outbound connection throttling
+	nodeConfig.DialerConfig = network.NewDialerConfig(
+		v.GetUint32(OutboundConnectionThrottlingRps),
+		v.GetDuration(OutboundConnectionTimeout),
+	)
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
