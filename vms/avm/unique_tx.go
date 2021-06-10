@@ -6,6 +6,7 @@ package avm
 import (
 	"errors"
 	"fmt"
+
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -120,7 +121,8 @@ func (tx *UniqueTx) Key() interface{} { return tx.txID }
 // ids.ShortEmpty ID or an address from the transaction object. An address is returned if the
 // tx object has UTXO with a singular receiver.
 // Should we check if the value of funds is > 0 too? 🤔❓
-func getAddress(tx *UniqueTx) ids.ShortID {
+func getAddresses(tx *UniqueTx) []ids.ShortID {
+	addrs := []ids.ShortID{}
 	// go through all transfer outputs, assert they are secp transfer outputs
 	// filter by threshold == 1 and address in the transfer output == 1
 	for _, utxo := range tx.UTXOs() {
@@ -134,10 +136,10 @@ func getAddress(tx *UniqueTx) ids.ShortID {
 			continue
 		}
 
-		return out.OutputOwners.Addrs[0]
+		addrs = append(addrs, out.OutputOwners.Addrs[0])
 	}
 	// return empty
-	return ids.ShortEmpty
+	return addrs
 }
 
 // Accept is called when the transaction was finalized as accepted by consensus
@@ -179,6 +181,19 @@ func (tx *UniqueTx) Accept() error {
 
 	txID := tx.ID()
 
+	// Get transaction address and proceed with indexing the transaction against the prefix DB
+	// associated with the address if the returned address is not empty
+	// should this be enabled on a config flag? Like indexing? 🤔❓
+	addresses := getAddresses(tx)
+	tx.vm.ctx.Log.Info("Retrieved address data %s", addresses)
+	for _, address := range addresses {
+		addressPrefixDB := linkeddb.NewDefault(prefixdb.New(address[:], tx.vm.db))
+		err := addressPrefixDB.Put(txID[:], tx.Bytes())
+		if err != nil {
+			tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", err)
+		}
+	}
+
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
@@ -191,22 +206,6 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
-
-	// Get transaction address and proceed with indexing the transaction against the prefix DB
-	// associated with the address if the returned address is not empty
-	// should this be enabled on a config flag? Like indexing? 🤔❓
-	address := getAddress(tx)
-	tx.vm.ctx.Log.Info("Retrieved address data %s", address)
-	if address != ids.ShortEmpty {
-		addressPrefixDB := linkeddb.NewDefault(prefixdb.New(address.Bytes(), tx.vm.db))
-		// []byte(txID.String()) as key vs []byte(txID.Hex()) 🤔❓
-		e := addressPrefixDB.Put([]byte(txID.String()), tx.Bytes())
-		if e != nil {
-			tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", e)
-		}
-	} else {
-		tx.vm.ctx.Log.Info("skipping indexing of transaction %s because output is not singular", txID.String())
-	}
 
 	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)

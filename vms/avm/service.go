@@ -6,11 +6,12 @@ package avm
 import (
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/database/linkeddb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"math"
 	"net/http"
 	"strings"
+
+	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -18,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -82,12 +84,13 @@ type GetTxStatusReply struct {
 }
 
 type GetReceivedTxsArgs struct {
-	Address   string `json:"address"`
-	PageIndex uint   `json:"pageIndex"`
-	PageSize  uint   `json:"pageSize"`
+	api.JSONAddress
+	PageIndex uint `json:"pageIndex"`
+	PageSize  uint `json:"pageSize"`
 }
+
 type GetReceivedTxsReply struct {
-	Txs []string `json:"transactions"`
+	TxIDs []ids.ID `json:"txIDs"`
 }
 
 // TODO: Remove static hardcoded limit of page size
@@ -105,25 +108,26 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
 
-	addressTxDB := linkeddb.NewDefault(prefixdb.New(address.Bytes(), service.vm.db))
-
-	if empty, _ := addressTxDB.IsEmpty(); empty {
-		service.vm.ctx.Log.Info("AddressTxDb is empty")
-		return nil
-	}
+	addressTxDB := linkeddb.NewDefault(prefixdb.New(address[:], service.vm.db))
 
 	// todo replace with NewIteratorWithStart with args.PageIndex and args.PageSize parameters
-	txIterator := addressTxDB.NewIterator()
-	txs := make([]string, 10)
+	txIDIter := addressTxDB.NewIterator()
+	txIDs := []ids.ID{}
 	service.vm.ctx.Log.Info("Fetching transactions for address")
-	for txIterator.Next() {
-		// todo process txIterator.Value() to fetch the associated tx object too
-		txID := string(txIterator.Key())
-		txs = append(txs, txID)
-	}
-	service.vm.ctx.Log.Info("Fetched %d transactions for address", len(txs))
+	for txIDIter.Next() {
+		txIDBytes := txIDIter.Key()
+		if len(txIDBytes) != hashing.HashLen {
+			return fmt.Errorf("invalid tx ID %s", txIDBytes)
+		}
+		var txID ids.ID
+		copy(txID[:], txIDIter.Key())
 
-	reply.Txs = txs
+		// todo process txIDIter.Value() to fetch the associated tx object too
+		txIDs = append(txIDs, txID)
+	}
+	service.vm.ctx.Log.Info("Fetched %d transactions for address", len(txIDs))
+
+	reply.TxIDs = txIDs
 	return nil
 }
 
