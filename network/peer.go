@@ -63,7 +63,6 @@ type peer struct {
 	// * Has sent us a Version message
 	// * Has sent us a PeerList message
 	// * Is a compatible version
-	// * Is not closed
 	// Only modified on the connection's reader routine.
 	finishedHandshake utils.AtomicBool
 
