@@ -268,6 +268,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int64(SnowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
 	fs.Duration(SnowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
+	// Metrics
+	fs.Bool(MeterVMsEnabledKey, false, "Enable Meter VMs to track VM performance with more granularity")
+
 	// IPC
 	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
@@ -597,6 +600,9 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	} else {
 		nodeConfig.IPCPath = ipcs.DefaultBaseURL
 	}
+
+	// Metrics
+	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
 
 	// Throttling
 	nodeConfig.MaxNonStakerPendingMsgs = v.GetUint32(MaxNonStakerPendingMsgsKey)

@@ -113,6 +113,14 @@ type VM struct {
 	walletService WalletService
 }
 
+func (vm *VM) Connected(id ids.ShortID) error {
+	return nil // noop
+}
+
+func (vm *VM) Disconnected(id ids.ShortID) error {
+	return nil // noop
+}
+
 /*
  ******************************************************************************
  ******************************** Avalanche API *******************************
@@ -224,8 +232,6 @@ func (vm *VM) Initialize(
 // Bootstrapping is called by the consensus engine when it starts bootstrapping
 // this chain
 func (vm *VM) Bootstrapping() error {
-	vm.metrics.numBootstrappingCalls.Inc()
-
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -237,8 +243,6 @@ func (vm *VM) Bootstrapping() error {
 // Bootstrapped is called by the consensus engine when it is done bootstrapping
 // this chain
 func (vm *VM) Bootstrapped() error {
-	vm.metrics.numBootstrappedCalls.Inc()
-
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -265,8 +269,6 @@ func (vm *VM) Shutdown() error {
 
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
-	vm.metrics.numCreateHandlersCalls.Inc()
-
 	codec := cjson.NewCodec()
 
 	rpcServer := rpc.NewServer()
@@ -310,8 +312,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Pending implements the avalanche.DAGVM interface
 func (vm *VM) PendingTxs() []snowstorm.Tx {
-	vm.metrics.numPendingCalls.Inc()
-
 	vm.timer.Cancel()
 
 	txs := vm.txs
@@ -321,15 +321,11 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 
 // Parse implements the avalanche.DAGVM interface
 func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
-	vm.metrics.numParseCalls.Inc()
-
 	return vm.parseTx(b)
 }
 
 // Get implements the avalanche.DAGVM interface
 func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
-	vm.metrics.numGetCalls.Inc()
-
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: txID,

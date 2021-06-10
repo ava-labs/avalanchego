@@ -615,6 +615,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		RetryBootstrap:                         n.Config.RetryBootstrap,
 		RetryBootstrapMaxAttempts:              n.Config.RetryBootstrapMaxAttempts,
 		ShutdownNodeFunc:                       n.Shutdown,
+		MeterVMEnabled:                         n.Config.MeterVMEnabled,
 		ChainConfigs:                           n.Config.ChainConfigs,
 		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,

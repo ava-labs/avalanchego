@@ -94,6 +94,7 @@ const (
 	IpcAPIEnabledKey                          = "api-ipcs-enabled"
 	IpcsChainIDsKey                           = "ipcs-chain-ids"
 	IpcsPathKey                               = "ipcs-path"
+	MeterVMsEnabledKey                        = "meter-vms-enabled"
 	ConsensusGossipFrequencyKey               = "consensus-gossip-frequency"
 	ConsensusGossipAcceptedFrontierSizeKey    = "consensus-accepted-frontier-gossip-size"
 	ConsensusGossipOnAcceptSizeKey            = "consensus-on-accept-gossip-size"
