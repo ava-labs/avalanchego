@@ -188,13 +188,12 @@ func (p *peer) requestFinishHandshake() {
 	for {
 		select {
 		case <-finishHandshakeTicker.C:
-			finishedHandshake := p.finishedHandshake.GetValue()
-			closed := p.closed.GetValue()
-
-			if finishedHandshake || closed {
+			if p.finishedHandshake.GetValue() {
 				return
 			}
-
+			if p.closed.GetValue() {
+				return
+			}
 			if !p.gotVersion.GetValue() {
 				p.sendGetVersion()
 			}
