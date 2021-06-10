@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/database"
+
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 
@@ -85,21 +87,29 @@ type GetTxStatusReply struct {
 
 type GetReceivedTxsArgs struct {
 	api.JSONAddress
-	PageIndex uint `json:"pageIndex"`
-	PageSize  uint `json:"pageSize"`
+	// Cursor used as a page index / offset
+	Cursor string `json:"cursor"`
+	// PageSize num of items per page
+	PageSize uint `json:"pageSize"`
+	// AssetID defaulted to AVAX if omitted or left blank
+	AssetID string `json:"assetID"`
 }
 
 type GetReceivedTxsReply struct {
 	TxIDs []ids.ID `json:"txIDs"`
+	// Cursor used as a page index / offset
+	Cursor ids.ID `json:"cursor"`
 }
 
 // TODO: Remove static hardcoded limit of page size
 const MaxPageSize uint = 1000
 
 // GetReceivedTxs returns list of transactions received by given address
+// prefix db by assetId, API will provide a field in request to allow filtering by assetId, else default to AVAX
 func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs, reply *GetReceivedTxsReply) error {
-	if args.PageSize > MaxPageSize {
-		return fmt.Errorf("page_size must not exceed maximum allowed size of %d", MaxPageSize)
+	pageSize := args.PageSize
+	if pageSize == 0 || pageSize > MaxPageSize {
+		return fmt.Errorf("pageSize must be greater than zero and less than the maximum allowed size of %d", MaxPageSize)
 	}
 
 	// Parse to address
@@ -108,12 +118,25 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
 
-	addressTxDB := linkeddb.NewDefault(prefixdb.New(address[:], service.vm.db))
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
+	if err != nil {
+		return err
+	}
 
-	// todo replace with NewIteratorWithStart with args.PageIndex and args.PageSize parameters
-	txIDIter := addressTxDB.NewIterator()
-	txIDs := []ids.ID{}
-	service.vm.ctx.Log.Info("Fetching transactions for address")
+	addressTxDB := prefixdb.New(address[:], service.vm.db)
+	assetPrefixDB := linkeddb.NewDefault(prefixdb.New(assetID[:], addressTxDB))
+
+	var txIDIter database.Iterator
+	unspecifiedCursor := len(args.Cursor) == 0
+	if unspecifiedCursor {
+		txIDIter = assetPrefixDB.NewIterator()
+	} else {
+		txIDIter = assetPrefixDB.NewIteratorWithStart([]byte(args.Cursor))
+	}
+
+	service.vm.ctx.Log.Debug("Fetching transactions for address")
+
+	var txIDs []ids.ID
 	for txIDIter.Next() {
 		txIDBytes := txIDIter.Key()
 		if len(txIDBytes) != hashing.HashLen {
@@ -122,12 +145,22 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 		var txID ids.ID
 		copy(txID[:], txIDIter.Key())
 
-		// todo process txIDIter.Value() to fetch the associated tx object too
 		txIDs = append(txIDs, txID)
+
+		// pageSize will be at least 1 so we do this at the end of the loop
+		if uint(len(txIDs)) == pageSize { // why is length of something not uint!? 🤷‍
+			break
+		}
 	}
-	service.vm.ctx.Log.Info("Fetched %d transactions for address", len(txIDs))
+
+	service.vm.ctx.Log.Debug("Fetched %d transactions for address", len(txIDs))
 
 	reply.TxIDs = txIDs
+	if len(txIDs) > 0 {
+		lastTx := txIDs[len(txIDs)-1]
+		reply.Cursor = lastTx
+	}
+
 	return nil
 }
 

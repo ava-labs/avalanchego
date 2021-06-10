@@ -117,12 +117,17 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
 func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
+type addressAssetIDEntry struct {
+	Address ids.ShortID
+	AssetID ids.ID
+}
+
 // getAddress returns a ids.ShortID address given a transaction. This function returns either a
 // ids.ShortEmpty ID or an address from the transaction object. An address is returned if the
 // tx object has UTXO with a singular receiver.
 // Should we check if the value of funds is > 0 too? 🤔❓
-func getAddresses(tx *UniqueTx) []ids.ShortID {
-	addrs := []ids.ShortID{}
+func getAddresses(tx *UniqueTx) []addressAssetIDEntry {
+	addrs := []addressAssetIDEntry{}
 	// go through all transfer outputs, assert they are secp transfer outputs
 	// filter by threshold == 1 and address in the transfer output == 1
 	for _, utxo := range tx.UTXOs() {
@@ -136,7 +141,10 @@ func getAddresses(tx *UniqueTx) []ids.ShortID {
 			continue
 		}
 
-		addrs = append(addrs, out.OutputOwners.Addrs[0])
+		addrs = append(addrs, addressAssetIDEntry{
+			Address: out.OutputOwners.Addrs[0],
+			AssetID: utxo.AssetID(),
+		})
 	}
 	// return empty
 	return addrs
@@ -185,12 +193,13 @@ func (tx *UniqueTx) Accept() error {
 	// associated with the address if the returned address is not empty
 	// should this be enabled on a config flag? Like indexing? 🤔❓
 	addresses := getAddresses(tx)
-	tx.vm.ctx.Log.Info("Retrieved address data %s", addresses)
+	tx.vm.ctx.Log.Debug("Retrieved address data %s", addresses)
 	for _, address := range addresses {
-		addressPrefixDB := linkeddb.NewDefault(prefixdb.New(address[:], tx.vm.db))
-		err := addressPrefixDB.Put(txID[:], tx.Bytes())
+		addressPrefixDB := prefixdb.New(address.Address[:], tx.vm.db)
+		assetPrefixDB := linkeddb.NewDefault(prefixdb.New(address.AssetID[:], addressPrefixDB))
+		err := assetPrefixDB.Put(txID[:], tx.Bytes())
 		if err != nil {
-			tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", err)
+			tx.vm.ctx.Log.Error("Failed to save transaction to the address, assetID prefix DB", err)
 		}
 	}
 
