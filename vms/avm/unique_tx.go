@@ -198,9 +198,9 @@ func (tx *UniqueTx) Accept() error {
 	address := getAddress(tx)
 	tx.vm.ctx.Log.Info("Retrieved address data %s", address)
 	if address != ids.ShortEmpty {
-		addressPrefixDb := linkeddb.NewDefault(prefixdb.New(address.Bytes(), tx.vm.db))
+		addressPrefixDB := linkeddb.NewDefault(prefixdb.New(address.Bytes(), tx.vm.db))
 		// []byte(txID.String()) as key vs []byte(txID.Hex()) 🤔❓
-		e := addressPrefixDb.Put([]byte(txID.String()), tx.Bytes())
+		e := addressPrefixDB.Put([]byte(txID.String()), tx.Bytes())
 		if e != nil {
 			tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", e)
 		}
