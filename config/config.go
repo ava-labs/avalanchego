@@ -16,8 +16,15 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kardianos/osext"
+
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
+
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -33,9 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/kardianos/osext"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 const (

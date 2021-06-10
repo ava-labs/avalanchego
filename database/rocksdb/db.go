@@ -33,8 +33,12 @@ const (
 	// should be added to a batch size per operation.
 	rocksDBByteOverhead = 8
 )
-var _ database.Database = &Database{}
-var errFailedToCreateIterator = errors.New("failed to create iterator")
+
+var (
+	errFailedToCreateIterator = errors.New("failed to create iterator")
+
+	_ database.Database = &Database{}
+)
 
 // Database is a persistent key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace
@@ -245,10 +249,9 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 	}
 	it.Seek(prefix)
 	return &iter{
-		it:            it,
-		db:            db,
-		expectsPrefix: true,
-		prefix:        prefix,
+		it:     it,
+		db:     db,
+		prefix: prefix,
 	}
 }
 
@@ -276,10 +279,9 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 		it.Seek(prefix)
 	}
 	return &iter{
-		it:            it,
-		db:            db,
-		expectsPrefix: true,
-		prefix:        prefix,
+		it:     it,
+		db:     db,
+		prefix: prefix,
 	}
 }
 
@@ -400,13 +402,12 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 }
 
 type iter struct {
-	it            *grocksdb.Iterator
-	db            *Database
-	expectsPrefix bool
-	prefix        []byte
-	started       bool
-	key           []byte
-	value         []byte
+	it      *grocksdb.Iterator
+	db      *Database
+	prefix  []byte
+	started bool
+	key     []byte
+	value   []byte
 }
 
 // Error implements the Iterator interface
@@ -436,18 +437,20 @@ func (it *iter) Next() bool {
 		it.it.Next()
 	}
 	it.started = true
-	valid := it.it.Valid()
-	if !valid {
+
+	if valid := it.it.Valid(); !valid {
 		it.key = nil
 		it.value = nil
-	} else {
-		it.key = it.it.Key().Data()
-		it.value = it.it.Value().Data()
-		if it.expectsPrefix && !bytes.HasPrefix(it.key, it.prefix) {
-			valid = false
-			it.key = nil
-			it.value = nil
-		}
+		return false
 	}
-	return valid
+
+	it.key = it.it.Key().Data()
+	it.value = it.it.Value().Data()
+
+	if !bytes.HasPrefix(it.key, it.prefix) {
+		it.key = nil
+		it.value = nil
+		return false
+	}
+	return true
 }
