@@ -483,9 +483,9 @@ func (m *manager) createAvalancheChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-
-	vm = vertex2.NewMeterVM(vm)
-
+	if m.MeterVMEnabled {
+		vm = vertex2.NewMeterVM(vm)
+	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
@@ -623,9 +623,9 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-
-	vm = block2.NewMeterVM(vm)
-
+	if m.MeterVMEnabled {
+		vm = block2.NewMeterVM(vm)
+	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
