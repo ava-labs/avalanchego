@@ -21,8 +21,8 @@ var (
 	errCreateHandlers       = errors.New("unexpectedly called CreateHandlers")
 	errCreateStaticHandlers = errors.New("unexpectedly called CreateStaticHandlers")
 	errHealthCheck          = errors.New("unexpectedly called HealthCheck")
-	errConnected          = errors.New("unexpectedly called Connected")
-	errDisconnected          = errors.New("unexpectedly called Disconnected")
+	errConnected            = errors.New("unexpectedly called Connected")
+	errDisconnected         = errors.New("unexpectedly called Disconnected")
 
 	_ VM = &TestVM{}
 )

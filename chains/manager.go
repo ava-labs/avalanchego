@@ -565,7 +565,7 @@ func (m *manager) createAvalancheChain(
 			TxBlocked:  txBlocker,
 			Manager:    vtxManager,
 
-			VM:         vm,
+			VM: vm,
 		},
 		Params:    consensusParams,
 		Consensus: &avcon.Topological{},
