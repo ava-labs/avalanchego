@@ -114,8 +114,6 @@ func TestInitializeCanRecordsCoreGenesis(t *testing.T) {
 	}
 }
 
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
 func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *VM, *snowman.TestBlock) {
 	// setup
 	coreGenBlk := &snowman.TestBlock{

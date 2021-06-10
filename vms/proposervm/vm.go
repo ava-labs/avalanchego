@@ -57,7 +57,7 @@ func init() {
 	}
 }
 
-//////// clock interface and implementation, to ease up UTs
+// clock interface and implementation, to ease up UTs
 type clock interface {
 	now() time.Time
 }
@@ -96,7 +96,7 @@ func (vm *VM) handleBlockTiming() {
 	vm.toEngine <- msg
 }
 
-//////// common.VM interface implementation
+// common.VM interface implementation
 func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
@@ -160,7 +160,7 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-//////// block.ChainVM interface implementation
+// block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	sb, err := vm.ChainVM.BuildBlock()
 	if err != nil {
@@ -268,7 +268,7 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	return coreID, nil
 }
 
-//////// Connector VMs handling
+// Connector VMs handling
 func (vm *VM) Connected(validatorID ids.ShortID) (bool, error) {
 	if connector, ok := vm.ChainVM.(validators.Connector); ok {
 		if err := connector.Connected(validatorID); err != nil {

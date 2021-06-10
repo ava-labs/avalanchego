@@ -83,7 +83,7 @@ func (pb *ProposerBlock) sign() error {
 	return nil
 }
 
-//////// choices.Decidable interface implementation
+// choices.Decidable interface implementation
 func (pb *ProposerBlock) ID() ids.ID {
 	return pb.id
 }
@@ -109,7 +109,7 @@ func (pb *ProposerBlock) Status() choices.Status {
 	return pb.coreBlk.Status()
 }
 
-//////// snowman.Block interface implementation
+// snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
 	if res, err := pb.vm.state.getProBlock(pb.header.PrntID); err == nil {
 		return res
@@ -173,7 +173,7 @@ func (pb *ProposerBlock) Height() uint64 {
 	return pb.header.Height
 }
 
-//////// snowman.OracleBlock interface implementation
+// snowman.OracleBlock interface implementation
 func (pb *ProposerBlock) Options() ([2]snowman.Block, error) {
 	if oracleBlk, ok := pb.coreBlk.(snowman.OracleBlock); ok {
 		return oracleBlk.Options()
