@@ -142,7 +142,7 @@ func getAddress(tx *UniqueTx) ids.ShortID {
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {
-	fmt.Println("Transaction got accepted!")
+	tx.vm.ctx.Log.Info("Transaction got accepted!")
 
 	if s := tx.Status(); s != choices.Processing {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
@@ -196,6 +196,7 @@ func (tx *UniqueTx) Accept() error {
 	// associated with the address if the returned address is not empty
 	// should this be enabled on a config flag? Like indexing? 🤔❓
 	address := getAddress(tx)
+	tx.vm.ctx.Log.Info("Retrieved address data %s", address)
 	if address != ids.ShortEmpty {
 		addressPrefixDb := linkeddb.NewDefault(prefixdb.New(address.Bytes(), tx.vm.db))
 		// []byte(txID.String()) as key vs []byte(txID.Hex()) 🤔❓
@@ -203,6 +204,8 @@ func (tx *UniqueTx) Accept() error {
 		if e != nil {
 			tx.vm.ctx.Log.Error("Failed to save transaction to the address DB", e)
 		}
+	} else {
+		tx.vm.ctx.Log.Info("skipping indexing of transaction %s because output is not singular", txID.String())
 	}
 
 	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))

@@ -108,18 +108,20 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 	addressTxDb := linkeddb.NewDefault(prefixdb.New(address.Bytes(), service.vm.db))
 
 	if empty, _ := addressTxDb.IsEmpty(); empty {
+		service.vm.ctx.Log.Info("AddressTxDb is empty")
 		return nil
 	}
 
 	// todo replace with NewIteratorWithStart with args.PageIndex and args.PageSize parameters
 	txIterator := addressTxDb.NewIterator()
 	txs := make([]string, 10)
-
+	service.vm.ctx.Log.Info("Fetching transactions for address")
 	for txIterator.Next() {
 		// todo process txIterator.Value() to fetch the associated tx object too
 		txId := string(txIterator.Key())
 		txs = append(txs, txId)
 	}
+	service.vm.ctx.Log.Info("Fetched %d transactions for address", len(txs))
 
 	reply.Txs = txs
 	return nil
