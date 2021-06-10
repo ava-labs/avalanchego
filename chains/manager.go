@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	block2 "github.com/ava-labs/avalanchego/vms/metervm/block"
+	vertex2 "github.com/ava-labs/avalanchego/vms/metervm/vertex"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/server"
@@ -159,11 +162,16 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
+	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
+
+	// Max Time to spend fetching a container and its
+	// ancestors when responding to a GetAncestors
+	BootstrapMaxTimeGetAncestors time.Duration
 	// Max number of containers in a multiput message sent by this node.
-	MultiputMaxContainersSent int
+	BootstrapMultiputMaxContainersSent int
 	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
-	MultiputMaxContainersReceived int
+	BootstrapMultiputMaxContainersReceived int
 }
 
 type manager struct {
@@ -475,15 +483,17 @@ func (m *manager) createAvalancheChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	if m.MeterVMEnabled {
+		vm = vertex2.NewMeterVM(vm)
+	}
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db.Database)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
@@ -547,13 +557,15 @@ func (m *manager) createAvalancheChain(
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
 				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
-				MultiputMaxContainersSent:     m.MultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.MultiputMaxContainersReceived,
+				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
 			Manager:    vtxManager,
-			VM:         vm,
+
+			VM: vm,
 		},
 		Params:    consensusParams,
 		Consensus: &avcon.Topological{},
@@ -611,14 +623,17 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	if m.MeterVMEnabled {
+		vm = block2.NewMeterVM(vm)
+	}
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
@@ -679,8 +694,9 @@ func (m *manager) createSnowmanChain(
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
 				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
-				MultiputMaxContainersSent:     m.MultiputMaxContainersSent,
-				MultiputMaxContainersReceived: m.MultiputMaxContainersReceived,
+				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
 			VM:           vm,

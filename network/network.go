@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"errors"
 	"fmt"
@@ -145,6 +146,7 @@ type network struct {
 	// Gossip a peer list to this many peers when gossiping
 	peerListGossipSize           int
 	peerListStakerGossipFraction int
+	dialerConfig                 DialerConfig
 	getVersionTimeout            time.Duration
 	allowPrivateIPs              bool
 	gossipAcceptedFrontierSize   uint
@@ -211,6 +213,11 @@ type network struct {
 	// TODO also remove from this map when the peer leaves the validator set
 	latestPeerIP map[ids.ShortID]signedPeerIP
 
+	// Node ID --> Function to execute to stop trying to dial the node.
+	// A node is present in this map if and only if we are actively
+	// trying to dial the node.
+	connAttempts sync.Map
+
 	// Contains []byte. Used as an optimization.
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool sync.Pool
@@ -243,6 +250,7 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
+	dialerConfig DialerConfig,
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
@@ -287,6 +295,7 @@ func NewDefaultNetwork(
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
+		dialerConfig,
 		tlsKey,
 		isFetchOnly,
 	)
@@ -333,6 +342,7 @@ func NewNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
+	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
 ) Network {
@@ -366,6 +376,7 @@ func NewNetwork(
 		peerListGossipFreq:                 peerListGossipFreq,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
+		dialerConfig:                       dialerConfig,
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
 		gossipAcceptedFrontierSize:         gossipAcceptedFrontierSize,
@@ -1150,8 +1161,15 @@ func (n *network) gossipPeerList() {
 	}
 }
 
-// assumes the stateLock is not held. Only returns if the ip is connected to or
-// the network is closed
+// Returns when:
+// * We connected to [ip]
+// * The network is closed
+// * We gave up connecting to [ip] because the IP is stale
+// If [nodeID] == ids.ShortEmpty, won't cancel an existing
+// attempt to connect to the peer with that IP.
+// We do this so we don't cancel attempted to connect to bootstrap beacons.
+// See method TrackIP.
+// Assumes [n.stateLock] isn't held when this method is called.
 func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	str := ip.String()
 	n.stateLock.RLock()
@@ -1205,7 +1223,31 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 		n.retryDelay[str] = delay
 		n.stateLock.Unlock()
 
-		err := n.attemptConnect(ip)
+		// If we are already trying to connect to this node ID,
+		// cancel the existing attempt.
+		// If [nodeID] is the empty ID, [ip] is a bootstrap beacon.
+		// In that case, don't cancel existing connection attempt.
+		if nodeID != ids.ShortEmpty {
+			if cancel, exists := n.connAttempts.Load(nodeID); exists {
+				n.log.Verbo("canceling attempt to connect to stale IP of %s%s", constants.NodeIDPrefix, nodeID)
+				cancel.(context.CancelFunc)()
+			}
+		}
+
+		// When [cancel] is called, we give up on this attempt to connect
+		// (if we have not yet connected.)
+		// This occurs at the sooner of:
+		// * [connectTo] is called again with the same node ID
+		// * The call to [attemptConnect] below returns
+		ctx, cancel := context.WithCancel(context.Background())
+		n.connAttempts.Store(nodeID, cancel)
+
+		// Attempt to connect
+		err := n.attemptConnect(ctx, ip)
+		cancel() // to avoid goroutine leak
+
+		n.connAttempts.Delete(nodeID)
+
 		if err == nil {
 			return
 		}
@@ -1214,15 +1256,25 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	}
 }
 
-// assumes the stateLock is not held. Returns nil if a connection was able to be
-// established, or the network is closed.
-func (n *network) attemptConnect(ip utils.IPDesc) error {
+// Attempt to connect to the peer at [ip].
+// If [ctx] is canceled, stops trying to connect.
+// Returns nil if:
+// * A connection was established
+// * The network is closed.
+// * [ctx] is canceled.
+// Assumes [n.stateLock] is not held when this method is called.
+func (n *network) attemptConnect(ctx context.Context, ip utils.IPDesc) error {
 	n.log.Verbo("attempting to connect to %s", ip)
-
-	conn, err := n.dialer.Dial(ip)
+	conn, err := n.dialer.Dial(ctx, ip)
 	if err != nil {
+		// If [ctx] was canceled, return nil so we don't try to connect again
+		if ctx.Err() == context.Canceled {
+			return nil
+		}
+		// Error wasn't because connection attempt was canceled
 		return err
 	}
+
 	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
 			n.log.Warn("failed to set no linger due to: %s", err)

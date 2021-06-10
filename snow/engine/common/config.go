@@ -4,6 +4,8 @@
 package common
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
@@ -28,6 +30,10 @@ type Config struct {
 
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
+
+	// Max time to spend fetching a container and its ancestors when responding
+	// to a GetAncestors
+	MaxTimeGetAncestors time.Duration
 
 	// Max number of containers in a multiput message sent by this node.
 	MultiputMaxContainersSent int

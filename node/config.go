@@ -76,6 +76,7 @@ type Config struct {
 	PeerListSize        uint32
 	PeerListGossipSize  uint32
 	PeerListGossipFreq  time.Duration
+	DialerConfig        network.DialerConfig
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
@@ -119,6 +120,9 @@ type Config struct {
 	IPCAPIEnabled      bool
 	IPCPath            string
 	IPCDefaultChainIDs []string
+
+	// Metrics
+	MeterVMEnabled bool
 
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
@@ -165,4 +169,8 @@ type Config struct {
 
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig
+
+	// Max time to spend fetching a container and its
+	// ancestors while responding to a GetAncestors message
+	BootstrapMaxTimeGetAncestors time.Duration
 }
