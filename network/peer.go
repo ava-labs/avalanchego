@@ -301,6 +301,7 @@ func (p *peer) WriteMessages() {
 
 	p.sendVersion()
 
+	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
 			p.id,
@@ -308,27 +309,26 @@ func (p *peer) WriteMessages() {
 
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
-		writer := bufio.NewWriter(p.conn)
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
 			for len(byteSlice) > 0 {
 				if err := p.conn.SetWriteDeadline(time.Now().Add(p.net.pingPongTimeout)); err != nil {
 					p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.id, p.getIP(), err)
 					return
 				}
-
 				written, err := writer.Write(byteSlice)
 				if err != nil {
 					p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
 					return
 				}
-				err = writer.Flush()
-				if err != nil {
-					p.net.log.Warn("couldn't flush writer to %s: %s", p.id, err)
-					return
-				}
+
 				p.tickerOnce.Do(p.StartTicker)
 				byteSlice = byteSlice[written:]
 			}
+		}
+		// Make sure the peer got the entire message
+		if err := writer.Flush(); err != nil {
+			p.net.log.Warn("couldn't flush writer to %s: %s", p.id, p.getIP(), err)
+			return
 		}
 
 		p.senderLock.Lock()
