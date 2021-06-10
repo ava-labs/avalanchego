@@ -7,6 +7,9 @@ on:
 
 jobs:
   build-x86_64-binaries-tarball:
+    # Ensure this only runs on avalanchego repo
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
+
     runs-on: ubuntu-18.04 
 
     steps:
@@ -45,6 +48,7 @@ jobs:
         RELEASE: "focal"
 
   build-arm64-binaries-tarball:
+    if: ${{ github.repository=='ava-labs/avalanchego' }}
     runs-on: [self-hosted, linux, ARM64, bionic]
 
     steps:

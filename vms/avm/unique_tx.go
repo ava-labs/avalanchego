@@ -311,7 +311,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	tx.validity = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
 		tx.vm.codec,
-		tx.vm.ctx.AVAXAssetID,
+		tx.vm.feeAssetID,
 		tx.vm.txFee,
 		tx.vm.creationTxFee,
 		len(tx.vm.fxs),

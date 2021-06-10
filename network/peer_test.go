@@ -108,6 +108,8 @@ func TestPeer_Close(t *testing.T) {
 		defaultGossipPeerListFreq,
 		NewDialerConfig(0, 30*time.Second),
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, netwrk)
 
@@ -127,7 +129,7 @@ func TestPeer_Close(t *testing.T) {
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sender = make(chan []byte, 10)
 	testMsg := newTestMsg(GetVersion, newmsgbytes)
-	peer.Send(testMsg)
+	peer.Send(testMsg, true)
 
 	// make sure the net pending and peer pending bytes updated
 	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {

@@ -7,55 +7,118 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/stretchr/testify/assert"
 )
 
 const (
-	localhost = "127.0.0.1:9651"
+	host1 = "127.0.0.1"
+	host2 = "127.0.0.2"
+	host3 = "127.0.0.3"
 )
 
 func TestNoConnMeter(t *testing.T) {
-	m := NewConnMeter(0, 1)
-
-	count, err := m.Register(localhost)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	count, err = m.Register(localhost)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, count)
+	meters := []ConnMeter{
+		NewConnMeter(0, 1, 1),
+		NewConnMeter(time.Nanosecond, 0, 1),
+		NewConnMeter(time.Nanosecond, 1, 0),
+	}
+	// Each meter should allow all
+	for _, meter := range meters {
+		for i := 0; i < 10; i++ {
+			allow := meter.Allow(host1)
+			assert.True(t, allow)
+		}
+	}
 }
 
-func TestConnMeter(t *testing.T) {
-	m := NewConnMeter(time.Hour, 1)
-
-	count, err := m.Register(localhost)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, count)
-
-	count, err = m.Register(localhost)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+// Test that we allow <= [maxConns] per [resetDuration]
+func TestConnMeterMaxConnsMet(t *testing.T) {
+	meter := NewConnMeter(time.Hour, 1, 3)
+	for i := 0; i < 3; i++ {
+		allow := meter.Allow(host1)
+		assert.True(t, allow)
+	}
+	allow := meter.Allow(host1)
+	assert.False(t, allow)
 }
 
-func TestConnMeterReplace(t *testing.T) {
-	remote := "127.0.0.2:9651"
-	differentPort := "127.0.0.1:9650"
-	m := NewConnMeter(time.Hour, 1)
+// Test that old connections are dropped from the connection
+// counter.
+func TestConnMeterOldConnsCleared(t *testing.T) {
+	now := time.Now()
+	resetDuration := 5 * time.Second
+	meterIntf := NewConnMeter(resetDuration, 1, 3)
+	meter := meterIntf.(*connMeter)
+	meter.Clock = &timer.Clock{}
+	meter.Clock.Set(now)
 
-	count, err := m.Register(localhost)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, count)
+	// Allow 3 within resetDuration
+	for i := 0; i < 3; i++ {
+		allow := meter.Allow(host1)
+		assert.True(t, allow)
+	}
 
-	count, err = m.Register(differentPort)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, count)
+	// 4th isn't allowed
+	allow := meter.Allow(host1)
+	assert.False(t, allow)
 
-	count, err = m.Register(remote)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, count)
+	// Sleep until right before connections should be cleared.
+	meter.Clock.Set(now.Add(resetDuration).Add(-5 * time.Millisecond))
 
-	count, err = m.Register(localhost)
-	assert.NoError(t, err)
-	assert.Equal(t, 0, count)
+	// Shouldn't have cleared yet
+	allow = meter.Allow(host1)
+	assert.False(t, allow)
+
+	// Sleep until right after connections should be cleared.
+	meter.Clock.Set(now.Add(resetDuration).Add(5 * time.Millisecond))
+
+	// Allow 3 within resetDuration
+	for i := 0; i < 3; i++ {
+		allow := meter.Allow(host1)
+		assert.True(t, allow)
+	}
+
+	// 4th isn't allowed
+	allow = meter.Allow(host1)
+	assert.False(t, allow)
+}
+
+// Make sure that allowed connection attempts
+// from one host aren't counted against another host.
+func TestConnMeterMultipleHosts(t *testing.T) {
+	m := NewConnMeter(time.Hour, 5, 1)
+
+	allow := m.Allow(host1)
+	assert.True(t, allow)
+	allow = m.Allow(host1)
+	assert.False(t, allow)
+
+	allow = m.Allow(host2)
+	assert.True(t, allow)
+	allow = m.Allow(host2)
+	assert.False(t, allow)
+
+	allow = m.Allow(host3)
+	assert.True(t, allow)
+	allow = m.Allow(host3)
+	assert.False(t, allow)
+}
+
+// Test that the connection counter cache size
+// is being set properly
+func TestConnMeterCacheSize(t *testing.T) {
+	m := NewConnMeter(time.Hour, 1, 1)
+
+	allow := m.Allow(host1)
+	assert.True(t, allow)
+	allow = m.Allow(host1)
+	assert.False(t, allow) // Rate-limited
+
+	// Should kick host 1 out of the cache
+	allow = m.Allow(host2)
+	assert.True(t, allow)
+
+	allow = m.Allow(host1)
+	assert.True(t, allow) // No longer rate-limited
 }

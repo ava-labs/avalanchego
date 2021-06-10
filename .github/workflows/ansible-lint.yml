@@ -1,7 +1,10 @@
 name: Ansible Lint
 on:
-  - pull_request
-  - push
+  push:
+    tags:
+      - '*' # Push events to every tag
+    branches:
+      - master
 
 jobs:
   build-ansible:
