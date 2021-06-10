@@ -137,7 +137,7 @@ func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingRequests {
+	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingGetAncestorsRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 

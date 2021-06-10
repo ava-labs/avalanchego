@@ -6,6 +6,8 @@ package ids
 import (
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestShortSetContains(t *testing.T) {
@@ -236,4 +238,30 @@ func TestShortSetString(t *testing.T) {
 	} else if count := strings.Count(str, ","); count != 1 {
 		t.Fatalf("Should only have one %s in %s", ",", str)
 	}
+}
+
+func TestShortSetPop(t *testing.T) {
+	var s ShortSet
+	_, ok := s.Pop()
+	assert.False(t, ok)
+
+	s = make(ShortSet)
+	_, ok = s.Pop()
+	assert.False(t, ok)
+
+	id1, id2 := GenerateTestShortID(), GenerateTestShortID()
+	s.Add(id1, id2)
+
+	got, ok := s.Pop()
+	assert.True(t, ok)
+	assert.True(t, got == id1 || got == id2)
+	assert.EqualValues(t, 1, s.Len())
+
+	got, ok = s.Pop()
+	assert.True(t, ok)
+	assert.True(t, got == id1 || got == id2)
+	assert.EqualValues(t, 0, s.Len())
+
+	_, ok = s.Pop()
+	assert.False(t, ok)
 }
