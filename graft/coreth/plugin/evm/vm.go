@@ -666,7 +666,7 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
-	handler := vm.chain.NewRPCHandler(time.Duration(vm.config.APIMaxDuration))
+	handler := vm.chain.NewRPCHandler(vm.config.APIMaxDuration.Duration)
 	enabledAPIs := vm.config.EthAPIs()
 	vm.chain.AttachEthService(handler, enabledAPIs)
 
@@ -1109,7 +1109,7 @@ func (vm *VM) startContinuousProfiler() {
 	}
 	vm.profiler = profiler.NewContinuous(
 		filepath.Join(vm.config.ContinuousProfilerDir),
-		vm.config.ContinuousProfilerFrequency,
+		vm.config.ContinuousProfilerFrequency.Duration,
 		vm.config.ContinuousProfilerMaxFiles,
 	)
 	defer vm.profiler.Shutdown()
