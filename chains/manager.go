@@ -32,7 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
-	proposervm "github.com/ava-labs/avalanchego/vms/proposervm"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
@@ -637,9 +637,10 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	// Initialize the VM
+	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+	proposerVM := proposervm.NewProVM(vm, proposervm.NoProposerBlocks) // Todo: handle on VM basis
+	if err := proposerVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
@@ -669,9 +670,6 @@ func (m *manager) createSnowmanChain(
 		Handler: handler,
 		Preempt: sb.afterBootstrapped(),
 	}
-
-	// wrap vm to handle extra fields introduced with leader-ed snowman
-	proposerVM := proposervm.NewProVM(vm, proposervm.NoProposerBlocks) // Todo: handle on VM basis
 
 	// The engine handles consensus
 	engine := &smeng.Transitive{}
