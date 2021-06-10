@@ -166,7 +166,7 @@ func (n *Node) initNetworking() error {
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
 
-	dialer := network.NewDialer(TCP)
+	dialer := network.NewDialer(TCP, n.Config.DialerConfig, n.Log)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -212,7 +212,7 @@ func (n *Node) initNetworking() error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Warn("Failed to connect to bootstrap nodes. Node shutting down...")
+				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
 		})
@@ -255,7 +255,10 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
+		n.Config.DialerConfig,
 		n.Config.FetchOnly,
+		n.Config.ConsensusGossipAcceptedFrontierSize,
+		n.Config.ConsensusGossipOnAcceptSize,
 	)
 
 	return nil
@@ -579,41 +582,44 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		FetchOnly:                 n.Config.FetchOnly,
-		FetchOnlyFrom:             fetchOnlyFrom,
-		StakingEnabled:            n.Config.EnableStaking,
-		StakingKey:                &n.Config.StakingTLSCert.PrivateKey,
-		MaxPendingMsgs:            n.Config.MaxPendingMsgs,
-		MaxNonStakerPendingMsgs:   n.Config.MaxNonStakerPendingMsgs,
-		StakerMSGPortion:          n.Config.StakerMSGPortion,
-		StakerCPUPortion:          n.Config.StakerCPUPortion,
-		Log:                       n.Log,
-		LogFactory:                n.LogFactory,
-		VMManager:                 n.vmManager,
-		DecisionEvents:            n.DecisionDispatcher,
-		ConsensusEvents:           n.ConsensusDispatcher,
-		DBManager:                 n.DBManager,
-		Router:                    n.Config.ConsensusRouter,
-		Net:                       n.Net,
-		ConsensusParams:           n.Config.ConsensusParams,
-		EpochFirstTransition:      n.Config.EpochFirstTransition,
-		EpochDuration:             n.Config.EpochDuration,
-		Validators:                n.vdrs,
-		NodeID:                    n.ID,
-		NetworkID:                 n.Config.NetworkID,
-		Server:                    &n.APIServer,
-		Keystore:                  n.keystore,
-		AtomicMemory:              &n.sharedMemory,
-		AVAXAssetID:               avaxAssetID,
-		XChainID:                  xChainID,
-		CriticalChains:            criticalChains,
-		TimeoutManager:            timeoutManager,
-		HealthService:             n.healthService,
-		WhitelistedSubnets:        n.Config.WhitelistedSubnets,
-		RetryBootstrap:            n.Config.RetryBootstrap,
-		RetryBootstrapMaxAttempts: n.Config.RetryBootstrapMaxAttempts,
-		ShutdownNodeFunc:          n.Shutdown,
-		ChainConfigs:              n.Config.ChainConfigs,
+		FetchOnly:                              n.Config.FetchOnly,
+		FetchOnlyFrom:                          fetchOnlyFrom,
+		StakingEnabled:                         n.Config.EnableStaking,
+		StakingKey:                             &n.Config.StakingTLSCert.PrivateKey,
+		MaxPendingMsgs:                         n.Config.MaxPendingMsgs,
+		MaxNonStakerPendingMsgs:                n.Config.MaxNonStakerPendingMsgs,
+		StakerMSGPortion:                       n.Config.StakerMSGPortion,
+		StakerCPUPortion:                       n.Config.StakerCPUPortion,
+		Log:                                    n.Log,
+		LogFactory:                             n.LogFactory,
+		VMManager:                              n.vmManager,
+		DecisionEvents:                         n.DecisionDispatcher,
+		ConsensusEvents:                        n.ConsensusDispatcher,
+		DBManager:                              n.DBManager,
+		Router:                                 n.Config.ConsensusRouter,
+		Net:                                    n.Net,
+		ConsensusParams:                        n.Config.ConsensusParams,
+		EpochFirstTransition:                   n.Config.EpochFirstTransition,
+		EpochDuration:                          n.Config.EpochDuration,
+		Validators:                             n.vdrs,
+		NodeID:                                 n.ID,
+		NetworkID:                              n.Config.NetworkID,
+		Server:                                 &n.APIServer,
+		Keystore:                               n.keystore,
+		AtomicMemory:                           &n.sharedMemory,
+		AVAXAssetID:                            avaxAssetID,
+		XChainID:                               xChainID,
+		CriticalChains:                         criticalChains,
+		TimeoutManager:                         timeoutManager,
+		HealthService:                          n.healthService,
+		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
+		RetryBootstrap:                         n.Config.RetryBootstrap,
+		RetryBootstrapMaxAttempts:              n.Config.RetryBootstrapMaxAttempts,
+		ShutdownNodeFunc:                       n.Shutdown,
+		ChainConfigs:                           n.Config.ChainConfigs,
+		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
+		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
+		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
 	})
 
 	vdrs := n.vdrs

@@ -2104,13 +2104,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: vdrs,
-				Beacons:    beacons,
-				SampleK:    beacons.Len(),
-				Alpha:      beacons.Weight()/2 + 1,
-				Sender:     &sender,
-				Subnet:     subnet,
+				Ctx:                           ctx,
+				Validators:                    vdrs,
+				Beacons:                       beacons,
+				SampleK:                       beacons.Len(),
+				Alpha:                         beacons.Weight()/2 + 1,
+				Sender:                        &sender,
+				Subnet:                        subnet,
+				MultiputMaxContainersSent:     2000,
+				MultiputMaxContainersReceived: 2000,
 			},
 			Blocked: blocked,
 			VM:      vm,
