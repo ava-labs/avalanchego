@@ -582,7 +582,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-
 		FetchOnly:                              n.Config.FetchOnly,
 		FetchOnlyFrom:                          fetchOnlyFrom,
 		StakingEnabled:                         n.Config.EnableStaking,
