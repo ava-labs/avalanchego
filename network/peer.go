@@ -4,6 +4,7 @@
 package network
 
 import (
+	"bufio"
 	"crypto/x509"
 	"encoding/binary"
 	"math"
@@ -233,8 +234,9 @@ func (p *peer) ReadMessages() {
 
 	pendingBuffer := wrappers.Packer{}
 	readBuffer := make([]byte, p.net.readBufferSize)
+	reader := bufio.NewReader(p.conn)
 	for {
-		read, err := p.conn.Read(readBuffer)
+		read, err := reader.Read(readBuffer)
 		if err != nil {
 			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.getIP(), err)
 			return
@@ -306,6 +308,7 @@ func (p *peer) WriteMessages() {
 
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
+		writer := bufio.NewWriter(p.conn)
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
 			for len(byteSlice) > 0 {
 				if err := p.conn.SetWriteDeadline(time.Now().Add(p.net.pingPongTimeout)); err != nil {
@@ -313,9 +316,14 @@ func (p *peer) WriteMessages() {
 					return
 				}
 
-				written, err := p.conn.Write(byteSlice)
+				written, err := writer.Write(byteSlice)
 				if err != nil {
 					p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
+					return
+				}
+				err = writer.Flush()
+				if err != nil {
+					p.net.log.Warn("couldn't flush writer to %s: %s", p.id, err)
 					return
 				}
 				p.tickerOnce.Do(p.StartTicker)
