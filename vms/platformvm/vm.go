@@ -6,7 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"github.com/NYTimes/gziphandler"
+	"github.com/ava-labs/avalanchego/api/compression"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
@@ -418,7 +418,7 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 		return nil, err
 	}
 
-	gzipHandler := gziphandler.GzipHandler(server)
+	gzipHandler := compression.EnableGzipSupport(server)
 	return map[string]*common.HTTPHandler{
 		"": {
 			Handler: gzipHandler,

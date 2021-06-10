@@ -5,11 +5,11 @@ package health
 
 import (
 	"fmt"
+	"github.com/ava-labs/avalanchego/api/compression"
 	"net/http"
 	"time"
 
 	stdjson "encoding/json"
-	"github.com/NYTimes/gziphandler"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -84,7 +84,7 @@ func (as *apiServer) Handler() (*common.HTTPHandler, error) {
 			as.log.Debug("failed to encode the health check response due to %s", err)
 		}
 	})
-	gzHandler := gziphandler.GzipHandler(handler)
+	gzHandler := compression.EnableGzipSupport(handler)
 	return &common.HTTPHandler{LockOptions: common.NoLock, Handler: gzHandler}, nil
 }
 

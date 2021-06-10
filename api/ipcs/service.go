@@ -6,6 +6,7 @@ package ipcs
 import (
 	"fmt"
 	"github.com/NYTimes/gziphandler"
+	"github.com/ava-labs/avalanchego/api/compression"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -43,7 +44,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 
-	return &common.HTTPHandler{Handler: gziphandler.GzipHandler(newServer)}, newServer.RegisterService(ipcServer, "ipcs")
+	return &common.HTTPHandler{Handler: compression.EnableGzipSupport(newServer)}, newServer.RegisterService(ipcServer, "ipcs")
 }
 
 // PublishBlockchainArgs are the arguments for calling PublishBlockchain

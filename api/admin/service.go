@@ -5,7 +5,7 @@ package admin
 
 import (
 	"errors"
-	"github.com/NYTimes/gziphandler"
+	"github.com/ava-labs/avalanchego/api/compression"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -53,7 +53,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 	}, "admin"); err != nil {
 		return nil, err
 	}
-	return &common.HTTPHandler{Handler: gziphandler.GzipHandler(newServer)}, nil
+	return &common.HTTPHandler{Handler: compression.EnableGzipSupport(newServer)}, nil
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
