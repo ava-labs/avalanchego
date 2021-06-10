@@ -126,6 +126,13 @@ type peer struct {
 	// the peer's local time when it sent a Version.
 	// The time in [sigAndTime] is the one mentioned above.
 	sigAndTime utils.AtomicInterface
+
+	// Used in [handleAcceptedFrontier], [handleAccepted],
+	// [handleGetAccepted], [handleChits].
+	// We use this one ids.Set rather than allocating one per method call.
+	// Should be cleared before use.
+	// Should only be used in peer's reader goroutine.
+	idSet ids.Set
 }
 
 // newPeer returns a properly initialized *peer.
@@ -324,11 +331,16 @@ func (p *peer) WriteMessages() {
 		now := p.net.clock.Time().Unix()
 		atomic.StoreInt64(&p.lastSent, now)
 		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
+
+		p.net.byteSlicePool.Put(msg)
 	}
 }
 
 // send assumes that the [stateLock] is not held.
-func (p *peer) Send(msg Msg) bool {
+// If [canModifyMsg], [msg] may be modified by this method.
+// If ![canModifyMsg], [msg] will not be modified by this method.
+// [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
+func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
 
@@ -359,14 +371,23 @@ func (p *peer) Send(msg Msg) bool {
 		return false
 	}
 
+	// If the flag says to not modify [msgBytes], copy it so that the copy,
+	// not [msgBytes], will be put back into the pool after it's written.
+	toSend := msgBytes
+	if !canModifyMsg {
+		toSend = make([]byte, msgBytesLen)
+		copy(toSend, msgBytes)
+	}
+
 	select {
-	case p.sender <- msgBytes:
+	case p.sender <- toSend:
 		p.pendingBytes = newConnPendingBytes
 		return true
 	default:
 		// we never sent the message, remove from pending totals
 		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
+		p.net.byteSlicePool.Put(toSend)
 		return false
 	}
 }
@@ -510,9 +531,11 @@ func (p *peer) close() {
 func (p *peer) sendGetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.metrics.getVersion.numSent.Inc()
-		p.net.metrics.getVersion.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.metrics.getVersion.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.metrics.getVersion.numFailed.Inc()
@@ -541,10 +564,11 @@ func (p *peer) sendVersion() {
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
 
-	sent := p.Send(msg)
+	lenMsg := len(msg.Bytes())
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.metrics.version.numSent.Inc()
-		p.net.metrics.version.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.metrics.version.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 		p.versionSent.SetValue(true)
 	} else {
@@ -557,9 +581,11 @@ func (p *peer) sendVersion() {
 func (p *peer) sendGetPeerList() {
 	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.getPeerlist.numSent.Inc()
-		p.net.getPeerlist.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.getPeerlist.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.getPeerlist.numFailed.Inc()
@@ -580,10 +606,11 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	sent := p.Send(msg)
+	lenMsg := len(msg.Bytes())
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.peerList.numSent.Inc()
-		p.net.peerList.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.peerList.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 		p.peerListSent.SetValue(true)
 	} else {
@@ -596,9 +623,11 @@ func (p *peer) sendPeerList() {
 func (p *peer) sendPing() {
 	msg, err := p.net.b.Ping()
 	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.ping.numSent.Inc()
-		p.net.ping.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.ping.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.ping.numFailed.Inc()
@@ -610,9 +639,11 @@ func (p *peer) sendPing() {
 func (p *peer) sendPong() {
 	msg, err := p.net.b.Pong()
 	p.net.log.AssertNoError(err)
-	if p.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	sent := p.Send(msg, true)
+	if sent {
 		p.net.pong.numSent.Inc()
-		p.net.pong.sentBytes.Add(float64(len(msg.Bytes())))
+		p.net.pong.sentBytes.Add(float64(lenMsg))
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.pong.numFailed.Inc()
@@ -793,8 +824,8 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	// Am I already peered to them? (safe because [p.net.stateLock] is held)
-	foundPeer, ok := p.net.peers[nodeID]
-	if ok && !foundPeer.closed.GetValue() {
+
+	if foundPeer, ok := p.net.peers.getByID(nodeID); ok && !foundPeer.closed.GetValue() {
 		p.net.log.Verbo(
 			"not peering to %s because we are already connected to %s",
 			peer.IPDesc,
@@ -876,19 +907,19 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.AcceptedFrontier(p.id, chainID, requestID, containerIDs)
@@ -903,19 +934,19 @@ func (p *peer) handleGetAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.GetAccepted(p.id, chainID, requestID, deadline, containerIDs)
@@ -929,19 +960,19 @@ func (p *peer) handleAccepted(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.Accepted(p.id, chainID, requestID, containerIDs)
@@ -1025,19 +1056,19 @@ func (p *peer) handleChits(msg Msg) {
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
-	containerIDsSet := ids.NewSet(len(containerIDsBytes)) // To prevent duplicates
+	p.idSet.Clear()
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			return
 		}
-		if containerIDsSet.Contains(containerID) {
+		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
 		containerIDs[i] = containerID
-		containerIDsSet.Add(containerID)
+		p.idSet.Add(containerID)
 	}
 
 	p.net.router.Chits(p.id, chainID, requestID, containerIDs)

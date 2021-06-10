@@ -6,7 +6,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"syscall"
 
 	"github.com/ava-labs/avalanchego/app/process"
@@ -34,13 +33,13 @@ func main() {
 
 	fmt.Println(process.Header)
 
-	// Set the log directory for this process by adding a subdirectory
-	// "daemon" to the log directory given in the config
+	// Set the log directory for this process by adding a suffix
+	// "-daemon" to the log directory given in the config
 	logConfigCopy := nodeConfig.LoggingConfig
-	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
+	logConfigCopy.Directory += "-daemon"
 	logFactory := logging.NewFactory(logConfigCopy)
 
-	log, err := logFactory.Make()
+	log, err := logFactory.Make("main")
 	if err != nil {
 		logFactory.Close()
 
@@ -68,7 +67,12 @@ func main() {
 
 	// Run normally
 	exitCode, err := nodeManager.runNormal()
-	log.Debug("node returned exit code %s, error %v", exitCode, err)
+	if err != nil {
+		log.Error("running node returned error: %s", err)
+	} else {
+		log.Debug("node returned exit code %d", exitCode)
+	}
+
 	nodeManager.shutdown() // make sure all the nodes are stopped
 
 	logFactory.Close()

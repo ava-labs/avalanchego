@@ -6,6 +6,7 @@ package manager
 import (
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,7 +27,7 @@ func TestNewSingleLevelDB(t *testing.T) {
 
 	v1 := version.DefaultVersion1_0_0
 
-	dbPath := path.Join(dir, v1.String())
+	dbPath := filepath.Join(dir, v1.String())
 	db, err := leveldb.New(dbPath, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
@@ -121,13 +122,13 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	v1 := version.NewDefaultVersion(1, 1, 0)
 	v2 := version.NewDefaultVersion(1, 2, 0)
 
-	dbPath1 := path.Join(dir, v1.String())
+	dbPath1 := filepath.Join(dir, v1.String())
 	db1, err := leveldb.New(dbPath1, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	dbPath2 := path.Join(dir, v2.String())
+	dbPath2 := filepath.Join(dir, v2.String())
 	db2, err := leveldb.New(dbPath2, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
@@ -144,11 +145,17 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	err = db1.Close()
 	assert.NoError(t, err)
 
-	_, err = os.Create(path.Join(dir, "dummy"))
+	f, err := os.Create(filepath.Join(dir, "dummy"))
 	assert.NoError(t, err)
 
-	_, err = NewLevelDB(dir, logging.NoLog{}, v1, true)
+	err = f.Close()
+	assert.NoError(t, err)
+
+	db, err := NewLevelDB(dir, logging.NoLog{}, v1, true)
 	assert.NoError(t, err, "expected not to error with a non-directory file being present")
+
+	err = db.Close()
+	assert.NoError(t, err)
 }
 
 func TestNewSortsDatabases(t *testing.T) {
@@ -163,7 +170,7 @@ func TestNewSortsDatabases(t *testing.T) {
 	}
 
 	for _, version := range vers {
-		dbPath := path.Join(dir, version.String())
+		dbPath := filepath.Join(dir, version.String())
 		db, err := leveldb.New(dbPath, logging.NoLog{})
 		if err != nil {
 			t.Fatal(err)
@@ -420,11 +427,11 @@ func TestDoesNotIncludePreviousVersions(t *testing.T) {
 	dir := t.TempDir()
 	v1 := version.NewDefaultVersion(1, 1, 0)
 	v2 := version.NewDefaultVersion(1, 2, 0)
-	db1Path := path.Join(dir, v1.String())
+	db1Path := filepath.Join(dir, v1.String())
 	db1, err := leveldb.New(db1Path, logging.NoLog{})
 	defer db1.Close()
 	assert.NoError(t, err)
-	db2Path := path.Join(dir, v2.String())
+	db2Path := filepath.Join(dir, v2.String())
 	db2, err := leveldb.New(db2Path, logging.NoLog{})
 	assert.NoError(t, err)
 

@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"errors"
 	"fmt"
@@ -46,12 +47,12 @@ const (
 	defaultPeerListStakerGossipFraction              = 2
 	defaultGetVersionTimeout                         = 10 * time.Second
 	defaultAllowPrivateIPs                           = true
-	defaultGossipSize                                = 50
 	defaultPingPongTimeout                           = 30 * time.Second
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024 // 16 KB
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultConnMeterCacheSize                        = 1000
+	defaultByteSliceCap                              = 128
 )
 
 var (
@@ -145,14 +146,15 @@ type network struct {
 	// Gossip a peer list to this many peers when gossiping
 	peerListGossipSize           int
 	peerListStakerGossipFraction int
+	dialerConfig                 DialerConfig
 	getVersionTimeout            time.Duration
 	allowPrivateIPs              bool
-	gossipSize                   int
+	gossipAcceptedFrontierSize   uint
+	gossipOnAcceptSize           uint
 	pingPongTimeout              time.Duration
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	connMeterMaxConns            int
 	connMeter                    ConnMeter
 	b                            Builder
 	isFetchOnly                  bool
@@ -161,7 +163,7 @@ type network struct {
 	stateLock    sync.RWMutex
 	pendingBytes int64
 	closed       utils.AtomicBool
-	peers        map[ids.ShortID]*peer
+	peers        peersData
 
 	// disconnectedIPs, connectedIPs, peerAliasIPs, and myIPs
 	// are maps with ip.String() keys that are used to determine if
@@ -210,6 +212,15 @@ type network struct {
 	// A peer is removed from this map when [connected] is called with the peer as the argument
 	// TODO also remove from this map when the peer leaves the validator set
 	latestPeerIP map[ids.ShortID]signedPeerIP
+
+	// Node ID --> Function to execute to stop trying to dial the node.
+	// A node is present in this map if and only if we are actively
+	// trying to dial the node.
+	connAttempts sync.Map
+
+	// Contains []byte. Used as an optimization.
+	// Can be accessed by multiple goroutines concurrently.
+	byteSlicePool sync.Pool
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -239,7 +250,10 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
+	dialerConfig DialerConfig,
 	isFetchOnly bool,
+	gossipAcceptedFrontierSize uint,
+	gossipOnAcceptSize uint,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -269,7 +283,8 @@ func NewDefaultNetwork(
 		defaultPeerListStakerGossipFraction,
 		defaultGetVersionTimeout,
 		defaultAllowPrivateIPs,
-		defaultGossipSize,
+		gossipAcceptedFrontierSize,
+		gossipOnAcceptSize,
 		defaultPingPongTimeout,
 		defaultPingFrequency,
 		defaultReadBufferSize,
@@ -280,6 +295,7 @@ func NewDefaultNetwork(
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
+		dialerConfig,
 		tlsKey,
 		isFetchOnly,
 	)
@@ -314,7 +330,8 @@ func NewNetwork(
 	peerListStakerGossipFraction int,
 	getVersionTimeout time.Duration,
 	allowPrivateIPs bool,
-	gossipSize int,
+	gossipAcceptedFrontierSize uint,
+	gossipOnAcceptSize uint,
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 	readBufferSize uint32,
@@ -325,6 +342,7 @@ func NewNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
+	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
 ) Network {
@@ -358,9 +376,11 @@ func NewNetwork(
 		peerListGossipFreq:                 peerListGossipFreq,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
+		dialerConfig:                       dialerConfig,
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
-		gossipSize:                         gossipSize,
+		gossipAcceptedFrontierSize:         gossipAcceptedFrontierSize,
+		gossipOnAcceptSize:                 gossipOnAcceptSize,
 		pingPongTimeout:                    pingPongTimeout,
 		pingFrequency:                      pingFrequency,
 		disconnectedIPs:                    make(map[string]struct{}),
@@ -369,17 +389,26 @@ func NewNetwork(
 		peerAliasTimeout:                   peerAliasTimeout,
 		retryDelay:                         make(map[string]time.Duration),
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
-		peers:                              make(map[ids.ShortID]*peer),
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize),
-		connMeterMaxConns:                  connMeterMaxConns,
+		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
 		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
 		isFetchOnly:                        isFetchOnly,
+		byteSlicePool: sync.Pool{
+			New: func() interface{} {
+				return make([]byte, 0, defaultByteSliceCap)
+			},
+		},
 	}
+	netw.b = Builder{
+		getByteSlice: func() []byte {
+			return netw.byteSlicePool.Get().([]byte)
+		},
+	}
+	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
 	if err := netw.initialize(registerer); err != nil {
@@ -399,7 +428,8 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -410,7 +440,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 			sentTo = append(sentTo, vID)
 			n.getAcceptedFrontier.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			n.getAcceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
+			n.getAcceptedFrontier.sentBytes.Add(float64(lenMsg))
 		}
 	}
 	return sentTo
@@ -433,7 +463,8 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -444,7 +475,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	} else {
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
-		n.acceptedFrontier.sentBytes.Add(float64(len(msg.Bytes())))
+		n.acceptedFrontier.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -468,7 +499,8 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -479,7 +511,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		} else {
 			n.getAccepted.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			n.getAccepted.sentBytes.Add(float64(len(msg.Bytes())))
+			n.getAccepted.sentBytes.Add(float64(lenMsg))
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -503,7 +535,8 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -514,7 +547,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
-		n.accepted.sentBytes.Add(float64(len(msg.Bytes())))
+		n.accepted.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -531,7 +564,8 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -543,7 +577,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 	n.getAncestors.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
-	n.getAncestors.sentBytes.Add(float64(len(msg.Bytes())))
+	n.getAncestors.sentBytes.Add(float64(lenMsg))
 	return true
 }
 
@@ -560,7 +594,8 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -571,7 +606,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	} else {
 		n.multiPut.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
-		n.multiPut.sentBytes.Add(float64(len(msg.Bytes())))
+		n.multiPut.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -584,7 +619,8 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	n.log.AssertNoError(err)
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -596,7 +632,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 	n.get.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
-	n.get.sentBytes.Add(float64(len(msg.Bytes())))
+	n.get.sentBytes.Add(float64(lenMsg))
 	return true
 }
 
@@ -618,7 +654,8 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -630,7 +667,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 	} else {
 		n.put.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
-		n.put.sentBytes.Add(float64(len(msg.Bytes())))
+		n.put.sentBytes.Add(float64(lenMsg))
 	}
 }
 
@@ -656,7 +693,8 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -669,7 +707,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
 			n.sendFailRateCalculator.Observe(0, now)
-			n.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
+			n.pushQuery.sentBytes.Add(float64(lenMsg))
 		}
 	}
 	return sentTo
@@ -687,7 +725,8 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+		lenMsg := len(msg.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -699,7 +738,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			sentTo = append(sentTo, vID)
-			n.pullQuery.sentBytes.Add(float64(len(msg.Bytes())))
+			n.pullQuery.sentBytes.Add(float64(lenMsg))
 		}
 	}
 	return sentTo
@@ -722,7 +761,8 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	}
 
 	peer := n.getPeer(validatorID)
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg) {
+	lenMsg := len(msg.Bytes())
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -733,14 +773,14 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 	} else {
 		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
-		n.chits.sentBytes.Add(float64(len(msg.Bytes())))
+		n.chits.sentBytes.Add(float64(lenMsg))
 	}
 }
 
 // Gossip attempts to gossip the container to the network
 // assumes the stateLock is not held.
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(chainID, containerID, container); err != nil {
+	if err := n.gossipContainer(chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -753,37 +793,38 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.ChainID, containerID, container)
+	return n.gossipContainer(ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
 }
 
-// upgradeIncoming returns a boolean indicating if we should
-// upgrade an incoming connection or drop it.
-//
+// shouldUpgradeIncoming returns whether we should
+// upgrade an incoming connection from a peer
+// at the IP whose string repr. is [ipStr].
 // Assumes stateLock is not held.
-func (n *network) upgradeIncoming(remoteAddr string) (bool, error) {
+func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	ip, err := utils.ToIPDesc(remoteAddr)
-	if err != nil {
-		return false, fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+	if _, ok := n.connectedIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's connected", ipStr)
+		return false
+	}
+	if _, ok := n.myIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's myself", ipStr)
+		return false
+	}
+	if _, ok := n.peerAliasIPs[ipStr]; ok {
+		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
+		return false
+	}
+	if !n.connMeter.Allow(ipStr) {
+		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
+		return false
 	}
 
-	str := ip.String()
-	if _, ok := n.connectedIPs[str]; ok {
-		return false, nil
-	}
-	if _, ok := n.myIPs[str]; ok {
-		return false, nil
-	}
-	if _, ok := n.peerAliasIPs[str]; ok {
-		return false, nil
-	}
-
-	// Note that we attempt to upgrade remote addresses contained
-	// in disconnectedIPs to because that could allow us to initialize
+	// Note that we attempt to upgrade remote addresses in
+	// [n.disconnectedIPs] because that could allow us to initialize
 	// a connection with a peer we've been attempting to dial.
-	return true, nil
+	return true
 }
 
 // Dispatch starts accepting connections from other nodes attempting to connect
@@ -834,13 +875,14 @@ func (n *network) Dispatch() error {
 		// Specifically, this can occur when one of our existing
 		// peers attempts to connect to one our IP aliases (that they
 		// aren't yet aware is an alias).
-		addr := conn.RemoteAddr().String()
-		if upgrade, err := n.upgradeIncoming(addr); err != nil {
-			n.log.Debug("error during upgrade incoming check: %s", err)
-			_ = conn.Close()
-			continue
-		} else if !upgrade {
-			n.log.Debug("dropping duplicate connection from %s", addr)
+		remoteAddr := conn.RemoteAddr().String()
+		ip, err := utils.ToIPDesc(remoteAddr)
+		if err != nil {
+			return fmt.Errorf("unable to convert remote address %s to IPDesc: %w", remoteAddr, err)
+		}
+		ipStr := ip.IP.String()
+		upgrade := n.shouldUpgradeIncoming(ipStr)
+		if !upgrade {
 			_ = conn.Close()
 			continue
 		}
@@ -852,14 +894,6 @@ func (n *network) Dispatch() error {
 			if err := conn.SetNoDelay(true); err != nil {
 				n.log.Warn("failed to set socket nodelay due to: %s", err)
 			}
-		}
-
-		ticks, err := n.connMeter.Register(addr)
-		// looking for > n.connMeterMaxConns indicating the second tick
-		if err == nil && ticks > n.connMeterMaxConns {
-			n.log.Debug("connection from %s temporarily dropped", addr)
-			_ = conn.Close()
-			continue
 		}
 
 		go func() {
@@ -879,8 +913,8 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 	var peers []PeerID
 
 	if len(nodeIDs) == 0 {
-		peers = make([]PeerID, 0, len(n.peers))
-		for _, peer := range n.peers {
+		peers = make([]PeerID, 0, n.peers.size())
+		for _, peer := range n.peers.peersList {
 			if peer.connected.GetValue() {
 				peers = append(peers, PeerID{
 					IP:           peer.conn.RemoteAddr().String(),
@@ -897,8 +931,7 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 	} else {
 		peers = make([]PeerID, 0, len(nodeIDs))
 		for _, nodeID := range nodeIDs {
-			peer, ok := n.peers[nodeID]
-			if ok && peer.connected.GetValue() {
+			if peer, ok := n.peers.getByID(nodeID); ok && peer.connected.GetValue() {
 				peers = append(peers, PeerID{
 					IP:           peer.conn.RemoteAddr().String(),
 					PublicIP:     peer.getIP().String(),
@@ -940,13 +973,9 @@ func (n *network) close() {
 	}
 	n.closed.SetValue(true)
 
-	peersToClose := make([]*peer, len(n.peers))
-	i := 0
-	for _, peer := range n.peers {
-		peersToClose[i] = peer
-		i++
-	}
-	n.peers = make(map[ids.ShortID]*peer)
+	peersToClose := make([]*peer, n.peers.size())
+	copy(peersToClose, n.peers.peersList)
+	n.peers.reset()
 	n.stateLock.Unlock()
 
 	for _, peer := range peersToClose {
@@ -974,7 +1003,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // assumes the stateLock is not held.
-func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte) error {
+func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
 	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
@@ -985,21 +1014,20 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte)
 
 	allPeers := n.getAllPeers()
 
-	numToGossip := n.gossipSize
-	if numToGossip > len(allPeers) {
-		numToGossip = len(allPeers)
+	if int(numToGossip) > len(allPeers) {
+		numToGossip = uint(len(allPeers))
 	}
 
 	s := sampler.NewUniform()
 	if err := s.Initialize(uint64(len(allPeers))); err != nil {
 		return err
 	}
-	indices, err := s.Sample(numToGossip)
+	indices, err := s.Sample(int(numToGossip))
 	if err != nil {
 		return err
 	}
 	for _, index := range indices {
-		if allPeers[int(index)].Send(msg) {
+		if allPeers[int(index)].Send(msg, false) {
 			n.put.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 		} else {
@@ -1125,16 +1153,23 @@ func (n *network) gossipPeerList() {
 		}
 
 		for _, index := range stakerIndices {
-			stakers[int(index)].Send(msg)
+			stakers[int(index)].Send(msg, false)
 		}
 		for _, index := range nonStakerIndices {
-			nonStakers[int(index)].Send(msg)
+			nonStakers[int(index)].Send(msg, false)
 		}
 	}
 }
 
-// assumes the stateLock is not held. Only returns if the ip is connected to or
-// the network is closed
+// Returns when:
+// * We connected to [ip]
+// * The network is closed
+// * We gave up connecting to [ip] because the IP is stale
+// If [nodeID] == ids.ShortEmpty, won't cancel an existing
+// attempt to connect to the peer with that IP.
+// We do this so we don't cancel attempted to connect to bootstrap beacons.
+// See method TrackIP.
+// Assumes [n.stateLock] isn't held when this method is called.
 func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	str := ip.String()
 	n.stateLock.RLock()
@@ -1188,7 +1223,31 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 		n.retryDelay[str] = delay
 		n.stateLock.Unlock()
 
-		err := n.attemptConnect(ip)
+		// If we are already trying to connect to this node ID,
+		// cancel the existing attempt.
+		// If [nodeID] is the empty ID, [ip] is a bootstrap beacon.
+		// In that case, don't cancel existing connection attempt.
+		if nodeID != ids.ShortEmpty {
+			if cancel, exists := n.connAttempts.Load(nodeID); exists {
+				n.log.Verbo("canceling attempt to connect to stale IP of %s%s", constants.NodeIDPrefix, nodeID)
+				cancel.(context.CancelFunc)()
+			}
+		}
+
+		// When [cancel] is called, we give up on this attempt to connect
+		// (if we have not yet connected.)
+		// This occurs at the sooner of:
+		// * [connectTo] is called again with the same node ID
+		// * The call to [attemptConnect] below returns
+		ctx, cancel := context.WithCancel(context.Background())
+		n.connAttempts.Store(nodeID, cancel)
+
+		// Attempt to connect
+		err := n.attemptConnect(ctx, ip)
+		cancel() // to avoid goroutine leak
+
+		n.connAttempts.Delete(nodeID)
+
 		if err == nil {
 			return
 		}
@@ -1197,15 +1256,25 @@ func (n *network) connectTo(ip utils.IPDesc, nodeID ids.ShortID) {
 	}
 }
 
-// assumes the stateLock is not held. Returns nil if a connection was able to be
-// established, or the network is closed.
-func (n *network) attemptConnect(ip utils.IPDesc) error {
+// Attempt to connect to the peer at [ip].
+// If [ctx] is canceled, stops trying to connect.
+// Returns nil if:
+// * A connection was established
+// * The network is closed.
+// * [ctx] is canceled.
+// Assumes [n.stateLock] is not held when this method is called.
+func (n *network) attemptConnect(ctx context.Context, ip utils.IPDesc) error {
 	n.log.Verbo("attempting to connect to %s", ip)
-
-	conn, err := n.dialer.Dial(ip)
+	conn, err := n.dialer.Dial(ctx, ip)
 	if err != nil {
+		// If [ctx] was canceled, return nil so we don't try to connect again
+		if ctx.Err() == context.Canceled {
+			return nil
+		}
+		// Error wasn't because connection attempt was canceled
 		return err
 	}
+
 	if conn, ok := conn.(*net.TCPConn); ok {
 		if err := conn.SetLinger(0); err != nil {
 			n.log.Warn("failed to set no linger due to: %s", err)
@@ -1285,7 +1354,7 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// If I am already connected to this peer, then I should close this new
 	// connection and add an alias record.
-	if peer, ok := n.peers[p.id]; ok {
+	if peer, ok := n.peers.getByID(p.id); ok {
 		if !ip.IsZero() {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
@@ -1295,8 +1364,8 @@ func (n *network) tryAddPeer(p *peer) error {
 		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
 	}
 
-	n.peers[p.id] = p
-	n.numPeers.Set(float64(len(n.peers)))
+	n.peers.add(p)
+	n.numPeers.Set(float64(n.peers.size()))
 	p.Start()
 	return nil
 }
@@ -1308,8 +1377,38 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
-	peers := make([]utils.IPCertDesc, 0, len(n.peers))
-	for _, peer := range n.peers {
+	totalNumPeers := n.peers.size()
+
+	numToSend := n.peerListSize
+	if totalNumPeers < numToSend {
+		numToSend = totalNumPeers
+	}
+
+	if numToSend == 0 {
+		return nil, nil
+	}
+	res := make([]utils.IPCertDesc, 0, numToSend)
+
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(totalNumPeers)); err != nil {
+		return nil, err
+	}
+
+	for len(res) != numToSend {
+		sampledIdx, err := s.Next() // lazy-sampling
+		if err != nil {
+			// all peers have been sampled and not enough valid ones found.
+			// return what we have
+			return res, nil
+		}
+
+		// TODO: consider possibility of grouping peers in different buckets
+		// (e.g. validators/non-validators, connected/disconnected)
+		peer, found := n.peers.getByIdx(int(sampledIdx))
+		if !found {
+			return res, fmt.Errorf("no peer at index %v", sampledIdx)
+		}
+
 		peerIP := peer.getIP()
 		switch {
 		case !peer.connected.GetValue():
@@ -1324,35 +1423,21 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
 			continue
 		}
-		if signedIP, ok := peer.sigAndTime.GetValue().(signedPeerIP); ok {
-			if signedIP.ip.Equal(peerIP) {
-				peers = append(peers, utils.IPCertDesc{
-					IPDesc:    peerIP,
-					Signature: signedIP.signature,
-					Cert:      peer.cert,
-					Time:      signedIP.time,
-				})
-			}
+
+		signedIP, ok := peer.sigAndTime.GetValue().(signedPeerIP)
+		if !ok || !signedIP.ip.Equal(peerIP) {
+			continue
 		}
+
+		res = append(res, utils.IPCertDesc{
+			IPDesc:    peerIP,
+			Signature: signedIP.signature,
+			Cert:      peer.cert,
+			Time:      signedIP.time,
+		})
 	}
 
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(peers))); err != nil {
-		return nil, err
-	}
-	numToSend := n.peerListSize
-	if len(peers) < numToSend {
-		numToSend = len(peers)
-	}
-	indices, err := s.Sample(numToSend)
-	if err != nil {
-		return nil, err
-	}
-	sampledPeers := make([]utils.IPCertDesc, numToSend)
-	for i, index := range indices {
-		sampledPeers[i] = peers[index]
-	}
-	return sampledPeers, nil
+	return res, nil
 }
 
 // should only be called after the peer is marked as connected. Should not be
@@ -1417,8 +1502,8 @@ func (n *network) disconnected(p *peer) {
 
 	n.log.Debug("disconnected from %s at %s", p.id, ip)
 
-	delete(n.peers, p.id)
-	n.numPeers.Set(float64(len(n.peers)))
+	n.peers.remove(p)
+	n.numPeers.Set(float64(n.peers.size()))
 
 	p.releaseAllAliases()
 
@@ -1462,9 +1547,10 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	peers := make([]*PeerElement, validatorIDs.Len())
 	i := 0
 	for validatorID := range validatorIDs {
-		vID := validatorID // Prevent overwrite in next loop iteration
+		vID := validatorID              // Prevent overwrite in next loop iteration
+		peer, _ := n.peers.getByID(vID) // note: peer may be nil
 		peers[i] = &PeerElement{
-			peer: n.peers[vID],
+			peer: peer,
 			id:   vID,
 		}
 		i++
@@ -1473,7 +1559,7 @@ func (n *network) getPeers(validatorIDs ids.ShortSet) []*PeerElement {
 	return peers
 }
 
-// Safe copy the peers. Assumes the stateLock is not held.
+// Safe copy of the peers. Assumes the stateLock is not held.
 func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
@@ -1482,11 +1568,11 @@ func (n *network) getAllPeers() []*peer {
 		return nil
 	}
 
-	peers := make([]*peer, len(n.peers))
-	i := 0
-	for _, peer := range n.peers {
-		peers[i] = peer
-		i++
+	peers := make([]*peer, 0, n.peers.size())
+	for _, peer := range n.peers.peersList {
+		if peer.connected.GetValue() && peer.compatible.GetValue() {
+			peers = append(peers, peer)
+		}
 	}
 	return peers
 }
@@ -1500,7 +1586,9 @@ func (n *network) getPeer(validatorID ids.ShortID) *peer {
 	if n.closed.GetValue() {
 		return nil
 	}
-	return n.peers[validatorID]
+
+	res, _ := n.peers.getByID(validatorID) // note: peer may be nil
+	return res
 }
 
 // HealthCheck returns information about several network layer health checks.
@@ -1511,7 +1599,7 @@ func (n *network) HealthCheck() (interface{}, error) {
 	// Get some data with the state lock held
 	connectedTo := 0
 	n.stateLock.RLock()
-	for _, peer := range n.peers {
+	for _, peer := range n.peers.peersList {
 		if peer != nil && peer.connected.GetValue() {
 			connectedTo++
 		}

@@ -41,6 +41,8 @@ const (
 	levelDBByteOverhead = 8
 )
 
+var _ database.Database = &Database{}
+
 // Database is a persistent key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace
 // in binary-alphabetical order.
@@ -53,7 +55,7 @@ type Database struct {
 	// Delete and batch writes fail with ErrAvoidCorruption.
 	errored uint64
 }
-var _ database.Database = &Database{}
+
 // New returns a wrapped LevelDB object.
 func New(file string, log logging.Logger) (*Database, error) {
 	// Open the db and recover any potential corruptions

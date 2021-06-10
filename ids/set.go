@@ -158,3 +158,13 @@ func (ids Set) String() string {
 	sb.WriteString("}")
 	return sb.String()
 }
+
+// Removes and returns an element. If the set is empty, does nothing and returns
+// false.
+func (ids *Set) Pop() (ID, bool) {
+	for id := range *ids {
+		delete(*ids, id)
+		return id, true
+	}
+	return ID{}, false
+}

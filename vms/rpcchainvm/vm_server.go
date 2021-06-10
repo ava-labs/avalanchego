@@ -43,6 +43,7 @@ var _ vmproto.VMServer = &VMServer{}
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
+	vmproto.UnimplementedVMServer
 	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 
@@ -238,6 +239,33 @@ func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmprot
 	errs.Add(vm.connCloser.Close())
 
 	return &vmproto.ShutdownResponse{}, errs.Err
+}
+
+func (vm *VMServer) CreateStaticHandlers(context.Context, *vmproto.CreateStaticHandlersRequest) (*vmproto.CreateStaticHandlersResponse, error) {
+	handlers, err := vm.vm.CreateStaticHandlers()
+	if err != nil {
+		return nil, err
+	}
+	resp := &vmproto.CreateStaticHandlersResponse{}
+	for prefix, h := range handlers {
+		handler := h
+
+		// start the messenger server
+		serverID := vm.broker.NextId()
+		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
+			server := grpc.NewServer(opts...)
+			vm.serverCloser.Add(server)
+			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			return server
+		})
+
+		resp.Handlers = append(resp.Handlers, &vmproto.Handler{
+			Prefix:      prefix,
+			LockOptions: uint32(handler.LockOptions),
+			Server:      serverID,
+		})
+	}
+	return resp, nil
 }
 
 func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandlersRequest) (*vmproto.CreateHandlersResponse, error) {

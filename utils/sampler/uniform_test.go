@@ -59,6 +59,10 @@ var (
 			name: "over sample",
 			test: UniformOverSampleTest,
 		},
+		{
+			name: "lazily sample",
+			test: UniformLazilySample,
+		},
 	}
 )
 
@@ -125,4 +129,25 @@ func UniformOverSampleTest(t *testing.T, s Uniform) {
 
 	_, err = s.Sample(4)
 	assert.Error(t, err, "should have returned an out of range error")
+}
+
+func UniformLazilySample(t *testing.T, s Uniform) {
+	err := s.Initialize(3)
+	assert.NoError(t, err)
+
+	for j := 0; j < 2; j++ {
+		sampled := map[uint64]bool{}
+		for i := 0; i < 3; i++ {
+			val, err := s.Next()
+			assert.NoError(t, err)
+			assert.False(t, sampled[val])
+
+			sampled[val] = true
+		}
+
+		_, err = s.Next()
+		assert.Error(t, err, "should have returned an out of range error")
+
+		s.Reset()
+	}
 }

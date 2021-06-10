@@ -25,3 +25,21 @@ func TestInterface(t *testing.T) {
 		test(t, db)
 	}
 }
+
+func BenchmarkInterface(b *testing.B) {
+	for _, size := range database.BenchmarkSizes {
+		keys, values := database.SetupBenchmark(b, size, size)
+		for _, bench := range database.Benchmarks {
+			folder := b.TempDir()
+
+			db, err := New(folder, logging.NoLog{})
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			defer db.Close()
+
+			bench(b, db, "leveldb", keys, values)
+		}
+	}
+}

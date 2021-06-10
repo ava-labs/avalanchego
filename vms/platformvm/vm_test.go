@@ -2120,13 +2120,16 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	err = engine.Initialize(smeng.Config{
 		Config: bootstrap.Config{
 			Config: common.Config{
-				Ctx:        ctx,
-				Validators: vdrs,
-				Beacons:    beacons,
-				SampleK:    beacons.Len(),
-				Alpha:      beacons.Weight()/2 + 1,
-				Sender:     &sender,
-				Subnet:     subnet,
+				Ctx:                           ctx,
+				Validators:                    vdrs,
+				Beacons:                       beacons,
+				SampleK:                       beacons.Len(),
+				StartupAlpha:                  (beacons.Weight() + 1) / 2,
+				Alpha:                         (beacons.Weight() + 1) / 2,
+				Sender:                        &sender,
+				Subnet:                        subnet,
+				MultiputMaxContainersSent:     2000,
+				MultiputMaxContainersReceived: 2000,
 			},
 			Blocked: blocked,
 			VM:      vm,
@@ -2166,6 +2169,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
+
+	if err := engine.Connected(peerID); err != nil {
+		t.Fatal(err)
+	}
 
 	externalSender.GetAcceptedFrontierF = nil
 	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
