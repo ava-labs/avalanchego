@@ -2414,9 +2414,9 @@ func TestValidatorIPs(t *testing.T) {
 	thirdValidatorPeer := createPeer(ids.ShortID{0x03}, thirdValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, thirdValidatorPeer, true)
 
-	assert.True(t, dummyNetwork.vdrs.Contains(firstValidatorPeer.id))
-	assert.True(t, dummyNetwork.vdrs.Contains(secondValidatorPeer.id))
-	assert.True(t, dummyNetwork.vdrs.Contains(thirdValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(firstValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(secondValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(thirdValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err := dummyNetwork.validatorIPs()
@@ -2449,7 +2449,7 @@ func TestValidatorIPs(t *testing.T) {
 	disconnectedValidatorPeer := createPeer(ids.ShortID{0x01}, disconnectedValidatorIPDesc, appVersion)
 	disconnectedValidatorPeer.finishedHandshake.SetValue(false)
 	addPeerToNetwork(&dummyNetwork, disconnectedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2467,7 +2467,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	zeroValidatorPeer := createPeer(ids.ShortID{0x01}, zeroIPValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, zeroValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(zeroValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(zeroValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2486,7 +2486,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	nonValidatorPeer := createPeer(ids.ShortID{0x04}, nonValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, nonValidatorPeer, false)
-	assert.False(t, dummyNetwork.vdrs.Contains(nonValidatorPeer.id))
+	assert.False(t, dummyNetwork.vdrs.Contains(nonValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2506,7 +2506,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	maskedValidatorPeer := createPeer(ids.ShortID{0x01}, maskedValidatorIPDesc, maskedVersion)
 	addPeerToNetwork(&dummyNetwork, maskedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(maskedValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(maskedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2532,7 +2532,7 @@ func TestValidatorIPs(t *testing.T) {
 		time: uint64(0),
 	})
 	addPeerToNetwork(&dummyNetwork, wrongCertValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(wrongCertValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(wrongCertValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2554,7 +2554,7 @@ func TestValidatorIPs(t *testing.T) {
 		}
 		peer := createPeer(ids.ShortID{byte(i)}, ipDesc, appVersion)
 		addPeerToNetwork(&dummyNetwork, peer, true)
-		assert.True(t, dummyNetwork.vdrs.Contains(peer.id))
+		assert.True(t, dummyNetwork.vdrs.Contains(peer.nodeID))
 	}
 
 	// test
@@ -2747,8 +2747,8 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 // Helper method for TestValidatorIPs
 func createPeer(peerID ids.ShortID, peerIPDesc utils.IPDesc, peerVersion version.Application) *peer {
 	newPeer := peer{
-		ip: peerIPDesc,
-		id: peerID,
+		ip:     peerIPDesc,
+		nodeID: peerID,
 	}
 	newPeer.finishedHandshake.SetValue(true)
 	newPeer.versionStruct.SetValue(peerVersion)
@@ -2764,7 +2764,7 @@ func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool)
 	targetNetwork.peers.add(peerToAdd)
 
 	if isValidator {
-		validator := validators.NewValidator(peerToAdd.id, uint64(10))
+		validator := validators.NewValidator(peerToAdd.nodeID, uint64(10))
 		currentValidators := targetNetwork.vdrs.List()
 		currentValidators = append(currentValidators, validator)
 		_ = targetNetwork.vdrs.Set(currentValidators)

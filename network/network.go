@@ -911,11 +911,11 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 				peers = append(peers, PeerID{
 					IP:           peer.conn.RemoteAddr().String(),
 					PublicIP:     peer.getIP().String(),
-					ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
+					ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
 					Version:      peer.versionStr.GetValue().(string),
 					LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 					LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-					Benched:      n.benchlistManager.GetBenched(peer.id),
+					Benched:      n.benchlistManager.GetBenched(peer.nodeID),
 				})
 			}
 		}
@@ -928,11 +928,11 @@ func (n *network) Peers(nodeIDs []ids.ShortID) []PeerID {
 			peers = append(peers, PeerID{
 				IP:           peer.conn.RemoteAddr().String(),
 				PublicIP:     peer.getIP().String(),
-				ID:           peer.id.PrefixedString(constants.NodeIDPrefix),
+				ID:           peer.nodeID.PrefixedString(constants.NodeIDPrefix),
 				Version:      peer.versionStr.GetValue().(string),
 				LastSent:     time.Unix(atomic.LoadInt64(&peer.lastSent), 0),
 				LastReceived: time.Unix(atomic.LoadInt64(&peer.lastReceived), 0),
-				Benched:      n.benchlistManager.GetBenched(peer.id),
+				Benched:      n.benchlistManager.GetBenched(peer.nodeID),
 			})
 		}
 	}
@@ -1079,7 +1079,7 @@ func (n *network) gossipPeerList() {
 		stakers := make([]*peer, 0, len(allPeers))
 		nonStakers := make([]*peer, 0, len(allPeers))
 		for _, peer := range allPeers {
-			if n.vdrs.Contains(peer.id) {
+			if n.vdrs.Contains(peer.nodeID) {
 				stakers = append(stakers, peer)
 			} else {
 				nonStakers = append(nonStakers, peer)
@@ -1245,7 +1245,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 		return err
 	}
 
-	id, conn, cert, err := upgrader.Upgrade(p.conn)
+	nodeID, conn, cert, err := upgrader.Upgrade(p.conn)
 	if err != nil {
 		_ = p.conn.Close()
 		n.log.Verbo("failed to upgrade connection with %s", err)
@@ -1260,7 +1260,7 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 
 	p.cert = cert
 	p.sender = make(chan []byte, n.sendQueueSize)
-	p.id = id
+	p.nodeID = nodeID
 	p.conn = conn
 
 	if err := n.tryAddPeer(p); err != nil {
@@ -1286,7 +1286,7 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
-	if p.id == n.id {
+	if p.nodeID == n.id {
 		if !ip.IsZero() {
 			// if n.ip is less useful than p.ip set it to this IP
 			if n.ip.IP().IsZero() {
@@ -1304,14 +1304,14 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// If I am already connected to this peer, then I should close this new
 	// connection and add an alias record.
-	if peer, ok := n.peers.getByID(p.id); ok {
+	if peer, ok := n.peers.getByID(p.nodeID); ok {
 		if !ip.IsZero() {
 			str := ip.String()
 			delete(n.disconnectedIPs, str)
 			delete(n.retryDelay, str)
 			peer.addAlias(ip)
 		}
-		return fmt.Errorf("duplicated connection from %s at %s", p.id.PrefixedString(constants.NodeIDPrefix), ip)
+		return fmt.Errorf("duplicated connection from %s at %s", p.nodeID.PrefixedString(constants.NodeIDPrefix), ip)
 	}
 
 	n.peers.add(p)
@@ -1365,7 +1365,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			continue
 		case peerIP.IsZero():
 			continue
-		case !n.vdrs.Contains(peer.id):
+		case !n.vdrs.Contains(peer.nodeID):
 			continue
 		}
 
@@ -1403,28 +1403,28 @@ func (n *network) connected(p *peer) {
 
 	if n.hasMasked {
 		if n.versionCompatibility.Unmaskable(peerVersion) != nil {
-			if err := n.vdrs.MaskValidator(p.id); err != nil {
-				n.log.Error("failed to mask validator %s due to %s", p.id, err)
+			if err := n.vdrs.MaskValidator(p.nodeID); err != nil {
+				n.log.Error("failed to mask validator %s due to %s", p.nodeID, err)
 			}
 		} else {
-			if err := n.vdrs.RevealValidator(p.id); err != nil {
-				n.log.Error("failed to reveal validator %s due to %s", p.id, err)
+			if err := n.vdrs.RevealValidator(p.nodeID); err != nil {
+				n.log.Error("failed to reveal validator %s due to %s", p.nodeID, err)
 			}
 		}
 		n.log.Verbo("The new staking set is:\n%s", n.vdrs)
 	} else {
 		if n.versionCompatibility.WontMask(peerVersion) != nil {
-			n.maskedValidators.Add(p.id)
+			n.maskedValidators.Add(p.nodeID)
 		} else {
-			n.maskedValidators.Remove(p.id)
+			n.maskedValidators.Remove(p.nodeID)
 		}
 	}
 
 	// TODO also delete an entry from this map when they leave the validator set
-	delete(n.latestPeerIP, p.id)
+	delete(n.latestPeerIP, p.nodeID)
 
 	ip := p.getIP()
-	n.log.Debug("connected to %s at %s", p.id, ip)
+	n.log.Debug("connected to %s at %s", p.nodeID, ip)
 
 	if !ip.IsZero() {
 		str := ip.String()
@@ -1434,7 +1434,7 @@ func (n *network) connected(p *peer) {
 		n.connectedIPs[str] = struct{}{}
 	}
 
-	n.router.Connected(p.id)
+	n.router.Connected(p.nodeID)
 }
 
 // should only be called after the peer is marked as connected.
@@ -1445,7 +1445,7 @@ func (n *network) disconnected(p *peer) {
 
 	ip := p.getIP()
 
-	n.log.Debug("disconnected from %s at %s", p.id, ip)
+	n.log.Debug("disconnected from %s at %s", p.nodeID, ip)
 
 	n.peers.remove(p)
 	n.numPeers.Set(float64(n.peers.size()))
@@ -1458,14 +1458,14 @@ func (n *network) disconnected(p *peer) {
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		if n.vdrs.Contains(p.id) {
-			n.track(ip, p.id)
+		if n.vdrs.Contains(p.nodeID) {
+			n.track(ip, p.nodeID)
 		}
 	}
 
 	// Only send Disconnected to router if Connected was sent
 	if p.finishedHandshake.GetValue() {
-		n.router.Disconnected(p.id)
+		n.router.Disconnected(p.nodeID)
 	}
 }
 
