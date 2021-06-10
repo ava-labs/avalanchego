@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -59,17 +58,11 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	proVM := NewProVM(coreVM, time.Unix(0, 0)) // enable ProBlks
 	proVM.state.init(memdb.New())
 
-	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.clk.now().Unix(), 100)
+	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.now().Unix(), 100)
 	newBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: nil, // could be genesis
-		HeightV: 1,
-		BytesV:  []byte{1},
+		BytesV: []byte{1},
 	}
-	proBlk, _ := NewProBlock(&proVM, proHdr, newBlk, nil, false)
+	proBlk, _ := NewProBlock(&proVM, proHdr, newBlk, nil, false) // not signing block, cannot err
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -94,21 +87,12 @@ func TestProposerBlockParseFailure(t *testing.T) {
 	coreVM := &block.TestVM{}
 	proVM := NewProVM(coreVM, time.Unix(0, 0)) // enable ProBlks
 
-	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.clk.now().Unix(), 0)
-	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
-		},
-		ParentV: nil, // could be genesis
-		HeightV: 1,
-		BytesV:  []byte{1},
-	}
-	proBlk, _ := NewProBlock(&proVM, proHdr, coreBlk, nil, false) // not signing block, cannot err
+	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.now().Unix(), 0)
+	proBlk, _ := NewProBlock(&proVM, proHdr, &snowman.TestBlock{}, nil, false) // not signing block, cannot err
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		return coreBlk, errors.New("Block marshalling failed")
+		return nil, errors.New("Block marshalling failed")
 	}
 
 	// test
@@ -122,21 +106,19 @@ func TestProposerBlockParseFailure(t *testing.T) {
 	}
 }
 
-func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
+func TestProposerBlockVerificationParent(t *testing.T) {
 	coreVM := &block.TestVM{}
 	proVM := NewProVM(coreVM, time.Unix(0, 0)) // enable ProBlks
 	proVM.state.init(memdb.New())
 
-	ParentProBlk, _ := NewProBlock(&proVM, ProposerBlockHeader{}, &snowman.TestBlock{}, nil,
-		false) // not signing block, cannot err
+	prntProHdr := NewProHeader(ids.ID{}, 0, proVM.pChainHeight())
+	prntProBlk, _ := NewProBlock(&proVM, prntProHdr, &snowman.TestBlock{},
+		nil, false) // not signing block, cannot err
 
-	childHdr := NewProHeader(ParentProBlk.ID(), 0, ParentProBlk.Height()+1)
-	childCoreBlk := &snowman.TestBlock{
+	childProHdr := NewProHeader(prntProBlk.ID(), 0, proVM.pChainHeight())
+	childProBlk, _ := NewProBlock(&proVM, childProHdr, &snowman.TestBlock{
 		VerifyV: nil,
-		HeightV: childHdr.Height,
-	}
-	childProBlk, _ := NewProBlock(&proVM, childHdr, childCoreBlk, nil,
-		false) // not signing block, cannot err
+	}, nil, false) // not signing block, cannot err
 
 	// Parent block not store yet
 	err := childProBlk.Verify()
@@ -147,29 +129,33 @@ func TestProposerBlockWithUnknownParentDoesNotVerify(t *testing.T) {
 	}
 
 	// now store parentBlock
-	proVM.state.cacheProBlk(&ParentProBlk)
+	proVM.state.cacheProBlk(&prntProBlk)
 
 	if err := childProBlk.Verify(); err != nil {
-		t.Fatal("Block with known parent should not verify")
+		t.Fatal("Block with known parent should verify")
 	}
 }
 
-func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
+func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	coreVM := &block.TestVM{}
 	proVM := NewProVM(coreVM, time.Unix(0, 0)) // enable ProBlks
 
-	parentHdr := NewProHeader(ids.ID{}, proVM.clk.now().Unix(), 0)
-	ParentProBlk, _ := NewProBlock(&proVM, parentHdr, &snowman.TestBlock{}, nil, false) // not signing block, cannot err
+	prntTimestamp := proVM.now().Unix()
+	ParentProBlk, _ := NewProBlock(&proVM,
+		NewProHeader(ids.ID{}, prntTimestamp, proVM.pChainHeight()),
+		&snowman.TestBlock{},
+		nil, false) // not signing block, cannot err
 	proVM.state.cacheProBlk(&ParentProBlk)
 
-	childHdr := NewProHeader(ParentProBlk.ID(), 0, ParentProBlk.Height()+1)
-	childCoreBlk := &snowman.TestBlock{
-		VerifyV: nil,
-		HeightV: childHdr.Height,
-	}
-	childProBlk, _ := NewProBlock(&proVM, childHdr, childCoreBlk, nil, false) // not signing block, cannot err
+	childProBlk, _ := NewProBlock(&proVM,
+		NewProHeader(ParentProBlk.ID(), 0, proVM.pChainHeight()),
+		&snowman.TestBlock{
+			VerifyV: nil,
+		},
+		nil, false) // not signing block, cannot err
 
-	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(-1 * time.Second).Unix()
+	// child block timestamp cannot be lower than parent timestamp
+	childProBlk.header.Timestamp = time.Unix(prntTimestamp, 0).Add(-1 * time.Second).Unix()
 	err := childProBlk.Verify()
 	if err == nil {
 		t.Fatal("Proposer block timestamp too old should not verify")
@@ -177,17 +163,17 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 		t.Fatal("Old proposer block timestamp should have different error")
 	}
 
-	childProBlk.header.Timestamp = ParentProBlk.header.Timestamp
+	childProBlk.header.Timestamp = prntTimestamp
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Proposer block timestamp equal to parent block timestamp should verify")
 	}
 
-	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(BlkSubmissionTolerance).Unix()
+	childProBlk.header.Timestamp = time.Unix(prntTimestamp, 0).Add(BlkSubmissionTolerance).Unix()
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Proposer block timestamp within submission window should verify")
 	}
 
-	childProBlk.header.Timestamp = time.Unix(ParentProBlk.header.Timestamp, 0).Add(BlkSubmissionTolerance + time.Second).Unix()
+	childProBlk.header.Timestamp = time.Unix(prntTimestamp, 0).Add(BlkSubmissionTolerance + time.Second).Unix()
 	if err := childProBlk.Verify(); err == nil {
 		t.Fatal("Proposer block timestamp after submission window should not verify")
 	} else if err != ErrProBlkBadTimestamp {
@@ -195,47 +181,50 @@ func TestProposerBlockOlderThanItsParentDoesNotVerify(t *testing.T) {
 	}
 }
 
-func TestProposerBlockWithWrongHeightDoesNotVerify(t *testing.T) {
+func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	coreVM := &block.TestVM{}
 	proVM := NewProVM(coreVM, time.Unix(0, 0)) // enable ProBlks
+	proVM.dummyPChainHeight = 666
 
+	prntBlkPChainHeight := proVM.pChainHeight() / 2
 	ParentProBlk, _ := NewProBlock(&proVM,
-		NewProHeader(ids.ID{}, 0, 200),
-		&snowman.TestBlock{
-			HeightV: 200,
-		}, nil, false) // not signing block, cannot err
+		NewProHeader(ids.ID{}, 0, prntBlkPChainHeight),
+		&snowman.TestBlock{}, nil, false) // not signing block, cannot err
 	proVM.state.cacheProBlk(&ParentProBlk)
 
 	childHdr := NewProHeader(ParentProBlk.ID(), 0, 0)
-	childCoreBlk := &snowman.TestBlock{
-		VerifyV: nil,
-		HeightV: ParentProBlk.Height() + 1,
-	}
-	childProBlk, _ := NewProBlock(&proVM, childHdr, childCoreBlk, nil, false)
+	childProBlk, _ := NewProBlock(&proVM, childHdr,
+		&snowman.TestBlock{
+			VerifyV: nil,
+		}, nil, false)
 
-	// child block must strictly follow parent block height
-	childProBlk.header.Height = ParentProBlk.Height() - 1
+	// child P-Chain height must follow parent P-Chain height
+	childProBlk.header.PChainHeight = prntBlkPChainHeight - 1
 	if err := childProBlk.Verify(); err == nil {
-		t.Fatal("Proposer block has wrong height")
+		t.Fatal("ProBlock's P-Chain-Height cannot be lower than parent ProBlock's one")
 	} else if err != ErrProBlkWrongHeight {
 		t.Fatal("Proposer block has wrong height should have different error")
 	}
 
-	childProBlk.header.Height = ParentProBlk.Height()
-	if err := childProBlk.Verify(); err == nil {
-		t.Fatal("Proposer block has wrong height")
-	} else if err != ErrProBlkWrongHeight {
-		t.Fatal("Proposer block has wrong height should have different error")
-	}
-
-	childProBlk.header.Height = ParentProBlk.Height() + 1
+	childProBlk.header.PChainHeight = prntBlkPChainHeight
 	if err := childProBlk.Verify(); err != nil {
-		t.Fatal("Proposer block height should follow parent height")
+		t.Fatal("ProBlock's P-Chain-Height can be larger or equal than parent ProBlock's one")
 	}
 
-	childProBlk.header.Height = ParentProBlk.Height() + 2
+	childProBlk.header.PChainHeight = prntBlkPChainHeight + 1
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("ProBlock's P-Chain-Height can be larger or equal than parent ProBlock's one")
+	}
+
+	// block P-Chain height cannot be larger than current P-Chain height
+	childProBlk.header.PChainHeight = proVM.pChainHeight()
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("ProBlock's P-Chain-Height can be larger or equal than parent ProBlock's one")
+	}
+
+	childProBlk.header.PChainHeight = proVM.pChainHeight() + 1
 	if err := childProBlk.Verify(); err == nil {
-		t.Fatal("Proposer block has wrong height")
+		t.Fatal("ProBlock's P-Chain-Height cannot be higher than current P chain height")
 	} else if err != ErrProBlkWrongHeight {
 		t.Fatal("Proposer block has wrong height should have different error")
 	}

@@ -70,8 +70,9 @@ func (c clockImpl) now() time.Time {
 
 type VM struct {
 	block.ChainVM
-	state           *innerState
-	clk             clock
+	state *innerState
+	windower
+	clock
 	stakingKey      crypto.Signer
 	fromWrappedVM   chan common.Message
 	toEngine        chan<- common.Message
@@ -81,7 +82,7 @@ type VM struct {
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) VM {
 	res := VM{
 		ChainVM:         vm,
-		clk:             clockImpl{},
+		clock:           clockImpl{},
 		stakingKey:      nil,
 		fromWrappedVM:   nil,
 		toEngine:        nil,
@@ -174,7 +175,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		hdr := NewProHeader(proParent.ID(), vm.clk.now().Unix(), proParent.Height()+1)
+		hdr := NewProHeader(proParent.ID(), vm.now().Unix(), vm.pChainHeight())
 		proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
 		if err != nil {
 			return nil, err

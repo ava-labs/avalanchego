@@ -137,7 +137,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		setTime: time.Now(),
 	}
 	proVM := NewProVM(coreVM, proBlkStartTime)
-	proVM.clk = tc
+	proVM.clock = tc
 
 	if pTestCert == nil {
 		var err error
@@ -163,11 +163,9 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2021),
-			StatusV: choices.Processing,
+			IDV: ids.Empty.Prefix(2021),
 		},
 		ParentV: coreGenBlk,
-		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
@@ -198,12 +196,9 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 	newBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Processing,
+			IDV: ids.Empty.Prefix(2021),
 		},
 		ParentV: genesisBlk,
-		HeightV: 1,
-		BytesV:  []byte{1},
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return newBlk, nil }
 
@@ -277,7 +272,6 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 			IDV: ids.GenerateTestID(),
 		},
 		ParentV: coreGenBlk,
-		HeightV: 1,
 		BytesV:  []byte{1},
 		VerifyV: nil,
 	}
@@ -286,7 +280,6 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 			IDV: ids.GenerateTestID(),
 		},
 		ParentV: coreBlk1,
-		HeightV: 2,
 		BytesV:  []byte{2},
 		VerifyV: nil,
 	}
@@ -322,7 +315,6 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 			IDV: ids.GenerateTestID(),
 		},
 		ParentV: coreBlk2,
-		HeightV: 3,
 		BytesV:  []byte{3},
 		VerifyV: nil,
 	}
@@ -382,11 +374,9 @@ func TestProposerVMCanParseAndCacheCoreBlocksWithNoHeader(t *testing.T) {
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2021),
-			StatusV: choices.Unknown,
+			IDV: ids.Empty.Prefix(2021),
 		},
-		BytesV:  []byte{0},
-		HeightV: 0,
+		BytesV: []byte{0},
 	}
 
 	coreVM.CantParseBlock = true
@@ -427,11 +417,9 @@ func TestSetPreferenceWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(10),
-			StatusV: choices.Processing,
+			IDV: ids.Empty.Prefix(10),
 		},
 		ParentV: coreGenBlk,
-		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
@@ -452,7 +440,6 @@ func TestSetPreferenceWorksWithProBlocksAndWrappedBlocks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: coreGenBlk,
-		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
 	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
@@ -519,7 +506,6 @@ func TestBuildBlockCanReturnCoreBlocks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		ParentV: coreGenBlk,
-		HeightV: coreGenBlk.HeightV + 1,
 		VerifyV: nil,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }

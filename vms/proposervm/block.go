@@ -13,7 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
-const BlkSubmissionTolerance = 10 * time.Second // Todo: move to consensus?
+const (
+	BlkSubmissionTolerance = 10 * time.Second
+	BlkSubmissionWinLength = 2 * time.Second
+)
 
 var (
 	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
@@ -23,17 +26,17 @@ var (
 )
 
 type ProposerBlockHeader struct {
-	PrntID    ids.ID `serialize:"true" json:"parentID"`
-	Timestamp int64  `serialize:"true"`
-	Height    uint64 `serialize:"true"`
-	Signature []byte `serialize:"true"`
+	PrntID       ids.ID `serialize:"true" json:"parentID"`
+	Timestamp    int64  `serialize:"true"`
+	PChainHeight uint64 `serialize:"true"`
+	Signature    []byte `serialize:"true"`
 }
 
 func NewProHeader(prntID ids.ID, unixTime int64, height uint64) ProposerBlockHeader {
 	return ProposerBlockHeader{
-		PrntID:    prntID,
-		Timestamp: unixTime,
-		Height:    height,
+		PrntID:       prntID,
+		Timestamp:    unixTime,
+		PChainHeight: height,
 	}
 }
 
@@ -125,15 +128,14 @@ func (pb *ProposerBlock) Verify() error {
 
 	prntBlk, err := pb.vm.state.getProBlock(pb.header.PrntID)
 	if err != nil {
-		// TODO: log error
 		return ErrProBlkNotFound
 	}
 
-	if pb.header.Height != prntBlk.header.Height+1 {
+	if pb.header.PChainHeight < prntBlk.header.PChainHeight {
 		return ErrProBlkWrongHeight
 	}
 
-	if pb.header.Height != pb.coreBlk.Height() {
+	if pb.header.PChainHeight > pb.vm.pChainHeight() {
 		return ErrProBlkWrongHeight
 	}
 
@@ -141,7 +143,14 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkBadTimestamp
 	}
 
-	if time.Unix(pb.header.Timestamp, 0).After(pb.vm.clk.now().Add(BlkSubmissionTolerance)) {
+	nodeID := ids.ID{} // TODO: retrieve nodeID from signature
+	blkWinDelay := pb.vm.BlkSubmissionDelay(pb.header.PChainHeight, nodeID)
+	blkWinStart := time.Unix(prntBlk.header.Timestamp, 0).Add(blkWinDelay)
+	if time.Unix(pb.header.Timestamp, 0).Before(blkWinStart) {
+		return ErrProBlkBadTimestamp
+	}
+
+	if time.Unix(pb.header.Timestamp, 0).After(pb.vm.now().Add(BlkSubmissionTolerance)) {
 		return ErrProBlkBadTimestamp
 	}
 
@@ -170,7 +179,7 @@ func (pb *ProposerBlock) Bytes() []byte {
 }
 
 func (pb *ProposerBlock) Height() uint64 {
-	return pb.header.Height
+	return pb.coreBlk.Height()
 }
 
 // snowman.OracleBlock interface implementation
