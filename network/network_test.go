@@ -1777,7 +1777,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 			assert.Fail(t, "handler 0 unauthorized connection", id.String())
 		},
 		disconnected: func(id ids.ShortID) {
-			if id == id1 && !wg2Done {
+			if id == id1 {
 				wg2.Done()
 				return
 			}

@@ -1462,7 +1462,11 @@ func (n *network) disconnected(p *peer) {
 			n.track(ip, p.id)
 		}
 	}
-	n.router.Disconnected(p.id)
+
+	// Only send Disconnected to router if Connected was sent
+	if p.finishedHandshake.GetValue() {
+		n.router.Disconnected(p.id)
+	}
 }
 
 // holds onto the peer object as a result of helper functions
