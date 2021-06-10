@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Test that the Throttler returned by NewThrottler works
-func TestThrottler(t *testing.T) {
+// Test that the DialThrottler returned by NewDialThrottler works
+func TestDialThrottler(t *testing.T) {
 	startTime := time.Now()
 	// Allows 5 per second
-	throttler := NewThrottler(5)
+	throttler := NewDialThrottler(5)
 	// Use all 5
 	for i := 0; i < 5; i++ {
 		acquiredChan := make(chan struct{}, 1)
@@ -58,9 +58,9 @@ func TestThrottler(t *testing.T) {
 }
 
 // Test that Acquire honors its specification about its context being canceled
-func TestThrottlerCancel(t *testing.T) {
+func TestDialThrottlerCancel(t *testing.T) {
 	// Allows 5 per second
-	throttler := NewThrottler(5)
+	throttler := NewDialThrottler(5)
 	// Use all 5
 	for i := 0; i < 5; i++ {
 		acquiredChan := make(chan struct{}, 1)
@@ -99,8 +99,8 @@ func TestThrottlerCancel(t *testing.T) {
 }
 
 // Test that the Throttler return by NewNoThrottler never blocks on Acquire()
-func TestNoThrottler(t *testing.T) {
-	throttler := NewNoThrottler()
+func TestNoDialThrottler(t *testing.T) {
+	throttler := NewNoDialThrottler()
 	for i := 0; i < 250; i++ {
 		startTime := time.Now()
 		err := throttler.Acquire(context.Background()) // Should always immediately return

@@ -6,32 +6,32 @@ import (
 	"golang.org/x/time/rate"
 )
 
-type Throttler interface {
+type DialThrottler interface {
 	// Block until the event associated with this Acquire can happen.
 	// If [ctx] is canceled, gives up and returns an error.
 	Acquire(ctx context.Context) error
 }
 
-type throttler struct {
+type dialThrottler struct {
 	limiter *rate.Limiter
 }
 
-type noThrottler struct{}
+type noDialThrottler struct{}
 
-func (t throttler) Acquire(ctx context.Context) error {
+func (t dialThrottler) Acquire(ctx context.Context) error {
 	return t.limiter.Wait(ctx)
 }
 
-func NewThrottler(throttleLimit int) Throttler {
-	return throttler{
+func NewDialThrottler(throttleLimit int) DialThrottler {
+	return dialThrottler{
 		limiter: rate.NewLimiter(rate.Limit(throttleLimit), throttleLimit),
 	}
 }
 
-func NewNoThrottler() Throttler {
-	return noThrottler{}
+func NewNoDialThrottler() DialThrottler {
+	return noDialThrottler{}
 }
 
-func (t noThrottler) Acquire(context.Context) error {
+func (t noDialThrottler) Acquire(context.Context) error {
 	return nil
 }
