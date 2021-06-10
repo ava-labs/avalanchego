@@ -52,7 +52,7 @@ func NewDialer(network string, dialerConfig DialerConfig, log logging.Logger) Di
 		throttler = NewThrottler(int(dialerConfig.throttleRps))
 	}
 	log.Debug(
-		"dialer has outgoing connection limit of %s/second and dial timeout %s",
+		"dialer has outgoing connection limit of %d/second and dial timeout %s",
 		dialerConfig.throttleRps,
 		dialerConfig.connectionTimeout,
 	)
