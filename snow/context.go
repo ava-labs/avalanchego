@@ -4,7 +4,7 @@
 package snow
 
 import (
-	"crypto"
+	"crypto/tls"
 	"sync"
 	"time"
 
@@ -73,7 +73,7 @@ type Context struct {
 	bootstrapped uint32
 
 	// Staking signer for snoman++ blocks
-	StakingKey *crypto.PrivateKey
+	StakingCert tls.Certificate
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

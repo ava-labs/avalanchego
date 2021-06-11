@@ -7,6 +7,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -64,7 +66,7 @@ func (is *innerState) commitBlk(blk *ProposerBlock) error {
 	}
 
 	wrpdID := blk.coreBlk.ID()
-	proID, err := cdc.Marshal(codecVersion, is.wrpdToProID[wrpdID])
+	proID, err := idToBytes(is.wrpdToProID[wrpdID])
 	if err != nil {
 		is.wipeFromCacheProBlk(blk.ID())
 		return err
@@ -94,16 +96,16 @@ func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
 	}
 
 	var mPb marshallingProposerBLock
-	if _, err := cdc.Unmarshal(proBytes, &mPb); err != nil {
+	if err := mPb.unmarshal(proBytes); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal proposerBlockHeader: %s", err)
 	}
 
-	sb, err := is.vm.ChainVM.ParseBlock(mPb.WrpdBytes)
+	sb, err := is.vm.ChainVM.ParseBlock(mPb.wrpdBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	proBlk, _ := NewProBlock(is.vm, mPb.Header, sb, proBytes, false) // not signing block, cannot err
+	proBlk, _ := NewProBlock(is.vm, mPb.ProposerBlockHeader, sb, proBytes, false) // not signing block, cannot err
 	is.cacheProBlk(&proBlk)
 
 	return &proBlk, nil
@@ -119,9 +121,9 @@ func (is *innerState) getBlockFromWrappedBlkID(wrappedID ids.ID) (*ProposerBlock
 		return nil, ErrProBlkNotFound
 	}
 
-	var proID ids.ID
-	if _, err := cdc.Unmarshal(proIDBytes, &proID); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal proposerBlockID: %s", err)
+	proID, err := bytesToID(proIDBytes)
+	if err != nil {
+		return nil, err
 	}
 
 	return is.getProBlock(proID)
@@ -130,4 +132,31 @@ func (is *innerState) getBlockFromWrappedBlkID(wrappedID ids.ID) (*ProposerBlock
 func (is *innerState) wipeCache() { // useful for UTs
 	is.knownProBlocks = make(map[ids.ID]*ProposerBlock)
 	is.wrpdToProID = make(map[ids.ID]ids.ID)
+}
+
+func idToBytes(id ids.ID) ([]byte, error) {
+	p := wrappers.Packer{Bytes: make([]byte, hashing.HashLen+4)}
+	if p.PackBytes(id[:]); p.Errored() {
+		return nil, fmt.Errorf("could not marshal block id")
+	}
+	return p.Bytes, nil
+}
+
+func bytesToID(b []byte) (id ids.ID, err error) {
+	res := ids.ID{}
+	p := wrappers.Packer{
+		Bytes: b,
+	}
+
+	IDBytes := p.UnpackBytes()
+	switch {
+	case p.Errored():
+		return res, fmt.Errorf("could not unmarshal block id")
+	case len(IDBytes) != len(res):
+		return res, fmt.Errorf("could not unmarshal block id")
+	default:
+		copy(res[:], IDBytes)
+	}
+
+	return res, nil
 }

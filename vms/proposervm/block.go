@@ -3,13 +3,16 @@ package proposervm
 import (
 	"crypto"
 	cryptorand "crypto/rand"
+	"crypto/x509"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
@@ -22,27 +25,119 @@ var (
 	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
 	ErrProBlkNotFound      = errors.New("proposer block not found")
 	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
+	ErrInvalidTLSKey       = errors.New("invalid validator signing key")
+	ErrInvalidNodeID       = errors.New("could not retrieve nodeID from proposer block certificate")
+	ErrInvalidSignature    = errors.New("proposer block signature does not verify")
 	ErrProBlkWrongHeight   = errors.New("proposer block has wrong height")
+	ErrProBlkFailedParsing = errors.New("could not parse proposer block")
 )
 
 type ProposerBlockHeader struct {
-	PrntID       ids.ID `serialize:"true" json:"parentID"`
-	Timestamp    int64  `serialize:"true"`
-	PChainHeight uint64 `serialize:"true"`
-	Signature    []byte `serialize:"true"`
+	version      uint16
+	prntID       ids.ID
+	timestamp    int64
+	pChainHeight uint64
+	valCert      x509.Certificate
+	signature    []byte
 }
 
-func NewProHeader(prntID ids.ID, unixTime int64, height uint64) ProposerBlockHeader {
+func NewProHeader(prntID ids.ID, unixTime int64, height uint64, cert x509.Certificate) ProposerBlockHeader {
 	return ProposerBlockHeader{
-		PrntID:       prntID,
-		Timestamp:    unixTime,
-		PChainHeight: height,
+		version:      codecVersion,
+		prntID:       prntID,
+		timestamp:    unixTime,
+		pChainHeight: height,
+		valCert:      cert,
 	}
 }
 
 type marshallingProposerBLock struct {
-	Header    ProposerBlockHeader `serialize:"true"`
-	WrpdBytes []byte              `serialize:"true"`
+	ProposerBlockHeader
+	wrpdBytes []byte
+}
+
+func (mPb *marshallingProposerBLock) marshal() ([]byte, error) {
+	p := wrappers.Packer{
+		MaxSize: 1 << 18,
+		Bytes:   make([]byte, 0, 128),
+	}
+	if p.PackShort(mPb.version); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackBytes(mPb.prntID[:]); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackLong(uint64(mPb.timestamp)); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackLong(mPb.pChainHeight); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackX509Certificate(&mPb.valCert); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackBytes(mPb.signature); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackBytes(mPb.wrpdBytes); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	return p.Bytes, nil
+}
+
+func (mPb *marshallingProposerBLock) unmarshal(b []byte) error {
+	p := wrappers.Packer{
+		Bytes: b,
+	}
+
+	if mPb.version = p.UnpackShort(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	prntIDBytes := p.UnpackBytes()
+	switch {
+	case p.Errored():
+		return ErrProBlkFailedParsing
+	case len(prntIDBytes) != len(mPb.prntID):
+		return ErrProBlkFailedParsing
+	default:
+		copy(mPb.prntID[:], prntIDBytes)
+	}
+
+	if mPb.timestamp = int64(p.UnpackLong()); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	if mPb.pChainHeight = p.UnpackLong(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	pValCert := p.UnpackX509Certificate()
+	if p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+	if pValCert != nil {
+		mPb.valCert = *pValCert
+	} else {
+		mPb.valCert = x509.Certificate{} // special case: genesis has empty certificate
+	}
+
+	if mPb.signature = p.UnpackBytes(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	if mPb.wrpdBytes = p.UnpackBytes(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	return nil
 }
 
 type ProposerBlock struct {
@@ -76,13 +171,18 @@ func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block, bytes []byte
 }
 
 func (pb *ProposerBlock) sign() error {
-	pb.header.Signature = nil
+	pb.header.signature = nil
 	msgHash := hashing.ComputeHash256Array(pb.getBytes())
-	sig, err := pb.vm.stakingKey.Sign(cryptorand.Reader, msgHash[:], crypto.SHA256)
+	signKey, ok := pb.vm.stakingCert.PrivateKey.(crypto.Signer)
+	if !ok {
+		return ErrInvalidTLSKey
+	}
+
+	sig, err := signKey.Sign(cryptorand.Reader, msgHash[:], crypto.SHA256)
 	if err != nil {
 		return err
 	}
-	pb.header.Signature = sig
+	pb.header.signature = sig
 	return nil
 }
 
@@ -95,7 +195,7 @@ func (pb *ProposerBlock) Accept() error {
 	err := pb.coreBlk.Accept()
 	if err == nil {
 		// pb parent block should not be needed anymore.
-		pb.vm.state.wipeFromCacheProBlk(pb.header.PrntID)
+		pb.vm.state.wipeFromCacheProBlk(pb.header.prntID)
 	}
 	return err
 }
@@ -114,44 +214,75 @@ func (pb *ProposerBlock) Status() choices.Status {
 
 // snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
-	if res, err := pb.vm.state.getProBlock(pb.header.PrntID); err == nil {
+	if res, err := pb.vm.state.getProBlock(pb.header.prntID); err == nil {
 		return res
 	}
 
-	return &missing.Block{BlkID: pb.header.PrntID}
+	return &missing.Block{BlkID: pb.header.prntID}
 }
 
 func (pb *ProposerBlock) Verify() error {
+	// validate version
+	if pb.header.version != codecVersion {
+		return fmt.Errorf("codecVersion not matching")
+	}
+
+	// validate core block
 	if err := pb.coreBlk.Verify(); err != nil {
 		return err
 	}
 
-	prntBlk, err := pb.vm.state.getProBlock(pb.header.PrntID)
+	// validate parent
+	prntBlk, err := pb.vm.state.getProBlock(pb.header.prntID)
 	if err != nil {
 		return ErrProBlkNotFound
 	}
 
-	if pb.header.PChainHeight < prntBlk.header.PChainHeight {
+	// validate height
+	if pb.header.pChainHeight < prntBlk.header.pChainHeight {
 		return ErrProBlkWrongHeight
 	}
 
-	if pb.header.PChainHeight > pb.vm.pChainHeight() {
+	// validate timestamp
+	if pb.header.pChainHeight > pb.vm.pChainHeight() {
 		return ErrProBlkWrongHeight
 	}
 
-	if pb.header.Timestamp < prntBlk.header.Timestamp {
+	if pb.header.timestamp < prntBlk.header.timestamp {
 		return ErrProBlkBadTimestamp
 	}
 
-	nodeID := ids.ID{} // TODO: retrieve nodeID from signature
-	blkWinDelay := pb.vm.BlkSubmissionDelay(pb.header.PChainHeight, nodeID)
-	blkWinStart := time.Unix(prntBlk.header.Timestamp, 0).Add(blkWinDelay)
-	if time.Unix(pb.header.Timestamp, 0).Before(blkWinStart) {
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pb.header.valCert.Raw))
+	if err != nil {
+		return ErrInvalidNodeID
+	}
+
+	blkWinDelay := pb.vm.BlkSubmissionDelay(pb.header.pChainHeight, nodeID)
+	blkWinStart := time.Unix(prntBlk.header.timestamp, 0).Add(blkWinDelay)
+	if time.Unix(pb.header.timestamp, 0).Before(blkWinStart) {
 		return ErrProBlkBadTimestamp
 	}
 
-	if time.Unix(pb.header.Timestamp, 0).After(pb.vm.now().Add(BlkSubmissionTolerance)) {
+	if time.Unix(pb.header.timestamp, 0).After(pb.vm.now().Add(BlkSubmissionTolerance)) {
 		return ErrProBlkBadTimestamp
+	}
+
+	// validate signature.
+	blkSignature := make([]byte, len(pb.header.signature))
+	copy(blkSignature, pb.header.signature)
+	pb.header.signature = make([]byte, 0)
+
+	blkBytes := make([]byte, len(pb.bytes))
+	copy(blkBytes, pb.bytes)
+	pb.bytes = make([]byte, 0)
+
+	signedBytes := pb.getBytes()
+	pb.header.signature = blkSignature
+	pb.bytes = blkBytes
+
+	if err = pb.header.valCert.CheckSignature(pb.header.valCert.SignatureAlgorithm,
+		signedBytes, pb.header.signature); err != nil {
+		return ErrInvalidSignature
 	}
 
 	return nil
@@ -159,12 +290,10 @@ func (pb *ProposerBlock) Verify() error {
 
 func (pb *ProposerBlock) getBytes() []byte {
 	var mPb marshallingProposerBLock
-	mPb.Header = pb.header
-	mPb.WrpdBytes = pb.coreBlk.Bytes()
+	mPb.ProposerBlockHeader = pb.header
+	mPb.wrpdBytes = pb.coreBlk.Bytes()
 
-	var err error
-	var res []byte
-	res, err = cdc.Marshal(codecVersion, &mPb)
+	res, err := mPb.marshal()
 	if err != nil {
 		res = make([]byte, 0)
 	}

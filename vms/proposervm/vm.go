@@ -14,20 +14,17 @@ package proposervm
 // implemented via the proposer block header
 
 import (
-	"crypto"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
-	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -35,25 +32,10 @@ const (
 )
 
 var (
+	genesisParentID      = ids.ID{}
 	NoProposerBlocks     = time.Unix(1<<63-62135596801, 999999999)
-	cdc                  = codec.NewDefaultManager()
 	ErrCannotSignWithKey = errors.New("unable to use key to sign proposer blocks")
 )
-
-func init() {
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&marshallingProposerBLock{}),
-		c.RegisterType(&ids.ID{}),
-		cdc.RegisterCodec(codecVersion, c),
-	)
-
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-}
 
 // clock interface and implementation, to ease up UTs
 type clock interface {
@@ -71,7 +53,7 @@ type VM struct {
 	state *innerState
 	windower
 	clock
-	stakingKey      crypto.Signer
+	stakingCert     tls.Certificate
 	fromWrappedVM   chan common.Message
 	toEngine        chan<- common.Message
 	proBlkStartTime time.Time
@@ -81,7 +63,6 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) VM {
 	res := VM{
 		ChainVM:         vm,
 		clock:           clockImpl{},
-		stakingKey:      nil,
 		fromWrappedVM:   nil,
 		toEngine:        nil,
 		proBlkStartTime: proBlkStart,
@@ -107,13 +88,7 @@ func (vm *VM) Initialize(
 ) error {
 	vm.state.init(dbManager.Current().Database)
 
-	pKey := *ctx.StakingKey
-	signer, ok := pKey.(crypto.Signer)
-	if !ok {
-		return ErrCannotSignWithKey
-	}
-
-	vm.stakingKey = signer
+	vm.stakingCert = ctx.StakingCert
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
 	if time.Now().After(vm.proBlkStartTime) {
@@ -140,7 +115,7 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			hdr := NewProHeader(ids.ID{}, 0, 0)
+			hdr := NewProHeader(genesisParentID, 0, 0, x509.Certificate{})
 			proGenBlk, _ := NewProBlock(vm, hdr, genesisBlk, nil, false) // not signing block, cannot err
 
 			// Skipping verification for genesis block.
@@ -173,7 +148,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		hdr := NewProHeader(proParent.ID(), vm.now().Unix(), vm.pChainHeight())
+		hdr := NewProHeader(proParent.ID(), vm.now().Unix(), vm.pChainHeight(), *vm.stakingCert.Leaf)
 		proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
 		if err != nil {
 			return nil, err
@@ -192,27 +167,15 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	return sb, nil
 }
 
-func (vm *VM) tryParseAsProposerBlock(b []byte) (*marshallingProposerBLock, error) {
-	var mPb marshallingProposerBLock
-	cdcVer, err := cdc.Unmarshal(b, &mPb)
-
-	if err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal proposerBlockHeader: %s", err)
-	} else if cdcVer != codecVersion {
-		return nil, fmt.Errorf("codecVersion not matching")
-	}
-	return &mPb, nil
-}
-
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	mPb, err := vm.tryParseAsProposerBlock(b)
-	if err == nil {
-		sb, err := vm.ChainVM.ParseBlock(mPb.WrpdBytes)
+	var mPb marshallingProposerBLock
+	if err := mPb.unmarshal(b); err == nil {
+		sb, err := vm.ChainVM.ParseBlock(mPb.wrpdBytes)
 		if err != nil {
 			return nil, err
 		}
 
-		proBlk, _ := NewProBlock(vm, mPb.Header, sb, b, false) // not signing block, cannot err
+		proBlk, _ := NewProBlock(vm, mPb.ProposerBlockHeader, sb, b, false) // not signing block, cannot err
 
 		vm.state.cacheProBlk(&proBlk)
 		if err := vm.state.commitBlk(&proBlk); err != nil {

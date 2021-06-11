@@ -4,7 +4,7 @@
 package chains
 
 import (
-	"crypto"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"sync"
@@ -125,8 +125,8 @@ type ChainConfig struct {
 
 // ManagerConfig ...
 type ManagerConfig struct {
-	StakingEnabled            bool               // True iff the network has staking enabled
-	StakingKey                *crypto.PrivateKey // needed to sign snowman++ blocks
+	StakingEnabled            bool            // True iff the network has staking enabled
+	StakingCert               tls.Certificate // needed to sign snowman++ blocks
 	MaxPendingMsgs            uint32
 	MaxNonStakerPendingMsgs   uint32
 	StakerMSGPortion          float64
@@ -353,7 +353,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		Metrics:              m.ConsensusParams.Metrics,
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
-		StakingKey:           m.StakingKey,
+		StakingCert:          m.StakingCert,
 	}
 
 	// Get a factory for the vm we want to use on our chain

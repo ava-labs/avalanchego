@@ -94,14 +94,14 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 
 	if pTestCert == nil {
 		var err error
-		pTestCert, _ = staking.NewTLSCert()
+		pTestCert, err = staking.NewTLSCert()
 		if err != nil {
 			t.Fatal("Could not generate dummy StakerCert")
 		}
 	}
 
 	dummyCtx := &snow.Context{
-		StakingKey: &pTestCert.PrivateKey,
+		StakingCert: *pTestCert,
 	}
 	dummyDBManager := manager.NewDefaultMemDBManager()
 	if err := proVM.Initialize(dummyCtx, dummyDBManager, coreGenBlk.Bytes(), nil, nil, nil, nil); err != nil {
@@ -193,8 +193,11 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 	}
 
 	proGenBlkID, _ := proVM.LastAccepted()
-	proHdr := NewProHeader(proGenBlkID, time.Now().AddDate(0, 0, -1).Unix(), coreBlk.Height())
-	proBlk, _ := NewProBlock(proVM, proHdr, coreBlk, nil, false) // not signing block, cannot err
+	proHdr := NewProHeader(proGenBlkID, time.Now().AddDate(0, 0, -1).Unix(), coreBlk.Height(), *pTestCert.Leaf)
+	proBlk, err := NewProBlock(proVM, proHdr, coreBlk, nil, true)
+	if err != nil {
+		t.Fatal("could not sign proposert block")
+	}
 
 	// test
 	parsedBlk, err := proVM.ParseBlock(proBlk.Bytes())

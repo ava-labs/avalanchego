@@ -20,7 +20,7 @@ func (w *windower) pChainHeight() uint64 {
 	return w.dummyPChainHeight
 }
 
-func (w *windower) BlkSubmissionDelay(pChainHeight uint64, valID ids.ID) time.Duration {
+func (w *windower) BlkSubmissionDelay(pChainHeight uint64, valID ids.ShortID) time.Duration {
 	// TODO:
 	//       pick validators population at given pChainHeight
 	//       if valID not in validator set, valPos = len(validators population)
