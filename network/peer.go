@@ -139,6 +139,8 @@ type peer struct {
 	// Should be cleared before use.
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
+
+	gzipEnabled bool
 }
 
 // newPeer returns a properly initialized *peer.
@@ -283,6 +285,37 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
+		if p.gzipEnabled {
+			p.net.log.Verbo("inflating message from %s", p.id)
+			bReader := bufio.NewReader(bytes.NewReader(msgBytes))
+			testBytes, err := bReader.Peek(2) // read a few bytes without consuming
+			if err != nil {
+				p.net.log.Error("Could not peek first two bytes of gzipped message from peer %s %s", p.id, err)
+				return
+			}
+
+			compLen := len(msgBytes)
+			if testBytes[0] == 31 && testBytes[1] == 139 {
+				p.net.log.Debug("Decompressing gzipped message from peer %s", p.id)
+				gzipReader, err := gzip.NewReader(bReader)
+				if err != nil {
+					p.net.log.Error("Could not init gzip on gzipped message from peer %s %s", p.id, err)
+					return
+				}
+
+				_, err = gzipReader.Read(msgBytes)
+				if err != nil {
+					p.net.log.Error("Could not read gzipped message from peer %s %s", p.id, err)
+					return
+				}
+				p.net.log.Debug("Inflated message from peer %s, compressed=%s, decompressed=%s", compLen, len(msgBytes))
+			} else {
+				p.net.log.Debug("Gzip enabled peer did not compress this message %s", p.id)
+			}
+		} else {
+			p.net.log.Debug("Peer did not have gzip enabled %s", p.id)
+		}
+
 		p.net.log.Verbo("parsing new message from %s:\n%s",
 			p.id,
 			formatting.DumpBytes{Bytes: msgBytes})
@@ -400,6 +433,10 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	}
 
 	msgBytes := msg.Bytes()
+	if p.gzipEnabled {
+		msgBytes = compress(msgBytes, p.net.log)
+	}
+
 	msgBytesLen := int64(len(msgBytes))
 
 	// lets assume send will be successful, we add to the network pending bytes.
@@ -809,6 +846,9 @@ func (p *peer) handleVersion(msg Msg) {
 		p.discardIP()
 		return
 	}
+
+	// todo marker version should be constant
+	p.gzipEnabled = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
