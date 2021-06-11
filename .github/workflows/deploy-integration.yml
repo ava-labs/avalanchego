@@ -1,4 +1,4 @@
-name: deploy2integration
+name: Deploy to Integration
 
 on:
   push:
@@ -8,13 +8,11 @@ on:
 jobs:
   deploy-to-integration:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout devops repo
     - uses: actions/checkout@v2
       with: 
         repository: ava-labs/devops
-        path: devops
         token: ${{ secrets.AVALANCHE_PAT }}
 
 #    - name: Run Healthcheck
