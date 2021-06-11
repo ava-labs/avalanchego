@@ -3,21 +3,21 @@
 
 package evm
 
-import "github.com/ava-labs/avalanchego/ids"
-
-// ID this VM should be referenced by
-var (
-	ID = ids.ID{'e', 'v', 'm'}
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
-// Factory ...
-type Factory struct {
-	Fee uint64
-}
+var (
+	// ID this VM should be referenced by
+	ID = ids.ID{'e', 'v', 'm'}
 
-// New ...
-func (f *Factory) New() interface{} {
-	return &VM{
-		txFee: f.Fee,
-	}
+	_ vms.VMFactory = &Factory{}
+)
+
+type Factory struct{}
+
+func (f *Factory) New(*snow.Context) (interface{}, error) {
+	return &VM{}, nil
 }
