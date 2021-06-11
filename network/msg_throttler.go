@@ -5,6 +5,7 @@ package network
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -23,18 +24,25 @@ type MsgThrottler interface {
 
 	// Mark that a message from [nodeID] of size [msgSize]
 	// has been removed from the incoming message buffer.
-	Release(msgSize uint64, nodeID ids.ShortID)
+	// TODO use duration
+	Release(msgSize uint64, nodeID ids.ShortID, dur time.Duration)
 }
 
 // msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
 type sybilMsgThrottler struct {
-	cond                   sync.Cond
-	vdrs                   validators.Set
+	cond sync.Cond
+	// Primary network validator set
+	vdrs validators.Set
+	// Max number of unprocessed bytes from validators
 	maxUnprocessedVdrBytes uint64
-	remainingVdrBytes      uint64
-	remainingAtLargeBytes  uint64
-	vdrToBytesUsed         map[ids.ShortID]uint64
+	// Number of bytes left in the validator byte allocation.
+	// Initialized to [maxUnprocessedVdrBytes].
+	remainingVdrBytes uint64
+	// Number of bytes left in the at-large byte allocation
+	remainingAtLargeBytes uint64
+	// Node ID --> Bytes they've taken from the validator allocation
+	vdrToBytesUsed map[ids.ShortID]uint64
 }
 
 func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
@@ -51,7 +59,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 
 		// See if we can use the validator byte allocation
 		weight, isVdr := t.vdrs.GetWeight(nodeID)
-		if isVdr && t.remainingVdrBytes > msgSize {
+		if isVdr && t.remainingVdrBytes >= msgSize {
 			bytesAllowed := uint64(float64(t.maxUnprocessedVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
 			if t.vdrToBytesUsed[nodeID]+msgSize <= bytesAllowed {
 				// Take from the validator byte allocation
@@ -61,13 +69,42 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 			}
 		}
 
-		// Wait until some space is released
+		// Wait until there are more bytes in the allocations
+		// Signalled during every [Release] call
 		t.cond.Wait()
 	}
 }
 
-func (t *sybilMsgThrottler) Release(uint64, ids.ShortID) {
-	// TODO
+func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID, _ time.Duration) {
+	if msgSize == 0 {
+		return // TODO this should never happen
+	}
+	t.cond.L.Lock()
+	defer t.cond.L.Unlock()
+
+	// Try to release these bytes back to the validator allocation
+	vdrBytesUsed := t.vdrToBytesUsed[nodeID]
+	switch { // This switch is exhaustive
+	case vdrBytesUsed > msgSize:
+		// Put all bytes back in validator allocation
+		t.remainingVdrBytes += msgSize
+		t.vdrToBytesUsed[nodeID] -= msgSize
+	case vdrBytesUsed == msgSize:
+		// Put all bytes back in validator allocation
+		t.remainingVdrBytes += msgSize
+		delete(t.vdrToBytesUsed, nodeID)
+	case vdrBytesUsed < msgSize && vdrBytesUsed > 0:
+		// Put some bytes back in validator allocation
+		t.remainingVdrBytes += vdrBytesUsed
+		t.remainingAtLargeBytes += msgSize - vdrBytesUsed
+		delete(t.vdrToBytesUsed, nodeID)
+	case vdrBytesUsed < msgSize && vdrBytesUsed == 0:
+		// Put no bytes in validator allocation
+		t.remainingAtLargeBytes += msgSize
+	}
+
+	// Notify that there are more bytes available
+	t.cond.Broadcast()
 }
 
 // noMsgThrottler implements MsgThrottler.
@@ -76,4 +113,4 @@ type noMsgThrottler struct{}
 
 func (*noMsgThrottler) Acquire(uint64, ids.ShortID) {}
 
-func (*noMsgThrottler) Release(uint64, ids.ShortID) {}
+func (*noMsgThrottler) Release(uint64, ids.ShortID, time.Duration) {}
