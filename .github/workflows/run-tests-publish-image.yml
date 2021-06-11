@@ -1,4 +1,4 @@
-name: E2E Tests + Publish Docker Image
+name: Lint + e2e Tests + Publish Docker Image
 
 on:
   push:
