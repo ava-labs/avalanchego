@@ -19,3 +19,11 @@ jobs:
       with: 
         repository: ava-labs/devops
         token: ${{ secrets.AVALANCHE_PAT }}
+  
+    - name: Deploy Ansible
+      uses: actions/checkout@v1
+      uses: ./.github/actions/ansible
+      with: 
+        playbook: scripts/ansible/testnet/healthy.yml
+        inventory: scripts/ansible/testnet/inventory/integration-validators.yml
+
