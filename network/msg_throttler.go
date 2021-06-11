@@ -28,6 +28,20 @@ type MsgThrottler interface {
 	Release(msgSize uint64, nodeID ids.ShortID, dur time.Duration)
 }
 
+func newSybilMsgThrottler(
+	vdrs validators.Set,
+	maxUnprocessedVdrBytes uint64,
+	maxUnprocessedAtLargeBytes uint64,
+) MsgThrottler {
+	return &sybilMsgThrottler{
+		vdrs:                   vdrs,
+		maxUnprocessedVdrBytes: maxUnprocessedVdrBytes,
+		remainingVdrBytes:      maxUnprocessedVdrBytes,
+		remainingAtLargeBytes:  maxUnprocessedAtLargeBytes,
+		vdrToBytesUsed:         make(map[ids.ShortID]uint64),
+	}
+}
+
 // msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
 type sybilMsgThrottler struct {
