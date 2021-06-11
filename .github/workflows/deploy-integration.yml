@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-    - uses: actions/checkout@v2
+      uses: actions/checkout@v2
       with:
         path: master
 
     - name: Checkout devops repo
-    - uses: actions/checkout@v2
+      uses: actions/checkout@v2
       with: 
         repository: ava-labs/devops
         token: ${{ secrets.AVALANCHE_PAT }}
