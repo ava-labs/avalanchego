@@ -427,10 +427,14 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 
 	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
 	now := n.clock.Time()
+	compMsg := compress(msg.Bytes(), n.log)
+	lenMsg := len(msg.Bytes())
+	lenCompMsg := len(compMsg)
+	n.log.Debug("compression: op,len,compLen,time GetAcceptedFrontier,%d,%d,%d", lenMsg, lenCompMsg, time.Now().Sub(now).Nanoseconds())
+
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		lenMsg := len(msg.Bytes())
 		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
@@ -465,7 +469,12 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	peer := n.getPeer(validatorID)
+	t1 := time.Now()
+	compMsg := compress(msg.Bytes(), n.log)
 	lenMsg := len(msg.Bytes())
+	lenCompMsg := len(compMsg)
+	n.log.Debug("compression: op,len,compLen,time AcceptedFrontier,%d,%d,%d", lenMsg, lenCompMsg, time.Now().Sub(t1).Nanoseconds())
+
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
@@ -566,7 +575,12 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 	}
 
 	peer := n.getPeer(validatorID)
+	t1 := time.Now()
+	compMsg := compress(msg.Bytes(), n.log)
 	lenMsg := len(msg.Bytes())
+	lenCompMsg := len(compMsg)
+	n.log.Debug("compression: op,len,compLen,time GetAncestors,%d,%d,%d", lenMsg, lenCompMsg, time.Now().Sub(t1).Nanoseconds())
+
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
@@ -596,7 +610,11 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	peer := n.getPeer(validatorID)
+	t1 := time.Now()
+	compMsg := compress(msg.Bytes(), n.log)
 	lenMsg := len(msg.Bytes())
+	lenCompMsg := len(compMsg)
+	n.log.Debug("compression: op,len,compLen,time MultiPut,%d,%d,%d", lenMsg, lenCompMsg, time.Now().Sub(t1).Nanoseconds())
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
@@ -691,11 +709,17 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		return nil // Packing message failed
 	}
 
+	t1 := time.Now()
+	msgBytes := msg.Bytes()
+	compMsg := compress(msgBytes, n.log)
+	lenMsg := len(msgBytes)
+	lenCompMsg := len(compMsg)
+	n.log.Debug("compression: op,len,compLen,time PushQuery,%d,%d,%d", lenMsg, lenCompMsg, time.Now().Sub(t1).Nanoseconds())
+
 	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		lenMsg := len(msg.Bytes())
 		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
@@ -723,11 +747,17 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
 	n.log.AssertNoError(err)
 
+	t1 := time.Now()
+	msgBytes := msg.Bytes()
+	compMsg := compress(msgBytes, n.log)
+	lenMsg := len(msgBytes)
+	lenCompMsg := len(compMsg)
+	n.log.Debug("compression: op,len,compLen,time PullQuery,%d,%d,%d", lenMsg, lenCompMsg, time.Now().Sub(t1).Nanoseconds())
+
 	sentTo := make([]ids.ShortID, 0, validatorIDs.Len())
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		lenMsg := len(msg.Bytes())
 		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
@@ -761,9 +791,14 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 		n.sendFailRateCalculator.Observe(1, now)
 		return
 	}
+	t1 := time.Now()
+	msgBytes := msg.Bytes()
+	compMsg := compress(msgBytes, n.log)
+	lenMsg := len(msgBytes)
+	lenCompMsg := len(compMsg)
+	n.log.Debug("compression: op,len,compLen,time Chits,%d,%d,%d", lenMsg, lenCompMsg, time.Now().Sub(t1).Nanoseconds())
 
 	peer := n.getPeer(validatorID)
-	lenMsg := len(msg.Bytes())
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
