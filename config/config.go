@@ -484,7 +484,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	}
 
 	if nodeConfig.FetchOnly || v.GetBool(FakeStakingCerts) {
-		// In fetch only mode, use an ephemeral staking key/cert
+		// In fetch only mode or if explicitly set, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
 			return node.Config{}, process.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %w", err)
