@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -170,10 +171,20 @@ func (sm *sharedMemory) Indexed(
 }
 
 func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...database.Batch) error {
+	var (
+		versionDbBatches []database.Batch
+		vdb              *versiondb.Database
+	)
 	for peerChainID, keys := range requests {
 		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-		vdb, db := sm.m.GetDatabase(sharedID)
-		defer sm.m.ReleaseDatabase(sharedID)
+
+		var db database.Database
+		if vdb == nil {
+			vdb, db = sm.m.GetDatabase(sharedID)
+			defer sm.m.ReleaseDatabase(sharedID)
+		} else {
+			db = sm.m.GetPrefixDbInstanceFromVdb(vdb, sharedID)
+		}
 
 		s := state{
 			c: sm.m.codec,
@@ -197,9 +208,15 @@ func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...
 			return err
 		}
 
-		WriteAll(myBatch, batches...)
+		versionDbBatches = append(versionDbBatches, myBatch)
+
 	}
-	return nil
+
+	baseBatch, otherBatches := versionDbBatches[0], versionDbBatches[1:]
+
+	batches = append(batches, otherBatches...)
+
+	return WriteAll(baseBatch, batches...)
 }
 
 func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
