@@ -1,4 +1,4 @@
-name: Deploy to Integration
+name: deploy2integration
 
 on:
   push:
