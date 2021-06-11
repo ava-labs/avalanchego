@@ -27,9 +27,9 @@ jobs:
         sudo apt install ansible
 
     - name: Setup SSH key
-      uses: shimataro/ssh-key-action@v2
+      uses: webfactory/ssh-agent@v0.5.3
       with:
-        key: $${ secrets.AVALANCHE_KEY }}
+        ssh-private-key: ${{ secrets.AVALANCHE_KEY }}
        
     - name: Run Ansible
       run: |
