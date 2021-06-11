@@ -26,9 +26,11 @@ jobs:
         sudo add-apt-repository --yes --update ppa:ansible/ansible
         sudo apt install ansible
 
+    - name: Setup SSH key
+      uses: shimataro/ssh-key-action@v2
+      with:
+        key: $${ secrets.AVALANCHE_KEY }}
+       
     - name: Run Ansible
       run: |
-        ssh-add $SSH_KEY
         ansible-playbook -i scripts/ansible/testnet/inventory/integration-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
-      env:
-        ssh_key: ${{ secrets.AVALANCHE_KEY }}
