@@ -21,9 +21,7 @@ jobs:
         token: ${{ secrets.AVALANCHE_PAT }}
   
     - name: Deploy Ansible
-      uses: actions/checkout@v1
-      uses: ./.github/actions/ansible
+      uses: dawidd6/action-ansible-playbook@v2
       with: 
         playbook: scripts/ansible/testnet/healthy.yml
         inventory: scripts/ansible/testnet/inventory/integration-validators.yml
-
