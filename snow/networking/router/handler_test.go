@@ -55,8 +55,8 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	currentTime := time.Now()
 	handler.clock.Set(currentTime)
 
-	handler.GetAcceptedFrontier(ids.ShortID{}, 1, currentTime.Add(-time.Second))
-	handler.GetAccepted(ids.ShortID{}, 1, currentTime.Add(time.Second), nil)
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, currentTime.Add(-time.Second), func() {})
+	handler.GetAccepted(ids.ShortID{}, 1, currentTime.Add(time.Second), nil, func() {})
 
 	go handler.Dispatch()
 
@@ -96,7 +96,7 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	)
 	assert.NoError(t, err)
 
-	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Time{})
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Time{}, func() {})
 	go handler.Dispatch()
 
 	ticker := time.NewTicker(20 * time.Millisecond)
@@ -140,7 +140,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	}
 	go handler.Dispatch()
 
-	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Now().Add(time.Second))
+	handler.GetAcceptedFrontier(ids.ShortID{}, 1, time.Now().Add(time.Second), func() {})
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 	select {

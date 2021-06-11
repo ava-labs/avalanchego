@@ -221,6 +221,8 @@ type network struct {
 	// Contains []byte. Used as an optimization.
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool sync.Pool
+
+	msgThrottler MsgThrottler
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -410,7 +412,7 @@ func NewNetwork(
 	}
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-
+	netw.msgThrottler = newSybilMsgThrottler(netw.vdrs, 256*1024*1024, 128*1024*1024)
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}

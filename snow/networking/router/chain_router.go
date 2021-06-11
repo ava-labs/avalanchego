@@ -259,7 +259,13 @@ func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
 // GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
-func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time) {
+func (cr *ChainRouter) GetAcceptedFrontier(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Time,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -271,7 +277,7 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 	}
 
 	// Pass the message to the chain It's OK if we drop this.
-	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline)
+	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline, onFinishedHandling)
 	if dropped {
 		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
@@ -282,7 +288,13 @@ func (cr *ChainRouter) GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.
 // AcceptedFrontier routes an incoming AcceptedFrontier request from the
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
-func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (cr *ChainRouter) AcceptedFrontier(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	containerIDs []ids.ID,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -315,7 +327,7 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.AcceptedFrontier(validatorID, requestID, containerIDs)
+	dropped := !chain.AcceptedFrontier(validatorID, requestID, containerIDs, onFinishedHandling)
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFrontierFailed(validatorID, requestID)
@@ -328,7 +340,11 @@ func (cr *ChainRouter) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID,
 // GetAcceptedFrontierFailed routes an incoming GetAcceptedFrontierFailed
 // request from the validator with ID [validatorID] to the consensus engine
 // working on the chain with ID [chainID]
-func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+func (cr *ChainRouter) GetAcceptedFrontierFailed(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -352,7 +368,14 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(validatorID ids.ShortID, chainI
 // GetAccepted routes an incoming GetAccepted request from the
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
-func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID) {
+func (cr *ChainRouter) GetAccepted(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Time,
+	containerIDs []ids.ID,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -363,7 +386,7 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 	}
 
 	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs)
+	dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs, onFinishedHandling)
 	if dropped {
 		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
@@ -374,7 +397,13 @@ func (cr *ChainRouter) GetAccepted(validatorID ids.ShortID, chainID ids.ID, requ
 // Accepted routes an incoming Accepted request from the validator with ID
 // [validatorID] to the consensus engine working on the chain with ID
 // [chainID]
-func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (cr *ChainRouter) Accepted(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	containerIDs []ids.ID,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -407,7 +436,7 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.Accepted(validatorID, requestID, containerIDs)
+	dropped := !chain.Accepted(validatorID, requestID, containerIDs, onFinishedHandling)
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAcceptedFailed(validatorID, requestID)
@@ -420,7 +449,11 @@ func (cr *ChainRouter) Accepted(validatorID ids.ShortID, chainID ids.ID, request
 // GetAcceptedFailed routes an incoming GetAcceptedFailed request from the
 // validator with ID [validatorID]  to the consensus engine working on the
 // chain with ID [chainID]
-func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+func (cr *ChainRouter) GetAcceptedFailed(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -444,7 +477,14 @@ func (cr *ChainRouter) GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID
 // GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
 // The maximum number of ancestors to respond with is defined in snow/engine/commong/bootstrapper.go
-func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
+func (cr *ChainRouter) GetAncestors(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Time,
+	containerID ids.ID,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -456,7 +496,7 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 	}
 
 	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID)
+	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID, onFinishedHandling)
 	if dropped {
 		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
@@ -466,7 +506,13 @@ func (cr *ChainRouter) GetAncestors(validatorID ids.ShortID, chainID ids.ID, req
 
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+func (cr *ChainRouter) MultiPut(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	containers [][]byte,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -499,7 +545,7 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.MultiPut(validatorID, requestID, containers)
+	dropped := !chain.MultiPut(validatorID, requestID, containers, onFinishedHandling)
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetAncestorsFailed(validatorID, requestID)
@@ -511,7 +557,11 @@ func (cr *ChainRouter) MultiPut(validatorID ids.ShortID, chainID ids.ID, request
 
 // GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+func (cr *ChainRouter) GetAncestorsFailed(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -534,7 +584,14 @@ func (cr *ChainRouter) GetAncestorsFailed(validatorID ids.ShortID, chainID ids.I
 
 // Get routes an incoming Get request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
+func (cr *ChainRouter) Get(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Time,
+	containerID ids.ID,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -546,7 +603,7 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	}
 
 	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.Get(validatorID, requestID, deadline, containerID)
+	dropped := !chain.Get(validatorID, requestID, deadline, containerID, onFinishedHandling)
 	if dropped {
 		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
@@ -556,7 +613,14 @@ func (cr *ChainRouter) Get(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 // Put routes an incoming Put request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+func (cr *ChainRouter) Put(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	containerID ids.ID,
+	container []byte,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -577,7 +641,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	// If this is a gossip message, pass to the chain
 	if requestID == constants.GossipMsgRequestID {
 		// It's ok to drop this message.
-		dropped := !chain.Put(validatorID, requestID, containerID, container)
+		dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
 		if dropped {
 			cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 		} else {
@@ -608,7 +672,7 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.Put(validatorID, requestID, containerID, container)
+	dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.GetFailed(validatorID, requestID)
@@ -620,7 +684,11 @@ func (cr *ChainRouter) Put(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+func (cr *ChainRouter) GetFailed(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -642,7 +710,15 @@ func (cr *ChainRouter) GetFailed(validatorID ids.ShortID, chainID ids.ID, reques
 
 // PushQuery routes an incoming PushQuery request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte) {
+func (cr *ChainRouter) PushQuery(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Time,
+	containerID ids.ID,
+	container []byte,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -654,7 +730,7 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	}
 
 	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container)
+	dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container, onFinishedHandling)
 	if dropped {
 		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
@@ -664,7 +740,14 @@ func (cr *ChainRouter) PushQuery(validatorID ids.ShortID, chainID ids.ID, reques
 
 // PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID) {
+func (cr *ChainRouter) PullQuery(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Time,
+	containerID ids.ID,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -675,7 +758,7 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 	}
 
 	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID)
+	dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID, onFinishedHandling)
 	if dropped {
 		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
 	} else {
@@ -685,7 +768,13 @@ func (cr *ChainRouter) PullQuery(validatorID ids.ShortID, chainID ids.ID, reques
 
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
+func (cr *ChainRouter) Chits(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	votes []ids.ID,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -718,7 +807,7 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, request.msgType, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.Chits(validatorID, requestID, votes)
+	dropped := !chain.Chits(validatorID, requestID, votes, onFinishedHandling)
 	if dropped {
 		// We weren't able to pass the response to the chain
 		chain.QueryFailed(validatorID, requestID)
@@ -730,7 +819,11 @@ func (cr *ChainRouter) Chits(validatorID ids.ShortID, chainID ids.ID, requestID 
 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-func (cr *ChainRouter) QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32) {
+func (cr *ChainRouter) QueryFailed(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 

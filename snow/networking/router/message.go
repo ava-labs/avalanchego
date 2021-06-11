@@ -14,16 +14,23 @@ import (
 )
 
 type message struct {
-	messageType  constants.MsgType
-	validatorID  ids.ShortID
-	requestID    uint32
-	containerID  ids.ID
-	container    []byte
-	containers   [][]byte
-	containerIDs []ids.ID
-	notification common.Message
-	received     time.Time // Time this message was received
-	deadline     time.Time // Time this message must be responded to
+	messageType    constants.MsgType
+	validatorID    ids.ShortID
+	requestID      uint32
+	containerID    ids.ID
+	container      []byte
+	containers     [][]byte
+	containerIDs   []ids.ID
+	notification   common.Message
+	received       time.Time // Time this message was received
+	deadline       time.Time // Time this message must be responded to
+	onDoneHandling func()
+}
+
+func (m message) doneHandling() {
+	if m.onDoneHandling != nil {
+		m.onDoneHandling()
+	}
 }
 
 // IsPeriodic returns true if this message is of a type that is sent on a

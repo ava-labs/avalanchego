@@ -147,7 +147,8 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		handler.MultiPut(ids.ShortID{}, 1, nil)
+		// TODO put function below
+		handler.MultiPut(ids.ShortID{}, 1, nil, func() {})
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
 		chainRouter.Shutdown()
@@ -326,12 +327,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Clear each timeout by simulating responses to the queries
 	// Note: Depends on the ordering of [msgs]
-	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
-	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil)
-	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil)
-	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil)
+	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, nil)
+	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil, nil)
+	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil, nil)
+	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil, nil)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }

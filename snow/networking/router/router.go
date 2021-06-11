@@ -42,18 +42,96 @@ type Router interface {
 // ExternalRouter routes messages from the network to the
 // Handler of the consensus engine that the message is intended for
 type ExternalRouter interface {
-	RegisterRequest(validatorID ids.ShortID, chainID ids.ID, requestID uint32, msgType constants.MsgType)
-	GetAcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time)
-	AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
-	GetAccepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerIDs []ids.ID)
-	Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
-	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
-	MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
-	Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
-	Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
-	PushQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID, container []byte)
-	PullQuery(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, containerID ids.ID)
-	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
+	RegisterRequest(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		msgType constants.MsgType,
+	)
+	GetAcceptedFrontier(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Time,
+		onFinishedHandling func(),
+	)
+	AcceptedFrontier(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		containerIDs []ids.ID,
+		onFinishedHandling func(),
+	)
+	GetAccepted(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Time,
+		containerIDs []ids.ID,
+		onFinishedHandling func(),
+	)
+	Accepted(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		containerIDs []ids.ID,
+		onFinishedHandling func(),
+	)
+	GetAncestors(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Time,
+		containerID ids.ID,
+		onFinishedHandling func(),
+	)
+	MultiPut(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		containers [][]byte,
+		onFinishedHandling func(),
+	)
+	Get(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Time,
+		containerID ids.ID,
+		onFinishedHandling func(),
+	)
+	Put(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		containerID ids.ID,
+		container []byte,
+		onFinishedHandling func(),
+	)
+	PushQuery(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Time,
+		containerID ids.ID,
+		container []byte,
+		onFinishedHandling func(),
+	)
+	PullQuery(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		deadline time.Time,
+		containerID ids.ID,
+		onFinishedHandling func(),
+	)
+	Chits(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		votes []ids.ID,
+		onFinishedHandling func(),
+	)
 }
 
 // InternalRouter deals with messages internal to this node
