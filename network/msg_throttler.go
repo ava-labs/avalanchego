@@ -59,19 +59,35 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 
 		// See if we can use the validator byte allocation
 		weight, isVdr := t.vdrs.GetWeight(nodeID)
-		if isVdr && t.remainingVdrBytes >= msgSize {
-			bytesAllowed := uint64(float64(t.maxUnprocessedVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
-			if t.vdrToBytesUsed[nodeID]+msgSize <= bytesAllowed {
-				// Take from the validator byte allocation
-				t.remainingVdrBytes -= msgSize
-				t.vdrToBytesUsed[nodeID] += msgSize
-				break
-			}
+		if !isVdr {
+			// This node isn't a validator.
+			// Wait until there are more bytes in an allocation.
+			t.cond.Wait()
+			continue
 		}
 
-		// Wait until there are more bytes in the allocations
-		// Signalled during every [Release] call
-		t.cond.Wait()
+		// Need [vdrBytesNeeded] from the validator allocation.
+		// The remainder of [t.remainingAtLargeBytes], if any, will be used.
+		vdrBytesNeeded := msgSize - t.remainingAtLargeBytes
+		if t.remainingVdrBytes < vdrBytesNeeded {
+			// Wait until there are more bytes in an allocation.
+			t.cond.Wait()
+			continue
+		}
+
+		// Number of bytes this node can take from validator allocation.
+		vdrBytesAllowed := uint64(float64(t.maxUnprocessedVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
+		if t.vdrToBytesUsed[nodeID]+vdrBytesNeeded > vdrBytesAllowed {
+			// Wait until there are more bytes in an allocation.
+			t.cond.Wait()
+			continue
+		}
+
+		// Use the rest of [remainingAtLargeBytes] and some of [remainingVdrBytes]
+		t.remainingVdrBytes -= vdrBytesNeeded
+		t.remainingAtLargeBytes = 0
+		t.vdrToBytesUsed[nodeID] += vdrBytesNeeded
+		break
 	}
 }
 
