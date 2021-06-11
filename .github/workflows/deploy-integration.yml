@@ -1,0 +1,25 @@
+name: Deploy to Integration
+
+on:
+  push:
+    branch:
+      - CD
+
+jobs:
+  deploy-to-integration:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout devops repo
+    - uses: actions/checkout@v2
+      with: 
+        repository: ava-labs/devops
+        path: devops
+        token: ${{ secrets.AVALANCHE_PAT }}
+
+    - name: Run Healthcheck
+    - uses: actions/checkout@v1
+    - uses: ./.github/actions/ansible
+      with:
+      playbook: scripts/ansible/testnet/healthy.yml
+      inventory: scripts/ansible/testnet/inventory/integration-validators.yml
