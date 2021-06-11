@@ -2,8 +2,8 @@ name: Deploy to Integration
 
 on:
   push:
-    branch:
-      - 'CD'
+    branches:
+      - CD
 
 jobs:
   deploy-to-integration:
