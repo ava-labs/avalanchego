@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -36,10 +35,9 @@ const (
 )
 
 var (
-	NoProposerBlocks       = time.Unix(1<<63-62135596801, 999999999)
-	cdc                    = codec.NewDefaultManager()
-	ErrInnerVMNotConnector = errors.New("chainVM wrapped in proposerVM does not implement snowman.Connector")
-	ErrCannotSignWithKey   = errors.New("unable to use key to sign proposer blocks")
+	NoProposerBlocks     = time.Unix(1<<63-62135596801, 999999999)
+	cdc                  = codec.NewDefaultManager()
+	ErrCannotSignWithKey = errors.New("unable to use key to sign proposer blocks")
 )
 
 func init() {
@@ -267,23 +265,4 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 
 	// no proposerBlock wrapping core block; return coreID
 	return coreID, nil
-}
-
-// Connector VMs handling
-func (vm *VM) Connected(validatorID ids.ShortID) (bool, error) {
-	if connector, ok := vm.ChainVM.(validators.Connector); ok {
-		if err := connector.Connected(validatorID); err != nil {
-			return ok, err
-		}
-	}
-	return false, ErrInnerVMNotConnector
-}
-
-func (vm *VM) Disconnected(validatorID ids.ShortID) (bool, error) {
-	if connector, ok := vm.ChainVM.(validators.Connector); ok {
-		if err := connector.Disconnected(validatorID); err != nil {
-			return ok, err
-		}
-	}
-	return false, ErrInnerVMNotConnector
 }

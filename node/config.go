@@ -121,6 +121,9 @@ type Config struct {
 	IPCPath            string
 	IPCDefaultChainIDs []string
 
+	// Metrics
+	MeterVMEnabled bool
+
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
 	RouterHealthConfig       router.HealthConfig

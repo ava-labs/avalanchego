@@ -2108,7 +2108,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 				Validators:                    vdrs,
 				Beacons:                       beacons,
 				SampleK:                       beacons.Len(),
-				Alpha:                         beacons.Weight()/2 + 1,
+				StartupAlpha:                  (beacons.Weight() + 1) / 2,
+				Alpha:                         (beacons.Weight() + 1) / 2,
 				Sender:                        &sender,
 				Subnet:                        subnet,
 				MultiputMaxContainersSent:     2000,
@@ -2152,6 +2153,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	// Allow incoming messages to be routed to the new chain
 	chainRouter.AddChain(handler)
 	go ctx.Log.RecoverAndPanic(handler.Dispatch)
+
+	if err := engine.Connected(peerID); err != nil {
+		t.Fatal(err)
+	}
 
 	externalSender.GetAcceptedFrontierF = nil
 	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
