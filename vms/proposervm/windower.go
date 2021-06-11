@@ -12,6 +12,7 @@ import (
 
 type windower struct {
 	dummyPChainHeight uint64 // mock until P-Chain is integrated
+	mockedValPos      uint
 }
 
 func (w *windower) pChainHeight() uint64 {
@@ -25,6 +26,5 @@ func (w *windower) BlkSubmissionDelay(pChainHeight uint64, valID ids.ID) time.Du
 	//       if valID not in validator set, valPos = len(validators population)
 	//       else pick random permutation, seed by pChainHeight???
 	//       valPos is valID position in the permutation
-	valPos := 0
-	return time.Duration(valPos) * BlkSubmissionWinLength
+	return time.Duration(w.mockedValPos) * BlkSubmissionWinLength
 }

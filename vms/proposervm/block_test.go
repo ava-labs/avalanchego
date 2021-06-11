@@ -163,11 +163,32 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		t.Fatal("Old proposer block timestamp should have different error")
 	}
 
+	// block cannot arrive before its creator window starts
+	proVM.mockedValPos = 0
 	childProBlk.header.Timestamp = prntTimestamp
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Proposer block timestamp equal to parent block timestamp should verify")
 	}
 
+	proVM.mockedValPos = 1
+	blkNodeID := ids.ID{}
+	winDelay := proVM.BlkSubmissionDelay(childProBlk.header.PChainHeight, blkNodeID)
+	childProBlk.header.Timestamp = time.Unix(prntTimestamp, 0).Add(winDelay - time.Second).Unix()
+	if err := childProBlk.Verify(); err == nil {
+		t.Fatal("Proposer block timestamp before submission window should not verify")
+	}
+
+	childProBlk.header.Timestamp = time.Unix(prntTimestamp, 0).Add(winDelay).Unix()
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("Proposer block timestamp at submission window start should verify")
+	}
+
+	childProBlk.header.Timestamp = time.Unix(prntTimestamp, 0).Add(winDelay + 5*time.Second).Unix()
+	if err := childProBlk.Verify(); err != nil {
+		t.Fatal("Proposer block timestamp after submission window start should verify")
+	}
+
+	// block timestamp cannot exceed BlkSubmissionTolerance
 	childProBlk.header.Timestamp = time.Unix(prntTimestamp, 0).Add(BlkSubmissionTolerance).Unix()
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Proposer block timestamp within submission window should verify")
