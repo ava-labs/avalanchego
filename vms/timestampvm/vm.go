@@ -185,9 +185,8 @@ func (vm *VM) ParseBlock(bytes []byte) (snowman.Block, error) {
 // The block is persisted in storage
 func (vm *VM) NewBlock(parentID ids.ID, height uint64, data [dataLen]byte, timestamp time.Time) (*Block, error) {
 	block := &Block{
-		Block:     core.NewBlock(parentID, height),
-		Data:      data,
-		Timestamp: timestamp.Unix(),
+		Block: core.NewBlock(parentID, height, timestamp.Unix()),
+		Data:  data,
 	}
 	blockBytes, err := vm.codec.Marshal(codecVersion, block)
 	if err != nil {

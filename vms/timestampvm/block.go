@@ -24,7 +24,6 @@ var (
 type Block struct {
 	*core.Block `serialize:"true"`
 	Data        [dataLen]byte `serialize:"true"`
-	Timestamp   int64         `serialize:"true"`
 }
 
 // Verify returns nil iff this block is valid.
@@ -41,11 +40,11 @@ func (b *Block) Verify() error {
 		return errDatabaseGet
 	}
 
-	if b.Timestamp < time.Unix(parent.Timestamp, 0).Unix() {
+	if b.Time < parent.Time {
 		return errTimestampTooEarly
 	}
 
-	if b.Timestamp >= time.Now().Add(time.Hour).Unix() {
+	if time.Until(b.Timestamp()) >= time.Hour {
 		return errTimestampTooLate
 	}
 

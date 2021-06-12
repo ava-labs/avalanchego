@@ -5,6 +5,7 @@ package missing
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -16,26 +17,12 @@ var errMissingBlock = errors.New("missing block")
 // Block represents a block that can't be found
 type Block struct{ BlkID ids.ID }
 
-// ID ...
-func (mb *Block) ID() ids.ID { return mb.BlkID }
-
-// Height ...
-func (mb *Block) Height() uint64 { return 0 }
-
-// Accept ...
-func (*Block) Accept() error { return errMissingBlock }
-
-// Reject ...
-func (*Block) Reject() error { return errMissingBlock }
-
-// Status ...
-func (*Block) Status() choices.Status { return choices.Unknown }
-
-// Parent ...
-func (*Block) Parent() snowman.Block { return nil }
-
-// Verify ...
-func (*Block) Verify() error { return errMissingBlock }
-
-// Bytes ...
-func (*Block) Bytes() []byte { return nil }
+func (mb *Block) ID() ids.ID           { return mb.BlkID }
+func (mb *Block) Height() uint64       { return 0 }
+func (mb *Block) Timestamp() time.Time { return time.Time{} }
+func (*Block) Accept() error           { return errMissingBlock }
+func (*Block) Reject() error           { return errMissingBlock }
+func (*Block) Status() choices.Status  { return choices.Unknown }
+func (*Block) Parent() snowman.Block   { return nil }
+func (*Block) Verify() error           { return errMissingBlock }
+func (*Block) Bytes() []byte           { return nil }
