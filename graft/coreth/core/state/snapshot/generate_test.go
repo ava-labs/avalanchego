@@ -648,7 +648,7 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
 
-	case <-time.After(250 * time.Millisecond):
+	case <-time.After(500 * time.Millisecond):
 		t.Errorf("Snapshot generation failed")
 	}
 	checkSnapRoot(t, snap, root)
