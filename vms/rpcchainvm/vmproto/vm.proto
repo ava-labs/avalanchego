@@ -113,7 +113,9 @@ message BlockVerifyRequest {
     bytes id = 1;
 }
 
-message BlockVerifyResponse {}
+message BlockVerifyResponse {
+    bytes timestamp = 1;
+}
 
 message BlockAcceptRequest {
     bytes id = 1;
