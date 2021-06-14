@@ -7,6 +7,7 @@ on:
 
 jobs:
   deploy-to-integration:
+    needs: build-focal-amd64-package
     runs-on: [self-hosted, linux, deploy]
     steps:
     - name: Checkout
@@ -23,4 +24,8 @@ jobs:
     - name: Run Ansible
       run: |
         export ANSIBLE_HOST_KEY_CHECKING=False
-        ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
+        $DEPLOY && ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
+        $DEPLOY && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+        $DEPLOY && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+      env:
+        deploy: ${{ secrets.DEPLOY}}
