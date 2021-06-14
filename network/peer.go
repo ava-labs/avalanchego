@@ -327,7 +327,7 @@ func (p *peer) WriteMessages() {
 		}
 		// Make sure the peer got the entire message
 		if err := writer.Flush(); err != nil {
-			p.net.log.Warn("couldn't flush writer to %s: %s", p.id, p.getIP(), err)
+			p.net.log.Verbo("couldn't flush writer to %s: %s", p.id, p.getIP(), err)
 			return
 		}
 
