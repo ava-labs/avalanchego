@@ -223,7 +223,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Staking
 	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
-	fs.Bool(EphemeralStakingCertsEnabledKey, false, "Forces the node to use ephemeral staking certificates. Defaults to false")
+	fs.Bool(EphemeralStakingCertsEnabledKey, false, "If true, the node uses an ephemeral staking key and certificate, and has an ephemeral node ID.")
 	fs.String(StakingKeyPathKey, defaultStakingKeyPath, "Path to the TLS private key for staking")
 	fs.String(StakingCertPathKey, defaultStakingCertPath, "Path to the TLS certificate for staking")
 	fs.Uint64(StakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
