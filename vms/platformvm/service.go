@@ -1098,13 +1098,22 @@ type AddDelegatorArgs struct {
 // delegator to the primary network
 func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("Platform: AddDelegator called")
+
+	localTime := service.vm.clock.Time()
+	syncTime := localTime.Add(2 * syncBound)
+	syncUnix := json.Uint64(syncTime.Unix())
+
+	if args.StartTime == 0 {
+		args.StartTime = syncUnix
+	}
+
 	switch {
-	case uint64(args.StartTime) < service.vm.clock.Unix():
-		return fmt.Errorf("start time must be in the future")
-	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
-		return errStartTimeTooLate
 	case args.RewardAddress == "":
 		return errNoRewardAddress
+	case args.StartTime < syncUnix:
+		return errStartTimeTooSoon
+	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+		return errStartTimeTooLate
 	}
 
 	// Parse the node ID
