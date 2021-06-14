@@ -395,15 +395,15 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 	tr, _ := trie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ := rlp.EncodeToBytes(acc)
-	tr.Update([]byte("acc-1"), val) // 0xc7a30f39aff471c95d8a837497ad0e49b65be475cc0953540f80cfcdbdcd9074
+	tr.Update([]byte("acc-1"), val) // 0x7dd654835190324640832972b7c4c6eaa0c50541e36766d054ed57721f1dc7eb
 
 	acc = &Account{Balance: big.NewInt(2), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
-	tr.Update([]byte("acc-2"), val) // 0x65145f923027566669a1ae5ccac66f945b55ff6eaeb17d2ea8e048b7d381f2d7
+	tr.Update([]byte("acc-2"), val) // 0xf73118e0254ce091588d66038744a0afae5f65a194de67cff310c683ae43329e
 
 	acc = &Account{Balance: big.NewInt(3), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
-	tr.Update([]byte("acc-3"), val) // 0x19ead688e907b0fab07176120dceec244a72aff2f0aa51e8b827584e378772f4
+	tr.Update([]byte("acc-3"), val) // 0x515d3de35e143cd976ad476398d910aa7bf8a02e8fd7eb9e3baacddbbcbfcb41
 	tr.Commit(nil)                  // Root: 0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978
 
 	// Delete an account trie leaf and ensure the generator chokes
@@ -445,15 +445,15 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ := rlp.EncodeToBytes(acc)
-	accTrie.Update([]byte("acc-1"), val) // 0x7af8a31cdacf9672ae46ac2726ece52a0a5e4d9b80fb39ca04d8a6c87de634b0
+	accTrie.Update([]byte("acc-1"), val) // 0x547b07c3a71669c00eda14077d85c7fd14575b92d459572540b25b9a11914dcb
 
 	acc = &Account{Balance: big.NewInt(2), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
-	accTrie.Update([]byte("acc-2"), val) // 0x16691bc8a441197767e40bb66f521b92952edaf1462813f4f5bcca39aae72ffa
+	accTrie.Update([]byte("acc-2"), val) // 0xf73118e0254ce091588d66038744a0afae5f65a194de67cff310c683ae43329e
 
 	acc = &Account{Balance: big.NewInt(3), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
-	accTrie.Update([]byte("acc-3"), val) // 0xa819054cfef894169a5b56ccc4e5e06f14829d4a57498e8b9fb13ff21491828d
+	accTrie.Update([]byte("acc-3"), val) // 0x70da4ebd7602dd313c936b39000ed9ab7f849986a90ea934f0c3ec4cc9840441
 	accTrie.Commit(nil)                  // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 
 	// We can only corrupt the disk database, so flush the tries out
@@ -500,15 +500,15 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	acc := &Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ := rlp.EncodeToBytes(acc)
-	accTrie.Update([]byte("acc-1"), val) // 0x7af8a31cdacf9672ae46ac2726ece52a0a5e4d9b80fb39ca04d8a6c87de634b0
+	accTrie.Update([]byte("acc-1"), val) // 0x547b07c3a71669c00eda14077d85c7fd14575b92d459572540b25b9a11914dcb
 
 	acc = &Account{Balance: big.NewInt(2), Root: emptyRoot.Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
-	accTrie.Update([]byte("acc-2"), val) // 0x16691bc8a441197767e40bb66f521b92952edaf1462813f4f5bcca39aae72ffa
+	accTrie.Update([]byte("acc-2"), val) // 0xf73118e0254ce091588d66038744a0afae5f65a194de67cff310c683ae43329e
 
 	acc = &Account{Balance: big.NewInt(3), Root: stTrie.Hash().Bytes(), CodeHash: emptyCode.Bytes()}
 	val, _ = rlp.EncodeToBytes(acc)
-	accTrie.Update([]byte("acc-3"), val) // 0xa819054cfef894169a5b56ccc4e5e06f14829d4a57498e8b9fb13ff21491828d
+	accTrie.Update([]byte("acc-3"), val) // 0x70da4ebd7602dd313c936b39000ed9ab7f849986a90ea934f0c3ec4cc9840441
 	accTrie.Commit(nil)                  // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 
 	// We can only corrupt the disk database, so flush the tries out
