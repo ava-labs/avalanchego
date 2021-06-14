@@ -22,7 +22,8 @@ jobs:
         token: ${{ secrets.AVALANCHE_PAT }}
   
     - name: Run Ansible
-      run: |
+      run: 
+      shell: bash |
         export ANSIBLE_HOST_KEY_CHECKING=False
         echo $DEPLOY
         $DEPLOY && ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
