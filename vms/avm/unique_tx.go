@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -117,37 +118,33 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
 func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
-type addressAssetIDEntry struct {
-	Address ids.ShortID
-	AssetID ids.ID
-}
-
 // getAddress returns a ids.ShortID address given a transaction. This function returns either a
 // ids.ShortEmpty ID or an address from the transaction object. An address is returned if the
 // tx object has UTXO with a singular receiver.
 // Should we check if the value of funds is > 0 too? 🤔❓
-func getAddresses(tx *UniqueTx) []addressAssetIDEntry {
-	addrs := []addressAssetIDEntry{}
+func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]bool {
+	// map of address => [...AssetID => bool]
+	addresses := map[ids.ShortID]map[ids.ID]bool{}
+
 	// go through all transfer outputs, assert they are secp transfer outputs
-	// filter by threshold == 1 and address in the transfer output == 1
 	for _, utxo := range tx.UTXOs() {
+		// todo what do we do about inputs?
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			continue
 		}
 
-		notSingularOutputReceiver := len(out.OutputOwners.Addrs) != 1 && out.OutputOwners.Threshold != 1
-		if notSingularOutputReceiver {
-			continue
+		assetID := utxo.AssetID()
+		for _, addr := range out.OutputOwners.Addrs {
+			if _, exists := addresses[addr]; !exists {
+				// is this necessary?
+				addresses[addr] = make(map[ids.ID]bool)
+			}
+			addresses[addr][assetID] = true
 		}
-
-		addrs = append(addrs, addressAssetIDEntry{
-			Address: out.OutputOwners.Addrs[0],
-			AssetID: utxo.AssetID(),
-		})
 	}
 	// return empty
-	return addrs
+	return addresses
 }
 
 // Accept is called when the transaction was finalized as accepted by consensus
@@ -194,12 +191,42 @@ func (tx *UniqueTx) Accept() error {
 	// should this be enabled on a config flag? Like indexing? 🤔❓
 	addresses := getAddresses(tx)
 	tx.vm.ctx.Log.Debug("Retrieved address data %s", addresses)
-	for _, address := range addresses {
-		addressPrefixDB := prefixdb.New(address.Address[:], tx.vm.db)
-		assetPrefixDB := linkeddb.NewDefault(prefixdb.New(address.AssetID[:], addressPrefixDB))
-		err := assetPrefixDB.Put(txID[:], tx.Bytes())
-		if err != nil {
-			tx.vm.ctx.Log.Error("Failed to save transaction to the address, assetID prefix DB", err)
+	for address, assetIDMap := range addresses {
+		addressPrefixDB := prefixdb.New(address[:], tx.vm.db)
+		for assetID := range assetIDMap {
+			assetPrefixDB := linkeddb.NewDefault(prefixdb.New(assetID[:], addressPrefixDB))
+			var idx uint64 = 1
+			idxBytes := make([]byte, 8)
+			exists, err := assetPrefixDB.Has([]byte("idx"))
+			tx.vm.ctx.Log.Debug("Processing address, assetID %s, %s, idx exists?", address, assetID, exists)
+			if err != nil {
+				tx.vm.ctx.Log.Error("Error checking idx value exists: %s", err)
+				return err
+			}
+
+			if exists {
+				idxBytes, err = assetPrefixDB.Get([]byte("idx"))
+				idx = binary.BigEndian.Uint64(idxBytes)
+				tx.vm.ctx.Log.Debug("fetched index %d", idx)
+				if err != nil {
+					// index exists but we can't read it? return error
+					tx.vm.ctx.Log.Error("Error reading idx value: %s", err)
+					return err
+				}
+			}
+			tx.vm.ctx.Log.Debug("Writing at index %d txID %s", idx, txID)
+			err = assetPrefixDB.Put(idxBytes, txID[:])
+			if err != nil {
+				tx.vm.ctx.Log.Error("Failed to save transaction to the address, assetID prefix DB %s", err)
+			}
+
+			idx++
+			binary.BigEndian.PutUint64(idxBytes, idx)
+			tx.vm.ctx.Log.Debug("New index %d", idx)
+			err = assetPrefixDB.Put([]byte("idx"), idxBytes)
+			if err != nil {
+				tx.vm.ctx.Log.Error("Failed to save transaction index to the address, assetID prefix DB %s", err)
+			}
 		}
 	}
 

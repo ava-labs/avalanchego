@@ -4,10 +4,12 @@
 package avm
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -98,7 +100,7 @@ type GetReceivedTxsArgs struct {
 type GetReceivedTxsReply struct {
 	TxIDs []ids.ID `json:"txIDs"`
 	// Cursor used as a page index / offset
-	Cursor ids.ID `json:"cursor"`
+	Cursor string `json:"cursor"`
 }
 
 // TODO: Remove static hardcoded limit of page size
@@ -120,7 +122,7 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
-		return err
+		return fmt.Errorf("specified `assetID` is invalid: %w", err)
 	}
 
 	addressTxDB := prefixdb.New(address[:], service.vm.db)
@@ -128,27 +130,41 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 
 	var txIDIter database.Iterator
 	unspecifiedCursor := len(args.Cursor) == 0
+	cursor := -1
+
 	if unspecifiedCursor {
 		txIDIter = assetPrefixDB.NewIterator()
 	} else {
-		txIDIter = assetPrefixDB.NewIteratorWithStart([]byte(args.Cursor))
+		cursor, err := strconv.ParseUint(args.Cursor, 10, 64)
+		if err != nil {
+			return fmt.Errorf("specified cursor is invalid: %w", err)
+		}
+		cBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(cBytes, cursor)
+		txIDIter = assetPrefixDB.NewIteratorWithStart(cBytes)
 	}
 
 	service.vm.ctx.Log.Debug("Fetching transactions for address")
 
 	var txIDs []ids.ID
 	for txIDIter.Next() {
-		txIDBytes := txIDIter.Key()
+		if string(txIDIter.Key()) == "idx" {
+			service.vm.ctx.Log.Debug("skipping index key")
+			continue
+		}
+		txIDBytes := txIDIter.Value()
 		if len(txIDBytes) != hashing.HashLen {
 			return fmt.Errorf("invalid tx ID %s", txIDBytes)
 		}
 		var txID ids.ID
-		copy(txID[:], txIDIter.Key())
+		copy(txID[:], txIDIter.Value())
 
 		txIDs = append(txIDs, txID)
 
 		// pageSize will be at least 1 so we do this at the end of the loop
+		service.vm.ctx.Log.Debug("tx len, max len, %d, %d", len(txIDs), pageSize)
 		if uint(len(txIDs)) == pageSize { // why is length of something not uint!? 🤷‍
+			service.vm.ctx.Log.Debug("skipping.")
 			break
 		}
 	}
@@ -157,8 +173,13 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 
 	reply.TxIDs = txIDs
 	if len(txIDs) > 0 {
-		lastTx := txIDs[len(txIDs)-1]
-		reply.Cursor = lastTx
+		if unspecifiedCursor {
+			cursor = 1 + len(txIDs)
+		} else {
+			cursor += len(txIDs)
+		}
+
+		reply.Cursor = strconv.FormatInt(int64(cursor), 10)
 	}
 
 	return nil
