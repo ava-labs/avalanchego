@@ -2,8 +2,8 @@ name: Branch Push CI
 on: [push]
 
 jobs:
-  run_lint:
-    name: lint
+  lint:
+    name: Lint
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
@@ -12,7 +12,25 @@ jobs:
         with:
           version: latest
           working-directory: .
-          args: --timeout 10m
+          args: --timeout 3m
+  test:
+    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        go: ['1.15']
+        os: [macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-latest]
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v1
+      with:
+        go-version: ${{ matrix.go }}
+    - run: go mod download
+      shell: bash
+    - run: ./scripts/build.sh evm
+      shell: bash
+    - run: ./scripts/build_test.sh
+      shell: bash
   e2e:
     name: Golang E2E Tests v${{ matrix.go }} (${{ matrix.os }})
     needs: run_lint
@@ -31,5 +49,6 @@ jobs:
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
-        KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
-        KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
+        KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
+        KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
+  

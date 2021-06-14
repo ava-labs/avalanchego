@@ -35,4 +35,4 @@ WORKDIR /avalanchego/build
 
 # Copy the executables into the container
 COPY --from=builtImage /avalanchego/build .
-COPY --from=builder /build/evm ./plugins/evm
+COPY --from=builder /build/evm ./avalanchego-latest/plugins/evm

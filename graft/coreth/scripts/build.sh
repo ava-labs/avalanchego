@@ -5,13 +5,13 @@ set -o nounset
 set -o pipefail
 
 # Avalanche root directory
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+CORETH_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
 
 # Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
+source "$CORETH_PATH"/scripts/versions.sh
 
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$CORETH_PATH"/scripts/constants.sh
 
 if [[ $# -eq 1 ]]; then
     binary_path=$1
