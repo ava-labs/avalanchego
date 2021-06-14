@@ -10,6 +10,11 @@ jobs:
 #    needs: build-focal-amd64-package
     runs-on: [self-hosted, linux, deploy]
     steps:
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      shell: bash
+
     - name: Checkout
       uses: actions/checkout@v2
       with:
@@ -26,10 +31,13 @@ jobs:
         export ANSIBLE_HOST_KEY_CHECKING=False
         if [[ ${{ secrets.DEPLOY }} == "true" ]]
         then 
-          echo 'The deployment is enabled.  Deploying to integration'
+          echo "The deployment is enabled.  Deploying $TAG to integration"
           ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
           ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
           ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
         else
           echo 'The deployment is not set to "true".  Skipping deployment.'
         fi
+      env:
+        TAG: ${{ steps.get_version.outputs.VERSION }}
+
