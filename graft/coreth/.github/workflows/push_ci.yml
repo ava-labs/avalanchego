@@ -33,7 +33,6 @@ jobs:
       shell: bash
   e2e:
     name: Golang E2E Tests v${{ matrix.go }} (${{ matrix.os }})
-    needs: run_lint
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
