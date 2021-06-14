@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy-to-integration:
-    runs-on: [self-hosted, linux, deploy, focal]
+    runs-on: [self-hosted, linux, deploy]
     steps:
     - name: Checkout
       uses: actions/checkout@v2
