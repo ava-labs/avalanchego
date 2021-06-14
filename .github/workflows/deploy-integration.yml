@@ -24,6 +24,12 @@ jobs:
     - name: Run Ansible
       run: | 
         export ANSIBLE_HOST_KEY_CHECKING=False
-        ${{ secrets.DEPLOY }} && ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
-        ${{ secrets.DEPLOY }} && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
-        ${{ secrets.DEPLOY }} && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+        if [[ ${{ secrets.DEPLOY }} == "true" ]]
+        then 
+          echo 'The deployment is enabled.  Deploying to integration'
+          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
+          ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+          ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+        else
+          echo 'The deployment is not set to "true".  Skipping deployment.'
+        fi
