@@ -34,6 +34,8 @@ const (
 	// Max number of addresses allowed for a single keystore user
 	maxKeystoreAddresses = 5000
 
+	// Minimum amount of delay to allow a transaction to be issued through the
+	// API
 	minAddStakerDelay = 2 * syncBound
 )
 
@@ -48,6 +50,7 @@ var (
 	errNoPrimaryValidators   = errors.New("no default subnet validators")
 	errCorruptedReason       = errors.New("tx validity corrupted")
 	errStartTimeTooSoon      = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
+	errStartTimeTooLate      = errors.New("start time is too far in the future")
 )
 
 // Service defines the API calls that can be made to the platform chain
