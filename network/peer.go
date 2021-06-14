@@ -421,27 +421,27 @@ func (p *peer) handle(msg Msg) {
 	switch op {
 	case Version:
 		p.handleVersion(msg)
-		p.net.msgThrottler.Release(msgLen, p.id, 0) // TODO put duration
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	case GetVersion:
 		p.handleGetVersion(msg)
-		p.net.msgThrottler.Release(msgLen, p.id, 0) // TODO put duration
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	case Ping:
 		p.handlePing(msg)
-		p.net.msgThrottler.Release(msgLen, p.id, 0) // TODO put duration
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	case Pong:
 		p.handlePong(msg)
-		p.net.msgThrottler.Release(msgLen, p.id, 0) // TODO put duration
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	case GetPeerList:
 		p.handleGetPeerList(msg)
-		p.net.msgThrottler.Release(msgLen, p.id, 0) // TODO put duration
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	case PeerList:
 		p.handlePeerList(msg)
-		p.net.msgThrottler.Release(msgLen, p.id, 0) // TODO put duration
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	}
 	if !p.connected.GetValue() {
@@ -454,7 +454,7 @@ func (p *peer) handle(msg Msg) {
 		if !p.gotPeerList.GetValue() {
 			p.sendGetPeerList()
 		}
-		p.net.msgThrottler.Release(msgLen, p.id, 0)
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	}
 
@@ -471,7 +471,7 @@ func (p *peer) handle(msg Msg) {
 				p.compatible.SetValue(false)
 			}
 		}
-		p.net.msgThrottler.Release(msgLen, p.id, 0)
+		p.net.msgThrottler.Release(msgLen, p.id)
 		return
 	}
 
@@ -909,14 +909,13 @@ func (p *peer) handleGetAcceptedFrontier(msg Msg) {
 	requestID := msg.Get(RequestID).(uint32)
 	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAcceptedFrontier(
 		p.id,
 		chainID,
 		requestID,
 		deadline,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -943,14 +942,13 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 		p.idSet.Add(containerID)
 	}
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.AcceptedFrontier(
 		p.id,
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -978,7 +976,6 @@ func (p *peer) handleGetAccepted(msg Msg) {
 		p.idSet.Add(containerID)
 	}
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAccepted(
 		p.id,
@@ -986,7 +983,7 @@ func (p *peer) handleGetAccepted(msg Msg) {
 		requestID,
 		deadline,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1013,14 +1010,13 @@ func (p *peer) handleAccepted(msg Msg) {
 		p.idSet.Add(containerID)
 	}
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Accepted(
 		p.id,
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1033,7 +1029,6 @@ func (p *peer) handleGet(msg Msg) {
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Get(
 		p.id,
@@ -1041,7 +1036,7 @@ func (p *peer) handleGet(msg Msg) {
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1053,7 +1048,6 @@ func (p *peer) handleGetAncestors(msg Msg) {
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAncestors(
 		p.id,
@@ -1061,7 +1055,7 @@ func (p *peer) handleGetAncestors(msg Msg) {
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1074,7 +1068,6 @@ func (p *peer) handlePut(msg Msg) {
 	p.net.log.AssertNoError(err)
 	container := msg.Get(ContainerBytes).([]byte)
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Put(
 		p.id,
@@ -1082,7 +1075,7 @@ func (p *peer) handlePut(msg Msg) {
 		requestID,
 		containerID,
 		container,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1093,14 +1086,13 @@ func (p *peer) handleMultiPut(msg Msg) {
 	requestID := msg.Get(RequestID).(uint32)
 	containers := msg.Get(MultiContainerBytes).([][]byte)
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.MultiPut(
 		p.id,
 		chainID,
 		requestID,
 		containers,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1114,7 +1106,6 @@ func (p *peer) handlePushQuery(msg Msg) {
 	p.net.log.AssertNoError(err)
 	container := msg.Get(ContainerBytes).([]byte)
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.PushQuery(
 		p.id,
@@ -1123,7 +1114,7 @@ func (p *peer) handlePushQuery(msg Msg) {
 		deadline,
 		containerID,
 		container,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1136,7 +1127,6 @@ func (p *peer) handlePullQuery(msg Msg) {
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.PullQuery(
 		p.id,
@@ -1144,7 +1134,7 @@ func (p *peer) handlePullQuery(msg Msg) {
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 
@@ -1171,14 +1161,13 @@ func (p *peer) handleChits(msg Msg) {
 		p.idSet.Add(containerID)
 	}
 
-	now := time.Now()
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Chits(
 		p.id,
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id, time.Since(now)) },
+		func() { p.net.msgThrottler.Release(msgLen, p.id) },
 	)
 }
 

@@ -5,7 +5,6 @@ package network
 
 import (
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -25,7 +24,7 @@ type MsgThrottler interface {
 	// Mark that a message from [nodeID] of size [msgSize]
 	// has been removed from the incoming message buffer.
 	// TODO use duration
-	Release(msgSize uint64, nodeID ids.ShortID, dur time.Duration)
+	Release(msgSize uint64, nodeID ids.ShortID)
 }
 
 func newSybilMsgThrottler(
@@ -105,7 +104,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	}
 }
 
-func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID, _ time.Duration) {
+func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	if msgSize == 0 {
 		return // TODO this should never happen
 	}
@@ -143,4 +142,4 @@ type noMsgThrottler struct{}
 
 func (*noMsgThrottler) Acquire(uint64, ids.ShortID) {}
 
-func (*noMsgThrottler) Release(uint64, ids.ShortID, time.Duration) {}
+func (*noMsgThrottler) Release(uint64, ids.ShortID) {}
