@@ -209,7 +209,7 @@ func TestVMNilConfig(t *testing.T) {
 func TestVMContinuosProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
-	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": %v}", profilerDir, int64(profilerFrequency))
+	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": \"500ms\"}", profilerDir)
 	_, vm, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
 	assert.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
 	assert.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
