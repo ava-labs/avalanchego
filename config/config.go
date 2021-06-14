@@ -223,7 +223,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Staking
 	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
-	fs.Bool(EphemeralStakingCertsEnabledKey, false, "If true, the node uses an ephemeral staking key and certificate, and has an ephemeral node ID.")
+	fs.Bool(EphemeralStakingCertEnabledKey, false, "If true, the node uses an ephemeral staking key and certificate, and has an ephemeral node ID.")
 	fs.String(StakingKeyPathKey, defaultStakingKeyPath, "Path to the TLS private key for staking")
 	fs.String(StakingCertPathKey, defaultStakingCertPath, "Path to the TLS certificate for staking")
 	fs.Uint64(StakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
@@ -490,7 +490,7 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 		return node.Config{}, process.Config{}, errInvalidStakerWeights
 	}
 
-	if nodeConfig.FetchOnly || v.GetBool(EphemeralStakingCertsEnabledKey) {
+	if nodeConfig.FetchOnly || v.GetBool(EphemeralStakingCertEnabledKey) {
 		// In fetch only mode or if explicitly set, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
