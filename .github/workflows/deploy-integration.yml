@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy-to-integration:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, deploy, focal]
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -20,17 +20,6 @@ jobs:
         repository: ava-labs/devops
         token: ${{ secrets.AVALANCHE_PAT }}
   
-    - name: Install Ansible
-      run: |
-        sudo apt install software-properties-common
-        sudo add-apt-repository --yes --update ppa:ansible/ansible
-        sudo apt install ansible
-
-    - name: Setup SSH key
-      uses: webfactory/ssh-agent@v0.5.3
-      with:
-        ssh-private-key: ${{ secrets.AVALANCHE_KEY }}
-       
     - name: Run Ansible
       run: |
         ansible-playbook -i scripts/ansible/testnet/inventory/integration-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
