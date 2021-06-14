@@ -23,9 +23,8 @@ jobs:
   
     - name: Run Ansible
       run: | 
-        bash
         export ANSIBLE_HOST_KEY_CHECKING=False
-        if [[ "$DEPLOY" = true ]]
+        if [[ "$DEPLOY" == true ]]
         then
           echo "The deployment will work"
         else
