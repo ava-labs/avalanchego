@@ -122,9 +122,11 @@ func (tx *UniqueTx) Key() interface{} { return tx.txID }
 // ids.ShortEmpty ID or an address from the transaction object. An address is returned if the
 // tx object has UTXO with a singular receiver.
 // Should we check if the value of funds is > 0 too? 🤔❓
-func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]bool {
+var valExists = struct{}{}
+
+func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]struct{} {
 	// map of address => [...AssetID => bool]
-	addresses := map[ids.ShortID]map[ids.ID]bool{}
+	addresses := map[ids.ShortID]map[ids.ID]struct{}{}
 
 	// go through all transfer outputs, assert they are secp transfer outputs
 	for _, utxo := range tx.UTXOs() {
@@ -137,14 +139,15 @@ func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]bool {
 		assetID := utxo.AssetID()
 		for _, addr := range out.OutputOwners.Addrs {
 			if _, exists := addresses[addr]; !exists {
-				// is this necessary?
-				addresses[addr] = make(map[ids.ID]bool)
+				addresses[addr] = make(map[ids.ID]struct{})
 			}
-			addresses[addr][assetID] = true
+			addresses[addr][assetID] = valExists
 		}
 	}
 	return addresses
 }
+
+var idxKey = []byte("idx")
 
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {
@@ -199,7 +202,7 @@ func (tx *UniqueTx) Accept() error {
 			idxBytes := make([]byte, 8)
 			binary.BigEndian.PutUint64(idxBytes, idx)
 
-			exists, err := assetPrefixDB.Has([]byte("idx"))
+			exists, err := assetPrefixDB.Has(idxKey)
 			tx.vm.ctx.Log.Debug("Processing address, assetID %s, %s, idx exists?", address, assetID, exists)
 			if err != nil {
 				tx.vm.ctx.Log.Error("Error checking idx value exists: %s", err)
@@ -207,7 +210,7 @@ func (tx *UniqueTx) Accept() error {
 			}
 
 			if exists {
-				idxBytes, err = assetPrefixDB.Get([]byte("idx"))
+				idxBytes, err = assetPrefixDB.Get(idxKey)
 				idx = binary.BigEndian.Uint64(idxBytes)
 				tx.vm.ctx.Log.Debug("fetched index %d", idx)
 				if err != nil {
@@ -225,9 +228,9 @@ func (tx *UniqueTx) Accept() error {
 			idx++
 			binary.BigEndian.PutUint64(idxBytes, idx)
 			tx.vm.ctx.Log.Debug("New index %d", idx)
-			err = assetPrefixDB.Put([]byte("idx"), idxBytes)
+			err = assetPrefixDB.Put(idxKey, idxBytes)
 			if err != nil {
-				tx.vm.ctx.Log.Error("Failed to save transaction index to the address, assetID prefix DB %s", err)
+				tx.vm.ctx.Log.Error("Failed to save transaction index to the address, assetID prefix DB: %s", err)
 			}
 		}
 	}
