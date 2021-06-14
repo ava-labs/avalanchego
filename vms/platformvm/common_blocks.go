@@ -168,7 +168,12 @@ func (b *CommonBlock) ParentID() ids.ID { return b.PrntID }
 func (b *CommonBlock) Height() uint64 { return b.Hght }
 
 // Timestamp returns this block's time.
-func (b *CommonBlock) Timestamp() time.Time { return b.timestamp }
+func (b *CommonBlock) Timestamp() time.Time {
+	if b.id == b.vm.lastAcceptedID {
+		return b.vm.internalState.GetTimestamp()
+	}
+	return b.timestamp
+}
 
 // Parent returns [b]'s parent
 func (b *CommonBlock) Parent() snowman.Block {
