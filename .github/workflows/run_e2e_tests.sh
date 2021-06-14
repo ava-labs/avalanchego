@@ -15,13 +15,13 @@ avalanchego_repo="avaplatform/avalanchego"
 avalanche_testing_image="${avalanche_testing_repo}:master"
 
 # Avalanche root directory
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
+CORETH_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 
 # Load the versions
-source "$AVALANCHE_PATH"/scripts/versions.sh
+source "$CORETH_PATH"/scripts/versions.sh
 
 # Load the constants
-source "$AVALANCHE_PATH"/scripts/constants.sh
+source "$CORETH_PATH"/scripts/constants.sh
 
 # Login to docker
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
@@ -59,7 +59,7 @@ docker pull $avalanche_testing_image
 git_commit_id=$( git rev-list -1 HEAD )
 
 # Build current avalanchego
-source "$AVALANCHE_PATH"/scripts/build_image.sh
+source "$CORETH_PATH"/scripts/build_image.sh
 
 # Target built version to use in avalanche-testing
 avalanche_image="avaplatform/avalanchego:$build_image_id"
@@ -77,7 +77,7 @@ custom_params_json="{
 }"
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 
-bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
+bash "$CORETH_PATH/.kurtosis/kurtosis.sh" \
     --tests "C-Chain Bombard WorkFlow" \
     --custom-params "${custom_params_json}" \
     "${avalanche_testing_image}" \
