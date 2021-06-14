@@ -51,4 +51,3 @@ jobs:
         DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
         KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
-  
