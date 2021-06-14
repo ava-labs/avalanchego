@@ -143,7 +143,6 @@ func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]bool {
 			addresses[addr][assetID] = true
 		}
 	}
-	// return empty
 	return addresses
 }
 
