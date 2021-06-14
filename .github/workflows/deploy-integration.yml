@@ -22,4 +22,4 @@ jobs:
   
     - name: Run Ansible
       run: |
-        ansible-playbook -i scripts/ansible/testnet/inventory/integration-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
+        ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
