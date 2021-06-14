@@ -2,12 +2,12 @@ name: Deploy to Integration
 
 on:
   push:
-    branches:
-      - CD
+    tags:
+      - '*'
 
 jobs:
   deploy-to-integration:
-#    needs: build-focal-amd64-package
+    needs: build-focal-amd64-package
     runs-on: [self-hosted, linux, deploy]
     steps:
     - name: Get the version
@@ -32,9 +32,9 @@ jobs:
         if [[ ${{ secrets.DEPLOY }} == "true" ]]
         then 
           echo "The deployment is enabled.  Deploying $TAG to integration"
-          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
-          ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
-          ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/new-update-from-s3-and-restart.yml -e $TAG
+          ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/new-update-from-s3-and-restart.yml -e $TAG
+          ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u avalanche scripts/ansible/mainnet/new-update-from-s3-and-restart.yml -e $TAG
         else
           echo 'The deployment is not set to "true".  Skipping deployment.'
         fi
