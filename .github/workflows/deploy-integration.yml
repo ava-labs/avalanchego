@@ -25,6 +25,6 @@ jobs:
       run: |
         export ANSIBLE_HOST_KEY_CHECKING=False
         echo $DEPLOY
-        $DEPLOY && ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
+        ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
       env:
         deploy: ${{ secrets.DEPLOY}}
