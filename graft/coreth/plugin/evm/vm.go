@@ -270,7 +270,7 @@ func (vm *VM) Initialize(
 	vm.config.SetDefaults()
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
 		}
 	}
 
