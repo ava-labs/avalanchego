@@ -12,8 +12,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/database"
-
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 
@@ -128,45 +126,63 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 	addressTxDB := prefixdb.New(address[:], service.vm.db)
 	assetPrefixDB := linkeddb.NewDefault(prefixdb.New(assetID[:], addressTxDB))
 
-	var txIDIter database.Iterator
+	var cursor uint64
+	cursorBytes := make([]byte, 8)
 	unspecifiedCursor := len(args.Cursor) == 0
-	cursor := -1
-
 	if unspecifiedCursor {
-		txIDIter = assetPrefixDB.NewIterator()
+		cursor = 1
+		binary.BigEndian.PutUint64(cursorBytes, cursor)
 	} else {
-		cursor, err := strconv.ParseUint(args.Cursor, 10, 64)
+		cursor, err = strconv.ParseUint(args.Cursor, 10, 64)
 		if err != nil {
-			return fmt.Errorf("specified cursor is invalid: %w", err)
+			return fmt.Errorf("specified cursor is invalid, must be numeric > 0 : %w", err)
 		}
-		cBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(cBytes, cursor)
-		txIDIter = assetPrefixDB.NewIteratorWithStart(cBytes)
+
+		if cursor == 0 {
+			return fmt.Errorf("cursor must be > 0")
+		}
+
+		binary.BigEndian.PutUint64(cursorBytes, cursor)
 	}
 
-	service.vm.ctx.Log.Debug("Fetching transactions for address")
+	service.vm.ctx.Log.Debug("Fetching transactions, cursor %s", cursor)
 
 	var txIDs []ids.ID
-	for txIDIter.Next() {
-		if string(txIDIter.Key()) == "idx" {
-			service.vm.ctx.Log.Debug("skipping index key")
-			continue
+	exists, err := assetPrefixDB.Has(cursorBytes)
+	service.vm.ctx.Log.Debug("cursor, exists, err = %d, %s, %s", cursor, exists, err)
+	for exists && err == nil {
+		var txIDBytes []byte
+		txIDBytes, err = assetPrefixDB.Get(cursorBytes)
+		service.vm.ctx.Log.Debug("Getting transaction at cursor %d", cursor)
+
+		if err != nil {
+			return fmt.Errorf("error fetching transaction: %s", err)
 		}
-		txIDBytes := txIDIter.Value()
+
 		if len(txIDBytes) != hashing.HashLen {
 			return fmt.Errorf("invalid tx ID %s", txIDBytes)
 		}
+
 		var txID ids.ID
-		copy(txID[:], txIDIter.Value())
+		copy(txID[:], txIDBytes)
 
 		txIDs = append(txIDs, txID)
 
-		// pageSize will be at least 1 so we do this at the end of the loop
-		service.vm.ctx.Log.Debug("tx len, max len, %d, %d", len(txIDs), pageSize)
-		if uint(len(txIDs)) == pageSize { // why is length of something not uint!? 🤷‍
-			service.vm.ctx.Log.Debug("skipping.")
+		service.vm.ctx.Log.Debug("Got transaction at cursor %d, %s", cursor, txID)
+
+		cursor++
+		binary.BigEndian.PutUint64(cursorBytes, cursor)
+
+		if uint(len(txIDs)) >= pageSize {
 			break
 		}
+
+		exists, err = assetPrefixDB.Has(cursorBytes)
+		service.vm.ctx.Log.Debug("cursor, exists, err = %d, %s, %s", cursor, exists, err)
+	}
+
+	if err != nil {
+		return fmt.Errorf("error fetching transactions: %s", err)
 	}
 
 	service.vm.ctx.Log.Debug("Fetched %d transactions for address", len(txIDs))
@@ -174,9 +190,9 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 	reply.TxIDs = txIDs
 	if len(txIDs) > 0 {
 		if unspecifiedCursor {
-			cursor = 1 + len(txIDs)
+			cursor = 1 + uint64(len(txIDs))
 		} else {
-			cursor += len(txIDs)
+			cursor += uint64(len(txIDs))
 		}
 
 		reply.Cursor = strconv.FormatInt(int64(cursor), 10)

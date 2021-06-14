@@ -195,8 +195,11 @@ func (tx *UniqueTx) Accept() error {
 		addressPrefixDB := prefixdb.New(address[:], tx.vm.db)
 		for assetID := range assetIDMap {
 			assetPrefixDB := linkeddb.NewDefault(prefixdb.New(assetID[:], addressPrefixDB))
+
 			var idx uint64 = 1
 			idxBytes := make([]byte, 8)
+			binary.BigEndian.PutUint64(idxBytes, idx)
+
 			exists, err := assetPrefixDB.Has([]byte("idx"))
 			tx.vm.ctx.Log.Debug("Processing address, assetID %s, %s, idx exists?", address, assetID, exists)
 			if err != nil {
