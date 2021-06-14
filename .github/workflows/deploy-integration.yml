@@ -22,4 +22,5 @@ jobs:
   
     - name: Run Ansible
       run: |
+        export ANSIBLE_HOST_KEY_CHECKING=False
         ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
