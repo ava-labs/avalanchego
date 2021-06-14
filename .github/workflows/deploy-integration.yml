@@ -24,12 +24,6 @@ jobs:
     - name: Run Ansible
       run: | 
         export ANSIBLE_HOST_KEY_CHECKING=False
-        if [[ "${{ secrets.DEPLOY }}" == "true" ]]
-        then
-          echo "The deployment will work"
-        else
-          echo "The deployment will fail"
-        fi
-#        $DEPLOY && ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
-#        $DEPLOY && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
-#        $DEPLOY && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+        ${{ secrets.DEPLOY }} && ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/healthy.yml
+        ${{ secrets.DEPLOY }} && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
+        ${{ secrets.DEPLOY }} && ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/healthy.yml
