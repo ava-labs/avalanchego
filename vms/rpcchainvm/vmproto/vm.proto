@@ -1,5 +1,7 @@
 syntax = "proto3";
+
 package vmproto;
+
 option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto";
 
 // To compile: protoc --go_out=plugins=grpc:. vm.proto
@@ -14,7 +16,7 @@ message InitializeRequest {
     bytes genesisBytes = 7;
     bytes upgradeBytes = 8;
     bytes configBytes = 9;
-    
+
     repeated VersionedDBServer dbServers = 10;
     uint32 engineServer = 11;
     uint32 keystoreServer = 12;
@@ -54,6 +56,12 @@ message ShutdownResponse {}
 message CreateHandlersRequest {}
 
 message CreateHandlersResponse {
+    repeated Handler handlers = 1;
+}
+
+message CreateStaticHandlersRequest {}
+
+message CreateStaticHandlersResponse {
     repeated Handler handlers = 1;
 }
 
@@ -119,9 +127,9 @@ message BlockRejectRequest {
 
 message BlockRejectResponse {}
 
-message HealthRequest{}
+message HealthRequest {}
 
-message HealthResponse{
+message HealthResponse {
     string details = 1;
 }
 
@@ -131,6 +139,7 @@ service VM {
     rpc Bootstrapped(BootstrappedRequest) returns (BootstrappedResponse);
     rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
     rpc CreateHandlers(CreateHandlersRequest) returns (CreateHandlersResponse);
+    rpc CreateStaticHandlers(CreateStaticHandlersRequest) returns (CreateStaticHandlersResponse);
     rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);

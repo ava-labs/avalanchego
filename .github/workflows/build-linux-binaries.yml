@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-x86_64-binaries-tarball:
-    runs-on: ubuntu-18.04 
+    runs-on: ubuntu-18.04
 
     steps:
     - uses: actions/checkout@v2

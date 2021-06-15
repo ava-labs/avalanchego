@@ -7,13 +7,13 @@ package logging
 type NoFactory struct{}
 
 // Make ...
-func (NoFactory) Make() (Logger, error) { return NoLog{}, nil }
+func (NoFactory) Make(string) (Logger, error) { return NoLog{}, nil }
 
 // MakeChain ...
-func (NoFactory) MakeChain(string, string) (Logger, error) { return NoLog{}, nil }
+func (NoFactory) MakeChain(string) (Logger, error) { return NoLog{}, nil }
 
-// MakeSubdir ...
-func (NoFactory) MakeSubdir(string) (Logger, error) { return NoLog{}, nil }
+// MakeChainChild ...
+func (NoFactory) MakeChainChild(string, string) (Logger, error) { return NoLog{}, nil }
 
 // Close ...
 func (NoFactory) Close() {}

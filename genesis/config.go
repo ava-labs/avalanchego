@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path"
+	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -211,10 +211,10 @@ func GetConfig(networkID uint32) *Config {
 
 // GetConfigFile loads a *Config from a provided
 // filepath.
-func GetConfigFile(filepath string) (*Config, error) {
-	b, err := ioutil.ReadFile(path.Clean(filepath))
+func GetConfigFile(fp string) (*Config, error) {
+	b, err := ioutil.ReadFile(filepath.Clean(fp))
 	if err != nil {
-		return nil, fmt.Errorf("unable to load file %s: %w", filepath, err)
+		return nil, fmt.Errorf("unable to load file %s: %w", fp, err)
 	}
 
 	var unparsedConfig UnparsedConfig

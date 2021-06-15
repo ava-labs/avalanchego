@@ -202,20 +202,20 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 // MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]
 func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, blks [][]byte) error {
-	if lenBlks := len(blks); lenBlks > common.MaxContainersPerMultiPut {
-		b.Ctx.Log.Debug("MultiPut(%s, %d) contains more than maximum number of blocks",
-			vdr, requestID)
-		return b.GetAncestorsFailed(vdr, requestID)
-	} else if lenBlks == 0 {
+	lenBlks := len(blks)
+	if lenBlks == 0 {
 		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no blocks", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
+	}
+	if lenBlks > b.MultiputMaxContainersReceived {
+		blks = blks[:b.MultiputMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenBlks-b.MultiputMaxContainersReceived, vdr, requestID)
 	}
 
 	// Make sure this is in response to a request we made
 	wantedBlkID, ok := b.OutstandingRequests.Remove(vdr, requestID)
 	if !ok { // this message isn't in response to a request we made
-		b.Ctx.Log.Debug("received unexpected MultiPut from %s with ID %d",
-			vdr, requestID)
+		b.Ctx.Log.Debug("received unexpected MultiPut from %s with ID %d", vdr, requestID)
 		return nil
 	}
 
