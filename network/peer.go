@@ -307,7 +307,7 @@ func (p *peer) WriteMessages() {
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
 		msgLen := len(msg)
-		var compMsgSize = -1
+		compMsgSize := -1
 
 		if msgLen >= 128 {
 			// only enable gzip if msg size is > 128 bytes
