@@ -1,6 +1,11 @@
 #!/bin/bash
+if [ -n "$1" ]; then 
+  cd $1
+  echo "Found folder $1"
+fi
 for PBF in $(find . -type f | grep proto$)
 do
+  echo $PBF
   PFILE=$(basename $PBF)
   FDIR=$(dirname $PBF)
   PDIR=$(dirname $FDIR)
