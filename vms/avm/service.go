@@ -4,6 +4,7 @@
 package avm
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -38,6 +39,8 @@ const (
 
 	// Max number of addresses allowed for a single keystore user
 	maxKeystoreAddresses = 5000
+
+	maxPageSize uint64 = 1000
 )
 
 var (
@@ -102,26 +105,12 @@ type GetReceivedTxsReply struct {
 	Cursor string `json:"cursor"`
 }
 
-const MaxPageSize uint64 = 1000
-
-func isEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i, v := range a {
-		if v != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // GetReceivedTxs returns list of transactions received by given address
 // prefix db by assetId, API will provide a field in request to allow filtering by assetId, else default to AVAX
 func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs, reply *GetReceivedTxsReply) error {
 	pageSize := uint64(args.PageSize)
-	if pageSize == 0 || pageSize > MaxPageSize {
-		return fmt.Errorf("pageSize must be greater than zero and less than the maximum allowed size of %d", MaxPageSize)
+	if pageSize == 0 || pageSize > maxPageSize {
+		return fmt.Errorf("pageSize must be greater than zero and less than the maximum allowed size of %d", maxPageSize)
 	}
 
 	// Parse to address
@@ -160,9 +149,8 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 
 	service.vm.ctx.Log.Debug("Fetching transactions, cursor %s", cursor)
 
-	var txIDs []ids.ID
 	for iterator.Next() {
-		if isEqual([]byte("idx"), iterator.Key()) {
+		if bytes.Equal([]byte("idx"), iterator.Key()) {
 			continue
 		}
 
@@ -174,22 +162,20 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 		var txID ids.ID
 		copy(txID[:], txIDBytes)
 
-		txIDs = append(txIDs, txID)
-		if uint64(len(txIDs)) >= pageSize {
+		reply.TxIDs = append(reply.TxIDs, txID)
+		if uint64(len(reply.TxIDs)) >= pageSize {
 			break
 		}
 	}
 
-	service.vm.ctx.Log.Debug("Fetched %d transactions for address", len(txIDs))
+	service.vm.ctx.Log.Debug("Fetched %d transactions for address", len(reply.TxIDs))
 
-	reply.TxIDs = txIDs
-	if len(txIDs) > 0 {
+	if len(reply.TxIDs) > 0 {
 		if unspecifiedCursor {
-			cursor = 1 + uint64(len(txIDs))
+			cursor = 1 + uint64(len(reply.TxIDs))
 		} else {
-			cursor += uint64(len(txIDs))
+			cursor += uint64(len(reply.TxIDs))
 		}
-
 		reply.Cursor = strconv.FormatInt(int64(cursor), 10)
 	}
 

@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -21,6 +22,7 @@ import (
 )
 
 var (
+	idxKey             = []byte("idx")
 	errAssetIDMismatch = errors.New("asset IDs in the input don't match the utxo")
 	errWrongAssetID    = errors.New("asset ID must be AVAX in the atomic tx")
 	errMissingUTXO     = errors.New("missing utxo")
@@ -146,8 +148,6 @@ func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]struct{} {
 	return addresses
 }
 
-var idxKey = []byte("idx")
-
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {
 	tx.vm.ctx.Log.Info("Transaction got accepted!")
@@ -204,31 +204,27 @@ func (tx *UniqueTx) Accept() error {
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
 			var idx uint64
-			var idxBytes []byte
-
 			idxBytes, err := assetPrefixDB.Get(idxKey)
-
-			// we have an error and it is not item not found error
-			if err != nil && err != database.ErrNotFound {
+			switch {
+			// Unexpected error
+			case err != nil && err != database.ErrNotFound:
 				tx.vm.ctx.Log.Fatal("Error checking idx value exists: %s", err)
 				return err
-			} else if err == database.ErrNotFound {
-				// idx was not found in database, create defaults
-				idx = 1
-				idxBytes = make([]byte, 8)
+			case err == database.ErrNotFound:
+				// idx not found; this must be the first entry.
+				idx = 0
+				idxBytes = make([]byte, wrappers.LongLen)
 				binary.BigEndian.PutUint64(idxBytes, idx)
-			}
-
-			// if we managed to read the index from the database:
-			if err == nil {
+			default:
+				// Parse [idxBytes]
 				idx = binary.BigEndian.Uint64(idxBytes)
 				tx.vm.ctx.Log.Debug("fetched index %d", idx)
 			}
 
 			tx.vm.ctx.Log.Debug("Writing at index %d txID %s", idx, txID)
-			err = assetPrefixDB.Put(idxBytes, txID[:])
-			if err != nil {
+			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
 				tx.vm.ctx.Log.Fatal("Failed to save transaction to the address, assetID prefix DB %s", err)
+				return err
 			}
 
 			// increment and store the index for next use
@@ -236,9 +232,9 @@ func (tx *UniqueTx) Accept() error {
 			binary.BigEndian.PutUint64(idxBytes, idx)
 			tx.vm.ctx.Log.Debug("New index %d", idx)
 
-			err = assetPrefixDB.Put(idxKey, idxBytes)
-			if err != nil {
+			if err := assetPrefixDB.Put(idxKey, idxBytes); err != nil {
 				tx.vm.ctx.Log.Fatal("Failed to save transaction index to the address, assetID prefix DB: %s", err)
+				return err
 			}
 		}
 	}
