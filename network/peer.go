@@ -308,7 +308,7 @@ func (p *peer) ReadMessages() {
 					p.net.log.Error("Could not read gzipped message from peer %s %s", p.id, err)
 					return
 				}
-				p.net.log.Debug("Inflated message from peer %s, compressed=%s, decompressed=%s", compLen, len(msgBytes))
+				p.net.log.Debug("Inflated message from peer %d, compressed=%d, decompressed=%s", p.id, compLen, len(msgBytes))
 			} else {
 				p.net.log.Debug("Gzip enabled peer did not compress this message %s", p.id)
 			}
