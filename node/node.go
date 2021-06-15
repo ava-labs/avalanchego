@@ -635,7 +635,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
+		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
 			Chains:             n.chainManager,
 			Validators:         vdrs,
 			StakingEnabled:     n.Config.EnableStaking,
@@ -651,17 +651,17 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
 		}),
-		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
+		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
 			Fee:         n.Config.TxFee,
 		}),
-		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
+		n.vmManager.RegisterFactory(evm.ID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
-		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
-		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
-		n.vmManager.RegisterVMFactory(propertyfx.ID, &propertyfx.Factory{}),
+		n.vmManager.RegisterFactory(timestampvm.ID, &timestampvm.Factory{}),
+		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
+		n.vmManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err
