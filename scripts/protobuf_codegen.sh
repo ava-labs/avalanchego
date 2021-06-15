@@ -1,9 +1,14 @@
 #!/bin/bash
+
+TARGET="."
+
 if [ -n "$1" ]; then 
-  cd $1
-  echo "Found folder $1"
+  TARGET="$1"
 fi
-for PBF in $(find . -type f | grep proto$)
+
+echo "Target folder is: $TARGET"
+
+for PBF in $(find $TARGET -type f | grep proto$)
 do
   echo $PBF
   PFILE=$(basename $PBF)
