@@ -210,7 +210,7 @@ func (tx *UniqueTx) Accept() error {
 
 			// we have an error and it is not item not found error
 			if err != nil && err != database.ErrNotFound {
-				tx.vm.ctx.Log.Error("Error checking idx value exists: %s", err)
+				tx.vm.ctx.Log.Fatal("Error checking idx value exists: %s", err)
 				return err
 			} else if err == database.ErrNotFound {
 				// idx was not found in database, create defaults
@@ -228,7 +228,7 @@ func (tx *UniqueTx) Accept() error {
 			tx.vm.ctx.Log.Debug("Writing at index %d txID %s", idx, txID)
 			err = assetPrefixDB.Put(idxBytes, txID[:])
 			if err != nil {
-				tx.vm.ctx.Log.Error("Failed to save transaction to the address, assetID prefix DB %s", err)
+				tx.vm.ctx.Log.Fatal("Failed to save transaction to the address, assetID prefix DB %s", err)
 			}
 
 			// increment and store the index for next use
@@ -238,7 +238,7 @@ func (tx *UniqueTx) Accept() error {
 
 			err = assetPrefixDB.Put(idxKey, idxBytes)
 			if err != nil {
-				tx.vm.ctx.Log.Error("Failed to save transaction index to the address, assetID prefix DB: %s", err)
+				tx.vm.ctx.Log.Fatal("Failed to save transaction index to the address, assetID prefix DB: %s", err)
 			}
 		}
 	}
