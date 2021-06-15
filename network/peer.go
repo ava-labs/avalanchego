@@ -232,70 +232,113 @@ func (p *peer) ReadMessages() {
 		return
 	}
 
-	pendingBuffer := wrappers.Packer{}
+	var (
+		msgLen        uint32
+		pendingBuffer wrappers.Packer
+	)
 	readBuffer := make([]byte, p.net.readBufferSize)
 	reader := bufio.NewReader(p.conn)
 	for {
-		read, err := reader.Read(readBuffer)
-		if err != nil {
-			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.getIP(), err)
-			return
-		}
+		// Read the length of the next message from the peer
+		// and wait until the throttler says to proceed
+		for {
+			read, err := reader.Read(readBuffer)
+			if err != nil {
+				p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
+				return
+			}
+			pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:read]...)
+			msgLen, err = pendingBuffer.PeekInt()
+			doneReadingMsgLen := err == nil
+			if doneReadingMsgLen {
+				if int64(msgLen) > p.net.maxMessageSize {
+					p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.id, p.getIP(), msgLen)
+					return
+				}
+				// Wait until the throttler says we can proceed to read the message
+				p.net.msgThrottler.Acquire(uint64(msgLen), p.id)
+				break // break from the inner loop
+			}
 
-		pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:read]...)
-
-		msgBytes := pendingBuffer.UnpackBytes()
-		if pendingBuffer.Errored() {
-			// if reading the bytes errored, then we haven't read the full
-			// message yet
-			pendingBuffer.Offset = 0
-			pendingBuffer.Err = nil
-
-			if int64(len(pendingBuffer.Bytes)) > p.net.maxMessageSize+wrappers.IntLen {
-				// we have read more bytes than the max message size allows for,
-				// so we should terminate this connection
-
-				p.net.log.Verbo("error reading too many bytes on %s %s", p.id, err)
+			if len(pendingBuffer.Bytes) >= wrappers.IntLen {
+				// We should be able to parse the message length by now but we can't
+				p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
 				return
 			}
 
-			// we should try to read more bytes to finish the message
-			continue
+			// If reading the msg length errored, we haven't read the full message length yet
+			pendingBuffer.Offset = 0
+			pendingBuffer.Err = nil
 		}
 
-		// we read the full message bytes
+		for {
+			// Read the message body
+			read, err := p.conn.Read(readBuffer)
+			if err != nil {
+				p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
+				p.net.msgThrottler.Release(uint64(msgLen), p.id)
+				return
+			}
 
-		// set the pending bytes to any extra bytes that were read
-		pendingBuffer.Bytes = pendingBuffer.Bytes[pendingBuffer.Offset:]
-		// set the offset back to the start of the next message
-		pendingBuffer.Offset = 0
+			pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:read]...)
 
-		if int64(len(msgBytes)) > p.net.maxMessageSize {
-			// if this message is longer than the max message length, then we
-			// should terminate this connection
+			msgBytes := pendingBuffer.UnpackBytes()
+			doneReadingMsg := !pendingBuffer.Errored()
+			if !doneReadingMsg {
+				if uint32(len(pendingBuffer.Bytes)) > msgLen+wrappers.IntLen {
+					// We should be able to parse a message by now.
+					// Terminate this connection.
+					p.net.log.Verbo("read too large message from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
+					p.net.msgThrottler.Release(uint64(msgLen), p.id)
+					return
+				}
 
-			p.net.log.Verbo("error reading too many bytes on %s %s", p.id, err)
-			return
-		}
+				// if reading the bytes errored, then we haven't read the full
+				// message yet
+				pendingBuffer.Offset = 0
+				pendingBuffer.Err = nil
 
-		p.net.log.Verbo("parsing new message from %s:\n%s",
-			p.id,
-			formatting.DumpBytes{Bytes: msgBytes})
+				// we should try to read more bytes to finish the message
+				continue
+			}
+			// We read the full message
+			// Set [pendingBuffer.Bytes] to the rest of the bytes that were read
+			pendingBuffer.Bytes = pendingBuffer.Bytes[pendingBuffer.Offset:]
+			// Reset the offset to the start of the next message
+			pendingBuffer.Offset = 0
 
-		msg, err := p.net.b.Parse(msgBytes)
-		if err != nil {
-			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
-				p.id,
+			if len(msgBytes) > int(msgLen) {
+				// This message is longer than the peer said it would be.
+				p.net.log.Verbo(
+					"expected message length from %s%s at %s to be %d but got %d",
+					constants.NodeIDPrefix, p.ip, p.getIP(),
+					msgLen,
+					len(msgBytes),
+				)
+				p.net.msgThrottler.Release(uint64(msgLen), p.id)
+				return
+			}
+
+			p.net.log.Verbo("parsing new message from %s%s at %s:\n%s",
+				constants.NodeIDPrefix, p.id, p.getIP(),
 				formatting.DumpBytes{Bytes: msgBytes},
-				err)
-			continue
+			)
+
+			msg, err := p.net.b.Parse(msgBytes)
+			if err != nil {
+				p.net.log.Verbo("failed to parse new message from %s%s at %s:\n%s\n%s",
+					constants.NodeIDPrefix, p.id, p.getIP(),
+					formatting.DumpBytes{Bytes: msgBytes},
+					err,
+				)
+				continue
+			}
+			// Handle the message.
+			// Note that when we are done handling this message, we must
+			// call [p.net.msgThrottler.Release] to give back the bytes
+			// used by this message.
+			p.handle(msg)
 		}
-
-		// Wait until we can take more bytes from this peer.
-		// TODO Acquire the bytes before we read the message
-		p.net.msgThrottler.Acquire(uint64(len(msgBytes)), p.id)
-
-		p.handle(msg)
 	}
 }
 
