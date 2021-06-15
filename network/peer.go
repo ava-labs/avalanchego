@@ -403,6 +403,7 @@ func compress(msg []byte, log logging.Logger) []byte {
 			compMsgSize = b.Len()
 		}
 	}
+	_ = gWriter.Close()
 
 	log.Debug("packed message len:%d, compLen:%d",
 		msgLen,
