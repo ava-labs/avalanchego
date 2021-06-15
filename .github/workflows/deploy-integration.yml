@@ -32,9 +32,9 @@ jobs:
         if [[ ${{ secrets.DEPLOY }} == "true" ]]
         then 
           echo "The deployment is enabled.  Deploying $TAG to integration"
-          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/new-update-from-s3-and-restart.yml -e $TAG
-          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/new-update-from-s3-and-restart.yml -e $TAG
-          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u avalanche scripts/ansible/mainnet/new-update-from-s3-and-restart.yml -e $TAG
+          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/new-update-from-s3-and-restart.yml -e release_ver=$TAG
+          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/new-update-from-s3-and-restart.yml -e release_ver=$TAG
+          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u avalanche scripts/ansible/mainnet/new-update-from-s3-and-restart.yml -e release_ver=$TAG
         else
           echo 'The deployment is not set to "true".  Skipping deployment.'
         fi
