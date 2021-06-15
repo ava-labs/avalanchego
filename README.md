@@ -38,9 +38,31 @@ Build Avalanche using the build script:
 
 The Avalanche binary, named `avalanchego`, is in the `build` directory.
 
+### Binary Repository
+
+Install AvalancheGo using an `apt` repository.
+
+#### Adding the APT Repository
+
+On debian based linux distributions, run:
+
+```sh
+sudo su -
+wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
+echo "deb https://downloads.avax.network/apt bionic main" > /etc/apt/sources.list.d/avalanche.list
+exit
+```
+
+#### Installing the Latest Version
+
+```sh
+sudo apt-get update
+sudo apt-get install avalanchego
+```
+
 ### Binary Install
 
-Download the [latest build](https://github.com/ava-labs/avalanchego-internal/releases/latest).
+Download the [latest build](https://github.com/ava-labs/avalanchego/releases/latest) for your operating system and architecture.
 
 The Avalanche binary to be executed is named `avalanchego`.
 
