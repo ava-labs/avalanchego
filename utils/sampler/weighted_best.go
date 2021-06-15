@@ -6,7 +6,6 @@ package sampler
 import (
 	"errors"
 	"math"
-	"math/rand"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -15,8 +14,6 @@ import (
 )
 
 var errNoValidWeightedSamplers = errors.New("no valid weighted samplers found")
-
-func init() { rand.Seed(time.Now().UnixNano()) }
 
 // weightedBest implements the Weighted interface.
 //
@@ -54,7 +51,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 			// here, as the generated numbers are only used to perform an
 			// optimistic benchmark. Which means the results could be arbitrary
 			// and the correctness of the implementation wouldn't be effected.
-			samples[i] = uint64(rand.Int63n(int64(totalWeight))) // #nosec G404
+			samples[i] = uint64(globalRNG.Int63n(int64(totalWeight))) // #nosec G404
 		}
 	}
 
