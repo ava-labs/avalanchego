@@ -5,11 +5,13 @@ package health
 
 import (
 	"fmt"
-	"github.com/ava-labs/avalanchego/api/compression"
 	"net/http"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/compression"
+
 	stdjson "encoding/json"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"

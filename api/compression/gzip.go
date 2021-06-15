@@ -1,8 +1,9 @@
 package compression
 
 import (
-	"github.com/NYTimes/gziphandler"
 	"net/http"
+
+	"github.com/NYTimes/gziphandler"
 )
 
 func EnableGzipSupport(handler http.Handler) http.Handler {

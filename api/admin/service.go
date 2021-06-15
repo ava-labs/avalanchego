@@ -5,8 +5,9 @@ package admin
 
 import (
 	"errors"
-	"github.com/ava-labs/avalanchego/api/compression"
 	"net/http"
+
+	"github.com/ava-labs/avalanchego/api/compression"
 
 	"github.com/gorilla/rpc/v2"
 

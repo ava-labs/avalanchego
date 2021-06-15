@@ -6,8 +6,9 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"github.com/ava-labs/avalanchego/api/compression"
 	"time"
+
+	"github.com/ava-labs/avalanchego/api/compression"
 
 	"github.com/gorilla/rpc/v2"
 

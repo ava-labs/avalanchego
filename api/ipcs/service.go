@@ -5,9 +5,9 @@ package ipcs
 
 import (
 	"fmt"
-	"github.com/NYTimes/gziphandler"
-	"github.com/ava-labs/avalanchego/api/compression"
 	"net/http"
+
+	"github.com/ava-labs/avalanchego/api/compression"
 
 	"github.com/gorilla/rpc/v2"
 
