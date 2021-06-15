@@ -6,6 +6,7 @@ package evm
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -189,6 +190,11 @@ func (b *Block) Parent() snowman.Block {
 // Height implements the snowman.Block interface
 func (b *Block) Height() uint64 {
 	return b.ethBlock.Number().Uint64()
+}
+
+// Timestamp implements the snowman.Block interface
+func (b *Block) Timestamp() time.Time {
+	return time.Unix(int64(b.ethBlock.Time()), 0)
 }
 
 // syntacticVerify verifies that a *Block is well-formed.
