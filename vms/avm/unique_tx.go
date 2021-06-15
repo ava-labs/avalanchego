@@ -228,6 +228,7 @@ func (tx *UniqueTx) Accept() error {
 			idx++
 			binary.BigEndian.PutUint64(idxBytes, idx)
 			tx.vm.ctx.Log.Debug("New index %d", idx)
+			// why does the following call always fail at index 1?!
 			err = assetPrefixDB.Put(idxKey, idxBytes)
 			if err != nil {
 				tx.vm.ctx.Log.Error("Failed to save transaction index to the address, assetID prefix DB: %s", err)
