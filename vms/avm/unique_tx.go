@@ -21,6 +21,8 @@ var (
 	errRejectedTx      = errors.New("transaction is rejected")
 )
 
+var _ snowstorm.Tx = &UniqueTx{}
+
 // UniqueTx provides a de-duplication service for txs. This only provides a
 // performance boost
 type UniqueTx struct {
