@@ -322,3 +322,15 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 	}
 	return batchGroups, nil
 }
+
+func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.AtomicRequests, batch ...database.Batch) error {
+	formattedBatch := make(map[string][]string)
+	for key, _ := range batchChainsAndInputs {
+		formattedBatch[key.String()] = []string{"ggg"}
+	}
+	req := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
+		BatchChainsAndInputs: formattedBatch,
+		Continues:            true,
+		Id:                   stdatomic.AddInt64(&c.uniqueID, 1),
+	}
+}

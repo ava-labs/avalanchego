@@ -1,4 +1,8 @@
 #!/bin/bash
+if [ -n "$1" ]; then 
+  cd $1
+  echo "Found folder $1"
+fi
 for PBF in $(find . -type f | grep proto$)
 do
   PFILE=$(basename $PBF)

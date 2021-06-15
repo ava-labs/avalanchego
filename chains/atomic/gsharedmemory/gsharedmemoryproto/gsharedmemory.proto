@@ -18,9 +18,14 @@ message Batch {
 }
 
 message AtomicRequest {
-    int64 requestType = 1;
+    SharedMemoryMethod requestType = 1;
 	repeated bytes utxoIDs = 2;
 	repeated Element elems = 3;
+}
+
+enum SharedMemoryMethod {
+    Put = 0;
+    Remove = 1;
 }
 
 message Element {
@@ -37,8 +42,12 @@ message PutRequest {
     bool continues = 5;
 }
 
+message BatchMap {
+    string value = 1;
+}
+
 message RemoveAndPutMultipleRequest {
-    repeated AtomicRequest batchChainsAndInputs = 1;
+    map<string, BatchMap> batchChainsAndInputs = 1;
     repeated Batch batches = 2;
     int64 id = 3;
     bool continues = 4;
