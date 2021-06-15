@@ -19,6 +19,10 @@ func newRNG() rng {
 	return rand.New(&syncSource{Source: source}) // #nosec G404
 }
 
+func Seed(seed int64) {
+	globalRNG.Seed(seed)
+}
+
 type rng interface {
 	// Seed uses the provided seed value to initialize the generator to a
 	// deterministic state.
