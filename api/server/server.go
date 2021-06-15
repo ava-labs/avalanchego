@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/api/compression"
+
 	"github.com/gorilla/handlers"
 
 	"github.com/rs/cors"
@@ -197,6 +199,9 @@ func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base,
 	if err != nil {
 		return err
 	}
+	// Apply gzip http.Handler wrapper
+	// Adding this last so that it gets called the first
+	h = compression.EnableGzipSupport(h)
 	return s.router.AddRouter(url, endpoint, h)
 }
 
