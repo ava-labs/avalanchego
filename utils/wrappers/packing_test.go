@@ -653,3 +653,50 @@ func TestPackIPCertList(t *testing.T) {
 	assert.Equal(t, ipCert.Signature, resolvedUnpackedIPCertList[0].Signature)
 	assert.Equal(t, ipCert.Time, resolvedUnpackedIPCertList[0].Time)
 }
+
+func TestPeekInt(t *testing.T) {
+	p := Packer{MaxSize: 8}
+	_, err := p.PeekInt()
+	assert.Error(t, err)
+
+	// Pack 2 ints
+	p.PackInt(1)
+	assert.NoError(t, p.Err)
+	p.PackInt(2)
+	assert.NoError(t, p.Err)
+
+	// Load into a new packer
+	p = Packer{Bytes: p.Bytes}
+
+	// Peek
+	got, err := p.PeekInt()
+	assert.NoError(t, err)
+	assert.EqualValues(t, 1, got)
+	// Should be idempotent
+	got, err = p.PeekInt()
+	assert.NoError(t, err)
+	assert.EqualValues(t, 1, got)
+
+	// Pop
+	got = p.UnpackInt()
+	assert.NoError(t, p.Err)
+	assert.EqualValues(t, 1, got)
+
+	// Peek
+	got, err = p.PeekInt()
+	assert.NoError(t, err)
+	assert.EqualValues(t, 2, got)
+	// Should be idempotent
+	got, err = p.PeekInt()
+	assert.NoError(t, err)
+	assert.EqualValues(t, 2, got)
+
+	// Pop
+	got = p.UnpackInt()
+	assert.NoError(t, p.Err)
+	assert.EqualValues(t, 2, got)
+
+	// Should be empty now
+	_, err = p.PeekInt()
+	assert.Error(t, err)
+}
