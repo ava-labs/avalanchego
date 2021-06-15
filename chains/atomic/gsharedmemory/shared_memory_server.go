@@ -32,6 +32,9 @@ type Server struct {
 
 	removesLock sync.Mutex
 	removes     map[int64]*removeRequest
+
+	removeAndPutMultipleLock sync.Mutex
+	removeAndPutMultiple  map[int64]*removeAndPutMultipleRequest
 }
 
 // NewServer returns shared memory connected to remote shared memory
@@ -43,7 +46,13 @@ func NewServer(sm atomic.SharedMemory, db database.Database) *Server {
 		gets:    make(map[int64]*getRequest),
 		indexed: make(map[int64]*indexedRequest),
 		removes: make(map[int64]*removeRequest),
+		removeAndPutMultiple: make(map[int64]*removeAndPutMultipleRequest) ,
 	}
+}
+
+type removeAndPutMultipleRequest struct {
+	batchChainsAndInputs map[ids.ID][]*AtomicRequests
+	batch database.Batch
 }
 
 type putRequest struct {
@@ -108,6 +117,13 @@ type getRequest struct {
 
 	executed        bool
 	remainingValues [][]byte
+}
+
+func (s *Server) removeAndPutMultiple(
+	_ context.Context,
+	req *gsharedmemoryproto.RemoveAndPutMultipleRequest
+) (*gsharedmemoryproto.RemoveAndPutMultipleResponse, error) {
+
 }
 
 func (s *Server) Get(

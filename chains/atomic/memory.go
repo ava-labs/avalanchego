@@ -67,6 +67,11 @@ func (m *Memory) GetDatabase(sharedID ids.ID) (*versiondb.Database, database.Dat
 	return vdb, prefixdb.New(sharedID[:], vdb)
 }
 
+// GetPrefixDbInstanceFromVdb returns a new prefix db on an existing versiondb
+func (m *Memory) GetPrefixDbInstanceFromVdb(vdb *versiondb.Database, sharedID ids.ID) database.Database {
+	return prefixdb.New(sharedID[:], vdb)
+}
+
 // ReleaseDatabase unlocks the provided DB
 func (m *Memory) ReleaseDatabase(sharedID ids.ID) {
 	lock := m.releaseLock(sharedID)

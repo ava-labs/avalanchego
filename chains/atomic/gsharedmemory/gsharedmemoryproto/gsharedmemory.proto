@@ -17,6 +17,12 @@ message Batch {
     int64 id = 3;
 }
 
+message AtomicRequest {
+    int64 requestType = 1;
+	repeated bytes utxoIDs = 2;
+	repeated Element elems = 3;
+}
+
 message Element {
     bytes Key = 1;
     bytes Value = 2;
@@ -30,6 +36,15 @@ message PutRequest {
     int64 id = 4;
     bool continues = 5;
 }
+
+message RemoveAndPutMultipleRequest {
+    repeated AtomicRequest batchChainsAndInputs = 1;
+    repeated Batch batches = 2;
+    int64 id = 3;
+    bool continues = 4;
+}
+
+message RemoveAndPutMultipleResponse {}
 
 message PutResponse {}
 
@@ -77,4 +92,5 @@ service SharedMemory {
     rpc Get(GetRequest) returns (GetResponse);
     rpc Indexed(IndexedRequest) returns (IndexedResponse);
     rpc Remove(RemoveRequest) returns (RemoveResponse);
+    rpc RemoveAndPutMultiple(RemoveAndPutMultipleRequest) returns (RemoveAndPutMultipleResponse);
 }

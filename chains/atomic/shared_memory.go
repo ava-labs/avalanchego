@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -24,6 +25,19 @@ var (
 
 	errDuplicatedOperation = errors.New("duplicated operation on provided value")
 )
+
+type SharedMemoryMethod int
+
+const (
+	Put SharedMemoryMethod = iota
+	Remove
+)
+
+type AtomicRequests struct {
+	requestType SharedMemoryMethod
+	utxoIDs     [][]byte
+	elems       []*Element
+}
 
 type dbElement struct {
 	// Present indicates the value was removed before existing.
@@ -68,6 +82,8 @@ type SharedMemory interface {
 		err error,
 	)
 	Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error
+
+	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*AtomicRequests, batches ...database.Batch) error
 }
 
 // sharedMemory provides the API for a blockchain to interact with shared memory
@@ -75,6 +91,32 @@ type SharedMemory interface {
 type sharedMemory struct {
 	m           *Memory
 	thisChainID ids.ID
+}
+
+func fetchValueAndIndexDB(peerChainID, smChainID []byte, requestType SharedMemoryMethod, db database.Database) (database.Database, database.Database) {
+	var valueDB, indexDB database.Database
+	switch requestType {
+	case Remove:
+		if bytes.Compare(smChainID, peerChainID) == -1 {
+			valueDB = prefixdb.New(smallerValuePrefix, db)
+			indexDB = prefixdb.New(smallerIndexPrefix, db)
+		} else {
+			valueDB = prefixdb.New(largerValuePrefix, db)
+			indexDB = prefixdb.New(largerIndexPrefix, db)
+		}
+	case Put:
+		if bytes.Compare(smChainID, peerChainID) == -1 {
+			valueDB = prefixdb.New(largerValuePrefix, db)
+			indexDB = prefixdb.New(largerIndexPrefix, db)
+		} else {
+			valueDB = prefixdb.New(smallerValuePrefix, db)
+			indexDB = prefixdb.New(smallerIndexPrefix, db)
+		}
+	default:
+		panic("Illegal type")
+	}
+
+	return valueDB, indexDB
 }
 
 func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...database.Batch) error {
@@ -85,13 +127,8 @@ func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
-		s.valueDB = prefixdb.New(largerValuePrefix, db)
-		s.indexDB = prefixdb.New(largerIndexPrefix, db)
-	} else {
-		s.valueDB = prefixdb.New(smallerValuePrefix, db)
-		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
-	}
+
+	s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
 
 	for _, elem := range elems {
 		if err := s.SetValue(elem); err != nil {
@@ -169,6 +206,65 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
+func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*AtomicRequests, batches ...database.Batch) error {
+	var (
+		versionDbBatches []database.Batch
+		vdb              *versiondb.Database
+	)
+	for peerChainID, atomicRequests := range batchChainsAndInputs {
+		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
+
+		var db database.Database
+
+		if vdb == nil {
+			vdb, db = sm.m.GetDatabase(sharedID)
+			defer sm.m.ReleaseDatabase(sharedID)
+		} else {
+			db = sm.m.GetPrefixDbInstanceFromVdb(vdb, sharedID)
+		}
+
+		s := state{
+			c: sm.m.codec,
+		}
+
+		for _, atomicRequest := range atomicRequests {
+			switch atomicRequest.requestType {
+			case Remove:
+				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
+
+				for _, key := range atomicRequest.utxoIDs {
+					if err := s.RemoveValue(key); err != nil {
+						return err
+					}
+				}
+			case Put:
+				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
+
+				for _, elem := range atomicRequest.elems {
+					if err := s.SetValue(elem); err != nil {
+						return err
+					}
+				}
+			default:
+				panic("Illegal type")
+			}
+
+		}
+
+		myBatch, err := vdb.CommitBatch()
+		if err != nil {
+			return err
+		}
+
+		versionDbBatches = append(versionDbBatches, myBatch)
+	}
+
+	baseBatch, otherBatches := versionDbBatches[0], versionDbBatches[1:]
+
+	batches = append(batches, otherBatches...)
+
+	return WriteAll(baseBatch, batches...)
+}
 func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 	vdb, db := sm.m.GetDatabase(sharedID)
@@ -177,13 +273,8 @@ func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
-		s.valueDB = prefixdb.New(smallerValuePrefix, db)
-		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
-	} else {
-		s.valueDB = prefixdb.New(largerValuePrefix, db)
-		s.indexDB = prefixdb.New(largerIndexPrefix, db)
-	}
+
+	s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
 
 	for _, key := range keys {
 		if err := s.RemoveValue(key); err != nil {
