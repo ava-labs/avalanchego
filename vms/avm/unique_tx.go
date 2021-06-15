@@ -8,7 +8,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/database"
+
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -196,29 +197,30 @@ func (tx *UniqueTx) Accept() error {
 	for address, assetIDMap := range addresses {
 		addressPrefixDB := prefixdb.New(address[:], tx.vm.db)
 		for assetID := range assetIDMap {
-			assetPrefixDB := linkeddb.NewDefault(prefixdb.New(assetID[:], addressPrefixDB))
+			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
-			var idx uint64 = 1
-			idxBytes := make([]byte, 8)
-			binary.BigEndian.PutUint64(idxBytes, idx)
+			var idx uint64
+			var idxBytes []byte
 
-			exists, err := assetPrefixDB.Has(idxKey)
-			tx.vm.ctx.Log.Debug("Processing address, assetID %s, %s, idx exists?", address, assetID, exists)
-			if err != nil {
+			idxBytes, err := assetPrefixDB.Get(idxKey)
+
+			// we have an error and it is not item not found error
+			if err != nil && err != database.ErrNotFound {
 				tx.vm.ctx.Log.Error("Error checking idx value exists: %s", err)
 				return err
+			} else if err == database.ErrNotFound {
+				// idx was not found in database, create defaults
+				idx = 1
+				idxBytes = make([]byte, 8)
+				binary.BigEndian.PutUint64(idxBytes, idx)
 			}
 
-			if exists {
-				idxBytes, err = assetPrefixDB.Get(idxKey)
+			// if we managed to read the index from the database:
+			if err == nil {
 				idx = binary.BigEndian.Uint64(idxBytes)
 				tx.vm.ctx.Log.Debug("fetched index %d", idx)
-				if err != nil {
-					// index exists but we can't read it? return error
-					tx.vm.ctx.Log.Error("Error reading idx value: %s", err)
-					return err
-				}
 			}
+
 			tx.vm.ctx.Log.Debug("Writing at index %d txID %s", idx, txID)
 			err = assetPrefixDB.Put(idxBytes, txID[:])
 			if err != nil {

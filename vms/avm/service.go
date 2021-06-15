@@ -12,7 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/database/linkeddb"
+	"github.com/ava-labs/avalanchego/database"
+
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -90,7 +91,7 @@ type GetReceivedTxsArgs struct {
 	// Cursor used as a page index / offset
 	Cursor string `json:"cursor"`
 	// PageSize num of items per page
-	PageSize uint `json:"pageSize"`
+	PageSize json.Uint64 `json:"pageSize"`
 	// AssetID defaulted to AVAX if omitted or left blank
 	AssetID string `json:"assetID"`
 }
@@ -102,12 +103,24 @@ type GetReceivedTxsReply struct {
 }
 
 // TODO: Remove static hardcoded limit of page size
-const MaxPageSize uint = 1000
+const MaxPageSize uint64 = 1000
+
+func isEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
 
 // GetReceivedTxs returns list of transactions received by given address
 // prefix db by assetId, API will provide a field in request to allow filtering by assetId, else default to AVAX
 func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs, reply *GetReceivedTxsReply) error {
-	pageSize := args.PageSize
+	pageSize := uint64(args.PageSize)
 	if pageSize == 0 || pageSize > MaxPageSize {
 		return fmt.Errorf("pageSize must be greater than zero and less than the maximum allowed size of %d", MaxPageSize)
 	}
@@ -124,14 +137,14 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 	}
 
 	addressTxDB := prefixdb.New(address[:], service.vm.db)
-	assetPrefixDB := linkeddb.NewDefault(prefixdb.New(assetID[:], addressTxDB))
+	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
 
 	var cursor uint64
 	cursorBytes := make([]byte, 8)
 	unspecifiedCursor := len(args.Cursor) == 0
+	var iterator database.Iterator
 	if unspecifiedCursor {
-		cursor = 1
-		binary.BigEndian.PutUint64(cursorBytes, cursor)
+		iterator = assetPrefixDB.NewIterator()
 	} else {
 		cursor, err = strconv.ParseUint(args.Cursor, 10, 64)
 		if err != nil {
@@ -143,22 +156,18 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 		}
 
 		binary.BigEndian.PutUint64(cursorBytes, cursor)
+		iterator = assetPrefixDB.NewIteratorWithStart(cursorBytes)
 	}
 
 	service.vm.ctx.Log.Debug("Fetching transactions, cursor %s", cursor)
 
 	var txIDs []ids.ID
-	exists, err := assetPrefixDB.Has(cursorBytes)
-	service.vm.ctx.Log.Debug("cursor, exists, err = %d, %s, %s", cursor, exists, err)
-	for exists && err == nil {
-		var txIDBytes []byte
-		txIDBytes, err = assetPrefixDB.Get(cursorBytes)
-		service.vm.ctx.Log.Debug("Getting transaction at cursor %d", cursor)
-
-		if err != nil {
-			return fmt.Errorf("error fetching transaction: %s", err)
+	for iterator.Next() {
+		if isEqual([]byte("idx"), iterator.Key()) {
+			continue
 		}
 
+		txIDBytes := iterator.Value()
 		if len(txIDBytes) != hashing.HashLen {
 			return fmt.Errorf("invalid tx ID %s", txIDBytes)
 		}
@@ -167,22 +176,9 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 		copy(txID[:], txIDBytes)
 
 		txIDs = append(txIDs, txID)
-
-		service.vm.ctx.Log.Debug("Got transaction at cursor %d, %s", cursor, txID)
-
-		cursor++
-		binary.BigEndian.PutUint64(cursorBytes, cursor)
-
-		if uint(len(txIDs)) >= pageSize {
+		if uint64(len(txIDs)) >= pageSize {
 			break
 		}
-
-		exists, err = assetPrefixDB.Has(cursorBytes)
-		service.vm.ctx.Log.Debug("cursor, exists, err = %d, %s, %s", cursor, exists, err)
-	}
-
-	if err != nil {
-		return fmt.Errorf("error fetching transactions: %s", err)
 	}
 
 	service.vm.ctx.Log.Debug("Fetched %d transactions for address", len(txIDs))
