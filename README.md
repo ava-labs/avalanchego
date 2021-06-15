@@ -38,6 +38,12 @@ Build Avalanche using the build script:
 
 The Avalanche binary, named `avalanchego`, is in the `build` directory.
 
+### Binary Install
+
+Download the [latest build](https://github.com/ava-labs/avalanchego-internal/releases/latest).
+
+The Avalanche binary to be executed is named `avalanchego`.
+
 ### Docker Install
 
 Make sure docker is installed on the machine - so commands like `docker run` etc. are available.
