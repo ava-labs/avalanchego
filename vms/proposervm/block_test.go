@@ -7,10 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/staking"
 )
 
 type TestOptionsBlock struct {
@@ -57,10 +54,11 @@ func (tC testClock) now() time.Time {
 func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	coreVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
-	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.now().Unix(), 100, *pTestCert.Leaf)
 	newBlk := &snowman.TestBlock{
-		BytesV: []byte{1},
+		BytesV:     []byte{1},
+		TimestampV: proVM.now(),
 	}
+	proHdr := NewProHeader(ids.Empty.Prefix(8), newBlk.Timestamp().Unix(), 100, *pTestCert.Leaf)
 	proBlk, _ := NewProBlock(proVM, proHdr, newBlk, nil, false) // not signing block, cannot err
 
 	coreVM.CantParseBlock = true
@@ -85,8 +83,11 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 func TestProposerBlockParseFailure(t *testing.T) {
 	coreVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
-	proHdr := NewProHeader(ids.Empty.Prefix(8), proVM.now().Unix(), 0, *pTestCert.Leaf)
-	proBlk, _ := NewProBlock(proVM, proHdr, &snowman.TestBlock{}, nil, false) // not signing block, cannot err
+	coreBlk := &snowman.TestBlock{
+		TimestampV: proVM.now(),
+	}
+	proHdr := NewProHeader(ids.Empty.Prefix(8), coreBlk.Timestamp().Unix(), 0, *pTestCert.Leaf)
+	proBlk, _ := NewProBlock(proVM, proHdr, coreBlk, nil, false) // not signing block, cannot err
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -356,28 +357,5 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 		t.Fatal("ProBlock's P-Chain-Height cannot be higher than current P chain height")
 	} else if err != ErrProBlkWrongHeight {
 		t.Fatal("Proposer block has wrong height should have different error")
-	}
-}
-
-func TestSIMPLE_SIGNATURE_TEST(t *testing.T) {
-	cert, err := staking.NewTLSCert()
-	if err != nil {
-		t.Fatal("Could not generate dummy StakerCert")
-	}
-
-	coreVM := &block.TestVM{}
-	proVM := NewProVM(coreVM, time.Unix(0, 0))
-	proVM.stakingCert = *cert
-	coreBlk := &snowman.TestBlock{
-		TestDecidable: choices.TestDecidable{
-			IDV: ids.Empty.Prefix(2021),
-		},
-		BytesV: []byte{0},
-	}
-
-	proHdr := NewProHeader(ids.ID{}, 0, 0, *cert.Leaf)
-	/*proBlk*/ _, err = NewProBlock(&proVM, proHdr, coreBlk, nil, true)
-	if err != nil {
-		t.Fatal("could not sign parent block")
 	}
 }

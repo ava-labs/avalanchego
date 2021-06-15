@@ -34,6 +34,7 @@ message InitializeResponse {
     uint32 status = 3;
     uint64 height = 4;
     bytes bytes = 5;
+    bytes timestamp = 6;
 }
 
 message VersionedDBServer {
@@ -78,6 +79,7 @@ message BuildBlockResponse {
     bytes parentID = 2;
     bytes bytes = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
     // status is always processing
 }
 
@@ -90,6 +92,7 @@ message ParseBlockResponse {
     bytes parentID = 2;
     uint32 status = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
 }
 
 message GetBlockRequest {
@@ -101,6 +104,7 @@ message GetBlockResponse {
     bytes bytes = 2;
     uint32 status = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
 }
 
 message SetPreferenceRequest {
@@ -113,7 +117,9 @@ message BlockVerifyRequest {
     bytes id = 1;
 }
 
-message BlockVerifyResponse {}
+message BlockVerifyResponse {
+    bytes timestamp = 1;
+}
 
 message BlockAcceptRequest {
     bytes id = 1;

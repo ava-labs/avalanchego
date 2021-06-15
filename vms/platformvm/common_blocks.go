@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -131,11 +132,12 @@ type CommonBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
 	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
 
-	self   Block // self is a reference to this block's implementing struct
-	id     ids.ID
-	bytes  []byte
-	status choices.Status
-	vm     *VM
+	self      Block // self is a reference to this block's implementing struct
+	id        ids.ID
+	bytes     []byte
+	timestamp time.Time
+	status    choices.Status
+	vm        *VM
 
 	// This block's children
 	children []Block
@@ -164,6 +166,14 @@ func (b *CommonBlock) ParentID() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.
 func (b *CommonBlock) Height() uint64 { return b.Hght }
+
+// Timestamp returns this block's time.
+func (b *CommonBlock) Timestamp() time.Time {
+	if b.id == b.vm.lastAcceptedID {
+		return b.vm.internalState.GetTimestamp()
+	}
+	return b.timestamp
+}
 
 // Parent returns [b]'s parent
 func (b *CommonBlock) Parent() snowman.Block {

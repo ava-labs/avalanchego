@@ -193,6 +193,8 @@ func (pb *ProposalBlock) Verify() error {
 	pb.onCommitState.AddTx(&pb.Tx, Committed)
 	pb.onAbortState.AddTx(&pb.Tx, Aborted)
 
+	pb.timestamp = parentState.GetTimestamp()
+
 	pb.vm.currentBlocks[blkID] = pb
 	parentIntf.addChild(pb)
 	return nil

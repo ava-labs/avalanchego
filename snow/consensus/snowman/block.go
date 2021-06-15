@@ -4,6 +4,8 @@
 package snowman
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
@@ -41,4 +43,10 @@ type Block interface {
 
 	// Height returns the height of this block in the chain.
 	Height() uint64
+
+	// Time this block was proposed at. This value should be consistent across
+	// all nodes. If this block hasn't been successfully verified, any value can
+	// be returned. If this block is the last accepted block, the timestamp must
+	// be returned correctly. Otherwise, accepted blocks can return any value.
+	Timestamp() time.Time
 }

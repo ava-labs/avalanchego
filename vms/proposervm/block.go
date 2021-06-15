@@ -164,11 +164,11 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkWrongHeight
 	}
 
-	// validate timestamp
 	if pb.header.pChainHeight > pb.vm.pChainHeight() {
 		return ErrProBlkWrongHeight
 	}
 
+	// validate timestamp
 	if pb.header.timestamp < prntBlk.header.timestamp {
 		return ErrProBlkBadTimestamp
 	}
@@ -230,6 +230,10 @@ func (pb *ProposerBlock) Bytes() []byte {
 
 func (pb *ProposerBlock) Height() uint64 {
 	return pb.coreBlk.Height()
+}
+
+func (pb *ProposerBlock) Timestamp() time.Time {
+	return pb.coreBlk.Timestamp()
 }
 
 // snowman.OracleBlock interface implementation

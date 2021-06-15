@@ -87,7 +87,7 @@ func (vm *VM) Initialize(
 	vm.stakingCert = ctx.StakingCert
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
-	if time.Now().After(vm.proBlkStartTime) {
+	if vm.now().After(vm.proBlkStartTime) {
 		// proposerVM intercepts VM events for blocks and times event relay to consensus
 		vm.toEngine = toEngine
 		vm.fromWrappedVM = make(chan common.Message, len(toEngine))
@@ -111,7 +111,7 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			hdr := NewProHeader(genesisParentID, 0, 0, x509.Certificate{})
+			hdr := NewProHeader(genesisParentID, genesisBlk.Timestamp().Unix(), 0, x509.Certificate{})
 			proGenBlk, _ := NewProBlock(vm, hdr, genesisBlk, nil, false) // not signing block, cannot err
 
 			// Skipping verification for genesis block.
@@ -138,13 +138,13 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
-	if time.Now().After(vm.proBlkStartTime) {
+	if vm.now().After(vm.proBlkStartTime) {
 		proParent, err := vm.state.getBlockFromWrappedBlkID(sb.Parent().ID())
 		if err != nil {
 			return nil, err
 		}
 
-		hdr := NewProHeader(proParent.ID(), vm.now().Unix(), vm.pChainHeight(), *vm.stakingCert.Leaf)
+		hdr := NewProHeader(proParent.ID(), sb.Timestamp().Unix(), vm.pChainHeight(), *vm.stakingCert.Leaf)
 		proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
 		if err != nil {
 			return nil, err

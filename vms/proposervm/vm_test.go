@@ -181,8 +181,9 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 
 	coreBlkDoesNotVerify := errors.New("coreBlk should not verify in this test")
 	coreBlk := &snowman.TestBlock{
-		BytesV:  []byte{1},
-		VerifyV: coreBlkDoesNotVerify,
+		BytesV:     []byte{1},
+		VerifyV:    coreBlkDoesNotVerify,
+		TimestampV: time.Now().AddDate(0, 0, -1),
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -193,7 +194,7 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 	}
 
 	proGenBlkID, _ := proVM.LastAccepted()
-	proHdr := NewProHeader(proGenBlkID, time.Now().AddDate(0, 0, -1).Unix(), coreBlk.Height(), *pTestCert.Leaf)
+	proHdr := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), coreBlk.Height(), *pTestCert.Leaf)
 	proBlk, err := NewProBlock(proVM, proHdr, coreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
