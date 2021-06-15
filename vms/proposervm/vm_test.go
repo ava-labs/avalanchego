@@ -19,6 +19,15 @@ import (
 
 var pTestCert *tls.Certificate = nil // package variable to init it only once
 
+type TestValidatorVM struct {
+	block.TestVM
+	// TODO: implement test ValidatorVM attributes
+}
+
+func (tVM *TestValidatorVM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+	return nil, nil
+}
+
 func TestInitializeRecordsGenesis(t *testing.T) {
 	coreVM, proVM, genesisBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
@@ -67,7 +76,7 @@ func TestInitializeCanRecordsCoreGenesis(t *testing.T) {
 	}
 }
 
-func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *VM, *snowman.TestBlock) {
+func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*TestValidatorVM, *VM, *snowman.TestBlock) {
 	// setup
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -78,7 +87,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		HeightV: 0,
 	}
 
-	coreVM := &block.TestVM{}
+	coreVM := &TestValidatorVM{}
 	coreVM.CantInitialize = true
 	coreVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
 		return nil

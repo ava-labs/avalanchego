@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -72,8 +73,9 @@ type Context struct {
 	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
 	bootstrapped uint32
 
-	// Staking signer for snoman++ blocks
-	StakingCert tls.Certificate
+	// snoman++ attributes
+	StakingCert tls.Certificate // block signer
+	ValidatorVM validators.VM   // interface for P-Chain validators
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

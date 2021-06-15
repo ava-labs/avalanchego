@@ -196,6 +196,9 @@ type manager struct {
 	// Key: Chain's ID
 	// Value: The chain
 	chains map[ids.ID]*router.Handler
+
+	// snoman++ related interface to allow validators retrival
+	validatorVM validators.VM
 }
 
 // New returns a new Manager
@@ -293,6 +296,16 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.subnets[chainParams.SubnetID] = sb
 	}
 
+	if chainParams.SubnetID == constants.PrimaryNetworkID && chainParams.ID == constants.PlatformChainID {
+		if valVM, ok := chain.Engine.GetVM().(validators.VM); ok {
+			m.validatorVM = valVM
+		} else {
+			m.Log.Fatal("platformVM  %s does not implement validatorsVM interface", chainParams.ID)
+			go m.ShutdownNodeFunc(1)
+			return
+		}
+	}
+
 	m.chainsLock.Lock()
 	m.chains[chainParams.ID] = chain.Handler
 	m.chainsLock.Unlock()
@@ -354,6 +367,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
 		StakingCert:          m.StakingCert,
+		ValidatorVM:          m.validatorVM,
 	}
 
 	// Get a factory for the vm we want to use on our chain

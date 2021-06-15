@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // windower interfaces with P-Chain and it is responsible for:
@@ -11,6 +12,7 @@ import (
 // calculate the start time for the block submission window of a given validator
 
 type windower struct {
+	validators.VM
 	dummyPChainHeight uint64 // mock until P-Chain is integrated
 	mockedValPos      uint
 }
