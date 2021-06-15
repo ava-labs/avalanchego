@@ -121,8 +121,6 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
 func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
-var valExists = struct{}{}
-
 // getAddress returns a map of address and assetID Set data for a given transaction object
 func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]struct{} {
 	// map of address => [AssetIDs...]
@@ -142,7 +140,7 @@ func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]struct{} {
 			if _, exists := addresses[addr]; !exists {
 				addresses[addr] = make(map[ids.ID]struct{})
 			}
-			addresses[addr][assetID] = valExists
+			addresses[addr][assetID] = struct{}{}
 		}
 	}
 	return addresses
@@ -206,8 +204,8 @@ func (tx *UniqueTx) Accept() error {
 			var idx uint64
 			idxBytes, err := assetPrefixDB.Get(idxKey)
 			switch {
-			// Unexpected error
 			case err != nil && err != database.ErrNotFound:
+				// Unexpected error
 				tx.vm.ctx.Log.Fatal("Error checking idx value exists: %s", err)
 				return err
 			case err == database.ErrNotFound:
