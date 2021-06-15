@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/compression"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -419,10 +417,9 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 		return nil, err
 	}
 
-	gzipHandler := compression.EnableGzipSupport(server)
 	return map[string]*common.HTTPHandler{
 		"": {
-			Handler: gzipHandler,
+			Handler: server,
 		},
 	}, nil
 }

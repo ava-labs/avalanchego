@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/api/compression"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -60,7 +58,7 @@ func NewService(
 	}, "info"); err != nil {
 		return nil, err
 	}
-	return &common.HTTPHandler{Handler: compression.EnableGzipSupport(newServer)}, nil
+	return &common.HTTPHandler{Handler: newServer}, nil
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion

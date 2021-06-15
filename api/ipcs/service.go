@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/api/compression"
-
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -44,7 +42,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 
-	return &common.HTTPHandler{Handler: compression.EnableGzipSupport(newServer)}, newServer.RegisterService(ipcServer, "ipcs")
+	return &common.HTTPHandler{Handler: newServer}, newServer.RegisterService(ipcServer, "ipcs")
 }
 
 // PublishBlockchainArgs are the arguments for calling PublishBlockchain

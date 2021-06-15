@@ -185,6 +185,7 @@ func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.Context, b
 	}
 	// Apply middleware to reject calls to the handler before the chain finishes bootstrapping
 	h = rejectMiddleware(h, ctx)
+	h = compression.EnableGzipSupport(h)
 	return s.router.AddRouter(url, endpoint, h)
 }
 
