@@ -1,5 +1,12 @@
 package proposervm
 
+// ProposerBlock is a decorator for a snowman.Block, created to handle block headers introduced with snowman++
+// ProposerBlock is made up of a ProposerBlockHeader, carrying all the new fields introduced with snowman++, and
+// a core block, which is a snowman.Block.
+// ProposerBlock serialization is a two step process: the header is serialized at proposervm level, while core block
+// serialization is deferred to the ChainVM wrapped into proposervm.VM. The structure marshallingProposerBLock encapsulates
+// the serialization logic
+
 import (
 	"crypto"
 	cryptorand "crypto/rand"
@@ -19,6 +26,7 @@ import (
 const (
 	BlkSubmissionTolerance = 10 * time.Second
 	BlkSubmissionWinLength = 2 * time.Second
+	proBlkVersion          = 0
 )
 
 var (
@@ -43,101 +51,12 @@ type ProposerBlockHeader struct {
 
 func NewProHeader(prntID ids.ID, unixTime int64, height uint64, cert x509.Certificate) ProposerBlockHeader {
 	return ProposerBlockHeader{
-		version:      codecVersion,
+		version:      proBlkVersion,
 		prntID:       prntID,
 		timestamp:    unixTime,
 		pChainHeight: height,
 		valCert:      cert,
 	}
-}
-
-type marshallingProposerBLock struct {
-	ProposerBlockHeader
-	wrpdBytes []byte
-}
-
-func (mPb *marshallingProposerBLock) marshal() ([]byte, error) {
-	p := wrappers.Packer{
-		MaxSize: 1 << 18,
-		Bytes:   make([]byte, 0, 128),
-	}
-	if p.PackShort(mPb.version); p.Errored() {
-		return nil, ErrProBlkFailedParsing
-	}
-
-	if p.PackBytes(mPb.prntID[:]); p.Errored() {
-		return nil, ErrProBlkFailedParsing
-	}
-
-	if p.PackLong(uint64(mPb.timestamp)); p.Errored() {
-		return nil, ErrProBlkFailedParsing
-	}
-
-	if p.PackLong(mPb.pChainHeight); p.Errored() {
-		return nil, ErrProBlkFailedParsing
-	}
-
-	if p.PackX509Certificate(&mPb.valCert); p.Errored() {
-		return nil, ErrProBlkFailedParsing
-	}
-
-	if p.PackBytes(mPb.signature); p.Errored() {
-		return nil, ErrProBlkFailedParsing
-	}
-
-	if p.PackBytes(mPb.wrpdBytes); p.Errored() {
-		return nil, ErrProBlkFailedParsing
-	}
-
-	return p.Bytes, nil
-}
-
-func (mPb *marshallingProposerBLock) unmarshal(b []byte) error {
-	p := wrappers.Packer{
-		Bytes: b,
-	}
-
-	if mPb.version = p.UnpackShort(); p.Errored() {
-		return ErrProBlkFailedParsing
-	}
-
-	prntIDBytes := p.UnpackBytes()
-	switch {
-	case p.Errored():
-		return ErrProBlkFailedParsing
-	case len(prntIDBytes) != len(mPb.prntID):
-		return ErrProBlkFailedParsing
-	default:
-		copy(mPb.prntID[:], prntIDBytes)
-	}
-
-	if mPb.timestamp = int64(p.UnpackLong()); p.Errored() {
-		return ErrProBlkFailedParsing
-	}
-
-	if mPb.pChainHeight = p.UnpackLong(); p.Errored() {
-		return ErrProBlkFailedParsing
-	}
-
-	pValCert := p.UnpackX509Certificate()
-	if p.Errored() {
-		return ErrProBlkFailedParsing
-	}
-	if pValCert != nil {
-		mPb.valCert = *pValCert
-	} else {
-		mPb.valCert = x509.Certificate{} // special case: genesis has empty certificate
-	}
-
-	if mPb.signature = p.UnpackBytes(); p.Errored() {
-		return ErrProBlkFailedParsing
-	}
-
-	if mPb.wrpdBytes = p.UnpackBytes(); p.Errored() {
-		return ErrProBlkFailedParsing
-	}
-
-	return nil
 }
 
 type ProposerBlock struct {
@@ -201,6 +120,8 @@ func (pb *ProposerBlock) Accept() error {
 }
 
 func (pb *ProposerBlock) Reject() error {
+	// TODO: rejection of ProposerBlock does not imply rejection of coreBlk
+	// to refactor upon integration with P-chain
 	err := pb.coreBlk.Reject()
 	if err == nil {
 		pb.vm.state.wipeFromCacheProBlk(pb.id)
@@ -223,7 +144,7 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 
 func (pb *ProposerBlock) Verify() error {
 	// validate version
-	if pb.header.version != codecVersion {
+	if pb.header.version != proBlkVersion {
 		return fmt.Errorf("codecVersion not matching")
 	}
 
@@ -318,4 +239,93 @@ func (pb *ProposerBlock) Options() ([2]snowman.Block, error) {
 	}
 
 	return [2]snowman.Block{}, ErrInnerBlockNotOracle
+}
+
+type marshallingProposerBLock struct {
+	ProposerBlockHeader
+	wrpdBytes []byte
+}
+
+func (mPb *marshallingProposerBLock) marshal() ([]byte, error) {
+	p := wrappers.Packer{
+		MaxSize: 1 << 18,
+		Bytes:   make([]byte, 0, 128),
+	}
+	if p.PackShort(mPb.version); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackBytes(mPb.prntID[:]); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackLong(uint64(mPb.timestamp)); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackLong(mPb.pChainHeight); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackX509Certificate(&mPb.valCert); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackBytes(mPb.signature); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	if p.PackBytes(mPb.wrpdBytes); p.Errored() {
+		return nil, ErrProBlkFailedParsing
+	}
+
+	return p.Bytes, nil
+}
+
+func (mPb *marshallingProposerBLock) unmarshal(b []byte) error {
+	p := wrappers.Packer{
+		Bytes: b,
+	}
+
+	if mPb.version = p.UnpackShort(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	prntIDBytes := p.UnpackBytes()
+	switch {
+	case p.Errored():
+		return ErrProBlkFailedParsing
+	case len(prntIDBytes) != len(mPb.prntID):
+		return ErrProBlkFailedParsing
+	default:
+		copy(mPb.prntID[:], prntIDBytes)
+	}
+
+	if mPb.timestamp = int64(p.UnpackLong()); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	if mPb.pChainHeight = p.UnpackLong(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	pValCert := p.UnpackX509Certificate()
+	if p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+	if pValCert != nil {
+		mPb.valCert = *pValCert
+	} else {
+		mPb.valCert = x509.Certificate{} // special case: genesis has empty certificate
+	}
+
+	if mPb.signature = p.UnpackBytes(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	if mPb.wrpdBytes = p.UnpackBytes(); p.Errored() {
+		return ErrProBlkFailedParsing
+	}
+
+	return nil
 }

@@ -3,10 +3,10 @@ package proposervm
 // VM is a decorator for a snowman.ChainVM struct, created to handle block headers introduced with snowman++
 
 // Contract
-// * After initialization. full ProposerBlocks (proHeader + core block ) are stored in proposervm.VM's db
-// on Build/ParseBlock, AFTER calls to core vm's Build/ParseBlock, which we ASSUME
+// * After initialization. full ProposerBlocks (proHeader + core block) are stored in proposervm.VM's db
+// on Build/ParseBlock calls, AFTER calls to core vm's Build/ParseBlock, which we ASSUME
 //  would store core block on core VM's db.
-// * ProposerVM do not track ProposerBlock state; instead state relate calls (Accept/Reject/Status) are
+// * ProposerVM do not track ProposerBlock state; instead state related calls (Accept/Reject/Status) are
 // forwarded to the core VM. Since block registration HAPPENS BEFORE block status settings,
 // proposerVM is guaranteed not to lose the last accepted block
 // * ProposerVM can handle both ProposerVM blocks AND generic snowman.Block not wrapped with a ProposerBlocHeader
@@ -25,10 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-)
-
-const (
-	codecVersion = 1987
 )
 
 var (
