@@ -102,7 +102,6 @@ type GetReceivedTxsReply struct {
 	Cursor string `json:"cursor"`
 }
 
-// TODO: Remove static hardcoded limit of page size
 const MaxPageSize uint64 = 1000
 
 func isEqual(a, b []byte) bool {

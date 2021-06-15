@@ -119,25 +119,23 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
 func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
-// getAddress returns a ids.ShortID address given a transaction. This function returns either a
-// ids.ShortEmpty ID or an address from the transaction object. An address is returned if the
-// tx object has UTXO with a singular receiver.
-// Should we check if the value of funds is > 0 too? 🤔❓
 var valExists = struct{}{}
 
+// getAddress returns a map of address and assetID Set data for a given transaction object
 func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]struct{} {
-	// map of address => [...AssetID => bool]
+	// map of address => [AssetIDs...]
 	addresses := map[ids.ShortID]map[ids.ID]struct{}{}
 
 	// go through all transfer outputs, assert they are secp transfer outputs
 	for _, utxo := range tx.UTXOs() {
-		// todo what do we do about inputs?
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			continue
 		}
 
 		assetID := utxo.AssetID()
+		// For each address that exists, we add it to the map, adding the
+		// assetID against it
 		for _, addr := range out.OutputOwners.Addrs {
 			if _, exists := addresses[addr]; !exists {
 				addresses[addr] = make(map[ids.ID]struct{})
@@ -189,9 +187,15 @@ func (tx *UniqueTx) Accept() error {
 
 	txID := tx.ID()
 
-	// Get transaction address and proceed with indexing the transaction against the prefix DB
-	// associated with the address if the returned address is not empty
-	// should this be enabled on a config flag? Like indexing? 🤔❓
+	// Get transaction address and assetID map and proceed with indexing the transaction
+	// The transaction is indexed against the address -> assetID prefixdb database. Since we need to maintain
+	// the order of the transactions, the indexing is done as follows:
+	// [address]
+	// |  [assetID]
+	// |  |
+	// |  | "idx" => 3 		Running transaction index key, represents the next index
+	// |  | "1"   => txID1
+	// |  | "2"   => txID1
 	addresses := getAddresses(tx)
 	tx.vm.ctx.Log.Debug("Retrieved address data %s", addresses)
 	for address, assetIDMap := range addresses {
@@ -227,6 +231,7 @@ func (tx *UniqueTx) Accept() error {
 				tx.vm.ctx.Log.Error("Failed to save transaction to the address, assetID prefix DB %s", err)
 			}
 
+			// increment and store the index for next use
 			idx++
 			binary.BigEndian.PutUint64(idxBytes, idx)
 			tx.vm.ctx.Log.Debug("New index %d", idx)
