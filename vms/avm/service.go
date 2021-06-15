@@ -10,10 +10,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
-	"strconv"
 	"strings"
-
-	"github.com/ava-labs/avalanchego/database"
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 
@@ -25,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -92,7 +90,7 @@ type GetTxStatusReply struct {
 type GetReceivedTxsArgs struct {
 	api.JSONAddress
 	// Cursor used as a page index / offset
-	Cursor string `json:"cursor"`
+	Cursor json.Uint64 `json:"cursor"`
 	// PageSize num of items per page
 	PageSize json.Uint64 `json:"pageSize"`
 	// AssetID defaulted to AVAX if omitted or left blank
@@ -102,7 +100,7 @@ type GetReceivedTxsArgs struct {
 type GetReceivedTxsReply struct {
 	TxIDs []ids.ID `json:"txIDs"`
 	// Cursor used as a page index / offset
-	Cursor string `json:"cursor"`
+	Cursor json.Uint64 `json:"cursor"`
 }
 
 // GetReceivedTxs returns list of transactions received by given address
@@ -127,34 +125,18 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 	addressTxDB := prefixdb.New(address[:], service.vm.db)
 	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
 
-	var cursor uint64
-	cursorBytes := make([]byte, 8)
-	unspecifiedCursor := len(args.Cursor) == 0
-	var iterator database.Iterator
-	if unspecifiedCursor {
-		iterator = assetPrefixDB.NewIterator()
-	} else {
-		cursor, err = strconv.ParseUint(args.Cursor, 10, 64)
-		if err != nil {
-			return fmt.Errorf("specified cursor is invalid, must be numeric > 0 : %w", err)
-		}
+	cursor := uint64(args.Cursor)
+	service.vm.ctx.Log.Debug("Fetching transactions, cursor %d", cursor)
+	cursorBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(cursorBytes, cursor)
 
-		if cursor == 0 {
-			return fmt.Errorf("cursor must be > 0")
-		}
-
-		binary.BigEndian.PutUint64(cursorBytes, cursor)
-		iterator = assetPrefixDB.NewIteratorWithStart(cursorBytes)
-	}
-
-	service.vm.ctx.Log.Debug("Fetching transactions, cursor %s", cursor)
-
-	for iterator.Next() {
-		if bytes.Equal([]byte("idx"), iterator.Key()) {
+	iter := assetPrefixDB.NewIteratorWithStart(cursorBytes)
+	for iter.Next() {
+		if bytes.Equal(idxKey, iter.Key()) {
 			continue
 		}
 
-		txIDBytes := iterator.Value()
+		txIDBytes := iter.Value()
 		if len(txIDBytes) != hashing.HashLen {
 			return fmt.Errorf("invalid tx ID %s", txIDBytes)
 		}
@@ -169,16 +151,10 @@ func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs
 	}
 
 	service.vm.ctx.Log.Debug("Fetched %d transactions for address", len(reply.TxIDs))
-
-	if len(reply.TxIDs) > 0 {
-		if unspecifiedCursor {
-			cursor = 1 + uint64(len(reply.TxIDs))
-		} else {
-			cursor += uint64(len(reply.TxIDs))
-		}
-		reply.Cursor = strconv.FormatInt(int64(cursor), 10)
-	}
-
+	// To get the next set of tx IDs, the user should provide this cursor.
+	// e.g. if they provided cursor 5, and read 6 tx IDs, they should start
+	// next time from index (cursor) 11.
+	reply.Cursor = json.Uint64(cursor + uint64(len(reply.TxIDs)))
 	return nil
 }
 
