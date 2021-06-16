@@ -52,6 +52,8 @@ const (
 
 var BootstrappedKey = []byte{0x00}
 
+var _ Manager = &manager{}
+
 // Manager manages the chains running on this node.
 // It can:
 //   * Create a chain

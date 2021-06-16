@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -21,7 +22,10 @@ var (
 	errRejectedTx      = errors.New("transaction is rejected")
 )
 
-var _ snowstorm.Tx = &UniqueTx{}
+var (
+	_ snowstorm.Tx    = &UniqueTx{}
+	_ cache.Evictable = &UniqueTx{}
+)
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
 // performance boost

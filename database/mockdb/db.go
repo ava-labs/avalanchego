@@ -11,6 +11,8 @@ import (
 
 var errNoFunction = errors.New("user didn't specify what value(s) return")
 
+var _ database.Database = &Database{}
+
 // Database implements database.Database.
 // This is a mock database meant to be used in tests.
 // You specify the database's return value(s) for a given method call by

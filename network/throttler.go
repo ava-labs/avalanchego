@@ -6,6 +6,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
+var (
+	_ Throttler = &throttler{}
+	_ Throttler = &noThrottler{}
+)
+
 type Throttler interface {
 	// Block until the event associated with this Acquire can happen.
 	// If [ctx] is canceled, gives up and returns an error.

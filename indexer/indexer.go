@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/api/server"
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -50,7 +51,9 @@ var (
 	hasRunKey               = []byte{0x07}
 )
 
-var _ Indexer = &indexer{}
+var (
+	_ Indexer = &indexer{}
+)
 
 // Config for an indexer
 type Config struct {
@@ -68,7 +71,7 @@ type Config struct {
 // they were accepted by this node.
 // Indexer is threadsafe.
 type Indexer interface {
-	RegisterChain(name string, ctx *snow.Context, engine common.Engine)
+	chains.Registrant
 	// Close will do nothing and return nil after the first call
 	io.Closer
 }

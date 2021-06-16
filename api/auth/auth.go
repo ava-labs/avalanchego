@@ -54,6 +54,8 @@ var (
 	errTooManyEndpoints = fmt.Errorf("can only name at most %d endpoints", maxEndpoints)
 )
 
+var _ Auth = &auth{}
+
 type Auth interface {
 	// Create and return a new token that allows access to each API endpoint for
 	// [duration] such that the API's path ends with an element of [endpoints].

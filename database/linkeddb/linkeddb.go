@@ -16,6 +16,8 @@ const (
 
 var headKey = []byte{0x01}
 
+var _ LinkedDB = &linkedDB{}
+
 // LinkedDB provides a key value interface while allowing iteration.
 type LinkedDB interface {
 	database.KeyValueReader

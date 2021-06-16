@@ -11,6 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+)
+
 type Database struct {
 	lock sync.RWMutex
 
