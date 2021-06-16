@@ -9,9 +9,6 @@ import (
 	"sync"
 	"time"
 
-	block2 "github.com/ava-labs/avalanchego/vms/metervm/block"
-	vertex2 "github.com/ava-labs/avalanchego/vms/metervm/vertex"
-
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/server"
@@ -34,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
@@ -483,8 +481,9 @@ func (m *manager) createAvalancheChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+
 	if m.MeterVMEnabled {
-		vm = vertex2.NewMeterVM(vm)
+		vm = metervm.NewVertexVM(vm)
 	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
@@ -623,8 +622,9 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+
 	if m.MeterVMEnabled {
-		vm = block2.NewMeterVM(vm)
+		vm = metervm.NewBlockVM(vm)
 	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
