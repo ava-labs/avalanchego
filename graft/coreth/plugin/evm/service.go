@@ -153,7 +153,7 @@ type ImportKeyArgs struct {
 
 // ImportKey adds a private key to the provided user
 func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
-	log.Info(fmt.Sprintf("EVM: ImportKey called for user '%s'", args.Username))
+	log.Info("EVM: ImportKey called", "username", args.Username)
 
 	if !strings.HasPrefix(args.PrivateKey, constants.SecretKeyPrefix) {
 		return fmt.Errorf("private key missing %s prefix", constants.SecretKeyPrefix)
@@ -452,7 +452,7 @@ type GetAtomicTxStatusReply struct {
 
 // GetAtomicTxStatus returns the status of the specified transaction
 func (service *AvaxAPI) GetAtomicTxStatus(r *http.Request, args *api.JSONTxID, reply *GetAtomicTxStatusReply) error {
-	log.Info("EVM: GetAtomicTxStatus called with %s", args.TxID)
+	log.Info("EVM: GetAtomicTxStatus called", "txID", args.TxID)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
@@ -475,7 +475,7 @@ type FormattedTx struct {
 
 // GetAtomicTx returns the specified transaction
 func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply *FormattedTx) error {
-	log.Info("EVM: GetAtomicTx called with %s", args.TxID)
+	log.Info("EVM: GetAtomicTx called", "txID", args.TxID)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
