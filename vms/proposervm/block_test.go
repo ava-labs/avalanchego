@@ -114,16 +114,20 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not retrieve P-chain height")
 	}
+
+	prntCoreBlk := snowman.TestBlock{}
 	prntProHdr := NewProHeader(ids.ID{}, 0, pCH, *pTestCert.Leaf)
-	prntProBlk, err := NewProBlock(proVM, prntProHdr, &snowman.TestBlock{}, nil, true)
+	prntProBlk, err := NewProBlock(proVM,
+		prntProHdr, &prntCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
 	}
 
+	childCoreBlk := snowman.TestBlock{
+		ParentV: &prntCoreBlk,
+	}
 	childProHdr := NewProHeader(prntProBlk.ID(), 0, pCH, *pTestCert.Leaf)
-	childProBlk, err := NewProBlock(proVM, childProHdr, &snowman.TestBlock{
-		VerifyV: nil,
-	}, nil, true)
+	childProBlk, err := NewProBlock(proVM, childProHdr, &childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
 	}
@@ -132,7 +136,7 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	err = childProBlk.Verify()
 	if err == nil {
 		t.Fatal("Block with unknown parent should not verify")
-	} else if err != ErrProBlkNotFound {
+	} else if err != ErrProBlkWrongParent {
 		t.Fatal("Block with unknown parent should have different error")
 	}
 
@@ -154,9 +158,11 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not retrieve P-chain height")
 	}
+
+	prntCoreBlk := snowman.TestBlock{}
 	ParentProBlk, err := NewProBlock(proVM,
 		NewProHeader(ids.ID{}, prntTimestamp, pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{}, nil, true)
+		&prntCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
 	}
@@ -164,13 +170,14 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 	// child block timestamp cannot be lower than parent timestamp
 	timeBeforeParent := time.Unix(prntTimestamp, 0).Add(-1 * time.Second).Unix()
+	childCoreBlk := snowman.TestBlock{
+		ParentV: &prntCoreBlk,
+	}
 	childProBlk, err := NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			timeBeforeParent,
 			pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -189,9 +196,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(ParentProBlk.ID(),
 			firstWindowsStart,
 			pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -209,9 +214,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(ParentProBlk.ID(),
 			beforeWindowStart,
 			pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -226,9 +229,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(ParentProBlk.ID(),
 			atWindowStart,
 			pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -243,9 +244,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(ParentProBlk.ID(),
 			afterWindowStart,
 			pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -259,9 +258,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(ParentProBlk.ID(),
 			AtSubWindowEnd,
 			pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -275,9 +272,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(ParentProBlk.ID(),
 			afterSubWinEnd,
 			pCH, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -295,20 +290,22 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 
 	prntBlkPChainHeight, _ := proVM.pChainHeight()
 	prntBlkPChainHeight /= 2
+	prntCoreBlk := snowman.TestBlock{}
 	ParentProBlk, err := NewProBlock(proVM,
 		NewProHeader(ids.ID{}, 0, prntBlkPChainHeight, *pTestCert.Leaf),
-		&snowman.TestBlock{}, nil, true)
+		&prntCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
 	proVM.state.cacheProBlk(&ParentProBlk)
 
 	// child P-Chain height must not precede parent P-Chain height
+	childCoreBlk := snowman.TestBlock{
+		ParentV: &prntCoreBlk,
+	}
 	childProBlk, err := NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(), 0, prntBlkPChainHeight-1, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -322,9 +319,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	// child P-Chain height can be equal to parent P-Chain height
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(), 0, prntBlkPChainHeight, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -335,9 +330,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	// child P-Chain height may follow parent P-Chain height
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(), 0, prntBlkPChainHeight+1, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -349,9 +342,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	currPChainHeight, _ := proVM.pChainHeight()
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(), 0, currPChainHeight, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -362,9 +353,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	// block P-Chain height cannot be larger than current P-Chain height
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(), 0, currPChainHeight+1, *pTestCert.Leaf),
-		&snowman.TestBlock{
-			VerifyV: nil,
-		}, nil, true)
+		&childCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}

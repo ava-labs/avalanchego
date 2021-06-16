@@ -6,13 +6,16 @@ package proposervm
 // ProposerBlock serialization is a two step process: the header is serialized at proposervm level, while core block
 // serialization is deferred to the ChainVM wrapped into proposervm.VM. The structure marshallingProposerBLock encapsulates
 // the serialization logic
+// Contract:
+// * Parent ProposerBlock wraps Parent CoreBlock of CoreBlock wrapped into Child ProposerBlock
+// * Only one call to each coreBlock's Verify() is issued from proposerVM TODO
+// * VERIFY FAILS ON GENESIS TODO: fix maybe
 
 import (
 	"crypto"
 	cryptorand "crypto/rand"
 	"crypto/x509"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -31,7 +34,9 @@ const (
 
 var (
 	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
+	ErrProBlkWrongVersion  = errors.New("proposer block has unsupported version")
 	ErrProBlkNotFound      = errors.New("proposer block not found")
+	ErrProBlkWrongParent   = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
 	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
 	ErrInvalidTLSKey       = errors.New("invalid validator signing key")
 	ErrInvalidNodeID       = errors.New("could not retrieve nodeID from proposer block certificate")
@@ -145,10 +150,11 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 func (pb *ProposerBlock) Verify() error {
 	// validate version
 	if pb.header.version != proBlkVersion {
-		return fmt.Errorf("codecVersion not matching")
+		return ErrProBlkWrongVersion
 	}
 
 	// validate core block
+	// TODO: should be called only one, hence at the end
 	if err := pb.coreBlk.Verify(); err != nil {
 		return err
 	}
@@ -156,7 +162,11 @@ func (pb *ProposerBlock) Verify() error {
 	// validate parent
 	prntBlk, err := pb.vm.state.getProBlock(pb.header.prntID)
 	if err != nil {
-		return ErrProBlkNotFound
+		return ErrProBlkWrongParent
+	}
+
+	if prntBlk.coreBlk.ID() != pb.coreBlk.Parent().ID() {
+		return ErrProBlkWrongParent
 	}
 
 	// validate height
