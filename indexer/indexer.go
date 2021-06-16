@@ -49,9 +49,7 @@ var (
 	isIncompletePrefix      = byte(0x04)
 	previouslyIndexedPrefix = byte(0x05)
 	hasRunKey               = []byte{0x07}
-)
 
-var (
 	_ Indexer = &indexer{}
 )
 
