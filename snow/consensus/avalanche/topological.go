@@ -22,6 +22,8 @@ var (
 	errNoLeaves  = errors.New("couldn't pop a leaf from leaf set")
 )
 
+var _ Consensus = &Topological{}
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 

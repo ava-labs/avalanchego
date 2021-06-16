@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
+var _ AddressManager = &addressManager{}
+
 type AddressManager interface {
 	// ParseLocalAddress takes in an address for this chain and produces the ID
 	ParseLocalAddress(addrStr string) (ids.ShortID, error)

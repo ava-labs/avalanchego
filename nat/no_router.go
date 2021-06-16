@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	errNoRouterCantMapPorts = errors.New("can't map ports without a known router")
-	errFetchingIP           = errors.New("getting outbound IP failed")
+	errNoRouterCantMapPorts        = errors.New("can't map ports without a known router")
+	errFetchingIP                  = errors.New("getting outbound IP failed")
+	_                       Router = &noRouter{}
 )
 
 const googleDNSServer = "8.8.8.8:80"
