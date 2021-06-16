@@ -305,7 +305,7 @@ func (h *Handler) AcceptedFrontier(
 	requestID uint32,
 	containerIDs []ids.ID,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.AcceptedFrontierMsg,
 		validatorID:    validatorID,
@@ -314,7 +314,6 @@ func (h *Handler) AcceptedFrontier(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
@@ -335,7 +334,7 @@ func (h *Handler) GetAccepted(
 	deadline time.Time,
 	containerIDs []ids.ID,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.GetAcceptedMsg,
 		validatorID:    validatorID,
@@ -345,7 +344,6 @@ func (h *Handler) GetAccepted(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // Accepted passes a Accepted message received from the network to the consensus
@@ -355,7 +353,7 @@ func (h *Handler) Accepted(
 	requestID uint32,
 	containerIDs []ids.ID,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.AcceptedMsg,
 		validatorID:    validatorID,
@@ -364,7 +362,6 @@ func (h *Handler) Accepted(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
@@ -384,7 +381,7 @@ func (h *Handler) GetAncestors(
 	deadline time.Time,
 	containerID ids.ID,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.GetAncestorsMsg,
 		validatorID:    validatorID,
@@ -394,7 +391,6 @@ func (h *Handler) GetAncestors(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // MultiPut passes a MultiPut message received from the network to the consensus engine.
@@ -403,7 +399,7 @@ func (h *Handler) MultiPut(
 	requestID uint32,
 	containers [][]byte,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.MultiPutMsg,
 		validatorID:    validatorID,
@@ -412,7 +408,6 @@ func (h *Handler) MultiPut(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
@@ -438,7 +433,7 @@ func (h *Handler) Get(
 	deadline time.Time,
 	containerID ids.ID,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.GetMsg,
 		validatorID:    validatorID,
@@ -448,7 +443,6 @@ func (h *Handler) Get(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // Put passes a Put message received from the network to the consensus engine.
@@ -458,7 +452,7 @@ func (h *Handler) Put(
 	containerID ids.ID,
 	container []byte,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.PutMsg,
 		validatorID:    validatorID,
@@ -468,7 +462,6 @@ func (h *Handler) Put(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // GetFailed passes a GetFailed message to the consensus engine.
@@ -488,7 +481,7 @@ func (h *Handler) PushQuery(
 	containerID ids.ID,
 	container []byte,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.PushQueryMsg,
 		validatorID:    validatorID,
@@ -499,7 +492,6 @@ func (h *Handler) PushQuery(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // PullQuery passes a PullQuery message received from the network to the consensus engine.
@@ -509,7 +501,7 @@ func (h *Handler) PullQuery(
 	deadline time.Time,
 	containerID ids.ID,
 	onDoneHandling func(),
-) bool {
+) {
 	h.msgChan <- message{
 		messageType:    constants.PullQueryMsg,
 		validatorID:    validatorID,
@@ -519,11 +511,10 @@ func (h *Handler) PullQuery(
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // Chits passes a Chits message received from the network to the consensus engine.
-func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID, onDoneHandling func()) bool {
+func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID, onDoneHandling func()) {
 	h.msgChan <- message{
 		messageType:    constants.ChitsMsg,
 		validatorID:    validatorID,
@@ -532,7 +523,6 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.I
 		received:       h.clock.Time(),
 		onDoneHandling: onDoneHandling,
 	}
-	return true
 }
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.

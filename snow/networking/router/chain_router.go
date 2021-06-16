@@ -276,7 +276,7 @@ func (cr *ChainRouter) GetAcceptedFrontier(
 		return
 	}
 
-	// Pass the message to the chain It's OK if we drop this.
+	// Pass the message to the chain
 	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline, onFinishedHandling)
 	if dropped {
 		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
@@ -327,14 +327,15 @@ func (cr *ChainRouter) AcceptedFrontier(
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedFrontierMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.AcceptedFrontier(validatorID, requestID, containerIDs, onFinishedHandling)
-	if dropped {
-		// We weren't able to pass the response to the chain
-		chain.GetAcceptedFrontierFailed(validatorID, requestID)
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	chain.AcceptedFrontier(validatorID, requestID, containerIDs, onFinishedHandling)
+	//dropped := !chain.AcceptedFrontier(validatorID, requestID, containerIDs, onFinishedHandling)
+	//if dropped {
+	//	// We weren't able to pass the response to the chain
+	//	chain.GetAcceptedFrontierFailed(validatorID, requestID)
+	//	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	//} else {
+	//	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	//}
 }
 
 // GetAcceptedFrontierFailed routes an incoming GetAcceptedFrontierFailed
@@ -385,13 +386,14 @@ func (cr *ChainRouter) GetAccepted(
 		return
 	}
 
-	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs, onFinishedHandling)
-	if dropped {
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	// Pass the message to the chain.
+	chain.GetAccepted(validatorID, requestID, deadline, containerIDs, onFinishedHandling)
+	// dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs, onFinishedHandling)
+	// if dropped {
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // Accepted routes an incoming Accepted request from the validator with ID
@@ -436,14 +438,15 @@ func (cr *ChainRouter) Accepted(
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAcceptedMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.Accepted(validatorID, requestID, containerIDs, onFinishedHandling)
-	if dropped {
-		// We weren't able to pass the response to the chain
-		chain.GetAcceptedFailed(validatorID, requestID)
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	chain.Accepted(validatorID, requestID, containerIDs, onFinishedHandling)
+	// dropped := !chain.Accepted(validatorID, requestID, containerIDs, onFinishedHandling)
+	// if dropped {
+	// 	// We weren't able to pass the response to the chain
+	// 	chain.GetAcceptedFailed(validatorID, requestID)
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // GetAcceptedFailed routes an incoming GetAcceptedFailed request from the
@@ -495,13 +498,14 @@ func (cr *ChainRouter) GetAncestors(
 		return
 	}
 
-	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	if dropped {
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	// Pass the message to the chain
+	chain.GetAncestors(validatorID, requestID, deadline, containerID, onFinishedHandling)
+	// dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID, onFinishedHandling)
+	// if dropped {
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
@@ -545,14 +549,15 @@ func (cr *ChainRouter) MultiPut(
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetAncestorsMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.MultiPut(validatorID, requestID, containers, onFinishedHandling)
-	if dropped {
-		// We weren't able to pass the response to the chain
-		chain.GetAncestorsFailed(validatorID, requestID)
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	chain.MultiPut(validatorID, requestID, containers, onFinishedHandling)
+	// dropped := !chain.MultiPut(validatorID, requestID, containers, onFinishedHandling)
+	// if dropped {
+	// 	// We weren't able to pass the response to the chain
+	// 	chain.GetAncestorsFailed(validatorID, requestID)
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
@@ -602,13 +607,14 @@ func (cr *ChainRouter) Get(
 		return
 	}
 
-	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.Get(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	if dropped {
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	// Pass the message to the chain
+	chain.Get(validatorID, requestID, deadline, containerID, onFinishedHandling)
+	// dropped := !chain.Get(validatorID, requestID, deadline, containerID, onFinishedHandling)
+	// if dropped {
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // Put routes an incoming Put request from the validator with ID [validatorID]
@@ -641,12 +647,13 @@ func (cr *ChainRouter) Put(
 	// If this is a gossip message, pass to the chain
 	if requestID == constants.GossipMsgRequestID {
 		// It's ok to drop this message.
-		dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
-		if dropped {
-			cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-		} else {
-			cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-		}
+		chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
+		// dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
+		// if dropped {
+		// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+		// } else {
+		// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+		// }
 		return
 	}
 
@@ -672,14 +679,15 @@ func (cr *ChainRouter) Put(
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, constants.GetMsg, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
-	if dropped {
-		// We weren't able to pass the response to the chain
-		chain.GetFailed(validatorID, requestID)
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
+	// dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
+	// if dropped {
+	// 	// We weren't able to pass the response to the chain
+	// 	chain.GetFailed(validatorID, requestID)
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
@@ -729,13 +737,14 @@ func (cr *ChainRouter) PushQuery(
 		return
 	}
 
-	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container, onFinishedHandling)
-	if dropped {
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	// Pass the message to the chain
+	chain.PushQuery(validatorID, requestID, deadline, containerID, container, onFinishedHandling)
+	// dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container, onFinishedHandling)
+	// if dropped {
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
@@ -757,13 +766,14 @@ func (cr *ChainRouter) PullQuery(
 		return
 	}
 
-	// Pass the message to the chain. It's OK if we drop this.
-	dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	if dropped {
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	// Pass the message to the chain
+	chain.PullQuery(validatorID, requestID, deadline, containerID, onFinishedHandling)
+	// dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID, onFinishedHandling)
+	// if dropped {
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
@@ -807,14 +817,15 @@ func (cr *ChainRouter) Chits(
 	cr.timeoutManager.RegisterResponse(validatorID, chainID, uniqueRequestID, request.msgType, latency)
 
 	// Pass the response to the chain
-	dropped := !chain.Chits(validatorID, requestID, votes, onFinishedHandling)
-	if dropped {
-		// We weren't able to pass the response to the chain
-		chain.QueryFailed(validatorID, requestID)
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	chain.Chits(validatorID, requestID, votes, onFinishedHandling)
+	// dropped := !chain.Chits(validatorID, requestID, votes, onFinishedHandling)
+	// if dropped {
+	// 	// We weren't able to pass the response to the chain
+	// 	chain.QueryFailed(validatorID, requestID)
+	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
+	// } else {
+	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
+	// }
 }
 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]
