@@ -18,10 +18,30 @@ func TestInterface(t *testing.T) {
 			t.Fatalf("rocksdb.New(%q, logging.NoLog{}) errored with %s", folder, err)
 		}
 
+		test(t, db)
+
 		// The database may have been closed by the test, so we don't care if it
 		// errors here.
-		defer db.Close()
+		_ = db.Close()
+	}
+}
 
-		test(t, db)
+func BenchmarkInterface(b *testing.B) {
+	for _, size := range database.BenchmarkSizes {
+		keys, values := database.SetupBenchmark(b, size, size)
+		for _, bench := range database.Benchmarks {
+			folder := b.TempDir()
+
+			db, err := New(folder, logging.NoLog{})
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			bench(b, db, "rocksdb", keys, values)
+
+			// The database may have been closed by the test, so we don't care if it
+			// errors here.
+			_ = db.Close()
+		}
 	}
 }

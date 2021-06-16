@@ -18,11 +18,13 @@ func TestInterface(t *testing.T) {
 			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
 		}
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
 		defer db.Close()
 
 		test(t, db)
+
+		// The database may have been closed by the test, so we don't care if it
+		// errors here.
+		_ = db.Close()
 	}
 }
 
@@ -37,9 +39,11 @@ func BenchmarkInterface(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			defer db.Close()
-
 			bench(b, db, "leveldb", keys, values)
+
+			// The database may have been closed by the test, so we don't care if it
+			// errors here.
+			_ = db.Close()
 		}
 	}
 }
