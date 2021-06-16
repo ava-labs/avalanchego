@@ -57,14 +57,16 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 	blocker, _ := queue.NewWithMissing(db, "", prometheus.NewRegistry())
 
 	commonConfig := common.Config{
-		Ctx:        ctx,
-		Validators: peers,
-		Beacons:    peers,
-		SampleK:    peers.Len(),
-		Alpha:      peers.Weight()/2 + 1,
-		Sender:     sender,
-		Subnet:     subnet,
-		Timer:      &common.TimerTest{},
+		Ctx:                           ctx,
+		Validators:                    peers,
+		Beacons:                       peers,
+		SampleK:                       peers.Len(),
+		Alpha:                         peers.Weight()/2 + 1,
+		Sender:                        sender,
+		Subnet:                        subnet,
+		Timer:                         &common.TimerTest{},
+		MultiputMaxContainersSent:     2000,
+		MultiputMaxContainersReceived: 2000,
 	}
 	return Config{
 		Config:  commonConfig,

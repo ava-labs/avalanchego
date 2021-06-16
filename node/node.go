@@ -166,7 +166,7 @@ func (n *Node) initNetworking() error {
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
 
-	dialer := network.NewDialer(TCP)
+	dialer := network.NewDialer(TCP, n.Config.DialerConfig, n.Log)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -212,7 +212,7 @@ func (n *Node) initNetworking() error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Warn("Failed to connect to bootstrap nodes. Node shutting down...")
+				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
 		})
@@ -255,7 +255,10 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
+		n.Config.DialerConfig,
 		n.Config.FetchOnly,
+		n.Config.ConsensusGossipAcceptedFrontierSize,
+		n.Config.ConsensusGossipOnAcceptSize,
 	)
 
 	return nil
@@ -579,39 +582,44 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		FetchOnly:                 n.Config.FetchOnly,
-		FetchOnlyFrom:             fetchOnlyFrom,
-		StakingEnabled:            n.Config.EnableStaking,
-		MaxPendingMsgs:            n.Config.MaxPendingMsgs,
-		MaxNonStakerPendingMsgs:   n.Config.MaxNonStakerPendingMsgs,
-		StakerMSGPortion:          n.Config.StakerMSGPortion,
-		StakerCPUPortion:          n.Config.StakerCPUPortion,
-		Log:                       n.Log,
-		LogFactory:                n.LogFactory,
-		VMManager:                 n.vmManager,
-		DecisionEvents:            n.DecisionDispatcher,
-		ConsensusEvents:           n.ConsensusDispatcher,
-		DBManager:                 n.DBManager,
-		Router:                    n.Config.ConsensusRouter,
-		Net:                       n.Net,
-		ConsensusParams:           n.Config.ConsensusParams,
-		EpochFirstTransition:      n.Config.EpochFirstTransition,
-		EpochDuration:             n.Config.EpochDuration,
-		Validators:                n.vdrs,
-		NodeID:                    n.ID,
-		NetworkID:                 n.Config.NetworkID,
-		Server:                    &n.APIServer,
-		Keystore:                  n.keystore,
-		AtomicMemory:              &n.sharedMemory,
-		AVAXAssetID:               avaxAssetID,
-		XChainID:                  xChainID,
-		CriticalChains:            criticalChains,
-		TimeoutManager:            timeoutManager,
-		HealthService:             n.healthService,
-		WhitelistedSubnets:        n.Config.WhitelistedSubnets,
-		RetryBootstrap:            n.Config.RetryBootstrap,
-		RetryBootstrapMaxAttempts: n.Config.RetryBootstrapMaxAttempts,
-		ShutdownNodeFunc:          n.Shutdown,
+		FetchOnly:                              n.Config.FetchOnly,
+		FetchOnlyFrom:                          fetchOnlyFrom,
+		StakingEnabled:                         n.Config.EnableStaking,
+		MaxPendingMsgs:                         n.Config.MaxPendingMsgs,
+		MaxNonStakerPendingMsgs:                n.Config.MaxNonStakerPendingMsgs,
+		StakerMSGPortion:                       n.Config.StakerMSGPortion,
+		StakerCPUPortion:                       n.Config.StakerCPUPortion,
+		Log:                                    n.Log,
+		LogFactory:                             n.LogFactory,
+		VMManager:                              n.vmManager,
+		DecisionEvents:                         n.DecisionDispatcher,
+		ConsensusEvents:                        n.ConsensusDispatcher,
+		DBManager:                              n.DBManager,
+		Router:                                 n.Config.ConsensusRouter,
+		Net:                                    n.Net,
+		ConsensusParams:                        n.Config.ConsensusParams,
+		EpochFirstTransition:                   n.Config.EpochFirstTransition,
+		EpochDuration:                          n.Config.EpochDuration,
+		Validators:                             n.vdrs,
+		NodeID:                                 n.ID,
+		NetworkID:                              n.Config.NetworkID,
+		Server:                                 &n.APIServer,
+		Keystore:                               n.keystore,
+		AtomicMemory:                           &n.sharedMemory,
+		AVAXAssetID:                            avaxAssetID,
+		XChainID:                               xChainID,
+		CriticalChains:                         criticalChains,
+		TimeoutManager:                         timeoutManager,
+		HealthService:                          n.healthService,
+		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
+		RetryBootstrap:                         n.Config.RetryBootstrap,
+		RetryBootstrapMaxAttempts:              n.Config.RetryBootstrapMaxAttempts,
+		ShutdownNodeFunc:                       n.Shutdown,
+		MeterVMEnabled:                         n.Config.MeterVMEnabled,
+		ChainConfigs:                           n.Config.ChainConfigs,
+		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
+		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
+		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
 	})
 
 	vdrs := n.vdrs
@@ -626,7 +634,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
+		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
 			Chains:             n.chainManager,
 			Validators:         vdrs,
 			StakingEnabled:     n.Config.EnableStaking,
@@ -642,18 +650,17 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
 		}),
-		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
+		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
 			Fee:         n.Config.TxFee,
 		}),
-		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
-			Path:   filepath.Join(n.Config.PluginDir, "evm"),
-			Config: n.Config.CorethConfig,
+		n.vmManager.RegisterFactory(evm.ID, &rpcchainvm.Factory{
+			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
-		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
-		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
-		n.vmManager.RegisterVMFactory(propertyfx.ID, &propertyfx.Factory{}),
+		n.vmManager.RegisterFactory(timestampvm.ID, &timestampvm.Factory{}),
+		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
+		n.vmManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err

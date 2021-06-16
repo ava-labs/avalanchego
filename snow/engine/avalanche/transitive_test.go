@@ -2475,7 +2475,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 	if err := te.Initialize(config); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.Startup(); err != nil {
+	if err := te.Connected(vdr); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2880,7 +2880,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	if err := te.Initialize(config); err != nil {
 		t.Fatal(err)
 	}
-	if err := te.Startup(); err != nil {
+	if err := te.Connected(vdr); err != nil {
 		t.Fatal(err)
 	}
 

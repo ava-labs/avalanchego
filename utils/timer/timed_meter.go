@@ -9,9 +9,13 @@ import (
 	"time"
 )
 
+var _ Meter = &TimedMeter{}
+
 // TimedMeter is a meter that discards old events
 type TimedMeter struct {
 	lock sync.Mutex
+	// Can be used to fake time in tests
+	Clock *Clock
 	// Amount of time to keep a tick
 	Duration time.Duration
 	// TODO: Currently this list has an entry for each tick... This isn't really
@@ -40,17 +44,20 @@ func (tm *TimedMeter) init() {
 	if tm.tickList == nil {
 		tm.tickList = list.New()
 	}
+	if tm.Clock == nil {
+		tm.Clock = &Clock{}
+	}
 }
 
 func (tm *TimedMeter) tick() {
 	tm.init()
-	tm.tickList.PushBack(time.Now())
+	tm.tickList.PushBack(tm.Clock.Time())
 }
 
 func (tm *TimedMeter) ticks() int {
 	tm.init()
 
-	timeBound := time.Now().Add(-tm.Duration)
+	timeBound := tm.Clock.Time().Add(-tm.Duration)
 	// removeExpiredHead returns false once there is nothing left to remove
 	for tm.removeExpiredHead(timeBound) {
 	}

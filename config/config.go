@@ -8,14 +8,20 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/network"
+
 	"github.com/ava-labs/avalanchego/app/process"
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/ipcs"
@@ -39,7 +45,13 @@ import (
 const (
 	avalanchegoLatest     = "avalanchego-latest"
 	avalanchegoPreupgrade = "avalanchego-preupgrade"
+	chainConfigFileName   = "config"
+	chainUpgradeFileName  = "upgrade"
 )
+
+var deprecatedKeys = map[string]string{
+	CorethConfigKey: "please use config files for C chain",
+}
 
 // Results of parsing the CLI
 var (
@@ -52,6 +64,7 @@ var (
 	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
 	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
 	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
+	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs", "chains")
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
 
@@ -64,8 +77,12 @@ func init() {
 		defaultBuildDirs = append(defaultBuildDirs, folderPath)
 		defaultBuildDirs = append(defaultBuildDirs, filepath.Dir(folderPath))
 	}
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
 	defaultBuildDirs = append(defaultBuildDirs,
-		".",
+		wd,
 		filepath.Join("/", "usr", "local", "lib", constants.AppName),
 		defaultDataDir,
 	)
@@ -84,31 +101,38 @@ func avalancheFlagSet() *flag.FlagSet {
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
-	// config
+	// Config File
 	fs.String(ConfigFileKey, "", "Specifies a config file")
-	// Genesis config File
+
+	// Genesis Config File
 	fs.String(GenesisConfigFileKey, "", "Specifies a genesis config file (ignored when running standard networks)")
+
 	// Network ID
 	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
+
 	// AVAX fees
 	fs.Uint64(TxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
 	fs.Uint64(CreationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
+
 	// Database
 	fs.Bool(DBEnabledKey, true, "Turn on persistent storage")
 	fs.String(DBPathKey, defaultDBDir, "Path to database directory")
+
 	// Coreth config
 	fs.String(CorethConfigKey, "", "Specifies config to pass into coreth")
+
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
 	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	fs.String(LogDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
+
 	// Assertions
 	fs.Bool(AssertionsEnabledKey, true, "Turn on assertion execution")
+
 	// Signature Verification
 	fs.Bool(SignatureVerificationEnabledKey, true, "Turn on signature verification")
 
-	// Networking
 	// Peer List Gossip
 	gossipHelpMsg := fmt.Sprintf(
 		"Gossip [%s] peers to [%s] peers every [%s]",
@@ -119,20 +143,24 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(NetworkPeerListSizeKey, 20, gossipHelpMsg)
 	fs.Uint(NetworkPeerListGossipSizeKey, 50, gossipHelpMsg)
 	fs.Duration(NetworkPeerListGossipFreqKey, time.Minute, gossipHelpMsg)
+
 	// Public IP Resolution
 	fs.String(PublicIPKey, "", "Public IP of this node for P2P communication. If empty, try to discover with NAT. Ignored if dynamic-public-ip is non-empty.")
 	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
+
 	// Incoming Connection Throttling
-	// After we receive [conn-meter-max-conns] incoming connections from a given IP
-	// in the last [conn-meter-reset-duration], we close all subsequent incoming connections
-	// from the IP before upgrade.
+	// Upgrade at most [conn-meter-max-conns] incoming connections from a given IP
+	// in the last [conn-meter-reset-duration].
 	fs.Duration(ConnMeterResetDurationKey, 0*time.Second,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+			"If either is 0, incoming connections are not rate-limited.")
 	fs.Int(ConnMeterMaxConnsKey, 5,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If [conn-meter-reset-duration] is 0, incoming connections are not rate-limited.")
+			"If either is 0, incoming connections are not rate-limited.")
+	// Outgoing Connection Throttling
+	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
+	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer.")
 	// Timeouts
 	fs.Duration(NetworkInitialTimeoutKey, 5*time.Second, "Initial timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkMinimumTimeoutKey, 2*time.Second, "Minimum timeout value of the adaptive timeout manager.")
@@ -140,14 +168,17 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
 	fs.Uint(SendQueueSizeKey, 512, "Max number of messages waiting to be sent to a given peer.")
+
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
 		"to an IP address previously associated with a peer (i.e. a peer alias).")
+
 	// Benchlist
 	fs.Int(BenchlistFailThresholdKey, 10, "Number of consecutive failed queries before benchlisting a node.")
 	fs.Bool(BenchlistPeerSummaryEnabledKey, false, "Enables peer specific query latency metrics.")
 	fs.Duration(BenchlistDurationKey, 30*time.Minute, "Max amount of time a peer is benchlisted after surpassing the threshold.")
 	fs.Duration(BenchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
+
 	// Router
 	fs.Uint(MaxNonStakerPendingMsgsKey, uint(router.DefaultMaxNonStakerPendingMsgs), "Maximum number of messages a non-staker is allowed to have pending.")
 	fs.Float64(StakerMsgReservedKey, router.DefaultStakerPortion, "Reserve a portion of the chain message queue's space for stakers.")
@@ -155,8 +186,10 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Uint(MaxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
 	fs.Duration(ConsensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
+	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
+	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
 
-	// HTTP API
+	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
 	fs.Uint(HTTPPortKey, 9650, "Port of the HTTP server")
 	fs.Bool(HTTPSEnabledKey, false, "Upgrade the HTTP server to HTTPs")
@@ -172,7 +205,8 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Bool(MetricsAPIEnabledKey, true, "If true, this node exposes the Metrics API")
 	fs.Bool(HealthAPIEnabledKey, true, "If true, this node exposes the Health API")
 	fs.Bool(IpcAPIEnabledKey, false, "If true, IPCs can be opened")
-	// Health
+
+	// Health Checks
 	fs.Duration(HealthCheckFreqKey, 30*time.Second, "Time between health checks")
 	fs.Duration(HealthCheckAveragerHalflifeKey, 10*time.Second, "Halflife of averager when calculating a running average in a health check")
 	// Network Layer Health
@@ -189,6 +223,7 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Staking
 	fs.Uint(StakingPortKey, 9651, "Port of the consensus server")
 	fs.Bool(StakingEnabledKey, true, "Enable staking. If enabled, Network TLS is required.")
+	fs.Bool(StakingEphemeralCertEnabledKey, false, "If true, the node uses an ephemeral staking key and certificate, and has an ephemeral node ID.")
 	fs.String(StakingKeyPathKey, defaultStakingKeyPath, "Path to the TLS private key for staking")
 	fs.String(StakingCertPathKey, defaultStakingCertPath, "Path to the TLS certificate for staking")
 	fs.Uint64(StakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
@@ -209,12 +244,16 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Duration(StakeMintingPeriodKey, 365*24*time.Hour, "Consumption period of the staking function")
 	// Subnets
 	fs.String(WhitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
+
 	// Bootstrapping
 	fs.String(BootstrapIPsKey, "", "Comma separated list of bootstrap peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")
 	fs.String(BootstrapIDsKey, "", "Comma separated list of bootstrap peer ids to connect to. Example: NodeID-JR4dVmy6ffUGAKCBDkyCbeZbyHQBeDsET,NodeID-8CrVPQZ4VSqgL8zTdvL14G8HqAfrBr4z")
 	fs.Bool(RetryBootstrapKey, true, "Specifies whether bootstrap should be retried")
 	fs.Int(RetryBootstrapMaxAttemptsKey, 50, "Specifies how many times bootstrap should be retried")
 	fs.Duration(BootstrapBeaconConnectionTimeoutKey, time.Minute, "Timeout when attempting to connect to bootstrapping beacons.")
+	fs.Duration(BootstrapMaxTimeGetAncestorsKey, 50*time.Millisecond, "Max Time to spend fetching a container and its ancestors when responding to a GetAncestors")
+	fs.Uint(BootstrapMultiputMaxContainersSentKey, 2000, "Max number of containers in a Multiput message sent by this node")
+	fs.Uint(BootstrapMultiputMaxContainersReceivedKey, 2000, "This node reads at most this many containers from an incoming Multiput message")
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
@@ -230,6 +269,9 @@ func avalancheFlagSet() *flag.FlagSet {
 	fs.Int64(SnowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
 	fs.Duration(SnowEpochDuration, 6*time.Hour, "Duration of each epoch")
 
+	// Metrics
+	fs.Bool(MeterVMsEnabledKey, false, "Enable Meter VMs to track VM performance with more granularity")
+
 	// IPC
 	fs.String(IpcsChainIDsKey, "", "Comma separated list of chain ids to add to the IPC engine. Example: 11111111111111111111111111111111LpoYY,4R5p2RXDGLqaifZE4hHWH9owe34pfoBULn1DrQTWivjg8o4aH")
 	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
@@ -237,17 +279,21 @@ func avalancheFlagSet() *flag.FlagSet {
 	// Indexer
 	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
+
 	// Plugin
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
+
 	// Build directory
 	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
+
+	// Chain Config Dir
+	fs.String(ChainConfigDirKey, defaultChainConfigDir, "Chain specific configurations parent directory. Defaults to $HOME/.avalanchego/configs/chains/")
 
 	// Profiles
 	fs.String(ProfileDirKey, defaultProfileDir, "Path to the profile directory")
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
-
 	return fs
 }
 
@@ -257,6 +303,11 @@ func getViper() (*viper.Viper, error) {
 	v := viper.New()
 	fs := avalancheFlagSet()
 	pflag.CommandLine.AddGoFlagSet(fs)
+	// Flag deprecations must be before parse
+	if err := deprecateFlags(); err != nil {
+		return nil, err
+	}
+
 	pflag.Parse()
 	if err := v.BindPFlags(pflag.CommandLine); err != nil {
 		return nil, err
@@ -267,12 +318,16 @@ func getViper() (*viper.Viper, error) {
 			return nil, err
 		}
 	}
+
+	// Config deprecations must be after v.ReadInConfig
+	deprecateConfigs(v, fs.Output())
 	return v, nil
 }
 
 // getConfigFromViper sets attributes on [config] based on the values
 // defined in the [viper] environment
 func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
+	// TODO Divide this function into smaller parts (see getChainConfigs) for efficient testing
 	// First, get the process config
 	processConfig := process.Config{}
 	processConfig.DisplayVersionAndExit = v.GetBool(VersionKey)
@@ -338,6 +393,8 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.ConsensusParams.MaxItemProcessingTime = v.GetDuration(SnowMaxTimeProcessingKey)
 	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
+	nodeConfig.ConsensusGossipAcceptedFrontierSize = uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey))
+	nodeConfig.ConsensusGossipOnAcceptSize = uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey))
 
 	// Logging:
 	loggingConfig, err := logging.DefaultConfig()
@@ -433,11 +490,11 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 		return node.Config{}, process.Config{}, errInvalidStakerWeights
 	}
 
-	if nodeConfig.FetchOnly {
-		// In fetch only mode, use an ephemeral staking key/cert
+	if nodeConfig.FetchOnly || v.GetBool(StakingEphemeralCertEnabledKey) {
+		// In fetch only mode or if explicitly set, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
-			return node.Config{}, process.Config{}, fmt.Errorf("couldn't generate dummy staking key/cert: %w", err)
+			return node.Config{}, process.Config{}, fmt.Errorf("couldn't generate ephemeral staking key/cert: %w", err)
 		}
 		nodeConfig.StakingTLSCert = *cert
 	} else {
@@ -545,6 +602,9 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 		nodeConfig.IPCPath = ipcs.DefaultBaseURL
 	}
 
+	// Metrics
+	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
+
 	// Throttling
 	nodeConfig.MaxNonStakerPendingMsgs = v.GetUint32(MaxNonStakerPendingMsgsKey)
 	nodeConfig.StakerMSGPortion = v.GetFloat64(StakerMsgReservedKey)
@@ -601,6 +661,12 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
 	nodeConfig.PeerListGossipFreq = v.GetDuration(NetworkPeerListGossipFreqKey)
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
+
+	// Outbound connection throttling
+	nodeConfig.DialerConfig = network.NewDialerConfig(
+		v.GetUint32(OutboundConnectionThrottlingRps),
+		v.GetDuration(OutboundConnectionTimeout),
+	)
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
@@ -679,21 +745,6 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	// Crypto
 	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
 
-	// Coreth Plugin
-	if v.IsSet(CorethConfigKey) {
-		corethConfigValue := v.Get(CorethConfigKey)
-		switch value := corethConfigValue.(type) {
-		case string:
-			nodeConfig.CorethConfig = value
-		default:
-			corethConfigBytes, err := json.Marshal(value)
-			if err != nil {
-				return node.Config{}, process.Config{}, fmt.Errorf("couldn't parse coreth config: %w", err)
-			}
-			nodeConfig.CorethConfig = string(corethConfigBytes)
-		}
-	}
-
 	// Indexer
 	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
 
@@ -701,9 +752,19 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.RetryBootstrap = v.GetBool(RetryBootstrapKey)
 	nodeConfig.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
 	nodeConfig.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
+	nodeConfig.BootstrapMaxTimeGetAncestors = v.GetDuration(BootstrapMaxTimeGetAncestorsKey)
+	nodeConfig.BootstrapMultiputMaxContainersSent = int(v.GetUint(BootstrapMultiputMaxContainersSentKey))
+	nodeConfig.BootstrapMultiputMaxContainersReceived = int(v.GetUint(BootstrapMultiputMaxContainersReceivedKey))
 
 	// Peer alias
 	nodeConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
+
+	// Chain Configs
+	chainConfigs, err := getChainConfigs(v)
+	if err != nil {
+		return node.Config{}, process.Config{}, err
+	}
+	nodeConfig.ChainConfigs = chainConfigs
 
 	// Profile config
 	nodeConfig.ProfilerConfig.Dir = os.ExpandEnv(v.GetString(ProfileDirKey))
@@ -712,6 +773,55 @@ func getConfigsFromViper(v *viper.Viper) (node.Config, process.Config, error) {
 	nodeConfig.ProfilerConfig.MaxNumFiles = v.GetInt(ProfileContinuousMaxFilesKey)
 
 	return nodeConfig, processConfig, nil
+}
+
+// getChainConfigs reads & puts chainConfigs to node config
+func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
+	chainConfigDir := v.GetString(ChainConfigDirKey)
+	chainsPath := path.Clean(chainConfigDir)
+	// user specified a chain config dir explicitly, but dir does not exist.
+	if v.IsSet(ChainConfigDirKey) {
+		info, err := os.Stat(chainsPath)
+		if err != nil {
+			return nil, err
+		}
+		if !info.IsDir() {
+			return nil, fmt.Errorf("not a directory: %v", chainsPath)
+		}
+	}
+	// gets direct subdirs
+	chainDirs, err := filepath.Glob(path.Join(chainsPath, "*"))
+	if err != nil {
+		return nil, err
+	}
+	chainConfigs, err := readChainConfigDirs(chainDirs)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't read chain configs: %w", err)
+	}
+
+	// Coreth Plugin
+	if v.IsSet(CorethConfigKey) {
+		// error if C config is already populated
+		if isCChainConfigSet(chainConfigs) {
+			return nil, fmt.Errorf("config for coreth(C) is already provided in chain config files")
+		}
+		corethConfigValue := v.Get(CorethConfigKey)
+		var corethConfigBytes []byte
+		switch value := corethConfigValue.(type) {
+		case string:
+			corethConfigBytes = []byte(value)
+		default:
+			corethConfigBytes, err = json.Marshal(value)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't parse coreth config: %w", err)
+			}
+		}
+		cChainPrimaryAlias := genesis.GetCChainAliases()[0]
+		cChainConfig := chainConfigs[cChainPrimaryAlias]
+		cChainConfig.Config = corethConfigBytes
+		chainConfigs[cChainPrimaryAlias] = cChainConfig
+	}
+	return chainConfigs, nil
 }
 
 // Initialize config.BootstrapPeers.
@@ -788,4 +898,108 @@ func GetConfigs(commit string) (node.Config, process.Config, error) {
 	}
 
 	return nodeConfig, processConfig, err
+}
+
+// ReadsChainConfigs reads chain config files from static directories and returns map with contents,
+// if successful.
+func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, error) {
+	chainConfigMap := make(map[string]chains.ChainConfig)
+	for _, chainDir := range chainDirs {
+		dirInfo, err := os.Stat(chainDir)
+		if err != nil {
+			return nil, err
+		}
+
+		if !dirInfo.IsDir() {
+			continue
+		}
+
+		// chainconfigdir/chainId/config.*
+		configData, err := readSingleFile(chainDir, chainConfigFileName)
+		if err != nil {
+			return chainConfigMap, err
+		}
+
+		// chainconfigdir/chainId/upgrade.*
+		upgradeData, err := readSingleFile(chainDir, chainUpgradeFileName)
+		if err != nil {
+			return chainConfigMap, err
+		}
+
+		chainConfigMap[dirInfo.Name()] = chains.ChainConfig{
+			Config:  configData,
+			Upgrade: upgradeData,
+		}
+	}
+
+	return chainConfigMap, nil
+}
+
+// safeReadFile reads a file but does not return an error if there is no file exists at path
+func safeReadFile(path string) ([]byte, error) {
+	ok, err := fileExists(path)
+	if err == nil && ok {
+		return ioutil.ReadFile(path)
+	}
+	return nil, err
+}
+
+// fileExists checks if a file exists before we
+// try using it to prevent further errors.
+func fileExists(filePath string) (bool, error) {
+	info, err := os.Stat(filePath)
+	if err == nil {
+		return !info.IsDir(), nil
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
+}
+
+// readSingleFile reads a single file with name fileName without specifying any extension.
+// it errors when there are more than 1 file with the given fileName
+func readSingleFile(parentDir string, fileName string) ([]byte, error) {
+	filePath := path.Join(parentDir, fileName)
+	files, err := filepath.Glob(filePath + ".*") // all possible extensions
+	if err != nil {
+		return nil, err
+	}
+	if len(files) > 1 {
+		return nil, fmt.Errorf("too much %s file in %s", fileName, parentDir)
+	}
+	if len(files) == 0 { // no file found, return nothing
+		return nil, nil
+	}
+	return safeReadFile(files[0])
+}
+
+// checks if C chain config bytes already set in map with alias key.
+// it does only checks alias key, chainId is not available at this point.
+func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
+	cChainAliases := genesis.GetCChainAliases()
+	for _, alias := range cChainAliases {
+		val, ok := chainConfigs[alias]
+		if ok && len(val.Config) > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func deprecateConfigs(v *viper.Viper, output io.Writer) {
+	for key, message := range deprecatedKeys {
+		if v.InConfig(key) {
+			fmt.Fprintf(output, "Config %s has been deprecated, %s\n", key, message)
+		}
+	}
+}
+
+func deprecateFlags() error {
+	for key, message := range deprecatedKeys {
+		if err := pflag.CommandLine.MarkDeprecated(key, message); err != nil {
+			return err
+		}
+	}
+	return nil
 }

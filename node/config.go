@@ -76,6 +76,7 @@ type Config struct {
 	PeerListSize        uint32
 	PeerListGossipSize  uint32
 	PeerListGossipFreq  time.Duration
+	DialerConfig        network.DialerConfig
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
@@ -120,11 +121,18 @@ type Config struct {
 	IPCPath            string
 	IPCDefaultChainIDs []string
 
+	// Metrics
+	MeterVMEnabled bool
+
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
 	RouterHealthConfig       router.HealthConfig
-	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
+	ConsensusGossipFrequency time.Duration
+	// Number of peers to gossip to when gossiping accepted frontier
+	ConsensusGossipAcceptedFrontierSize uint
+	// Number of peers to gossip each accepted container to
+	ConsensusGossipOnAcceptSize uint
 
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration
@@ -138,9 +146,6 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Coreth
-	CorethConfig string
-
 	IndexAllowIncomplete bool
 
 	// Should Bootstrap be retried
@@ -152,9 +157,20 @@ type Config struct {
 	// Timeout when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration
 
+	// Max number of containers in a multiput message sent by this node.
+	BootstrapMultiputMaxContainersSent int
+
+	// This node will only consider the first [MultiputMaxContainersReceived]
+	// containers in a multiput it receives.
+	BootstrapMultiputMaxContainersReceived int
+
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
 
 	// ChainConfigs
-	ChainConfigs map[ids.ID]chains.ChainConfig
+	ChainConfigs map[string]chains.ChainConfig
+
+	// Max time to spend fetching a container and its
+	// ancestors while responding to a GetAncestors message
+	BootstrapMaxTimeGetAncestors time.Duration
 }

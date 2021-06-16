@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
@@ -34,7 +33,10 @@ const (
 	bootstrappingDelay = 10 * time.Second
 )
 
-var errUnexpectedTimeout = errors.New("unexpected timeout fired")
+var (
+	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
+	_                    common.Bootstrapable = &Bootstrapper{}
+)
 
 // Config ...
 type Config struct {
@@ -138,7 +140,7 @@ func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingRequests {
+	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingGetAncestorsRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 
@@ -286,12 +288,14 @@ func (b *Bootstrapper) process(vtxs ...avalanche.Vertex) error {
 // MultiPut handles the receipt of multiple containers. Should be received in response to a GetAncestors message to [vdr]
 // with request ID [requestID]. Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) error {
-	if lenVtxs := len(vtxs); lenVtxs > common.MaxContainersPerMultiPut {
-		b.Ctx.Log.Debug("MultiPut(%s, %d) contains more than maximum number of vertices", vdr, requestID)
-		return b.GetAncestorsFailed(vdr, requestID)
-	} else if lenVtxs == 0 {
+	lenVtxs := len(vtxs)
+	if lenVtxs == 0 {
 		b.Ctx.Log.Debug("MultiPut(%s, %d) contains no vertices", vdr, requestID)
 		return b.GetAncestorsFailed(vdr, requestID)
+	}
+	if lenVtxs > b.MultiputMaxContainersReceived {
+		vtxs = vtxs[:b.MultiputMaxContainersReceived]
+		b.Ctx.Log.Debug("ignoring %d containers in multiput(%s, %d)", lenVtxs-b.MultiputMaxContainersReceived, vdr, requestID)
 	}
 
 	requestedVtxID, requested := b.OutstandingRequests.Remove(vdr, requestID)
@@ -301,7 +305,6 @@ func (b *Bootstrapper) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte
 			b.Ctx.Log.Debug("failed to parse unrequested vertex from %s with requestID %d: %s", vdr, requestID, err)
 			return nil
 		}
-
 		b.Ctx.Log.Debug("failed to parse requested vertex %s: %s", requestedVtxID, err)
 		b.Ctx.Log.Verbo("vertex: %s", formatting.DumpBytes{Bytes: vtxs[0]})
 		return b.fetch(requestedVtxID)
@@ -496,20 +499,18 @@ func (b *Bootstrapper) finish() error {
 
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
-	if connector, ok := b.VM.(validators.Connector); ok {
-		if err := connector.Connected(validatorID); err != nil {
-			return err
-		}
+	err := b.VM.Connected(validatorID)
+	if err != nil {
+		return err
 	}
 	return b.Bootstrapper.Connected(validatorID)
 }
 
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
-	if connector, ok := b.VM.(validators.Connector); ok {
-		if err := connector.Disconnected(validatorID); err != nil {
-			return err
-		}
+	err := b.VM.Disconnected(validatorID)
+	if err != nil {
+		return err
 	}
 	return b.Bootstrapper.Disconnected(validatorID)
 }

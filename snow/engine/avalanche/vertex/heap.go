@@ -7,6 +7,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 )
 
+var (
+	_ Heap           = &maxHeightVertexHeap{}
+	_ heap.Interface = &priorityQueue{}
+)
+
 // A priorityQueue implements heap.Interface and holds vertexItems.
 type priorityQueue []avalanche.Vertex
 

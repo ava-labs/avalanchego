@@ -29,7 +29,10 @@ const (
 	serverShutdownTimeout = 10 * time.Second
 )
 
-var errUnknownLockOption = errors.New("invalid lock options")
+var (
+	errUnknownLockOption            = errors.New("invalid lock options")
+	_                    RouteAdder = &Server{}
+)
 
 type RouteAdder interface {
 	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
