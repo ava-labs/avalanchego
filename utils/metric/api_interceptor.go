@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/gorilla/rpc/v2"
+
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type APIInterceptor interface {
