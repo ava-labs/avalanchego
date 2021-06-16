@@ -57,7 +57,7 @@ type VM struct {
 	proBlkStartTime time.Time
 }
 
-func NewProVM(vm block.ChainVM, proBlkStart time.Time) VM {
+func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 	res := VM{
 		ChainVM:         vm,
 		clock:           clockImpl{},
@@ -66,7 +66,7 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) VM {
 		proBlkStartTime: proBlkStart,
 	}
 	res.state = newState(&res)
-	return res
+	return &res
 }
 
 func (vm *VM) handleBlockTiming() {
@@ -90,7 +90,8 @@ func (vm *VM) Initialize(
 	if ctx.ValidatorVM != nil {
 		vm.windower.VM = ctx.ValidatorVM
 	} else {
-		// core VM must implement the validators.VM interface
+		// a nil ctx.ValidatorVM is expected only if we are wrapping P-chain VM itself.
+		// Then core VM must implement the validators.VM interface
 		if valVM, ok := vm.ChainVM.(validators.VM); ok {
 			vm.windower.VM = valVM
 		} else {
@@ -156,7 +157,11 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		hdr := NewProHeader(proParent.ID(), sb.Timestamp().Unix(), vm.pChainHeight(), *vm.stakingCert.Leaf)
+		h, err := vm.pChainHeight()
+		if err != nil {
+			return nil, err
+		}
+		hdr := NewProHeader(proParent.ID(), sb.Timestamp().Unix(), h, *vm.stakingCert.Leaf)
 		proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
 		if err != nil {
 			return nil, err

@@ -716,7 +716,7 @@ func (m *manager) createSnowmanChain(
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
-			VM:           &proposerVM,
+			VM:           proposerVM,
 			Bootstrapped: m.unblockChains,
 		},
 		Params:    consensusParams,

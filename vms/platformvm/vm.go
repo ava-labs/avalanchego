@@ -449,14 +449,13 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 }
 
 // GetValidatorSet returns the validator set at the specified height for the
-// provided subnetID.
+// provided subnetID. Implements validators.VM interface
 func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
-	if err != nil {
+	lastAcceptedHeight, err := vm.GetCurrentHeight()
+	switch {
+	case err != nil:
 		return nil, err
-	}
-	lastAcceptedHeight := lastAccepted.Height()
-	if lastAcceptedHeight < height {
+	case lastAcceptedHeight < height:
 		return nil, database.ErrNotFound
 	}
 
@@ -501,6 +500,15 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 		}
 	}
 	return vdrSet, nil
+}
+
+// Implements validators.VM interface
+func (vm *VM) GetCurrentHeight() (uint64, error) {
+	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
+	if err != nil {
+		return 0, err
+	}
+	return lastAccepted.Height(), nil
 }
 
 func (vm *VM) updateValidators(force bool) error {

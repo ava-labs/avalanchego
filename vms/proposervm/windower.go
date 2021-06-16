@@ -13,13 +13,11 @@ import (
 
 type windower struct {
 	validators.VM
-	dummyPChainHeight uint64 // mock until P-Chain is integrated
-	mockedValPos      uint
+	mockedValPos uint
 }
 
-func (w *windower) pChainHeight() uint64 {
-	// TODO: call platformVM.LastAccepted().Height instead of mock
-	return w.dummyPChainHeight
+func (w *windower) pChainHeight() (uint64, error) {
+	return w.VM.GetCurrentHeight()
 }
 
 func (w *windower) BlkSubmissionDelay(pChainHeight uint64, valID ids.ShortID) time.Duration {

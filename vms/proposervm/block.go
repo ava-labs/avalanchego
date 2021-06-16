@@ -164,7 +164,7 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkWrongHeight
 	}
 
-	if pb.header.pChainHeight > pb.vm.pChainHeight() {
+	if h, err := pb.vm.pChainHeight(); err != nil || pb.header.pChainHeight > h {
 		return ErrProBlkWrongHeight
 	}
 

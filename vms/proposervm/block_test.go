@@ -52,7 +52,7 @@ func (tC testClock) now() time.Time {
 }
 
 func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
-	coreVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	newBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
@@ -81,7 +81,7 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 }
 
 func TestProposerBlockParseFailure(t *testing.T) {
-	coreVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TimestampV: proVM.now(),
@@ -106,15 +106,21 @@ func TestProposerBlockParseFailure(t *testing.T) {
 }
 
 func TestProposerBlockVerificationParent(t *testing.T) {
-	_, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
-	prntProHdr := NewProHeader(ids.ID{}, 0, proVM.pChainHeight(), *pTestCert.Leaf)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	pCH, err := proVM.pChainHeight()
+	if err != nil {
+		t.Fatal("could not retrieve P-chain height")
+	}
+	prntProHdr := NewProHeader(ids.ID{}, 0, pCH, *pTestCert.Leaf)
 	prntProBlk, err := NewProBlock(proVM, prntProHdr, &snowman.TestBlock{}, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
 	}
 
-	childProHdr := NewProHeader(prntProBlk.ID(), 0, proVM.pChainHeight(), *pTestCert.Leaf)
+	childProHdr := NewProHeader(prntProBlk.ID(), 0, pCH, *pTestCert.Leaf)
 	childProBlk, err := NewProBlock(proVM, childProHdr, &snowman.TestBlock{
 		VerifyV: nil,
 	}, nil, true)
@@ -139,11 +145,17 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 }
 
 func TestProposerBlockVerificationTimestamp(t *testing.T) {
-	_, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
 
 	prntTimestamp := proVM.now().Unix()
+	pCH, err := proVM.pChainHeight()
+	if err != nil {
+		t.Fatal("could not retrieve P-chain height")
+	}
 	ParentProBlk, err := NewProBlock(proVM,
-		NewProHeader(ids.ID{}, prntTimestamp, proVM.pChainHeight(), *pTestCert.Leaf),
+		NewProHeader(ids.ID{}, prntTimestamp, pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{}, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
@@ -155,7 +167,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk, err := NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			timeBeforeParent,
-			proVM.pChainHeight(), *pTestCert.Leaf),
+			pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -176,7 +188,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			firstWindowsStart,
-			proVM.pChainHeight(), *pTestCert.Leaf),
+			pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -196,7 +208,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			beforeWindowStart,
-			proVM.pChainHeight(), *pTestCert.Leaf),
+			pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -213,7 +225,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			atWindowStart,
-			proVM.pChainHeight(), *pTestCert.Leaf),
+			pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -230,7 +242,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			afterWindowStart,
-			proVM.pChainHeight(), *pTestCert.Leaf),
+			pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -246,7 +258,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			AtSubWindowEnd,
-			proVM.pChainHeight(), *pTestCert.Leaf),
+			pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -262,7 +274,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(ParentProBlk.ID(),
 			afterSubWinEnd,
-			proVM.pChainHeight(), *pTestCert.Leaf),
+			pCH, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -277,10 +289,12 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 }
 
 func TestProposerBlockVerificationPChainHeight(t *testing.T) {
-	_, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	proVM.dummyPChainHeight = 666
+	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
 
-	prntBlkPChainHeight := proVM.pChainHeight() / 2
+	prntBlkPChainHeight, _ := proVM.pChainHeight()
+	prntBlkPChainHeight /= 2
 	ParentProBlk, err := NewProBlock(proVM,
 		NewProHeader(ids.ID{}, 0, prntBlkPChainHeight, *pTestCert.Leaf),
 		&snowman.TestBlock{}, nil, true)
@@ -332,8 +346,9 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	}
 
 	// block P-Chain height cannot be at most equal to current P-Chain height
+	currPChainHeight, _ := proVM.pChainHeight()
 	childProBlk, err = NewProBlock(proVM,
-		NewProHeader(ParentProBlk.ID(), 0, proVM.pChainHeight(), *pTestCert.Leaf),
+		NewProHeader(ParentProBlk.ID(), 0, currPChainHeight, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
@@ -346,7 +361,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 
 	// block P-Chain height cannot be larger than current P-Chain height
 	childProBlk, err = NewProBlock(proVM,
-		NewProHeader(ParentProBlk.ID(), 0, proVM.pChainHeight()+1, *pTestCert.Leaf),
+		NewProHeader(ParentProBlk.ID(), 0, currPChainHeight+1, *pTestCert.Leaf),
 		&snowman.TestBlock{
 			VerifyV: nil,
 		}, nil, true)
