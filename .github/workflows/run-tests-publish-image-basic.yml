@@ -3,7 +3,7 @@ name: Basic Lint + e2e Tests + Publish Docker Image
 on:
   push:
     tags-ignore:
-      - *
+      - '*' # Ignores all tags
     branches-ignore:
       - master
       - dev

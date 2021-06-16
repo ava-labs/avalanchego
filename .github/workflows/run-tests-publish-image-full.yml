@@ -3,7 +3,7 @@ name: Full Lint + e2e Tests + Publish Docker Image
 on:
   push:
     tags:
-      - *
+      - '*' # Push events to every tag
     branches:
     - master
     - dev
