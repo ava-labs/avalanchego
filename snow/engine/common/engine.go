@@ -284,12 +284,6 @@ type QueryHandler interface {
 // other components of this validator. Functions only return fatal errors if
 // they occur.
 type InternalHandler interface {
-	// Startup this engine.
-	//
-	// This function will be called once the environment is configured to be
-	// able to run the engine.
-	Startup() error
-
 	// Notify this engine that a registered timeout has fired.
 	Timeout() error
 

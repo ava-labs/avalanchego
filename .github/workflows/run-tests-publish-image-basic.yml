@@ -1,0 +1,44 @@
+name: Basic Lint + e2e Tests + Publish Docker Image
+
+on:
+  push:
+    tags-ignore:
+      - '*' # Ignores all tags
+    branches-ignore:
+      - master
+      - dev
+
+jobs:
+  run_lint:
+    name: lint
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          working-directory: .
+          args: --timeout 10m
+
+  run_e2e_tests_plus_publish_image:
+    needs: run_lint
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Run Kurtosis Tests
+        env:
+          KURTOSIS_CLIENT_ID: ${{ secrets.kurtosis_client_id }}
+          KURTOSIS_CLIENT_SECRET: ${{ secrets.kurtosis_client_secret }}
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+        run: .github/workflows/run_e2e_tests.sh avalanchego-basic --parallelism 5 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+
+      - name: Publish image to DockerHub
+        # only publish images from ava-labs/avalanchego
+        if: github.repository == 'ava-labs/avalanchego'
+        env:
+          DOCKER_USERNAME: ${{ secrets.docker_username }}
+          DOCKER_PASS: ${{ secrets.docker_pass }}
+
+        run: .github/workflows/publish_image.sh

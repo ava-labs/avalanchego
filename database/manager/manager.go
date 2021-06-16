@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -27,6 +26,8 @@ var (
 	errNonSortedAndUniqueDBs = errors.New("managed databases were not sorted and unique")
 	errNoDBs                 = errors.New("no dbs given")
 )
+
+var _ Manager = &manager{}
 
 type Manager interface {
 	// Current returns the database with the current database version.
@@ -80,7 +81,7 @@ func New(
 	includePreviousVersions bool,
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
-	currentDBPath := path.Join(dbDirPath, currentVersion.String())
+	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
 	currentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)

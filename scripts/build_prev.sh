@@ -6,20 +6,24 @@ set -o pipefail
 
 CURRENT_DIR="$(pwd)"
 
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
-source $AVALANCHE_PATH/scripts/constants.sh
+# Avalanchego root folder
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Load the versions
+source "$AVALANCHE_PATH"/scripts/versions.sh
+# Load the constants
+source "$AVALANCHE_PATH"/scripts/constants.sh
 
 rm -rf tmp
-echo "Fetching AvalancheGo ${PREUPGRADE_AVALANCHEGO_VER}..."
-git clone -b $PREUPGRADE_AVALANCHEGO_VER --single-branch --quiet https://github.com/ava-labs/avalanchego tmp
+echo "Fetching AvalancheGo ${prev_avalanchego_version}..."
+git clone -b $prev_avalanchego_version --single-branch --quiet https://github.com/ava-labs/avalanchego tmp
 cd tmp
 
 # Run the pre-db upgrade version's build script
-echo "Building AvalancheGo ${PREUPGRADE_AVALANCHEGO_VER}..."
+echo "Building AvalancheGo ${prev_avalanchego_version}..."
 "$CURRENT_DIR/tmp/scripts/build.sh" > /dev/null
 # Copy the binaries to where we expect them
-mkdir -p $PREV_PLUGIN_DIR
-mv $CURRENT_DIR/tmp/build/avalanchego "$PREV_AVALANCHEGO_PROCESS_PATH"
-mv  $CURRENT_DIR/tmp/build/plugins/* "$PREV_PLUGIN_DIR"
+mkdir -p $prev_plugin_dir
+mv $CURRENT_DIR/tmp/build/avalanchego "$prev_avalanchego_process_path"
+mv  $CURRENT_DIR/tmp/build/plugins/* "$prev_plugin_dir"
 cd -
 rm -rf tmp

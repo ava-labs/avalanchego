@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	block2 "github.com/ava-labs/avalanchego/vms/metervm/block"
+	vertex2 "github.com/ava-labs/avalanchego/vms/metervm/vertex"
+
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/server"
@@ -47,7 +50,10 @@ const (
 	defaultChannelSize = 1024
 )
 
-var BootstrappedKey = []byte{0x00}
+var (
+	BootstrappedKey         = []byte{0x00}
+	_               Manager = &manager{}
+)
 
 // Manager manages the chains running on this node.
 // It can:
@@ -112,11 +118,11 @@ type chain struct {
 }
 
 // ChainConfig is configuration settings for the current execution.
-// [Settings] is the user-provided settings blob for the chain.
-// [Upgrades] is a chain-specific blob for coordinating upgrades.
+// [Config] is the user-provided config blob for the chain.
+// [Upgrade] is a chain-specific blob for coordinating upgrades.
 type ChainConfig struct {
-	Settings []byte
-	Upgrades []byte
+	Config  []byte
+	Upgrade []byte
 }
 
 // ManagerConfig ...
@@ -149,9 +155,9 @@ type ManagerConfig struct {
 	WhitelistedSubnets        ids.Set          // Subnets to validate
 	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
 	HealthService             health.Service
-	RetryBootstrap            bool // Should Bootstrap be retried
-	RetryBootstrapMaxAttempts int  // Max number of times to retry bootstrap
-	ChainConfigs              map[ids.ID]ChainConfig
+	RetryBootstrap            bool                   // Should Bootstrap be retried
+	RetryBootstrapMaxAttempts int                    // Max number of times to retry bootstrap
+	ChainConfigs              map[string]ChainConfig // alias -> ChainConfig
 	// If true, shut down the node after the Primary Network has bootstrapped
 	// and use [FetchOnlyFrom] as beacons
 	FetchOnly bool
@@ -159,6 +165,16 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
+	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
+
+	// Max Time to spend fetching a container and its
+	// ancestors when responding to a GetAncestors
+	BootstrapMaxTimeGetAncestors time.Duration
+	// Max number of containers in a multiput message sent by this node.
+	BootstrapMultiputMaxContainersSent int
+	// This node will only consider the first [MultiputMaxContainersReceived]
+	// containers in a multiput it receives.
+	BootstrapMultiputMaxContainersReceived int
 }
 
 type manager struct {
@@ -226,7 +242,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			alias)
 		return
 	}
-
 	m.Log.Info("creating chain:\n"+
 		"    ID: %s\n"+
 		"    VMID:%s",
@@ -316,7 +331,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Create the log and context of the chain
-	chainLog, err := m.LogFactory.MakeChain(primaryAlias, "")
+	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating chain's log %w", err)
 	}
@@ -342,7 +357,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Get a factory for the vm we want to use on our chain
-	vmFactory, err := m.VMManager.GetVMFactory(vmID)
+	vmFactory, err := m.VMManager.GetFactory(vmID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
@@ -362,7 +377,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		}
 
 		// Get a factory for the fx we want to use on our chain
-		fxFactory, err := m.VMManager.GetVMFactory(fxID)
+		fxFactory, err := m.VMManager.GetFactory(fxID)
 		if err != nil {
 			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
@@ -471,15 +486,17 @@ func (m *manager) createAvalancheChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	if m.MeterVMEnabled {
+		vm = vertex2.NewMeterVM(vm)
+	}
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db.Database)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
@@ -497,8 +514,8 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	chainConfig := m.ChainConfigs[ctx.ChainID]
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
+	chainConfig := m.getChainConfig(ctx.ChainID)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -532,22 +549,26 @@ func (m *manager) createAvalancheChain(
 	if err := engine.Initialize(aveng.Config{
 		Config: avbootstrap.Config{
 			Config: common.Config{
-				Ctx:                       ctx,
-				Validators:                validators,
-				Beacons:                   beacons,
-				SampleK:                   sampleK,
-				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
-				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                    &sender,
-				Subnet:                    sb,
-				Timer:                     timer,
-				RetryBootstrap:            m.RetryBootstrap,
-				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
+				Ctx:                           ctx,
+				Validators:                    validators,
+				Beacons:                       beacons,
+				SampleK:                       sampleK,
+				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                        &sender,
+				Subnet:                        sb,
+				Timer:                         timer,
+				RetryBootstrap:                m.RetryBootstrap,
+				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
 			Manager:    vtxManager,
-			VM:         vm,
+
+			VM: vm,
 		},
 		Params:    consensusParams,
 		Consensus: &avcon.Topological{},
@@ -605,15 +626,17 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	if m.MeterVMEnabled {
+		vm = block2.NewMeterVM(vm)
+	}
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)
@@ -626,8 +649,8 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the VM
-	chainConfig := m.ChainConfigs[ctx.ChainID]
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrades, chainConfig.Settings, msgChan, fxs); err != nil {
+	chainConfig := m.getChainConfig(ctx.ChainID)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
@@ -663,17 +686,20 @@ func (m *manager) createSnowmanChain(
 	if err := engine.Initialize(smeng.Config{
 		Config: smbootstrap.Config{
 			Config: common.Config{
-				Ctx:                       ctx,
-				Validators:                validators,
-				Beacons:                   beacons,
-				SampleK:                   sampleK,
-				StartupAlpha:              (3*bootstrapWeight + 3) / 4,
-				Alpha:                     bootstrapWeight/2 + 1, // must be > 50%
-				Sender:                    &sender,
-				Subnet:                    sb,
-				Timer:                     timer,
-				RetryBootstrap:            m.RetryBootstrap,
-				RetryBootstrapMaxAttempts: m.RetryBootstrapMaxAttempts,
+				Ctx:                           ctx,
+				Validators:                    validators,
+				Beacons:                       beacons,
+				SampleK:                       sampleK,
+				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
+				Alpha:                         bootstrapWeight/2 + 1, // must be > 50%
+				Sender:                        &sender,
+				Subnet:                        sb,
+				Timer:                         timer,
+				RetryBootstrap:                m.RetryBootstrap,
+				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
+				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
+				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
 			VM:           vm,
@@ -773,4 +799,20 @@ func (m *manager) isChainWithAlias(aliases ...string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// getChainConfig returns value of a entry by looking at ID key and alias key
+// it first searches ID key, then falls back to it's corresponding primary alias
+func (m *manager) getChainConfig(id ids.ID) ChainConfig {
+	if val, ok := m.ManagerConfig.ChainConfigs[id.String()]; ok {
+		return val
+	}
+	aliases := m.Aliases(id)
+	for _, alias := range aliases {
+		if val, ok := m.ManagerConfig.ChainConfigs[alias]; ok {
+			return val
+		}
+	}
+
+	return ChainConfig{}
 }

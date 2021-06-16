@@ -311,6 +311,28 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	return handlers, nil
 }
 
+func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
+	resp, err := vm.client.CreateStaticHandlers(context.Background(), &vmproto.CreateStaticHandlersRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+	handlers := make(map[string]*common.HTTPHandler, len(resp.Handlers))
+	for _, handler := range resp.Handlers {
+		conn, err := vm.broker.Dial(handler.Server)
+		if err != nil {
+			return nil, err
+		}
+
+		vm.conns = append(vm.conns, conn)
+		handlers[handler.Prefix] = &common.HTTPHandler{
+			LockOptions: common.LockOption(handler.LockOptions),
+			Handler:     ghttp.NewClient(ghttpproto.NewHTTPClient(conn), vm.broker),
+		}
+	}
+	return handlers, nil
+}
+
 func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.BuildBlockRequest{})
 	if err != nil {
@@ -448,3 +470,13 @@ func (b *BlockClient) Verify() error {
 
 func (b *BlockClient) Bytes() []byte  { return b.bytes }
 func (b *BlockClient) Height() uint64 { return b.height }
+
+// AV-590, quantify overhead of passing these over RPC
+
+func (vm *VMClient) Connected(id ids.ShortID) error {
+	return nil // noop
+}
+
+func (vm *VMClient) Disconnected(id ids.ShortID) error {
+	return nil // noop
+}
