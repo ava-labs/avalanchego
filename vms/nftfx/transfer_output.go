@@ -3,6 +3,7 @@ package nftfx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -12,8 +13,9 @@ const (
 )
 
 var (
-	errNilTransferOutput = errors.New("nil transfer output")
-	errPayloadTooLarge   = errors.New("payload too large")
+	errNilTransferOutput              = errors.New("nil transfer output")
+	errPayloadTooLarge                = errors.New("payload too large")
+	_                    verify.State = &TransferOutput{}
 )
 
 // TransferOutput ...

@@ -18,10 +18,11 @@ const (
 )
 
 var (
-	utxoStatePrefix      = []byte("utxo")
-	statusStatePrefix    = []byte("status")
-	singletonStatePrefix = []byte("singleton")
-	txStatePrefix        = []byte("tx")
+	utxoStatePrefix            = []byte("utxo")
+	statusStatePrefix          = []byte("status")
+	singletonStatePrefix       = []byte("singleton")
+	txStatePrefix              = []byte("tx")
+	_                    State = &state{}
 )
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
