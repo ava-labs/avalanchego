@@ -12,20 +12,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-// DefaultLogDirectory ...
+// DefaultLogDirectory is the default directory where logs are saved
 var DefaultLogDirectory = fmt.Sprintf("~/.%s/logs", constants.AppName)
 
-// Config ...
+// Config defines the configuration of a logger
 type Config struct {
 	RotationInterval                                                                                time.Duration
 	FileSize, RotationSize, FlushSize                                                               int
 	DisableLogging, DisableDisplaying, DisableContextualDisplaying, DisableFlushOnWrite, Assertions bool
 	LogLevel, DisplayLevel                                                                          Level
 	DisplayHighlight                                                                                Highlight
-	Directory, MsgPrefix                                                                            string
+	Directory, MsgPrefix, LoggerName                                                                string
 }
 
-// DefaultConfig ...
+// DefaultConfig returns a logger configuration with default parameters
 func DefaultConfig() (Config, error) {
 	dir, err := homedir.Expand(DefaultLogDirectory)
 	return Config{

@@ -18,12 +18,14 @@ func DefaultConfigTest() Config {
 	}
 
 	return Config{
-		Ctx:           snow.DefaultContextTest(),
-		Validators:    validators.NewSet(),
-		Beacons:       validators.NewSet(),
-		Sender:        &SenderTest{},
-		Bootstrapable: &BootstrapableTest{},
-		Subnet:        subnet,
-		Timer:         &TimerTest{},
+		Ctx:                           snow.DefaultContextTest(),
+		Validators:                    validators.NewSet(),
+		Beacons:                       validators.NewSet(),
+		Sender:                        &SenderTest{},
+		Bootstrapable:                 &BootstrapableTest{},
+		Subnet:                        subnet,
+		Timer:                         &TimerTest{},
+		MultiputMaxContainersSent:     2000,
+		MultiputMaxContainersReceived: 2000,
 	}
 }

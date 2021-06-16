@@ -159,8 +159,8 @@ func (ids Set) String() string {
 	return sb.String()
 }
 
-// Removes and returns an element at random, if any exist.
-// If none exist, does nothing and returns false.
+// Removes and returns an element. If the set is empty, does nothing and returns
+// false.
 func (ids *Set) Pop() (ID, bool) {
 	for id := range *ids {
 		delete(*ids, id)

@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -28,23 +27,12 @@ import (
 
 var testChangeAddr = ids.GenerateTestShortID()
 
-// Returns:
-// 1) genesis bytes of vm
-// 2) the VM
-// 3) The service that wraps the VM
-// 4) atomic memory to use in tests
-func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
-	genesisBytes, _, vm, m := GenesisVM(t)
-	keystore, err := keystore.CreateTestKeystore()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := keystore.CreateUser(username, password); err != nil {
-		t.Fatalf("couldn't add user: %s", err)
-	}
-	vm.ctx.Keystore = keystore.NewBlockchainKeyStore(chainID)
-	s := &Service{vm: vm}
-	return genesisBytes, vm, s, m
+var testCases = []struct {
+	name      string
+	avaxAsset bool
+}{
+	{"genesis asset is AVAX", true},
+	{"genesis asset is TEST", false},
 }
 
 // Returns:
@@ -52,8 +40,29 @@ func setup(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 // 2) the VM
 // 3) The service that wraps the VM
 // 4) atomic memory to use in tests
-func setupWithKeys(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
-	genesisBytes, vm, s, m := setup(t)
+func setup(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atomic.Memory, *Tx) {
+	var genesisBytes []byte
+	var vm *VM
+	var m *atomic.Memory
+	var genesisTx *Tx
+	if isAVAXAsset {
+		genesisBytes, _, vm, m = GenesisVM(t)
+		genesisTx = GetAVAXTxFromGenesisTest(genesisBytes, t)
+	} else {
+		genesisBytes, _, vm, m = setupTxFeeAssets(t)
+		genesisTx = GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
+	}
+	s := &Service{vm: vm}
+	return genesisBytes, vm, s, m, genesisTx
+}
+
+// Returns:
+// 1) genesis bytes of vm
+// 2) the VM
+// 3) The service that wraps the VM
+// 4) atomic memory to use in tests
+func setupWithKeys(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atomic.Memory, *Tx) {
+	genesisBytes, vm, s, m, tx := setup(t, isAVAXAsset)
 
 	// Import the initially funded private keys
 	user := userState{vm: vm}
@@ -73,7 +82,7 @@ func setupWithKeys(t *testing.T) ([]byte, *VM, *Service, *atomic.Memory) {
 		t.Fatalf("Failed to set user addresses: %s", err)
 	}
 
-	return genesisBytes, vm, s, m
+	return genesisBytes, vm, s, m, tx
 }
 
 // Sample from a set of addresses and return them raw and formatted as strings.
@@ -125,7 +134,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 		err = s.GetBalance(nil,
 			&GetBalanceArgs{
 				Address: addrStr,
-				AssetID: s.vm.ctx.AVAXAssetID.String(),
+				AssetID: s.vm.feeAssetID.String(),
 			},
 			reply,
 		)
@@ -150,7 +159,7 @@ func verifyTxFeeDeducted(t *testing.T, s *Service, fromAddrs []ids.ShortID, numT
 }
 
 func TestServiceIssueTx(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	genesisBytes, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -164,7 +173,6 @@ func TestServiceIssueTx(t *testing.T) {
 	if err == nil {
 		t.Fatal("Expected empty transaction to return an error")
 	}
-
 	tx := NewTx(t, genesisBytes, vm)
 	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
 	if err != nil {
@@ -181,7 +189,7 @@ func TestServiceIssueTx(t *testing.T) {
 }
 
 func TestServiceGetTxStatus(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	genesisBytes, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -234,7 +242,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 
 // Test the GetBalance method when argument Strict is true
 func TestServiceGetBalanceStrict(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -388,7 +396,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 }
 
 func TestServiceGetAllBalances(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -581,7 +589,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 }
 
 func TestServiceGetTx(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -589,8 +597,6 @@ func TestServiceGetTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	genesisTxBytes := genesisTx.Bytes()
 	txID := genesisTx.ID()
 
 	reply := api.FormattedTx{}
@@ -605,11 +611,11 @@ func TestServiceGetTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, genesisTxBytes, txBytes, "Wrong tx returned from service.GetTx")
+	assert.Equal(t, genesisTx.Bytes(), txBytes, "Wrong tx returned from service.GetTx")
 }
 
 func TestServiceGetNilTx(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -623,7 +629,7 @@ func TestServiceGetNilTx(t *testing.T) {
 }
 
 func TestServiceGetUnknownTx(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -637,7 +643,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 }
 
 func TestServiceGetUTXOs(t *testing.T) {
-	_, vm, s, m := setup(t)
+	_, vm, s, m, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -903,15 +909,13 @@ func TestServiceGetUTXOs(t *testing.T) {
 }
 
 func TestGetAssetDescription(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 		vm.ctx.Lock.Unlock()
 	}()
-
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxAssetID := genesisTx.ID()
 
@@ -932,15 +936,13 @@ func TestGetAssetDescription(t *testing.T) {
 }
 
 func TestGetBalance(t *testing.T) {
-	genesisBytes, vm, s, _ := setup(t)
+	_, vm, s, _, genesisTx := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 		vm.ctx.Lock.Unlock()
 	}()
-
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxAssetID := genesisTx.ID()
 
@@ -963,284 +965,296 @@ func TestGetBalance(t *testing.T) {
 }
 
 func TestCreateFixedCapAsset(t *testing.T) {
-	_, vm, s, _ := setupWithKeys(t)
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, vm, s, _, _ := setupWithKeys(t, tc.avaxAsset)
+			defer func() {
+				if err := vm.Shutdown(); err != nil {
+					t.Fatal(err)
+				}
+				vm.ctx.Lock.Unlock()
+			}()
 
-	reply := AssetIDChangeAddr{}
-	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+			reply := AssetIDChangeAddr{}
+			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
-		},
-		Name:         "testAsset",
-		Symbol:       "TEST",
-		Denomination: 1,
-		InitialHolders: []*Holder{{
-			Amount:  123456789,
-			Address: addrStr,
-		}},
-	}, &reply)
-	if err != nil {
-		t.Fatal(err)
-	} else if reply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
+			err = s.CreateFixedCapAsset(nil, &CreateAssetArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+				},
+				Name:         "testAsset",
+				Symbol:       "TEST",
+				Denomination: 1,
+				InitialHolders: []*Holder{{
+					Amount:  123456789,
+					Address: addrStr,
+				}},
+			}, &reply)
+			if err != nil {
+				t.Fatal(err)
+			} else if reply.ChangeAddr != changeAddrStr {
+				t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
+			}
+		})
 	}
 }
 
 func TestCreateVariableCapAsset(t *testing.T) {
-	_, vm, s, _ := setupWithKeys(t)
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, vm, s, _, _ := setupWithKeys(t, tc.avaxAsset)
+			defer func() {
+				if err := vm.Shutdown(); err != nil {
+					t.Fatal(err)
+				}
+				vm.ctx.Lock.Unlock()
+			}()
 
-	reply := AssetIDChangeAddr{}
-	minterAddrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
-	changeAddrStr := fromAddrsStr[0]
-	if err != nil {
-		t.Fatal(err)
-	}
+			reply := AssetIDChangeAddr{}
+			minterAddrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+			changeAddrStr := fromAddrsStr[0]
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
-		},
-		Name:   "test asset",
-		Symbol: "TEST",
-		MinterSets: []Owners{
-			{
-				Threshold: 1,
-				Minters: []string{
-					minterAddrStr,
+			err = s.CreateVariableCapAsset(nil, &CreateAssetArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
 				},
-			},
-		},
-	}, &reply)
-	if err != nil {
-		t.Fatal(err)
-	} else if reply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
-	}
+				Name:   "test asset",
+				Symbol: "TEST",
+				MinterSets: []Owners{
+					{
+						Threshold: 1,
+						Minters: []string{
+							minterAddrStr,
+						},
+					},
+				},
+			}, &reply)
+			if err != nil {
+				t.Fatal(err)
+			} else if reply.ChangeAddr != changeAddrStr {
+				t.Fatalf("expected change address %s but got %s", changeAddrStr, reply.ChangeAddr)
+			}
 
-	createAssetTx := UniqueTx{
-		vm:   vm,
-		txID: reply.AssetID,
-	}
-	if status := createAssetTx.Status(); status != choices.Processing {
-		t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
-	}
-	if err := createAssetTx.Accept(); err != nil {
-		t.Fatalf("Failed to accept CreateVariableCapAssetTx due to: %s", err)
-	}
+			createAssetTx := UniqueTx{
+				vm:   vm,
+				txID: reply.AssetID,
+			}
+			if status := createAssetTx.Status(); status != choices.Processing {
+				t.Fatalf("CreateVariableCapAssetTx status should have been Processing, but was %s", status)
+			}
+			if err := createAssetTx.Accept(); err != nil {
+				t.Fatalf("Failed to accept CreateVariableCapAssetTx due to: %s", err)
+			}
 
-	createdAssetID := reply.AssetID.String()
-	// Test minting of the created variable cap asset
-	mintArgs := &MintArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
-		},
-		Amount:  200,
-		AssetID: createdAssetID,
-		To:      minterAddrStr, // Send newly minted tokens to this address
-	}
-	mintReply := &api.JSONTxIDChangeAddr{}
-	if err := s.Mint(nil, mintArgs, mintReply); err != nil {
-		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
-	} else if mintReply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address %s but got %s", changeAddrStr, mintReply.ChangeAddr)
-	}
+			createdAssetID := reply.AssetID.String()
+			// Test minting of the created variable cap asset
+			mintArgs := &MintArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+				},
+				Amount:  200,
+				AssetID: createdAssetID,
+				To:      minterAddrStr, // Send newly minted tokens to this address
+			}
+			mintReply := &api.JSONTxIDChangeAddr{}
+			if err := s.Mint(nil, mintArgs, mintReply); err != nil {
+				t.Fatalf("Failed to mint variable cap asset due to: %s", err)
+			} else if mintReply.ChangeAddr != changeAddrStr {
+				t.Fatalf("expected change address %s but got %s", changeAddrStr, mintReply.ChangeAddr)
+			}
 
-	mintTx := UniqueTx{
-		vm:   vm,
-		txID: mintReply.TxID,
-	}
+			mintTx := UniqueTx{
+				vm:   vm,
+				txID: mintReply.TxID,
+			}
 
-	if status := mintTx.Status(); status != choices.Processing {
-		t.Fatalf("MintTx status should have been Processing, but was %s", status)
-	}
-	if err := mintTx.Accept(); err != nil {
-		t.Fatalf("Failed to accept MintTx due to: %s", err)
-	}
+			if status := mintTx.Status(); status != choices.Processing {
+				t.Fatalf("MintTx status should have been Processing, but was %s", status)
+			}
+			if err := mintTx.Accept(); err != nil {
+				t.Fatalf("Failed to accept MintTx due to: %s", err)
+			}
 
-	sendArgs := &SendArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: []string{minterAddrStr}},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
-		},
-		SendOutput: SendOutput{
-			Amount:  200,
-			AssetID: createdAssetID,
-			To:      fromAddrsStr[0],
-		},
-	}
-	sendReply := &api.JSONTxIDChangeAddr{}
-	if err := s.Send(nil, sendArgs, sendReply); err != nil {
-		t.Fatalf("Failed to send newly minted variable cap asset due to: %s", err)
-	} else if sendReply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
+			sendArgs := &SendArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{From: []string{minterAddrStr}},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+				},
+				SendOutput: SendOutput{
+					Amount:  200,
+					AssetID: createdAssetID,
+					To:      fromAddrsStr[0],
+				},
+			}
+			sendReply := &api.JSONTxIDChangeAddr{}
+			if err := s.Send(nil, sendArgs, sendReply); err != nil {
+				t.Fatalf("Failed to send newly minted variable cap asset due to: %s", err)
+			} else if sendReply.ChangeAddr != changeAddrStr {
+				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, sendReply.ChangeAddr)
+			}
+		})
 	}
 }
 
 func TestNFTWorkflow(t *testing.T) {
-	_, vm, s, _ := setupWithKeys(t)
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, vm, s, _, _ := setupWithKeys(t, tc.avaxAsset)
+			defer func() {
+				if err := vm.Shutdown(); err != nil {
+					t.Fatal(err)
+				}
+				vm.ctx.Lock.Unlock()
+			}()
 
-	fromAddrs, fromAddrsStr := sampleAddrs(t, vm, addrs)
+			fromAddrs, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	// Test minting of the created variable cap asset
-	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
+			// Test minting of the created variable cap asset
+			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	createArgs := &CreateNFTAssetArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
-		},
-		Name:   "BIG COIN",
-		Symbol: "COIN",
-		MinterSets: []Owners{
-			{
-				Threshold: 1,
-				Minters: []string{
-					addrStr,
+			createArgs := &CreateNFTAssetArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
 				},
-			},
-		},
-	}
-	createReply := &AssetIDChangeAddr{}
-	if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
-		t.Fatalf("Failed to mint variable cap asset due to: %s", err)
-	} else if createReply.ChangeAddr != fromAddrsStr[0] {
-		t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], createReply.ChangeAddr)
-	}
+				Name:   "BIG COIN",
+				Symbol: "COIN",
+				MinterSets: []Owners{
+					{
+						Threshold: 1,
+						Minters: []string{
+							addrStr,
+						},
+					},
+				},
+			}
+			createReply := &AssetIDChangeAddr{}
+			if err := s.CreateNFTAsset(nil, createArgs, createReply); err != nil {
+				t.Fatalf("Failed to mint variable cap asset due to: %s", err)
+			} else if createReply.ChangeAddr != fromAddrsStr[0] {
+				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], createReply.ChangeAddr)
+			}
 
-	assetID := createReply.AssetID
-	createNFTTx := UniqueTx{
-		vm:   vm,
-		txID: createReply.AssetID,
-	}
-	// Accept the transaction so that we can Mint NFTs for the test
-	if createNFTTx.Status() != choices.Processing {
-		t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
-	}
-	if err := createNFTTx.Accept(); err != nil {
-		t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
-	} else if err := verifyTxFeeDeducted(t, s, fromAddrs, 1); err != nil {
-		t.Fatal(err)
-	}
+			assetID := createReply.AssetID
+			createNFTTx := UniqueTx{
+				vm:   vm,
+				txID: createReply.AssetID,
+			}
+			// Accept the transaction so that we can Mint NFTs for the test
+			if createNFTTx.Status() != choices.Processing {
+				t.Fatalf("CreateNFTTx should have been processing after creating the NFT")
+			}
+			if err := createNFTTx.Accept(); err != nil {
+				t.Fatalf("Failed to accept CreateNFT transaction: %s", err)
+			} else if err := verifyTxFeeDeducted(t, s, fromAddrs, 1); err != nil {
+				t.Fatal(err)
+			}
 
-	payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
-	if err != nil {
-		t.Fatal(err)
-	}
-	mintArgs := &MintNFTArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONFromAddrs:  api.JSONFromAddrs{},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
-		},
-		AssetID:  assetID.String(),
-		Payload:  payload,
-		To:       addrStr,
-		Encoding: formatting.Hex,
-	}
-	mintReply := &api.JSONTxIDChangeAddr{}
+			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
+			if err != nil {
+				t.Fatal(err)
+			}
+			mintArgs := &MintNFTArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
+				},
+				AssetID:  assetID.String(),
+				Payload:  payload,
+				To:       addrStr,
+				Encoding: formatting.Hex,
+			}
+			mintReply := &api.JSONTxIDChangeAddr{}
 
-	if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
-		t.Fatalf("MintNFT returned an error: %s", err)
-	} else if createReply.ChangeAddr != fromAddrsStr[0] {
-		t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], mintReply.ChangeAddr)
-	}
+			if err := s.MintNFT(nil, mintArgs, mintReply); err != nil {
+				t.Fatalf("MintNFT returned an error: %s", err)
+			} else if createReply.ChangeAddr != fromAddrsStr[0] {
+				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], mintReply.ChangeAddr)
+			}
 
-	mintNFTTx := UniqueTx{
-		vm:   vm,
-		txID: mintReply.TxID,
-	}
-	if mintNFTTx.Status() != choices.Processing {
-		t.Fatal("MintNFTTx should have been processing after minting the NFT")
-	}
+			mintNFTTx := UniqueTx{
+				vm:   vm,
+				txID: mintReply.TxID,
+			}
+			if mintNFTTx.Status() != choices.Processing {
+				t.Fatal("MintNFTTx should have been processing after minting the NFT")
+			}
 
-	// Accept the transaction so that we can send the newly minted NFT
-	if err := mintNFTTx.Accept(); err != nil {
-		t.Fatalf("Failed to accept MintNFTTx: %s", err)
-	}
+			// Accept the transaction so that we can send the newly minted NFT
+			if err := mintNFTTx.Accept(); err != nil {
+				t.Fatalf("Failed to accept MintNFTTx: %s", err)
+			}
 
-	sendArgs := &SendNFTArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONFromAddrs:  api.JSONFromAddrs{},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
-		},
-		AssetID: assetID.String(),
-		GroupID: 0,
-		To:      addrStr,
-	}
-	sendReply := &api.JSONTxIDChangeAddr{}
-	if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
-		t.Fatalf("Failed to send NFT due to: %s", err)
-	} else if sendReply.ChangeAddr != fromAddrsStr[0] {
-		t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], sendReply.ChangeAddr)
+			sendArgs := &SendNFTArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: fromAddrsStr[0]},
+				},
+				AssetID: assetID.String(),
+				GroupID: 0,
+				To:      addrStr,
+			}
+			sendReply := &api.JSONTxIDChangeAddr{}
+			if err := s.SendNFT(nil, sendArgs, sendReply); err != nil {
+				t.Fatalf("Failed to send NFT due to: %s", err)
+			} else if sendReply.ChangeAddr != fromAddrsStr[0] {
+				t.Fatalf("expected change address to be %s but got %s", fromAddrsStr[0], sendReply.ChangeAddr)
+			}
+		})
 	}
 }
 
 func TestImportExportKey(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -1301,7 +1315,7 @@ func TestImportExportKey(t *testing.T) {
 }
 
 func TestImportAVMKeyNoDuplicates(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _, _ := setup(t, true)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1369,7 +1383,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 }
 
 func TestSend(t *testing.T) {
-	genesisBytes, vm, s, _ := setupWithKeys(t)
+	_, vm, s, _, genesisTx := setupWithKeys(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -1377,7 +1391,6 @@ func TestSend(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	assetID := genesisTx.ID()
 	addr := keys[0].PublicKey().Address()
 
@@ -1425,74 +1438,77 @@ func TestSend(t *testing.T) {
 }
 
 func TestSendMultiple(t *testing.T) {
-	genesisBytes, vm, s, _ := setupWithKeys(t)
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, vm, s, _, genesisTx := setupWithKeys(t, tc.avaxAsset)
+			defer func() {
+				if err := vm.Shutdown(); err != nil {
+					t.Fatal(err)
+				}
+				vm.ctx.Lock.Unlock()
+			}()
 
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	assetID := genesisTx.ID()
-	addr := keys[0].PublicKey().Address()
+			assetID := genesisTx.ID()
+			addr := keys[0].PublicKey().Address()
 
-	addrStr, err := vm.FormatLocalAddress(addr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, fromAddrsStr := sampleAddrs(t, vm, addrs)
+			addrStr, err := vm.FormatLocalAddress(addr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			changeAddrStr, err := vm.FormatLocalAddress(testChangeAddr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, fromAddrsStr := sampleAddrs(t, vm, addrs)
 
-	args := &SendMultipleArgs{
-		JSONSpendHeader: api.JSONSpendHeader{
-			UserPass: api.UserPass{
-				Username: username,
-				Password: password,
-			},
-			JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
-			JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
-		},
-		Outputs: []SendOutput{
-			{
-				Amount:  500,
-				AssetID: assetID.String(),
-				To:      addrStr,
-			},
-			{
-				Amount:  1000,
-				AssetID: assetID.String(),
-				To:      addrStr,
-			},
-		},
-	}
-	reply := &api.JSONTxIDChangeAddr{}
-	vm.timer.Cancel()
-	if err := s.SendMultiple(nil, args, reply); err != nil {
-		t.Fatalf("Failed to send transaction: %s", err)
-	} else if reply.ChangeAddr != changeAddrStr {
-		t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
-	}
+			args := &SendMultipleArgs{
+				JSONSpendHeader: api.JSONSpendHeader{
+					UserPass: api.UserPass{
+						Username: username,
+						Password: password,
+					},
+					JSONFromAddrs:  api.JSONFromAddrs{From: fromAddrsStr},
+					JSONChangeAddr: api.JSONChangeAddr{ChangeAddr: changeAddrStr},
+				},
+				Outputs: []SendOutput{
+					{
+						Amount:  500,
+						AssetID: assetID.String(),
+						To:      addrStr,
+					},
+					{
+						Amount:  1000,
+						AssetID: assetID.String(),
+						To:      addrStr,
+					},
+				},
+			}
+			reply := &api.JSONTxIDChangeAddr{}
+			vm.timer.Cancel()
+			if err := s.SendMultiple(nil, args, reply); err != nil {
+				t.Fatalf("Failed to send transaction: %s", err)
+			} else if reply.ChangeAddr != changeAddrStr {
+				t.Fatalf("expected change address to be %s but got %s", changeAddrStr, reply.ChangeAddr)
+			}
 
-	pendingTxs := vm.txs
-	if len(pendingTxs) != 1 {
-		t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
-	}
+			pendingTxs := vm.txs
+			if len(pendingTxs) != 1 {
+				t.Fatalf("Expected to find 1 pending tx after send, but found %d", len(pendingTxs))
+			}
 
-	if reply.TxID != pendingTxs[0].ID() {
-		t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
-	}
+			if reply.TxID != pendingTxs[0].ID() {
+				t.Fatal("Transaction ID returned by SendMultiple does not match the transaction found in vm's pending transactions")
+			}
 
-	if _, err = vm.GetTx(reply.TxID); err != nil {
-		t.Fatalf("Failed to retrieve created transaction: %s", err)
+			if _, err = vm.GetTx(reply.TxID); err != nil {
+				t.Fatalf("Failed to retrieve created transaction: %s", err)
+			}
+		})
 	}
 }
 
 func TestCreateAndListAddresses(t *testing.T) {
-	_, vm, s, _ := setup(t)
+	_, vm, s, _, _ := setup(t, true)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -1530,61 +1546,63 @@ func TestCreateAndListAddresses(t *testing.T) {
 	t.Fatalf("Failed to find newly created address among %d addresses", len(listReply.Addresses))
 }
 
-func TestImportAVAX(t *testing.T) {
-	genesisBytes, vm, s, m := setupWithKeys(t)
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
-	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-	assetID := genesisTx.ID()
-	addr0 := keys[0].PublicKey().Address()
+func TestImport(t *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, vm, s, m, genesisTx := setupWithKeys(t, tc.avaxAsset)
+			defer func() {
+				if err := vm.Shutdown(); err != nil {
+					t.Fatal(err)
+				}
+				vm.ctx.Lock.Unlock()
+			}()
+			assetID := genesisTx.ID()
+			addr0 := keys[0].PublicKey().Address()
 
-	// Must set AVAX assetID to be the correct asset since only AVAX can be imported
-	utxo := &avax.UTXO{
-		UTXOID: avax.UTXOID{TxID: ids.Empty},
-		Asset:  avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 7,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{addr0},
-			},
-		},
-	}
-	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
+			utxo := &avax.UTXO{
+				UTXOID: avax.UTXOID{TxID: ids.Empty},
+				Asset:  avax.Asset{ID: assetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 7,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr0},
+					},
+				},
+			}
+			utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	peerSharedMemory := m.NewSharedMemory(platformChainID)
-	utxoID := utxo.InputID()
-	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   utxoID[:],
-		Value: utxoBytes,
-		Traits: [][]byte{
-			addr0.Bytes(),
-		},
-	}}); err != nil {
-		t.Fatal(err)
-	}
+			peerSharedMemory := m.NewSharedMemory(platformChainID)
+			utxoID := utxo.InputID()
+			if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+				Key:   utxoID[:],
+				Value: utxoBytes,
+				Traits: [][]byte{
+					addr0.Bytes(),
+				},
+			}}); err != nil {
+				t.Fatal(err)
+			}
 
-	addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
-	if err != nil {
-		t.Fatal(err)
-	}
-	args := &ImportArgs{
-		UserPass: api.UserPass{
-			Username: username,
-			Password: password,
-		},
-		SourceChain: "P",
-		To:          addrStr,
-	}
-	reply := &api.JSONTxID{}
-	if err := s.ImportAVAX(nil, args, reply); err != nil {
-		t.Fatalf("Failed to import AVAX due to %s", err)
+			addrStr, err := vm.FormatLocalAddress(keys[0].PublicKey().Address())
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := &ImportArgs{
+				UserPass: api.UserPass{
+					Username: username,
+					Password: password,
+				},
+				SourceChain: "P",
+				To:          addrStr,
+			}
+			reply := &api.JSONTxID{}
+			if err := s.Import(nil, args, reply); err != nil {
+				t.Fatalf("Failed to import AVAX due to %s", err)
+			}
+		})
 	}
 }

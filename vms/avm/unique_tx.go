@@ -21,6 +21,8 @@ var (
 	errRejectedTx      = errors.New("transaction is rejected")
 )
 
+var _ snowstorm.Tx = &UniqueTx{}
+
 // UniqueTx provides a de-duplication service for txs. This only provides a
 // performance boost
 type UniqueTx struct {
@@ -311,7 +313,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	tx.validity = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
 		tx.vm.codec,
-		tx.vm.ctx.AVAXAssetID,
+		tx.vm.feeAssetID,
 		tx.vm.txFee,
 		tx.vm.creationTxFee,
 		len(tx.vm.fxs),
