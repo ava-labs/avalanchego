@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
@@ -122,28 +124,51 @@ func (tx *UniqueTx) ID() ids.ID       { return tx.txID }
 func (tx *UniqueTx) Key() interface{} { return tx.txID }
 
 // getAddress returns a map of address and assetID Set data for a given transaction object
-func getAddresses(tx *UniqueTx) map[ids.ShortID]map[ids.ID]struct{} {
+func getAddresses(tx *UniqueTx, log logging.Logger) map[ids.ShortID]map[ids.ID]struct{} {
 	// map of address => [AssetIDs...]
 	addresses := map[ids.ShortID]map[ids.ID]struct{}{}
 
-	// go through all transfer outputs, assert they are secp transfer outputs
+	// index input UTXOs
+	for _, utxoID := range tx.InputUTXOs() {
+		utxo, err := tx.vm.getUTXO(utxoID)
+		if err != nil {
+			// this should probably not be handled like this
+			log.Error("Error occurred when fetching input UTXO: %s", err)
+			continue
+		}
+
+		fmt.Printf("utxo type %T\n", utxo)
+		in, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			continue
+		}
+
+		mapUTXOToAddressAndAsset(utxo, in, addresses)
+	}
+
+	// index output utxos
 	for _, utxo := range tx.UTXOs() {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			continue
 		}
 
-		assetID := utxo.AssetID()
-		// For each address that exists, we add it to the map, adding the
-		// assetID against it
-		for _, addr := range out.OutputOwners.Addrs {
-			if _, exists := addresses[addr]; !exists {
-				addresses[addr] = make(map[ids.ID]struct{})
-			}
-			addresses[addr][assetID] = struct{}{}
-		}
+		mapUTXOToAddressAndAsset(utxo, out, addresses)
 	}
+
 	return addresses
+}
+
+func mapUTXOToAddressAndAsset(utxo *avax.UTXO, out *secp256k1fx.TransferOutput, addresses map[ids.ShortID]map[ids.ID]struct{}) {
+	assetID := utxo.AssetID()
+	// For each address that exists, we add it to the map, adding the
+	// assetID against it
+	for _, addr := range out.OutputOwners.Addrs {
+		if _, exists := addresses[addr]; !exists {
+			addresses[addr] = make(map[ids.ID]struct{})
+		}
+		addresses[addr][assetID] = struct{}{}
+	}
 }
 
 // Accept is called when the transaction was finalized as accepted by consensus
@@ -194,7 +219,7 @@ func (tx *UniqueTx) Accept() error {
 	// |  | "idx" => 3 		Running transaction index key, represents the next index
 	// |  | "1"   => txID1
 	// |  | "2"   => txID1
-	addresses := getAddresses(tx)
+	addresses := getAddresses(tx, tx.vm.ctx.Log)
 	tx.vm.ctx.Log.Debug("Retrieved address data %s", addresses)
 	for address, assetIDMap := range addresses {
 		addressPrefixDB := prefixdb.New(address[:], tx.vm.db)
