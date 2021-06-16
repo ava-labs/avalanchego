@@ -38,6 +38,8 @@ var (
 	errFailedToCreateIterator = errors.New("failed to create iterator")
 
 	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+	_ database.Iterator = &iterator{}
 )
 
 // Database is a persistent key-value store. Apart from basic data storage
@@ -200,7 +202,7 @@ func (db *Database) NewIterator() database.Iterator {
 		return &nodb.Iterator{Err: errFailedToCreateIterator}
 	}
 	it.Seek(nil)
-	return &iter{
+	return &iterator{
 		it: it,
 		db: db,
 	}
@@ -224,7 +226,7 @@ func (db *Database) NewIteratorWithStart(start []byte) database.Iterator {
 		return &nodb.Iterator{Err: errFailedToCreateIterator}
 	}
 	it.Seek(start)
-	return &iter{
+	return &iterator{
 		it: it,
 		db: db,
 	}
@@ -248,7 +250,7 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 		return &nodb.Iterator{Err: errFailedToCreateIterator}
 	}
 	it.Seek(prefix)
-	return &iter{
+	return &iterator{
 		it:     it,
 		db:     db,
 		prefix: prefix,
@@ -278,7 +280,7 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 	} else {
 		it.Seek(prefix)
 	}
-	return &iter{
+	return &iterator{
 		it:     it,
 		db:     db,
 		prefix: prefix,
@@ -401,7 +403,7 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 	return nil
 }
 
-type iter struct {
+type iterator struct {
 	it      *grocksdb.Iterator
 	db      *Database
 	prefix  []byte
@@ -411,19 +413,19 @@ type iter struct {
 }
 
 // Error implements the Iterator interface
-func (it *iter) Error() error { return it.it.Err() }
+func (it *iterator) Error() error { return it.it.Err() }
 
 // Key implements the Iterator interface
-func (it *iter) Key() []byte {
+func (it *iterator) Key() []byte {
 	return utils.CopyBytes(it.key)
 }
 
 // Value implements the Iterator interface
-func (it *iter) Value() []byte {
+func (it *iterator) Value() []byte {
 	return utils.CopyBytes(it.value)
 }
 
-func (it *iter) Release() {
+func (it *iterator) Release() {
 	it.db.lock.RLock()
 	defer it.db.lock.RUnlock()
 
@@ -432,7 +434,7 @@ func (it *iter) Release() {
 	}
 }
 
-func (it *iter) Next() bool {
+func (it *iterator) Next() bool {
 	if it.started {
 		it.it.Next()
 	}

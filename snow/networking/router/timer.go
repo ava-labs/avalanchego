@@ -5,7 +5,11 @@ package router
 
 import (
 	"time"
+
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
+
+var _ common.Timer = &Timer{}
 
 type Timer struct {
 	Handler *Handler

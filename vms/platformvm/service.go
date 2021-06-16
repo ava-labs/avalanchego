@@ -33,6 +33,10 @@ const (
 
 	// Max number of addresses allowed for a single keystore user
 	maxKeystoreAddresses = 5000
+
+	// Minimum amount of delay to allow a transaction to be issued through the
+	// API
+	minAddStakerDelay = 2 * syncBound
 )
 
 var (
@@ -45,6 +49,8 @@ var (
 	errNoKeys                = errors.New("user has no keys or funds")
 	errNoPrimaryValidators   = errors.New("no default subnet validators")
 	errCorruptedReason       = errors.New("tx validity corrupted")
+	errStartTimeTooSoon      = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
+	errStartTimeTooLate      = errors.New("start time is too far in the future")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -973,12 +979,22 @@ type AddValidatorArgs struct {
 func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("Platform: AddValidator called")
 
+	now := service.vm.clock.Time()
+	minAddStakerTime := now.Add(minAddStakerDelay)
+	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
+	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
+
+	if args.StartTime == 0 {
+		args.StartTime = minAddStakerUnix
+	}
+
 	switch {
 	case args.RewardAddress == "":
 		return errNoRewardAddress
-	case uint64(args.StartTime) < service.vm.clock.Unix():
-		return fmt.Errorf("start time must be in the future")
-	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+	case args.StartTime < minAddStakerUnix:
+		return errStartTimeTooSoon
+	case args.StartTime > maxAddStakerUnix:
 		return errStartTimeTooLate
 	case args.DelegationFeeRate < 0 || args.DelegationFeeRate > 100:
 		return errInvalidDelegationRate
@@ -1089,13 +1105,24 @@ type AddDelegatorArgs struct {
 // delegator to the primary network
 func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("Platform: AddDelegator called")
+
+	now := service.vm.clock.Time()
+	minAddStakerTime := now.Add(minAddStakerDelay)
+	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
+	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
+
+	if args.StartTime == 0 {
+		args.StartTime = minAddStakerUnix
+	}
+
 	switch {
-	case uint64(args.StartTime) < service.vm.clock.Unix():
-		return fmt.Errorf("start time must be in the future")
-	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
-		return errStartTimeTooLate
 	case args.RewardAddress == "":
 		return errNoRewardAddress
+	case args.StartTime < minAddStakerUnix:
+		return errStartTimeTooSoon
+	case args.StartTime > maxAddStakerUnix:
+		return errStartTimeTooLate
 	}
 
 	// Parse the node ID
@@ -1204,12 +1231,22 @@ type AddSubnetValidatorArgs struct {
 func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Info("Platform: AddSubnetValidator called")
 
+	now := service.vm.clock.Time()
+	minAddStakerTime := now.Add(minAddStakerDelay)
+	minAddStakerUnix := json.Uint64(minAddStakerTime.Unix())
+	maxAddStakerTime := now.Add(maxFutureStartTime)
+	maxAddStakerUnix := json.Uint64(maxAddStakerTime.Unix())
+
+	if args.StartTime == 0 {
+		args.StartTime = minAddStakerUnix
+	}
+
 	switch {
 	case args.SubnetID == "":
 		return errNoSubnetID
-	case uint64(args.StartTime) < service.vm.clock.Unix():
-		return fmt.Errorf("start time must be in the future")
-	case uint64(args.StartTime) > service.vm.clock.Unix()+uint64(maxFutureStartTime.Seconds()):
+	case args.StartTime < minAddStakerUnix:
+		return errStartTimeTooSoon
+	case args.StartTime > maxAddStakerUnix:
 		return errStartTimeTooLate
 	}
 

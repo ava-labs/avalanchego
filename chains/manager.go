@@ -50,7 +50,10 @@ const (
 	defaultChannelSize = 1024
 )
 
-var BootstrappedKey = []byte{0x00}
+var (
+	BootstrappedKey         = []byte{0x00}
+	_               Manager = &manager{}
+)
 
 // Manager manages the chains running on this node.
 // It can:
@@ -354,7 +357,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Get a factory for the vm we want to use on our chain
-	vmFactory, err := m.VMManager.GetVMFactory(vmID)
+	vmFactory, err := m.VMManager.GetFactory(vmID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
@@ -374,7 +377,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		}
 
 		// Get a factory for the fx we want to use on our chain
-		fxFactory, err := m.VMManager.GetVMFactory(fxID)
+		fxFactory, err := m.VMManager.GetFactory(fxID)
 		if err != nil {
 			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}

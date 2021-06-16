@@ -15,6 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var (
+	_ Set  = &set{}
+	_ Poll = &poll{}
+)
+
 type poll struct {
 	Poll
 	start time.Time

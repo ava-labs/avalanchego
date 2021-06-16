@@ -40,8 +40,8 @@ import (
 const (
 	defaultInitialReconnectDelay                     = time.Second
 	defaultMaxReconnectDelay                         = time.Hour
-	DefaultMaxMessageSize                     uint32 = 1 << 21
-	defaultMaxNetworkPendingSendBytes                = 1 << 29 // 512MB
+	DefaultMaxMessageSize                     uint32 = 2 * 1024 * 1024   // 2 MB
+	defaultMaxNetworkPendingSendBytes                = 512 * 1024 * 1024 // 512 MB
 	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
 	defaultMaxClockDifference                        = time.Minute
 	defaultPeerListStakerGossipFraction              = 2
@@ -51,7 +51,7 @@ const (
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                            = 16 * 1024 // 16 KB
 	defaultReadHandshakeTimeout                      = 15 * time.Second
-	defaultConnMeterCacheSize                        = 1000
+	defaultConnMeterCacheSize                        = 1024
 	defaultByteSliceCap                              = 128
 )
 
@@ -60,6 +60,8 @@ var (
 	errPeerIsMyself          = errors.New("peer is myself")
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 )
+
+var _ Network = &network{}
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 

@@ -37,6 +37,11 @@ function docker_tag_exists() {
     curl --silent -H "Authorization: JWT ${TOKEN}" -f --head -lL https://hub.docker.com/v2/repositories/$1/tags/$2/ > /dev/null
 }
 
+testBatch="${1:-}"
+shift 1
+
+echo "Running Test Batch: ${testBatch}"
+
 # Defines the avalanche-testing tag to use
 # Either uses the same tag as the current branch or uses the default
 if docker_tag_exists $avalanche_testing_repo $current_branch; then
@@ -73,7 +78,7 @@ custom_params_json="{
     \"isKurtosisCoreDevMode\": false,
     \"avalanchegoImage\":\"${avalanche_image}\",
     \"avalanchegoByzantineImage\":\"${avalanchego_byzantine_image}\",
-    \"testBatch\":\"avalanchego\"
+    \"testBatch\":\"${testBatch}\"
 }"
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
 

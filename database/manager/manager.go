@@ -29,6 +29,8 @@ var (
 	errNoDBs                 = errors.New("no dbs given")
 )
 
+var _ Manager = &manager{}
+
 type Manager interface {
 	// Current returns the database with the current database version.
 	Current() *VersionedDatabase

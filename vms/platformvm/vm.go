@@ -67,7 +67,6 @@ const (
 var (
 	errInvalidID         = errors.New("invalid ID")
 	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooLate  = errors.New("start time is too far in the future")
 	errStartTimeTooEarly = errors.New("start time is before the current chain time")
 	errStartAfterEndTime = errors.New("start time is after the end time")
 
@@ -75,6 +74,7 @@ var (
 	_ validators.Connector = &VM{}
 	_ common.StaticVM      = &VM{}
 	_ secp256k1fx.VM       = &VM{}
+	_ Fx                   = &secp256k1fx.Fx{}
 )
 
 // VM implements the snowman.ChainVM interface
