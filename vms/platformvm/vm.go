@@ -74,6 +74,7 @@ var (
 	_ validators.Connector = &VM{}
 	_ common.StaticVM      = &VM{}
 	_ secp256k1fx.VM       = &VM{}
+	_ Fx                   = &secp256k1fx.Fx{}
 )
 
 // VM implements the snowman.ChainVM interface

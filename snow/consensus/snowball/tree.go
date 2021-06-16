@@ -10,6 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var (
+	_ node = &unaryNode{}
+	_ node = &binaryNode{}
+)
+
 // TreeFactory implements Factory by returning a tree struct
 type TreeFactory struct{}
 

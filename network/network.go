@@ -61,6 +61,8 @@ var (
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 )
 
+var _ Network = &network{}
+
 func init() { rand.Seed(time.Now().UnixNano()) }
 
 // Network defines the functionality of the networking library.

@@ -10,6 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+)
+
 // Database tracks the amount of time each operation takes and how many bytes
 // are read/written to the underlying database instance.
 type Database struct {

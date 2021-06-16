@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	ErrFilterNotInitialized = errors.New("filter not initialized")
-	ErrAddressLimit         = errors.New("address limit exceeded")
-	ErrInvalidFilterParam   = errors.New("invalid bloom filter params")
-	ErrInvalidCommand       = errors.New("invalid command")
+	ErrFilterNotInitialized        = errors.New("filter not initialized")
+	ErrAddressLimit                = errors.New("address limit exceeded")
+	ErrInvalidFilterParam          = errors.New("invalid bloom filter params")
+	ErrInvalidCommand              = errors.New("invalid command")
+	_                       Filter = &connection{}
 )
 
 type Filter interface {

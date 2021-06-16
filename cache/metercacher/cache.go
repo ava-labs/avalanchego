@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
+var _ cache.Cacher = &Cache{}
+
 type Cache struct {
 	metrics
 	cache cache.Cacher
