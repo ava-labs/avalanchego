@@ -87,7 +87,7 @@ type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
 
-type GetReceivedTxsArgs struct {
+type GetTxsArgs struct {
 	api.JSONAddress
 	// Cursor used as a page index / offset
 	Cursor json.Uint64 `json:"cursor"`
@@ -97,15 +97,15 @@ type GetReceivedTxsArgs struct {
 	AssetID string `json:"assetID"`
 }
 
-type GetReceivedTxsReply struct {
+type GetTxsReply struct {
 	TxIDs []ids.ID `json:"txIDs"`
 	// Cursor used as a page index / offset
 	Cursor json.Uint64 `json:"cursor"`
 }
 
-// GetReceivedTxs returns list of transactions received by given address
+// GetTxs returns list of transactions for a given address
 // prefix db by assetId, API will provide a field in request to allow filtering by assetId, else default to AVAX
-func (service *Service) GetReceivedTxs(r *http.Request, args *GetReceivedTxsArgs, reply *GetReceivedTxsReply) error {
+func (service *Service) GetTxs(r *http.Request, args *GetTxsArgs, reply *GetTxsReply) error {
 	pageSize := uint64(args.PageSize)
 	if pageSize == 0 || pageSize > maxPageSize {
 		return fmt.Errorf("pageSize must be greater than zero and less than the maximum allowed size of %d", maxPageSize)
