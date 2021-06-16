@@ -184,6 +184,38 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	}
 }
 
+func TestBuildBlockIsIdempotent(t *testing.T) {
+	// given the same core block, BuildBlock returns the same proposer block
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+
+	coreVM.CantBuildBlock = true
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.Empty.Prefix(111),
+		},
+		ParentV: coreGenBlk,
+		VerifyV: nil,
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+
+	// test
+	builtBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("proposerVM could not build block")
+	}
+	builtBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("proposerVM could not build block")
+	}
+
+	if !bytes.Equal(builtBlk1.Bytes(), builtBlk2.Bytes()) {
+		t.Fatal("proposer blocks wrapping the same core block are different")
+	}
+}
+
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	// setup
 	coreVM, valVM, proVM, genesisBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
