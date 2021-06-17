@@ -98,22 +98,32 @@ func (h *Handler) Dispatch() {
 			cond.L.Unlock()
 			return
 		}
+		// Get the next message we should process
 		msg := h.unprocessedMsgs.Pop()
 		cond.L.Unlock()
 
+		// If this message's deadline has passed, don't process it.
 		if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
-			h.ctx.Log.Verbo("Dropping message due to likely timeout: %s", msg)
+			h.ctx.Log.Verbo("Dropping message due to timeout: %s", msg)
 			h.metrics.dropped.Inc()
 			h.metrics.expired.Inc()
 			msg.doneHandling()
 			continue
 		}
-		h.handleMsg(msg)
+
+		// Process the message
+		err := h.handleMsg(msg)
+		// If there was an error, shut down this chain
+		if err != nil {
+			h.ctx.Log.Fatal("chain shutting down due to error %q while processing message: %s", err, msg)
+			h.StartShutdown()
+			return
+		}
 	}
 }
 
 // Dispatch a message to the consensus engine.
-func (h *Handler) handleMsg(msg message) {
+func (h *Handler) handleMsg(msg message) error {
 	startTime := h.clock.Time()
 
 	isPeriodic := msg.IsPeriodic()
@@ -147,12 +157,7 @@ func (h *Handler) handleMsg(msg message) {
 	} else {
 		h.ctx.Log.Debug("Finished handling message: %s", msg.messageType)
 	}
-
-	if err != nil {
-		h.ctx.Log.Fatal("forcing chain to shutdown due to: %s, while processing message: %s", err, msg)
-		h.unprocessedMsgs.Shutdown()
-		h.closing.SetValue(true)
-	}
+	return err
 }
 
 func (h *Handler) handleConsensusMsg(msg message, startTime time.Time) error {
@@ -497,15 +502,16 @@ func (h *Handler) Notify(msg common.Message) {
 	})
 }
 
-// Shutdown asynchronously shuts down the dispatcher.
-// The handler should never be invoked again after calling
-// Shutdown.
-func (h *Handler) Shutdown() {
+// StartShutdown starts the shutdown process for this handler/engine.
+// [h] should not be invoked again after calling this method.
+// [h.closed] is closed when done shutting down.
+func (h *Handler) StartShutdown() {
 	h.closing.SetValue(true)
 	h.unprocessedMsgs.Shutdown()
 	h.engine.Halt()
 }
 
+// Shuts down [h.engine] and calls [h.onCloseF].
 func (h *Handler) shutdownDispatch() {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
@@ -517,8 +523,8 @@ func (h *Handler) shutdownDispatch() {
 	if h.onCloseF != nil {
 		go h.onCloseF()
 	}
-	h.closing.SetValue(true)
-	h.metrics.shutdown.Observe(float64(time.Since(startTime)))
+	endTime := h.clock.Time()
+	h.metrics.shutdown.Observe(float64(endTime.Sub(startTime)))
 	close(h.closed)
 }
 

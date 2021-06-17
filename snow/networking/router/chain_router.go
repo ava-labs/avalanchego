@@ -192,7 +192,7 @@ func (cr *ChainRouter) Shutdown() {
 	cr.intervalNotifier.Stop()
 
 	for _, chain := range prevChains {
-		chain.Shutdown()
+		chain.StartShutdown()
 	}
 
 	ticker := time.NewTicker(cr.closeTimeout)
@@ -242,7 +242,7 @@ func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
 	delete(cr.chains, chainID)
 	cr.lock.Unlock()
 
-	chain.Shutdown()
+	chain.StartShutdown()
 
 	ticker := time.NewTicker(cr.closeTimeout)
 	select {
