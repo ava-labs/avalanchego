@@ -285,35 +285,30 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		if p.gzipEnabled {
-			p.net.log.Verbo("inflating message from %s", p.id)
-			bReader := bufio.NewReader(bytes.NewReader(msgBytes))
-			testBytes, err := bReader.Peek(2) // read a few bytes without consuming
+		// if peer is gzip enabled, and message is gzipped, we read it
+		if p.gzipEnabled && len(msgBytes) > 2 && msgBytes[0] == 31 && msgBytes[1] == 139 {
+			// this msg is gzipped
+			compressedMsgLen := len(msgBytes)
+			p.net.log.Debug("Reading gzipped message, len=%d", compressedMsgLen)
+			byteReader := bytes.NewReader(msgBytes)
+			gzipReader, err := gzip.NewReader(byteReader)
 			if err != nil {
-				p.net.log.Error("Could not peek first two bytes of gzipped message from peer %s %s", p.id, err)
+				p.net.log.Error("Error creating a gzip reader, err: %w", err)
 				return
 			}
 
-			compLen := len(msgBytes)
-			if testBytes[0] == 31 && testBytes[1] == 139 {
-				p.net.log.Debug("Decompressing gzipped message from peer %s", p.id)
-				gzipReader, err := gzip.NewReader(bReader)
-				if err != nil {
-					p.net.log.Error("Could not init gzip on gzipped message from peer %s %s", p.id, err)
-					return
-				}
-
-				_, err = gzipReader.Read(msgBytes)
-				if err != nil {
-					p.net.log.Error("Could not read gzipped message from peer %s %s", p.id, err)
-					return
-				}
-				p.net.log.Debug("Inflated message from peer %d, compressed=%d, decompressed=%s", p.id, compLen, len(msgBytes))
-			} else {
-				p.net.log.Debug("Gzip enabled peer did not compress this message %s", p.id)
+			var inflatedMsg []byte
+			var bytesRead uint
+			scanner := bufio.NewScanner(gzipReader)
+			for scanner.Scan() {
+				deflatedBytes := scanner.Bytes()
+				bytesRead += uint(len(deflatedBytes))
+				inflatedMsg = append(inflatedMsg, deflatedBytes...)
 			}
-		} else {
-			p.net.log.Debug("Peer did not have gzip enabled %s", p.id)
+
+			p.net.log.Debug("Read gzipped message, compLen=%d, read=%d, msgLen=%d", compressedMsgLen, bytesRead, len(inflatedMsg))
+
+			msgBytes = inflatedMsg
 		}
 
 		p.net.log.Verbo("parsing new message from %s:\n%s",
@@ -416,7 +411,7 @@ func compress(msg []byte, log logging.Logger) []byte {
 // If [canModifyMsg], [msg] may be modified by this method.
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
-func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
+func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
 
@@ -434,7 +429,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	}
 
 	msgBytes := msg.Bytes()
-	if p.gzipEnabled {
+	if compressMsg && p.gzipEnabled {
 		msgBytes = compress(msgBytes, p.net.log)
 	}
 
@@ -612,7 +607,7 @@ func (p *peer) sendGetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
+	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.metrics.getVersion.numSent.Inc()
 		p.net.metrics.getVersion.sentBytes.Add(float64(lenMsg))
@@ -645,7 +640,7 @@ func (p *peer) sendVersion() {
 	p.net.log.AssertNoError(err)
 
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
+	sent := p.Send(msg, true, false)
 	if sent {
 		p.net.metrics.version.numSent.Inc()
 		p.net.metrics.version.sentBytes.Add(float64(lenMsg))
@@ -670,7 +665,7 @@ func (p *peer) sendGetPeerList() {
 	lenCompMsg := len(compMsgBytes)
 	p.net.log.Debug("compression: op,len,compLen,time SendGetPeerList,%d,%d,%d", lenMsg, lenCompMsg, time.Since(t1).Nanoseconds())
 
-	sent := p.Send(msg, true)
+	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.getPeerlist.numSent.Inc()
 		p.net.getPeerlist.sentBytes.Add(float64(lenMsg))
@@ -701,7 +696,7 @@ func (p *peer) sendPeerList() {
 	lenCompMsg := len(compMsg)
 	p.net.log.Debug("compression: op,len,compLen,time SendPeerList,%d,%d,%d", lenMsg, lenCompMsg, time.Since(t1).Nanoseconds())
 
-	sent := p.Send(msg, true)
+	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.peerList.numSent.Inc()
 		p.net.peerList.sentBytes.Add(float64(lenMsg))
@@ -718,7 +713,7 @@ func (p *peer) sendPing() {
 	msg, err := p.net.b.Ping()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
+	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.ping.numSent.Inc()
 		p.net.ping.sentBytes.Add(float64(lenMsg))
@@ -734,7 +729,7 @@ func (p *peer) sendPong() {
 	msg, err := p.net.b.Pong()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true)
+	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.pong.numSent.Inc()
 		p.net.pong.sentBytes.Add(float64(lenMsg))
