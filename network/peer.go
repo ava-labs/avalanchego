@@ -287,9 +287,12 @@ func (p *peer) ReadMessages() {
 		}
 
 		// if peer is gzip enabled, and message is gzipped, we read it
+		var inflatedMsgLen, compressedMsgLen int
+		var t int64
 		if p.gzipEnabled && len(msgBytes) > 2 && msgBytes[0] == 31 && msgBytes[1] == 139 {
+			t1 := time.Now()
 			// this msg is gzipped
-			compressedMsgLen := len(msgBytes)
+			compressedMsgLen = len(msgBytes)
 			// p.net.log.Debug("Reading gzipped message, len=%d", compressedMsgLen)
 			byteReader := bytes.NewReader(msgBytes)
 			gzipReader, err := gzip.NewReader(byteReader)
@@ -301,10 +304,11 @@ func (p *peer) ReadMessages() {
 			inflatedMsg, err := ioutil.ReadAll(gzipReader)
 			if err != nil {
 				p.net.log.Error("Error reading bytes: %s", err)
+				return
 			}
 
-			p.net.log.Debug("Read gzipped message, compLen=%d, msgLen=%d", compressedMsgLen, len(inflatedMsg))
-
+			inflatedMsgLen = len(inflatedMsg)
+			t = time.Since(t1).Nanoseconds()
 			msgBytes = inflatedMsg
 		} else {
 			p.net.log.Debug("Read non-compressed message, msgLen=%d", len(msgBytes))
@@ -315,6 +319,15 @@ func (p *peer) ReadMessages() {
 			formatting.DumpBytes{Bytes: msgBytes})
 
 		msg, err := p.net.b.Parse(msgBytes)
+		if inflatedMsgLen != compressedMsgLen {
+			op := msg.Op().String()
+			p.net.log.Debug("unpacked message op, len, compLen, t \t %s, %d, %d, %d",
+				op,
+				inflatedMsgLen,
+				compressedMsgLen,
+				t)
+		}
+
 		if err != nil {
 			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
 				p.id,
@@ -376,13 +389,14 @@ func (p *peer) WriteMessages() {
 const compressionThreshold = 128
 
 // compress compresses given msg bytes if larger than 128 bytes
-func compress(msg []byte, log logging.Logger) []byte {
+func compress(op string, msg []byte, log logging.Logger) []byte {
 	msgLen := len(msg)
 
 	if msgLen < compressionThreshold {
 		return msg
 	}
 
+	t1 := time.Now()
 	compMsgSize := -1
 	var b bytes.Buffer
 	gWriter := gzip.NewWriter(&b)
@@ -399,9 +413,11 @@ func compress(msg []byte, log logging.Logger) []byte {
 	}
 	_ = gWriter.Close()
 
-	log.Debug("packed message len:%d, compLen:%d",
+	log.Debug("packed message op, len, compLen, t \t %s, %d, %d, %d",
+		op,
 		msgLen,
-		compMsgSize)
+		compMsgSize,
+		time.Since(t1).Nanoseconds())
 
 	return b.Bytes()
 }
@@ -429,7 +445,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 
 	msgBytes := msg.Bytes()
 	if compressMsg && p.gzipEnabled {
-		msgBytes = compress(msgBytes, p.net.log)
+		msgBytes = compress(msg.Op().String(), msgBytes, p.net.log)
 	}
 
 	msgBytesLen := int64(len(msgBytes))
@@ -658,7 +674,7 @@ func (p *peer) sendGetPeerList() {
 
 	t1 := time.Now()
 	msgBytes := msg.Bytes()
-	compMsgBytes := compress(msgBytes, p.net.log)
+	compMsgBytes := compress(msg.Op().String(), msgBytes, p.net.log)
 
 	lenMsg := len(msgBytes)
 	lenCompMsg := len(compMsgBytes)
@@ -690,8 +706,8 @@ func (p *peer) sendPeerList() {
 
 	t1 := time.Now()
 	msgBytes := msg.Bytes()
-	compMsg := compress(msgBytes, p.net.log)
 	lenMsg := len(msgBytes)
+	compMsg := compress(msg.Op().String(), msgBytes, p.net.log)
 	lenCompMsg := len(compMsg)
 	p.net.log.Debug("compression: op,len,compLen,time SendPeerList,%d,%d,%d", lenMsg, lenCompMsg, time.Since(t1).Nanoseconds())
 
