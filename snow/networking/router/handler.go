@@ -116,7 +116,8 @@ func (h *Handler) Dispatch() {
 func (h *Handler) handleMsg(msg message) {
 	startTime := h.clock.Time()
 
-	if msg.IsPeriodic() {
+	isPeriodic := msg.IsPeriodic()
+	if isPeriodic {
 		h.ctx.Log.Verbo("Forwarding message to consensus: %s", msg)
 	} else {
 		h.ctx.Log.Debug("Forwarding message to consensus: %s", msg)
@@ -141,7 +142,7 @@ func (h *Handler) handleMsg(msg message) {
 	}
 	msg.doneHandling()
 
-	if msg.IsPeriodic() {
+	if isPeriodic {
 		h.ctx.Log.Verbo("Finished handling message: %s", msg.messageType)
 	} else {
 		h.ctx.Log.Debug("Finished handling message: %s", msg.messageType)
@@ -152,6 +153,54 @@ func (h *Handler) handleMsg(msg message) {
 		h.unprocessedMsgs.Shutdown()
 		h.closing.SetValue(true)
 	}
+}
+
+func (h *Handler) handleConsensusMsg(msg message, startTime time.Time) error {
+	var err error
+	switch msg.messageType {
+	case constants.GetAcceptedFrontierMsg:
+		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
+	case constants.AcceptedFrontierMsg:
+		err = h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
+	case constants.GetAcceptedFrontierFailedMsg:
+		err = h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
+	case constants.GetAcceptedMsg:
+		err = h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
+	case constants.AcceptedMsg:
+		err = h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
+	case constants.GetAcceptedFailedMsg:
+		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
+	case constants.GetAncestorsMsg:
+		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
+	case constants.GetAncestorsFailedMsg:
+		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
+	case constants.MultiPutMsg:
+		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
+	case constants.GetMsg:
+		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
+	case constants.GetFailedMsg:
+		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
+	case constants.PutMsg:
+		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+	case constants.PushQueryMsg:
+		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+	case constants.PullQueryMsg:
+		err = h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
+	case constants.QueryFailedMsg:
+		err = h.engine.QueryFailed(msg.validatorID, msg.requestID)
+	case constants.ChitsMsg:
+		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
+	case constants.ConnectedMsg:
+		err = h.engine.Connected(msg.validatorID)
+	case constants.DisconnectedMsg:
+		err = h.engine.Disconnected(msg.validatorID)
+	}
+	endTime := h.clock.Time()
+	timeConsumed := endTime.Sub(startTime)
+	histogram := h.metrics.getMSGHistogram(msg.messageType)
+	histogram.Observe(float64(timeConsumed))
+	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)
+	return err
 }
 
 // GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
@@ -471,56 +520,6 @@ func (h *Handler) shutdownDispatch() {
 	h.closing.SetValue(true)
 	h.metrics.shutdown.Observe(float64(time.Since(startTime)))
 	close(h.closed)
-}
-
-func (h *Handler) handleConsensusMsg(msg message, startTime time.Time) error {
-	var err error
-	switch msg.messageType {
-	case constants.GetAcceptedFrontierMsg:
-		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
-	case constants.AcceptedFrontierMsg:
-		err = h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
-	case constants.GetAcceptedFrontierFailedMsg:
-		err = h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
-	case constants.GetAcceptedMsg:
-		err = h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
-	case constants.AcceptedMsg:
-		err = h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
-	case constants.GetAcceptedFailedMsg:
-		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
-	case constants.GetAncestorsMsg:
-		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
-	case constants.GetAncestorsFailedMsg:
-		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
-	case constants.MultiPutMsg:
-		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
-	case constants.GetMsg:
-		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
-	case constants.GetFailedMsg:
-		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
-	case constants.PutMsg:
-		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-	case constants.PushQueryMsg:
-		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
-	case constants.PullQueryMsg:
-		err = h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
-	case constants.QueryFailedMsg:
-		err = h.engine.QueryFailed(msg.validatorID, msg.requestID)
-	case constants.ChitsMsg:
-		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
-	case constants.ConnectedMsg:
-		err = h.engine.Connected(msg.validatorID)
-	case constants.DisconnectedMsg:
-		err = h.engine.Disconnected(msg.validatorID)
-	}
-	endTime := h.clock.Time()
-	timeConsumed := endTime.Sub(startTime)
-
-	histogram := h.metrics.getMSGHistogram(msg.messageType)
-	histogram.Observe(float64(timeConsumed))
-
-	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)
-	return err
 }
 
 // func (h *Handler) sendReliableMsg(msg message) {
