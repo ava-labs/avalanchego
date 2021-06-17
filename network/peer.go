@@ -9,7 +9,6 @@ import (
 	"compress/gzip"
 	"crypto/x509"
 	"encoding/binary"
-	"fmt"
 	"io/ioutil"
 	"math"
 	"net"
@@ -389,6 +388,7 @@ func (p *peer) WriteMessages() {
 const compressionThreshold = 128
 
 // compress compresses given msg bytes if larger than 128 bytes
+// in case of any errors, we return the original data uncompressed
 func compress(op string, msg []byte, log logging.Logger) []byte {
 	msgLen := len(msg)
 
@@ -397,22 +397,27 @@ func compress(op string, msg []byte, log logging.Logger) []byte {
 	}
 
 	t1 := time.Now()
-	compMsgSize := -1
 	var b bytes.Buffer
 	gWriter := gzip.NewWriter(&b)
-	_, gErr := gWriter.Write(msg)
-	if gErr != nil {
-		fmt.Println(gErr)
-	} else {
-		gErr = gWriter.Flush()
-		if gErr != nil {
-			fmt.Println(gErr)
-		} else {
-			compMsgSize = b.Len()
-		}
+	_, err := gWriter.Write(msg)
+	if err != nil {
+		log.Error("Error compressing data: %s", err)
+		return msg
 	}
-	_ = gWriter.Close()
 
+	err = gWriter.Flush()
+	if err != nil {
+		log.Error("Error flushing gzip writer: %s", err)
+		return msg
+	}
+
+	err = gWriter.Close()
+	if err != nil {
+		log.Error("Error closing gzip writer: %s", err)
+		return msg
+	}
+
+	compMsgSize := b.Len()
 	log.Debug("packed message op, len, compLen, t \t %s, %d, %d, %d",
 		op,
 		msgLen,
