@@ -169,14 +169,14 @@ func TestSeeding(t *testing.T) {
 	s1.Reset()
 	v, err := s1.Next()
 	assert.NoError(err)
-	assert.EqualValues(5, v)
+	assert.EqualValues(44, v)
 
 	s1.Seed(0)
 
 	s2.Reset()
 	v, err = s2.Next()
 	assert.NoError(err)
-	assert.NotEqualValues(5, v)
+	assert.NotEqualValues(44, v)
 
 	s1.Seed(0)
 
@@ -184,5 +184,5 @@ func TestSeeding(t *testing.T) {
 	s1.ClearSeed()
 	v, err = s1.Next()
 	assert.NoError(err)
-	assert.NotEqualValues(5, v)
+	assert.NotEqualValues(44, v)
 }

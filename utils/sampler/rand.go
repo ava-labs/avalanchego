@@ -7,16 +7,21 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"gonum.org/v1/gonum/mathext/prng"
 )
 
-var globalRNG = newRNG()
+var (
+	int63Mask uint64 = 1<<63 - 1
+	globalRNG        = newRNG()
+)
 
 func newRNG() rng {
-	source := rand.NewSource(time.Now().UnixNano())
-
+	source := prng.NewMT19937()
+	source.Seed(uint64(time.Now().UnixNano()))
 	// We don't use a cryptographically secure source of randomness here, as
 	// there's no need to ensure a truly random sampling.
-	return rand.New(&syncSource{Source: source}) // #nosec G404
+	return rand.New(&syncSource{rng: source}) // #nosec G404
 }
 
 func Seed(seed int64) {
@@ -35,18 +40,22 @@ type rng interface {
 
 type syncSource struct {
 	lock sync.Mutex
-	rand.Source
+	rng  *prng.MT19937
 }
 
 func (s *syncSource) Seed(seed int64) {
 	s.lock.Lock()
-	s.Source.Seed(seed)
+	s.rng.Seed(uint64(seed))
 	s.lock.Unlock()
 }
 
 func (s *syncSource) Int63() int64 {
+	return int64(s.Uint64() & int63Mask)
+}
+
+func (s *syncSource) Uint64() uint64 {
 	s.lock.Lock()
-	n := s.Source.Int63()
+	n := s.rng.Uint64()
 	s.lock.Unlock()
 	return n
 }
