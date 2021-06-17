@@ -385,14 +385,14 @@ func (p *peer) WriteMessages() {
 	}
 }
 
-const compressionThreshold = 128
+const compressionThresholdBytes = 128
 
 // compress compresses given msg bytes if larger than 128 bytes
 // in case of any errors, we return the original data uncompressed
 func compress(op string, msg []byte, log logging.Logger) []byte {
 	msgLen := len(msg)
 
-	if msgLen < compressionThreshold {
+	if msgLen < compressionThresholdBytes {
 		return msg
 	}
 
