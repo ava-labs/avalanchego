@@ -306,6 +306,12 @@ func (p *peer) ReadMessages() {
 				return
 			}
 
+			err = gzipReader.Close()
+			if err != nil {
+				p.net.log.Error("Error closing gzip reader: %s", err)
+				return
+			}
+
 			inflatedMsgLen = len(inflatedMsg)
 			t = time.Since(t1).Nanoseconds()
 			msgBytes = inflatedMsg
