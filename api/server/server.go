@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/compression"
+	"github.com/NYTimes/gziphandler"
 
 	"github.com/gorilla/handlers"
 
@@ -78,7 +78,7 @@ func (s *Server) Initialize(
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
 	})
-	s.handler = corsWrapper.Handler(s.router)
+	s.handler = gziphandler.GzipHandler(corsWrapper.Handler(s.router))
 
 	for _, wrapper := range wrappers {
 		s.handler = wrapper.WrapHandler(s.handler)
@@ -185,7 +185,6 @@ func (s *Server) AddChainRoute(handler *common.HTTPHandler, ctx *snow.Context, b
 	}
 	// Apply middleware to reject calls to the handler before the chain finishes bootstrapping
 	h = rejectMiddleware(h, ctx)
-	h = compression.EnableGzipSupport(h)
 	return s.router.AddRouter(url, endpoint, h)
 }
 
@@ -200,9 +199,6 @@ func (s *Server) AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base,
 	if err != nil {
 		return err
 	}
-	// Apply gzip http.Handler wrapper
-	// Adding this last so that it gets called the first
-	h = compression.EnableGzipSupport(h)
 	return s.router.AddRouter(url, endpoint, h)
 }
 
