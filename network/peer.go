@@ -681,14 +681,7 @@ func (p *peer) sendGetPeerList() {
 	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
 
-	t1 := time.Now()
-	msgBytes := msg.Bytes()
-	compMsgBytes := p.compress(msg.Op().String(), msgBytes)
-
-	lenMsg := len(msgBytes)
-	lenCompMsg := len(compMsgBytes)
-	p.net.log.Debug("compression: op,len,compLen,time SendGetPeerList,%d,%d,%d", lenMsg, lenCompMsg, time.Since(t1).Nanoseconds())
-
+	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.getPeerlist.numSent.Inc()
@@ -713,13 +706,8 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	t1 := time.Now()
 	msgBytes := msg.Bytes()
 	lenMsg := len(msgBytes)
-	compMsg := p.compress(msg.Op().String(), msgBytes)
-	lenCompMsg := len(compMsg)
-	p.net.log.Debug("compression: op,len,compLen,time SendPeerList,%d,%d,%d", lenMsg, lenCompMsg, time.Since(t1).Nanoseconds())
-
 	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.peerList.numSent.Inc()
