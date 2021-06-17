@@ -158,6 +158,7 @@ func (cr *ChainRouter) RegisterRequest(
 	})
 	cr.metrics.outstandingRequests.Set(float64(cr.timedRequests.Len()))
 	cr.lock.Unlock()
+
 	// Register a timeout to fire if we don't get a reply in time.
 	var timeoutHandler func() // Called upon timeout
 	switch msgType {
@@ -195,15 +196,15 @@ func (cr *ChainRouter) Shutdown() {
 	}
 
 	ticker := time.NewTicker(cr.closeTimeout)
-	timedout := false
+	timedOut := false
 	for _, chain := range prevChains {
 		select {
 		case <-chain.closed:
 		case <-ticker.C:
-			timedout = true
+			timedOut = true
 		}
 	}
-	if timedout {
+	if timedOut {
 		cr.log.Warn("timed out while shutting down the chains")
 	}
 	ticker.Stop()
@@ -217,7 +218,7 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 
 	chainID := chain.Context().ChainID
 	cr.log.Debug("registering chain %s with chain router", chainID)
-	chain.toClose = func() { cr.RemoveChain(chainID) }
+	chain.onCloseF = func() { cr.RemoveChain(chainID) }
 	cr.chains[chainID] = chain
 
 	for validatorID := range cr.peers {
@@ -272,17 +273,13 @@ func (cr *ChainRouter) GetAcceptedFrontier(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("GetAcceptedFrontier(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
 
 	// Pass the message to the chain
-	dropped := !chain.GetAcceptedFrontier(validatorID, requestID, deadline, onFinishedHandling)
-	if dropped {
-		cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	} else {
-		cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	}
+	chain.GetAcceptedFrontier(validatorID, requestID, deadline, onFinishedHandling)
 }
 
 // AcceptedFrontier routes an incoming AcceptedFrontier request from the
@@ -301,6 +298,7 @@ func (cr *ChainRouter) AcceptedFrontier(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("AcceptedFrontier(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
 		return
 	}
@@ -310,11 +308,13 @@ func (cr *ChainRouter) AcceptedFrontier(
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
+		onFinishedHandling()
 		// We didn't request this message. Ignore.
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.GetAcceptedFrontierMsg {
+		onFinishedHandling()
 		// We got back a reply of wrong type. Ignore.
 		return
 	}
@@ -328,14 +328,6 @@ func (cr *ChainRouter) AcceptedFrontier(
 
 	// Pass the response to the chain
 	chain.AcceptedFrontier(validatorID, requestID, containerIDs, onFinishedHandling)
-	//dropped := !chain.AcceptedFrontier(validatorID, requestID, containerIDs, onFinishedHandling)
-	//if dropped {
-	//	// We weren't able to pass the response to the chain
-	//	chain.GetAcceptedFrontierFailed(validatorID, requestID)
-	//	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	//} else {
-	//	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	//}
 }
 
 // GetAcceptedFrontierFailed routes an incoming GetAcceptedFrontierFailed
@@ -382,18 +374,13 @@ func (cr *ChainRouter) GetAccepted(
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("GetAccepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
 		return
 	}
 
 	// Pass the message to the chain.
 	chain.GetAccepted(validatorID, requestID, deadline, containerIDs, onFinishedHandling)
-	// dropped := !chain.GetAccepted(validatorID, requestID, deadline, containerIDs, onFinishedHandling)
-	// if dropped {
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // Accepted routes an incoming Accepted request from the validator with ID
@@ -412,6 +399,7 @@ func (cr *ChainRouter) Accepted(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("Accepted(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerIDs)
 		return
 	}
@@ -421,11 +409,13 @@ func (cr *ChainRouter) Accepted(
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
+		onFinishedHandling()
 		// We didn't request this message. Ignore.
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.GetAcceptedMsg {
+		onFinishedHandling()
 		// We got back a reply of wrong type. Ignore.
 		return
 	}
@@ -439,14 +429,6 @@ func (cr *ChainRouter) Accepted(
 
 	// Pass the response to the chain
 	chain.Accepted(validatorID, requestID, containerIDs, onFinishedHandling)
-	// dropped := !chain.Accepted(validatorID, requestID, containerIDs, onFinishedHandling)
-	// if dropped {
-	// 	// We weren't able to pass the response to the chain
-	// 	chain.GetAcceptedFailed(validatorID, requestID)
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // GetAcceptedFailed routes an incoming GetAcceptedFailed request from the
@@ -494,18 +476,13 @@ func (cr *ChainRouter) GetAncestors(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("GetAncestors(%s, %s, %d) dropped due to unknown chain", validatorID, chainID, requestID)
 		return
 	}
 
 	// Pass the message to the chain
 	chain.GetAncestors(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	// dropped := !chain.GetAncestors(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	// if dropped {
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // MultiPut routes an incoming MultiPut message from the validator with ID [validatorID]
@@ -523,6 +500,7 @@ func (cr *ChainRouter) MultiPut(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
 		return
 	}
@@ -532,11 +510,13 @@ func (cr *ChainRouter) MultiPut(
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
+		onFinishedHandling()
 		// We didn't request this message. Ignore.
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.GetAncestorsMsg {
+		onFinishedHandling()
 		// We got back a reply of wrong type. Ignore.
 		return
 	}
@@ -550,14 +530,6 @@ func (cr *ChainRouter) MultiPut(
 
 	// Pass the response to the chain
 	chain.MultiPut(validatorID, requestID, containers, onFinishedHandling)
-	// dropped := !chain.MultiPut(validatorID, requestID, containers, onFinishedHandling)
-	// if dropped {
-	// 	// We weren't able to pass the response to the chain
-	// 	chain.GetAncestorsFailed(validatorID, requestID)
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // GetAncestorsFailed routes an incoming GetAncestorsFailed message from the validator with ID [validatorID]
@@ -603,18 +575,13 @@ func (cr *ChainRouter) Get(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("Get(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		return
 	}
 
 	// Pass the message to the chain
 	chain.Get(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	// dropped := !chain.Get(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	// if dropped {
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // Put routes an incoming Put request from the validator with ID [validatorID]
@@ -641,19 +608,13 @@ func (cr *ChainRouter) Put(
 			cr.log.Debug("Put(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 			cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 		}
+		onFinishedHandling()
 		return
 	}
 
 	// If this is a gossip message, pass to the chain
 	if requestID == constants.GossipMsgRequestID {
-		// It's ok to drop this message.
 		chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
-		// dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
-		// if dropped {
-		// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-		// } else {
-		// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-		// }
 		return
 	}
 
@@ -662,11 +623,13 @@ func (cr *ChainRouter) Put(
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
+		onFinishedHandling()
 		// We didn't request this message. Ignore.
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.GetMsg {
+		onFinishedHandling()
 		// We got back a reply of wrong type. Ignore.
 		return
 	}
@@ -680,14 +643,6 @@ func (cr *ChainRouter) Put(
 
 	// Pass the response to the chain
 	chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
-	// dropped := !chain.Put(validatorID, requestID, containerID, container, onFinishedHandling)
-	// if dropped {
-	// 	// We weren't able to pass the response to the chain
-	// 	chain.GetFailed(validatorID, requestID)
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // GetFailed routes an incoming GetFailed message from the validator with ID [validatorID]
@@ -732,6 +687,7 @@ func (cr *ChainRouter) PushQuery(
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("PushQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 		return
@@ -739,12 +695,6 @@ func (cr *ChainRouter) PushQuery(
 
 	// Pass the message to the chain
 	chain.PushQuery(validatorID, requestID, deadline, containerID, container, onFinishedHandling)
-	// dropped := !chain.PushQuery(validatorID, requestID, deadline, containerID, container, onFinishedHandling)
-	// if dropped {
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // PullQuery routes an incoming PullQuery request from the validator with ID [validatorID]
@@ -762,18 +712,13 @@ func (cr *ChainRouter) PullQuery(
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("PullQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		return
 	}
 
 	// Pass the message to the chain
 	chain.PullQuery(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	// dropped := !chain.PullQuery(validatorID, requestID, deadline, containerID, onFinishedHandling)
-	// if dropped {
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // Chits routes an incoming Chits message from the validator with ID [validatorID]
@@ -791,6 +736,7 @@ func (cr *ChainRouter) Chits(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
+		onFinishedHandling()
 		cr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
 		return
 	}
@@ -801,11 +747,13 @@ func (cr *ChainRouter) Chits(
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
 		// We didn't request this message. Ignore.
+		onFinishedHandling()
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.PullQueryMsg && request.msgType != constants.PushQueryMsg {
 		// We got back a reply of wrong type. Ignore.
+		onFinishedHandling()
 		return
 	}
 	cr.timedRequests.Delete(uniqueRequestID)
@@ -818,14 +766,6 @@ func (cr *ChainRouter) Chits(
 
 	// Pass the response to the chain
 	chain.Chits(validatorID, requestID, votes, onFinishedHandling)
-	// dropped := !chain.Chits(validatorID, requestID, votes, onFinishedHandling)
-	// if dropped {
-	// 	// We weren't able to pass the response to the chain
-	// 	chain.QueryFailed(validatorID, requestID)
-	// 	cr.registerMsgDrop(chain.ctx.IsBootstrapped())
-	// } else {
-	// 	cr.registerMsgSuccess(chain.ctx.IsBootstrapped())
-	// }
 }
 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]
@@ -936,6 +876,7 @@ func (cr *ChainRouter) Gossip() {
 }
 
 // EndInterval notifies the chains that the current CPU interval has ended
+// TODO remove?
 func (cr *ChainRouter) EndInterval() {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()

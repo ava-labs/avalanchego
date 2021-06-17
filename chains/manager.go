@@ -592,10 +592,6 @@ func (m *manager) createAvalancheChain(
 		engine,
 		validators,
 		msgChan,
-		m.MaxPendingMsgs,
-		m.MaxNonStakerPendingMsgs,
-		m.StakerMSGPortion,
-		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
@@ -712,10 +708,6 @@ func (m *manager) createSnowmanChain(
 		engine,
 		validators,
 		msgChan,
-		m.MaxPendingMsgs,
-		m.MaxNonStakerPendingMsgs,
-		m.StakerMSGPortion,
-		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
