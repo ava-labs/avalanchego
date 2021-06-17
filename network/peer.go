@@ -351,8 +351,11 @@ func (p *peer) WriteMessages() {
 
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
-		msgb := [wrappers.IntLen]byte{}
+		p.net.log.Verbo("sending new message to %s:\n%s",
+			p.id,
+			formatting.DumpBytes{Bytes: msg})
 
+		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
 			for len(byteSlice) > 0 {
@@ -706,8 +709,7 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	msgBytes := msg.Bytes()
-	lenMsg := len(msgBytes)
+	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true, true)
 	if sent {
 		p.net.peerList.numSent.Inc()
