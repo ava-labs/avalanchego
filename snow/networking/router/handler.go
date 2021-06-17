@@ -75,7 +75,7 @@ func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
 // Dispatch waits for incoming messages from the network
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
-	defer h.shutdownDispatch()
+	defer h.shutdown()
 
 	// TODO handle shut down signal
 	// TODO handle messages from the VM
@@ -499,15 +499,23 @@ func (h *Handler) Notify(msg common.Message) {
 }
 
 // StartShutdown starts the shutdown process for this handler/engine.
-// [h] should not be invoked again after calling this method.
-// [h.closed] is closed when done shutting down.
+// [h] must never be invoked again after calling this method.
+// This method causes [shutdown] to eventually be called.
+// [h.closed] is closed when this handler/engine are done shutting down.
 func (h *Handler) StartShutdown() {
 	h.unprocessedMsgs.Shutdown()
+	// Don't process any more bootstrap messages.
+	// If [h.engine] is processing a bootstrap message, stop.
+	// We do this because if we didn't, and the engine was in the
+	// middle of executing state transitions during bootstrapping,
+	// we wouldn't be able to grab [h.ctx.Lock] until the engine
+	// finished executing state transitions, which may take a long time.
+	// As a result, the router would time out on shutting down this chain.
 	h.engine.Halt()
 }
 
 // Shuts down [h.engine] and calls [h.onCloseF].
-func (h *Handler) shutdownDispatch() {
+func (h *Handler) shutdown() {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
