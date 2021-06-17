@@ -35,7 +35,6 @@ type Router interface {
 	) error
 	Shutdown()
 	AddChain(chain *Handler)
-	RemoveChain(chainID ids.ID)
 	health.Checkable
 }
 

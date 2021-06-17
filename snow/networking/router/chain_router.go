@@ -218,7 +218,7 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 
 	chainID := chain.Context().ChainID
 	cr.log.Debug("registering chain %s with chain router", chainID)
-	chain.onCloseF = func() { cr.RemoveChain(chainID) }
+	chain.onCloseF = func() { cr.removeChain(chainID) }
 	cr.chains[chainID] = chain
 
 	for validatorID := range cr.peers {
@@ -231,7 +231,7 @@ func (cr *ChainRouter) AddChain(chain *Handler) {
 
 // RemoveChain removes the specified chain so that incoming
 // messages can't be routed to it
-func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
+func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	cr.lock.Lock()
 	chain, exists := cr.chains[chainID]
 	if !exists {
@@ -255,6 +255,7 @@ func (cr *ChainRouter) RemoveChain(chainID ids.ID) {
 	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
 		go cr.onFatal(1)
 	}
+
 }
 
 // GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
