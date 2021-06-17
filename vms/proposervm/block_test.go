@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
@@ -18,6 +19,7 @@ func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
 	return [2]snowman.Block{}, nil
 }
 
+// ProposerBlock Option interface tests section
 func TestProposerBlockOptionsHandling(t *testing.T) {
 	// setup
 	noOptionBlock := snowman.TestBlock{}
@@ -51,6 +53,7 @@ func (tC testClock) now() time.Time {
 	return tC.setTime
 }
 
+// TODO: these two below are the first tests I wrote. Remove or move to vm tests
 func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
@@ -105,6 +108,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 	}
 }
 
+// ProposerBlock.Verify tests section
 func TestProposerBlockVerificationParent(t *testing.T) {
 	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
@@ -116,7 +120,7 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	}
 
 	prntCoreBlk := snowman.TestBlock{}
-	prntProHdr := NewProHeader(ids.ID{}, 0, pCH, *pTestCert.Leaf)
+	prntProHdr := NewProHeader(ids.Empty, 0, pCH, *pTestCert.Leaf)
 	prntProBlk, err := NewProBlock(proVM,
 		prntProHdr, &prntCoreBlk, nil, true)
 	if err != nil {
@@ -161,7 +165,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 	prntCoreBlk := snowman.TestBlock{}
 	ParentProBlk, err := NewProBlock(proVM,
-		NewProHeader(ids.ID{}, prntTimestamp, pCH, *pTestCert.Leaf),
+		NewProHeader(ids.Empty, prntTimestamp, pCH, *pTestCert.Leaf),
 		&prntCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
@@ -292,7 +296,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	prntBlkPChainHeight /= 2
 	prntCoreBlk := snowman.TestBlock{}
 	ParentProBlk, err := NewProBlock(proVM,
-		NewProHeader(ids.ID{}, 0, prntBlkPChainHeight, *pTestCert.Leaf),
+		NewProHeader(ids.Empty, 0, prntBlkPChainHeight, *pTestCert.Leaf),
 		&prntCoreBlk, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
@@ -361,5 +365,103 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 		t.Fatal("ProBlock's P-Chain-Height cannot be higher than current P chain height")
 	} else if err != ErrProBlkWrongHeight {
 		t.Fatal("Proposer block has wrong height should have different error")
+	}
+}
+
+// ProposerBlock.Accept tests section
+func TestProposerBlockAcceptSetLastAcceptedBlock(t *testing.T) {
+	// setup
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+
+	coreVM.CantBuildBlock = true
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2021),
+			StatusV: choices.Processing,
+		},
+		ParentV: coreGenBlk,
+		VerifyV: nil,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+
+	builtBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("proposerVM could not build block")
+	}
+
+	// test
+	if err := builtBlk.Accept(); err != nil {
+		t.Fatal("could not accept block")
+	}
+
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
+		if coreBlk.Status() == choices.Accepted {
+			return coreBlk.ID(), nil
+		}
+		return coreGenBlk.ID(), nil
+	}
+	if acceptedID, err := proVM.LastAccepted(); err != nil {
+		t.Fatal("could not retrieve last accepted block")
+	} else if acceptedID != builtBlk.ID() {
+		t.Fatal("unexpected last accepted ID")
+	}
+}
+
+func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	currentPChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+
+	// generate two blocks with the same core block and store them
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2021),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+		HeightV: coreGenBlk.Height() + 1,
+	}
+	coreVM.LastAcceptedF = func() (ids.ID, error) {
+		if coreBlk.Status() == choices.Accepted {
+			return coreBlk.ID(), nil
+		}
+		return coreGenBlk.ID(), nil
+	}
+
+	proGenBlkID, _ := proVM.LastAccepted()
+	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, nil, true)
+	if err != nil {
+		t.Fatal("could not sign proposert block")
+	}
+	proVM.state.cacheProBlk(&proBlk1)
+
+	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), currentPChainHeight, *pTestCert.Leaf)
+	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, nil, true)
+	if err != nil {
+		t.Fatal("could not sign proposert block")
+	}
+	proVM.state.cacheProBlk(&proBlk2)
+
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("Test requires proBlk1 and proBlk2 to be different")
+	}
+
+	// set proBlk1 as preferred
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("could not accept proBlk1")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("coreBlk should have been accepted")
+	}
+
+	if acceptedID, err := proVM.LastAccepted(); err != nil {
+		t.Fatal("could not retrieve last accepted block")
+	} else if acceptedID != proBlk1.ID() {
+		t.Fatal("unexpected last accepted ID")
 	}
 }

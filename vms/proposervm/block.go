@@ -4,12 +4,15 @@ package proposervm
 // ProposerBlock is made up of a ProposerBlockHeader, carrying all the new fields introduced with snowman++, and
 // a core block, which is a snowman.Block.
 // ProposerBlock serialization is a two step process: the header is serialized at proposervm level, while core block
-// serialization is deferred to the ChainVM wrapped into proposervm.VM. The structure marshallingProposerBLock encapsulates
+// serialization is deferred to the core VM. The structure marshallingProposerBLock encapsulates
 // the serialization logic
 // Contract:
-// * Parent ProposerBlock wraps Parent CoreBlock of CoreBlock wrapped into Child ProposerBlock
-// * Only one call to each coreBlock's Verify() is issued from proposerVM TODO
+// * Parent ProposerBlock wraps Parent CoreBlock of CoreBlock wrapped into Child ProposerBlock.
+// TODO: ^^^^ Enforce each block is built on preference [right now in consensus there is just a warning]
+// * Only one call to each coreBlock's Verify() is issued from proposerVM. However Verify is memory only, so we won't persist
+// core blocks over which Verify has been called
 // * VERIFY FAILS ON GENESIS TODO: fix maybe
+// * Rejection of ProposerBlock does not constitute Rejection of wrapped CoreBlock
 
 import (
 	"crypto"
@@ -116,12 +119,31 @@ func (pb *ProposerBlock) ID() ids.ID {
 }
 
 func (pb *ProposerBlock) Accept() error {
-	err := pb.coreBlk.Accept()
-	if err == nil {
+	currAcceptedID, err := pb.vm.state.getLastAcceptedID()
+
+	switch err {
+	case nil:
+		if err := pb.vm.state.storeLastAcceptedID(pb.ID()); err != nil {
+			return err
+		}
+		if err := pb.coreBlk.Accept(); err != nil {
+			// attempt to restore previous accepted block and return
+			if err := pb.vm.state.storeLastAcceptedID(currAcceptedID); err != nil {
+				// TODO log
+				return err
+			}
+			return err
+		}
+
 		// pb parent block should not be needed anymore.
+		// TODO: consider pruning option
 		pb.vm.state.wipeFromCacheProBlk(pb.header.prntID)
+		return nil
+	case ErrLastAcceptedIDNotFound: // pre snowman++ case
+		return pb.coreBlk.Accept()
+	default:
+		return err
 	}
-	return err
 }
 
 func (pb *ProposerBlock) Reject() error {
@@ -153,12 +175,6 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkWrongVersion
 	}
 
-	// validate core block
-	// TODO: should be called only one, hence at the end
-	if err := pb.coreBlk.Verify(); err != nil {
-		return err
-	}
-
 	// validate parent
 	prntBlk, err := pb.vm.state.getProBlock(pb.header.prntID)
 	if err != nil {
@@ -183,6 +199,10 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkBadTimestamp
 	}
 
+	if time.Unix(pb.header.timestamp, 0).After(pb.vm.now().Add(BlkSubmissionTolerance)) {
+		return ErrProBlkBadTimestamp // too much in the future
+	}
+
 	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pb.header.valCert.Raw))
 	if err != nil {
 		return ErrInvalidNodeID
@@ -191,10 +211,6 @@ func (pb *ProposerBlock) Verify() error {
 	blkWinDelay := pb.vm.BlkSubmissionDelay(pb.header.pChainHeight, nodeID)
 	blkWinStart := time.Unix(prntBlk.header.timestamp, 0).Add(blkWinDelay)
 	if time.Unix(pb.header.timestamp, 0).Before(blkWinStart) {
-		return ErrProBlkBadTimestamp
-	}
-
-	if time.Unix(pb.header.timestamp, 0).After(pb.vm.now().Add(BlkSubmissionTolerance)) {
 		return ErrProBlkBadTimestamp
 	}
 
@@ -214,6 +230,12 @@ func (pb *ProposerBlock) Verify() error {
 	if err = pb.header.valCert.CheckSignature(pb.header.valCert.SignatureAlgorithm,
 		signedBytes, pb.header.signature); err != nil {
 		return ErrInvalidSignature
+	}
+
+	// validate core block. Verify must be called only once if it succeeds
+	// hence must be at the very end
+	if err := pb.coreBlk.Verify(); err != nil {
+		return err
 	}
 
 	return nil
@@ -243,7 +265,7 @@ func (pb *ProposerBlock) Height() uint64 {
 }
 
 func (pb *ProposerBlock) Timestamp() time.Time {
-	return pb.coreBlk.Timestamp()
+	return pb.coreBlk.Timestamp() // TODO: could this be pb.header.timestamp? they are built equal BUT not verified!
 }
 
 // snowman.OracleBlock interface implementation

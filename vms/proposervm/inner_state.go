@@ -1,6 +1,8 @@
 package proposervm
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -10,8 +12,14 @@ import (
 )
 
 var (
-	blockPrefix = []byte("block")
-	wrpdToProID = []byte("wrpdToProID")
+	blockPrefix               = []byte("block")
+	notableIDPrefix           = []byte("proGenID")
+	proGenIDKey               = []byte("proGenIDKey")
+	ErrGenesisNotFound        = errors.New("proposer genesis block not found")
+	preferredIDKey            = []byte("preferredIDKey")
+	ErrPreferredIDNotFound    = errors.New("preferred ID not found")
+	lastAcceptedIDKey         = []byte("lastAcceptedIDKey")
+	ErrLastAcceptedIDNotFound = errors.New("last accepted ID not found")
 )
 
 type innerState struct {
@@ -22,50 +30,56 @@ type innerState struct {
 	knownProBlocks map[ids.ID]*ProposerBlock
 	proBlkDB       *prefixdb.Database
 
-	wrpdToProID   map[ids.ID]ids.ID
-	wrpdToProIDDB *prefixdb.Database
+	proGenID       ids.ID
+	preferredID    ids.ID
+	lastAcceptedID ids.ID
+	notableIDsDB   *prefixdb.Database
 }
 
 func newState(vm *VM) *innerState {
 	res := innerState{
-		vm:             vm,
-		baseDB:         nil,
-		knownProBlocks: make(map[ids.ID]*ProposerBlock),
-		proBlkDB:       nil,
-		wrpdToProID:    make(map[ids.ID]ids.ID),
-		wrpdToProIDDB:  nil,
+		vm:           vm,
+		baseDB:       nil,
+		proBlkDB:     nil,
+		notableIDsDB: nil,
 	}
+	res.wipeCache()
 	return &res
 }
 
 func (is *innerState) init(db database.Database) {
 	is.baseDB = versiondb.New(db)
 	is.proBlkDB = prefixdb.New(blockPrefix, db)
-	is.wrpdToProIDDB = prefixdb.New(wrpdToProID, db)
+	is.notableIDsDB = prefixdb.New(notableIDPrefix, db)
+}
+
+func (is *innerState) wipeCache() {
+	is.knownProBlocks = make(map[ids.ID]*ProposerBlock)
+	is.proGenID = ids.Empty
+	is.preferredID = ids.Empty
+	is.lastAcceptedID = ids.Empty
 }
 
 func (is *innerState) cacheProBlk(blk *ProposerBlock) {
 	is.knownProBlocks[blk.ID()] = blk
-	is.wrpdToProID[blk.coreBlk.ID()] = blk.ID()
 }
 
 func (is *innerState) wipeFromCacheProBlk(id ids.ID) {
-	if blk, ok := is.knownProBlocks[id]; ok {
-		delete(is.wrpdToProID, blk.coreBlk.ID())
-		delete(is.knownProBlocks, id)
+	delete(is.knownProBlocks, id)
+
+	switch id {
+	case is.proGenID:
+		is.proGenID = ids.Empty
+	case is.preferredID:
+		is.preferredID = ids.Empty
+	case is.lastAcceptedID:
+		is.lastAcceptedID = ids.Empty
 	}
 }
 
 func (is *innerState) commitBlk(blk *ProposerBlock) error {
 	defer is.baseDB.Abort()
 	if err := is.proBlkDB.Put(blk.id[:], blk.bytes); err != nil {
-		is.wipeFromCacheProBlk(blk.ID())
-		return err
-	}
-
-	wrpdID := blk.coreBlk.ID()
-	value := is.wrpdToProID[wrpdID]
-	if err := is.wrpdToProIDDB.Put(wrpdID[:], value[:]); err != nil {
 		is.wipeFromCacheProBlk(blk.ID())
 		return err
 	}
@@ -105,23 +119,135 @@ func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
 	return &proBlk, nil
 }
 
-func (is *innerState) getBlockFromWrappedBlkID(wrappedID ids.ID) (*ProposerBlock, error) {
-	if proID, ok := is.wrpdToProID[wrappedID]; ok {
-		return is.knownProBlocks[proID], nil
-	}
+func (is *innerState) storeProGenID(id ids.ID) error {
+	defer is.baseDB.Abort()
+	currentGenID := is.proGenID
 
-	proIDBytes, err := is.wrpdToProIDDB.Get(wrappedID[:])
+	if err := is.notableIDsDB.Put(proGenIDKey, id[:]); err != nil {
+		is.proGenID = currentGenID
+		return err
+	}
+	batch, err := is.baseDB.CommitBatch()
 	if err != nil {
-		return nil, ErrProBlkNotFound
+		is.proGenID = currentGenID
+		return err
 	}
 
-	var proID ids.ID
-	copy(proID[:], proIDBytes)
+	if err := batch.Write(); err != nil {
+		is.proGenID = currentGenID
+		return err
+	}
 
-	return is.getProBlock(proID)
+	is.proGenID = id
+	return nil
 }
 
-func (is *innerState) wipeCache() { // useful for UTs
-	is.knownProBlocks = make(map[ids.ID]*ProposerBlock)
-	is.wrpdToProID = make(map[ids.ID]ids.ID)
+func (is *innerState) getProGenesisBlk() (*ProposerBlock, error) {
+	if !bytes.Equal(is.proGenID[:], ids.Empty[:]) {
+		return is.getProBlock(is.proGenID)
+	}
+
+	// not in memory, attempt retrieving it from db
+	proGenAvail, err := is.notableIDsDB.Has(proGenIDKey)
+	if err != nil {
+		return nil, err // could not query DB
+	}
+	if !proGenAvail {
+		return nil, ErrGenesisNotFound
+	}
+	proGenBytes, err := is.notableIDsDB.Get(proGenIDKey)
+	if err != nil {
+		return nil, err
+	}
+	copy(is.proGenID[:], proGenBytes)
+	return is.getProBlock(is.proGenID)
+}
+
+func (is *innerState) storePreference(id ids.ID) error {
+	defer is.baseDB.Abort()
+	currPrefID := is.preferredID
+
+	if err := is.notableIDsDB.Put(preferredIDKey, id[:]); err != nil {
+		is.preferredID = currPrefID
+		return err
+	}
+	batch, err := is.baseDB.CommitBatch()
+	if err != nil {
+		is.preferredID = currPrefID
+		return err
+	}
+
+	if err := batch.Write(); err != nil {
+		is.preferredID = currPrefID
+		return err
+	}
+
+	is.preferredID = id
+	return nil
+}
+
+func (is *innerState) getPreferredID() (ids.ID, error) {
+	if !bytes.Equal(is.preferredID[:], ids.Empty[:]) {
+		return is.preferredID, nil
+	}
+
+	// not in memory, attempt retrieving it from db
+	proPrefID, err := is.notableIDsDB.Has(preferredIDKey)
+	if err != nil {
+		return ids.Empty, err // could not query DB
+	}
+	if !proPrefID {
+		return ids.Empty, ErrPreferredIDNotFound
+	}
+	proPrefBytes, err := is.notableIDsDB.Get(proGenIDKey)
+	if err != nil {
+		return ids.Empty, err
+	}
+	copy(is.proGenID[:], proPrefBytes)
+	return is.preferredID, nil
+}
+
+func (is *innerState) storeLastAcceptedID(id ids.ID) error {
+	defer is.baseDB.Abort()
+	currLastAcceptedID := is.lastAcceptedID
+
+	if err := is.notableIDsDB.Put(lastAcceptedIDKey, id[:]); err != nil {
+		is.lastAcceptedID = currLastAcceptedID
+		return err
+	}
+	batch, err := is.baseDB.CommitBatch()
+	if err != nil {
+		is.lastAcceptedID = currLastAcceptedID
+		return err
+	}
+
+	if err := batch.Write(); err != nil {
+		is.lastAcceptedID = currLastAcceptedID
+		return err
+	}
+
+	is.lastAcceptedID = id
+	return nil
+}
+
+func (is *innerState) getLastAcceptedID() (ids.ID, error) {
+	if !bytes.Equal(is.lastAcceptedID[:], ids.Empty[:]) {
+		return is.lastAcceptedID, nil
+	}
+
+	// not in memory, attempt retrieving it from db
+	key := lastAcceptedIDKey
+	proAcceptedID, err := is.notableIDsDB.Has(key)
+	if err != nil {
+		return ids.Empty, err // could not query DB
+	}
+	if !proAcceptedID {
+		return ids.Empty, ErrLastAcceptedIDNotFound
+	}
+	proPrefBytes, err := is.notableIDsDB.Get(key)
+	if err != nil {
+		return ids.Empty, err
+	}
+	copy(is.proGenID[:], proPrefBytes)
+	return is.preferredID, nil
 }

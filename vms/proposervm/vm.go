@@ -3,6 +3,7 @@ package proposervm
 // VM is a decorator for a snowman.ChainVM struct, created to handle block headers introduced with snowman++
 
 // Contract
+// TODO: coreVM MUST build blocks on top of currently preferred block
 // * After initialization. full ProposerBlocks (proHeader + core block) are stored in proposervm.VM's db
 // on Build/ParseBlock calls, AFTER calls to core vm's Build/ParseBlock, which we ASSUME
 //  would store core block on core VM's db.
@@ -30,7 +31,7 @@ import (
 )
 
 var (
-	genesisParentID      = ids.ID{}
+	genesisParentID      = ids.Empty
 	NoProposerBlocks     = time.Unix(1<<63-62135596801, 999999999)
 	ErrCannotSignWithKey = errors.New("unable to use key to sign proposer blocks")
 )
@@ -52,7 +53,7 @@ type VM struct {
 	windower
 	clock
 	stakingCert     tls.Certificate
-	fromWrappedVM   chan common.Message
+	fromCoreVM      chan common.Message
 	toEngine        chan<- common.Message
 	proBlkStartTime time.Time
 }
@@ -61,7 +62,7 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 	res := VM{
 		ChainVM:         vm,
 		clock:           clockImpl{},
-		fromWrappedVM:   nil,
+		fromCoreVM:      nil,
 		toEngine:        nil,
 		proBlkStartTime: proBlkStart,
 	}
@@ -70,7 +71,7 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 }
 
 func (vm *VM) handleBlockTiming() {
-	msg := <-vm.fromWrappedVM
+	msg := <-vm.fromCoreVM
 	vm.toEngine <- msg
 }
 
@@ -103,38 +104,49 @@ func (vm *VM) Initialize(
 	if vm.now().After(vm.proBlkStartTime) {
 		// proposerVM intercepts VM events for blocks and times event relay to consensus
 		vm.toEngine = toEngine
-		vm.fromWrappedVM = make(chan common.Message, len(toEngine))
+		vm.fromCoreVM = make(chan common.Message, len(toEngine))
 
 		// Assuming genesisBytes has not proposerBlockHeader
 		if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
-			configBytes, vm.fromWrappedVM, fxs); err != nil {
+			configBytes, vm.fromCoreVM, fxs); err != nil {
 			return err
 		}
 
-		// Store genesis
-		genesisID, err := vm.ChainVM.LastAccepted()
-		if err != nil {
-			return err
-		}
-
-		if _, err := vm.state.getBlockFromWrappedBlkID(genesisID); err != nil {
-			// genesis not stored
-			genesisBlk, err := vm.ChainVM.GetBlock(genesisID)
+		_, err := vm.state.getProGenesisBlk()
+		switch err {
+		case ErrGenesisNotFound:
+			// rebuild genesis and store it
+			coreGenID, err := vm.ChainVM.LastAccepted()
 			if err != nil {
 				return err
 			}
-
-			hdr := NewProHeader(genesisParentID, genesisBlk.Timestamp().Unix(), 0, x509.Certificate{})
-			proGenBlk, _ := NewProBlock(vm, hdr, genesisBlk, nil, false) // not signing block, cannot err
-
+			coreGenBlk, err := vm.ChainVM.GetBlock(coreGenID)
+			if err != nil {
+				return err
+			}
+			proGenHdr := NewProHeader(genesisParentID, coreGenBlk.Timestamp().Unix(), 0, x509.Certificate{})
+			proGenBlk, _ := NewProBlock(vm, proGenHdr, coreGenBlk, nil, false) // not signing block, cannot err
 			// Skipping verification for genesis block.
+			// TODO: in case genesis is rebuilt, make sure it is the last accepted
+			if err := vm.state.storeProGenID(proGenBlk.ID()); err != nil {
+				return err
+			}
+			if err := vm.state.storePreference(proGenBlk.ID()); err != nil {
+				return err
+			}
+			if err := vm.state.storeLastAcceptedID(proGenBlk.ID()); err != nil {
+				return err
+			}
 			vm.state.cacheProBlk(&proGenBlk)
 			if err := vm.state.commitBlk(&proGenBlk); err != nil {
 				return err
 			}
-
-			go vm.handleBlockTiming()
+		case nil: // keep going
+		default:
+			return err
 		}
+
+		go vm.handleBlockTiming()
 	} else if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
 		configBytes, toEngine, fxs); err != nil {
 		return err
@@ -152,7 +164,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
 	if vm.now().After(vm.proBlkStartTime) {
-		proParent, err := vm.state.getBlockFromWrappedBlkID(sb.Parent().ID())
+		proParentID, err := vm.state.getPreferredID()
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +173,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		hdr := NewProHeader(proParent.ID(), sb.Timestamp().Unix(), h, *vm.stakingCert.Leaf)
+		hdr := NewProHeader(proParentID, sb.Timestamp().Unix(), h, *vm.stakingCert.Leaf)
 		proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
 		if err != nil {
 			return nil, err
@@ -221,24 +233,40 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 func (vm *VM) SetPreference(id ids.ID) error {
-	if proBlk, err := vm.state.getProBlock(id); err == nil {
-		return vm.ChainVM.SetPreference(proBlk.coreBlk.ID())
+	currPrefID, err := vm.state.getPreferredID()
+	switch err {
+	case nil:
+		proBlk, err := vm.state.getProBlock(id)
+		if err != nil {
+			return err
+		}
+		if err := vm.state.storePreference(id); err != nil {
+			return err
+		}
+		if err := vm.ChainVM.SetPreference(proBlk.coreBlk.ID()); err != nil {
+			// attempt restoring previous proposer block reference and return error
+			if err := vm.state.storePreference(currPrefID); err != nil {
+				// TODO log
+				return err
+			}
+			return err
+		}
+		return nil
+	case ErrPreferredIDNotFound: // pre snowman++ case
+		return vm.ChainVM.SetPreference(id)
+	default:
+		return err
 	}
-
-	// check whether block is core one, with no proposerBlockHeader
-	return vm.ChainVM.SetPreference(id)
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	coreID, err := vm.ChainVM.LastAccepted()
-	if err != nil {
-		return ids.ID{}, err
+	res, err := vm.state.getLastAcceptedID()
+	switch err {
+	case nil:
+		return res, nil
+	case ErrLastAcceptedIDNotFound: // pre snowman++ case
+		return vm.ChainVM.LastAccepted()
+	default:
+		return res, err
 	}
-
-	if proBlk, err := vm.state.getBlockFromWrappedBlkID(coreID); err == nil {
-		return proBlk.ID(), nil
-	}
-
-	// no proposerBlock wrapping core block; return coreID
-	return coreID, nil
 }
