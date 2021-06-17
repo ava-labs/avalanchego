@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"sync"
 
@@ -59,7 +60,8 @@ import (
 
 // Networking constants
 const (
-	TCP = "tcp"
+	TCP           = "tcp"
+	EVMPluginFile = "evm"
 )
 
 var (
@@ -655,7 +657,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Fee:         n.Config.TxFee,
 		}),
 		n.vmManager.RegisterFactory(evm.ID, &rpcchainvm.Factory{
-			Path: filepath.Join(n.Config.PluginDir, "evm"),
+			Path: filepath.Join(n.Config.PluginDir, EVMPluginFile),
 		}),
 		n.vmManager.RegisterFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
@@ -666,8 +668,43 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return errs.Err
 	}
 
+	if err := n.registerCustomRPCVMs(); err != nil {
+		return err
+	}
+
 	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(&n.APIServer)
+	return nil
+}
+
+func (n *Node) registerCustomRPCVMs() error {
+	files, err := os.ReadDir(n.Config.PluginDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		// skip evm plugin
+		if file.IsDir() || file.Name() == EVMPluginFile {
+			continue
+		}
+
+		// use file name as ID input
+		var bytes [32]byte
+		copy(bytes[:], file.Name())
+
+		vmID := ids.ID(bytes)
+
+		if err = n.vmManager.RegisterFactory(vmID, &rpcchainvm.Factory{
+			Path: filepath.Join(n.Config.PluginDir, file.Name()),
+		}); err != nil {
+			return err
+		}
+
+		if err = n.vmManager.Alias(vmID, file.Name()); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
