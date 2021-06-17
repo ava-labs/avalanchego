@@ -8,8 +8,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/sampler"
+
+	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
 
 func Simulate(

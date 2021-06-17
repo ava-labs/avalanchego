@@ -70,9 +70,7 @@ func (s *uniformResample) Next() (uint64, error) {
 	}
 
 	for {
-		// We don't use a cryptographically secure source of randomness here, as
-		// there's no need to ensure a truly random sampling.
-		draw := uint64(s.rng.Int63n(int64(s.length))) // #nosec G404
+		draw := uint64(s.rng.Int63n(int64(s.length)))
 		if _, ok := s.drawn[draw]; ok {
 			continue
 		}

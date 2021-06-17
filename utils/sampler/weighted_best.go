@@ -47,11 +47,7 @@ func (s *weightedBest) Initialize(weights []uint64) error {
 	if totalWeight > 0 {
 		samples = make([]uint64, s.benchmarkIterations)
 		for i := range samples {
-			// We don't need cryptographically secure random number generation
-			// here, as the generated numbers are only used to perform an
-			// optimistic benchmark. Which means the results could be arbitrary
-			// and the correctness of the implementation wouldn't be effected.
-			samples[i] = uint64(globalRNG.Int63n(int64(totalWeight))) // #nosec G404
+			samples[i] = uint64(globalRNG.Int63n(int64(totalWeight)))
 		}
 	}
 
