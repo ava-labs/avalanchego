@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -23,22 +21,24 @@ import (
 // Handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
 type Handler struct {
-	ctx     *snow.Context
+	ctx *snow.Context
+	// Useful for faking time in tests
 	clock   timer.Clock
 	metrics handlerMetrics
 	// The validator set that validates this chain
 	validators validators.Set
-	engine     common.Engine
-
-	// Closed when this handler and [engine]
-	// are done shutting down
-	closed        chan struct{}
+	// The consensus engine
+	engine common.Engine
+	// Closed when this handler and [engine] are done shutting down
+	closed chan struct{}
+	// Receives messages from the VM
 	msgFromVMChan <-chan common.Message
-	cpuTracker    tracker.TimeTracker
+	// Tracks CPU time spent processing messages from each node
+	cpuTracker tracker.TimeTracker
 	// Called in a goroutine when this handler/engine shuts down.
 	// May be nil.
-	onCloseF        func()
-	closing         utils.AtomicBool
+	onCloseF func()
+	// Holds messages that [engine] hasn't processed yet
 	unprocessedMsgs unprocessedMsgs
 }
 
@@ -91,10 +91,10 @@ func (h *Handler) Dispatch() {
 	cond := h.unprocessedMsgs.Cond()
 	for {
 		cond.L.Lock()
-		for h.unprocessedMsgs.Len() == 0 && !h.closing.GetValue() {
+		for h.unprocessedMsgs.Len() == 0 && !h.unprocessedMsgs.HasShutdown() {
 			cond.Wait()
 		}
-		if h.closing.GetValue() {
+		if h.unprocessedMsgs.HasShutdown() {
 			cond.L.Unlock()
 			return
 		}
@@ -506,7 +506,6 @@ func (h *Handler) Notify(msg common.Message) {
 // [h] should not be invoked again after calling this method.
 // [h.closed] is closed when done shutting down.
 func (h *Handler) StartShutdown() {
-	h.closing.SetValue(true)
 	h.unprocessedMsgs.Shutdown()
 	h.engine.Halt()
 }

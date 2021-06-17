@@ -23,7 +23,11 @@ type unprocessedMsgs interface {
 	// Returns a condition variable that is signalled when
 	// there are unprocessed messages or when Shutdown is called
 	Cond() *sync.Cond
+	// Signals the condition variable returned by Cond()
+	// and causes HasShutdown() to return true
 	Shutdown()
+	// Returns true iff Shutdown() has been called
+	HasShutdown() bool
 }
 
 func newUnprocessedMsgs(vdrs validators.Set, cpuTracker tracker.TimeTracker) unprocessedMsgs {
@@ -45,6 +49,8 @@ type unprocessedMsgsImpl struct {
 	// Useful for faking time in tests
 	clock timer.Clock
 	cond  sync.Cond
+	// true iff Shutdown() has been called
+	hasShutdown bool
 }
 
 func (u *unprocessedMsgsImpl) Push(msg message) {
@@ -54,6 +60,11 @@ func (u *unprocessedMsgsImpl) Push(msg message) {
 
 func (u *unprocessedMsgsImpl) Shutdown() {
 	u.cond.Signal()
+	u.hasShutdown = true
+}
+
+func (u *unprocessedMsgsImpl) HasShutdown() bool {
+	return u.hasShutdown
 }
 
 // Must only be called when [u.Len()] != 0
