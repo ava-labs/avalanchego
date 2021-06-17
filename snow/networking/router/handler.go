@@ -296,7 +296,6 @@ func (h *Handler) Accepted(
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
 // network to the consensus engine.
 func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) {
-	// TODO mark as reliable?
 	h.unprocessedMsgs.Push(message{
 		messageType: constants.GetAcceptedFailedMsg,
 		validatorID: validatorID,
@@ -342,7 +341,6 @@ func (h *Handler) MultiPut(
 
 // GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
 func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
-	// TODO mark as reliable?
 	h.unprocessedMsgs.Push(message{
 		messageType: constants.GetAncestorsFailedMsg,
 		validatorID: validatorID,
@@ -397,7 +395,6 @@ func (h *Handler) Put(
 
 // GetFailed passes a GetFailed message to the consensus engine.
 func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
-	// TODO mark as reliable?
 	h.unprocessedMsgs.Push(message{
 		messageType: constants.GetFailedMsg,
 		validatorID: validatorID,
@@ -459,7 +456,6 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.I
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.
 func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
-	// TODO mark as reliable?
 	h.unprocessedMsgs.Push(message{
 		messageType: constants.QueryFailedMsg,
 		validatorID: validatorID,
@@ -526,18 +522,6 @@ func (h *Handler) shutdownDispatch() {
 	h.metrics.shutdown.Observe(float64(endTime.Sub(startTime)))
 	close(h.closed)
 }
-
-// func (h *Handler) sendReliableMsg(msg message) {
-// 	h.reliableMsgsLock.Lock()
-// 	defer h.reliableMsgsLock.Unlock()
-
-// 	h.metrics.pending.Inc()
-// 	h.reliableMsgs = append(h.reliableMsgs, msg)
-// 	select {
-// 	case h.reliableMsgsSignalChan <- struct{}{}:
-// 	default:
-// 	}
-// }
 
 func (h *Handler) endInterval() {
 	now := h.clock.Time()
