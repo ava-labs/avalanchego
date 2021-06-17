@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"net"
 	"sync"
@@ -289,7 +290,7 @@ func (p *peer) ReadMessages() {
 		if p.gzipEnabled && len(msgBytes) > 2 && msgBytes[0] == 31 && msgBytes[1] == 139 {
 			// this msg is gzipped
 			compressedMsgLen := len(msgBytes)
-			p.net.log.Debug("Reading gzipped message, len=%d", compressedMsgLen)
+			// p.net.log.Debug("Reading gzipped message, len=%d", compressedMsgLen)
 			byteReader := bytes.NewReader(msgBytes)
 			gzipReader, err := gzip.NewReader(byteReader)
 			if err != nil {
@@ -297,18 +298,16 @@ func (p *peer) ReadMessages() {
 				return
 			}
 
-			var inflatedMsg []byte
-			var bytesRead uint
-			scanner := bufio.NewScanner(gzipReader)
-			for scanner.Scan() {
-				deflatedBytes := scanner.Bytes()
-				bytesRead += uint(len(deflatedBytes))
-				inflatedMsg = append(inflatedMsg, deflatedBytes...)
+			inflatedMsg, err := ioutil.ReadAll(gzipReader)
+			if err != nil {
+				p.net.log.Error("Error reading bytes: %s", err)
 			}
 
-			p.net.log.Debug("Read gzipped message, compLen=%d, read=%d, msgLen=%d", compressedMsgLen, bytesRead, len(inflatedMsg))
+			p.net.log.Debug("Read gzipped message, compLen=%d, msgLen=%d", compressedMsgLen, len(inflatedMsg))
 
 			msgBytes = inflatedMsg
+		} else {
+			p.net.log.Debug("Read non-compressed message, msgLen=%d", len(msgBytes))
 		}
 
 		p.net.log.Verbo("parsing new message from %s:\n%s",
