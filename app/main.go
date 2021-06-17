@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/version"
 
 	appPlugin "github.com/ava-labs/avalanchego/app/plugin"
 )
@@ -26,14 +27,25 @@ var GitCommit string
 // If specified in the config, serves a hashicorp plugin that can be consumed by
 // the daemon (see avalanchego/main).
 func main() {
-	nodeConfig, processConfig, err := config.GetConfigs(GitCommit)
+	fs := config.BuildFlagSet()
+	v, err := config.BuildViper(fs, os.Args[1:])
 	if err != nil {
-		fmt.Printf("couldn't get node config: %s\n", err)
+		fmt.Printf("couldn't configure flags: %s\n", err)
+		os.Exit(1)
+	}
+	processConfig, err := config.GetProcessConfig(v)
+	if err != nil {
+		fmt.Printf("couldn't load process config: %s\n", err)
+		os.Exit(1)
+	}
+	nodeConfig, err := config.GetNodeConfig(v, processConfig.BuildDir)
+	if err != nil {
+		fmt.Printf("couldn't load node config: %s\n", err)
 		os.Exit(1)
 	}
 
 	if processConfig.DisplayVersionAndExit {
-		fmt.Print(processConfig.VersionStr)
+		fmt.Print(version.String(GitCommit))
 		os.Exit(0)
 	}
 
