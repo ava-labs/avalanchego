@@ -12,6 +12,8 @@ const (
 	minCacheSize = 32
 )
 
+var _ Cacher = &LRU{}
+
 type entry struct {
 	Key   interface{}
 	Value interface{}

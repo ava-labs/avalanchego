@@ -12,7 +12,10 @@ const (
 	defaultAppSeparator = "/"
 )
 
-var errDifferentApps = errors.New("different applications")
+var (
+	errDifferentApps             = errors.New("different applications")
+	_                Application = &application{}
+)
 
 // Application defines what is needed to describe a versioned
 // Application.

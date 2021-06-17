@@ -7,6 +7,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &Batch{}
+)
+
 // Database is a lightning fast key value store with probabilistic operations.
 type Database struct{}
 

@@ -18,6 +18,11 @@ const (
 	iterativeDeleteThreshold = 512
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+)
+
 // Database implements the Database interface by living on top of another
 // database, writing changes to the underlying database only when commit is
 // called.

@@ -48,7 +48,10 @@ const (
 	defaultChannelSize = 1024
 )
 
-var BootstrappedKey = []byte{0x00}
+var (
+	BootstrappedKey         = []byte{0x00}
+	_               Manager = &manager{}
+)
 
 // Manager manages the chains running on this node.
 // It can:

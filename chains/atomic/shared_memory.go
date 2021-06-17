@@ -23,6 +23,8 @@ var (
 	largerIndexPrefix  = []byte{3}
 
 	errDuplicatedOperation = errors.New("duplicated operation on provided value")
+
+	_ SharedMemory = &sharedMemory{}
 )
 
 type dbElement struct {
