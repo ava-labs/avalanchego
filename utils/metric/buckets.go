@@ -1,14 +1,15 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package utils
+package metric
 
 import (
 	"time"
 )
 
-// Useful latency buckets
 var (
+	// Useful latency buckets
+
 	MillisecondsBuckets = []float64{
 		10,    // 10 ms is ~ instant
 		100,   // 100 ms
@@ -41,10 +42,9 @@ var (
 		5000, // 5 seconds - bad
 		// anything larger than 5 seconds will be bucketed together
 	}
-)
 
-// Useful bytes buckets
-var (
+	// Useful bytes buckets
+
 	BytesBuckets = []float64{
 		1 << 8,
 		1 << 10, // 1 KiB
