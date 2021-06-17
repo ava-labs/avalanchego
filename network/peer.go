@@ -16,8 +16,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -394,8 +392,8 @@ func (p *peer) WriteMessages() {
 const compressionThresholdBytes = 128
 
 // compress compresses given msg bytes if larger than 128 bytes
-// in case of any errors, we return the original data uncompressed
-func compress(op string, msg []byte, log logging.Logger) []byte {
+// in case of any errors, we log and return the original data uncompressed
+func (p *peer) compress(op string, msg []byte) []byte {
 	msgLen := len(msg)
 
 	if msgLen < compressionThresholdBytes {
@@ -407,24 +405,24 @@ func compress(op string, msg []byte, log logging.Logger) []byte {
 	gWriter := gzip.NewWriter(&b)
 	_, err := gWriter.Write(msg)
 	if err != nil {
-		log.Error("Error compressing data: %s", err)
+		p.net.log.Error("Error compressing data: %s", err)
 		return msg
 	}
 
 	err = gWriter.Flush()
 	if err != nil {
-		log.Error("Error flushing gzip writer: %s", err)
+		p.net.log.Error("Error flushing gzip writer: %s", err)
 		return msg
 	}
 
 	err = gWriter.Close()
 	if err != nil {
-		log.Error("Error closing gzip writer: %s", err)
+		p.net.log.Error("Error closing gzip writer: %s", err)
 		return msg
 	}
 
 	compMsgSize := b.Len()
-	log.Debug("packed message op, len, compLen, t \t %s, %d, %d, %d",
+	p.net.log.Debug("packed message op, len, compLen, t \t %s, %d, %d, %d",
 		op,
 		msgLen,
 		compMsgSize,
@@ -456,7 +454,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 
 	msgBytes := msg.Bytes()
 	if compressMsg && p.gzipEnabled {
-		msgBytes = compress(msg.Op().String(), msgBytes, p.net.log)
+		msgBytes = p.compress(msg.Op().String(), msgBytes)
 	}
 
 	msgBytesLen := int64(len(msgBytes))
@@ -685,7 +683,7 @@ func (p *peer) sendGetPeerList() {
 
 	t1 := time.Now()
 	msgBytes := msg.Bytes()
-	compMsgBytes := compress(msg.Op().String(), msgBytes, p.net.log)
+	compMsgBytes := p.compress(msg.Op().String(), msgBytes)
 
 	lenMsg := len(msgBytes)
 	lenCompMsg := len(compMsgBytes)
@@ -718,7 +716,7 @@ func (p *peer) sendPeerList() {
 	t1 := time.Now()
 	msgBytes := msg.Bytes()
 	lenMsg := len(msgBytes)
-	compMsg := compress(msg.Op().String(), msgBytes, p.net.log)
+	compMsg := p.compress(msg.Op().String(), msgBytes)
 	lenCompMsg := len(compMsg)
 	p.net.log.Debug("compression: op,len,compLen,time SendPeerList,%d,%d,%d", lenMsg, lenCompMsg, time.Since(t1).Nanoseconds())
 
