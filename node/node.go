@@ -7,8 +7,8 @@ import (
 	"crypto"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
-	"os"
 	"path/filepath"
 	"sync"
 
@@ -678,7 +678,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 }
 
 func (n *Node) registerCustomRPCVMs() error {
-	files, err := os.ReadDir(n.Config.PluginDir)
+	files, err := ioutil.ReadDir(n.Config.PluginDir)
 	if err != nil {
 		return err
 	}
