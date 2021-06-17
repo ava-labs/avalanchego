@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metervm
@@ -15,21 +15,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-var _ block.ChainVM = &BlockVM{}
+var _ block.ChainVM = &blockVM{}
 
 func NewBlockVM(vm block.ChainVM) block.ChainVM {
-	return &BlockVM{
+	return &blockVM{
 		ChainVM: vm,
 	}
 }
 
-type BlockVM struct {
+type blockVM struct {
 	block.ChainVM
 	blockMetrics
 	clock timer.Clock
 }
 
-func (vm *BlockVM) Initialize(
+func (vm *blockVM) Initialize(
 	ctx *snow.Context,
 	db manager.Manager,
 	genesisBytes,
@@ -45,7 +45,7 @@ func (vm *BlockVM) Initialize(
 	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs)
 }
 
-func (vm *BlockVM) BuildBlock() (snowman.Block, error) {
+func (vm *blockVM) BuildBlock() (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.BuildBlock()
 	end := vm.clock.Time()
@@ -53,7 +53,7 @@ func (vm *BlockVM) BuildBlock() (snowman.Block, error) {
 	return blk, err
 }
 
-func (vm *BlockVM) ParseBlock(b []byte) (snowman.Block, error) {
+func (vm *blockVM) ParseBlock(b []byte) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.ParseBlock(b)
 	end := vm.clock.Time()
@@ -61,7 +61,7 @@ func (vm *BlockVM) ParseBlock(b []byte) (snowman.Block, error) {
 	return blk, err
 }
 
-func (vm *BlockVM) GetBlock(id ids.ID) (snowman.Block, error) {
+func (vm *blockVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.GetBlock(id)
 	end := vm.clock.Time()
@@ -69,7 +69,7 @@ func (vm *BlockVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	return blk, err
 }
 
-func (vm *BlockVM) SetPreference(id ids.ID) error {
+func (vm *blockVM) SetPreference(id ids.ID) error {
 	start := vm.clock.Time()
 	err := vm.ChainVM.SetPreference(id)
 	end := vm.clock.Time()
@@ -77,7 +77,7 @@ func (vm *BlockVM) SetPreference(id ids.ID) error {
 	return err
 }
 
-func (vm *BlockVM) LastAccepted() (ids.ID, error) {
+func (vm *blockVM) LastAccepted() (ids.ID, error) {
 	start := vm.clock.Time()
 	lastAcceptedID, err := vm.ChainVM.LastAccepted()
 	end := vm.clock.Time()
