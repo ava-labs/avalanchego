@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
+
 	"github.com/gorilla/handlers"
 
 	"github.com/rs/cors"
@@ -76,7 +78,7 @@ func (s *Server) Initialize(
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
 	})
-	s.handler = corsWrapper.Handler(s.router)
+	s.handler = gziphandler.GzipHandler(corsWrapper.Handler(s.router))
 
 	for _, wrapper := range wrappers {
 		s.handler = wrapper.WrapHandler(s.handler)
