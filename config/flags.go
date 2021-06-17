@@ -63,7 +63,6 @@ func addProcessFlags(fs *flag.FlagSet) {
 	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
 }
 
-// NewFlagSet returns the complete set of flags for avalanchego
 func addNodeFlags(fs *flag.FlagSet) {
 	// Fetch only mode
 	fs.Bool(FetchOnlyKey, false, "If true, bootstrap the current database version then stop")
