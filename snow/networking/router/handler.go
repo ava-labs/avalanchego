@@ -511,7 +511,7 @@ func (h *Handler) shutdownDispatch() {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()
 
-	startTime := time.Now()
+	startTime := h.clock.Time()
 	if err := h.engine.Shutdown(); err != nil {
 		h.ctx.Log.Error("Error while shutting down the chain: %s", err)
 	}
