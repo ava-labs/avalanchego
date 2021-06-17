@@ -506,7 +506,7 @@ func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
 // Test marshalling a pointer to an interface
 func TestPointerToInterface(codec GeneralCodec, t testing.TB) {
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
-	var myPtr *Foo = &myinnerStruct
+	myPtr := &myinnerStruct
 
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)
