@@ -62,7 +62,7 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 		TimestampV: proVM.now(),
 	}
 	proHdr := NewProHeader(ids.Empty.Prefix(8), newBlk.Timestamp().Unix(), 100, *pTestCert.Leaf)
-	proBlk, _ := NewProBlock(proVM, proHdr, newBlk, nil, false) // not signing block, cannot err
+	proBlk, _ := NewProBlock(proVM, proHdr, newBlk, choices.Processing, nil, false) // not signing block, cannot err
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -90,7 +90,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 		TimestampV: proVM.now(),
 	}
 	proHdr := NewProHeader(ids.Empty.Prefix(8), coreBlk.Timestamp().Unix(), 0, *pTestCert.Leaf)
-	proBlk, _ := NewProBlock(proVM, proHdr, coreBlk, nil, false) // not signing block, cannot err
+	proBlk, _ := NewProBlock(proVM, proHdr, coreBlk, choices.Processing, nil, false) // not signing block, cannot err
 
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -122,7 +122,7 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	prntCoreBlk := snowman.TestBlock{}
 	prntProHdr := NewProHeader(ids.Empty, 0, pCH, *pTestCert.Leaf)
 	prntProBlk, err := NewProBlock(proVM,
-		prntProHdr, &prntCoreBlk, nil, true)
+		prntProHdr, &prntCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
 	}
@@ -131,7 +131,7 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 		ParentV: &prntCoreBlk,
 	}
 	childProHdr := NewProHeader(prntProBlk.ID(), 0, pCH, *pTestCert.Leaf)
-	childProBlk, err := NewProBlock(proVM, childProHdr, &childCoreBlk, nil, true)
+	childProBlk, err := NewProBlock(proVM, childProHdr, &childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
 	}
@@ -168,7 +168,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	prntCoreBlk := snowman.TestBlock{}
 	parentProBlk, err := NewProBlock(proVM,
 		NewProHeader(ids.Empty, prntTimestamp, pCH, *pTestCert.Leaf),
-		&prntCoreBlk, nil, true)
+		&prntCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign parent block")
 	}
@@ -185,7 +185,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(parentProBlk.ID(),
 			timeBeforeParent,
 			pCH, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -204,7 +204,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(parentProBlk.ID(),
 			firstWindowsStart,
 			pCH, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -222,7 +222,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(parentProBlk.ID(),
 			beforeWindowStart,
 			pCH, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -237,7 +237,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(parentProBlk.ID(),
 			atWindowStart,
 			pCH, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -252,7 +252,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(parentProBlk.ID(),
 			afterWindowStart,
 			pCH, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -266,7 +266,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(parentProBlk.ID(),
 			AtSubWindowEnd,
 			pCH, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -280,7 +280,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		NewProHeader(parentProBlk.ID(),
 			afterSubWinEnd,
 			pCH, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -301,7 +301,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	prntCoreBlk := snowman.TestBlock{}
 	parentProBlk, err := NewProBlock(proVM,
 		NewProHeader(ids.Empty, 0, prntBlkPChainHeight, *pTestCert.Leaf),
-		&prntCoreBlk, nil, true)
+		&prntCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -315,7 +315,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	}
 	childProBlk, err := NewProBlock(proVM,
 		NewProHeader(parentProBlk.ID(), 0, prntBlkPChainHeight-1, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -329,7 +329,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	// child P-Chain height can be equal to parent P-Chain height
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(parentProBlk.ID(), 0, prntBlkPChainHeight, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -340,7 +340,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	// child P-Chain height may follow parent P-Chain height
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(parentProBlk.ID(), 0, prntBlkPChainHeight+1, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -352,7 +352,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	currPChainHeight, _ := proVM.pChainHeight()
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(parentProBlk.ID(), 0, currPChainHeight, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -363,7 +363,7 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	// block P-Chain height cannot be larger than current P-Chain height
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(parentProBlk.ID(), 0, currPChainHeight+1, *pTestCert.Leaf),
-		&childCoreBlk, nil, true)
+		&childCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign child block")
 	}
@@ -440,7 +440,7 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 
 	proGenBlkID, _ := proVM.LastAccepted()
 	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, nil, true)
+	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -449,7 +449,7 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	}
 
 	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, nil, true)
+	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -473,5 +473,188 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 		t.Fatal("could not retrieve last accepted block")
 	} else if acceptedID != proBlk1.ID() {
 		t.Fatal("unexpected last accepted ID")
+	}
+}
+
+func TestProAndCoreBlockAccept_SimpleCase(t *testing.T) {
+	// there is just one ProBlock with no siblings being accepted
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	currentPChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+
+	// generate one proposer block...
+	coreVM.CantBuildBlock = true
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2021),
+			StatusV: choices.Processing,
+		},
+		ParentV: coreGenBlk,
+		VerifyV: nil,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	proBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk.Status() != choices.Processing {
+		t.Fatal("Newly built pro blocks must have processing status")
+	}
+
+	// ..accept it and check that both it and its core block are accepted
+	if err := proBlk.Accept(); err != nil {
+		t.Fatal("Could not accept proposer block")
+	}
+
+	if proBlk.Status() != choices.Accepted {
+		t.Fatal("accepted pro block has wrong status")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("accepted core block has wrong status")
+	}
+}
+
+func TestProAndCoreBlockAccept_BlockConflict(t *testing.T) {
+	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings;
+	// Once proBlk1 is accepted, proBlk2 is rejected
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	currentPChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+
+	// generate proBlk1 and proBlk2 with different coreBlocks
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreBlk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2222),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("test requires proBlk1 different from proBlk2")
+	}
+
+	// ..accept proBlk2 and check that proBlk2 is accepted and proBlk1 rejected
+	if err := proBlk2.Accept(); err != nil {
+		t.Fatal("Could not accept proposer block")
+	}
+
+	if proBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+}
+
+func TestProAndCoreBlockAccept_ChainConflict(t *testing.T) {
+	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings; proBlk2 a child
+	// Once proBlk1 is accepted, proBlk2 and its child are rejected
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	currentPChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+
+	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreBlk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2222),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("test requires proBlk1 different from proBlk2")
+	}
+
+	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
+		t.Fatal("could not set preference")
+	}
+	coreBlk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(3333),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{3},
+		ParentV: coreBlk2,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	proBlk3, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+
+	// ..accept proBlk1 and check that proBlk1 is accepted and proBlk2/proBlk3 are  rejected
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not accept proposer block")
+	}
+
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
 	}
 }

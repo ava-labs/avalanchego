@@ -35,16 +35,17 @@ const (
 )
 
 var (
-	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
-	ErrProBlkWrongVersion  = errors.New("proposer block has unsupported version")
-	ErrProBlkNotFound      = errors.New("proposer block not found")
-	ErrProBlkWrongParent   = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
-	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
-	ErrInvalidTLSKey       = errors.New("invalid validator signing key")
-	ErrInvalidNodeID       = errors.New("could not retrieve nodeID from proposer block certificate")
-	ErrInvalidSignature    = errors.New("proposer block signature does not verify")
-	ErrProBlkWrongHeight   = errors.New("proposer block has wrong height")
-	ErrProBlkFailedParsing = errors.New("could not parse proposer block")
+	ErrInnerBlockNotOracle     = errors.New("core snowman block does not implement snowman.OracleBlock")
+	ErrProBlkWrongVersion      = errors.New("proposer block has unsupported version")
+	ErrProBlkNotFound          = errors.New("proposer block not found")
+	ErrProBlkWrongParent       = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
+	ErrProBlkBadTimestamp      = errors.New("proposer block timestamp outside tolerance window")
+	ErrInvalidTLSKey           = errors.New("invalid validator signing key")
+	ErrInvalidNodeID           = errors.New("could not retrieve nodeID from proposer block certificate")
+	ErrInvalidSignature        = errors.New("proposer block signature does not verify")
+	ErrProBlkWrongHeight       = errors.New("proposer block has wrong height")
+	ErrProBlkFailedParsing     = errors.New("could not parse proposer block")
+	ErrFailedHandlingConflicts = errors.New("could not handle conflict on accept")
 )
 
 type ProposerBlockHeader struct {
@@ -69,15 +70,17 @@ func NewProHeader(prntID ids.ID, unixTime int64, height uint64, cert x509.Certif
 type ProposerBlock struct {
 	header  ProposerBlockHeader
 	coreBlk snowman.Block
+	status  choices.Status
 	id      ids.ID
 	bytes   []byte
 	vm      *VM
 }
 
-func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block, bytes []byte, signBlk bool) (ProposerBlock, error) {
+func NewProBlock(vm *VM, hdr ProposerBlockHeader, sb snowman.Block, st choices.Status, bytes []byte, signBlk bool) (ProposerBlock, error) {
 	res := ProposerBlock{
 		header:  hdr,
 		coreBlk: sb,
+		status:  st,
 		bytes:   bytes,
 		vm:      vm,
 	}
@@ -118,19 +121,22 @@ func (pb *ProposerBlock) ID() ids.ID {
 }
 
 func (pb *ProposerBlock) Accept() error {
-	currAcceptedID, err := pb.vm.state.getLastAcceptedID()
-
+	_, err := pb.vm.state.getLastAcceptedID()
 	switch err {
 	case nil:
 		if err := pb.vm.state.storeLastAcceptedID(pb.ID()); err != nil {
 			return err
 		}
 		if err := pb.coreBlk.Accept(); err != nil {
-			// attempt to restore previous accepted block and return
-			if err := pb.vm.state.storeLastAcceptedID(currAcceptedID); err != nil {
-				// TODO log
-				return err
-			}
+			// TODO: attempt to restore previous accepted block and return
+			return err
+		}
+
+		pb.status = choices.Accepted
+		// TODO: persist
+
+		if err := pb.vm.handleConflicts(pb); err != nil {
+			// TODO: attempt to restore previous accepted block and return
 			return err
 		}
 
@@ -146,8 +152,7 @@ func (pb *ProposerBlock) Accept() error {
 }
 
 func (pb *ProposerBlock) Reject() error {
-	// TODO: rejection of ProposerBlock does not imply rejection of coreBlk
-	// to refactor upon integration with P-chain
+	pb.status = choices.Rejected
 	err := pb.coreBlk.Reject()
 	if err == nil {
 		pb.vm.state.wipeFromCacheProBlk(pb.id)
@@ -156,7 +161,7 @@ func (pb *ProposerBlock) Reject() error {
 }
 
 func (pb *ProposerBlock) Status() choices.Status {
-	return pb.coreBlk.Status()
+	return pb.status
 }
 
 // snowman.Block interface implementation
@@ -236,6 +241,8 @@ func (pb *ProposerBlock) Verify() error {
 	if err := pb.coreBlk.Verify(); err != nil {
 		return err
 	}
+
+	pb.vm.siblings[prntBlk.ID()] = append(pb.vm.siblings[prntBlk.ID()], pb.ID())
 
 	return nil
 }

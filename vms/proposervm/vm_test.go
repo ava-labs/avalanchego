@@ -261,7 +261,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	}
 	proGenID, _ := proVM.LastAccepted()
 	proHdr1 := NewProHeader(proGenID, coreBlk1.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk1, nil, true)
+	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk1, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -278,7 +278,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		HeightV: genCoreBlk.Height() + 1,
 	}
 	proHdr2 := NewProHeader(proGenID, coreBlk2.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk2, nil, true)
+	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk2, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -350,7 +350,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	}
 	proGenID, _ := proVM.LastAccepted()
 	proHdr1 := NewProHeader(proGenID, coreBlk1.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk1, nil, true)
+	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk1, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -367,7 +367,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		HeightV: genCoreBlk.Height() + 1,
 	}
 	proHdr2 := NewProHeader(proGenID, coreBlk2.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk2, nil, true)
+	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk2, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -440,7 +440,7 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 
 	proGenBlkID, _ := proVM.LastAccepted()
 	proHdr := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk, err := NewProBlock(proVM, proHdr, coreBlk, nil, true)
+	proBlk, err := NewProBlock(proVM, proHdr, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -487,13 +487,13 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 	proGenBlkID, _ := proVM.LastAccepted()
 	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, nil, true)
+	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
 
 	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), currentPChainHeight, *pTestCert.Leaf)
-	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, nil, true)
+	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
@@ -578,7 +578,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	proGenBlkID, _ := proVM.LastAccepted()
 	netHdr := NewProHeader(proGenBlkID, netCoreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
-	netProBlk, err := NewProBlock(proVM, netHdr, netCoreBlk, nil, true)
+	netProBlk, err := NewProBlock(proVM, netHdr, netCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}

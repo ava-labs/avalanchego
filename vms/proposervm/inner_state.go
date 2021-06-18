@@ -3,24 +3,72 @@ package proposervm
 import (
 	"bytes"
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
-	blockPrefix               = []byte("block")
-	notableIDPrefix           = []byte("proGenID")
-	proGenIDKey               = []byte("proGenIDKey")
-	ErrGenesisNotFound        = errors.New("proposer genesis block not found")
-	preferredIDKey            = []byte("preferredIDKey")
-	ErrPreferredIDNotFound    = errors.New("preferred ID not found")
-	lastAcceptedIDKey         = []byte("lastAcceptedIDKey")
-	ErrLastAcceptedIDNotFound = errors.New("last accepted ID not found")
+	stateBlkVersion           uint16 = 0
+	ErrStateBlkFailedParsing         = errors.New("could not parse state proposer block")
+	blockPrefix                      = []byte("block")
+	notableIDPrefix                  = []byte("proGenID")
+	proGenIDKey                      = []byte("proGenIDKey")
+	ErrGenesisNotFound               = errors.New("proposer genesis block not found")
+	preferredIDKey                   = []byte("preferredIDKey")
+	ErrPreferredIDNotFound           = errors.New("preferred ID not found")
+	lastAcceptedIDKey                = []byte("lastAcceptedIDKey")
+	ErrLastAcceptedIDNotFound        = errors.New("last accepted ID not found")
 )
+
+type stateProBlk struct {
+	version uint16
+	ProBlk  []byte
+	status  choices.Status
+}
+
+func (sPB *stateProBlk) marshal() ([]byte, error) {
+	p := wrappers.Packer{
+		MaxSize: 1 << 18,
+		Bytes:   make([]byte, 0, 128),
+	}
+	if p.PackShort(sPB.version); p.Errored() {
+		return nil, ErrStateBlkFailedParsing
+	}
+
+	if p.PackBytes(sPB.ProBlk); p.Errored() {
+		return nil, ErrStateBlkFailedParsing
+	}
+
+	if p.PackInt(uint32(sPB.status)); p.Errored() {
+		return nil, ErrStateBlkFailedParsing
+	}
+	return p.Bytes, nil
+}
+
+func (sPB *stateProBlk) unmarshal(b []byte) error {
+	p := wrappers.Packer{
+		Bytes: b,
+	}
+
+	if sPB.version = p.UnpackShort(); p.Errored() {
+		return ErrStateBlkFailedParsing
+	}
+
+	if sPB.ProBlk = p.UnpackBytes(); p.Errored() {
+		return ErrStateBlkFailedParsing
+	}
+
+	if sPB.status = choices.Status(p.UnpackInt()); p.Errored() {
+		return ErrStateBlkFailedParsing
+	}
+
+	return nil
+}
 
 type innerState struct {
 	vm *VM
@@ -64,7 +112,17 @@ func (is *innerState) storeProBlk(blk *ProposerBlock) error {
 	is.knownProBlocks[blk.ID()] = blk
 
 	defer is.baseDB.Abort()
-	if err := is.proBlkDB.Put(blk.id[:], blk.bytes); err != nil {
+
+	stPrBlk := stateProBlk{
+		version: stateBlkVersion,
+		ProBlk:  blk.Bytes(),
+		status:  blk.Status(),
+	}
+	bytes, err := stPrBlk.marshal()
+	if err != nil {
+		return err
+	}
+	if err := is.proBlkDB.Put(blk.id[:], bytes); err != nil {
 		is.wipeFromCacheProBlk(blk.ID())
 		return err
 	}
@@ -96,22 +154,24 @@ func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
 		return proBlk, nil
 	}
 
-	proBytes, err := is.proBlkDB.Get(id[:])
+	stProBytes, err := is.proBlkDB.Get(id[:])
 	if err != nil {
 		return nil, ErrProBlkNotFound
 	}
 
-	var mPb marshallingProposerBLock
-	if err := mPb.unmarshal(proBytes); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal proposerBlockHeader: %s", err)
+	var sPB stateProBlk
+	if err := sPB.unmarshal(stProBytes); err != nil {
+		return nil, err
 	}
-
+	var mPb marshallingProposerBLock
+	if err := mPb.unmarshal(sPB.ProBlk); err != nil {
+		return nil, err
+	}
 	sb, err := is.vm.ChainVM.ParseBlock(mPb.wrpdBytes)
 	if err != nil {
 		return nil, err
 	}
-
-	proBlk, _ := NewProBlock(is.vm, mPb.ProposerBlockHeader, sb, proBytes, false) // not signing block, cannot err
+	proBlk, _ := NewProBlock(is.vm, mPb.ProposerBlockHeader, sb, sPB.status, sPB.ProBlk, false) // not signing block, cannot err
 	if err := is.storeProBlk(&proBlk); err != nil {
 		return nil, err
 	}
@@ -147,15 +207,15 @@ func (is *innerState) getProGenesisBlk() (*ProposerBlock, error) {
 		return is.getProBlock(is.proGenID)
 	}
 
-	// not in memory, attempt retrieving it from db
-	proGenAvail, err := is.notableIDsDB.Has(proGenIDKey)
+	key := proGenIDKey
+	proGenAvail, err := is.notableIDsDB.Has(key)
 	if err != nil {
 		return nil, err // could not query DB
 	}
 	if !proGenAvail {
 		return nil, ErrGenesisNotFound
 	}
-	proGenBytes, err := is.notableIDsDB.Get(proGenIDKey)
+	proGenBytes, err := is.notableIDsDB.Get(key)
 	if err != nil {
 		return nil, err
 	}
@@ -192,18 +252,19 @@ func (is *innerState) getPreferredID() (ids.ID, error) {
 	}
 
 	// not in memory, attempt retrieving it from db
-	proPrefID, err := is.notableIDsDB.Has(preferredIDKey)
+	key := preferredIDKey
+	proPrefID, err := is.notableIDsDB.Has(key)
 	if err != nil {
 		return ids.Empty, err // could not query DB
 	}
 	if !proPrefID {
 		return ids.Empty, ErrPreferredIDNotFound
 	}
-	proPrefBytes, err := is.notableIDsDB.Get(proGenIDKey)
+	proPrefBytes, err := is.notableIDsDB.Get(key)
 	if err != nil {
 		return ids.Empty, err
 	}
-	copy(is.proGenID[:], proPrefBytes)
+	copy(is.preferredID[:], proPrefBytes)
 	return is.preferredID, nil
 }
 
@@ -244,10 +305,10 @@ func (is *innerState) getLastAcceptedID() (ids.ID, error) {
 	if !proAcceptedID {
 		return ids.Empty, ErrLastAcceptedIDNotFound
 	}
-	proPrefBytes, err := is.notableIDsDB.Get(key)
+	proAcceptedBytes, err := is.notableIDsDB.Get(key)
 	if err != nil {
 		return ids.Empty, err
 	}
-	copy(is.proGenID[:], proPrefBytes)
-	return is.preferredID, nil
+	copy(is.lastAcceptedID[:], proAcceptedBytes)
+	return is.lastAcceptedID, nil
 }

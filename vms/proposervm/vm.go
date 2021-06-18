@@ -17,13 +17,13 @@ package proposervm
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -31,9 +31,8 @@ import (
 )
 
 var (
-	genesisParentID      = ids.Empty
-	NoProposerBlocks     = time.Unix(1<<63-62135596801, 999999999)
-	ErrCannotSignWithKey = errors.New("unable to use key to sign proposer blocks")
+	genesisParentID  = ids.Empty
+	NoProposerBlocks = time.Unix(1<<63-62135596801, 999999999)
 )
 
 // clock interface and implementation, to ease up UTs
@@ -56,6 +55,7 @@ type VM struct {
 	fromCoreVM      chan common.Message
 	toEngine        chan<- common.Message
 	proBlkStartTime time.Time
+	siblings        map[ids.ID]([]ids.ID)
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
@@ -65,6 +65,7 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 		fromCoreVM:      nil,
 		toEngine:        nil,
 		proBlkStartTime: proBlkStart,
+		siblings:        nil,
 	}
 	res.state = newState(&res)
 	return &res
@@ -125,7 +126,7 @@ func (vm *VM) Initialize(
 				return err
 			}
 			proGenHdr := NewProHeader(genesisParentID, coreGenBlk.Timestamp().Unix(), 0, x509.Certificate{})
-			proGenBlk, _ := NewProBlock(vm, proGenHdr, coreGenBlk, nil, false) // not signing block, cannot err
+			proGenBlk, _ := NewProBlock(vm, proGenHdr, coreGenBlk, choices.Accepted, nil, false) // not signing block, cannot err
 			// Skipping verification for genesis block.
 			if err := vm.state.storeProGenID(proGenBlk.ID()); err != nil {
 				return err
@@ -139,6 +140,9 @@ func (vm *VM) Initialize(
 			if err := vm.state.storeProBlk(&proGenBlk); err != nil {
 				return err
 			}
+
+			vm.siblings = make(map[ids.ID][]ids.ID)
+			vm.siblings[proGenBlk.ID()] = make([]ids.ID, 0)
 		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
@@ -172,7 +176,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 		hdr := NewProHeader(proParentID, sb.Timestamp().Unix(), h, *vm.stakingCert.Leaf)
-		proBlk, err := NewProBlock(vm, hdr, sb, nil, true)
+		proBlk, err := NewProBlock(vm, hdr, sb, choices.Processing, nil, true)
 		if err != nil {
 			return nil, err
 		}
@@ -184,6 +188,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		if err := vm.state.storeProBlk(&proBlk); err != nil {
 			return nil, err
 		}
+
 		return &proBlk, nil
 	}
 	return sb, nil
@@ -197,7 +202,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 			return nil, err
 		}
 
-		proBlk, _ := NewProBlock(vm, mPb.ProposerBlockHeader, sb, b, false) // not signing block, cannot err
+		proBlk, _ := NewProBlock(vm, mPb.ProposerBlockHeader, sb, choices.Processing, b, false) // not signing block, cannot err
 		if err := vm.state.storeProBlk(&proBlk); err != nil {
 			return nil, err
 		}
@@ -264,4 +269,53 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	default:
 		return res, err
 	}
+}
+
+func (vm *VM) handleConflicts(pb *ProposerBlock) error {
+	siblings, found := vm.siblings[pb.header.prntID]
+	if !found {
+		return ErrFailedHandlingConflicts // should not be possible
+	}
+	switch len(siblings) {
+	case 0: // no children, do nothing
+		return nil
+	case 1: // 1 children, no conflicts
+		break
+	default: // conflict
+		// TODO: handle coreBlocks
+		for _, cflc := range siblings {
+			if pb.ID() == cflc {
+				continue
+			}
+			if err := vm.rejectAllChildren(cflc); err != nil {
+				return ErrFailedHandlingConflicts
+			}
+		}
+	}
+
+	delete(vm.siblings, pb.header.prntID)
+	if _, found := vm.siblings[pb.ID()]; !found {
+		vm.siblings[pb.ID()] = make([]ids.ID, 0)
+	}
+	return nil
+}
+
+func (vm *VM) rejectAllChildren(root ids.ID) error {
+	// just level order descent
+	queue := make([]ids.ID, 0)
+	queue = append(queue, root)
+	for len(queue) != 0 {
+		node := queue[0]
+		queue = queue[1:]
+
+		if proBlk, err := vm.state.getProBlock(node); err != nil {
+			return ErrFailedHandlingConflicts
+		} else if err := proBlk.Reject(); err != nil {
+			return ErrFailedHandlingConflicts
+		}
+
+		queue = append(queue, vm.siblings[node]...)
+		delete(vm.siblings, node)
+	}
+	return nil
 }
