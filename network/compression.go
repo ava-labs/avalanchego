@@ -66,6 +66,7 @@ func NewCompressorPool() sync.Pool {
 
 type Decompressor interface {
 	Decompress([]byte) ([]byte, error)
+	IsCompressed([]byte) bool
 }
 
 type gzipDecompressor struct {
@@ -98,6 +99,10 @@ func (g gzipDecompressor) Decompress(msg []byte) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func (g gzipDecompressor) IsCompressed(msg []byte) bool {
+	return len(msg) > 2 && msg[0] == 31 && msg[1] == 139
 }
 
 func (g gzipDecompressor) init(msg []byte) error {

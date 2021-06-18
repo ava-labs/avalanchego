@@ -5,11 +5,8 @@ package network
 
 import (
 	"bufio"
-	"bytes"
-	"compress/gzip"
 	"crypto/x509"
 	"encoding/binary"
-	"io/ioutil"
 	"math"
 	"net"
 	"sync"
@@ -139,6 +136,7 @@ type peer struct {
 	idSet ids.Set
 
 	gzipEnabled    bool
+	decompressor   Decompressor
 	compressorPool sync.Pool
 }
 
@@ -287,28 +285,13 @@ func (p *peer) ReadMessages() {
 		// if peer is gzip enabled, and message is gzipped, we read it
 		var inflatedMsgLen, compressedMsgLen int
 		var t int64
-		if p.gzipEnabled && len(msgBytes) > 2 && msgBytes[0] == 31 && msgBytes[1] == 139 {
-			t1 := time.Now()
+		if p.gzipEnabled && p.decompressor.IsCompressed(msgBytes) {
 			// this msg is gzipped
+			t1 := time.Now()
 			compressedMsgLen = len(msgBytes)
-			// p.net.log.Debug("Reading gzipped message, len=%d", compressedMsgLen)
-			byteReader := bytes.NewReader(msgBytes)
-			gzipReader, err := gzip.NewReader(byteReader)
-			if err != nil {
-				p.net.log.Error("Error creating a gzip reader, err: %w", err)
-				return
-			}
-
-			inflatedMsg, err := ioutil.ReadAll(gzipReader)
+			inflatedMsg, err := p.decompressor.Decompress(msgBytes)
 			if err != nil {
 				p.net.log.Error("Error reading bytes: %s", err)
-				return
-			}
-
-			err = gzipReader.Close()
-			if err != nil {
-				p.net.log.Error("Error closing gzip reader: %s", err)
-				return
 			}
 
 			inflatedMsgLen = len(inflatedMsg)
