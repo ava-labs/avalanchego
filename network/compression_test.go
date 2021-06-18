@@ -10,6 +10,23 @@ import (
 	"time"
 )
 
+func TestGzipCompressor_Compress(t *testing.T) {
+	data := RandomString(10000)
+	dataBytes := []byte(data)
+	dataBytesLength := len(dataBytes)
+
+	compressor := NewCompressor()
+	compressedBytes, err := compressor.Compress(dataBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressedBytesLength := len(compressedBytes)
+
+	if compressedBytesLength >= dataBytesLength {
+		t.Fatalf("Compressed data should be smaller than data, cLen=%d, len=%d", compressedBytesLength, len(data))
+	}
+}
+
 func BenchmarkGzip(b *testing.B) {
 	b.Run("standard gzip", BenchmarkStandardGzip)
 	b.Run("best compression gzip", BenchmarkBestCompGzip)
@@ -56,7 +73,7 @@ func BenchmarkStandardGzipCompression(b *testing.B) {
 
 func BenchmarkStandardGzip(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		s := RandomString(1024)
+		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
 		cmpBytes := standardCompress(sBytes, gzip.DefaultCompression)
@@ -71,7 +88,7 @@ func BenchmarkStandardGzip(b *testing.B) {
 
 func BenchmarkBestCompGzip(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		s := RandomString(1024)
+		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
 		cmpBytes := standardCompress(sBytes, gzip.BestCompression)
@@ -86,7 +103,7 @@ func BenchmarkBestCompGzip(b *testing.B) {
 
 func BenchmarkBestSpeedGzip(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		s := RandomString(1024)
+		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
 		cmpBytes := standardCompress(sBytes, gzip.BestSpeed)
@@ -160,10 +177,9 @@ func RandomString(n int) string {
 }
 
 func TestStandardCompressDecompress(t *testing.T) {
-	s := RandomString(1024)
+	s := RandomString(4096)
 	sBytes := []byte(s)
 	cmpBytes := standardCompress(sBytes, gzip.DefaultCompression)
-	fmt.Printf("len, compLen %d, %d\n", len(sBytes), len(cmpBytes))
 	dcmpBytes := standardDecompress(cmpBytes)
 	dcmpString := string(dcmpBytes)
 	if dcmpString != s {
