@@ -70,6 +70,7 @@ type gzipDecompressor struct {
 	reader *gzip.Reader
 }
 
+// Decompress decompresses given bytes. In case of an error, original bytes are returned with error
 func (g *gzipDecompressor) Decompress(msg []byte) ([]byte, error) {
 	if g.buffer == nil {
 		err := g.init(msg)
@@ -97,6 +98,7 @@ func (g *gzipDecompressor) Decompress(msg []byte) ([]byte, error) {
 	return data, nil
 }
 
+// IsCompressed returns whether given bytes are compressed data or not
 func (g *gzipDecompressor) IsCompressed(msg []byte) bool {
 	return len(msg) > 2 && msg[0] == 31 && msg[1] == 139
 }
