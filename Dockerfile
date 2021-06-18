@@ -24,6 +24,7 @@ RUN ./scripts/build.sh
 # ============= Cleanup Stage ================
 FROM alpine:3.13 AS execution
 
+RUN apk add --no-cache libstdc++
 # Maintain compatibility with previous images
 RUN mkdir -p /avalanchego/build
 WORKDIR /avalanchego/build
