@@ -137,7 +137,6 @@ func getAddresses(tx *UniqueTx, log logging.Logger) map[ids.ShortID]map[ids.ID]s
 			continue
 		}
 
-		fmt.Printf("utxo type %T\n", utxo)
 		in, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			continue
