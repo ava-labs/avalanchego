@@ -38,32 +38,10 @@ func BenchmarkGzip(b *testing.B) {
 	b.Run("best speed gzip", BenchmarkBestSpeedGzip)
 }
 
-func BenchmarkPooledVsNonPooledGzip(b *testing.B) {
-	b.Run("PooledGzip", BenchmarkPooledGzip)
-	b.Run("NonPooledGzip", BenchmarkStandardGzipCompression)
-}
-
 var (
 	cmpBytes  []byte
 	dcmpBytes []byte
-	pool      = NewCompressorPool()
 )
-
-func BenchmarkPooledGzip(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		s := RandomString(4096)
-		sBytes := []byte(s)
-		t1 := time.Now()
-		w := pool.Get().(Compressor)
-		cmpBytes, err := w.Compress(sBytes)
-		if err != nil {
-			b.Fatal(err)
-		}
-		pool.Put(w)
-		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "CompressTime")
-		b.ReportMetric(float64(len(sBytes)-len(cmpBytes)), "BytesSaved")
-	}
-}
 
 func BenchmarkStandardGzipCompression(b *testing.B) {
 	for i := 0; i < b.N; i++ {

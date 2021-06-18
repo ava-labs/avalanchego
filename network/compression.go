@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io/ioutil"
-	"sync"
 )
 
 type Compressor interface {
@@ -59,14 +58,6 @@ func (w *gzipCompressor) init() {
 // NewCompressor returns a new compressor instance
 func NewCompressor() Compressor {
 	return &gzipCompressor{}
-}
-
-func NewCompressorPool() sync.Pool {
-	return sync.Pool{
-		New: func() interface{} {
-			return NewCompressor()
-		},
-	}
 }
 
 type Decompressor interface {
