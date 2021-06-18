@@ -9,7 +9,6 @@ import (
 
 type Compressor interface {
 	Compress([]byte) ([]byte, error)
-	Reset()
 }
 
 // gzipCompressor GZip Compressor implementation
@@ -20,7 +19,13 @@ type gzipCompressor struct {
 
 // Compress compresses given bytes and returns them
 // In case of any errors, the original bytes and error are returned.
-func (w gzipCompressor) Compress(msg []byte) ([]byte, error) {
+func (w *gzipCompressor) Compress(msg []byte) ([]byte, error) {
+	if w.buffer == nil {
+		w.init()
+	} else {
+		w.reset()
+	}
+
 	_, err := w.writer.Write(msg)
 	if err != nil {
 		return msg, err
@@ -40,20 +45,20 @@ func (w gzipCompressor) Compress(msg []byte) ([]byte, error) {
 }
 
 // Reset resets the state for the next use
-func (w gzipCompressor) Reset() {
+func (w *gzipCompressor) reset() {
 	w.buffer.Reset()
 	w.writer.Reset(w.buffer)
 }
 
+func (w *gzipCompressor) init() {
+	var buffer bytes.Buffer
+	w.buffer = &buffer
+	w.writer = gzip.NewWriter(w.buffer)
+}
+
 // NewCompressor returns a new compressor instance
 func NewCompressor() Compressor {
-	var buffer bytes.Buffer
-	gWriter := gzip.NewWriter(&buffer)
-
-	return gzipCompressor{
-		writer: gWriter,
-		buffer: &buffer,
-	}
+	return &gzipCompressor{}
 }
 
 func NewCompressorPool() sync.Pool {
@@ -74,7 +79,7 @@ type gzipDecompressor struct {
 	reader *gzip.Reader
 }
 
-func (g gzipDecompressor) Decompress(msg []byte) ([]byte, error) {
+func (g *gzipDecompressor) Decompress(msg []byte) ([]byte, error) {
 	if g.buffer == nil {
 		err := g.init(msg)
 		if err != nil {
@@ -101,11 +106,11 @@ func (g gzipDecompressor) Decompress(msg []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (g gzipDecompressor) IsCompressed(msg []byte) bool {
+func (g *gzipDecompressor) IsCompressed(msg []byte) bool {
 	return len(msg) > 2 && msg[0] == 31 && msg[1] == 139
 }
 
-func (g gzipDecompressor) init(msg []byte) error {
+func (g *gzipDecompressor) init(msg []byte) error {
 	g.buffer = bytes.NewReader(msg)
 	reader, err := gzip.NewReader(g.buffer)
 	if err != nil {
@@ -116,5 +121,5 @@ func (g gzipDecompressor) init(msg []byte) error {
 }
 
 func NewDecompressor() Decompressor {
-	return gzipDecompressor{}
+	return &gzipDecompressor{}
 }

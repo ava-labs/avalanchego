@@ -59,7 +59,6 @@ func BenchmarkPooledGzip(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		w.Reset()
 		pool.Put(w)
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "CompressTime")
 		b.ReportMetric(float64(len(sBytes)-len(cmpBytes)), "BytesSaved")

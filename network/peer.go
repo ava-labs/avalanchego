@@ -135,9 +135,9 @@ type peer struct {
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
 
-	gzipEnabled    bool
-	decompressor   Decompressor
-	compressorPool sync.Pool
+	gzipEnabled  bool
+	decompressor Decompressor
+	compressor   Compressor
 }
 
 // newPeer returns a properly initialized *peer.
@@ -388,11 +388,7 @@ func (p *peer) compress(op string, msg []byte) []byte {
 	}
 
 	t1 := time.Now()
-	compressor := p.compressorPool.Get().(Compressor)
-	compressedBytes, err := compressor.Compress(msg)
-	compressor.Reset()
-	p.compressorPool.Put(compressor)
-
+	compressedBytes, err := p.compressor.Compress(msg)
 	if err != nil {
 		return msg
 	}
@@ -832,7 +828,10 @@ func (p *peer) handleVersion(msg Msg) {
 
 	// todo marker version should be constant
 	p.gzipEnabled = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
-	p.compressorPool = NewCompressorPool()
+	if p.gzipEnabled {
+		p.compressor = NewCompressor()
+		p.decompressor = NewDecompressor()
+	}
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
