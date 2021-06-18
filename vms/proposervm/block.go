@@ -152,12 +152,17 @@ func (pb *ProposerBlock) Accept() error {
 }
 
 func (pb *ProposerBlock) Reject() error {
+	// coreBlock rejection is handled upon accept of siblings
 	pb.status = choices.Rejected
-	err := pb.coreBlk.Reject()
-	if err == nil {
-		pb.vm.state.wipeFromCacheProBlk(pb.id)
+	return nil
+}
+
+func (pb *ProposerBlock) coreReject() error {
+	if err := pb.coreBlk.Reject(); err != nil {
+		return err
 	}
-	return err
+	pb.vm.state.wipeFromCacheProBlk(pb.id)
+	return nil
 }
 
 func (pb *ProposerBlock) Status() choices.Status {
@@ -242,7 +247,7 @@ func (pb *ProposerBlock) Verify() error {
 		return err
 	}
 
-	pb.vm.siblings[prntBlk.ID()] = append(pb.vm.siblings[prntBlk.ID()], pb.ID())
+	pb.vm.siblings[prntBlk.ID()] = append(pb.vm.siblings[prntBlk.ID()], pb)
 
 	return nil
 }

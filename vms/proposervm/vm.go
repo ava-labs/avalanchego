@@ -55,7 +55,7 @@ type VM struct {
 	fromCoreVM      chan common.Message
 	toEngine        chan<- common.Message
 	proBlkStartTime time.Time
-	siblings        map[ids.ID]([]ids.ID)
+	siblings        map[ids.ID]([]*ProposerBlock)
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
@@ -141,8 +141,8 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			vm.siblings = make(map[ids.ID][]ids.ID)
-			vm.siblings[proGenBlk.ID()] = make([]ids.ID, 0)
+			vm.siblings = make(map[ids.ID][]*ProposerBlock)
+			vm.siblings[proGenBlk.ID()] = make([]*ProposerBlock, 0)
 		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
@@ -282,12 +282,11 @@ func (vm *VM) handleConflicts(pb *ProposerBlock) error {
 	case 1: // 1 children, no conflicts
 		break
 	default: // conflict
-		// TODO: handle coreBlocks
-		for _, cflc := range siblings {
-			if pb.ID() == cflc {
+		for _, sib := range siblings {
+			if pb.ID() == sib.ID() {
 				continue
 			}
-			if err := vm.rejectAllChildren(cflc); err != nil {
+			if err := vm.rejectAllFrom(sib, pb.coreBlk); err != nil {
 				return ErrFailedHandlingConflicts
 			}
 		}
@@ -295,27 +294,37 @@ func (vm *VM) handleConflicts(pb *ProposerBlock) error {
 
 	delete(vm.siblings, pb.header.prntID)
 	if _, found := vm.siblings[pb.ID()]; !found {
-		vm.siblings[pb.ID()] = make([]ids.ID, 0)
+		vm.siblings[pb.ID()] = make([]*ProposerBlock, 0)
 	}
 	return nil
 }
 
-func (vm *VM) rejectAllChildren(root ids.ID) error {
+func (vm *VM) rejectAllFrom(root *ProposerBlock, lastAcceptedCoreBlk snowman.Block) error {
 	// just level order descent
-	queue := make([]ids.ID, 0)
+	queue := make([]*ProposerBlock, 0)
 	queue = append(queue, root)
 	for len(queue) != 0 {
 		node := queue[0]
 		queue = queue[1:]
 
-		if proBlk, err := vm.state.getProBlock(node); err != nil {
-			return ErrFailedHandlingConflicts
-		} else if err := proBlk.Reject(); err != nil {
+		if err := node.Reject(); err != nil {
 			return ErrFailedHandlingConflicts
 		}
 
-		queue = append(queue, vm.siblings[node]...)
-		delete(vm.siblings, node)
+		// a coreBlk is rejected iff:
+		// * a sibling has been accepted
+		// * its parent has been rejected already
+		if node.coreBlk.ID() != lastAcceptedCoreBlk.ID() {
+			if node.coreBlk.Parent().ID() == lastAcceptedCoreBlk.Parent().ID() ||
+				node.coreBlk.Parent().Status() == choices.Rejected {
+				if err := node.coreReject(); err != nil {
+					return err
+				}
+			}
+		}
+
+		queue = append(queue, vm.siblings[node.ID()]...)
+		delete(vm.siblings, node.ID())
 	}
 	return nil
 }
