@@ -60,7 +60,7 @@ func addProcessFlags(fs *flag.FlagSet) {
 	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Plugin
-	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin. Defaults to true")
+	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin")
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
@@ -119,11 +119,12 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
 	// Incoming Connection Throttling
-	// Upgrade at most [conn-meter-max-conns] incoming connections from a given IP
-	// in the last [conn-meter-reset-duration].
+	// Upgrade at most [conn-meter-max-conns] incoming connections from a given
+	// IP in the last [conn-meter-reset-duration].
 	fs.Duration(ConnMeterResetDurationKey, 0*time.Second,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If either is 0, incoming connections are not rate-limited.")
+	// TODO: Use Uint rather than Int when negative arguments are invalid
 	fs.Int(ConnMeterMaxConnsKey, 5,
 		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
 			"If either is 0, incoming connections are not rate-limited.")
@@ -261,6 +262,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 // BuildFlagSet returns a complete set of flags for avalanchego
 func BuildFlagSet() *flag.FlagSet {
+	// TODO parse directly into a *pflag.FlagSet instead of into a *flag.FlagSet
+	// and then putting those into a *plag.FlagSet
 	fs := flag.NewFlagSet(constants.AppName, flag.ContinueOnError)
 	addProcessFlags(fs)
 	addNodeFlags(fs)

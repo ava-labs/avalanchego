@@ -44,7 +44,7 @@ const (
 
 var (
 	deprecatedKeys = map[string]string{
-		CorethConfigKey: "please use config files for C chain",
+		CorethConfigKey: "please use --config-file to specify C-Chain config",
 	}
 
 	errInvalidStakerWeights = errors.New("staking weights must be positive")

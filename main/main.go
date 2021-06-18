@@ -26,20 +26,22 @@ func main() {
 		fmt.Printf("couldn't configure flags: %s\n", err)
 		os.Exit(1)
 	}
+
 	processConfig, err := config.GetProcessConfig(v)
 	if err != nil {
 		fmt.Printf("couldn't load process config: %s\n", err)
-		os.Exit(1)
-	}
-	nodeConfig, err := config.GetNodeConfig(v, processConfig.BuildDir)
-	if err != nil {
-		fmt.Printf("couldn't load node config: %s\n", err)
 		os.Exit(1)
 	}
 
 	if processConfig.DisplayVersionAndExit {
 		fmt.Print(version.String(GitCommit))
 		os.Exit(0)
+	}
+
+	nodeConfig, err := config.GetNodeConfig(v, processConfig.BuildDir)
+	if err != nil {
+		fmt.Printf("couldn't load node config: %s\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Println(process.Header)
