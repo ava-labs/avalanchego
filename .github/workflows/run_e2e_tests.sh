@@ -4,13 +4,11 @@ set -o pipefail
 
 # Testing specific variables
 avalanche_testing_repo="avaplatform/avalanche-testing"
+avalanchego_byzantine_repo="avaplatform/avalanche-byzantine"
 
-# Define avalanche byzantine version to use
-avalanchego_byzantine_version=${AVALANCHEGO_BYZANTINE_VERSION:-'apricot-phase2'}
-avalanchego_byzantine_image="avaplatform/avalanche-byzantine:$avalanchego_byzantine_version"
-
-# Define avalanche testing version to use
+# Define default versions to use
 avalanche_testing_image="avaplatform/avalanche-testing:master"
+avalanchego_byzantine_image="avaplatform/avalanche-byzantine:master"
 
 # Fetch the images
 # If Docker Credentials are not available fail
@@ -51,7 +49,18 @@ else
     echo "$avalanche_testing_repo $current_branch does NOT exist; using the default image to run e2e tests"
 fi
 
+# Defines the avalanchego-byzantine tag to use
+# Either uses the same tag as the current branch or uses the default
+if docker_tag_exists $avalanchego_byzantine_repo $current_branch; then
+    echo "$avalanchego_byzantine_repo:$current_branch exists; using this image to run e2e tests"
+    avalanchego_byzantine_image="$avalanchego_byzantine_repo:$current_branch"
+else
+    echo "$avalanchego_byzantine_repo $current_branch does NOT exist; using the default image to run e2e tests"
+fi
+
 echo "Using $avalanche_testing_image for e2e tests"
+echo "Using $avalanchego_byzantine_image for e2e tests"
+
 
 # pulling the avalanche-testing image
 docker pull $avalanche_testing_image
@@ -84,5 +93,5 @@ custom_params_json="{
 
 bash "$AVALANCHE_PATH/.kurtosis/kurtosis.sh" \
     --custom-params "${custom_params_json}" \
-    "${avalanche_testing_image}" \
-    $@
+    ${1+"${@}"} \
+    "${avalanche_testing_image}" 
