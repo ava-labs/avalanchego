@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"sync"
 	"testing"
 	"time"
 )
@@ -17,60 +16,26 @@ func BenchmarkGzip(b *testing.B) {
 	b.Run("best speed gzip", BenchmarkBestSpeedGzip)
 }
 
-type gzipWriter struct {
-	writer *gzip.Writer
-	buffer *bytes.Buffer
-}
-
-func (w gzipWriter) Write(msg []byte) []byte {
-	_, err := w.writer.Write(msg)
-	if err != nil {
-		return msg
-	}
-
-	err = w.writer.Flush()
-	if err != nil {
-		return msg
-	}
-
-	err = w.writer.Close()
-	if err != nil {
-		return msg
-	}
-
-	return w.buffer.Bytes()
-}
-
-func (w gzipWriter) Reset() {
-	w.buffer.Reset()
-	w.writer.Reset(w.buffer)
-}
-
-var pool = sync.Pool{
-	New: func() interface{} {
-		var buffer bytes.Buffer
-		gWriter := gzip.NewWriter(&buffer)
-		return gzipWriter{
-			writer: gWriter,
-			buffer: &buffer,
-		}
-	},
-}
-
 func BenchmarkPooledVsNonPooledGzip(b *testing.B) {
 	b.Run("PooledGzip", BenchmarkPooledGzip)
 	b.Run("NonPooledGzip", BenchmarkStandardGzipCompression)
 }
 
-var cmpBytes []byte
+var (
+	cmpBytes []byte
+	pool     = NewCompressorPool()
+)
 
 func BenchmarkPooledGzip(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		s := RandomString(2048)
+		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
-		w := pool.Get().(gzipWriter)
-		cmpBytes = w.Write(sBytes)
+		w := pool.Get().(Compressor)
+		cmpBytes, err := w.Compress(sBytes)
+		if err != nil {
+			b.Fatal(err)
+		}
 		w.Reset()
 		pool.Put(w)
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "CompressTime")
@@ -80,7 +45,7 @@ func BenchmarkPooledGzip(b *testing.B) {
 
 func BenchmarkStandardGzipCompression(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		s := RandomString(1024)
+		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
 		cmpBytes = standardCompress(sBytes, gzip.DefaultCompression)
