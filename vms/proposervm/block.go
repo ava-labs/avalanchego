@@ -8,7 +8,6 @@ package proposervm
 // the serialization logic
 // Contract:
 // * Parent ProposerBlock wraps Parent CoreBlock of CoreBlock wrapped into Child ProposerBlock.
-// TODO: ^^^^ Enforce each block is built on preference [right now in consensus there is just a warning]
 // * Only one call to each coreBlock's Verify() is issued from proposerVM. However Verify is memory only, so we won't persist
 // core blocks over which Verify has been called
 // * VERIFY FAILS ON GENESIS TODO: fix maybe

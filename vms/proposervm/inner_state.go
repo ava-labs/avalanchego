@@ -60,24 +60,9 @@ func (is *innerState) wipeCache() {
 	is.lastAcceptedID = ids.Empty
 }
 
-func (is *innerState) cacheProBlk(blk *ProposerBlock) {
+func (is *innerState) storeProBlk(blk *ProposerBlock) error {
 	is.knownProBlocks[blk.ID()] = blk
-}
 
-func (is *innerState) wipeFromCacheProBlk(id ids.ID) {
-	delete(is.knownProBlocks, id)
-
-	switch id {
-	case is.proGenID:
-		is.proGenID = ids.Empty
-	case is.preferredID:
-		is.preferredID = ids.Empty
-	case is.lastAcceptedID:
-		is.lastAcceptedID = ids.Empty
-	}
-}
-
-func (is *innerState) commitBlk(blk *ProposerBlock) error {
 	defer is.baseDB.Abort()
 	if err := is.proBlkDB.Put(blk.id[:], blk.bytes); err != nil {
 		is.wipeFromCacheProBlk(blk.ID())
@@ -91,6 +76,19 @@ func (is *innerState) commitBlk(blk *ProposerBlock) error {
 	}
 
 	return batch.Write()
+}
+
+func (is *innerState) wipeFromCacheProBlk(id ids.ID) {
+	delete(is.knownProBlocks, id)
+
+	switch id {
+	case is.proGenID:
+		is.proGenID = ids.Empty
+	case is.preferredID:
+		is.preferredID = ids.Empty
+	case is.lastAcceptedID:
+		is.lastAcceptedID = ids.Empty
+	}
 }
 
 func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
@@ -114,7 +112,9 @@ func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
 	}
 
 	proBlk, _ := NewProBlock(is.vm, mPb.ProposerBlockHeader, sb, proBytes, false) // not signing block, cannot err
-	is.cacheProBlk(&proBlk)
+	if err := is.storeProBlk(&proBlk); err != nil {
+		return nil, err
+	}
 
 	return &proBlk, nil
 }

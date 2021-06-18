@@ -3,7 +3,7 @@ package proposervm
 // VM is a decorator for a snowman.ChainVM struct, created to handle block headers introduced with snowman++
 
 // Contract
-// TODO: coreVM MUST build blocks on top of currently preferred block
+// * CoreVM MUST build blocks on top of currently preferred block, otherwise Verify() will fail
 // * After initialization. full ProposerBlocks (proHeader + core block) are stored in proposervm.VM's db
 // on Build/ParseBlock calls, AFTER calls to core vm's Build/ParseBlock, which we ASSUME
 //  would store core block on core VM's db.
@@ -127,7 +127,6 @@ func (vm *VM) Initialize(
 			proGenHdr := NewProHeader(genesisParentID, coreGenBlk.Timestamp().Unix(), 0, x509.Certificate{})
 			proGenBlk, _ := NewProBlock(vm, proGenHdr, coreGenBlk, nil, false) // not signing block, cannot err
 			// Skipping verification for genesis block.
-			// TODO: in case genesis is rebuilt, make sure it is the last accepted
 			if err := vm.state.storeProGenID(proGenBlk.ID()); err != nil {
 				return err
 			}
@@ -137,11 +136,10 @@ func (vm *VM) Initialize(
 			if err := vm.state.storeLastAcceptedID(proGenBlk.ID()); err != nil {
 				return err
 			}
-			vm.state.cacheProBlk(&proGenBlk)
-			if err := vm.state.commitBlk(&proGenBlk); err != nil {
+			if err := vm.state.storeProBlk(&proGenBlk); err != nil {
 				return err
 			}
-		case nil: // keep going
+		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
 		}
@@ -183,8 +181,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		vm.state.cacheProBlk(&proBlk)
-		if err := vm.state.commitBlk(&proBlk); err != nil {
+		if err := vm.state.storeProBlk(&proBlk); err != nil {
 			return nil, err
 		}
 		return &proBlk, nil
@@ -201,9 +198,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		}
 
 		proBlk, _ := NewProBlock(vm, mPb.ProposerBlockHeader, sb, b, false) // not signing block, cannot err
-
-		vm.state.cacheProBlk(&proBlk)
-		if err := vm.state.commitBlk(&proBlk); err != nil {
+		if err := vm.state.storeProBlk(&proBlk); err != nil {
 			return nil, err
 		}
 
