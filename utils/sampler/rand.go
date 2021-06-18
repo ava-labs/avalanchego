@@ -31,11 +31,11 @@ func Seed(seed int64) {
 type rng interface {
 	// Seed uses the provided seed value to initialize the generator to a
 	// deterministic state.
-	Seed(int64)
+	Seed(seed int64)
 
 	// Int63n returns, as an int64, a non-negative pseudo-random number in
 	// [0,n). It panics if n <= 0.
-	Int63n(int64) int64
+	Int63n(n int64) int64
 }
 
 type syncSource struct {
