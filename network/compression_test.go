@@ -3,27 +3,32 @@ package network
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/rand"
 	"fmt"
-	"io/ioutil"
-	"math/rand"
+	"math/big"
 	"testing"
 	"time"
 )
 
-func TestGzipCompressor_Compress(t *testing.T) {
+func TestCompressDecompress(t *testing.T) {
 	data := RandomString(10000)
 	dataBytes := []byte(data)
-	dataBytesLength := len(dataBytes)
 
 	compressor := NewCompressor()
 	compressedBytes, err := compressor.Compress(dataBytes)
 	if err != nil {
 		t.Fatal(err)
 	}
-	compressedBytesLength := len(compressedBytes)
 
-	if compressedBytesLength >= dataBytesLength {
-		t.Fatalf("Compressed data should be smaller than data, cLen=%d, len=%d", compressedBytesLength, len(data))
+	decompressor := NewDecompressor()
+	decompressedBytes, err := decompressor.Decompress(compressedBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	decompressedData := string(decompressedBytes)
+	if decompressedData != data {
+		t.Fatalf("decompressed string must equal original string:\ndecomp:`%s`\noriginal:`%s`", decompressedData, data)
 	}
 }
 
@@ -39,8 +44,9 @@ func BenchmarkPooledVsNonPooledGzip(b *testing.B) {
 }
 
 var (
-	cmpBytes []byte
-	pool     = NewCompressorPool()
+	cmpBytes  []byte
+	dcmpBytes []byte
+	pool      = NewCompressorPool()
 )
 
 func BenchmarkPooledGzip(b *testing.B) {
@@ -72,46 +78,58 @@ func BenchmarkStandardGzipCompression(b *testing.B) {
 }
 
 func BenchmarkStandardGzip(b *testing.B) {
+	var err error
 	for i := 0; i < b.N; i++ {
 		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
-		cmpBytes := standardCompress(sBytes, gzip.DefaultCompression)
+		cmpBytes = standardCompress(sBytes, gzip.DefaultCompression)
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "CompressTime")
 		b.ReportMetric(float64(len(sBytes)-len(cmpBytes)), "BytesSaved")
 
 		t1 = time.Now()
-		_ = standardDecompress(cmpBytes)
+		dcmpBytes, err = standardDecompress(cmpBytes)
+		if err != nil {
+			b.Fatal(err)
+		}
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "DecompressTime")
 	}
 }
 
 func BenchmarkBestCompGzip(b *testing.B) {
+	var err error
 	for i := 0; i < b.N; i++ {
 		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
-		cmpBytes := standardCompress(sBytes, gzip.BestCompression)
+		cmpBytes = standardCompress(sBytes, gzip.BestCompression)
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "CompressTime")
 		b.ReportMetric(float64(len(sBytes)-len(cmpBytes)), "BytesSaved")
 
 		t1 = time.Now()
-		_ = standardDecompress(cmpBytes)
+		dcmpBytes, err = standardDecompress(cmpBytes)
+		if err != nil {
+			b.Fatal(err)
+		}
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "DecompressTime")
 	}
 }
 
 func BenchmarkBestSpeedGzip(b *testing.B) {
+	var err error
 	for i := 0; i < b.N; i++ {
 		s := RandomString(4096)
 		sBytes := []byte(s)
 		t1 := time.Now()
-		cmpBytes := standardCompress(sBytes, gzip.BestSpeed)
+		cmpBytes = standardCompress(sBytes, gzip.BestSpeed)
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "CompressTime")
 		b.ReportMetric(float64(len(sBytes)-len(cmpBytes)), "BytesSaved")
 
 		t1 = time.Now()
-		_ = standardDecompress(cmpBytes)
+		dcmpBytes, err = standardDecompress(cmpBytes)
+		if err != nil {
+			b.Fatal(err)
+		}
 		b.ReportMetric(float64(time.Since(t1).Nanoseconds()), "DecompressTime")
 	}
 }
@@ -144,26 +162,11 @@ func standardCompress(msg []byte, level int) []byte {
 	return buf.Bytes()
 }
 
-func standardDecompress(msg []byte) []byte {
-	bReader := bytes.NewReader(msg)
-	reader, err := gzip.NewReader(bReader)
-	if err != nil {
-		fmt.Printf("Error when creating gzip reader: %s\n", err)
-		return nil
-	}
+func standardDecompress(msg []byte) ([]byte, error) {
+	decompressor := NewDecompressor()
 
-	b, err := ioutil.ReadAll(reader)
-	if err != nil {
-		fmt.Printf("Error when reading gzipped data: %s\n", err)
-		return nil
-	}
-
-	err = reader.Close()
-	if err != nil {
-		fmt.Printf("Error when closing gzip reader: %s\n", err)
-		return nil
-	}
-	return b
+	b, err := decompressor.Decompress(msg)
+	return b, err
 }
 
 func RandomString(n int) string {
@@ -171,18 +174,12 @@ func RandomString(n int) string {
 
 	s := make([]rune, n)
 	for i := range s {
-		s[i] = letters[rand.Intn(len(letters))]
+		randIndex, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			panic(err)
+		}
+
+		s[i] = letters[randIndex.Int64()]
 	}
 	return string(s)
-}
-
-func TestStandardCompressDecompress(t *testing.T) {
-	s := RandomString(4096)
-	sBytes := []byte(s)
-	cmpBytes := standardCompress(sBytes, gzip.DefaultCompression)
-	dcmpBytes := standardDecompress(cmpBytes)
-	dcmpString := string(dcmpBytes)
-	if dcmpString != s {
-		t.Fatalf("decompressed string not equal to original string\ndecomp string: \t `%s`\noriginal string: \t `%s`\n", dcmpString, s)
-	}
 }

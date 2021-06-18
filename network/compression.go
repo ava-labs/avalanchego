@@ -3,6 +3,7 @@ package network
 import (
 	"bytes"
 	"compress/gzip"
+	"io/ioutil"
 	"sync"
 )
 
@@ -61,4 +62,54 @@ func NewCompressorPool() sync.Pool {
 			return NewCompressor()
 		},
 	}
+}
+
+type Decompressor interface {
+	Decompress([]byte) ([]byte, error)
+}
+
+type gzipDecompressor struct {
+	buffer *bytes.Reader
+	reader *gzip.Reader
+}
+
+func (g gzipDecompressor) Decompress(msg []byte) ([]byte, error) {
+	if g.buffer == nil {
+		err := g.init(msg)
+		if err != nil {
+			return msg, err
+		}
+	} else {
+		g.buffer.Reset(msg)
+		err := g.reader.Reset(g.buffer)
+		if err != nil {
+			return msg, err
+		}
+	}
+
+	data, err := ioutil.ReadAll(g.reader)
+	if err != nil {
+		return msg, err
+	}
+
+	err = g.reader.Close()
+	if err != nil {
+		return msg, err
+	}
+
+	return data, nil
+}
+
+func (g gzipDecompressor) init(msg []byte) error {
+	g.buffer = bytes.NewReader(msg)
+	reader, err := gzip.NewReader(g.buffer)
+	if err != nil {
+		return err
+	}
+	g.reader = reader
+	return nil
+}
+
+func NewDecompressor() Decompressor {
+	return gzipDecompressor{}
 }
