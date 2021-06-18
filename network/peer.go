@@ -138,7 +138,8 @@ type peer struct {
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
 
-	gzipEnabled bool
+	gzipEnabled    bool
+	compressorPool sync.Pool
 }
 
 // newPeer returns a properly initialized *peer.
@@ -404,34 +405,23 @@ func (p *peer) compress(op string, msg []byte) []byte {
 	}
 
 	t1 := time.Now()
-	var b bytes.Buffer
-	gWriter := gzip.NewWriter(&b)
-	_, err := gWriter.Write(msg)
+	compressor := p.compressorPool.Get().(Compressor)
+	compressedBytes, err := compressor.Compress(msg)
+	compressor.Reset()
+	p.compressorPool.Put(compressor)
+
 	if err != nil {
-		p.net.log.Error("Error compressing data: %s", err)
 		return msg
 	}
 
-	err = gWriter.Flush()
-	if err != nil {
-		p.net.log.Error("Error flushing gzip writer: %s", err)
-		return msg
-	}
-
-	err = gWriter.Close()
-	if err != nil {
-		p.net.log.Error("Error closing gzip writer: %s", err)
-		return msg
-	}
-
-	compMsgSize := b.Len()
+	compMsgSize := len(compressedBytes)
 	p.net.log.Debug("packed message op, len, compLen, t \t %s, %d, %d, %d",
 		op,
 		msgLen,
 		compMsgSize,
 		time.Since(t1).Nanoseconds())
 
-	return b.Bytes()
+	return compressedBytes
 }
 
 // send assumes that the [stateLock] is not held.
@@ -859,6 +849,7 @@ func (p *peer) handleVersion(msg Msg) {
 
 	// todo marker version should be constant
 	p.gzipEnabled = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
+	p.compressorPool = NewCompressorPool()
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
