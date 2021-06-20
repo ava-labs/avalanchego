@@ -55,7 +55,7 @@ type VM struct {
 	fromCoreVM      chan common.Message
 	toEngine        chan<- common.Message
 	proBlkStartTime time.Time
-	siblings        map[ids.ID]([]*ProposerBlock)
+	proBlkTree      map[ids.ID]([]*ProposerBlock)
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
@@ -65,7 +65,7 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 		fromCoreVM:      nil,
 		toEngine:        nil,
 		proBlkStartTime: proBlkStart,
-		siblings:        nil,
+		proBlkTree:      nil,
 	}
 	res.state = newState(&res)
 	return &res
@@ -141,8 +141,8 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			vm.siblings = make(map[ids.ID][]*ProposerBlock)
-			vm.siblings[proGenBlk.ID()] = make([]*ProposerBlock, 0)
+			vm.proBlkTree = make(map[ids.ID][]*ProposerBlock)
+			vm.proBlkTree[proGenBlk.ID()] = make([]*ProposerBlock, 0)
 		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
@@ -272,7 +272,7 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 }
 
 func (vm *VM) handleConflicts(pb *ProposerBlock) error {
-	siblings, found := vm.siblings[pb.header.prntID]
+	siblings, found := vm.proBlkTree[pb.header.prntID]
 	if !found {
 		return ErrFailedHandlingConflicts // should not be possible
 	}
@@ -292,9 +292,9 @@ func (vm *VM) handleConflicts(pb *ProposerBlock) error {
 		}
 	}
 
-	delete(vm.siblings, pb.header.prntID)
-	if _, found := vm.siblings[pb.ID()]; !found {
-		vm.siblings[pb.ID()] = make([]*ProposerBlock, 0)
+	delete(vm.proBlkTree, pb.header.prntID)
+	if _, found := vm.proBlkTree[pb.ID()]; !found {
+		vm.proBlkTree[pb.ID()] = make([]*ProposerBlock, 0)
 	}
 	return nil
 }
@@ -323,8 +323,8 @@ func (vm *VM) rejectAllFrom(root *ProposerBlock, lastAcceptedCoreBlk snowman.Blo
 			}
 		}
 
-		queue = append(queue, vm.siblings[node.ID()]...)
-		delete(vm.siblings, node.ID())
+		queue = append(queue, vm.proBlkTree[node.ID()]...)
+		delete(vm.proBlkTree, node.ID())
 	}
 	return nil
 }

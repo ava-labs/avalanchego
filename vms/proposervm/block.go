@@ -247,7 +247,7 @@ func (pb *ProposerBlock) Verify() error {
 		return err
 	}
 
-	pb.vm.siblings[prntBlk.ID()] = append(pb.vm.siblings[prntBlk.ID()], pb)
+	pb.vm.proBlkTree[prntBlk.ID()] = append(pb.vm.proBlkTree[prntBlk.ID()], pb)
 
 	return nil
 }
