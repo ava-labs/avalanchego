@@ -154,6 +154,7 @@ func (pb *ProposerBlock) Accept() error {
 func (pb *ProposerBlock) Reject() error {
 	// coreBlock rejection is handled upon accept of siblings
 	pb.status = choices.Rejected
+	// TODO: persist
 	return nil
 }
 
@@ -241,13 +242,20 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrInvalidSignature
 	}
 
-	// validate core block. Verify must be called only once if it succeeds
-	// hence must be at the very end
-	if err := pb.coreBlk.Verify(); err != nil {
-		return err
+	// validate core block, only once
+	verifiedCores := pb.vm.proBlkTree[prntBlk.ID()].verifiedCores
+	if _, verified := verifiedCores[pb.coreBlk.ID()]; !verified {
+		if err := pb.coreBlk.Verify(); err != nil {
+			return err
+		}
+
+		verifiedCores[pb.coreBlk.ID()] = struct{}{}
 	}
 
-	pb.vm.proBlkTree[prntBlk.ID()] = append(pb.vm.proBlkTree[prntBlk.ID()], pb)
+	pb.vm.proBlkTree[prntBlk.ID()] = proBlkTreeNode{
+		proChildren:   append(pb.vm.proBlkTree[prntBlk.ID()].proChildren, pb),
+		verifiedCores: verifiedCores,
+	}
 
 	return nil
 }

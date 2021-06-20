@@ -148,6 +148,9 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	if err := proVM.state.storeProBlk(&prntProBlk); err != nil {
 		t.Fatal("Could not store proposerBlock")
 	}
+	proVM.proBlkTree[prntProBlk.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Block with known parent should verify")
@@ -174,6 +177,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	}
 	if err := proVM.state.storeProBlk(&parentProBlk); err != nil {
 		t.Fatal("Could not store proposerBlock")
+	}
+	proVM.proBlkTree[parentProBlk.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 
 	// child block timestamp cannot be lower than parent timestamp
@@ -308,6 +314,9 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	if err := proVM.state.storeProBlk(&parentProBlk); err != nil {
 		t.Fatal("Could not store proposerBlock")
 	}
+	proVM.proBlkTree[parentProBlk.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 
 	// child P-Chain height must not precede parent P-Chain height
 	childCoreBlk := snowman.TestBlock{
@@ -371,6 +380,42 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 		t.Fatal("ProBlock's P-Chain-Height cannot be higher than current P chain height")
 	} else if err != ErrProBlkWrongHeight {
 		t.Fatal("Proposer block has wrong height should have different error")
+	}
+}
+
+func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
+	// Verify a block once (in this test by building it).
+	// Show that other verify call would not call coreBlk.Verify()
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	pChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2021),
+			StatusV: choices.Processing,
+		},
+		ParentV: coreGenBlk,
+		VerifyV: nil,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+
+	builtBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build block")
+	}
+
+	// set error on coreBlock.Verify and recall Verify()
+	coreBlk.VerifyV = errors.New("core block should be called only once")
+	if err := builtBlk.Verify(); err != nil {
+		t.Fatal("already verified block would not verify")
+	}
+
+	// rebuild a block with the same core block
+	pChainHeight++
+	if _, err := proVM.BuildBlock(); err != nil {
+		t.Fatal("could not build block with same core block")
 	}
 }
 
@@ -446,6 +491,9 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	}
 	if err := proVM.state.storeProBlk(&proBlk1); err != nil {
 		t.Fatal("Could not store proposerBlock")
+	}
+	proVM.proBlkTree[proBlk1.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 
 	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), currentPChainHeight, *pTestCert.Leaf)
@@ -618,6 +666,9 @@ func TestAccept_ChainConflict(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
@@ -694,6 +745,9 @@ func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
 
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -854,6 +908,9 @@ func TestReject_ParentFirst_ChainConflict(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
@@ -981,6 +1038,9 @@ func TestReject_ChildFirst_ChainConflict(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
@@ -1101,6 +1161,9 @@ func TestReject_ParentFirst_MixedCoreBlocksConflict(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
@@ -1211,6 +1274,9 @@ func TestReject_ChildFirst_MixedCoreBlocksConflict(t *testing.T) {
 
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{

@@ -308,6 +308,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("Could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 
 	// build block...
 	coreVM.CantBuildBlock = true
@@ -396,6 +399,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	}
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("Could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 
 	// build block...
@@ -635,6 +641,9 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 	if err := proVM.SetPreference(proBlk1.ID()); err != nil {
 		t.Fatal("Could not set preference")
 	}
+	proVM.proBlkTree[proBlk1.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build block")
@@ -672,6 +681,9 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 	// update preference to build next block
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("Could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 	proBlk3, err := proVM.BuildBlock()
 	if err != nil {

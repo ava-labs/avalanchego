@@ -46,6 +46,11 @@ func (c clockImpl) now() time.Time {
 	return time.Now()
 }
 
+type proBlkTreeNode struct {
+	proChildren   []*ProposerBlock
+	verifiedCores map[ids.ID]struct{} // set of already verified core IDs
+}
+
 type VM struct {
 	block.ChainVM
 	state *innerState
@@ -55,7 +60,7 @@ type VM struct {
 	fromCoreVM      chan common.Message
 	toEngine        chan<- common.Message
 	proBlkStartTime time.Time
-	proBlkTree      map[ids.ID]([]*ProposerBlock)
+	proBlkTree      map[ids.ID](proBlkTreeNode)
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
@@ -141,8 +146,11 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			vm.proBlkTree = make(map[ids.ID][]*ProposerBlock)
-			vm.proBlkTree[proGenBlk.ID()] = make([]*ProposerBlock, 0)
+			vm.proBlkTree = make(map[ids.ID]proBlkTreeNode)
+			vm.proBlkTree[proGenBlk.ID()] = proBlkTreeNode{
+				proChildren:   make([]*ProposerBlock, 0),
+				verifiedCores: make(map[ids.ID]struct{}),
+			}
 		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
@@ -272,17 +280,17 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 }
 
 func (vm *VM) handleConflicts(pb *ProposerBlock) error {
-	siblings, found := vm.proBlkTree[pb.header.prntID]
+	node, found := vm.proBlkTree[pb.header.prntID]
 	if !found {
 		return ErrFailedHandlingConflicts // should not be possible
 	}
-	switch len(siblings) {
+	switch len(node.proChildren) {
 	case 0: // no children, do nothing
 		return nil
 	case 1: // 1 children, no conflicts
 		break
 	default: // conflict
-		for _, sib := range siblings {
+		for _, sib := range node.proChildren {
 			if pb.ID() == sib.ID() {
 				continue
 			}
@@ -294,7 +302,10 @@ func (vm *VM) handleConflicts(pb *ProposerBlock) error {
 
 	delete(vm.proBlkTree, pb.header.prntID)
 	if _, found := vm.proBlkTree[pb.ID()]; !found {
-		vm.proBlkTree[pb.ID()] = make([]*ProposerBlock, 0)
+		vm.proBlkTree[pb.ID()] = proBlkTreeNode{
+			proChildren:   make([]*ProposerBlock, 0),
+			verifiedCores: make(map[ids.ID]struct{}),
+		}
 	}
 	return nil
 }
@@ -323,7 +334,8 @@ func (vm *VM) rejectAllFrom(root *ProposerBlock, lastAcceptedCoreBlk snowman.Blo
 			}
 		}
 
-		queue = append(queue, vm.proBlkTree[node.ID()]...)
+		childrenNodes := vm.proBlkTree[node.ID()].proChildren
+		queue = append(queue, childrenNodes...)
 		delete(vm.proBlkTree, node.ID())
 	}
 	return nil
