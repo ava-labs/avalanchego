@@ -9,14 +9,11 @@ import (
 	"io"
 )
 
-var gzipHeaderBytes = []byte{0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255}
-
 const compressionThresholdBytes = 128
 
 type Compressor interface {
 	Compress([]byte) ([]byte, error)
 	Decompress([]byte) ([]byte, error)
-	IsCompressed([]byte) bool
 	IsCompressable([]byte) bool
 }
 
@@ -50,11 +47,6 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 	return io.ReadAll(g.gzipReader)
-}
-
-// IsCompressed returns whether given bytes are compressed data or not
-func (g *gzipCompressor) IsCompressed(msg []byte) bool {
-	return len(msg) > 10 && bytes.Equal(msg[:10], gzipHeaderBytes)
 }
 
 func (g *gzipCompressor) IsCompressable(msg []byte) bool {
