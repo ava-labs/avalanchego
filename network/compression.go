@@ -22,16 +22,19 @@ type Compressor interface {
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
-	initialized bool
+	writerInitialised bool
+	readerInitialised bool
+
+	writeBuffer *bytes.Buffer
+	gzipWriter  *gzip.Writer
+
 	bytesReader *bytes.Reader
 	gzipReader  *gzip.Reader
-	gzipWriter  *gzip.Writer
-	writeBuffer *bytes.Buffer
 }
 
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
-	g.reset()
+	g.resetWriter()
 	if _, err := g.gzipWriter.Write(msg); err != nil {
 		return msg, err
 	}
@@ -46,21 +49,10 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 
 // Decompress decompresses [msg].
 func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
-	g.reset()
-	// todo move following into reset
-	if g.gzipReader == nil {
-		g.bytesReader = bytes.NewReader(msg)
-		gzipReader, err := gzip.NewReader(g.bytesReader)
-		if err != nil {
-			return nil, err
-		}
-		g.gzipReader = gzipReader
-	} else {
-		g.bytesReader.Reset(msg)
-		if err := g.gzipReader.Reset(g.bytesReader); err != nil && err != io.EOF {
-			return nil, err
-		}
+	if err := g.resetReader(msg); err != nil {
+		return nil, err
 	}
+
 	return io.ReadAll(g.gzipReader)
 }
 
@@ -73,15 +65,33 @@ func (g *gzipCompressor) IsCompressable(msg []byte) bool {
 	return len(msg) > compressionThresholdBytes
 }
 
-func (g *gzipCompressor) reset() {
-	if !g.initialized {
+func (g *gzipCompressor) resetWriter() {
+	if !g.writerInitialised {
 		var buf bytes.Buffer
 		g.writeBuffer = &buf
 		g.gzipWriter = gzip.NewWriter(g.writeBuffer)
-		g.initialized = true
+		g.writerInitialised = true
+	} else {
+		g.writeBuffer.Reset()
+		g.gzipWriter.Reset(g.writeBuffer)
 	}
-	g.writeBuffer.Reset()
-	g.gzipWriter.Reset(g.writeBuffer)
+}
+
+func (g *gzipCompressor) resetReader(msg []byte) error {
+	if !g.readerInitialised {
+		g.bytesReader = bytes.NewReader(msg)
+		gzipReader, err := gzip.NewReader(g.bytesReader)
+		if err != nil {
+			return err
+		}
+		g.gzipReader = gzipReader
+	} else {
+		g.bytesReader.Reset(msg)
+		if err := g.gzipReader.Reset(g.bytesReader); err != nil && err != io.EOF {
+			return err
+		}
+	}
+	return nil
 }
 
 // NewCompressor returns a new compressor instance
