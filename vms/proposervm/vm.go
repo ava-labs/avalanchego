@@ -17,7 +17,6 @@ package proposervm
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -27,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 var (
@@ -94,16 +92,8 @@ func (vm *VM) Initialize(
 	vm.state.init(dbManager.Current().Database)
 
 	vm.stakingCert = ctx.StakingCert
-	if ctx.ValidatorVM != nil {
-		vm.windower.VM = ctx.ValidatorVM
-	} else {
-		// a nil ctx.ValidatorVM is expected only if we are wrapping P-chain VM itself.
-		// Then core VM must implement the validators.VM interface
-		if valVM, ok := vm.ChainVM.(validators.VM); ok {
-			vm.windower.VM = valVM
-		} else {
-			return fmt.Errorf("core VM does not implement validators.VM interface")
-		}
+	if err := vm.windower.initialize(vm, ctx); err != nil {
+		return err
 	}
 
 	// TODO: comparison should be with genesis timestamp, not with Now()

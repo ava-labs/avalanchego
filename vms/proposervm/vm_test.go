@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -145,6 +146,16 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -181,6 +192,16 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -213,6 +234,16 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	coreVM, valVM, proVM, genesisBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	newBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -249,6 +280,16 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	currentPChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	// add to proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -341,6 +382,16 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	currentPChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	// add to proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -428,6 +479,16 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 	currentPChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	coreBlkDoesNotVerify := errors.New("coreBlk should not verify in this test")
 	coreBlk := &snowman.TestBlock{
@@ -476,6 +537,16 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	currentPChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	// create two Proposer blocks at the same height
 	coreBlk := &snowman.TestBlock{
@@ -548,6 +619,16 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	currentPChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	// one block is built from this proVM
 	localCoreBlk := &snowman.TestBlock{
@@ -600,6 +681,16 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	// build two blocks on top of genesis
 	coreBlk1 := &snowman.TestBlock{
@@ -827,6 +918,16 @@ func TestPreSnowmanSetPreference(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, NoProposerBlocks) // disable ProBlks
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+		if err != nil {
+			return nil, err
+		}
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
