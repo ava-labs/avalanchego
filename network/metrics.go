@@ -48,7 +48,7 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 	mm.bytesSaved = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_bytes_saved", msgType),
-		Help:      fmt.Sprintf("Size of bytes saved over %s messages sent to the network", msgType),
+		Help:      fmt.Sprintf("Number of bytes saved (due to compression) over %s messages sent to the network", msgType),
 	})
 
 	errs := wrappers.Errs{}
