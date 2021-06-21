@@ -94,16 +94,15 @@ func (h *Handler) Dispatch() {
 		// Wait until there is an unprocessed message
 		h.unprocessedMsgsCond.L.Lock()
 		for {
+			if closing := h.closing.GetValue(); closing {
+				h.unprocessedMsgsCond.L.Unlock()
+				return
+			}
 			// [h.unprocessedMsgsCond.L] must be held in this inner for loop
 			if h.unprocessedMsgs.Len() == 0 {
 				// Signalled in [h.push] and [h.StartShutdown]
 				h.unprocessedMsgsCond.Wait()
 				continue
-			}
-			closing := h.closing.GetValue()
-			if closing {
-				h.unprocessedMsgsCond.L.Unlock()
-				return
 			}
 			break
 		}
