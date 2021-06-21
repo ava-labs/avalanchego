@@ -4,6 +4,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+
+echo ${DOCKER_REPO:-"Nothing is set"}
+
+exit 1
 # Testing specific variables
 avalanche_testing_repo="avaplatform/avalanche-testing"
 avalanchego_byzantine_repo="avaplatform/avalanche-byzantine"
