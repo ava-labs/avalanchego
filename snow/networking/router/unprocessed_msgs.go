@@ -4,8 +4,6 @@
 package router
 
 import (
-	"sync"
-
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -20,14 +18,6 @@ type unprocessedMsgs interface {
 	Pop() message
 	// Returns the number of unprocessed messages
 	Len() int
-	// Returns a condition variable that is signalled when
-	// there are unprocessed messages or when Shutdown is called
-	Cond() *sync.Cond
-	// Signals the condition variable returned by Cond()
-	// and causes HasShutdown() to return true
-	Shutdown()
-	// Returns true iff Shutdown() has been called
-	HasShutdown() bool
 }
 
 func newUnprocessedMsgs(vdrs validators.Set, cpuTracker tracker.TimeTracker) unprocessedMsgs {
@@ -43,28 +33,14 @@ type unprocessedMsgsImpl struct {
 	// unprocessed messages
 	msgs []message
 	// Validator set for the chain associated with this
-	vdrs validators.Set
-	// TODO periodically call [cpuTracker.EndInterval]
+	vdrs       validators.Set
 	cpuTracker tracker.TimeTracker
 	// Useful for faking time in tests
 	clock timer.Clock
-	cond  sync.Cond
-	// true iff Shutdown() has been called
-	hasShutdown bool
 }
 
 func (u *unprocessedMsgsImpl) Push(msg message) {
 	u.msgs = append(u.msgs, msg)
-	u.cond.Signal()
-}
-
-func (u *unprocessedMsgsImpl) Shutdown() {
-	u.cond.Signal()
-	u.hasShutdown = true
-}
-
-func (u *unprocessedMsgsImpl) HasShutdown() bool {
-	return u.hasShutdown
 }
 
 // Must only be called when [u.Len()] != 0
@@ -84,10 +60,6 @@ func (u *unprocessedMsgsImpl) Pop() message {
 		u.msgs = append(u.msgs, msg)
 		u.msgs = u.msgs[1:]
 	}
-}
-
-func (u *unprocessedMsgsImpl) Cond() *sync.Cond {
-	return &u.cond
 }
 
 func (u *unprocessedMsgsImpl) Len() int {

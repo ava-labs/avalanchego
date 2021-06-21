@@ -5,6 +5,7 @@ package router
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
@@ -37,9 +39,12 @@ type Handler struct {
 	cpuTracker tracker.TimeTracker
 	// Called in a goroutine when this handler/engine shuts down.
 	// May be nil.
-	onCloseF func()
-	// Holds messages that [engine] hasn't processed yet
+	onCloseF            func()
+	unprocessedMsgsCond sync.Cond
+	// Holds messages that [engine] hasn't processed yet.
+	// [unprocessedMsgsCond.L] must be held while accessing [unprocessedMsgs].
 	unprocessedMsgs unprocessedMsgs
+	closing         utils.AtomicBool
 }
 
 // Initialize this consensus handler
@@ -77,30 +82,26 @@ func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
 func (h *Handler) Dispatch() {
 	defer h.shutdown()
 
-	// TODO handle shut down signal
-	// TODO handle messages from the VM
-	// 	case msg := <-h.msgFromVMChan:
-	// 		// handle a message from the VM
-	// 		h.handleMsg(message{
-	// 			messageType:  constants.NotifyMsg,
-	// 			notification: msg,
-	// 		})
-	// 	}
+	// Handle messages from the VM
+	go h.dispatchInternal()
 
-	// Signalled when there are unprocessed messages
-	cond := h.unprocessedMsgs.Cond()
+	// Handle messages from the network
 	for {
-		cond.L.Lock()
-		for h.unprocessedMsgs.Len() == 0 && !h.unprocessedMsgs.HasShutdown() {
-			cond.Wait()
+		h.unprocessedMsgsCond.L.Lock()
+		if h.unprocessedMsgs.Len() == 0 {
+			// Signalled in [h.push] and [h.StartShutdown]
+			h.unprocessedMsgsCond.Wait()
+			continue
 		}
-		if h.unprocessedMsgs.HasShutdown() {
-			cond.L.Unlock()
+		closing := h.closing.GetValue()
+		if closing {
+			h.unprocessedMsgsCond.L.Unlock()
 			return
 		}
+
 		// Get the next message we should process
 		msg := h.unprocessedMsgs.Pop()
-		cond.L.Unlock()
+		h.unprocessedMsgsCond.L.Unlock()
 
 		// If this message's deadline has passed, don't process it.
 		if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
@@ -160,6 +161,7 @@ func (h *Handler) handleMsg(msg message) error {
 	return err
 }
 
+// Assumes [h.ctx.Lock] is locked
 func (h *Handler) handleConsensusMsg(msg message, startTime time.Time) error {
 	var err error
 	switch msg.messageType {
@@ -216,7 +218,7 @@ func (h *Handler) GetAcceptedFrontier(
 	deadline time.Time,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.GetAcceptedFrontierMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -234,7 +236,7 @@ func (h *Handler) AcceptedFrontier(
 	containerIDs []ids.ID,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.AcceptedFrontierMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -247,8 +249,7 @@ func (h *Handler) AcceptedFrontier(
 // GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
 // from the network to the consensus engine.
 func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) {
-	// TODO mark this as reliable?
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.GetAcceptedFrontierFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
@@ -264,7 +265,7 @@ func (h *Handler) GetAccepted(
 	containerIDs []ids.ID,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.GetAcceptedMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -283,7 +284,7 @@ func (h *Handler) Accepted(
 	containerIDs []ids.ID,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.AcceptedMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -296,7 +297,7 @@ func (h *Handler) Accepted(
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
 // network to the consensus engine.
 func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.GetAcceptedFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
@@ -311,7 +312,7 @@ func (h *Handler) GetAncestors(
 	containerID ids.ID,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.GetAncestorsMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -329,7 +330,7 @@ func (h *Handler) MultiPut(
 	containers [][]byte,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.MultiPutMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -341,7 +342,7 @@ func (h *Handler) MultiPut(
 
 // GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
 func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.GetAncestorsFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
@@ -350,7 +351,7 @@ func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 
 // Timeout passes a new timeout notification to the consensus engine
 func (h *Handler) Timeout() {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.TimeoutMsg,
 	})
 }
@@ -363,7 +364,7 @@ func (h *Handler) Get(
 	containerID ids.ID,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.GetMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -382,7 +383,7 @@ func (h *Handler) Put(
 	container []byte,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.PutMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -395,7 +396,7 @@ func (h *Handler) Put(
 
 // GetFailed passes a GetFailed message to the consensus engine.
 func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.GetFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
@@ -411,7 +412,7 @@ func (h *Handler) PushQuery(
 	container []byte,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.PushQueryMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -431,7 +432,7 @@ func (h *Handler) PullQuery(
 	containerID ids.ID,
 	onDoneHandling func(),
 ) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.PullQueryMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -444,7 +445,7 @@ func (h *Handler) PullQuery(
 
 // Chits passes a Chits message received from the network to the consensus engine.
 func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID, onDoneHandling func()) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:    constants.ChitsMsg,
 		validatorID:    validatorID,
 		requestID:      requestID,
@@ -456,7 +457,7 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.I
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.
 func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.QueryFailedMsg,
 		validatorID: validatorID,
 		requestID:   requestID,
@@ -465,7 +466,7 @@ func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
 
 // Connected passes a new connection notification to the consensus engine
 func (h *Handler) Connected(validatorID ids.ShortID) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.ConnectedMsg,
 		validatorID: validatorID,
 	})
@@ -473,7 +474,7 @@ func (h *Handler) Connected(validatorID ids.ShortID) {
 
 // Disconnected passes a new connection notification to the consensus engine
 func (h *Handler) Disconnected(validatorID ids.ShortID) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.DisconnectedMsg,
 		validatorID: validatorID,
 	})
@@ -485,14 +486,14 @@ func (h *Handler) Gossip() {
 		// Shouldn't send gossiping messages while the chain is bootstrapping
 		return
 	}
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType: constants.GossipMsg,
 	})
 }
 
 // Notify ...
 func (h *Handler) Notify(msg common.Message) {
-	h.unprocessedMsgs.Push(message{
+	h.push(message{
 		messageType:  constants.NotifyMsg,
 		notification: msg,
 	})
@@ -503,7 +504,9 @@ func (h *Handler) Notify(msg common.Message) {
 // This method causes [shutdown] to eventually be called.
 // [h.closed] is closed when this handler/engine are done shutting down.
 func (h *Handler) StartShutdown() {
-	h.unprocessedMsgs.Shutdown()
+	h.closing.SetValue(true)
+	// If we're waiting, in [Dispatch], wake up.
+	h.unprocessedMsgsCond.Broadcast()
 	// Don't process any more bootstrap messages.
 	// If [h.engine] is processing a bootstrap message, stop.
 	// We do this because if we didn't, and the engine was in the
@@ -529,6 +532,32 @@ func (h *Handler) shutdown() {
 	endTime := h.clock.Time()
 	h.metrics.shutdown.Observe(float64(endTime.Sub(startTime)))
 	close(h.closed)
+}
+
+func (h *Handler) push(msg message) {
+	h.unprocessedMsgsCond.L.Lock()
+	defer h.unprocessedMsgsCond.L.Unlock()
+
+	h.unprocessedMsgs.Push(msg)
+	h.unprocessedMsgsCond.Broadcast()
+}
+
+func (h *Handler) dispatchInternal() {
+	for {
+		select {
+		case <-h.closed:
+			return
+		case msg := <-h.msgFromVMChan:
+			if closing := h.closing.GetValue(); closing {
+				return
+			}
+			// handle a message from the VM
+			h.push(message{
+				messageType:  constants.NotifyMsg,
+				notification: msg,
+			})
+		}
+	}
 }
 
 func (h *Handler) endInterval() {
