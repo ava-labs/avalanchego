@@ -153,6 +153,8 @@ func (pb *ProposerBlock) Accept() error {
 		// pb parent block should not be needed anymore.
 		// TODO: consider pruning option
 		pb.vm.state.wipeFromCacheProBlk(pb.header.prntID)
+		pb.vm.scheduler.newAcceptedBlk <- pb.vm.windower.getNextWindowStart(pb.Timestamp())
+
 		return nil
 	case ErrLastAcceptedIDNotFound: // pre snowman++ case
 		return pb.coreBlk.Accept()

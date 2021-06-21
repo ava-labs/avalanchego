@@ -608,6 +608,8 @@ func TestAccept_BlockConflict(t *testing.T) {
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk1.Bytes()):
 			return coreBlk1, nil
 		case bytes.Equal(b, coreBlk2.Bytes()):
@@ -714,6 +716,8 @@ func TestAccept_ChainConflict(t *testing.T) {
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk1.Bytes()):
 			return coreBlk1, nil
 		case bytes.Equal(b, coreBlk2.Bytes()):
@@ -852,6 +856,8 @@ func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk.Bytes()):
 			return coreBlk, nil
 		case bytes.Equal(b, coreBlk3.Bytes()):
@@ -1047,6 +1053,8 @@ func TestReject_ParentFirst_ChainConflict(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk1.Bytes()):
 			return coreBlk1, nil
 		case bytes.Equal(b, coreBlk2.Bytes()):
@@ -1187,6 +1195,8 @@ func TestReject_ChildFirst_ChainConflict(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk1.Bytes()):
 			return coreBlk1, nil
 		case bytes.Equal(b, coreBlk2.Bytes()):
@@ -1332,6 +1342,8 @@ func TestReject_ParentFirst_MixedCoreBlocksConflict(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk.Bytes()):
 			return coreBlk, nil
 		case bytes.Equal(b, coreBlk3.Bytes()):
@@ -1466,6 +1478,8 @@ func TestReject_ChildFirst_MixedCoreBlocksConflict(t *testing.T) {
 	}
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
 		case bytes.Equal(b, coreBlk.Bytes()):
 			return coreBlk, nil
 		case bytes.Equal(b, coreBlk3.Bytes()):

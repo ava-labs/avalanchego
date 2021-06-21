@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -136,21 +135,6 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	valVM := &TestValidatorVM{
 		T: t,
 	}
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
-	valVM.CantGetValidatorSet = true
-	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
-	if err != nil {
-		t.Fatal("Could not evalute nodeID")
-	}
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		res[ids.ShortID{1}] = uint64(5)
-		res[ids.ShortID{2}] = uint64(6)
-		res[ids.ShortID{3}] = uint64(7)
-		return res, nil
-	}
 
 	ctx := &snow.Context{
 		StakingCert: *pTestCert,
@@ -160,6 +144,19 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	if err := proVM.Initialize(ctx, dummyDBManager, coreGenBlk.Bytes(), nil, nil, nil, nil); err != nil {
 		t.Fatal("failed to initialize proposerVM")
 	}
+
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.CantGetValidatorSet = true
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[proVM.nodeID] = uint64(10)
+		res[ids.ShortID{1}] = uint64(5)
+		res[ids.ShortID{2}] = uint64(6)
+		res[ids.ShortID{3}] = uint64(7)
+		return res, nil
+	}
+
 	return coreVM, valVM, proVM, coreGenBlk
 }
 

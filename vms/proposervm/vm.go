@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -54,29 +55,26 @@ type VM struct {
 	state *innerState
 	windower
 	clock
-	stakingCert     tls.Certificate
-	fromCoreVM      chan common.Message
-	toEngine        chan<- common.Message
-	proBlkStartTime time.Time
-	proBlkTree      map[ids.ID](proBlkTreeNode)
+
+	// node identity attributes
+	stakingCert tls.Certificate
+	nodeID      ids.ShortID
+
+	scheduler *scheduler
+
+	proBlkActivationTime time.Time
+	proBlkTree           map[ids.ID](proBlkTreeNode)
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 	res := VM{
-		ChainVM:         vm,
-		clock:           clockImpl{},
-		fromCoreVM:      nil,
-		toEngine:        nil,
-		proBlkStartTime: proBlkStart,
-		proBlkTree:      nil,
+		ChainVM:              vm,
+		clock:                clockImpl{},
+		proBlkActivationTime: proBlkStart,
+		proBlkTree:           nil,
 	}
 	res.state = newState(&res)
 	return &res
-}
-
-func (vm *VM) handleBlockTiming() {
-	msg := <-vm.fromCoreVM
-	vm.toEngine <- msg
 }
 
 // common.VM interface implementation
@@ -91,20 +89,28 @@ func (vm *VM) Initialize(
 ) error {
 	vm.state.init(dbManager.Current().Database)
 
+	var err error
 	vm.stakingCert = ctx.StakingCert
+	if vm.nodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(vm.stakingCert.Leaf.Raw)); err != nil {
+		return err
+	}
+
 	if err := vm.windower.initialize(vm, ctx); err != nil {
 		return err
 	}
 
+	vm.scheduler = &scheduler{}
+	if err := vm.scheduler.initialize(vm, toEngine); err != nil {
+		return err
+	}
+
 	// TODO: comparison should be with genesis timestamp, not with Now()
-	if vm.now().After(vm.proBlkStartTime) {
+	if vm.now().After(vm.proBlkActivationTime) {
 		// proposerVM intercepts VM events for blocks and times event relay to consensus
-		vm.toEngine = toEngine
-		vm.fromCoreVM = make(chan common.Message, len(toEngine))
 
 		// Assuming genesisBytes has not proposerBlockHeader
 		if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
-			configBytes, vm.fromCoreVM, fxs); err != nil {
+			configBytes, vm.scheduler.coreVMChannel(), fxs); err != nil {
 			return err
 		}
 
@@ -146,7 +152,8 @@ func (vm *VM) Initialize(
 			return err
 		}
 
-		go vm.handleBlockTiming()
+		vm.scheduler.rescheduleBlkTicker()
+		go vm.scheduler.handleBlockTiming()
 	} else if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
 		configBytes, toEngine, fxs); err != nil {
 		return err
@@ -163,7 +170,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
-	if vm.now().After(vm.proBlkStartTime) {
+	if vm.now().After(vm.proBlkActivationTime) {
 		proParentID, err := vm.state.getPreferredID()
 		if err != nil {
 			return nil, err
