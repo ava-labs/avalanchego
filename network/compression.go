@@ -9,7 +9,7 @@ import (
 	"io"
 )
 
-var gzipHeaderBytes = []byte{0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 4, 0}
+var gzipHeaderBytes = []byte{0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255}
 
 const compressionThresholdBytes = 128
 
