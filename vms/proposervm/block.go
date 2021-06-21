@@ -182,6 +182,12 @@ func (pb *ProposerBlock) Verify() error {
 
 		verifiedCores[pb.coreBlk.ID()] = struct{}{}
 	}
+
+	pb.vm.proBlkTree[prntBlk.ID()] = proBlkTreeNode{
+		proChildren:   append(pb.vm.proBlkTree[prntBlk.ID()].proChildren, pb),
+		verifiedCores: verifiedCores,
+	}
+
 	return nil
 }
 
