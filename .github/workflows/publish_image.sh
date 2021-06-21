@@ -28,4 +28,5 @@ echo "Pushing: $avalanchego_dockerhub_repo:$current_branch"
 echo "$DOCKER_PASS" | docker login --username "$DOCKER_USERNAME" --password-stdin
 
 ## pushing image with tags
-docker image push -a $avalanchego_dockerhub_repo
+# testing - clear this
+echo docker image push -a $avalanchego_dockerhub_repo
