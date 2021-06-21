@@ -379,35 +379,20 @@ func (p *peer) WriteMessages() {
 
 const compressionThresholdBytes = 128
 
-// compress compresses given msg bytes if larger than 128 bytes
-// in case of any errors, we log and return the original data uncompressed
-func (p *peer) compress(op string, msg []byte) []byte {
+// compress compresses [msg]
+func (p *peer) compress(msg []byte) ([]byte, error) {
 	msgLen := len(msg)
-
-	if msgLen < compressionThresholdBytes {
-		return msg
+	if msgLen < compressionThresholdBytes { // TODO move this logic to compressor
+		return msg, nil
 	}
-
-	t1 := time.Now()
-	compressedBytes, err := p.compressor.Compress(msg)
-	if err != nil {
-		return msg
-	}
-
-	compMsgSize := len(compressedBytes)
-	p.net.log.Debug("packed message op, len, compLen, t \t %s, %d, %d, %d",
-		op,
-		msgLen,
-		compMsgSize,
-		time.Since(t1).Nanoseconds())
-
-	return compressedBytes
+	return p.compressor.Compress(msg)
 }
 
 // send assumes that the [stateLock] is not held.
 // If [canModifyMsg], [msg] may be modified by this method.
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
+// TODO move logic about whether to compress to the Compressor
 func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
@@ -427,7 +412,12 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 
 	msgBytes := msg.Bytes()
 	if compressMsg && p.gzipEnabled {
-		msgBytes = p.compress(msg.Op().String(), msgBytes)
+		var err error
+		msgBytes, err = p.compress(msgBytes)
+		if err != nil {
+			p.net.log.Error("couldn't compress message: %s", err)
+			return false
+		}
 	}
 
 	msgBytesLen := int64(len(msgBytes))
