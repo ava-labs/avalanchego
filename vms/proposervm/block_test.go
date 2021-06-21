@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 type TestOptionsBlock struct {
@@ -43,14 +44,6 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal("Proposer block should forward wrapped block options if this implements Option interface")
 	}
-}
-
-type testClock struct {
-	setTime time.Time
-}
-
-func (tC testClock) now() time.Time {
-	return tC.setTime
 }
 
 // TODO: these two below are the first tests I wrote. Remove or move to vm tests
@@ -110,10 +103,8 @@ func TestProposerBlockParseFailure(t *testing.T) {
 
 // ProposerBlock.Verify tests section
 func TestProposerBlockVerificationParent(t *testing.T) {
-	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	_, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
 	pCH, err := proVM.pChainHeight()
 	if err != nil {
 		t.Fatal("could not retrieve P-chain height")
@@ -148,6 +139,9 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	if err := proVM.state.storeProBlk(&prntProBlk); err != nil {
 		t.Fatal("Could not store proposerBlock")
 	}
+	proVM.proBlkTree[prntProBlk.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Block with known parent should verify")
@@ -157,7 +151,21 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	pChainHeight := uint64(2000)
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valVM.CantGetValidatorSet = true
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		res[ids.ShortID{1}] = uint64(5)
+		res[ids.ShortID{2}] = uint64(6)
+		res[ids.ShortID{3}] = uint64(7)
+		return res, nil
+	}
 
 	prntTimestamp := proVM.now().Unix()
 	pCH, err := proVM.pChainHeight()
@@ -174,6 +182,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	}
 	if err := proVM.state.storeProBlk(&parentProBlk); err != nil {
 		t.Fatal("Could not store proposerBlock")
+	}
+	proVM.proBlkTree[parentProBlk.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 
 	// child block timestamp cannot be lower than parent timestamp
@@ -197,27 +208,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		t.Fatal("Old proposer block timestamp should have different error")
 	}
 
-	// block can arrive at its creator window starts
-	firstWindowsStart := prntTimestamp
-	proVM.mockedValPos = 0 // creator windows is the first
-	childProBlk, err = NewProBlock(proVM,
-		NewProHeader(parentProBlk.ID(),
-			firstWindowsStart,
-			pCH, *pTestCert.Leaf),
-		&childCoreBlk, choices.Processing, nil, true)
-	if err != nil {
-		t.Fatal("could not sign child block")
-	}
-
-	if err := childProBlk.Verify(); err != nil {
-		t.Fatal("Proposer block timestamp equal to parent block timestamp should verify")
-	}
-
 	// block cannot arrive before its creator window starts
-	proVM.mockedValPos = 1 // creator windows is the second
-	blkNodeID := ids.ShortID{}
-	winDelay := proVM.BlkSubmissionDelay(childProBlk.header.pChainHeight, blkNodeID)
-	beforeWindowStart := time.Unix(prntTimestamp, 0).Add(winDelay - time.Second).Unix()
+	winDelay := proVM.BlkSubmissionDelay(pChainHeight, nodeID)
+	beforeWindowStart := time.Unix(prntTimestamp, 0).Add(winDelay).Add(-time.Second).Unix()
 	childProBlk, err = NewProBlock(proVM,
 		NewProHeader(parentProBlk.ID(),
 			beforeWindowStart,
@@ -293,12 +286,21 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
-	prntBlkPChainHeight, _ := proVM.pChainHeight()
-	prntBlkPChainHeight /= 2
 	prntCoreBlk := snowman.TestBlock{}
+	prntBlkPChainHeight := pChainHeight / 2
 	parentProBlk, err := NewProBlock(proVM,
 		NewProHeader(ids.Empty, 0, prntBlkPChainHeight, *pTestCert.Leaf),
 		&prntCoreBlk, choices.Processing, nil, true)
@@ -307,6 +309,9 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	}
 	if err := proVM.state.storeProBlk(&parentProBlk); err != nil {
 		t.Fatal("Could not store proposerBlock")
+	}
+	proVM.proBlkTree[parentProBlk.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
@@ -374,12 +379,46 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	}
 }
 
+func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
+	// Verify a block once (in this test by building it).
+	// Show that other verify call would not call coreBlk.Verify()
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	pChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2021),
+			StatusV: choices.Processing,
+		},
+		ParentV: coreGenBlk,
+		VerifyV: nil,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+
+	builtBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build block")
+	}
+
+	// set error on coreBlock.Verify and recall Verify()
+	coreBlk.VerifyV = errors.New("core block should be called only once")
+	if err := builtBlk.Verify(); err != nil {
+		t.Fatal("already verified block would not verify")
+	}
+
+	// rebuild a block with the same core block
+	pChainHeight++
+	if _, err := proVM.BuildBlock(); err != nil {
+		t.Fatal("could not build block with same core block")
+	}
+}
+
 // ProposerBlock.Accept tests section
 func TestProposerBlockAcceptSetLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -416,10 +455,7 @@ func TestProposerBlockAcceptSetLastAcceptedBlock(t *testing.T) {
 }
 
 func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate two blocks with the same core block and store them
 	coreBlk := &snowman.TestBlock{
@@ -439,7 +475,11 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	}
 
 	proGenBlkID, _ := proVM.LastAccepted()
-	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	pChainHeight, err := proVM.windower.GetCurrentHeight()
+	if err != nil {
+		t.Fatal("could not retrieve pChain height")
+	}
+	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -447,8 +487,11 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	if err := proVM.state.storeProBlk(&proBlk1); err != nil {
 		t.Fatal("Could not store proposerBlock")
 	}
+	proVM.proBlkTree[proBlk1.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 
-	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), currentPChainHeight, *pTestCert.Leaf)
+	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -476,12 +519,9 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	}
 }
 
-func TestProAndCoreBlockAccept_SimpleCase(t *testing.T) {
+func TestAccept_SingleBlock(t *testing.T) {
 	// there is just one ProBlock with no siblings being accepted
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate one proposer block...
 	coreVM.CantBuildBlock = true
@@ -494,6 +534,9 @@ func TestProAndCoreBlockAccept_SimpleCase(t *testing.T) {
 		VerifyV: nil,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) { return coreBlk, nil }
+
 	proBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -513,15 +556,371 @@ func TestProAndCoreBlockAccept_SimpleCase(t *testing.T) {
 	if coreBlk.Status() != choices.Accepted {
 		t.Fatal("accepted core block has wrong status")
 	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk, err = proVM.GetBlock(proBlk.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk.Status() != choices.Accepted {
+		t.Fatal("accepted pro block has wrong status")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("accepted core block has wrong status")
+	}
 }
 
-func TestProAndCoreBlockAccept_BlockConflict(t *testing.T) {
+func TestAccept_BlockConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings;
 	// Once proBlk1 is accepted, proBlk2 is rejected
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+
+	// generate proBlk1 and proBlk2 with different coreBlocks
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreBlk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2222),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("test requires proBlk1 different from proBlk2")
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
+
+	// ..accept proBlk2 and check that proBlk2 is accepted and proBlk1 rejected
+	if err := proBlk2.Accept(); err != nil {
+		t.Fatal("Could not accept proposer block")
+	}
+
+	if proBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk2, err = proVM.GetBlock(proBlk2.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk1, err = proVM.GetBlock(proBlk1.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+}
+
+func TestAccept_ChainConflict(t *testing.T) {
+	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings; proBlk2 has a child proBlk3
+	// Once proBlk1 is accepted, proBlk2 and proBlk3 are rejected
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+
+	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreBlk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2222),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("test requires proBlk1 different from proBlk2")
+	}
+
+	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
+		t.Fatal("could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
+	coreBlk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(3333),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{3},
+		ParentV: coreBlk2,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
+
+	proBlk3, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+
+	// ..accept proBlk1 and check that proBlk1 is accepted and proBlk2/proBlk3 are  rejected
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not accept proposer block")
+	}
+
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk1, err = proVM.GetBlock(proBlk1.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk2, err = proVM.GetBlock(proBlk2.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+
+	if proBlk3, err = proVM.GetBlock(proBlk3.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+}
+
+func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
+	// proBlk1 and proBlk2 wrap the same coreBlocks coreBlk and are siblings; proBlk2 has a child proBlk3
+	// Once proBlk1 is accepted, proBlk2 and proBlk3 are rejected, while coreBlk is accepted
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
+	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
+
+	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+
+	pChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("test requires proBlk1 different from proBlk2")
+	}
+
+	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
+		t.Fatal("could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
+	coreBlk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(3333),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{3},
+		ParentV: coreBlk,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	proBlk3, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
+
+	// ..accept proBlk1 and check that proBlk1 is accepted and proBlk2/proBlk3 are  rejected
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not accept proposer block")
+	}
+
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Child core block has wrong status")
+	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk1, err = proVM.GetBlock(proBlk1.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk2, err = proVM.GetBlock(proBlk2.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+
+	if proBlk3, err = proVM.GetBlock(proBlk3.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Child core block has wrong status")
+	}
+}
+
+// TODO: accept out-of-order test, just to document behavior. IF ACCEPT CAN COME CHILDREN FIRST
+
+// ProposerBlock.Reject tests section
+func TestReject_BlockConflict(t *testing.T) {
+	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings;
+	// ProBlk2 is rejected but its core not; ProBlk1 and core blocks statues as set on proBlk1's Accept
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate proBlk1 and proBlk2 with different coreBlocks
 	coreBlk1 := &snowman.TestBlock{
@@ -555,33 +954,45 @@ func TestProAndCoreBlockAccept_BlockConflict(t *testing.T) {
 		t.Fatal("test requires proBlk1 different from proBlk2")
 	}
 
-	// ..accept proBlk2 and check that proBlk2 is accepted and proBlk1 rejected
-	if err := proBlk2.Accept(); err != nil {
-		t.Fatal("Could not accept proposer block")
+	// ..reject proBlk2 and check that other blocks statuses are unaffected
+	if err := proBlk2.Reject(); err != nil {
+		t.Fatal("Could not reject proposer block")
 	}
 
-	if proBlk2.Status() != choices.Accepted {
-		t.Fatal("Accepted pro block has wrong status")
-	}
-	if coreBlk2.Status() != choices.Accepted {
-		t.Fatal("Accepted core block has wrong status")
-	}
-
-	if proBlk1.Status() != choices.Rejected {
+	if proBlk2.Status() != choices.Rejected {
 		t.Fatal("Rejected pro block has wrong status")
 	}
-	if coreBlk1.Status() != choices.Rejected {
-		t.Fatal("Rejected core block has wrong status")
+	if coreBlk2.Status() != choices.Processing {
+		t.Fatal("Rejecting Pro block should not affect core block")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("Rejection of a sibling should not affect block status")
+	}
+	if coreBlk1.Status() != choices.Processing {
+		t.Fatal("Rejection of a sibling should not affect core block status")
+	}
+
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not accept proposer block")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block should stay rejected upon sibling's accept")
+	}
+	if coreBlk2.Status() != choices.Rejected {
+		t.Fatal("this core block should be rejected one sibling is accepted")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("problk1 should be accepted")
+	}
+	if coreBlk1.Status() != choices.Accepted {
+		t.Fatal("coreblk1 should be accepted")
 	}
 }
 
-func TestProAndCoreBlockAccept_ChainConflict(t *testing.T) {
+func TestReject_ParentFirst_ChainConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings; proBlk2 has a child proBlk3
-	// Once proBlk1 is accepted, proBlk2 and proBlk3 are rejected
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	// ProBlk2 and ProBlk3 are rejected in this order before ProBlk1 is accepted
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
 	coreBlk1 := &snowman.TestBlock{
@@ -618,6 +1029,9 @@ func TestProAndCoreBlockAccept_ChainConflict(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(3333),
@@ -631,41 +1045,246 @@ func TestProAndCoreBlockAccept_ChainConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
-
-	// ..accept proBlk1 and check that proBlk1 is accepted and proBlk2/proBlk3 are  rejected
-	if err := proBlk1.Accept(); err != nil {
-		t.Fatal("Could not accept proposer block")
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
 	}
 
-	if proBlk1.Status() != choices.Accepted {
-		t.Fatal("Accepted pro block has wrong status")
+	// ..Reject ProBlk2 ...
+	if err := proBlk2.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk2")
 	}
-	if coreBlk1.Status() != choices.Accepted {
-		t.Fatal("Accepted core block has wrong status")
-	}
-
 	if proBlk2.Status() != choices.Rejected {
-		t.Fatal("Rejected pro block has wrong status")
+		t.Fatal("proBlk2 should be Rejected")
+	}
+	if coreBlk2.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk3.Status() != choices.Processing { // TODO: propagate rejection immediately
+		t.Fatal("Rejection of proBlock ancestor DOES NOT cause YET rejection of its descendants")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("coreBlk3 should not be rejected")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of sibling")
+	}
+	if coreBlk1.Status() != choices.Processing {
+		t.Fatal("coreBlk1 should be unaffected by rejection of sibling")
+	}
+
+	//  ... and ProBlk3,...
+	if err := proBlk3.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk3")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("ProBlk2 should stay rejected")
+	}
+	if coreBlk2.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("ProBlk3 should be rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of sibling")
+	}
+	if coreBlk1.Status() != choices.Processing {
+		t.Fatal("coreBlk1 should be unaffected by rejection of sibling")
+	}
+
+	// ...finally accept ProBlk1
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not reject ProBlk1")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("ProBlk2 should stay rejected")
 	}
 	if coreBlk2.Status() != choices.Rejected {
-		t.Fatal("Rejected core block has wrong status")
+		t.Fatal("Acceptance of sibling should cause rejection of coreBlk2")
 	}
-
 	if proBlk3.Status() != choices.Rejected {
-		t.Fatal("Rejected pro block has wrong status")
+		t.Fatal("ProBlk3 should stay rejected")
 	}
 	if coreBlk3.Status() != choices.Rejected {
-		t.Fatal("Rejected core block has wrong status")
+		t.Fatal("Acceptance of uncle should cause rejection of coreBlk2")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("proBlk1 should be accepted")
+	}
+	if coreBlk1.Status() != choices.Accepted {
+		t.Fatal("coreBlk1 should be accepted")
 	}
 }
 
-func TestProAndCoreBlockAccept_MixedCoreBlocksConflict(t *testing.T) {
+func TestReject_ChildFirst_ChainConflict(t *testing.T) {
+	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings; proBlk2 has a child proBlk3
+	// ProBlk3 and ProBlk2 are rejected in this order before ProBlk1 is accepted
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+
+	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreBlk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(2222),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{2},
+		ParentV: coreGenBlk,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("test requires proBlk1 different from proBlk2")
+	}
+
+	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
+		t.Fatal("could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
+	coreBlk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(3333),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{3},
+		ParentV: coreBlk2,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	proBlk3, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
+
+	//  ... Reject ProBlk3 ...
+	if err := proBlk3.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk3")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("ProBlk3 should be rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk2.Status() != choices.Processing {
+		t.Fatal("ProBlk2 should still be processing")
+	}
+	if coreBlk2.Status() != choices.Processing {
+		t.Fatal("coreBlk2 should still be processing")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of siblings' descendants")
+	}
+	if coreBlk1.Status() != choices.Processing {
+		t.Fatal("coreBlk1 should be unaffected by rejection of siblings' descendants")
+	}
+
+	// ... and ProBlk2, ...
+	if err := proBlk2.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk2")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("proBlk2 should be Rejected")
+	}
+	if coreBlk2.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("proBlk2 should stay Rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("coreBlk3 should still be processing")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of sibling")
+	}
+	if coreBlk1.Status() != choices.Processing {
+		t.Fatal("coreBlk1 should be unaffected by rejection of sibling")
+	}
+
+	// ...finally accept ProBlk1
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not reject ProBlk1")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("ProBlk2 should stay rejected")
+	}
+	if coreBlk2.Status() != choices.Rejected {
+		t.Fatal("Acceptance of sibling should cause rejection of coreBlk2")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("ProBlk3 should stay rejected")
+	}
+	if coreBlk3.Status() != choices.Rejected {
+		t.Fatal("Acceptance of uncle should cause rejection of coreBlk3")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("proBlk1 should be accepted")
+	}
+	if coreBlk1.Status() != choices.Accepted {
+		t.Fatal("coreBlk1 should be accepted")
+	}
+}
+
+func TestReject_ParentFirst_MixedCoreBlocksConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap the same coreBlocks coreBlk and are siblings; proBlk2 has a child proBlk3
-	// Once proBlk1 is accepted, proBlk2 and proBlk3 are rejected, while coreBlk is accepted
+	// proBlk2 and proBlk3 are rejected in this order, then proBlk1 is accepted
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
+	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
 
 	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
 	coreBlk := &snowman.TestBlock{
@@ -683,7 +1302,7 @@ func TestProAndCoreBlockAccept_MixedCoreBlocksConflict(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
-	currentPChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
+	pChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -694,6 +1313,9 @@ func TestProAndCoreBlockAccept_MixedCoreBlocksConflict(t *testing.T) {
 
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 	coreBlk3 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -708,27 +1330,209 @@ func TestProAndCoreBlockAccept_MixedCoreBlocksConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
-
-	// ..accept proBlk1 and check that proBlk1 is accepted and proBlk2/proBlk3 are  rejected
-	if err := proBlk1.Accept(); err != nil {
-		t.Fatal("Could not accept proposer block")
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
 	}
 
-	if proBlk1.Status() != choices.Accepted {
-		t.Fatal("Accepted pro block has wrong status")
+	// ..Reject ProBlk2 ...
+	if err := proBlk2.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk2")
 	}
-	if coreBlk.Status() != choices.Accepted {
-		t.Fatal("Accepted core block has wrong status")
-	}
-
 	if proBlk2.Status() != choices.Rejected {
-		t.Fatal("Rejected pro block has wrong status")
+		t.Fatal("proBlk2 should be Rejected")
 	}
-
-	if proBlk3.Status() != choices.Rejected {
-		t.Fatal("Rejected pro block has wrong status")
+	if coreBlk.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk3.Status() != choices.Processing { // TODO: propagate rejection immediately
+		t.Fatal("Rejection of proBlock ancestor DOES NOT cause YET rejection of its descendants")
 	}
 	if coreBlk3.Status() != choices.Processing {
-		t.Fatal("Child core block has wrong status")
+		t.Fatal("coreBlk3 should still be processing")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of sibling")
+	}
+
+	//  ... and ProBlk3,...
+	if err := proBlk3.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk3")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("ProBlk2 should stay rejected")
+	}
+	if coreBlk.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("ProBlk3 should stay rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of sibling")
+	}
+
+	// ...finally accept ProBlk1
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not reject ProBlk1")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("ProBlk2 should stay rejected")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("coreBlk1 should be accepted")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("ProBlk3 should stay rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("coreBlk3 should still be processing")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("proBlk1 should be accepted")
+	}
+}
+
+func TestReject_ChildFirst_MixedCoreBlocksConflict(t *testing.T) {
+	// proBlk1 and proBlk2 wrap the same coreBlocks coreBlk and are siblings; proBlk2 has a child proBlk3
+	// proBlk3 and proBlk2 are rejected in this order, then proBlk1 is accepted
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	pChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		return res, nil
+	}
+
+	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(1111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+
+	pChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	if proBlk1.ID() == proBlk2.ID() {
+		t.Fatal("test requires proBlk1 different from proBlk2")
+	}
+
+	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
+		t.Fatal("could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
+	coreBlk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(3333),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{3},
+		ParentV: coreBlk,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	proBlk3, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build proposer block")
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
+
+	// ..Reject ProBlk3 ...
+	if err := proBlk3.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk3")
+	}
+	if proBlk2.Status() != choices.Processing {
+		t.Fatal("ProBlk2 should be processing")
+	}
+	if coreBlk.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("ProBlk3 should stay rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of siblings' descendants")
+	}
+
+	//  ... and ProBlk2,...
+	if err := proBlk2.Reject(); err != nil {
+		t.Fatal("Could not reject ProBlk2")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("proBlk2 should be Rejected")
+	}
+	if coreBlk.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("proBlk3 should stay rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Rejection of ProBlock does not cause rejection of its coreBlk")
+	}
+	if proBlk1.Status() != choices.Processing {
+		t.Fatal("proBlk1 should be unaffected by rejection of sibling")
+	}
+
+	// ...finally accept ProBlk1
+	if err := proBlk1.Accept(); err != nil {
+		t.Fatal("Could not reject ProBlk1")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("ProBlk2 should stay rejected")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("coreBlk1 should be accepted")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("ProBlk3 should stay rejected")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("coreBlk3 should still be processing")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("proBlk1 should be accepted")
 	}
 }

@@ -18,7 +18,6 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -28,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -49,6 +47,11 @@ func (c clockImpl) now() time.Time {
 	return time.Now()
 }
 
+type proBlkTreeNode struct {
+	proChildren   []*ProposerBlock
+	verifiedCores map[ids.ID]struct{} // set of already verified core IDs
+}
+
 type VM struct {
 	block.ChainVM
 	state *innerState
@@ -58,7 +61,7 @@ type VM struct {
 	fromCoreVM      chan common.Message
 	toEngine        chan<- common.Message
 	proBlkStartTime time.Time
-	siblings        map[ids.ID]([]*ProposerBlock)
+	proBlkTree      map[ids.ID](proBlkTreeNode)
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
@@ -68,7 +71,7 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 		fromCoreVM:      nil,
 		toEngine:        nil,
 		proBlkStartTime: proBlkStart,
-		siblings:        nil,
+		proBlkTree:      nil,
 	}
 	res.state = newState(&res)
 	return &res
@@ -92,16 +95,8 @@ func (vm *VM) Initialize(
 	vm.state.init(dbManager.Current().Database)
 
 	vm.stakingCert = ctx.StakingCert
-	if ctx.ValidatorVM != nil {
-		vm.windower.VM = ctx.ValidatorVM
-	} else {
-		// a nil ctx.ValidatorVM is expected only if we are wrapping P-chain VM itself.
-		// Then core VM must implement the validators.VM interface
-		if valVM, ok := vm.ChainVM.(validators.VM); ok {
-			vm.windower.VM = valVM
-		} else {
-			return fmt.Errorf("core VM does not implement validators.VM interface")
-		}
+	if err := vm.windower.initialize(vm, ctx); err != nil {
+		return err
 	}
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
@@ -144,8 +139,11 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			vm.siblings = make(map[ids.ID][]*ProposerBlock)
-			vm.siblings[proGenBlk.ID()] = make([]*ProposerBlock, 0)
+			vm.proBlkTree = make(map[ids.ID]proBlkTreeNode)
+			vm.proBlkTree[proGenBlk.ID()] = proBlkTreeNode{
+				proChildren:   make([]*ProposerBlock, 0),
+				verifiedCores: make(map[ids.ID]struct{}),
+			}
 		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
@@ -297,61 +295,55 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	}
 }
 
-func (vm *VM) handleConflicts(pb *ProposerBlock) error {
-	parentID := pb.ParentID()
-	siblings, found := vm.siblings[parentID]
+func (vm *VM) propagateStatusFrom(pb *ProposerBlock) error {
+	prntID := pb.ParentID()
+	node, found := vm.proBlkTree[prntID]
 	if !found {
-		return ErrFailedHandlingConflicts // should not be possible
-	}
-	switch len(siblings) {
-	case 0: // no children, do nothing
-		return nil
-	case 1: // 1 children, no conflicts
-		break
-	default: // conflict
-		for _, sib := range siblings {
-			if pb.ID() == sib.ID() {
-				continue
-			}
-			if err := vm.rejectAllFrom(sib, pb.coreBlk); err != nil {
-				return ErrFailedHandlingConflicts
-			}
-		}
+		return ErrFailedHandlingConflicts
 	}
 
-	delete(vm.siblings, parentID)
-	if _, found := vm.siblings[pb.ID()]; !found {
-		vm.siblings[pb.ID()] = make([]*ProposerBlock, 0)
+	lastAcceptedID, err := vm.state.getLastAcceptedID()
+	if err != nil {
+		return ErrFailedHandlingConflicts
 	}
-	return nil
-}
 
-func (vm *VM) rejectAllFrom(root *ProposerBlock, lastAcceptedCoreBlk snowman.Block) error {
-	// just level order descent
+	lastAcceptedBlk, err := vm.state.getProBlock(lastAcceptedID)
+	if err != nil {
+		return ErrFailedHandlingConflicts
+	}
+
 	queue := make([]*ProposerBlock, 0)
-	queue = append(queue, root)
+	queue = append(queue, node.proChildren...)
+
+	// just level order descent
 	for len(queue) != 0 {
 		node := queue[0]
 		queue = queue[1:]
 
-		if err := node.Reject(); err != nil {
-			return ErrFailedHandlingConflicts
-		}
-
-		// a coreBlk is rejected iff:
+		// a block, proposer or core, is rejected iff:
 		// * a sibling has been accepted
 		// * its parent has been rejected already
-		if node.coreBlk.ID() != lastAcceptedCoreBlk.ID() {
-			if node.coreBlk.Parent().ID() == lastAcceptedCoreBlk.Parent().ID() ||
-				node.coreBlk.Parent().Status() == choices.Rejected {
-				if err := node.coreReject(); err != nil {
-					return err
+
+		if node.ID() != lastAcceptedBlk.ID() {
+			if node.Parent().ID() == lastAcceptedBlk.Parent().ID() ||
+				node.Parent().Status() == choices.Rejected {
+				if err := node.Reject(); err != nil {
+					return ErrFailedHandlingConflicts
 				}
 			}
 		}
 
-		queue = append(queue, vm.siblings[node.ID()]...)
-		delete(vm.siblings, node.ID())
+		if node.coreBlk.ID() != lastAcceptedBlk.coreBlk.ID() {
+			if node.coreBlk.Parent().ID() == lastAcceptedBlk.coreBlk.Parent().ID() ||
+				node.coreBlk.Parent().Status() == choices.Rejected {
+				if err := node.coreReject(); err != nil {
+					return ErrFailedHandlingConflicts
+				}
+			}
+		}
+
+		childrenNodes := vm.proBlkTree[node.ID()].proChildren
+		queue = append(queue, childrenNodes...)
 	}
 	return nil
 }

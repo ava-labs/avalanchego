@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -22,6 +23,14 @@ var (
 	errGetValidatorSet                  = errors.New("unexpectedly called GetValidatorSet")
 	errCurrentHeight                    = errors.New("unexpectedly called GetCurrentHeigh")
 )
+
+type testClock struct {
+	setTime time.Time
+}
+
+func (tC testClock) now() time.Time {
+	return tC.setTime
+}
 
 type TestValidatorVM struct {
 	T *testing.T
@@ -127,6 +136,21 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	valVM := &TestValidatorVM{
 		T: t,
 	}
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valVM.CantGetValidatorSet = true
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
+	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+		res := make(map[ids.ShortID]uint64)
+		res[nodeID] = uint64(10)
+		res[ids.ShortID{1}] = uint64(5)
+		res[ids.ShortID{2}] = uint64(6)
+		res[ids.ShortID{3}] = uint64(7)
+		return res, nil
+	}
 
 	ctx := &snow.Context{
 		StakingCert: *pTestCert,
@@ -142,9 +166,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 // VM.BuildBlock tests section
 func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 	// setup
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -178,9 +200,7 @@ func TestBuildBlockRecordsAndVerifiesBuiltBlock(t *testing.T) {
 
 func TestBuildBlockIsIdempotent(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -210,9 +230,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	// setup
-	coreVM, valVM, proVM, genesisBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	coreVM, _, proVM, genesisBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	newBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -245,10 +263,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 // both core blocks and pro blocks must be built on preferred
 func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
-	coreVM, valVM, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	coreVM, _, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// add to proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -260,7 +275,11 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		HeightV: genCoreBlk.Height() + 1,
 	}
 	proGenID, _ := proVM.LastAccepted()
-	proHdr1 := NewProHeader(proGenID, coreBlk1.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	pChainHeight, err := proVM.windower.GetCurrentHeight()
+	if err != nil {
+		t.Fatal("could not retrieve pChain height")
+	}
+	proHdr1 := NewProHeader(proGenID, coreBlk1.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk1, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -277,7 +296,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		ParentV: genCoreBlk,
 		HeightV: genCoreBlk.Height() + 1,
 	}
-	proHdr2 := NewProHeader(proGenID, coreBlk2.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	proHdr2 := NewProHeader(proGenID, coreBlk2.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk2, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -308,6 +327,9 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("Could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 
 	// build block...
 	coreVM.CantBuildBlock = true
@@ -334,10 +356,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 }
 
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
-	coreVM, valVM, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	coreVM, _, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// add to proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -349,7 +368,11 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		HeightV: genCoreBlk.Height() + 1,
 	}
 	proGenID, _ := proVM.LastAccepted()
-	proHdr1 := NewProHeader(proGenID, coreBlk1.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	pChainHeight, err := proVM.windower.GetCurrentHeight()
+	if err != nil {
+		t.Fatal("could not retrieve pChain height")
+	}
+	proHdr1 := NewProHeader(proGenID, coreBlk1.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk1, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -366,7 +389,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		ParentV: genCoreBlk,
 		HeightV: genCoreBlk.Height() + 1,
 	}
-	proHdr2 := NewProHeader(proGenID, coreBlk2.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	proHdr2 := NewProHeader(proGenID, coreBlk2.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk2, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -397,6 +420,9 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("Could not set preference")
 	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 
 	// build block...
 	coreVM.CantBuildBlock = true
@@ -418,10 +444,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 
 // VM.ParseBlock tests section
 func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
-	coreVM, valVM, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	coreVM, _, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreBlkDoesNotVerify := errors.New("coreBlk should not verify in this test")
 	coreBlk := &snowman.TestBlock{
@@ -439,7 +462,11 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 	}
 
 	proGenBlkID, _ := proVM.LastAccepted()
-	proHdr := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	pChainHeight, err := proVM.windower.GetCurrentHeight()
+	if err != nil {
+		t.Fatal("could not retrieve pChain height")
+	}
+	proHdr := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk, err := NewProBlock(proVM, proHdr, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -466,10 +493,7 @@ func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
 }
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
-	coreVM, valVM, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	coreVM, _, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// create two Proposer blocks at the same height
 	coreBlk := &snowman.TestBlock{
@@ -486,13 +510,17 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	}
 
 	proGenBlkID, _ := proVM.LastAccepted()
-	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	pChainHeight, err := proVM.windower.GetCurrentHeight()
+	if err != nil {
+		t.Fatal("could not retrieve pChain height")
+	}
+	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
 	}
 
-	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), currentPChainHeight, *pTestCert.Leaf)
+	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -538,10 +566,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 // VM.BuildBlock and VM.ParseBlock interoperability tests section
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
-	coreVM, valVM, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
+	coreVM, _, proVM, genCoreBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// one block is built from this proVM
 	localCoreBlk := &snowman.TestBlock{
@@ -577,7 +602,11 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 
 	proGenBlkID, _ := proVM.LastAccepted()
-	netHdr := NewProHeader(proGenBlkID, netCoreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	pChainHeight, err := proVM.windower.GetCurrentHeight()
+	if err != nil {
+		t.Fatal("could not retrieve pChain height")
+	}
+	netHdr := NewProHeader(proGenBlkID, netCoreBlk.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	netProBlk, err := NewProBlock(proVM, netHdr, netCoreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -591,9 +620,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 // VM persistency test section
 func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// build two blocks on top of genesis
 	coreBlk1 := &snowman.TestBlock{
@@ -635,6 +662,9 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 	if err := proVM.SetPreference(proBlk1.ID()); err != nil {
 		t.Fatal("Could not set preference")
 	}
+	proVM.proBlkTree[proBlk1.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
+	}
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build block")
@@ -672,6 +702,9 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 	// update preference to build next block
 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
 		t.Fatal("Could not set preference")
+	}
+	proVM.proBlkTree[proBlk2.ID()] = proBlkTreeNode{ // TODO: init data structure, refactor
+		verifiedCores: make(map[ids.ID]struct{}),
 	}
 	proBlk3, err := proVM.BuildBlock()
 	if err != nil {
@@ -812,10 +845,7 @@ func TestPreSnowmanParseBlock(t *testing.T) {
 }
 
 func TestPreSnowmanSetPreference(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, NoProposerBlocks) // disable ProBlks
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
-
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, NoProposerBlocks) // disable ProBlks
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{

@@ -24,7 +24,10 @@ import (
 // Parameters for delaying bootstrapping to avoid potential CPU burns
 const bootstrappingDelay = 10 * time.Second
 
-var errUnexpectedTimeout = errors.New("unexpected timeout fired")
+var (
+	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
+	_                    common.Bootstrapable = &Bootstrapper{}
+)
 
 // Config ...
 type Config struct {

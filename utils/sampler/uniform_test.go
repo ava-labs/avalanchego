@@ -151,3 +151,59 @@ func UniformLazilySample(t *testing.T, s Uniform) {
 		s.Reset()
 	}
 }
+
+func TestSeeding(t *testing.T) {
+	assert := assert.New(t)
+
+	s1 := NewBestUniform(30)
+	s2 := NewBestUniform(30)
+
+	err := s1.Initialize(50)
+	assert.NoError(err)
+
+	err = s2.Initialize(50)
+	assert.NoError(err)
+
+	s1.Seed(0)
+
+	s1.Reset()
+	s1Val, err := s1.Next()
+	assert.NoError(err)
+
+	s1.Seed(0)
+
+	s2.Reset()
+	v, err := s2.Next()
+	assert.NoError(err)
+	assert.NotEqualValues(s1Val, v)
+
+	s1.Seed(0)
+
+	s1.Reset()
+	s1.ClearSeed()
+	v, err = s1.Next()
+	assert.NoError(err)
+	assert.NotEqualValues(s1Val, v)
+}
+
+func TestSeedingProducesTheSame(t *testing.T) {
+	assert := assert.New(t)
+
+	s := NewBestUniform(30)
+
+	err := s.Initialize(50)
+	assert.NoError(err)
+
+	s.Seed(0)
+	s.Reset()
+
+	val0, err := s.Next()
+	assert.NoError(err)
+
+	s.Seed(0)
+	s.Reset()
+
+	val1, err := s.Next()
+	assert.NoError(err)
+	assert.Equal(val0, val1)
+}

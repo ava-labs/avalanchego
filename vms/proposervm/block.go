@@ -17,6 +17,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
@@ -64,11 +65,21 @@ func (pb *ProposerBlock) Accept() error {
 		}
 
 		pb.status = choices.Accepted
-		// TODO: persist
+		if err := pb.vm.state.storeProBlk(pb); err != nil {
+			return err
+		}
 
-		if err := pb.vm.handleConflicts(pb); err != nil {
+		if err := pb.vm.propagateStatusFrom(pb); err != nil {
 			// TODO: attempt to restore previous accepted block and return
 			return err
+		}
+
+		delete(pb.vm.proBlkTree, pb.ParentID())
+		if _, found := pb.vm.proBlkTree[pb.ID()]; !found {
+			pb.vm.proBlkTree[pb.ID()] = proBlkTreeNode{
+				proChildren:   make([]*ProposerBlock, 0),
+				verifiedCores: make(map[ids.ID]struct{}),
+			}
 		}
 
 		// pb parent block should not be needed anymore.
@@ -84,7 +95,14 @@ func (pb *ProposerBlock) Accept() error {
 
 func (pb *ProposerBlock) Reject() error {
 	// coreBlock rejection is handled upon accept of siblings
+	if pb.status == choices.Rejected {
+		return nil // no-op
+	}
+
 	pb.status = choices.Rejected
+	if err := pb.vm.state.storeProBlk(pb); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -155,13 +173,15 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrInvalidSignature
 	}
 
-	// validate core block. Verify must be called only once if it succeeds
-	// hence must be at the very end
-	if err := pb.coreBlk.Verify(); err != nil {
-		return err
-	}
+	// validate core block, only once
+	verifiedCores := pb.vm.proBlkTree[prntBlk.ID()].verifiedCores
+	if _, verified := verifiedCores[pb.coreBlk.ID()]; !verified {
+		if err := pb.coreBlk.Verify(); err != nil {
+			return err
+		}
 
-	pb.vm.siblings[prntBlk.ID()] = append(pb.vm.siblings[prntBlk.ID()], pb)
+		verifiedCores[pb.coreBlk.ID()] = struct{}{}
+	}
 	return nil
 }
 
