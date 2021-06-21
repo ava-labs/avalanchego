@@ -8,7 +8,7 @@ set -o pipefail
 SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 
-if [[ $# -eq 2 ]]; then
+if [[ $# -lt 3 ]]; then
     source "$SRC_DIR/build_local_image.sh"
 elif [[ $# -eq 3 ]]; then
     source "$SRC_DIR/build_image_from_remote.sh" $@
