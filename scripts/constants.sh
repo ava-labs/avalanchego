@@ -27,7 +27,8 @@ prev_avalanchego_process_path="$prev_build_dir/avalanchego-process"
 prev_plugin_dir="$prev_build_dir/plugins"
 
 # Avalabs docker hub
-avalanchego_dockerhub_repo=${DOCKER_REPO:-"avaplatform/avalanchego"}
+# avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
+avalanchego_dockerhub_repo=${DOCKER_REPO:-"local"}
 
 # Current branch
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
