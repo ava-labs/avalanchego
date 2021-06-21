@@ -407,12 +407,22 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 
 	msgBytes := msg.Bytes()
 	if compressMsg && p.gzipEnabled {
+		uncompressedLen := len(msgBytes)
+
 		var err error
-		msgBytes, err = p.compress(msgBytes)
+		compressedBytes, err := p.compress(msgBytes)
 		if err != nil {
 			p.net.log.Error("couldn't compress message: %s", err)
 			return false
 		}
+
+		compressedLen := len(compressedBytes)
+		bytesSaved := uncompressedLen - compressedLen
+
+		bytesSavedMetric := p.net.message(msg.Op()).bytesSaved
+		bytesSavedMetric.Observe(float64(bytesSaved))
+
+		msgBytes = compressedBytes
 	}
 
 	msgBytesLen := int64(len(msgBytes))
