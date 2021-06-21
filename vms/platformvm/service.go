@@ -1785,14 +1785,21 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return errors.New("argument 'blockchainID' not given")
 	}
 
-	if _, err := service.vm.Chains.Lookup(args.BlockchainID); err == nil {
-		reply.Status = Validating
-		return nil
-	}
 	blockchainID, err := ids.FromString(args.BlockchainID)
 	if err != nil {
 		return fmt.Errorf("problem parsing blockchainID %q: %w", args.BlockchainID, err)
 	}
+
+	if service.nodeValidates(blockchainID) {
+		reply.Status = Validating
+		return nil
+	}
+
+	if _, err := service.vm.Chains.Lookup(args.BlockchainID); err == nil {
+		reply.Status = Syncing
+		return nil
+	}
+
 	lastAcceptedID, err := service.vm.LastAccepted()
 	if err != nil {
 		return fmt.Errorf("problem loading last accepted ID: %w", err)
@@ -1806,14 +1813,34 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		reply.Status = Created
 		return nil
 	}
-	exists, err = service.chainExists(service.vm.preferred, blockchainID)
+
+	preferred, err := service.chainExists(service.vm.preferred, blockchainID)
 	if err != nil {
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
-	if exists {
+	if preferred {
 		reply.Status = Preferred
 	}
 	return nil
+}
+
+func (service *Service) nodeValidates(blockchainID ids.ID) bool {
+	chainTx, _, err := service.vm.internalState.GetTx(blockchainID)
+	if err != nil {
+		return false
+	}
+
+	chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
+	if !ok {
+		return false
+	}
+
+	validators, ok := service.vm.Validators.GetValidators(chain.SubnetID)
+	if !ok {
+		return false
+	}
+
+	return validators.Contains(service.vm.ctx.NodeID)
 }
 
 func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error) {
