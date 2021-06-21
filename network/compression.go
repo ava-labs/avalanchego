@@ -38,9 +38,6 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	if _, err := g.gzipWriter.Write(msg); err != nil {
 		return msg, err
 	}
-	if err := g.gzipWriter.Flush(); err != nil {
-		return msg, err
-	}
 	if err := g.gzipWriter.Close(); err != nil {
 		return msg, err
 	}
@@ -52,7 +49,6 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.resetReader(msg); err != nil {
 		return nil, err
 	}
-
 	return io.ReadAll(g.gzipReader)
 }
 
