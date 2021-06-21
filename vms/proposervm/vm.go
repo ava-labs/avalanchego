@@ -279,64 +279,55 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	}
 }
 
-func (vm *VM) handleConflicts(pb *ProposerBlock) error {
-	node, found := vm.proBlkTree[pb.header.prntID]
+func (vm *VM) propagateStatusFrom(pb *ProposerBlock) error {
+	prntID := pb.header.prntID
+	node, found := vm.proBlkTree[prntID]
 	if !found {
-		return ErrFailedHandlingConflicts // should not be possible
-	}
-	switch len(node.proChildren) {
-	case 0: // no children, do nothing
-		return nil
-	case 1: // 1 children, no conflicts
-		break
-	default: // conflict
-		for _, sib := range node.proChildren {
-			if pb.ID() == sib.ID() {
-				continue
-			}
-			if err := vm.rejectAllFrom(sib, pb.coreBlk); err != nil {
-				return ErrFailedHandlingConflicts
-			}
-		}
+		return ErrFailedHandlingConflicts
 	}
 
-	delete(vm.proBlkTree, pb.header.prntID)
-	if _, found := vm.proBlkTree[pb.ID()]; !found {
-		vm.proBlkTree[pb.ID()] = proBlkTreeNode{
-			proChildren:   make([]*ProposerBlock, 0),
-			verifiedCores: make(map[ids.ID]struct{}),
-		}
+	lastAcceptedID, err := vm.state.getLastAcceptedID()
+	if err != nil {
+		return ErrFailedHandlingConflicts
 	}
-	return nil
-}
 
-func (vm *VM) rejectAllFrom(root *ProposerBlock, lastAcceptedCoreBlk snowman.Block) error {
-	// just level order descent
+	lastAcceptedBlk, err := vm.state.getProBlock(lastAcceptedID)
+	if err != nil {
+		return ErrFailedHandlingConflicts
+	}
+
 	queue := make([]*ProposerBlock, 0)
-	queue = append(queue, root)
+	queue = append(queue, node.proChildren...)
+
+	// just level order descent
 	for len(queue) != 0 {
 		node := queue[0]
 		queue = queue[1:]
 
-		if err := node.Reject(); err != nil {
-			return ErrFailedHandlingConflicts
-		}
-
-		// a coreBlk is rejected iff:
+		// a block, proposer or core, is rejected iff:
 		// * a sibling has been accepted
 		// * its parent has been rejected already
-		if node.coreBlk.ID() != lastAcceptedCoreBlk.ID() {
-			if node.coreBlk.Parent().ID() == lastAcceptedCoreBlk.Parent().ID() ||
+
+		if node.ID() != lastAcceptedBlk.ID() {
+			if node.Parent().ID() == lastAcceptedBlk.Parent().ID() ||
+				node.Parent().Status() == choices.Rejected {
+				if err := node.Reject(); err != nil {
+					return ErrFailedHandlingConflicts
+				}
+			}
+		}
+
+		if node.coreBlk.ID() != lastAcceptedBlk.coreBlk.ID() {
+			if node.coreBlk.Parent().ID() == lastAcceptedBlk.coreBlk.Parent().ID() ||
 				node.coreBlk.Parent().Status() == choices.Rejected {
 				if err := node.coreReject(); err != nil {
-					return err
+					return ErrFailedHandlingConflicts
 				}
 			}
 		}
 
 		childrenNodes := vm.proBlkTree[node.ID()].proChildren
 		queue = append(queue, childrenNodes...)
-		delete(vm.proBlkTree, node.ID())
 	}
 	return nil
 }

@@ -678,6 +678,21 @@ func TestAccept_ChainConflict(t *testing.T) {
 		ParentV: coreBlk2,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
+
 	proBlk3, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -761,6 +776,17 @@ func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
 	proBlk3, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
 	}
 
 	// ..accept proBlk1 and check that proBlk1 is accepted and proBlk2/proBlk3 are  rejected
@@ -924,6 +950,19 @@ func TestReject_ParentFirst_ChainConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
 
 	// ..Reject ProBlk2 ...
 	if err := proBlk2.Reject(); err != nil {
@@ -1054,6 +1093,19 @@ func TestReject_ChildFirst_ChainConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
 
 	//  ... Reject ProBlk3 ...
 	if err := proBlk3.Reject(); err != nil {
@@ -1177,6 +1229,17 @@ func TestReject_ParentFirst_MixedCoreBlocksConflict(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
 
 	// ..Reject ProBlk2 ...
 	if err := proBlk2.Reject(); err != nil {
@@ -1290,6 +1353,17 @@ func TestReject_ChildFirst_MixedCoreBlocksConflict(t *testing.T) {
 	proBlk3, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk3.Bytes()):
+			return coreBlk3, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
 	}
 
 	// ..Reject ProBlk3 ...

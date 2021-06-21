@@ -135,9 +135,17 @@ func (pb *ProposerBlock) Accept() error {
 		pb.status = choices.Accepted
 		// TODO: persist
 
-		if err := pb.vm.handleConflicts(pb); err != nil {
+		if err := pb.vm.propagateStatusFrom(pb); err != nil {
 			// TODO: attempt to restore previous accepted block and return
 			return err
+		}
+
+		delete(pb.vm.proBlkTree, pb.header.prntID)
+		if _, found := pb.vm.proBlkTree[pb.ID()]; !found {
+			pb.vm.proBlkTree[pb.ID()] = proBlkTreeNode{
+				proChildren:   make([]*ProposerBlock, 0),
+				verifiedCores: make(map[ids.ID]struct{}),
+			}
 		}
 
 		// pb parent block should not be needed anymore.
@@ -162,7 +170,7 @@ func (pb *ProposerBlock) coreReject() error {
 	if err := pb.coreBlk.Reject(); err != nil {
 		return err
 	}
-	pb.vm.state.wipeFromCacheProBlk(pb.id)
+	// pb.vm.state.wipeFromCacheProBlk(pb.id) //TODO: persist state before wiping cache
 	return nil
 }
 
