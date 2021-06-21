@@ -5,6 +5,7 @@ package network
 
 import (
 	"bufio"
+	"compress/gzip"
 	"crypto/x509"
 	"encoding/binary"
 	"math"
@@ -281,24 +282,27 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		var inflatedMsgLen, compressedMsgLen int
-		var t int64
-		if p.gzipEnabled {
+		if p.gzipEnabled && p.compressor.IsDecompressable(msgBytes) {
 			// this msg is gzipped
-			t1 := time.Now()
-			compressedMsgLen = len(msgBytes)
 			inflatedMsg, err := p.compressor.Decompress(msgBytes)
 			if err != nil {
-				// print the error and resume unpacking the original bytes below
-				p.net.log.Error("Error reading bytes: %s", err)
+				// print the appropriate error and resume unpacking the original bytes below
+				switch err {
+				case gzip.ErrChecksum:
+					p.net.log.Fatal("Invalid checksum when parsing gzipped data: %s", err)
+					return
+				case gzip.ErrHeader:
+					p.net.log.Verbo("Message is not gzipped, reading message without decompressing")
+				default:
+					p.net.log.Error("Error reading bytes: %s; attempting to read message without decompressing", err)
+				}
 			} else {
-				inflatedMsgLen = len(inflatedMsg)
-				t = time.Since(t1).Nanoseconds()
+				p.net.log.Verbo("Successfully decompressed bytes")
 				msgBytes = inflatedMsg
 			}
 		} else {
 			// we proceed to unpack the original bytes
-			p.net.log.Debug("Read non-compressed message, msgLen=%d", len(msgBytes))
+			p.net.log.Verbo("Read non-compressed message, msgLen=%d", len(msgBytes))
 		}
 
 		p.net.log.Verbo("parsing new message from %s:\n%s",
@@ -306,15 +310,6 @@ func (p *peer) ReadMessages() {
 			formatting.DumpBytes{Bytes: msgBytes})
 
 		msg, err := p.net.b.Parse(msgBytes)
-		if inflatedMsgLen != compressedMsgLen {
-			op := msg.Op().String()
-			p.net.log.Debug("unpacked message op, len, compLen, t \t %s, %d, %d, %d",
-				op,
-				inflatedMsgLen,
-				compressedMsgLen,
-				t)
-		}
-
 		if err != nil {
 			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
 				p.id,

@@ -14,6 +14,7 @@ const compressionThresholdBytes = 128
 type Compressor interface {
 	Compress([]byte) ([]byte, error)
 	Decompress([]byte) ([]byte, error)
+	IsDecompressable([]byte) bool
 	IsCompressable([]byte) bool
 }
 
@@ -33,10 +34,10 @@ type gzipCompressor struct {
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	g.resetWriter()
 	if _, err := g.gzipWriter.Write(msg); err != nil {
-		return msg, err
+		return nil, err
 	}
 	if err := g.gzipWriter.Close(); err != nil {
-		return msg, err
+		return nil, err
 	}
 	return g.writeBuffer.Bytes(), nil
 }
@@ -46,7 +47,22 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.resetReader(msg); err != nil {
 		return nil, err
 	}
-	return io.ReadAll(g.gzipReader)
+
+	data, err := io.ReadAll(g.gzipReader)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = g.gzipReader.Close(); err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+func (g *gzipCompressor) IsDecompressable(msg []byte) bool {
+	// header is 10 bytes (/usr/local/Cellar/go/1.16.3/libexec/src/compress/gzip/gunzip.go:175 will throw EOF otherwise)
+	return len(msg) > 10
 }
 
 func (g *gzipCompressor) IsCompressable(msg []byte) bool {
