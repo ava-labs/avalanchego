@@ -281,9 +281,6 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		// TODO if message length > threshold, try to parse first as compressed.
-		// If that doesn't work, try to parse as uncompressed.
-		// if message length < threshold, try in opposite order.
 		var inflatedMsgLen, compressedMsgLen int
 		var t int64
 		if p.gzipEnabled && p.compressor.IsCompressed(msgBytes) {
@@ -292,13 +289,15 @@ func (p *peer) ReadMessages() {
 			compressedMsgLen = len(msgBytes)
 			inflatedMsg, err := p.compressor.Decompress(msgBytes)
 			if err != nil {
+				// print the error and resume unpacking the original bytes below
 				p.net.log.Error("Error reading bytes: %s", err)
+			} else {
+				inflatedMsgLen = len(inflatedMsg)
+				t = time.Since(t1).Nanoseconds()
+				msgBytes = inflatedMsg
 			}
-
-			inflatedMsgLen = len(inflatedMsg)
-			t = time.Since(t1).Nanoseconds()
-			msgBytes = inflatedMsg
 		} else {
+			// we proceed to unpack the original bytes
 			p.net.log.Debug("Read non-compressed message, msgLen=%d", len(msgBytes))
 		}
 
