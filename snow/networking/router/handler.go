@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/uptime"
 )
 
 // Handler passes incoming messages from the network to the consensus engine.
@@ -40,7 +41,7 @@ type Handler struct {
 	// Called in a goroutine when this handler/engine shuts down.
 	// May be nil.
 	onCloseF            func()
-	unprocessedMsgsCond sync.Cond
+	unprocessedMsgsCond *sync.Cond
 	// Holds messages that [engine] hasn't processed yet.
 	// [unprocessedMsgsCond.L] must be held while accessing [unprocessedMsgs].
 	unprocessedMsgs unprocessedMsgs
@@ -64,6 +65,9 @@ func (h *Handler) Initialize(
 	h.msgFromVMChan = msgFromVMChan
 	h.engine = engine
 	h.validators = validators
+	var lock sync.Mutex
+	h.unprocessedMsgsCond = sync.NewCond(&lock)
+	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval)
 	h.unprocessedMsgs = newUnprocessedMsgs(h.validators, h.cpuTracker)
 	return nil
 }
@@ -87,20 +91,26 @@ func (h *Handler) Dispatch() {
 
 	// Handle messages from the network
 	for {
+		// Wait until there is an unprocessed message
 		h.unprocessedMsgsCond.L.Lock()
-		if h.unprocessedMsgs.Len() == 0 {
-			// Signalled in [h.push] and [h.StartShutdown]
-			h.unprocessedMsgsCond.Wait()
-			continue
-		}
-		closing := h.closing.GetValue()
-		if closing {
-			h.unprocessedMsgsCond.L.Unlock()
-			return
+		for {
+			// [h.unprocessedMsgsCond.L] must be held in this inner for loop
+			if h.unprocessedMsgs.Len() == 0 {
+				// Signalled in [h.push] and [h.StartShutdown]
+				h.unprocessedMsgsCond.Wait()
+				continue
+			}
+			closing := h.closing.GetValue()
+			if closing {
+				h.unprocessedMsgsCond.L.Unlock()
+				return
+			}
+			break
 		}
 
 		// Get the next message we should process
 		msg := h.unprocessedMsgs.Pop()
+		h.ctx.Log.Info("popped %s. Len %d", msg, h.unprocessedMsgs.Len())
 		h.unprocessedMsgsCond.L.Unlock()
 
 		// If this message's deadline has passed, don't process it.
@@ -151,6 +161,7 @@ func (h *Handler) handleMsg(msg message) error {
 	default:
 		err = h.handleConsensusMsg(msg, startTime)
 	}
+
 	msg.doneHandling()
 
 	if isPeriodic {
@@ -534,12 +545,15 @@ func (h *Handler) shutdown() {
 	close(h.closed)
 }
 
+// Assumes [h.unprocessedMsgsCond.L] is not held
 func (h *Handler) push(msg message) {
 	h.unprocessedMsgsCond.L.Lock()
 	defer h.unprocessedMsgsCond.L.Unlock()
 
 	h.unprocessedMsgs.Push(msg)
+	h.ctx.Log.Info("pushed %s. New len %d", msg, h.unprocessedMsgs.Len())
 	h.unprocessedMsgsCond.Broadcast()
+
 }
 
 func (h *Handler) dispatchInternal() {

@@ -322,6 +322,7 @@ readLoop:
 			// this message, we must call [p.net.msgThrottler.Release]
 			// to give back the bytes used by this message.
 			p.handle(msg)
+			break
 		}
 	}
 }
