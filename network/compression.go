@@ -9,10 +9,15 @@ import (
 	"io"
 )
 
+var gzipHeaderBytes = []byte{0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 4, 0}
+
+const compressionThresholdBytes = 128
+
 type Compressor interface {
 	Compress([]byte) ([]byte, error)
 	Decompress([]byte) ([]byte, error)
 	IsCompressed([]byte) bool
+	IsCompressable([]byte) bool
 }
 
 // gzipCompressor implements Compressor
@@ -64,8 +69,11 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 
 // IsCompressed returns whether given bytes are compressed data or not
 func (g *gzipCompressor) IsCompressed(msg []byte) bool {
-	// TODO this is broken and we should fix/replace this
-	return len(msg) > 2 && msg[0] == 31 && msg[1] == 139
+	return len(msg) > 10 && bytes.Equal(msg[:10], gzipHeaderBytes)
+}
+
+func (g *gzipCompressor) IsCompressable(msg []byte) bool {
+	return len(msg) > compressionThresholdBytes
 }
 
 func (g *gzipCompressor) reset() {

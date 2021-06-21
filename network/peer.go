@@ -377,22 +377,18 @@ func (p *peer) WriteMessages() {
 	}
 }
 
-const compressionThresholdBytes = 128
-
 // compress compresses [msg]
 func (p *peer) compress(msg []byte) ([]byte, error) {
-	msgLen := len(msg)
-	if msgLen < compressionThresholdBytes { // TODO move this logic to compressor
-		return msg, nil
+	if p.compressor.IsCompressable(msg) {
+		return p.compressor.Compress(msg)
 	}
-	return p.compressor.Compress(msg)
+	return msg, nil
 }
 
 // send assumes that the [stateLock] is not held.
 // If [canModifyMsg], [msg] may be modified by this method.
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
-// TODO move logic about whether to compress to the Compressor
 func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
