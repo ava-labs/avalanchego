@@ -281,7 +281,9 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		// if peer is gzip enabled, and message is gzipped, we read it
+		// TODO if message length > threshold, try to parse first as compressed.
+		// If that doesn't work, try to parse as uncompressed.
+		// if message length < threshold, try in opposite order.
 		var inflatedMsgLen, compressedMsgLen int
 		var t int64
 		if p.gzipEnabled && p.compressor.IsCompressed(msgBytes) {
