@@ -5,9 +5,14 @@ package secp256k1fx
 
 import (
 	"errors"
+
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var errNoValueOutput = errors.New("output has no value")
+var (
+	errNoValueOutput              = errors.New("output has no value")
+	_                verify.State = &OutputOwners{}
+)
 
 // TransferOutput ...
 type TransferOutput struct {

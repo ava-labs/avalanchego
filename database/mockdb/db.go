@@ -9,7 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-var errNoFunction = errors.New("user didn't specify what value(s) return")
+var (
+	errNoFunction                   = errors.New("user didn't specify what value(s) return")
+	_             database.Database = &Database{}
+)
 
 // Database implements database.Database.
 // This is a mock database meant to be used in tests.

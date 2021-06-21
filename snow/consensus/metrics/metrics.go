@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
@@ -56,19 +56,19 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_accepted", metricName),
 		Help:      fmt.Sprintf("Latency of accepting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   utils.MillisecondsBuckets,
+		Buckets:   metric.MillisecondsBuckets,
 	})
 	m.latRejected = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_rejected", metricName),
 		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   utils.MillisecondsBuckets,
+		Buckets:   metric.MillisecondsBuckets,
 	})
 	m.longestRunningContainer = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_longest_running", metricName),
 		Help:      fmt.Sprintf("Latency of processing the issued %s in milliseconds", descriptionName),
-		Buckets:   utils.MillisecondsBuckets,
+		Buckets:   metric.MillisecondsBuckets,
 	})
 
 	errs := wrappers.Errs{}
