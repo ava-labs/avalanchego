@@ -109,7 +109,6 @@ func (h *Handler) Dispatch() {
 
 		// Get the next message we should process
 		msg := h.unprocessedMsgs.Pop()
-		h.ctx.Log.Info("popped %s. Len %d", msg, h.unprocessedMsgs.Len())
 		h.unprocessedMsgsCond.L.Unlock()
 
 		// If this message's deadline has passed, don't process it.
@@ -550,7 +549,6 @@ func (h *Handler) push(msg message) {
 	defer h.unprocessedMsgsCond.L.Unlock()
 
 	h.unprocessedMsgs.Push(msg)
-	h.ctx.Log.Info("pushed %s. New len %d", msg, h.unprocessedMsgs.Len())
 	h.unprocessedMsgsCond.Broadcast()
 
 }
