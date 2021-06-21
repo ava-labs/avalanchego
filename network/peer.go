@@ -240,7 +240,6 @@ func (p *peer) ReadMessages() {
 	reader := bufio.NewReader(p.conn)
 	// Continuously read and handle messages from this peer. When we exit this
 	// loop, this connection is closed.
-readLoop:
 	for {
 		// Read the length of the next message from the peer
 		// and wait until the throttler says to proceed
@@ -316,7 +315,7 @@ readLoop:
 				)
 				// Read the next message
 				p.net.msgThrottler.Release(uint64(msgLen), p.id)
-				continue readLoop
+				break
 			}
 			// Handle the message. Note that when we are done handling
 			// this message, we must call [p.net.msgThrottler.Release]
