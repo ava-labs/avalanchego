@@ -63,7 +63,6 @@ fi
 echo "Using $avalanche_testing_image for e2e tests"
 echo "Using $avalanchego_byzantine_image for e2e tests"
 
-
 # pulling the avalanche-testing image
 docker pull $avalanche_testing_image
 docker pull $avalanchego_byzantine_image
@@ -77,11 +76,14 @@ source "$AVALANCHE_PATH"/scripts/build_image.sh
 # Target built version to use in avalanche-testing
 avalanche_image="$avalanchego_dockerhub_repo:$current_branch"
 
+echo "Execution Summary:"
+echo ""
 echo "Running Avalanche Image: ${avalanche_image}"
 echo "Running Avalanche Image Tag: $current_branch"
 echo "Running Avalanche Testing Image: ${avalanche_testing_image}"
 echo "Running Avalanche Byzantine Image: ${avalanchego_byzantine_image}"
 echo "Git Commit ID : ${git_commit_id}"
+echo ""
 
 
 # >>>>>>>> avalanche-testing custom parameters <<<<<<<<<<<<<
