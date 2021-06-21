@@ -15,6 +15,7 @@ package proposervm
 // implemented via the proposer block header
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -28,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 var (
@@ -165,58 +168,81 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
-	if vm.now().After(vm.proBlkStartTime) {
-		proParentID, err := vm.state.getPreferredID()
-		if err != nil {
-			return nil, err
-		}
-
-		h, err := vm.pChainHeight()
-		if err != nil {
-			return nil, err
-		}
-		hdr := NewProHeader(proParentID, sb.Timestamp().Unix(), h, *vm.stakingCert.Leaf)
-		proBlk, err := NewProBlock(vm, hdr, sb, choices.Processing, nil, true)
-		if err != nil {
-			return nil, err
-		}
-
-		if err := proBlk.Verify(); err != nil {
-			return nil, err
-		}
-
-		if err := vm.state.storeProBlk(&proBlk); err != nil {
-			return nil, err
-		}
-
-		return &proBlk, nil
-	}
-	return sb, nil
-}
-
-func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	var mPb marshallingProposerBLock
-	if err := mPb.unmarshal(b); err == nil {
-		sb, err := vm.ChainVM.ParseBlock(mPb.wrpdBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		proBlk, _ := NewProBlock(vm, mPb.ProposerBlockHeader, sb, choices.Processing, b, false) // not signing block, cannot err
-		if err := vm.state.storeProBlk(&proBlk); err != nil {
-			return nil, err
-		}
-
-		return &proBlk, nil
+	if !vm.now().After(vm.proBlkStartTime) {
+		return sb, nil
 	}
 
-	// try parse it as a core block
-	sb, err := vm.ChainVM.ParseBlock(b)
+	proParentID, err := vm.state.getPreferredID()
 	if err != nil {
 		return nil, err
 	}
-	// no caching of core blocks into ProposerVM
-	return sb, nil
+
+	h, err := vm.pChainHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	slb, err := statelessblock.Build(
+		proParentID,
+		sb.Timestamp(),
+		h,
+		vm.stakingCert.Leaf,
+		sb.Bytes(),
+		vm.stakingCert.PrivateKey.(crypto.Signer),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	proBlk := ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: sb,
+		status:  choices.Processing,
+	}
+
+	if err := proBlk.Verify(); err != nil {
+		return nil, err
+	}
+
+	if err := vm.state.storeProBlk(&proBlk); err != nil {
+		return nil, err
+	}
+
+	return &proBlk, nil
+}
+
+func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
+	block, err := vm.parseProposerBlock(b)
+	if err == nil {
+		return &block, nil
+	}
+	return vm.ChainVM.ParseBlock(b)
+}
+
+func (vm *VM) parseProposerBlock(b []byte) (ProposerBlock, error) {
+	slb, err := statelessblock.Parse(b)
+	if err != nil {
+		return ProposerBlock{}, err
+	}
+
+	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+	if err != nil {
+		return ProposerBlock{}, err
+	}
+
+	block := ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: coreBlk,
+		status:  choices.Processing,
+	}
+
+	if err := vm.state.storeProBlk(&block); err != nil {
+		return ProposerBlock{}, err
+	}
+
+	return block, nil
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
@@ -272,7 +298,8 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 }
 
 func (vm *VM) handleConflicts(pb *ProposerBlock) error {
-	siblings, found := vm.siblings[pb.header.prntID]
+	parentID := pb.ParentID()
+	siblings, found := vm.siblings[parentID]
 	if !found {
 		return ErrFailedHandlingConflicts // should not be possible
 	}
@@ -292,7 +319,7 @@ func (vm *VM) handleConflicts(pb *ProposerBlock) error {
 		}
 	}
 
-	delete(vm.siblings, pb.header.prntID)
+	delete(vm.siblings, parentID)
 	if _, found := vm.siblings[pb.ID()]; !found {
 		vm.siblings[pb.ID()] = make([]*ProposerBlock, 0)
 	}

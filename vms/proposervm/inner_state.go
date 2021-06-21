@@ -122,8 +122,9 @@ func (is *innerState) storeProBlk(blk *ProposerBlock) error {
 	if err != nil {
 		return err
 	}
-	if err := is.proBlkDB.Put(blk.id[:], bytes); err != nil {
-		is.wipeFromCacheProBlk(blk.ID())
+	id := blk.ID()
+	if err := is.proBlkDB.Put(id[:], bytes); err != nil {
+		is.wipeFromCacheProBlk(id)
 		return err
 	}
 
@@ -159,23 +160,13 @@ func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
 		return nil, ErrProBlkNotFound
 	}
 
-	var sPB stateProBlk
-	if err := sPB.unmarshal(stProBytes); err != nil {
-		return nil, err
-	}
-	var mPb marshallingProposerBLock
-	if err := mPb.unmarshal(sPB.ProBlk); err != nil {
-		return nil, err
-	}
-	sb, err := is.vm.ChainVM.ParseBlock(mPb.wrpdBytes)
+	proBlk, err := is.vm.parseProposerBlock(stProBytes)
 	if err != nil {
 		return nil, err
 	}
-	proBlk, _ := NewProBlock(is.vm, mPb.ProposerBlockHeader, sb, sPB.status, sPB.ProBlk, false) // not signing block, cannot err
 	if err := is.storeProBlk(&proBlk); err != nil {
 		return nil, err
 	}
-
 	return &proBlk, nil
 }
 
