@@ -133,7 +133,9 @@ func (pb *ProposerBlock) Accept() error {
 		}
 
 		pb.status = choices.Accepted
-		// TODO: persist
+		if err := pb.vm.state.storeProBlk(pb); err != nil {
+			return err
+		}
 
 		if err := pb.vm.propagateStatusFrom(pb); err != nil {
 			// TODO: attempt to restore previous accepted block and return
@@ -161,8 +163,14 @@ func (pb *ProposerBlock) Accept() error {
 
 func (pb *ProposerBlock) Reject() error {
 	// coreBlock rejection is handled upon accept of siblings
+	if pb.status == choices.Rejected {
+		return nil // no-op
+	}
+
 	pb.status = choices.Rejected
-	// TODO: persist
+	if err := pb.vm.state.storeProBlk(pb); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -170,7 +178,7 @@ func (pb *ProposerBlock) coreReject() error {
 	if err := pb.coreBlk.Reject(); err != nil {
 		return err
 	}
-	// pb.vm.state.wipeFromCacheProBlk(pb.id) //TODO: persist state before wiping cache
+	pb.vm.state.wipeFromCacheProBlk(pb.id)
 	return nil
 }
 

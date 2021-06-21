@@ -26,7 +26,7 @@ var (
 )
 
 type stateProBlk struct {
-	version uint16
+	version uint16 // versioning for future proofing
 	ProBlk  []byte
 	status  choices.Status
 }
@@ -43,7 +43,6 @@ func (sPB *stateProBlk) marshal() ([]byte, error) {
 	if p.PackBytes(sPB.ProBlk); p.Errored() {
 		return nil, ErrStateBlkFailedParsing
 	}
-
 	if p.PackInt(uint32(sPB.status)); p.Errored() {
 		return nil, ErrStateBlkFailedParsing
 	}
@@ -62,7 +61,6 @@ func (sPB *stateProBlk) unmarshal(b []byte) error {
 	if sPB.ProBlk = p.UnpackBytes(); p.Errored() {
 		return ErrStateBlkFailedParsing
 	}
-
 	if sPB.status = choices.Status(p.UnpackInt()); p.Errored() {
 		return ErrStateBlkFailedParsing
 	}
@@ -108,8 +106,12 @@ func (is *innerState) wipeCache() {
 	is.lastAcceptedID = ids.Empty
 }
 
-func (is *innerState) storeProBlk(blk *ProposerBlock) error {
+func (is *innerState) cacheProBlk(blk *ProposerBlock) {
 	is.knownProBlocks[blk.ID()] = blk
+}
+
+func (is *innerState) storeProBlk(blk *ProposerBlock) error {
+	is.cacheProBlk(blk)
 
 	defer is.baseDB.Abort()
 
@@ -171,10 +173,9 @@ func (is *innerState) getProBlock(id ids.ID) (*ProposerBlock, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	proBlk, _ := NewProBlock(is.vm, mPb.ProposerBlockHeader, sb, sPB.status, sPB.ProBlk, false) // not signing block, cannot err
-	if err := is.storeProBlk(&proBlk); err != nil {
-		return nil, err
-	}
+	is.cacheProBlk(&proBlk)
 
 	return &proBlk, nil
 }

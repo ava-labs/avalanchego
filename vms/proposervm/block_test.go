@@ -542,6 +542,9 @@ func TestAccept_SingleBlock(t *testing.T) {
 		VerifyV: nil,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) { return coreBlk, nil }
+
 	proBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -555,6 +558,17 @@ func TestAccept_SingleBlock(t *testing.T) {
 		t.Fatal("Could not accept proposer block")
 	}
 
+	if proBlk.Status() != choices.Accepted {
+		t.Fatal("accepted pro block has wrong status")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("accepted core block has wrong status")
+	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk, err = proVM.GetBlock(proBlk.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
 	if proBlk.Status() != choices.Accepted {
 		t.Fatal("accepted pro block has wrong status")
 	}
@@ -602,6 +616,18 @@ func TestAccept_BlockConflict(t *testing.T) {
 	if proBlk1.ID() == proBlk2.ID() {
 		t.Fatal("test requires proBlk1 different from proBlk2")
 	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		default:
+			t.Fatal("Parsing unknown core block")
+			return nil, nil
+		}
+	}
 
 	// ..accept proBlk2 and check that proBlk2 is accepted and proBlk1 rejected
 	if err := proBlk2.Accept(); err != nil {
@@ -615,6 +641,27 @@ func TestAccept_BlockConflict(t *testing.T) {
 		t.Fatal("Accepted core block has wrong status")
 	}
 
+	if proBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk2, err = proVM.GetBlock(proBlk2.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk1, err = proVM.GetBlock(proBlk1.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
 	if proBlk1.Status() != choices.Rejected {
 		t.Fatal("Rejected pro block has wrong status")
 	}
@@ -723,6 +770,37 @@ func TestAccept_ChainConflict(t *testing.T) {
 	if coreBlk3.Status() != choices.Rejected {
 		t.Fatal("Rejected core block has wrong status")
 	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk1, err = proVM.GetBlock(proBlk1.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk2, err = proVM.GetBlock(proBlk2.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
+
+	if proBlk3, err = proVM.GetBlock(proBlk3.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected core block has wrong status")
+	}
 }
 
 func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
@@ -805,6 +883,34 @@ func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
 		t.Fatal("Rejected pro block has wrong status")
 	}
 
+	if proBlk3.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+	if coreBlk3.Status() != choices.Processing {
+		t.Fatal("Child core block has wrong status")
+	}
+
+	proVM.state.wipeCache() // check persistence
+	if proBlk1, err = proVM.GetBlock(proBlk1.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk1.Status() != choices.Accepted {
+		t.Fatal("Accepted pro block has wrong status")
+	}
+	if coreBlk.Status() != choices.Accepted {
+		t.Fatal("Accepted core block has wrong status")
+	}
+
+	if proBlk2, err = proVM.GetBlock(proBlk2.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
+	if proBlk2.Status() != choices.Rejected {
+		t.Fatal("Rejected pro block has wrong status")
+	}
+
+	if proBlk3, err = proVM.GetBlock(proBlk3.ID()); err != nil {
+		t.Fatal("could not retrieve proBlk after cache wiping")
+	}
 	if proBlk3.Status() != choices.Rejected {
 		t.Fatal("Rejected pro block has wrong status")
 	}
