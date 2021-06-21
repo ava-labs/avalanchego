@@ -64,10 +64,11 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 
 // IsCompressed returns whether given bytes are compressed data or not
 func (g *gzipCompressor) IsCompressed(msg []byte) bool {
+	// TODO this is broken and we should fix/replace this
 	return len(msg) > 2 && msg[0] == 31 && msg[1] == 139
 }
 
-func (g *gzipCompressor) reset() error {
+func (g *gzipCompressor) reset() {
 	if !g.initialized {
 		var buf bytes.Buffer
 		g.writeBuffer = &buf
@@ -76,7 +77,6 @@ func (g *gzipCompressor) reset() error {
 	}
 	g.writeBuffer.Reset()
 	g.gzipWriter.Reset(g.writeBuffer)
-	return nil
 }
 
 // NewCompressor returns a new compressor instance
