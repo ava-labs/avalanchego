@@ -283,7 +283,7 @@ func (p *peer) ReadMessages() {
 
 		var inflatedMsgLen, compressedMsgLen int
 		var t int64
-		if p.gzipEnabled && p.compressor.IsCompressed(msgBytes) {
+		if p.gzipEnabled {
 			// this msg is gzipped
 			t1 := time.Now()
 			compressedMsgLen = len(msgBytes)
