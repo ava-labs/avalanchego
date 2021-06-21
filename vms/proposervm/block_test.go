@@ -46,14 +46,6 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 	}
 }
 
-type testClock struct {
-	setTime time.Time
-}
-
-func (tC testClock) now() time.Time {
-	return tC.setTime
-}
-
 // TODO: these two below are the first tests I wrote. Remove or move to vm tests
 func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
@@ -111,20 +103,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 
 // ProposerBlock.Verify tests section
 func TestProposerBlockVerificationParent(t *testing.T) {
-	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	_, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	pCH, err := proVM.pChainHeight()
 	if err != nil {
@@ -307,22 +286,21 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	_, valVM, proVM, _ := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
-	valVM.CantGetValidatorSet = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
 	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
 		res := make(map[ids.ShortID]uint64)
 		res[nodeID] = uint64(10)
 		return res, nil
 	}
 
-	prntBlkPChainHeight, _ := proVM.pChainHeight()
-	prntBlkPChainHeight /= 2
 	prntCoreBlk := snowman.TestBlock{}
+	prntBlkPChainHeight := pChainHeight / 2
 	parentProBlk, err := NewProBlock(proVM,
 		NewProHeader(ids.Empty, 0, prntBlkPChainHeight, *pTestCert.Leaf),
 		&prntCoreBlk, choices.Processing, nil, true)
@@ -408,16 +386,6 @@ func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
 	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -450,19 +418,7 @@ func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
 // ProposerBlock.Accept tests section
 func TestProposerBlockAcceptSetLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -499,20 +455,7 @@ func TestProposerBlockAcceptSetLastAcceptedBlock(t *testing.T) {
 }
 
 func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate two blocks with the same core block and store them
 	coreBlk := &snowman.TestBlock{
@@ -532,7 +475,11 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	}
 
 	proGenBlkID, _ := proVM.LastAccepted()
-	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), currentPChainHeight, *pTestCert.Leaf)
+	pChainHeight, err := proVM.windower.GetCurrentHeight()
+	if err != nil {
+		t.Fatal("could not retrieve pChain height")
+	}
+	proHdr1 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk1, err := NewProBlock(proVM, proHdr1, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -544,7 +491,7 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 		verifiedCores: make(map[ids.ID]struct{}),
 	}
 
-	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), currentPChainHeight, *pTestCert.Leaf)
+	proHdr2 := NewProHeader(proGenBlkID, coreBlk.Timestamp().Add(time.Second).Unix(), pChainHeight, *pTestCert.Leaf)
 	proBlk2, err := NewProBlock(proVM, proHdr2, coreBlk, choices.Processing, nil, true)
 	if err != nil {
 		t.Fatal("could not sign proposert block")
@@ -574,20 +521,7 @@ func TestTwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 
 func TestAccept_SingleBlock(t *testing.T) {
 	// there is just one ProBlock with no siblings being accepted
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate one proposer block...
 	coreVM.CantBuildBlock = true
@@ -638,20 +572,7 @@ func TestAccept_SingleBlock(t *testing.T) {
 func TestAccept_BlockConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings;
 	// Once proBlk1 is accepted, proBlk2 is rejected
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate proBlk1 and proBlk2 with different coreBlocks
 	coreBlk1 := &snowman.TestBlock{
@@ -741,20 +662,7 @@ func TestAccept_BlockConflict(t *testing.T) {
 func TestAccept_ChainConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings; proBlk2 has a child proBlk3
 	// Once proBlk1 is accepted, proBlk2 and proBlk3 are rejected
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
 	coreBlk1 := &snowman.TestBlock{
@@ -885,15 +793,14 @@ func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap the same coreBlocks coreBlk and are siblings; proBlk2 has a child proBlk3
 	// Once proBlk1 is accepted, proBlk2 and proBlk3 are rejected, while coreBlk is accepted
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
+	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
 	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
 		res := make(map[ids.ShortID]uint64)
 		res[nodeID] = uint64(10)
 		return res, nil
@@ -915,7 +822,7 @@ func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
-	currentPChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
+	pChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -1013,20 +920,7 @@ func TestAccept_MixedCoreBlocksConflict(t *testing.T) {
 func TestReject_BlockConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings;
 	// ProBlk2 is rejected but its core not; ProBlk1 and core blocks statues as set on proBlk1's Accept
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate proBlk1 and proBlk2 with different coreBlocks
 	coreBlk1 := &snowman.TestBlock{
@@ -1098,20 +992,7 @@ func TestReject_BlockConflict(t *testing.T) {
 func TestReject_ParentFirst_ChainConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings; proBlk2 has a child proBlk3
 	// ProBlk2 and ProBlk3 are rejected in this order before ProBlk1 is accepted
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
 	coreBlk1 := &snowman.TestBlock{
@@ -1251,20 +1132,7 @@ func TestReject_ParentFirst_ChainConflict(t *testing.T) {
 func TestReject_ChildFirst_ChainConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap different coreBlocks and are siblings; proBlk2 has a child proBlk3
 	// ProBlk3 and ProBlk2 are rejected in this order before ProBlk1 is accepted
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
-		res := make(map[ids.ShortID]uint64)
-		res[nodeID] = uint64(10)
-		return res, nil
-	}
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 
 	// generate proBlk1 and proBlk2,proBlk3 chain with different coreBlocks
 	coreBlk1 := &snowman.TestBlock{
@@ -1405,15 +1273,14 @@ func TestReject_ParentFirst_MixedCoreBlocksConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap the same coreBlocks coreBlk and are siblings; proBlk2 has a child proBlk3
 	// proBlk2 and proBlk3 are rejected in this order, then proBlk1 is accepted
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
+	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
 	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
 		res := make(map[ids.ShortID]uint64)
 		res[nodeID] = uint64(10)
 		return res, nil
@@ -1435,7 +1302,7 @@ func TestReject_ParentFirst_MixedCoreBlocksConflict(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
-	currentPChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
+	pChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -1540,15 +1407,14 @@ func TestReject_ChildFirst_MixedCoreBlocksConflict(t *testing.T) {
 	// proBlk1 and proBlk2 wrap the same coreBlocks coreBlk and are siblings; proBlk2 has a child proBlk3
 	// proBlk3 and proBlk2 are rejected in this order, then proBlk1 is accepted
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	currentPChainHeight := uint64(2000)
+	pChainHeight := uint64(2000)
 	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return currentPChainHeight, nil }
-	valVM.CantGetValidatorSet = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(pTestCert.Leaf.Raw))
+	if err != nil {
+		t.Fatal("Could not evalute nodeID")
+	}
 	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(proVM.stakingCert.Leaf.Raw))
-		if err != nil {
-			return nil, err
-		}
 		res := make(map[ids.ShortID]uint64)
 		res[nodeID] = uint64(10)
 		return res, nil
@@ -1570,7 +1436,7 @@ func TestReject_ChildFirst_MixedCoreBlocksConflict(t *testing.T) {
 		t.Fatal("Could not build proposer block")
 	}
 
-	currentPChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
+	pChainHeight = uint64(4000) // move ahead P-Chain height so that proBlk1 != proBlk2
 	proBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
