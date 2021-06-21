@@ -401,6 +401,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 	}
 
 	msgBytes := msg.Bytes()
+	bytesSavedMetric := p.net.message(msg.Op()).bytesSaved
 	if compressMsg && p.gzipEnabled {
 		uncompressedLen := len(msgBytes)
 
@@ -414,10 +415,11 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 		compressedLen := len(compressedBytes)
 		bytesSaved := uncompressedLen - compressedLen
 
-		bytesSavedMetric := p.net.message(msg.Op()).bytesSaved
 		bytesSavedMetric.Observe(float64(bytesSaved))
 
 		msgBytes = compressedBytes
+	} else {
+		bytesSavedMetric.Observe(0)
 	}
 
 	msgBytesLen := int64(len(msgBytes))
