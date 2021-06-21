@@ -9,7 +9,7 @@ SRC_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 
 if [[ $# -eq 0 ]]; then
-    "$SRC_DIR/build_local_image.sh"
+    source "$SRC_DIR/build_local_image.sh"
 elif [[ $# -eq 2 ]]; then
     "$SRC_DIR/build_image_from_remote.sh" $@
 else

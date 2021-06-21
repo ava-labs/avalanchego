@@ -22,8 +22,7 @@ prev_avalanchego_process_path="$prev_build_dir/avalanchego-process"
 prev_plugin_dir="$prev_build_dir/plugins"
 
 # Avalabs docker hub
-dockerhub_repo="avaplatform/avalanchego"
-avalanche_image_name="avalanchego"
+avalanchego_dockerhub_repo=${DOCKER_REPO:-"avaplatform/avalanchego"}
 
 # Current branch
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
