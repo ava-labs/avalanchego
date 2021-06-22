@@ -27,7 +27,7 @@ type Codec struct {
 // [buffer]'s contents may be overwritten.
 // [buffer] may be nil.
 func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, compress bool) (Msg, error) {
-	fields, ok := Messages[op]
+	msgFields, ok := Messages[op]
 	if !ok {
 		return nil, errBadOp
 	}
@@ -46,7 +46,7 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 	}
 
 	// Pack the payload
-	for _, field := range fields {
+	for _, field := range msgFields {
 		data, ok := fieldValues[field]
 		if !ok {
 			return nil, errMissingField
@@ -87,7 +87,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 	// Unpack the op code (message type)
 	op := Op(p.UnpackByte())
 
-	message, ok := Messages[op]
+	msgFields, ok := Messages[op]
 	if !ok { // Unknown message type
 		return nil, errBadOp
 	}
@@ -118,9 +118,9 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 	}
 
 	// Parse each field of the payload
-	fields := make(map[Field]interface{}, len(message))
-	for _, field := range message {
-		fields[field] = field.Unpacker()(&p)
+	fieldValues := make(map[Field]interface{}, len(msgFields))
+	for _, field := range msgFields {
+		fieldValues[field] = field.Unpacker()(&p)
 	}
 
 	if p.Offset != len(b) {
@@ -129,7 +129,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 
 	return &msg{
 		op:     op,
-		fields: fields,
+		fields: fieldValues,
 		bytes:  b,
 	}, p.Err
 }
