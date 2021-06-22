@@ -252,25 +252,27 @@ func (p *peer) ReadMessages() {
 			pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:numBytesRead]...)
 			msgLen, err = pendingBuffer.PeekInt()
 			doneReadingMsgLen := err == nil
-			if doneReadingMsgLen {
-				if int64(msgLen) > p.net.maxMessageSize {
-					p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.id, p.getIP(), msgLen)
+			if !doneReadingMsgLen {
+				if len(pendingBuffer.Bytes) >= wrappers.IntLen {
+					// We should be able to parse the message length by now but we can't
+					p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
 					return
 				}
-				// Wait until the throttler says we can proceed to read the message
-				// Note that when we are done handling this message, or give up
-				// trying to read it, we must call [p.net.msgThrottler.Release]
-				// to give back the bytes used by this message.
-				p.net.msgThrottler.Acquire(uint64(msgLen), p.id)
-				// Done reading message length. Break from inner loop and
-				// read the actual message.
-				break
+				// Read more of the message length
+				continue
 			}
-			if len(pendingBuffer.Bytes) >= wrappers.IntLen {
-				// We should be able to parse the message length by now but we can't
-				p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
+			if int64(msgLen) > p.net.maxMessageSize {
+				p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.id, p.getIP(), msgLen)
 				return
 			}
+			// Wait until the throttler says we can proceed to read the message
+			// Note that when we are done handling this message, or give up
+			// trying to read it, we must call [p.net.msgThrottler.Release]
+			// to give back the bytes used by this message.
+			p.net.msgThrottler.Acquire(uint64(msgLen), p.id)
+			// Done reading message length. Break from inner loop and
+			// read the actual message.
+			break
 		}
 
 		// Read the message body
@@ -283,7 +285,7 @@ func (p *peer) ReadMessages() {
 				pendingBuffer.Offset = 0
 				pendingBuffer.Err = nil
 
-				// Get the rest of the message
+				// Get more of the message
 				read, err := reader.Read(readBuffer)
 				if err != nil {
 					p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
@@ -293,6 +295,7 @@ func (p *peer) ReadMessages() {
 				pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:read]...)
 				continue
 			}
+
 			// We read the full message body.
 			// Set [pendingBuffer.Bytes] to the rest of the bytes that were read.
 			pendingBuffer.Bytes = pendingBuffer.Bytes[pendingBuffer.Offset:]
@@ -304,6 +307,7 @@ func (p *peer) ReadMessages() {
 				formatting.DumpBytes{Bytes: msgBytes},
 			)
 
+			// Parse the message
 			msg, err := p.net.b.Parse(msgBytes)
 			if err != nil {
 				p.net.log.Verbo("failed to parse new message from %s%s at %s:\n%s\n%s",
@@ -311,10 +315,11 @@ func (p *peer) ReadMessages() {
 					formatting.DumpBytes{Bytes: msgBytes},
 					err,
 				)
-				// Read the next message
+				// Couldn't parse the message. Read the next one.
 				p.net.msgThrottler.Release(uint64(msgLen), p.id)
 				break
 			}
+
 			// Handle the message. Note that when we are done handling
 			// this message, we must call [p.net.msgThrottler.Release]
 			// to give back the bytes used by this message.
