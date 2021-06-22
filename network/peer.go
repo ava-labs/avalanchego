@@ -5,7 +5,6 @@ package network
 
 import (
 	"bufio"
-	"compress/gzip"
 	"crypto/x509"
 	"encoding/binary"
 	"math"
@@ -282,27 +281,14 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
+		// If we think [p] may send gzipped messages, try to decompress [msgBytes]
+		// before parsing.
 		if p.gzipEnabled {
-			// this msg is gzipped
-			inflatedMsg, err := p.compressor.Decompress(msgBytes)
-			if err != nil {
-				// print the appropriate error and resume unpacking the original bytes below
-				switch err {
-				case gzip.ErrChecksum:
-					p.net.log.Fatal("Invalid checksum when parsing gzipped data: %s", err)
-					return
-				case gzip.ErrHeader:
-					p.net.log.Verbo("Message is not gzipped, reading message without decompressing")
-				default:
-					p.net.log.Error("Error reading bytes: %s; attempting to read message without decompressing", err)
-				}
-			} else {
-				p.net.log.Verbo("Successfully decompressed bytes")
-				msgBytes = inflatedMsg
+			// Try to decompress [msgBytes]. If decompression succeeds, assign to [msgBytes].
+			// Otherwise just try to parse [msgBytes].
+			if decompressedMsgBytes, err := p.compressor.Decompress(msgBytes); err == nil {
+				msgBytes = decompressedMsgBytes
 			}
-		} else {
-			// we proceed to unpack the original bytes
-			p.net.log.Verbo("Read non-compressed message, msgLen=%d", len(msgBytes))
 		}
 
 		p.net.log.Verbo("parsing new message from %s:\n%s",
