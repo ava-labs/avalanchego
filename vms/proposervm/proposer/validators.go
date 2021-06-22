@@ -21,6 +21,6 @@ func (d validatorsSlice) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
 
 func (d validatorsSlice) Less(i, j int) bool {
 	iID := d[i].id
-	jID := d[i].id
+	jID := d[j].id
 	return bytes.Compare(iID[:], jID[:]) == -1
 }
