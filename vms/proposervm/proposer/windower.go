@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
@@ -31,16 +32,19 @@ type Windower interface {
 // windower interfaces with P-Chain and it is responsible for calculating the
 // delay for the block submission window of a given validator
 type windower struct {
-	vm       validators.VM
-	subnetID ids.ID
-	sampler  sampler.WeightedWithoutReplacement
+	vm          validators.VM
+	subnetID    ids.ID
+	chainSource uint64
+	sampler     sampler.WeightedWithoutReplacement
 }
 
-func New(vm validators.VM, subnetID ids.ID) Windower {
+func New(vm validators.VM, subnetID, chainID ids.ID) Windower {
+	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
-		vm:       vm,
-		subnetID: subnetID,
-		sampler:  sampler.NewDeterministicWeightedWithoutReplacement(),
+		vm:          vm,
+		subnetID:    subnetID,
+		chainSource: w.UnpackLong(),
+		sampler:     sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
 }
 
@@ -86,7 +90,8 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 		numToSample = int(weight)
 	}
 
-	w.sampler.Seed(int64(chainHeight))
+	seed := chainHeight ^ w.chainSource
+	w.sampler.Seed(int64(seed))
 
 	indices, err := w.sampler.Sample(numToSample)
 	if err != nil {

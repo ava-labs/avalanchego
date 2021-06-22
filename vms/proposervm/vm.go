@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -56,6 +57,7 @@ type proBlkTreeNode struct {
 type VM struct {
 	block.ChainVM
 	state.State
+	proposer.Windower
 
 	windower
 	clock
