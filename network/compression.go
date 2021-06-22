@@ -9,17 +9,21 @@ import (
 	"io"
 )
 
-const compressionThresholdBytes = 128
+const minCompressSize = 128
 
+// Compressor compresss and decompresses messages.
+// Decompress is the inverse of Compress.
+// Decompress(Compress(msg)) == msg
 type Compressor interface {
 	Compress([]byte) ([]byte, error)
 	Decompress([]byte) ([]byte, error)
-	IsDecompressable([]byte) bool
-	IsCompressable([]byte) bool
 }
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
+	// Compress messages with length >= [minCompressSize]
+	minCompressSize int
+
 	writerInitialised bool
 	readerInitialised bool
 
@@ -60,15 +64,6 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	return data, nil
 }
 
-func (g *gzipCompressor) IsDecompressable(msg []byte) bool {
-	// header is 10 bytes (/usr/local/Cellar/go/1.16.3/libexec/src/compress/gzip/gunzip.go:175 will throw EOF otherwise)
-	return len(msg) > 10
-}
-
-func (g *gzipCompressor) IsCompressable(msg []byte) bool {
-	return len(msg) > compressionThresholdBytes
-}
-
 func (g *gzipCompressor) resetWriter() {
 	if !g.writerInitialised {
 		var buf bytes.Buffer
@@ -98,7 +93,10 @@ func (g *gzipCompressor) resetReader(msg []byte) error {
 	return nil
 }
 
-// NewCompressor returns a new compressor instance
-func NewCompressor() Compressor {
-	return &gzipCompressor{}
+// NewCompressor returns a new Compressor that compresses
+// messages with length >=
+func NewCompressor(minCompressSize int) Compressor {
+	return &gzipCompressor{
+		minCompressSize: minCompressSize,
+	}
 }

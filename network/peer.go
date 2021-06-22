@@ -282,7 +282,7 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		if p.gzipEnabled && p.compressor.IsDecompressable(msgBytes) {
+		if p.gzipEnabled {
 			// this msg is gzipped
 			inflatedMsg, err := p.compressor.Decompress(msgBytes)
 			if err != nil {
@@ -371,14 +371,6 @@ func (p *peer) WriteMessages() {
 	}
 }
 
-// compress compresses [msg]
-func (p *peer) compress(msg []byte) ([]byte, error) {
-	if p.compressor.IsCompressable(msg) {
-		return p.compressor.Compress(msg)
-	}
-	return msg, nil
-}
-
 // send assumes that the [stateLock] is not held.
 // If [canModifyMsg], [msg] may be modified by this method.
 // If ![canModifyMsg], [msg] will not be modified by this method.
@@ -406,7 +398,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 		uncompressedLen := len(msgBytes)
 
 		var err error
-		compressedBytes, err := p.compress(msgBytes)
+		compressedBytes, err := p.compressor.Compress(msgBytes)
 		if err != nil {
 			p.net.log.Error("couldn't compress message: %s", err)
 			return false
@@ -822,7 +814,7 @@ func (p *peer) handleVersion(msg Msg) {
 	// todo marker version should be constant
 	p.gzipEnabled = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
 	if p.gzipEnabled {
-		p.compressor = NewCompressor()
+		p.compressor = NewCompressor(minCompressSize)
 	}
 
 	signedPeerIP := signedPeerIP{
