@@ -707,7 +707,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
-		p.net.log.Info("peer version (%s) not compatible: %s", peerVersion, err)
+		p.net.log.Verbo("peer version (%s) not compatible: %s", peerVersion, err)
 		p.discardIP()
 		return
 	}
