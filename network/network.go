@@ -431,7 +431,7 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false, true) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAcceptedFrontier(%s, %s, %d)",
 				vID,
 				chainID,
@@ -466,7 +466,7 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true, true) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -502,7 +502,7 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false, true) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -538,7 +538,7 @@ func (n *network) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true, true) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Accepted(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -567,7 +567,7 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true, true) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send GetAncestors(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -597,7 +597,7 @@ func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID ui
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true, true) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
 			validatorID,
 			chainID,
@@ -622,7 +622,7 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true, true) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Get(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -657,7 +657,7 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true, true) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -696,7 +696,7 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false, true) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -728,7 +728,7 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 		peer := peerElement.peer
 		vID := peerElement.id
 		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false, true) {
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PullQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -764,7 +764,7 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 
 	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
-	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true, true) {
+	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
 			validatorID,
 			chainID,
@@ -1029,7 +1029,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		return err
 	}
 	for _, index := range indices {
-		if allPeers[int(index)].Send(msg, false, true) {
+		if allPeers[int(index)].Send(msg, false) {
 			n.put.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 		} else {
@@ -1155,10 +1155,10 @@ func (n *network) gossipPeerList() {
 		}
 
 		for _, index := range stakerIndices {
-			stakers[int(index)].Send(msg, false, true)
+			stakers[int(index)].Send(msg, false)
 		}
 		for _, index := range nonStakerIndices {
-			nonStakers[int(index)].Send(msg, false, true)
+			nonStakers[int(index)].Send(msg, false)
 		}
 	}
 }

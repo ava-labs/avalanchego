@@ -9,17 +9,21 @@ import (
 	"io"
 )
 
-const compressionThresholdBytes = 128
+const minCompressSize = 128
 
+// Compressor compresss and decompresses messages.
+// Decompress is the inverse of Compress.
+// Decompress(Compress(msg)) == msg
 type Compressor interface {
 	Compress([]byte) ([]byte, error)
 	Decompress([]byte) ([]byte, error)
-	IsDecompressable([]byte) bool
-	IsCompressable([]byte) bool
 }
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
+	// Compress messages with length >= [minCompressSize]
+	minCompressSize int
+
 	writerInitialised bool
 	readerInitialised bool
 
@@ -32,6 +36,9 @@ type gzipCompressor struct {
 
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
+	if len(msg) < g.minCompressSize {
+		return msg, nil
+	}
 	g.resetWriter()
 	if _, err := g.gzipWriter.Write(msg); err != nil {
 		return nil, err
@@ -39,10 +46,10 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	if err := g.gzipWriter.Close(); err != nil {
 		return nil, err
 	}
-	cmpBufferBytes := g.writeBuffer.Bytes()
-	cmpBytes := make([]byte, len(cmpBufferBytes))
-	copy(cmpBytes, cmpBufferBytes)
-	return cmpBytes, nil
+	compressed := g.writeBuffer.Bytes()
+	compressedCopy := make([]byte, len(compressed))
+	copy(compressedCopy, compressed)
+	return compressedCopy, nil
 }
 
 // Decompress decompresses [msg].
@@ -50,29 +57,16 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.resetReader(msg); err != nil {
 		return nil, err
 	}
-
 	data, err := io.ReadAll(g.gzipReader)
 	if err != nil {
 		return nil, err
 	}
-
 	if err = g.gzipReader.Close(); err != nil {
 		return nil, err
 	}
-
-	decompData := make([]byte, len(data))
-	copy(decompData, data)
-
-	return decompData, nil
-}
-
-func (g *gzipCompressor) IsDecompressable(msg []byte) bool {
-	// header is 10 bytes (/usr/local/Cellar/go/1.16.3/libexec/src/compress/gzip/gunzip.go:175 will throw EOF otherwise)
-	return len(msg) > 10
-}
-
-func (g *gzipCompressor) IsCompressable(msg []byte) bool {
-	return len(msg) > compressionThresholdBytes
+	decompressed := make([]byte, len(data))
+	copy(decompressed, data)
+	return decompressed, nil
 }
 
 func (g *gzipCompressor) resetWriter() {
@@ -104,7 +98,27 @@ func (g *gzipCompressor) resetReader(msg []byte) error {
 	return nil
 }
 
-// NewCompressor returns a new compressor instance
-func NewCompressor() Compressor {
-	return &gzipCompressor{}
+// NewGzipCompressor returns a new gzip Compressor that compresses
+// messages with length >= [minCompressSize]
+func NewGzipCompressor(minCompressSize int) Compressor {
+	return &gzipCompressor{
+		minCompressSize: minCompressSize,
+	}
+}
+
+type noCompressor struct{}
+
+// Compress returns [msg]
+func (*noCompressor) Compress(msg []byte) ([]byte, error) {
+	return msg, nil
+}
+
+// Decompress returns [msg].
+func (*noCompressor) Decompress(msg []byte) ([]byte, error) {
+	return msg, nil
+}
+
+// NewNoCompressor returns a Compressor that does nothing
+func NewNoCompressor() Compressor {
+	return &noCompressor{}
 }

@@ -33,7 +33,6 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 		Name:      fmt.Sprintf("%s_received", msgType),
 		Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
 	})
-
 	mm.receivedBytes = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_received_bytes", msgType),
@@ -44,11 +43,10 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 		Name:      fmt.Sprintf("%s_sent_bytes", msgType),
 		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
 	})
-
 	mm.bytesSaved = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_bytes_saved", msgType),
-		Help:      fmt.Sprintf("Number of bytes saved (due to compression) over %s messages sent to the network", msgType),
+		Help:      fmt.Sprintf("Number of bytes saved (not sent) due to compression of %s messages", msgType),
 	})
 
 	errs := wrappers.Errs{}

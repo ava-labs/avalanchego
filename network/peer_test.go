@@ -129,7 +129,7 @@ func TestPeer_Close(t *testing.T) {
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sender = make(chan []byte, 10)
 	testMsg := newTestMsg(GetVersion, newmsgbytes)
-	peer.Send(testMsg, true, true)
+	peer.Send(testMsg, true)
 
 	// make sure the net pending and peer pending bytes updated
 	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {
@@ -152,5 +152,26 @@ func TestPeer_Close(t *testing.T) {
 	}
 	if peer.pendingBytes != int64(len(newmsgbytes)) {
 		t.Fatalf("pending bytes invalid")
+	}
+}
+
+func TestShouldCompress(t *testing.T) {
+	p := newPeer(nil, nil, utils.IPDesc{}) // Dummy values are OK here
+	shouldNotCompressOps := []Op{Version, GetVersion, PeerList, GetPeerList, Ping, Pong}
+	shouldCompressOps := []Op{Put, Get, MultiPut, GetAncestors, Accepted, AcceptedFrontier, GetAccepted, GetAcceptedFrontier, PushQuery, PullQuery, Chits}
+	for _, op := range shouldCompressOps {
+		// Shouldn't compress because [p.canHandleCompressed] == false
+		assert.False(t, p.shouldCompress(op))
+	}
+	for _, op := range shouldNotCompressOps {
+		assert.False(t, p.shouldCompress(op))
+	}
+
+	p.canHandleCompressed = true
+	for _, op := range shouldCompressOps {
+		assert.True(t, p.shouldCompress(op))
+	}
+	for _, op := range shouldNotCompressOps {
+		assert.False(t, p.shouldCompress(op))
 	}
 }
