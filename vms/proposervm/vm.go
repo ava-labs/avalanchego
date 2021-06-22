@@ -45,11 +45,6 @@ func (c clockImpl) now() time.Time {
 	return time.Now()
 }
 
-type proBlkTreeNode struct {
-	proChildren   []*ProposerBlock
-	verifiedCores map[ids.ID]struct{} // set of already verified core IDs
-}
-
 type VM struct {
 	block.ChainVM
 	state *innerState
@@ -63,7 +58,7 @@ type VM struct {
 	scheduler *scheduler
 
 	proBlkActivationTime time.Time
-	proBlkTree           map[ids.ID](proBlkTreeNode)
+	BlkTree
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
@@ -71,7 +66,6 @@ func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
 		ChainVM:              vm,
 		clock:                clockImpl{},
 		proBlkActivationTime: proBlkStart,
-		proBlkTree:           nil,
 	}
 	res.state = newState(&res)
 	return &res
@@ -142,11 +136,7 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			vm.proBlkTree = make(map[ids.ID]proBlkTreeNode)
-			vm.proBlkTree[proGenBlk.ID()] = proBlkTreeNode{
-				proChildren:   make([]*ProposerBlock, 0),
-				verifiedCores: make(map[ids.ID]struct{}),
-			}
+			vm.BlkTree.Initialize(vm, proGenBlk.ID())
 		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
@@ -274,57 +264,4 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	default:
 		return res, err
 	}
-}
-
-func (vm *VM) propagateStatusFrom(pb *ProposerBlock) error {
-	prntID := pb.header.prntID
-	node, found := vm.proBlkTree[prntID]
-	if !found {
-		return ErrFailedHandlingConflicts
-	}
-
-	lastAcceptedID, err := vm.state.getLastAcceptedID()
-	if err != nil {
-		return ErrFailedHandlingConflicts
-	}
-
-	lastAcceptedBlk, err := vm.state.getProBlock(lastAcceptedID)
-	if err != nil {
-		return ErrFailedHandlingConflicts
-	}
-
-	queue := make([]*ProposerBlock, 0)
-	queue = append(queue, node.proChildren...)
-
-	// just level order descent
-	for len(queue) != 0 {
-		node := queue[0]
-		queue = queue[1:]
-
-		// a block, proposer or core, is rejected iff:
-		// * a sibling has been accepted
-		// * its parent has been rejected already
-
-		if node.ID() != lastAcceptedBlk.ID() {
-			if node.Parent().ID() == lastAcceptedBlk.Parent().ID() ||
-				node.Parent().Status() == choices.Rejected {
-				if err := node.Reject(); err != nil {
-					return ErrFailedHandlingConflicts
-				}
-			}
-		}
-
-		if node.coreBlk.ID() != lastAcceptedBlk.coreBlk.ID() {
-			if node.coreBlk.Parent().ID() == lastAcceptedBlk.coreBlk.Parent().ID() ||
-				node.coreBlk.Parent().Status() == choices.Rejected {
-				if err := node.coreReject(); err != nil {
-					return ErrFailedHandlingConflicts
-				}
-			}
-		}
-
-		childrenNodes := vm.proBlkTree[node.ID()].proChildren
-		queue = append(queue, childrenNodes...)
-	}
-	return nil
 }
