@@ -135,8 +135,9 @@ type peer struct {
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
 
-	gzipEnabled bool
-	compressor  Compressor
+	// Compresses and de-compresses messages.
+	// If peer is not a sufficiently high version, may be a no-op compressor.
+	compressor Compressor
 }
 
 // newPeer returns a properly initialized *peer.
@@ -146,6 +147,9 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 		conn:         conn,
 		ip:           ip,
 		tickerCloser: make(chan struct{}),
+		// Don't compress messages until we learn that the peer's
+		// version is sufficiently high
+		compressor: NewNoCompressor(),
 	}
 	p.aliasTimer = timer.NewTimer(p.releaseExpiredAliases)
 
@@ -281,14 +285,10 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		// If we think [p] may send gzipped messages, try to decompress [msgBytes]
-		// before parsing.
-		if p.gzipEnabled {
-			// Try to decompress [msgBytes]. If decompression succeeds, assign to [msgBytes].
-			// Otherwise just try to parse [msgBytes].
-			if decompressedMsgBytes, err := p.compressor.Decompress(msgBytes); err == nil {
-				msgBytes = decompressedMsgBytes
-			}
+		// Try to decompress [msgBytes]. If decompression succeeds, assign to [msgBytes].
+		// Otherwise just try to parse [msgBytes].
+		if decompressedMsgBytes, err := p.compressor.Decompress(msgBytes); err == nil {
+			msgBytes = decompressedMsgBytes
 		}
 
 		p.net.log.Verbo("parsing new message from %s:\n%s",
@@ -361,7 +361,7 @@ func (p *peer) WriteMessages() {
 // If [canModifyMsg], [msg] may be modified by this method.
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
-func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
+func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
 
@@ -378,26 +378,20 @@ func (p *peer) Send(msg Msg, canModifyMsg bool, compressMsg bool) bool {
 		return false
 	}
 
-	msgBytes := msg.Bytes()
-	bytesSavedMetric := p.net.message(msg.Op()).bytesSaved
-	if compressMsg && p.gzipEnabled {
-		uncompressedLen := len(msgBytes)
+	shouldCompress := shouldCompress(msg.Op())
 
-		var err error
+	msgBytes := msg.Bytes()
+	if shouldCompress {
+		uncompressedLen := len(msgBytes)
 		compressedBytes, err := p.compressor.Compress(msgBytes)
 		if err != nil {
-			p.net.log.Error("couldn't compress message: %s", err)
+			p.net.log.Error("couldn't compress %s message: %s", msg.Op(), err)
 			return false
 		}
-
-		compressedLen := len(compressedBytes)
-		bytesSaved := uncompressedLen - compressedLen
-
-		bytesSavedMetric.Observe(float64(bytesSaved))
-
 		msgBytes = compressedBytes
-	} else {
-		bytesSavedMetric.Observe(0)
+		compressedLen := len(msgBytes)
+		bytesSaved := uncompressedLen - compressedLen
+		p.net.message(msg.Op()).bytesSaved.Observe(float64(bytesSaved))
 	}
 
 	msgBytesLen := int64(len(msgBytes))
@@ -574,7 +568,7 @@ func (p *peer) sendGetVersion() {
 	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true, true)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.metrics.getVersion.numSent.Inc()
 		p.net.metrics.getVersion.sentBytes.Add(float64(lenMsg))
@@ -607,7 +601,7 @@ func (p *peer) sendVersion() {
 	p.net.log.AssertNoError(err)
 
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true, false)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.metrics.version.numSent.Inc()
 		p.net.metrics.version.sentBytes.Add(float64(lenMsg))
@@ -625,7 +619,7 @@ func (p *peer) sendGetPeerList() {
 	p.net.log.AssertNoError(err)
 
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true, true)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.getPeerlist.numSent.Inc()
 		p.net.getPeerlist.sentBytes.Add(float64(lenMsg))
@@ -650,7 +644,7 @@ func (p *peer) sendPeerList() {
 	}
 
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true, true)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.peerList.numSent.Inc()
 		p.net.peerList.sentBytes.Add(float64(lenMsg))
@@ -667,7 +661,7 @@ func (p *peer) sendPing() {
 	msg, err := p.net.b.Ping()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true, true)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.ping.numSent.Inc()
 		p.net.ping.sentBytes.Add(float64(lenMsg))
@@ -683,7 +677,7 @@ func (p *peer) sendPong() {
 	msg, err := p.net.b.Pong()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
-	sent := p.Send(msg, true, true)
+	sent := p.Send(msg, true)
 	if sent {
 		p.net.pong.numSent.Inc()
 		p.net.pong.sentBytes.Add(float64(lenMsg))
@@ -790,19 +784,16 @@ func (p *peer) handleVersion(msg Msg) {
 
 	sig := msg.Get(SigBytes).([]byte)
 	signed := ipAndTimeBytes(peerIP, versionTime)
-	err = p.cert.CheckSignature(p.cert.SignatureAlgorithm, signed, sig)
-	if err != nil {
+	if err := p.cert.CheckSignature(p.cert.SignatureAlgorithm, signed, sig); err != nil {
 		p.net.log.Debug("signature verification failed for peer at %s: %s", peerIP, err)
 		p.discardIP()
 		return
 	}
 
 	// todo marker version should be constant
-	p.gzipEnabled = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
-	if p.gzipEnabled {
+	useGzipCompressor := peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
+	if useGzipCompressor {
 		p.compressor = NewGzipCompressor(minCompressSize)
-	} else {
-		p.compressor = NewNoCompressor()
 	}
 
 	signedPeerIP := signedPeerIP{
@@ -1253,6 +1244,15 @@ func (p *peer) releaseAllAliases() {
 		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.id)
 	}
 	p.aliases = nil
+}
+
+func shouldCompress(op Op) bool {
+	switch op {
+	case Version, GetVersion, PeerList, GetPeerList, Ping, Pong:
+		return false
+	default:
+		return true
+	}
 }
 
 func ipAndTimeBytes(ip utils.IPDesc, timestamp uint64) []byte {
