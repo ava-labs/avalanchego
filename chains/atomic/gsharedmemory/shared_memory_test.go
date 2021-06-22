@@ -45,7 +45,7 @@ func TestInterface(t *testing.T) {
 		sm0, conn0 := wrapSharedMemory(t, m.NewSharedMemory(chainID0), baseDB)
 		sm1, conn1 := wrapSharedMemory(t, m.NewSharedMemory(chainID1), baseDB)
 
-		test(t, chainID0, chainID1, sm0, sm1, testDB)
+		test(t, chainID0, chainID1, sm0, sm1, testDB, nil)
 
 		err = conn0.Close()
 		assert.NoError(err)
