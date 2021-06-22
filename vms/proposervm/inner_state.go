@@ -8,8 +8,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var (
@@ -24,49 +22,6 @@ var (
 	lastAcceptedIDKey                = []byte("lastAcceptedIDKey")
 	ErrLastAcceptedIDNotFound        = errors.New("last accepted ID not found")
 )
-
-type stateProBlk struct {
-	version uint16 // versioning for future proofing
-	ProBlk  []byte
-	status  choices.Status
-}
-
-func (sPB *stateProBlk) marshal() ([]byte, error) {
-	p := wrappers.Packer{
-		MaxSize: 1 << 18,
-		Bytes:   make([]byte, 0, 128),
-	}
-	if p.PackShort(sPB.version); p.Errored() {
-		return nil, ErrStateBlkFailedParsing
-	}
-
-	if p.PackBytes(sPB.ProBlk); p.Errored() {
-		return nil, ErrStateBlkFailedParsing
-	}
-	if p.PackInt(uint32(sPB.status)); p.Errored() {
-		return nil, ErrStateBlkFailedParsing
-	}
-	return p.Bytes, nil
-}
-
-func (sPB *stateProBlk) unmarshal(b []byte) error {
-	p := wrappers.Packer{
-		Bytes: b,
-	}
-
-	if sPB.version = p.UnpackShort(); p.Errored() {
-		return ErrStateBlkFailedParsing
-	}
-
-	if sPB.ProBlk = p.UnpackBytes(); p.Errored() {
-		return ErrStateBlkFailedParsing
-	}
-	if sPB.status = choices.Status(p.UnpackInt()); p.Errored() {
-		return ErrStateBlkFailedParsing
-	}
-
-	return nil
-}
 
 type innerState struct {
 	vm *VM

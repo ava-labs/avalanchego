@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -54,7 +55,8 @@ type proBlkTreeNode struct {
 
 type VM struct {
 	block.ChainVM
-	state *innerState
+	state.State
+
 	windower
 	clock
 	stakingCert     tls.Certificate
@@ -65,19 +67,15 @@ type VM struct {
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
-	res := VM{
+	return &VM{
 		ChainVM:         vm,
 		clock:           clockImpl{},
-		fromCoreVM:      nil,
-		toEngine:        nil,
 		proBlkStartTime: proBlkStart,
-		proBlkTree:      nil,
 	}
-	res.state = newState(&res)
-	return &res
 }
 
 func (vm *VM) handleBlockTiming() {
+	// TODO: this needs to send all messages, not just the first message
 	msg := <-vm.fromCoreVM
 	vm.toEngine <- msg
 }
