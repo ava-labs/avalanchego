@@ -70,7 +70,7 @@ func TestPruningBlockChain(t *testing.T) {
 				TrieCleanLimit: 256,
 				TrieDirtyLimit: 256,
 				Pruning:        true, // Enable pruning
-				SnapshotLimit:  256,
+				SnapshotLimit:  0,
 			},
 			chainConfig,
 			dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)),

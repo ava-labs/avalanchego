@@ -13,15 +13,6 @@ import (
 func TestAcceptedHeadSubscriptions(t *testing.T) {
 	chain, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
-	chain.SetOnSealFinish(func(block *types.Block) {
-		if err := chain.InsertBlock(block); err != nil {
-			t.Fatal(err)
-		}
-		if err := chain.SetPreference(block); err != nil {
-			t.Fatal(err)
-		}
-	})
-
 	chain.Start()
 	defer chain.Stop()
 
@@ -74,6 +65,7 @@ func TestAcceptedHeadSubscriptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndSetPreference(t, chain, block)
 	<-newTxPoolHeadChan
 	log.Info("Generated block with new counter contract creation", "blkNumber", block.NumberU64())
 

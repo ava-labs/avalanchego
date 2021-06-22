@@ -150,7 +150,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
 // the channel use to send messages to the engine, the vm, and atomic memory
-func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string) (chan engCommon.Message, *VM, []byte, *atomic.Memory) {
+func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory) {
 	vm, ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	if err := vm.Initialize(
 		ctx,
@@ -169,7 +169,7 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, confi
 		assert.NoError(t, vm.Bootstrapped())
 	}
 
-	return issuer, vm, genesisBytes, m
+	return issuer, vm, dbManager, m
 }
 
 func TestVMConfig(t *testing.T) {
@@ -293,6 +293,8 @@ func TestVMGenesis(t *testing.T) {
 	}
 }
 
+// Simple test to ensure we can issue an import transaction followed by an export transaction
+// and they will be indexed correctly when accepted.
 func TestIssueAtomicTxs(t *testing.T) {
 	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "", "")
 
@@ -435,7 +437,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 }
 
 func TestBuildEthTxBlock(t *testing.T) {
-	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "", "")
+	issuer, vm, dbManager, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -595,6 +597,21 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	if blk1Refreshed.ID() != blk1.ID() {
 		t.Fatalf("Found unexpected blkID for parent of blk2")
+	}
+
+	restartedVM := &VM{
+		txFee: testTxFee,
+	}
+	if err := restartedVM.Initialize(
+		NewContext(),
+		dbManager,
+		[]byte(genesisJSONApricotPhase2),
+		[]byte(""),
+		[]byte("{\"pruning-enabled\":true}"),
+		issuer,
+		[]*engCommon.Fx{},
+	); err != nil {
+		t.Fatal(err)
 	}
 }
 

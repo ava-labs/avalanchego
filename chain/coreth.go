@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
-	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
@@ -33,23 +32,19 @@ type Hash = common.Hash
 
 type ETHChain struct {
 	backend *eth.Ethereum
-	cb      *dummy.ConsensusCallbacks
-	mcb     *miner.MinerCallbacks
 }
 
 // NewETHChain creates an Ethereum blockchain with the given configs.
-func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, lastAcceptedHash common.Hash) (*ETHChain, error) {
+func NewETHChain(config *eth.Config, nodecfg *node.Config, chainDB ethdb.Database, settings eth.Settings, consensusCallbacks *dummy.ConsensusCallbacks, lastAcceptedHash common.Hash) (*ETHChain, error) {
 	node, err := node.New(nodecfg)
 	if err != nil {
 		return nil, err
 	}
-	cb := new(dummy.ConsensusCallbacks)
-	mcb := new(miner.MinerCallbacks)
-	backend, err := eth.New(node, config, cb, mcb, chainDB, settings, lastAcceptedHash)
+	backend, err := eth.New(node, config, consensusCallbacks, chainDB, settings, lastAcceptedHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create backend: %w", err)
 	}
-	chain := &ETHChain{backend: backend, cb: cb, mcb: mcb}
+	chain := &ETHChain{backend: backend}
 	backend.SetEtherbase(BlackholeAddr)
 	return chain, nil
 }
@@ -89,34 +84,6 @@ func (self *ETHChain) AddRemoteTxs(txs []*types.Transaction) []error {
 
 func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
 	return self.backend.TxPool().AddLocals(txs)
-}
-
-func (self *ETHChain) SetOnSeal(cb func(*types.Block) error) {
-	self.cb.OnSeal = cb
-}
-
-func (self *ETHChain) SetOnSealFinish(cb func(*types.Block)) {
-	self.mcb.OnSealFinish = cb
-}
-
-func (self *ETHChain) SetOnSealDrop(cb func(*types.Block)) {
-	self.mcb.OnSealDrop = cb
-}
-
-func (self *ETHChain) SetOnAPIs(cb dummy.OnAPIsCallbackType) {
-	self.cb.OnAPIs = cb
-}
-
-func (self *ETHChain) SetOnFinalize(cb dummy.OnFinalizeCallbackType) {
-	self.cb.OnFinalize = cb
-}
-
-func (self *ETHChain) SetOnFinalizeAndAssemble(cb dummy.OnFinalizeAndAssembleCallbackType) {
-	self.cb.OnFinalizeAndAssemble = cb
-}
-
-func (self *ETHChain) SetOnExtraStateChange(cb dummy.OnExtraStateChangeType) {
-	self.cb.OnExtraStateChange = cb
 }
 
 // Returns a new mutable state based on the current HEAD block.

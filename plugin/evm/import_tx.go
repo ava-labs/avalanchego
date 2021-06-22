@@ -288,9 +288,9 @@ func (vm *VM) newImportTx(
 
 // EVMStateTransfer performs the state transfer to increase the balances of
 // accounts accordingly with the imported EVMOutputs
-func (tx *UnsignedImportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
+func (tx *UnsignedImportTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
 	for _, to := range tx.Outs {
-		if to.AssetID == vm.ctx.AVAXAssetID {
+		if to.AssetID == ctx.AVAXAssetID {
 			log.Debug("crosschain X->C", "addr", to.Address, "amount", to.Amount, "assetID", "AVAX")
 			// If the asset is AVAX, convert the input amount in nAVAX to gWei by
 			// multiplying by the x2c rate.

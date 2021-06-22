@@ -1506,10 +1506,9 @@ func (bc *BlockChain) RemoveRejectedBlocks(start, end uint64) error {
 	return nil
 }
 
-func (bc *BlockChain) reprocessState(block *types.Block, reexec uint64, report bool) error {
+func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report bool) error {
 	var (
-		current = block
-		origin  = block.NumberU64()
+		origin = current.NumberU64()
 	)
 	// If the state is already available, skip re-processing
 	statedb, err := state.New(current.Root(), bc.stateCache, nil)
@@ -1523,7 +1522,7 @@ func (bc *BlockChain) reprocessState(block *types.Block, reexec uint64, report b
 		}
 		parent := bc.GetBlock(current.ParentHash(), current.NumberU64()-1)
 		if parent == nil {
-			return fmt.Errorf("missing block %s:%d", current.ParentHash(), current.NumberU64()-1)
+			return fmt.Errorf("missing block %s:%d", current.ParentHash().Hex(), current.NumberU64()-1)
 		}
 		current = parent
 
@@ -1548,12 +1547,16 @@ func (bc *BlockChain) reprocessState(block *types.Block, reexec uint64, report b
 		previousRoot common.Hash
 		triedb       = bc.stateCache.TrieDB()
 	)
+	statedb, err = state.New(current.Root(), bc.stateCache, nil)
+	if err != nil {
+		return fmt.Errorf("no longer able to create state for current root (%s: %d)", current.Hash().Hex(), current.NumberU64())
+	}
 	// Note: we add 1 since in each iteration, we attempt to re-execute the next block.
-	log.Info("Re-executing blocks to generate state for last accepted block", "from", current.NumberU64()+1, "to", origin+1)
+	log.Info("Re-executing blocks to generate state for last accepted block", "from", current.NumberU64()+1, "to", origin)
 	for current.NumberU64() < origin {
 		// Print progress logs if long enough time elapsed
 		if time.Since(logged) > 8*time.Second && report {
-			log.Info("Regenerating historical state", "block", current.NumberU64()+1, "target", origin, "remaining", origin-current.NumberU64()-1, "elapsed", time.Since(start))
+			log.Info("Regenerating historical state", "block", current.NumberU64()+1, "target", origin, "remaining", origin-current.NumberU64(), "elapsed", time.Since(start))
 			logged = time.Now()
 		}
 		// Retrieve the next block to regenerate and process it
@@ -1561,9 +1564,13 @@ func (bc *BlockChain) reprocessState(block *types.Block, reexec uint64, report b
 		if current = bc.GetBlockByNumber(next); current == nil {
 			return fmt.Errorf("failed to retrieve block %d while re-generating state", next)
 		}
-		_, _, _, err := bc.processor.Process(current, statedb, vm.Config{})
+		receipts, _, usedGas, err := bc.processor.Process(current, statedb, vm.Config{})
 		if err != nil {
-			return fmt.Errorf("processing block %d failed: %v", current.NumberU64(), err)
+			return fmt.Errorf("re-processing block %d failed: %v", current.NumberU64(), err)
+		}
+		// Validate the state using the default validator
+		if err := bc.validator.ValidateState(current, statedb, receipts, usedGas); err != nil {
+			return fmt.Errorf("re-processing block %d failed state check: %v", current.NumberU64(), err)
 		}
 		log.Debug("processed block", "block", current.Hash(), "number", current.NumberU64())
 		// Finalize the state so any modifications are written to the trie

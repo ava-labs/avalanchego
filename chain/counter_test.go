@@ -60,6 +60,7 @@ func TestCounter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndAccept(t, chain, block)
 
 	<-newTxPoolHeadChan
 	log.Info("Generated block with new counter contract creation", "blkNumber", block.NumberU64())
@@ -92,6 +93,7 @@ func TestCounter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndAccept(t, chain, block)
 
 	<-newTxPoolHeadChan
 	log.Info("Generated block with counter contract interactions", "blkNumber", block.NumberU64())

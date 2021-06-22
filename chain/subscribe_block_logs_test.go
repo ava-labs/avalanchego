@@ -15,17 +15,6 @@ import (
 func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	chain, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
-	// Override SetOnSealFinish set in NewDefaultChain, so that each sealed block
-	// is set as the new preferred block within this test.
-	chain.SetOnSealFinish(func(block *types.Block) {
-		if err := chain.InsertBlock(block); err != nil {
-			t.Fatal(err)
-		}
-		if err := chain.SetPreference(block); err != nil {
-			t.Fatal(err)
-		}
-	})
-
 	chain.Start()
 	defer chain.Stop()
 
@@ -83,6 +72,7 @@ func TestBlockLogsAllowUnfinalized(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndSetPreference(t, chain, block)
 
 	<-newTxPoolHeadChan
 
