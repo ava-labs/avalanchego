@@ -44,29 +44,10 @@ import (
 	"github.com/ava-labs/coreth/params"
 )
 
-// Original code:
-// Command line flags to configure the interpreters.
-// var (
-// 	testEVM   = flag.String("vm.evm", "", "EVM configuration")
-// 	testEWASM = flag.String("vm.ewasm", "", "EWASM configuration")
-// )
-
 func TestMain(m *testing.M) {
 	flag.Parse()
 	os.Exit(m.Run())
 }
-
-// Original code:
-// var (
-// baseDir = filepath.Join(".", "testdata")
-// blockTestDir       = filepath.Join(baseDir, "BlockchainTests")
-// stateTestDir       = filepath.Join(baseDir, "GeneralStateTests")
-// legacyStateTestDir = filepath.Join(baseDir, "LegacyTests", "Constantinople", "GeneralStateTests")
-// transactionTestDir = filepath.Join(baseDir, "TransactionTests")
-// vmTestDir          = filepath.Join(baseDir, "VMTests")
-// rlpTestDir         = filepath.Join(baseDir, "RLPTests")
-// difficultyTestDir  = filepath.Join(baseDir, "BasicTests")
-// )
 
 func readJSON(reader io.Reader, value interface{}) error {
 	data, err := ioutil.ReadAll(reader)

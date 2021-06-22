@@ -443,6 +443,9 @@ func TestBuildEthTxBlock(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -518,6 +521,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk1.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -551,6 +559,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	if err := blk2.Accept(); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk2.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	if status := blk2.Status(); status != choices.Accepted {
@@ -1461,7 +1474,7 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatalf("Unexpected error when setting preference that would trigger reorg: %s", err)
 	}
 
-	if err := vm1BlkC.Accept(); !strings.Contains(err.Error(), "expected accepted parent block hash") {
+	if err := vm1BlkC.Accept(); !strings.Contains(err.Error(), "expected accepted block to have parent") {
 		t.Fatalf("Unexpected error when setting block at finalized height: %s", err)
 	}
 }
@@ -1945,7 +1958,7 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	// Attempt to accept out of order
-	if err := vm1BlkD.Accept(); !strings.Contains(err.Error(), "expected accepted parent block hash") {
+	if err := vm1BlkD.Accept(); !strings.Contains(err.Error(), "expected accepted block to have parent") {
 		t.Fatalf("unexpected error when accepting out of order block: %s", err)
 	}
 
@@ -2957,10 +2970,10 @@ func TestApricotPhase1Transition(t *testing.T) {
 
 	// Confirm all txs are present
 	ethBlkTxs := vm1.chain.GetBlockByNumber(2).Transactions()
+	if len(ethBlkTxs) != 5 {
+		t.Fatalf("Expected 5 transactions in block, but found %d", len(ethBlkTxs))
+	}
 	for i, tx := range txs[:5] {
-		if len(ethBlkTxs) <= i {
-			t.Fatalf("missing transactions expected: %d but found: %d", len(txs), len(ethBlkTxs))
-		}
 		if ethBlkTxs[i].Hash() != tx.Hash() {
 			t.Fatalf("expected tx at index %d to have hash: %x but has: %x", i, txs[i].Hash(), tx.Hash())
 		}

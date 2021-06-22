@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/eth/ethconfig"
+	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -75,14 +76,13 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-c
 		Alloc:      core.GenesisAlloc{fundedKey.Address: {Balance: initialBalance}},
 	}
 
-	chain := NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
-
-	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
+	chain, err := NewETHChain(&config, &node.Config{}, rawdb.NewMemoryDatabase(), eth.DefaultSettings, common.Hash{})
+	if err != nil {
 		t.Fatal(err)
 	}
 
 	chain.SetOnSealFinish(func(block *types.Block) {
-		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+		if err := chain.InsertBlock(block); err != nil {
 			t.Fatal(err)
 		}
 		if err := chain.SetPreference(block); err != nil {

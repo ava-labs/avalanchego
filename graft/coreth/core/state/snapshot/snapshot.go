@@ -357,6 +357,77 @@ func (t *Tree) Update(blockRoot common.Hash, parentRoot common.Hash, destructs m
 	return nil
 }
 
+// Flatten flattens the given root into its parent. If it's parent is not
+// a disk layer, Flatten will return an error. Layers built on top of the
+// root are not removed. It is the responsibility of the caller to call
+// Discard to clean up any additional layers built on the parent of [root].
+func (t *Tree) Flatten(root common.Hash) error {
+	// Retrieve the head snapshot to cap from
+	snap := t.Snapshot(root)
+	if snap == nil {
+		return fmt.Errorf("snapshot [%#x] missing", root)
+	}
+	diff, ok := snap.(*diffLayer)
+	// If [root] already reflects a disk layer, Flatten is a no-op.
+	if !ok {
+		return nil
+	}
+	if diff.parent == nil {
+		return fmt.Errorf("snapshot [%#x] missing parent", root)
+	}
+
+	if _, ok := diff.parent.(*diskLayer); !ok {
+		return fmt.Errorf("snapshot [%#x] parent is diff layer", root)
+	}
+	parentRoot := diff.parent.Root()
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	parentLayer := t.layers[parentRoot]
+	if parentLayer == nil {
+		return fmt.Errorf("snapshot missing parent layer: %s", parentRoot)
+	}
+
+	diff.lock.RLock()
+	base := diffToDisk(diff)
+	diff.lock.RUnlock()
+
+	// Remove parent layer
+	delete(t.layers, parentRoot)
+
+	t.layers[base.root] = base
+	// Replace root with base in parent pointers
+	for _, snap := range t.layers {
+		if diff, ok := snap.(*diffLayer); ok {
+			if base.root == diff.parent.Root() {
+				diff.parent = base
+			}
+		}
+	}
+
+	log.Debug("Flattened snapshot tree", "root", root, "parent", parentRoot, "size", len(t.layers))
+	return nil
+}
+
+func (t *Tree) Layers() map[common.Hash]snapshot {
+	return t.layers
+}
+
+// Discard removes layers that we no longer need
+func (t *Tree) Discard(root common.Hash) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	snap := t.layers[root]
+	if snap == nil {
+		return fmt.Errorf("snapshot [%#x] missing", root)
+	}
+
+	delete(t.layers, root)
+	return nil
+}
+
 // Cap traverses downwards the snapshot tree from a head block hash until the
 // number of allowed layers are crossed. All layers beyond the permitted number
 // are flattened downwards.

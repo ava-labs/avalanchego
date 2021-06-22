@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
@@ -78,7 +79,7 @@ func ExampleGenerateChain() {
 	})
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, _ := NewBlockChain(db, nil, gspec.Config, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), vm.Config{}, nil, nil, true)
+	blockchain, _ := NewBlockChain(db, defaultCacheConfig, gspec.Config, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), vm.Config{}, common.Hash{})
 	defer blockchain.Stop()
 
 	if i, err := blockchain.InsertChain(chain); err != nil {
