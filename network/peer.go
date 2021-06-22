@@ -135,11 +135,12 @@ type peer struct {
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
 
-	// Compresses and de-compresses messages.
-	// If peer is not a sufficiently high version, may be a no-op compressor.
-	// Should never be nil.
+	// Compresses and de-compresses messages. Should never be nil.
 	// May be assigned a new value after we receive the peer's version.
 	compressor Compressor
+
+	// True if we should compress messages sent to this peer
+	canHandleCompressed bool
 }
 
 // newPeer returns a properly initialized *peer.
@@ -151,7 +152,7 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 		tickerCloser: make(chan struct{}),
 		// Don't compress messages until we learn that the peer's
 		// version is sufficiently high
-		compressor: NewNoCompressor(),
+		compressor: NewGzipCompressor(minCompressSize),
 	}
 	p.aliasTimer = timer.NewTimer(p.releaseExpiredAliases)
 
@@ -381,7 +382,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	}
 
 	// Only compress certain message types
-	shouldCompress := shouldCompress(msg.Op())
+	shouldCompress := p.shouldCompress(msg.Op())
 
 	msgBytes := msg.Bytes()
 	if shouldCompress {
@@ -794,10 +795,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	// todo marker version should be constant
-	useGzipCompressor := peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
-	if useGzipCompressor {
-		p.compressor = NewGzipCompressor(minCompressSize)
-	}
+	p.canHandleCompressed = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
@@ -1249,7 +1247,10 @@ func (p *peer) releaseAllAliases() {
 	p.aliases = nil
 }
 
-func shouldCompress(op Op) bool {
+func (p *peer) shouldCompress(op Op) bool {
+	if !p.canHandleCompressed {
+		return false
+	}
 	switch op {
 	case Version, GetVersion, PeerList, GetPeerList, Ping, Pong:
 		return false
