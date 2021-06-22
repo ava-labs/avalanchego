@@ -324,13 +324,75 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 }
 
 func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.AtomicRequests, batch ...database.Batch) error {
-	formattedBatch := make(map[string][]string)
-	for key, _ := range batchChainsAndInputs {
-		formattedBatch[key.String()] = []string{"ggg"}
+	formattedRequest := make(map[string]*gsharedmemoryproto.BatchMap)
+	keys, counter := make([][]byte, len(batchChainsAndInputs)), 0
+	for key, value := range batchChainsAndInputs {
+		formattedValues := make([]*gsharedmemoryproto.AtomicRequest, 0, len(value))
+		keys[counter] = []byte(key.String())
+		counter++
+		for k, v := range value {
+			formattedElements := make([]*gsharedmemoryproto.Element, 0, len(v.Elems))
+			for _, formatElems := range v.Elems {
+				formattedElements = append(formattedElements, &gsharedmemoryproto.Element{
+					Key:    formatElems.Key,
+					Value:  formatElems.Value,
+					Traits: formatElems.Traits,
+				})
+			}
+
+			formattedValues[k] = &gsharedmemoryproto.AtomicRequest{
+				RequestType: gsharedmemoryproto.SharedMemoryMethod(v.RequestType),
+				UtxoIDs:     v.UtxoIDs,
+				Elems:       formattedElements,
+			}
+
+			formattedRequest[key.String()] = &gsharedmemoryproto.BatchMap{Requests: formattedValues}
+		}
 	}
+
 	req := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
-		BatchChainsAndInputs: formattedBatch,
+		BatchChainsAndInputs: formattedRequest,
 		Continues:            true,
 		Id:                   stdatomic.AddInt64(&c.uniqueID, 1),
+		Keys:                 keys,
 	}
+
+	currentSize := 0
+	prevIndex := 0
+	for i, key := range keys {
+		sizeChange := baseElementSize + len(key)
+		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
+			if _, err := c.client.RemoveAndPutMultiple(context.Background(), req); err != nil {
+				return err
+			}
+
+			currentSize = 0
+			prevIndex = i
+		}
+		currentSize += sizeChange
+
+		req.Keys = keys[prevIndex : i+1]
+	}
+
+	batchGroups, err := c.makeBatches(batch, currentSize)
+	if err != nil {
+		return err
+	}
+
+	for i, batches := range batchGroups {
+		req.Batches = batches
+		req.Continues = i < len(batchGroups)-1
+		if _, err := c.client.RemoveAndPutMultiple(context.Background(), req); err != nil {
+			return err
+		}
+		req.Keys = nil
+	}
+	if len(batchGroups) == 0 {
+		req.Continues = false
+		if _, err := c.client.RemoveAndPutMultiple(context.Background(), req); err != nil {
+			return err
+		}
+	}
+	return nil
+
 }

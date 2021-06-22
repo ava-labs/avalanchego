@@ -34,9 +34,10 @@ const (
 )
 
 type AtomicRequests struct {
-	requestType SharedMemoryMethod
-	utxoIDs     [][]byte
-	elems       []*Element
+	RequestType SharedMemoryMethod
+	UtxoIDs     [][]byte
+	Elems       []*Element
+	Keys        [][]*AtomicRequests
 }
 
 type dbElement struct {
@@ -228,11 +229,11 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 		}
 
 		for _, atomicRequest := range atomicRequests {
-			switch atomicRequest.requestType {
+			switch atomicRequest.RequestType {
 			case Remove:
 				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
 
-				for _, key := range atomicRequest.utxoIDs {
+				for _, key := range atomicRequest.UtxoIDs {
 					if err := s.RemoveValue(key); err != nil {
 						return err
 					}
@@ -240,7 +241,7 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 			case Put:
 				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
 
-				for _, elem := range atomicRequest.elems {
+				for _, elem := range atomicRequest.Elems {
 					if err := s.SetValue(elem); err != nil {
 						return err
 					}

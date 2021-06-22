@@ -43,7 +43,7 @@ message PutRequest {
 }
 
 message BatchMap {
-    string value = 1;
+    repeated AtomicRequest requests = 1;
 }
 
 message RemoveAndPutMultipleRequest {
@@ -51,7 +51,9 @@ message RemoveAndPutMultipleRequest {
     repeated Batch batches = 2;
     int64 id = 3;
     bool continues = 4;
+    repeated bytes keys = 5;
 }
+
 
 message RemoveAndPutMultipleResponse {}
 
