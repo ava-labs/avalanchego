@@ -6,6 +6,15 @@ package avm
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+)
+
+var (
+	_ Fx = &secp256k1fx.Fx{}
+	_ Fx = &nftfx.Fx{}
+	_ Fx = &propertyfx.Fx{}
 )
 
 type parsedFx struct {

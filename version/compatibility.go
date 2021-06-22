@@ -11,8 +11,9 @@ import (
 )
 
 var (
-	errIncompatible = errors.New("peers version is incompatible")
-	errMaskable     = errors.New("peers version is maskable")
+	errIncompatible               = errors.New("peers version is incompatible")
+	errMaskable                   = errors.New("peers version is maskable")
+	_               Compatibility = &compatibility{}
 )
 
 // Compatibility a utility for checking the compatibility of peer versions

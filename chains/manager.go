@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
@@ -47,7 +48,10 @@ const (
 	defaultChannelSize = 1024
 )
 
-var BootstrappedKey = []byte{0x00}
+var (
+	BootstrappedKey         = []byte{0x00}
+	_               Manager = &manager{}
+)
 
 // Manager manages the chains running on this node.
 // It can:
@@ -159,6 +163,7 @@ type ManagerConfig struct {
 	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
+	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
 
 	// Max Time to spend fetching a container and its
 	// ancestors when responding to a GetAncestors
@@ -350,7 +355,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	}
 
 	// Get a factory for the vm we want to use on our chain
-	vmFactory, err := m.VMManager.GetVMFactory(vmID)
+	vmFactory, err := m.VMManager.GetFactory(vmID)
 	if err != nil {
 		return nil, fmt.Errorf("error while getting vmFactory: %w", err)
 	}
@@ -370,7 +375,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		}
 
 		// Get a factory for the fx we want to use on our chain
-		fxFactory, err := m.VMManager.GetVMFactory(fxID)
+		fxFactory, err := m.VMManager.GetFactory(fxID)
 		if err != nil {
 			return nil, fmt.Errorf("error while getting fxFactory: %w", err)
 		}
@@ -480,14 +485,17 @@ func (m *manager) createAvalancheChain(
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+	if m.MeterVMEnabled {
+		vm = metervm.NewVertexVM(vm)
+	}
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	vertexDB := prefixdb.New([]byte("vertex"), db.Database)
 	vertexBootstrappingDB := prefixdb.New([]byte("vertex_bs"), db.Database)
 	txBootstrappingDB := prefixdb.New([]byte("tx_bs"), db.Database)
@@ -558,7 +566,8 @@ func (m *manager) createAvalancheChain(
 			VtxBlocked: vtxBlocker,
 			TxBlocked:  txBlocker,
 			Manager:    vtxManager,
-			VM:         vm,
+
+			VM: vm,
 		},
 		Params:    consensusParams,
 		Consensus: &avcon.Topological{},
@@ -616,14 +625,18 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	meteredManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
+
+	if m.MeterVMEnabled {
+		vm = metervm.NewBlockVM(vm)
+	}
+	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
 		return nil, err
 	}
-	dbManager := meteredManager.NewPrefixDBManager(ctx.ChainID[:])
-	vmDBManager := dbManager.NewPrefixDBManager([]byte("vm"))
+	prefixDBManager := meterDBManager.NewPrefixDBManager(ctx.ChainID[:])
+	vmDBManager := prefixDBManager.NewPrefixDBManager([]byte("vm"))
 
-	db := dbManager.Current()
+	db := prefixDBManager.Current()
 	bootstrappingDB := prefixdb.New([]byte("bs"), db.Database)
 
 	blocked, err := queue.NewWithMissing(bootstrappingDB, consensusParams.Namespace+"_block", ctx.Metrics)

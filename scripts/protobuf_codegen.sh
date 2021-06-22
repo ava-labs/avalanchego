@@ -1,6 +1,16 @@
 #!/bin/bash
-for PBF in $(find . -type f | grep proto$)
+
+TARGET="."
+
+if [ -n "$1" ]; then 
+  TARGET="$1"
+fi
+
+echo "Target folder is: $TARGET"
+
+for PBF in $(find $TARGET -type f | grep proto$)
 do
+  echo $PBF
   PFILE=$(basename $PBF)
   FDIR=$(dirname $PBF)
   PDIR=$(dirname $FDIR)

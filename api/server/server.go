@@ -14,6 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
+
 	"github.com/gorilla/handlers"
 
 	"github.com/rs/cors"
@@ -29,7 +31,10 @@ const (
 	serverShutdownTimeout = 10 * time.Second
 )
 
-var errUnknownLockOption = errors.New("invalid lock options")
+var (
+	errUnknownLockOption            = errors.New("invalid lock options")
+	_                    RouteAdder = &Server{}
+)
 
 type RouteAdder interface {
 	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
@@ -73,7 +78,7 @@ func (s *Server) Initialize(
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
 	})
-	s.handler = corsWrapper.Handler(s.router)
+	s.handler = gziphandler.GzipHandler(corsWrapper.Handler(s.router))
 
 	for _, wrapper := range wrappers {
 		s.handler = wrapper.WrapHandler(s.handler)

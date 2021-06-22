@@ -4,6 +4,7 @@
 package network
 
 import (
+	"bufio"
 	"crypto/x509"
 	"encoding/binary"
 	"math"
@@ -232,8 +233,9 @@ func (p *peer) ReadMessages() {
 
 	pendingBuffer := wrappers.Packer{}
 	readBuffer := make([]byte, p.net.readBufferSize)
+	reader := bufio.NewReader(p.conn)
 	for {
-		read, err := p.conn.Read(readBuffer)
+		read, err := reader.Read(readBuffer)
 		if err != nil {
 			p.net.log.Verbo("error on connection read to %s %s %s", p.nodeID, p.getIP(), err)
 			return
@@ -298,6 +300,7 @@ func (p *peer) WriteMessages() {
 
 	p.sendVersion()
 
+	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
 			p.nodeID,
@@ -311,15 +314,20 @@ func (p *peer) WriteMessages() {
 					p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.nodeID, p.getIP(), err)
 					return
 				}
-
-				written, err := p.conn.Write(byteSlice)
+				written, err := writer.Write(byteSlice)
 				if err != nil {
 					p.net.log.Verbo("error writing to %s at %s due to: %s", p.nodeID, p.getIP(), err)
 					return
 				}
+
 				p.tickerOnce.Do(p.StartTicker)
 				byteSlice = byteSlice[written:]
 			}
+		}
+		// Make sure the peer got the entire message
+		if err := writer.Flush(); err != nil {
+			p.net.log.Verbo("couldn't flush writer to %s: %s", p.nodeID, p.getIP(), err)
+			return
 		}
 
 		p.senderLock.Lock()

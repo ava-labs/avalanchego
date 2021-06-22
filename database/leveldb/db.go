@@ -37,6 +37,11 @@ const (
 	levelDBByteOverhead = 8
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+)
+
 // Database is a persistent key-value store. Apart from basic data storage
 // functionality it also supports batch writes and iterating over the keyspace
 // in binary-alphabetical order.

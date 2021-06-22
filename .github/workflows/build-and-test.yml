@@ -1,20 +1,12 @@
-name: Build + Test Mac-Windows
+name: Build + Unit Tests
 
 on:
   push:
-    tags:
-      - '*' # Push events to every tag
-    branches:
-      - dev
-      - master
 
 jobs:
-  run_build_tests:
-    name: build_tests
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ windows-latest, macos-latest ]
+  run_build_unit_tests:
+    name: build_unit_test
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - name: build_test

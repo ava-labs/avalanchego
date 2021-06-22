@@ -22,6 +22,11 @@ const (
 	codecVersion = 0
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+)
+
 // Database encrypts all values that are provided
 type Database struct {
 	lock   sync.RWMutex

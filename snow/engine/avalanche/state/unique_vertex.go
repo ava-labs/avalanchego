@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -14,6 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+)
+
+var (
+	_ cache.Evictable  = &uniqueVertex{}
+	_ avalanche.Vertex = &uniqueVertex{}
 )
 
 // uniqueVertex acts as a cache for vertices in the database.

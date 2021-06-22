@@ -30,6 +30,8 @@ var (
 	errDuplicatedVersion = errors.New("duplicated codec version")
 )
 
+var _ Manager = &manager{}
+
 // Manager describes the functionality for managing codec versions.
 type Manager interface {
 	// Associate the given codec with the given version ID

@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/queue"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
@@ -34,7 +33,10 @@ const (
 	bootstrappingDelay = 10 * time.Second
 )
 
-var errUnexpectedTimeout = errors.New("unexpected timeout fired")
+var (
+	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
+	_                    common.Bootstrapable = &Bootstrapper{}
+)
 
 // Config ...
 type Config struct {
@@ -138,7 +140,7 @@ func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 // to fetch or we are at the maximum number of outstanding requests.
 func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 	b.needToFetch.Add(vtxIDs...)
-	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingRequests {
+	for b.needToFetch.Len() > 0 && b.OutstandingRequests.Len() < common.MaxOutstandingGetAncestorsRequests {
 		vtxID := b.needToFetch.CappedList(1)[0]
 		b.needToFetch.Remove(vtxID)
 
@@ -497,20 +499,18 @@ func (b *Bootstrapper) finish() error {
 
 // Connected implements the Engine interface.
 func (b *Bootstrapper) Connected(validatorID ids.ShortID) error {
-	if connector, ok := b.VM.(validators.Connector); ok {
-		if err := connector.Connected(validatorID); err != nil {
-			return err
-		}
+	err := b.VM.Connected(validatorID)
+	if err != nil {
+		return err
 	}
 	return b.Bootstrapper.Connected(validatorID)
 }
 
 // Disconnected implements the Engine interface.
 func (b *Bootstrapper) Disconnected(validatorID ids.ShortID) error {
-	if connector, ok := b.VM.(validators.Connector); ok {
-		if err := connector.Disconnected(validatorID); err != nil {
-			return err
-		}
+	err := b.VM.Disconnected(validatorID)
+	if err != nil {
+		return err
 	}
 	return b.Bootstrapper.Disconnected(validatorID)
 }
