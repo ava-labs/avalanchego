@@ -1,4 +1,7 @@
-package network
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package compression
 
 import (
 	"math/rand"
@@ -7,18 +10,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCompressDecompress(t *testing.T) {
-	data := make([]byte, minCompressSize+1)
+func TestGzipCompressDecompress(t *testing.T) {
+	data := make([]byte, 4096)
 	for i := 0; i < len(data); i++ {
 		data[i] = byte(rand.Intn(256)) // #nosec G404
 	}
 
-	data2 := make([]byte, minCompressSize+1)
+	data2 := make([]byte, 4096)
 	for i := 0; i < len(data); i++ {
 		data2[i] = byte(rand.Intn(256)) // #nosec G404
 	}
 
-	compressor := NewGzipCompressor(minCompressSize)
+	compressor := NewGzipCompressor()
 
 	dataCompressed, err := compressor.Compress(data)
 	assert.NoError(t, err)
@@ -41,16 +44,4 @@ func TestCompressDecompress(t *testing.T) {
 	nonGzipData := []byte{1, 2, 3}
 	_, err = compressor.Decompress(nonGzipData)
 	assert.Error(t, err)
-}
-
-func TestNoCompressor(t *testing.T) {
-	data := []byte{1, 2, 3}
-	compressor := NewNoCompressor()
-	compressedBytes, err := compressor.Compress(data)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, compressedBytes)
-
-	decompressedBytes, err := compressor.Decompress(compressedBytes)
-	assert.NoError(t, err)
-	assert.EqualValues(t, data, decompressedBytes)
 }

@@ -56,7 +56,7 @@ func (m Builder) PeerList(peers []utils.IPCertDesc) (Msg, error) {
 		map[Field]interface{}{
 			SignedPeers: peers,
 		},
-		false,
+		true,
 	)
 }
 
@@ -103,7 +103,7 @@ func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		false,
+		len(containerIDs) > 4,
 	)
 }
 
@@ -175,7 +175,7 @@ func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte)
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		false,
+		true,
 	)
 }
 
@@ -207,7 +207,7 @@ func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, conta
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		false,
+		true,
 	)
 }
 
@@ -224,7 +224,7 @@ func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, co
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		false,
+		true,
 	)
 }
 
@@ -260,6 +260,6 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID) 
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		false,
+		len(containerIDs) > 4,
 	)
 }

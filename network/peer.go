@@ -135,10 +135,6 @@ type peer struct {
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
 
-	// Compresses and de-compresses messages. Should never be nil.
-	// May be assigned a new value after we receive the peer's version.
-	compressor Compressor
-
 	// True if we should compress messages sent to this peer
 	canHandleCompressed bool
 }
@@ -150,9 +146,6 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 		conn:         conn,
 		ip:           ip,
 		tickerCloser: make(chan struct{}),
-		// Don't compress messages until we learn that the peer's
-		// version is sufficiently high
-		compressor: NewGzipCompressor(minCompressSize),
 	}
 	p.aliasTimer = timer.NewTimer(p.releaseExpiredAliases)
 
@@ -288,12 +281,6 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		// Try to decompress [msgBytes]. If decompression succeeds, assign to [msgBytes].
-		// Otherwise just try to parse [msgBytes].
-		if decompressedMsgBytes, err := p.compressor.Decompress(msgBytes); err == nil {
-			msgBytes = decompressedMsgBytes
-		}
-
 		p.net.log.Verbo("parsing new message from %s:\n%s",
 			p.id,
 			formatting.DumpBytes{Bytes: msgBytes})
@@ -381,23 +368,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 		return false
 	}
 
-	// Only compress certain message types
-	shouldCompress := p.shouldCompress(msg.Op())
-
 	msgBytes := msg.Bytes()
-	if shouldCompress {
-		uncompressedLen := len(msgBytes)
-		compressedBytes, err := p.compressor.Compress(msgBytes)
-		if err != nil {
-			p.net.log.Error("couldn't compress %s message: %s", msg.Op(), err)
-			return false
-		}
-		msgBytes = compressedBytes
-		compressedLen := len(msgBytes)
-		bytesSaved := uncompressedLen - compressedLen
-		p.net.message(msg.Op()).bytesSaved.Observe(float64(bytesSaved))
-	}
-
 	msgBytesLen := int64(len(msgBytes))
 
 	// lets assume send will be successful, we add to the network pending bytes.
@@ -1245,18 +1216,6 @@ func (p *peer) releaseAllAliases() {
 		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.id)
 	}
 	p.aliases = nil
-}
-
-func (p *peer) shouldCompress(op Op) bool {
-	if !p.canHandleCompressed {
-		return false
-	}
-	switch op {
-	case Version, GetVersion, PeerList, GetPeerList, Ping, Pong:
-		return false
-	default:
-		return true
-	}
 }
 
 func ipAndTimeBytes(ip utils.IPDesc, timestamp uint64) []byte {

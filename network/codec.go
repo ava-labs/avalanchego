@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -18,7 +19,7 @@ var (
 
 // Codec defines the serialization and deserialization of network messages
 type Codec struct {
-	compressor Compressor
+	compressor compression.Compressor
 }
 
 // Pack attempts to pack a map of fields into a message.
@@ -61,7 +62,7 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 		fields: fieldValues,
 		bytes:  p.Bytes,
 	}
-	if !compress {
+	if !compress || !compressableType {
 		return msg, nil
 	}
 
@@ -73,7 +74,7 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 	if err != nil {
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
-	// Remove the payload
+	// Remove the payload (keep just the message type and isCompressed)
 	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen]
 	// Attach the compressed payload
 	msg.bytes = append(msg.bytes, compressedPayloadBytes...)
@@ -112,7 +113,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 			return nil, fmt.Errorf("couldn't decompress payload of %s message: %s", op, err)
 		}
 		// Replace the compressed payload with the decompressed payload.
-		// Remove the compressed payload.
+		// Remove the compressed payload (keep just the message type and isCompressed)
 		p.Bytes = p.Bytes[:wrappers.ByteLen+wrappers.BoolLen]
 		// Attach the decompressed payload.
 		p.Bytes = append(p.Bytes, payloadBytes...)
@@ -124,7 +125,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 		fieldValues[field] = field.Unpacker()(&p)
 	}
 
-	if p.Offset != len(b) {
+	if p.Offset != len(p.Bytes) {
 		p.Add(fmt.Errorf("expected length %d got %d", len(b), p.Offset))
 	}
 

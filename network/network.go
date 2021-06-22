@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -406,6 +407,9 @@ func NewNetwork(
 		},
 	}
 	netw.b = Builder{
+		Codec: Codec{
+			compressor: compression.NewGzipCompressor(),
+		},
 		getByteSlice: func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
 		},

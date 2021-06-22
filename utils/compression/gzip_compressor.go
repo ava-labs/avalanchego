@@ -1,7 +1,7 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package compression
 
 import (
 	"bytes"
@@ -9,21 +9,8 @@ import (
 	"io"
 )
 
-const minCompressSize = 128
-
-// Compressor compresss and decompresses messages.
-// Decompress is the inverse of Compress.
-// Decompress(Compress(msg)) == msg
-type Compressor interface {
-	Compress([]byte) ([]byte, error)
-	Decompress([]byte) ([]byte, error)
-}
-
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
-	// Compress messages with length >= [minCompressSize]
-	minCompressSize int
-
 	writerInitialised bool
 	readerInitialised bool
 
@@ -36,9 +23,6 @@ type gzipCompressor struct {
 
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
-	if len(msg) < g.minCompressSize {
-		return msg, nil
-	}
 	g.resetWriter()
 	if _, err := g.gzipWriter.Write(msg); err != nil {
 		return nil, err
@@ -99,26 +83,6 @@ func (g *gzipCompressor) resetReader(msg []byte) error {
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
-// messages with length >= [minCompressSize]
-func NewGzipCompressor(minCompressSize int) Compressor {
-	return &gzipCompressor{
-		minCompressSize: minCompressSize,
-	}
-}
-
-type noCompressor struct{}
-
-// Compress returns [msg]
-func (*noCompressor) Compress(msg []byte) ([]byte, error) {
-	return msg, nil
-}
-
-// Decompress returns [msg].
-func (*noCompressor) Decompress(msg []byte) ([]byte, error) {
-	return msg, nil
-}
-
-// NewNoCompressor returns a Compressor that does nothing
-func NewNoCompressor() Compressor {
-	return &noCompressor{}
+func NewGzipCompressor() Compressor {
+	return &gzipCompressor{}
 }
