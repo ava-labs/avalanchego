@@ -320,7 +320,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 	vm.db.EndBatch()
 
-	if err := unsignedImportTx.EVMStateTransfer(vm, state); err != nil {
+	if err := unsignedImportTx.EVMStateTransfer(vm.ctx, state); err != nil {
 		t.Fatalf("EVM State Transfer failed due to: %s", err)
 	}
 
@@ -519,7 +519,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 
 	vm.db.EndBatch()
 
-	if err := unsignedImportTx.EVMStateTransfer(vm, state); err != nil {
+	if err := unsignedImportTx.EVMStateTransfer(vm.ctx, state); err != nil {
 		t.Fatalf("EVM State Transfer failed due to: %s", err)
 	}
 

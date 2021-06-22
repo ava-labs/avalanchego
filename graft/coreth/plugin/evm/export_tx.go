@@ -244,10 +244,10 @@ func (vm *VM) newExportTx(
 }
 
 // EVMStateTransfer executes the state update from the atomic export transaction
-func (tx *UnsignedExportTx) EVMStateTransfer(vm *VM, state *state.StateDB) error {
+func (tx *UnsignedExportTx) EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error {
 	addrs := map[[20]byte]uint64{}
 	for _, from := range tx.Ins {
-		if from.AssetID == vm.ctx.AVAXAssetID {
+		if from.AssetID == ctx.AVAXAssetID {
 			log.Debug("crosschain C->X", "addr", from.Address, "amount", from.Amount, "assetID", "AVAX")
 			// We multiply the input amount by x2cRate to convert AVAX back to the appropriate
 			// denomination before export.
