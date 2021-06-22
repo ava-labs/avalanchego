@@ -19,6 +19,7 @@ var (
 
 // Codec defines the serialization and deserialization of network messages
 type Codec struct {
+	// compressor must not be nil
 	compressor compression.Compressor
 }
 
