@@ -32,6 +32,12 @@ func TestUnmarshalConfig(t *testing.T) {
 			false,
 		},
 		{
+			"nanosecond durations parsed",
+			[]byte(fmt.Sprintf(`{"api-max-duration": 5000000000, "continuous-profiler-frequency": "%v"}`, 2*time.Minute)),
+			Config{APIMaxDuration: Duration{5 * time.Second}, ContinuousProfilerFrequency: Duration{2 * time.Minute}},
+			false,
+		},
+		{
 			"bad durations",
 			[]byte(`{"api-max-duration": "bad-duration"}`),
 			Config{},
