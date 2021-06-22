@@ -46,7 +46,10 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	if err := g.gzipWriter.Close(); err != nil {
 		return nil, err
 	}
-	return g.writeBuffer.Bytes(), nil
+	compressed := g.writeBuffer.Bytes()
+	compressedCopy := make([]byte, len(compressed))
+	copy(compressedCopy, compressed)
+	return compressedCopy, nil
 }
 
 // Decompress decompresses [msg].

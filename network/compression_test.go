@@ -8,12 +8,12 @@ import (
 )
 
 func TestCompressDecompress(t *testing.T) {
-	data := make([]byte, 4096)
+	data := make([]byte, minCompressSize+1)
 	for i := 0; i < len(data); i++ {
 		data[i] = byte(rand.Intn(256)) // #nosec G404
 	}
 
-	data2 := make([]byte, 4096)
+	data2 := make([]byte, minCompressSize+1)
 	for i := 0; i < len(data); i++ {
 		data2[i] = byte(rand.Intn(256)) // #nosec G404
 	}
