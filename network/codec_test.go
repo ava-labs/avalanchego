@@ -13,21 +13,21 @@ import (
 var TestCodec Codec
 
 func TestCodecPackInvalidOp(t *testing.T) {
-	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}))
+	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false)
 	assert.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
-	_, err := TestCodec.Pack(nil, Get, make(map[Field]interface{}))
+	_, err := TestCodec.Pack(nil, Get, make(map[Field]interface{}), false)
 	assert.Error(t, err)
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
-	_, err := TestCodec.Parse([]byte{math.MaxUint8})
+	_, err := TestCodec.Parse([]byte{math.MaxUint8}, true)
 	assert.Error(t, err)
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
-	_, err := TestCodec.Parse([]byte{byte(GetVersion), 0x00})
+	_, err := TestCodec.Parse([]byte{byte(GetVersion), 0x00}, true)
 	assert.Error(t, err)
 }
