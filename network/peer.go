@@ -244,35 +244,35 @@ func (p *peer) ReadMessages() {
 		// Read the length of the next message from the peer
 		// and wait until the throttler says to proceed
 		for {
+			// See if we can parse the message length
+			msgLen, err := pendingBuffer.PeekInt()
+			doneReadingMsgLen := err == nil
+			if doneReadingMsgLen {
+				if int64(msgLen) > p.net.maxMessageSize {
+					p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.id, p.getIP(), msgLen)
+					return
+				}
+				// Done reading the message length.
+				// Wait until the throttler says we can proceed to read the message.
+				// Note that when we are done handling this message, or give up
+				// trying to read it, we must call [p.net.msgThrottler.Release]
+				// to give back the bytes used by this message.
+				p.net.msgThrottler.Acquire(uint64(msgLen), p.id)
+				break
+			}
+			if len(pendingBuffer.Bytes) >= wrappers.IntLen {
+				// We should be able to parse the message length by now but we can't
+				p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
+				return
+			}
+
+			// Read more of the message length.
 			numBytesRead, err := reader.Read(readBuffer)
 			if err != nil {
 				p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
 				return
 			}
 			pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:numBytesRead]...)
-			msgLen, err = pendingBuffer.PeekInt()
-			doneReadingMsgLen := err == nil
-			if !doneReadingMsgLen {
-				if len(pendingBuffer.Bytes) >= wrappers.IntLen {
-					// We should be able to parse the message length by now but we can't
-					p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
-					return
-				}
-				// Read more of the message length
-				continue
-			}
-			if int64(msgLen) > p.net.maxMessageSize {
-				p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.id, p.getIP(), msgLen)
-				return
-			}
-			// Wait until the throttler says we can proceed to read the message
-			// Note that when we are done handling this message, or give up
-			// trying to read it, we must call [p.net.msgThrottler.Release]
-			// to give back the bytes used by this message.
-			p.net.msgThrottler.Acquire(uint64(msgLen), p.id)
-			// Done reading message length. Break from inner loop and
-			// read the actual message.
-			break
 		}
 
 		// Read the message body
