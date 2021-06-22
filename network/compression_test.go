@@ -1,15 +1,17 @@
 package network
 
 import (
-	"crypto/rand"
-	"math/big"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCompressDecompress(t *testing.T) {
-	data := []byte(randomString(1000))
+	data := make([]byte, 4096)
+	for i := 0; i < len(data); i++ {
+		data[i] = byte(rand.Intn(256))
+	}
 
 	compressor := NewGzipCompressor(minCompressSize)
 	compressedBytes, err := compressor.Compress(data)
@@ -18,15 +20,4 @@ func TestCompressDecompress(t *testing.T) {
 	decompressedBytes, err := compressor.Decompress(compressedBytes)
 	assert.NoError(t, err)
 	assert.EqualValues(t, data, decompressedBytes)
-}
-
-func randomString(n int) string {
-	letters := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 !%$*#@|/.,<>?[]{}-=_+()&^")
-	lettersLen := big.NewInt(int64(len(letters)))
-	s := make([]rune, n)
-	for i := range s {
-		randIndex, _ := rand.Int(rand.Reader, lettersLen)
-		s[i] = letters[randIndex.Int64()]
-	}
-	return string(s)
 }
