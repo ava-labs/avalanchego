@@ -4,6 +4,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
@@ -31,11 +32,13 @@ import (
 )
 
 const (
-	defaultSendQueueSize      = 1 << 10
-	defaultAliasTimeout       = 2 * time.Second
-	defaultGossipPeerListFreq = time.Minute
-	defaultPeerListSize       = 50
-	defaultGossipPeerListTo   = 100
+	defaultSendQueueSize              = 1 << 10
+	defaultAliasTimeout               = 2 * time.Second
+	defaultGossipPeerListFreq         = time.Minute
+	defaultPeerListSize               = 50
+	defaultGossipPeerListTo           = 100
+	defaultGossipAcceptedFrontierSize = 35
+	defaultGossipOnAcceptSize         = 20
 )
 
 var (
@@ -80,7 +83,7 @@ type testDialer struct {
 	closer func(net.Addr, net.Addr)
 }
 
-func (d *testDialer) Dial(ip utils.IPDesc) (net.Conn, error) {
+func (d *testDialer) Dial(ctx context.Context, ip utils.IPDesc) (net.Conn, error) {
 	d.outboundsLock.Lock()
 	defer d.outboundsLock.Unlock()
 
@@ -260,6 +263,8 @@ func initCerts(t *testing.T) {
 	tlsConfig2 = TLSConfig(*cert2)
 }
 
+var dialerConfig = NewDialerConfig(0, 30*time.Second)
+
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)
 
@@ -329,7 +334,10 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net)
 
@@ -460,7 +468,10 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -489,7 +500,10 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -631,7 +645,10 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -660,7 +677,10 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -803,7 +823,10 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -832,7 +855,10 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -980,7 +1006,10 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1009,7 +1038,10 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1131,7 +1163,10 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1160,7 +1195,10 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1413,7 +1451,10 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1442,7 +1483,10 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1471,7 +1515,10 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net2)
 
@@ -1500,7 +1547,10 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net3)
 
@@ -1850,7 +1900,10 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -1879,7 +1932,10 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -1908,7 +1964,10 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net2)
 
@@ -1937,7 +1996,10 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net3)
 
@@ -2203,7 +2265,10 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net0)
 
@@ -2232,7 +2297,10 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net1)
 
@@ -2261,7 +2329,10 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		dialerConfig,
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, net2)
 
