@@ -522,3 +522,123 @@ func TestStaleOriginLayer(t *testing.T) {
 		t.Errorf("expected account to exist: %v", err)
 	}
 }
+
+func TestRebloomOnFlatten(t *testing.T) {
+	// Create diff layers, including a level with two children, then flatten
+	// the layers and assert that the bloom filters are being updated correctly.
+	//
+	// Each layer will add an account which will be in the blooms for every
+	// following difflayer. No accesses would need to touch disk. Layers C and D
+	// should have all addrs in their blooms except for each others.
+	//
+	// After flattening A into the root, the remaining blooms should no longer
+	// have addrA but should retain all the others.
+	//
+	// After flattening B into A, blooms C and D should contain only their own
+	// addrs.
+	//
+	//          Initial Root (diskLayer)
+	//                   |
+	//                   A <- First diffLayer. Adds addrA
+	//                   |
+	//                   B <- Second diffLayer. Adds addrB
+	//                 /  \
+	//  Adds addrC -> C    D <- Adds addrD
+
+	var (
+		baseRoot       = common.HexToHash("0xff01")
+		baseBlockHash  = common.HexToHash("0x01")
+		diffRootA      = common.HexToHash("0xff02")
+		diffBlockHashA = common.HexToHash("0x02")
+		diffRootB      = common.HexToHash("0xff03")
+		diffBlockHashB = common.HexToHash("0x03")
+		diffRootC      = common.HexToHash("0xff04")
+		diffBlockHashC = common.HexToHash("0x04")
+		diffRootD      = common.HexToHash("0xff05")
+		diffBlockHashD = common.HexToHash("0x05")
+	)
+
+	snaps := NewTestTree(rawdb.NewMemoryDatabase(), baseBlockHash, baseRoot)
+	addrA := randomHash()
+	accountsA := map[common.Hash][]byte{
+		addrA: randomAccount(),
+	}
+	addrB := randomHash()
+	accountsB := map[common.Hash][]byte{
+		addrB: randomAccount(),
+	}
+	addrC := randomHash()
+	accountsC := map[common.Hash][]byte{
+		addrC: randomAccount(),
+	}
+	addrD := randomHash()
+	accountsD := map[common.Hash][]byte{
+		addrD: randomAccount(),
+	}
+
+	// Build the tree
+	if err := snaps.Update(diffBlockHashA, diffRootA, baseBlockHash, nil, accountsA, nil); err != nil {
+		t.Errorf("failed to create diff layer A: %v", err)
+	}
+	if err := snaps.Update(diffBlockHashB, diffRootB, diffBlockHashA, nil, accountsB, nil); err != nil {
+		t.Errorf("failed to create diff layer B: %v", err)
+	}
+	if err := snaps.Update(diffBlockHashC, diffRootC, diffBlockHashB, nil, accountsC, nil); err != nil {
+		t.Errorf("failed to create diff layer C: %v", err)
+	}
+	if err := snaps.Update(diffBlockHashD, diffRootD, diffBlockHashB, nil, accountsD, nil); err != nil {
+		t.Errorf("failed to create diff layer D: %v", err)
+	}
+
+	assertBlooms := func(snap Snapshot, hitsA, hitsB, hitsC, hitsD bool) {
+		dl, ok := snap.(*diffLayer)
+		if !ok {
+			t.Fatal("snapshot should be a diffLayer")
+		}
+
+		if hitsA != dl.diffed.Contains(accountBloomHasher(addrA)) {
+			t.Errorf("expected bloom filter to return %t but got %t", hitsA, !hitsA)
+		}
+
+		if hitsB != dl.diffed.Contains(accountBloomHasher(addrB)) {
+			t.Errorf("expected bloom filter to return %t but got %t", hitsB, !hitsB)
+		}
+
+		if hitsC != dl.diffed.Contains(accountBloomHasher(addrC)) {
+			t.Errorf("expected bloom filter to return %t but got %t", hitsC, !hitsC)
+		}
+
+		if hitsD != dl.diffed.Contains(accountBloomHasher(addrD)) {
+			t.Errorf("expected bloom filter to return %t but got %t", hitsD, !hitsD)
+		}
+	}
+
+	// First check that each layer's bloom has all current and ancestor addrs,
+	// but no sibling-only addrs.
+	assertBlooms(snaps.Snapshot(diffRootB), true, true, false, false)
+	assertBlooms(snaps.Snapshot(diffRootC), true, true, true, false)
+	assertBlooms(snaps.Snapshot(diffRootD), true, true, false, true)
+
+	// Flatten diffLayer A, making it a disk layer and trigger a rebloom on B, C
+	// and D. If we didn't rebloom, or didn't rebloom recursively, then blooms C
+	// and D would still think addrA was in the diff layers
+	if err := snaps.Flatten(diffBlockHashA); err != nil {
+		t.Errorf("failed to flattten diff block A: %v", err)
+	}
+
+	// Check that no blooms still have addrA, but they have all the others
+	assertBlooms(snaps.Snapshot(diffRootB), false, true, false, false)
+	assertBlooms(snaps.Snapshot(diffRootC), false, true, true, false)
+	assertBlooms(snaps.Snapshot(diffRootD), false, true, false, true)
+
+	// Flatten diffLayer B, making it a disk layer and trigger a rebloom on C
+	// and D. If we didn't rebloom, or didn't rebloom recursively, then blooms C
+	// and D would still think addrB was in the diff layers
+	if err := snaps.Flatten(diffBlockHashB); err != nil {
+		t.Errorf("failed to flattten diff block A: %v", err)
+	}
+
+	// Blooms C and D should now have only their own addrs
+	assertBlooms(snaps.Snapshot(diffRootC), false, false, true, false)
+	assertBlooms(snaps.Snapshot(diffRootD), false, false, false, true)
+}
