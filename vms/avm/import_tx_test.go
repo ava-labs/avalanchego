@@ -312,12 +312,18 @@ func TestIssueImportTx(t *testing.T) {
 			},
 		},
 	}
+
 	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	inputID := utxo.InputID()
+
+	if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+		t.Fatal("Error saving utxo", err)
+	}
+
 	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
@@ -352,6 +358,10 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	parsedTx := txs[0]
+	if err := parsedTx.Verify(); err != nil {
+		t.Fatal("Failed verify", err)
+	}
+
 	if err := parsedTx.Accept(); err != nil {
 		t.Fatal(err)
 	}
@@ -428,6 +438,18 @@ func TestForceAcceptImportTx(t *testing.T) {
 		},
 	}
 
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1000,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{key.PublicKey().Address()},
+			},
+		},
+	}
+
 	tx := &Tx{UnsignedTx: &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -443,8 +465,13 @@ func TestForceAcceptImportTx(t *testing.T) {
 			},
 		}},
 	}}
+
 	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
+	}
+
+	if err := vm.state.PutUTXO(utxoID.InputID(), utxo); err != nil {
+		t.Fatal("Error saving utxo", err)
 	}
 
 	parsedTx, err := vm.ParseTx(tx.Bytes())
