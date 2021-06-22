@@ -12,7 +12,6 @@ go 1.15
 require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
 	github.com/Microsoft/go-winio v0.4.14
-	github.com/anjmao/go2proto v0.0.3 // indirect
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -53,12 +52,5 @@ require (
 	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324
 	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.26.0
-	gopkg.in/src-d/go-parse-utils.v1 v1.1.2 // indirect
-	gopkg.in/src-d/proteus.v1 v1.3.3 // indirect
-	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
 	gotest.tools v2.2.0+incompatible
 )
-
-replace github.com/ava-labs/avalanchego/chains/atomic => ./chains/atomic
-
-replace github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto => ./chains/atomic/gsharedmemory/gsharedmemoryproto
