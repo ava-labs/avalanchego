@@ -10,7 +10,7 @@ binary_path="$GOPATH/src/github.com/ava-labs/avalanchego/build/avalanchego-lates
 dockerhub_repo="avaplatform/avalanchego"
 
 # Current branch
-current_branch=${CURRENT_BRANCH:-$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)}
+current_branch=${CURRENT_BRANCH:-$(git describe --tags --exact-match 2> /dev/null || git symbolic-ref -q --short HEAD || git rev-parse --short HEAD)}
 echo "Using branch: ${current_branch}"
 
 # Image build id
