@@ -10,14 +10,22 @@ import (
 
 func TestCompressDecompress(t *testing.T) {
 	data := []byte(randomString(1000))
+	data2 := []byte(randomString(1000))
 
 	compressor := NewCompressor()
 	compressedBytes, err := compressor.Compress(data)
 	assert.NoError(t, err)
 
+	compressedBytes2, err := compressor.Compress(data2)
+	assert.NoError(t, err)
+
 	decompressedBytes, err := compressor.Decompress(compressedBytes)
 	assert.NoError(t, err)
 	assert.EqualValues(t, data, decompressedBytes)
+
+	decompressedBytes2, err := compressor.Decompress(compressedBytes2)
+	assert.NoError(t, err)
+	assert.EqualValues(t, data2, decompressedBytes2)
 }
 
 func TestGzipCompressor_IsCompressable(t *testing.T) {

@@ -39,7 +39,10 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	if err := g.gzipWriter.Close(); err != nil {
 		return nil, err
 	}
-	return g.writeBuffer.Bytes(), nil
+	cmpBufferBytes := g.writeBuffer.Bytes()
+	cmpBytes := make([]byte, len(cmpBufferBytes))
+	copy(cmpBytes, cmpBufferBytes)
+	return cmpBytes, nil
 }
 
 // Decompress decompresses [msg].
@@ -57,7 +60,10 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	return data, nil
+	decompData := make([]byte, len(data))
+	copy(decompData, data)
+
+	return decompData, nil
 }
 
 func (g *gzipCompressor) IsDecompressable(msg []byte) bool {
