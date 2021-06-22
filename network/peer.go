@@ -766,7 +766,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	// todo marker version should be constant
-	p.canHandleCompressed = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
+	p.canHandleCompressed = peerVersion.Compare(version.NewDefaultVersion(1, 4, 9)) >= 0
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
