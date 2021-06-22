@@ -814,7 +814,9 @@ func (p *peer) handleVersion(msg Msg) {
 	// todo marker version should be constant
 	p.gzipEnabled = peerVersion.Compare(version.NewDefaultVersion(1, 4, 8)) >= 0
 	if p.gzipEnabled {
-		p.compressor = NewCompressor(minCompressSize)
+		p.compressor = NewGzipCompressor(minCompressSize)
+	} else {
+		p.compressor = NewNoCompressor()
 	}
 
 	signedPeerIP := signedPeerIP{

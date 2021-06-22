@@ -93,10 +93,27 @@ func (g *gzipCompressor) resetReader(msg []byte) error {
 	return nil
 }
 
-// NewCompressor returns a new Compressor that compresses
-// messages with length >=
-func NewCompressor(minCompressSize int) Compressor {
+// NewGzipCompressor returns a new gzip Compressor that compresses
+// messages with length >= [minCompressSize]
+func NewGzipCompressor(minCompressSize int) Compressor {
 	return &gzipCompressor{
 		minCompressSize: minCompressSize,
 	}
+}
+
+type noCompressor struct{}
+
+// Compress returns [msg]
+func (*noCompressor) Compress(msg []byte) ([]byte, error) {
+	return msg, nil
+}
+
+// Decompress returns [msg].
+func (*noCompressor) Decompress(msg []byte) ([]byte, error) {
+	return msg, nil
+}
+
+// NewNoCompressor returns a Compressor that does nothing
+func NewNoCompressor() Compressor {
+	return &noCompressor{}
 }

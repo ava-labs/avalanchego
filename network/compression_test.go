@@ -11,7 +11,7 @@ import (
 func TestCompressDecompress(t *testing.T) {
 	data := []byte(randomString(1000))
 
-	compressor := NewCompressor(minCompressSize)
+	compressor := NewGzipCompressor(minCompressSize)
 	compressedBytes, err := compressor.Compress(data)
 	assert.NoError(t, err)
 
