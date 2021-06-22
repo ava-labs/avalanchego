@@ -12,7 +12,6 @@ go 1.15
 require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
 	github.com/Microsoft/go-winio v0.4.14
-	github.com/anjmao/go2proto v0.0.3 // indirect
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -46,18 +45,12 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20210305035536-64b5b1c73954
 	go.opencensus.io v0.22.2 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4
-	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1 // indirect
+	golang.org/x/net v0.0.0-20210220033124-5f55cee0dc0d
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c // indirect
 	golang.org/x/text v0.3.4 // indirect
-	golang.org/x/tools v0.1.3 // indirect
+	golang.org/x/time v0.0.0-20201208040808-7e3f01d25324
 	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.26.0
-	gopkg.in/src-d/go-parse-utils.v1 v1.1.2 // indirect
-	gopkg.in/src-d/proteus.v1 v1.3.3 // indirect
-	gopkg.in/urfave/cli.v1 v1.20.0 // indirect
 	gotest.tools v2.2.0+incompatible
 )
-
-replace github.com/ava-labs/avalanchego/chains/atomic => ./chains/atomic
-
-replace github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto => ./chains/atomic/gsharedmemory/gsharedmemoryproto

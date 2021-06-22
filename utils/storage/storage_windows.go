@@ -16,9 +16,7 @@ const (
 	GETDISKFREESPACEEXW = "GetDiskFreeSpaceExW"
 )
 
-var (
-	errNonzeroErrorCode = errors.New("nonzero return from win32 call for disk space")
-)
+var errNonzeroErrorCode = errors.New("nonzero return from win32 call for disk space")
 
 func OsDiskStat(path string) (uint64, error) {
 	h, err := syscall.LoadDLL(KERNEL32DLL)

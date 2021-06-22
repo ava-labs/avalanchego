@@ -5,7 +5,6 @@ package rpcchainvm
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os/exec"
@@ -19,22 +18,16 @@ var errWrongVM = errors.New("wrong vm type")
 
 // Factory ...
 type Factory struct {
-	Path   string
-	Config string
+	Path string
 }
 
 // New ...
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	// Ignore warning from launching an executable with a variable command
 	// because the command is a controlled and required input
-	var cmd *exec.Cmd
-	if len(f.Config) > 0 {
-		// #nosec G204
-		cmd = exec.Command(f.Path, fmt.Sprintf("--config=%s", f.Config))
-	} else {
-		// #nosec G204
-		cmd = exec.Command(f.Path)
-	}
+
+	// #nosec G204
+	cmd := exec.Command(f.Path)
 
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,

@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// A VMFactory creates new instances of a VM
-type VMFactory interface {
+// A Factory creates new instances of a VM
+type Factory interface {
 	New(*snow.Context) (interface{}, error)
 }
 
@@ -31,11 +31,11 @@ type VMFactory interface {
 type Manager interface {
 	// Returns a factory that can create new instances of the VM
 	// with the given ID
-	GetVMFactory(ids.ID) (VMFactory, error)
+	GetFactory(ids.ID) (Factory, error)
 
 	// Associate an ID with the factory that creates new instances
 	// of the VM with the given ID
-	RegisterVMFactory(ids.ID, VMFactory) error
+	RegisterFactory(ids.ID, Factory) error
 
 	// Given an alias, return the ID of the VM associated with that alias
 	Lookup(string) (ids.ID, error)
@@ -55,7 +55,7 @@ type manager struct {
 
 	// Key: The key underlying a VM's ID
 	// Value: A factory that creates new instances of that VM
-	vmFactories map[ids.ID]VMFactory
+	vmFactories map[ids.ID]Factory
 
 	// The node's API server.
 	// [manager] adds routes to this server to expose new API endpoints/services
@@ -67,7 +67,7 @@ type manager struct {
 // NewManager returns an instance of a VM manager
 func NewManager(apiServer *server.Server, log logging.Logger) Manager {
 	m := &manager{
-		vmFactories: make(map[ids.ID]VMFactory),
+		vmFactories: make(map[ids.ID]Factory),
 		apiServer:   apiServer,
 		log:         log,
 	}
@@ -77,7 +77,7 @@ func NewManager(apiServer *server.Server, log logging.Logger) Manager {
 
 // Return a factory that can create new instances of the vm whose
 // ID is [vmID]
-func (m *manager) GetVMFactory(vmID ids.ID) (VMFactory, error) {
+func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
 	if factory, ok := m.vmFactories[vmID]; ok {
 		return factory, nil
 	}
@@ -86,7 +86,7 @@ func (m *manager) GetVMFactory(vmID ids.ID) (VMFactory, error) {
 
 // Map [vmID] to [factory]. [factory] creates new instances of the vm whose
 // ID is [vmID]
-func (m *manager) RegisterVMFactory(vmID ids.ID, factory VMFactory) error {
+func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 	if _, exists := m.vmFactories[vmID]; exists {
 		return fmt.Errorf("a vm with ID '%v' has already been registered", vmID)
 	}
@@ -104,7 +104,7 @@ func (m *manager) RegisterVMFactory(vmID ids.ID, factory VMFactory) error {
 // This method adds to the node's API server the static API of the VM with ID [vmID].
 // This allows clients to call the VM's static API methods.
 func (m *manager) addStaticAPIEndpoints(vmID ids.ID) error {
-	vmFactory, err := m.GetVMFactory(vmID)
+	vmFactory, err := m.GetFactory(vmID)
 	m.log.AssertNoError(err)
 	m.log.Debug("adding static API for VM with ID %s", vmID)
 	vm, err := vmFactory.New(nil)
