@@ -65,17 +65,18 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 		return msg, nil
 	}
 
-	// If [compress], compress the payload (not the op code, not isCompressed)
+	// If [compress], compress the payload (not the op code, not isCompressed).
+	// The slice below is guaranteed to be in-bounds because [p.Err] == nil
+	// implies that len(msg.bytes) >= 2
 	payloadBytes := msg.bytes[wrappers.BoolLen+wrappers.ByteLen:]
-	compressedPayload, err := c.compressor.Compress(payloadBytes)
+	compressedPayloadBytes, err := c.compressor.Compress(payloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
-	// Shrink [msg.bytes] to be the right size:
-	// 1 byte for the op code, 1 byte for isCompressed, len(compressedPayload) bytes for the compressed payload
-	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen+len(compressedPayload)]
-	// Copy the compressed payload into the message bytes
-	copy(msg.bytes[wrappers.BoolLen+wrappers.ByteLen:], compressedPayload)
+	// Remove the payload
+	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen]
+	// Attach the compressed payload
+	msg.bytes = append(msg.bytes, compressedPayloadBytes...)
 	return msg, nil
 }
 
@@ -110,7 +111,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 		if err != nil {
 			return nil, fmt.Errorf("couldn't decompress payload of %s message: %s", op, err)
 		}
-		// Replace the compressed payload with the decompressedPayload.
+		// Replace the compressed payload with the decompressed payload.
 		// Remove the compressed payload.
 		p.Bytes = p.Bytes[:wrappers.ByteLen+wrappers.BoolLen]
 		// Attach the decompressed payload.
