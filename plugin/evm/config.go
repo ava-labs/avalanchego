@@ -51,6 +51,7 @@ type Config struct {
 	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
 	// Eth Settings
+	Pruning                 bool     `json:"pruning-enabled"`
 	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
 	APIMaxDuration          Duration `json:"api-max-duration"`
 	MaxBlocksPerRequest     int64    `json:"api-max-blocks-per-request"`

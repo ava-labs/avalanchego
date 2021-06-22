@@ -137,7 +137,7 @@ func (b *Block) Accept() error {
 
 	if bonusBlocks.Contains(b.id) {
 		log.Info("skipping atomic tx acceptance on bonus block", "block", b.id)
-		return nil
+		return vm.db.Commit()
 	}
 
 	// Note: since CommitBatch holds the database lock, this precludes any other
@@ -164,7 +164,7 @@ func (b *Block) Reject() error {
 		b.vm.mempool.RejectTx(tx.ID())
 	}
 
-	return nil
+	return b.vm.chain.Reject(b.ethBlock)
 }
 
 // SetStatus implements the InternalBlock interface allowing ChainState
@@ -214,8 +214,9 @@ func (b *Block) Verify() error {
 		return err
 	}
 
-	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
-	return err
+	// InsertBlock must be the last step in verification to prevent a memory leak in the management
+	// of tries that the chain maintains an active reference to.
+	return b.vm.chain.InsertBlock(b.ethBlock)
 }
 
 func (b *Block) VerifyWithoutWrites() error {

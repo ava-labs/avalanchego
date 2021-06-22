@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"runtime"
 	"time"
 
 	"github.com/ava-labs/coreth/consensus"
@@ -52,7 +51,7 @@ var (
 )
 
 // modified from consensus.go
-func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool, seal bool) error {
+func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool) error {
 	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
@@ -101,35 +100,14 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		return consensus.ErrInvalidNumber
 	}
 	// Verify the engine specific seal securing the block
-	if seal {
-		if err := self.VerifySeal(chain, header); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (self *DummyEngine) verifyHeaderWorker(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool, index int) error {
-	var parent *types.Header
-	if index == 0 {
-		parent = chain.GetHeader(headers[0].ParentHash, headers[0].Number.Uint64()-1)
-	} else if headers[index-1].Hash() == headers[index].ParentHash {
-		parent = headers[index-1]
-	}
-	if parent == nil {
-		return consensus.ErrUnknownAncestor
-	}
-	if chain.GetHeader(headers[index].Hash(), headers[index].Number.Uint64()) != nil {
-		return nil // known block
-	}
-	return self.verifyHeader(chain, headers[index], parent, false, seals[index])
+	return self.VerifySeal(chain, header)
 }
 
 func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
-func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header, seal bool) error {
+func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
@@ -140,60 +118,7 @@ func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header 
 		return consensus.ErrUnknownAncestor
 	}
 	// Sanity checks passed, do a proper verification
-	return self.verifyHeader(chain, header, parent, false, seal)
-}
-
-func (self *DummyEngine) VerifyHeaders(chain consensus.ChainHeaderReader, headers []*types.Header, seals []bool) (chan<- struct{}, <-chan error) {
-	// Spawn as many workers as allowed threads
-	workers := runtime.GOMAXPROCS(0)
-	if len(headers) < workers {
-		workers = len(headers)
-	}
-
-	// Create a task channel and spawn the verifiers
-	var (
-		inputs = make(chan int)
-		done   = make(chan int, workers)
-		errors = make([]error, len(headers))
-		abort  = make(chan struct{})
-	)
-	for i := 0; i < workers; i++ {
-		go func() {
-			for index := range inputs {
-				errors[index] = self.verifyHeaderWorker(chain, headers, seals, index)
-				done <- index
-			}
-		}()
-	}
-
-	errorsOut := make(chan error, len(headers))
-	go func() {
-		defer close(inputs)
-		var (
-			in, out = 0, 0
-			checked = make([]bool, len(headers))
-			inputs  = inputs
-		)
-		for {
-			select {
-			case inputs <- in:
-				if in++; in == len(headers) {
-					// Reached end of headers. Stop sending to workers.
-					inputs = nil
-				}
-			case index := <-done:
-				for checked[index] = true; checked[out]; out++ {
-					errorsOut <- errors[out]
-					if out == len(headers)-1 {
-						return
-					}
-				}
-			case <-abort:
-				return
-			}
-		}
-	}()
-	return abort, errorsOut
+	return self.verifyHeader(chain, header, parent, false)
 }
 
 func (self *DummyEngine) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {

@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/eth/ethconfig"
+	"github.com/ava-labs/coreth/node"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -94,9 +95,8 @@ func TestMulticoin(t *testing.T) {
 	}
 	code := common.Hex2Bytes(contract)
 
-	chain := NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
-
-	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
+	chain, err := NewETHChain(&config, &node.Config{}, rawdb.NewMemoryDatabase(), eth.DefaultSettings, common.Hash{})
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -109,7 +109,7 @@ func TestMulticoin(t *testing.T) {
 	}
 
 	chain.SetOnSealFinish(func(block *types.Block) {
-		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+		if err := chain.InsertBlock(block); err != nil {
 			t.Fatal(err)
 		}
 		if err := chain.SetPreference(block); err != nil {

@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,10 +93,11 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey = []byte("last_accepted_key")
-	acceptedPrefix  = []byte("snowman_accepted")
-	ethDBPrefix     = []byte("ethdb")
-	atomicTxPrefix  = []byte("atomicTxDB")
+	lastAcceptedKey        = []byte("last_accepted_key")
+	acceptedPrefix         = []byte("snowman_accepted")
+	ethDBPrefix            = []byte("ethdb")
+	atomicTxPrefix         = []byte("atomicTxDB")
+	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
 var (
@@ -343,13 +345,11 @@ func (vm *VM) Initialize(
 	ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
+	ethConfig.Pruning = vm.config.Pruning
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
 	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
 
-	if err := ethConfig.SetGCMode("archive"); err != nil {
-		panic(err)
-	}
 	nodecfg := node.Config{
 		CorethVersion:         Version,
 		KeyStoreDir:           vm.config.KeystoreDirectory,
@@ -360,39 +360,23 @@ func (vm *VM) Initialize(
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
 	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
-	if lastAcceptedErr != nil && lastAcceptedErr != database.ErrNotFound {
-		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
-	}
-	initGenesis := lastAcceptedErr == database.ErrNotFound
-	vm.chain = coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), initGenesis)
-
-	var lastAccepted *types.Block
-	if lastAcceptedErr == nil {
-		if len(lastAcceptedBytes) != common.HashLength {
-			return fmt.Errorf("last accepted bytes should have been length %d, but found %d", common.HashLength, len(lastAcceptedBytes))
-		}
-		hash := common.BytesToHash(lastAcceptedBytes)
-		if block := vm.chain.GetBlockByHash(hash); block == nil {
-			return fmt.Errorf("last accepted block not found in chaindb")
-		} else {
-			lastAccepted = block
-		}
-	}
-
-	// Determine if db corruption has occurred.
+	var lastAcceptedHash common.Hash
 	switch {
-	case lastAccepted != nil && initGenesis:
-		return errors.New("database corruption detected, should be initializing genesis")
-	case lastAccepted == nil && !initGenesis:
-		return errors.New("database corruption detected, should not be initializing genesis")
-	case lastAccepted == nil && initGenesis:
-		log.Debug("lastAccepted is unavailable, setting to the genesis block")
-		lastAccepted = vm.chain.GetGenesisBlock()
+	case lastAcceptedErr == database.ErrNotFound:
+		// Leave [lastAcceptedHash] as the empty value to indicate the chain should be built from genesis.
+	case lastAcceptedErr != nil:
+		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
+	case len(lastAcceptedBytes) != common.HashLength:
+		return fmt.Errorf("last accepted bytes should have been length %d, but found %d", common.HashLength, len(lastAcceptedBytes))
+	default:
+		lastAcceptedHash = common.BytesToHash(lastAcceptedBytes)
 	}
-
-	if err := vm.chain.Accept(lastAccepted); err != nil {
-		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", lastAccepted.Hash().Hex(), err)
+	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), lastAcceptedHash)
+	if err != nil {
+		return err
 	}
+	vm.chain = ethChain
+	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	// Kickoff gasPriceUpdate goroutine once the backend is initialized, if it
 	// exists
@@ -503,7 +487,36 @@ func (vm *VM) Initialize(
 	// ignored by the VM's codec.
 	vm.baseCodec = linearcodec.NewDefault()
 
+	if err := vm.pruneChain(); err != nil {
+		return err
+	}
+
 	return vm.fx.Initialize(vm)
+}
+
+func (vm *VM) pruneChain() error {
+	if !vm.config.Pruning {
+		return nil
+	}
+	pruned, err := vm.db.Has(pruneRejectedBlocksKey)
+	if err != nil {
+		return fmt.Errorf("failed to check if the VM has pruned rejected blocks: %w", err)
+	}
+	if pruned {
+		return nil
+	}
+
+	lastAcceptedHeight := vm.LastAcceptedBlock().Height()
+	if err := vm.chain.RemoveRejectedBlocks(0, lastAcceptedHeight); err != nil {
+		return err
+	}
+	heightBytes := make([]byte, 8)
+	binary.PutUvarint(heightBytes, lastAcceptedHeight)
+	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err == nil {
+		return nil
+	} else {
+		return fmt.Errorf("failed to write pruned rejected blocks to db: %w", err)
+	}
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing

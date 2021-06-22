@@ -26,7 +26,7 @@ func TestSubscribeTransactionsTest(t *testing.T) {
 	// is set as the new preferred block within this test, but not immediately marked
 	// as accepted.
 	chain.SetOnSealFinish(func(block *types.Block) {
-		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
+		if err := chain.InsertBlock(block); err != nil {
 			t.Fatal(err)
 		}
 		if err := chain.SetPreference(block); err != nil {

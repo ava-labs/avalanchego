@@ -286,26 +286,6 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 	}
 }
 
-// Original code:
-// // makeHeaderChain creates a deterministic chain of headers rooted at parent.
-// func makeHeaderChain(parent *types.Header, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Header {
-// 	blocks := makeBlockChain(types.NewBlockWithHeader(parent), n, engine, db, seed)
-// 	headers := make([]*types.Header, len(blocks))
-// 	for i, block := range blocks {
-// 		headers[i] = block.Header()
-// 	}
-// 	return headers
-// }
-
-// Original code:
-// // makeBlockChain creates a deterministic chain of blocks rooted at parent.
-// func makeBlockChain(parent *types.Block, n int, engine consensus.Engine, db ethdb.Database, seed int) []*types.Block {
-// 	blocks, _ := GenerateChain(params.TestChainConfig, parent, engine, db, n, func(i int, b *BlockGen) {
-// 		b.SetCoinbase(common.Address{0: byte(seed), 19: byte(i)})
-// 	})
-// 	return blocks
-// }
-
 type fakeChainReader struct {
 	config *params.ChainConfig
 }
