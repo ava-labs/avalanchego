@@ -86,7 +86,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 	}
 
 	numToSample := maxWindows
-	if uint64(maxWindows) < weight {
+	if weight < uint64(numToSample) {
 		numToSample = int(weight)
 	}
 
