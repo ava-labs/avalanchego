@@ -21,3 +21,15 @@ func TestCompressDecompress(t *testing.T) {
 	assert.NoError(t, err)
 	assert.EqualValues(t, data, decompressedBytes)
 }
+
+func TestNoCompressor(t *testing.T) {
+	data := []byte{1, 2, 3}
+	compressor := NewNoCompressor()
+	compressedBytes, err := compressor.Compress(data)
+	assert.NoError(t, err)
+	assert.EqualValues(t, data, compressedBytes)
+
+	decompressedBytes, err := compressor.Decompress(compressedBytes)
+	assert.NoError(t, err)
+	assert.EqualValues(t, data, decompressedBytes)
+}
