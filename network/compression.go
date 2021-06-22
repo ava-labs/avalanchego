@@ -36,6 +36,9 @@ type gzipCompressor struct {
 
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
+	if len(msg) < g.minCompressSize {
+		return msg, nil
+	}
 	g.resetWriter()
 	if _, err := g.gzipWriter.Write(msg); err != nil {
 		return nil, err
@@ -51,16 +54,13 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.resetReader(msg); err != nil {
 		return nil, err
 	}
-
 	data, err := io.ReadAll(g.gzipReader)
 	if err != nil {
 		return nil, err
 	}
-
 	if err = g.gzipReader.Close(); err != nil {
 		return nil, err
 	}
-
 	return data, nil
 }
 

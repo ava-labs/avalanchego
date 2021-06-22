@@ -137,6 +137,8 @@ type peer struct {
 
 	// Compresses and de-compresses messages.
 	// If peer is not a sufficiently high version, may be a no-op compressor.
+	// Should never be nil.
+	// May be assigned a new value after we receive the peer's version.
 	compressor Compressor
 }
 
@@ -378,6 +380,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 		return false
 	}
 
+	// Only compress certain message types
 	shouldCompress := shouldCompress(msg.Op())
 
 	msgBytes := msg.Bytes()
