@@ -17,7 +17,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
@@ -74,17 +73,13 @@ func (pb *ProposerBlock) Accept() error {
 			return err
 		}
 
-		delete(pb.vm.proBlkTree, pb.ParentID())
-		if _, found := pb.vm.proBlkTree[pb.ID()]; !found {
-			pb.vm.proBlkTree[pb.ID()] = proBlkTreeNode{
-				proChildren:   make([]*ProposerBlock, 0),
-				verifiedCores: make(map[ids.ID]struct{}),
-			}
-		}
+		pb.vm.updateWithAcceptedBlk(pb)
 
 		// pb parent block should not be needed anymore.
 		// TODO: consider pruning option
 		pb.vm.state.wipeFromCacheProBlk(pb.ParentID())
+		pb.vm.scheduler.newAcceptedBlk <- pb.vm.windower.getNextWindowStart(pb.Timestamp())
+
 		return nil
 	case ErrLastAcceptedIDNotFound: // pre snowman++ case
 		return pb.coreBlk.Accept()
@@ -174,18 +169,13 @@ func (pb *ProposerBlock) Verify() error {
 	}
 
 	// validate core block, only once
-	verifiedCores := pb.vm.proBlkTree[prntBlk.ID()].verifiedCores
-	if _, verified := verifiedCores[pb.coreBlk.ID()]; !verified {
+	if !pb.vm.iscoreBlkVerified(pb) {
 		if err := pb.coreBlk.Verify(); err != nil {
 			return err
 		}
-
-		verifiedCores[pb.coreBlk.ID()] = struct{}{}
 	}
-
-	pb.vm.proBlkTree[prntBlk.ID()] = proBlkTreeNode{
-		proChildren:   append(pb.vm.proBlkTree[prntBlk.ID()].proChildren, pb),
-		verifiedCores: verifiedCores,
+	if err := pb.vm.addVerifiedBlk(pb); err != nil {
+		return err
 	}
 
 	return nil

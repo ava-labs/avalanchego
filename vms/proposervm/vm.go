@@ -27,10 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
-	"github.com/ava-labs/avalanchego/vms/proposervm/state"
-
-	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -49,11 +46,6 @@ func (c clockImpl) now() time.Time {
 	return time.Now()
 }
 
-type proBlkTreeNode struct {
-	proChildren   []*ProposerBlock
-	verifiedCores map[ids.ID]struct{} // set of already verified core IDs
-}
-
 type VM struct {
 	block.ChainVM
 	state.State
@@ -61,25 +53,23 @@ type VM struct {
 
 	windower
 	clock
-	stakingCert     tls.Certificate
-	fromCoreVM      chan common.Message
-	toEngine        chan<- common.Message
-	proBlkStartTime time.Time
-	proBlkTree      map[ids.ID](proBlkTreeNode)
+
+	// node identity attributes
+	stakingCert tls.Certificate
+	nodeID      ids.ShortID
+
+	scheduler *scheduler
+
+	proBlkActivationTime time.Time
+	BlkTree
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
-	return &VM{
-		ChainVM:         vm,
-		clock:           clockImpl{},
-		proBlkStartTime: proBlkStart,
+	res := VM{
+		ChainVM:              vm,
+		clock:                clockImpl{},
+		proBlkActivationTime: proBlkStart,
 	}
-}
-
-func (vm *VM) handleBlockTiming() {
-	// TODO: this needs to send all messages, not just the first message
-	msg := <-vm.fromCoreVM
-	vm.toEngine <- msg
 }
 
 // common.VM interface implementation
@@ -94,20 +84,28 @@ func (vm *VM) Initialize(
 ) error {
 	vm.state.init(dbManager.Current().Database)
 
+	var err error
 	vm.stakingCert = ctx.StakingCert
+	if vm.nodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(vm.stakingCert.Leaf.Raw)); err != nil {
+		return err
+	}
+
 	if err := vm.windower.initialize(vm, ctx); err != nil {
 		return err
 	}
 
+	vm.scheduler = &scheduler{}
+	if err := vm.scheduler.initialize(vm, toEngine); err != nil {
+		return err
+	}
+
 	// TODO: comparison should be with genesis timestamp, not with Now()
-	if vm.now().After(vm.proBlkStartTime) {
+	if vm.now().After(vm.proBlkActivationTime) {
 		// proposerVM intercepts VM events for blocks and times event relay to consensus
-		vm.toEngine = toEngine
-		vm.fromCoreVM = make(chan common.Message, len(toEngine))
 
 		// Assuming genesisBytes has not proposerBlockHeader
 		if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
-			configBytes, vm.fromCoreVM, fxs); err != nil {
+			configBytes, vm.scheduler.coreVMChannel(), fxs); err != nil {
 			return err
 		}
 
@@ -139,17 +137,14 @@ func (vm *VM) Initialize(
 				return err
 			}
 
-			vm.proBlkTree = make(map[ids.ID]proBlkTreeNode)
-			vm.proBlkTree[proGenBlk.ID()] = proBlkTreeNode{
-				proChildren:   make([]*ProposerBlock, 0),
-				verifiedCores: make(map[ids.ID]struct{}),
-			}
+			vm.BlkTree.Initialize(vm, proGenBlk.ID())
 		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
 		default:
 			return err
 		}
 
-		go vm.handleBlockTiming()
+		vm.scheduler.rescheduleBlkTicker()
+		go vm.scheduler.handleBlockTiming()
 	} else if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
 		configBytes, toEngine, fxs); err != nil {
 		return err
@@ -166,9 +161,11 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 	}
 
 	// TODO: comparison should be with genesis timestamp, not with Now()
-	if !vm.now().After(vm.proBlkStartTime) {
-		return sb, nil
-	}
+	if vm.now().After(vm.proBlkActivationTime) {
+		proParentID, err := vm.state.getPreferredID()
+		if err != nil {
+			return nil, err
+		}
 
 	proParentID, err := vm.state.getPreferredID()
 	if err != nil {
@@ -293,57 +290,4 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	default:
 		return res, err
 	}
-}
-
-func (vm *VM) propagateStatusFrom(pb *ProposerBlock) error {
-	prntID := pb.ParentID()
-	node, found := vm.proBlkTree[prntID]
-	if !found {
-		return ErrFailedHandlingConflicts
-	}
-
-	lastAcceptedID, err := vm.state.getLastAcceptedID()
-	if err != nil {
-		return ErrFailedHandlingConflicts
-	}
-
-	lastAcceptedBlk, err := vm.state.getProBlock(lastAcceptedID)
-	if err != nil {
-		return ErrFailedHandlingConflicts
-	}
-
-	queue := make([]*ProposerBlock, 0)
-	queue = append(queue, node.proChildren...)
-
-	// just level order descent
-	for len(queue) != 0 {
-		node := queue[0]
-		queue = queue[1:]
-
-		// a block, proposer or core, is rejected iff:
-		// * a sibling has been accepted
-		// * its parent has been rejected already
-
-		if node.ID() != lastAcceptedBlk.ID() {
-			if node.Parent().ID() == lastAcceptedBlk.Parent().ID() ||
-				node.Parent().Status() == choices.Rejected {
-				if err := node.Reject(); err != nil {
-					return ErrFailedHandlingConflicts
-				}
-			}
-		}
-
-		if node.coreBlk.ID() != lastAcceptedBlk.coreBlk.ID() {
-			if node.coreBlk.Parent().ID() == lastAcceptedBlk.coreBlk.Parent().ID() ||
-				node.coreBlk.Parent().Status() == choices.Rejected {
-				if err := node.coreReject(); err != nil {
-					return ErrFailedHandlingConflicts
-				}
-			}
-		}
-
-		childrenNodes := vm.proBlkTree[node.ID()].proChildren
-		queue = append(queue, childrenNodes...)
-	}
-	return nil
 }

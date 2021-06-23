@@ -1,8 +1,13 @@
 package proposervm
 
+// windower interfaces with P-Chain and it is responsible for:
+// retrieving current P-Chain height
+// calculate the start time for the block submission window of a given validator
+
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -34,17 +39,16 @@ func (d validatorsSlice) Less(i, j int) bool {
 	return d[i].weight > d[j].weight
 }
 
-// windower interfaces with P-Chain and it is responsible for:
-// retrieving current P-Chain height
-// calculate the start time for the block submission window of a given validator
-
 type windower struct {
+	proVM *VM
 	validators.VM
+	valMu    sync.Mutex
 	subnetID ids.ID
 	sampler  sampler.Uniform
 }
 
 func (w *windower) initialize(vm *VM, ctx *snow.Context) error {
+	w.proVM = vm
 	if ctx.ValidatorVM != nil {
 		vm.windower.VM = ctx.ValidatorVM
 	} else {
@@ -63,10 +67,14 @@ func (w *windower) initialize(vm *VM, ctx *snow.Context) error {
 }
 
 func (w *windower) pChainHeight() (uint64, error) {
+	w.valMu.Lock()
+	defer w.valMu.Unlock()
 	return w.VM.GetCurrentHeight()
 }
 
 func (w *windower) BlkSubmissionDelay(pChainHeight uint64, valID ids.ShortID) time.Duration {
+	w.valMu.Lock()
+	defer w.valMu.Unlock()
 	vMap, err := w.VM.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {
 		return BlkSubmissionTolerance
@@ -105,4 +113,15 @@ func (w *windower) BlkSubmissionDelay(pChainHeight uint64, valID ids.ShortID) ti
 	}
 
 	return time.Duration(valPos) * BlkSubmissionWinLength
+}
+
+func (w *windower) getNextWindowStart(parentTime time.Time) time.Time {
+	pCH, err := w.pChainHeight()
+	if err != nil {
+		return time.Now() // TODO pick different time
+	}
+
+	nextWinDelay := w.BlkSubmissionDelay(pCH, w.proVM.nodeID)
+
+	return parentTime.Add(nextWinDelay)
 }
