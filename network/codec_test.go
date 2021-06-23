@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var TestCodec Codec
+var TestCodec codec
 
 func TestCodecPackInvalidOp(t *testing.T) {
 	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false, false)
@@ -52,7 +52,7 @@ func TestCodecParseExtraSpace(t *testing.T) {
 
 // If [compress] == true and [includeIsCompressedFlag] == false, error
 func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
-	c := Codec{
+	c := codec{
 		compressor: compression.NewGzipCompressor(),
 	}
 	id := ids.GenerateTestID()
@@ -69,7 +69,7 @@ func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
 // Test packing and then parsing messages
 // when using a gzip compressor
 func TestCodecPackParseGzip(t *testing.T) {
-	c := Codec{
+	c := codec{
 		compressor: compression.NewGzipCompressor(),
 	}
 	id := ids.GenerateTestID()

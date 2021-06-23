@@ -10,7 +10,7 @@ import (
 
 // Builder extends a Codec to build messages safely
 type Builder struct {
-	Codec
+	codec
 	// [getByteSlice] must not be nil.
 	// [getByteSlice] may return nil.
 	// [getByteSlice] must be safe for concurrent access by multiple goroutines.

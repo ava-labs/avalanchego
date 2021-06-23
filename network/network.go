@@ -410,7 +410,7 @@ func NewNetwork(
 		},
 	}
 	netw.b = Builder{
-		Codec: Codec{
+		codec: codec{
 			compressor: compression.NewGzipCompressor(),
 		},
 		getByteSlice: func() []byte {

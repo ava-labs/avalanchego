@@ -18,8 +18,8 @@ var (
 	errCompressNeedsFlag = errors.New("compressed message requires isCompressed flag")
 )
 
-// Codec defines the serialization and deserialization of network messages
-type Codec struct {
+// codec defines the serialization and deserialization of network messages
+type codec struct {
 	// compressor must not be nil
 	compressor compression.Compressor
 }
@@ -34,7 +34,7 @@ type Codec struct {
 // If [compress] and [includeIsCompressedFlag], compress the payload.
 // If [compress] == true, [includeIsCompressedFlag] must be true
 // TODO remove [includeIsCompressedFlag] after network upgrade.
-func (c Codec) Pack(
+func (c codec) Pack(
 	buffer []byte,
 	op Op,
 	fieldValues map[Field]interface{},
@@ -102,7 +102,7 @@ func (c Codec) Pack(
 // whether the message payload is compressed. Should only be true
 // if we expect this peer to send us compressed messages.
 // TODO remove [parseIsCompressedFlag] after network upgrade
-func (c Codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
+func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)
