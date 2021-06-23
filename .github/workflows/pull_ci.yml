@@ -3,26 +3,23 @@ on: [pull_request]
 
 jobs:
   lint:
-    name: Lint Golang v${{ matrix.go }} (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        go: ['1.15']
-        os: [ubuntu-18.04]
+    name: Lint
+    runs-on: ubuntu-18.04
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-go@v1
-      with:
-        go-version: ${{ matrix.go }}
-    - run: .ci/lint.sh
-      shell: bash
+      - uses: actions/checkout@v2
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: latest
+          working-directory: .
+          args: --timeout 3m
   test:
-    name: Golang v${{ matrix.go }} (${{ matrix.os }})
+    name: Golang Unit Tests v${{ matrix.go }} (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         go: ['1.15']
-        os: [macos-11.0, ubuntu-18.04, ubuntu-20.04, windows-latest]
+        os: [ubuntu-20.04]
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v1
@@ -39,15 +36,17 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        go: ['1.15']
-        os: [ubuntu-20.04]
+        go: [ '1.15' ]
+        os: [ ubuntu-20.04 ]
     steps:
     - uses: actions/checkout@v2
     - uses: actions/setup-go@v1
       with:
         go-version: ${{ matrix.go }}
-    - run: ./.ci/run_e2e_tests.sh
+    - run: .github/workflows/run_e2e_tests.sh --parallelism 1 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
       shell: bash
       env:
         DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
         DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        KURTOSIS_CLIENT_ID: ${{ secrets.KURTOSIS_CLIENT_ID }}
+        KURTOSIS_CLIENT_SECRET: ${{ secrets.KURTOSIS_CLIENT_SECRET }}
