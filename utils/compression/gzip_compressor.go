@@ -11,8 +11,8 @@ import (
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
-	writerInitialised bool
-	readerInitialised bool
+	writerInitialized bool
+	readerInitialized bool
 
 	writeBuffer *bytes.Buffer
 	gzipWriter  *gzip.Writer
@@ -41,24 +41,22 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.resetReader(msg); err != nil {
 		return nil, err
 	}
-	data, err := io.ReadAll(g.gzipReader)
+	decompressed, err := io.ReadAll(g.gzipReader)
 	if err != nil {
 		return nil, err
 	}
 	if err = g.gzipReader.Close(); err != nil {
 		return nil, err
 	}
-	decompressed := make([]byte, len(data))
-	copy(decompressed, data)
 	return decompressed, nil
 }
 
 func (g *gzipCompressor) resetWriter() {
-	if !g.writerInitialised {
+	if !g.writerInitialized {
 		var buf bytes.Buffer
 		g.writeBuffer = &buf
 		g.gzipWriter = gzip.NewWriter(g.writeBuffer)
-		g.writerInitialised = true
+		g.writerInitialized = true
 	} else {
 		g.writeBuffer.Reset()
 		g.gzipWriter.Reset(g.writeBuffer)
@@ -66,13 +64,14 @@ func (g *gzipCompressor) resetWriter() {
 }
 
 func (g *gzipCompressor) resetReader(msg []byte) error {
-	if !g.readerInitialised {
+	if !g.readerInitialized {
 		g.bytesReader = bytes.NewReader(msg)
 		gzipReader, err := gzip.NewReader(g.bytesReader)
 		if err != nil {
 			return err
 		}
 		g.gzipReader = gzipReader
+		g.readerInitialized = true
 	} else {
 		g.bytesReader.Reset(msg)
 		if err := g.gzipReader.Reset(g.bytesReader); err != nil && err != io.EOF {
