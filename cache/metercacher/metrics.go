@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	metricsHelper "github.com/ava-labs/avalanchego/utils/metrics"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -34,10 +34,10 @@ func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
-	m.get = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "get")
-	m.put = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "put")
-	m.evict = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "evict")
-	m.flush = metricsHelper.NewNanosecnodsLatencyMetric(namespace, "flush")
+	m.get = metric.NewNanosecondsLatencyMetric(namespace, "get")
+	m.put = metric.NewNanosecondsLatencyMetric(namespace, "put")
+	m.evict = metric.NewNanosecondsLatencyMetric(namespace, "evict")
+	m.flush = metric.NewNanosecondsLatencyMetric(namespace, "flush")
 	m.hit = newCounterMetric(namespace, "hit")
 	m.miss = newCounterMetric(namespace, "miss")
 
