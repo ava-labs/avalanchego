@@ -28,7 +28,13 @@ type Codec struct {
 // Uses [buffer] to hold the message's byte repr.
 // [buffer]'s contents may be overwritten.
 // [buffer] may be nil.
-func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, compress bool) (Msg, error) {
+func (c Codec) Pack(
+	buffer []byte,
+	op Op,
+	fieldValues map[Field]interface{},
+	includeIsCompressedFlag bool,
+	compress bool,
+) (Msg, error) {
 	msgFields, ok := Messages[op]
 	if !ok {
 		return nil, errBadOp
@@ -42,8 +48,7 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 	p.PackByte(byte(op))
 
 	// If messages of this type may be compressed, pack whether the payload is compressed
-	compressableType := op != Version && op != GetVersion // TODO in the future, always pack
-	if compressableType {
+	if includeIsCompressedFlag {
 		p.PackBool(compress)
 	}
 
@@ -63,6 +68,7 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 		fields: fieldValues,
 		bytes:  p.Bytes,
 	}
+	compressableType := op != Version && op != GetVersion // TODO in the future, always pack
 	if !compress || !compressableType {
 		return msg, nil
 	}
