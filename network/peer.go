@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 // The signature of a peer's certificate on the byte representation
@@ -745,7 +744,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	// todo marker version should be constant
-	p.canHandleCompressed.SetValue(peerVersion.Compare(version.NewDefaultVersion(1, 4, 9)) >= 0)
+	p.canHandleCompressed.SetValue(peerVersion.Compare(minVersionCanHandleCompressed) >= 0)
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,

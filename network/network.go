@@ -57,9 +57,10 @@ const (
 )
 
 var (
-	errNetworkClosed         = errors.New("network closed")
-	errPeerIsMyself          = errors.New("peer is myself")
-	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
+	errNetworkClosed              = errors.New("network closed")
+	errPeerIsMyself               = errors.New("peer is myself")
+	errNetworkLayerUnhealthy      = errors.New("network layer is unhealthy")
+	minVersionCanHandleCompressed = version.NewDefaultVersion(1, 4, 9)
 )
 
 var _ Network = &network{}
