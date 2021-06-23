@@ -14,7 +14,6 @@ import (
 
 type messageMetrics struct {
 	receivedBytes, sentBytes, numSent, numFailed, numReceived prometheus.Counter
-	bytesSaved                                                prometheus.Histogram
 }
 
 func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registerer) error {
@@ -43,11 +42,6 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 		Name:      fmt.Sprintf("%s_sent_bytes", msgType),
 		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
 	})
-	mm.bytesSaved = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: constants.PlatformName,
-		Name:      fmt.Sprintf("%s_bytes_saved", msgType),
-		Help:      fmt.Sprintf("Number of bytes saved (not sent) due to compression of %s messages", msgType),
-	})
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -56,7 +50,6 @@ func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registere
 		registerer.Register(mm.numReceived),
 		registerer.Register(mm.receivedBytes),
 		registerer.Register(mm.sentBytes),
-		registerer.Register(mm.bytesSaved),
 	)
 
 	return errs.Err
