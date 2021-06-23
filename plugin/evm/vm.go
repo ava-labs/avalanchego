@@ -729,7 +729,7 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
 		"/avax": avaxAPI,
-		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
+		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandlerWithDuration([]string{"*"}, vm.config.APIMaxDuration.Duration)},
 	}, nil
 }
 
