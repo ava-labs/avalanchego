@@ -77,12 +77,11 @@ func (vm *VM) Initialize(
 ) error {
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
-	db := versiondb.New(prefixDB)
-	vm.State = state.New(db)
+	vm.db = versiondb.New(prefixDB)
+	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 	vm.ctx = ctx
-	vm.db = db
 	vm.verifiedBlocks = make(map[ids.ID]*ProposerBlock)
 
 	vm.scheduler = &scheduler{}
@@ -139,12 +138,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	blk, err := vm.getProposerBlock(slb.ID())
-	if err != nil {
-		return blk, nil
-	}
-
-	blk = &ProposerBlock{
+	blk := &ProposerBlock{
 		Block:   slb,
 		vm:      vm,
 		coreBlk: sb,
@@ -154,16 +148,16 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	block, err := vm.parseProposerBlock(b)
+	blk, err := vm.parseProposerBlock(b)
 	if err == nil {
-		return block, nil
+		return blk, nil
 	}
 	return vm.ChainVM.ParseBlock(b)
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	if res, err := vm.getProposerBlock(id); err == nil {
-		return res, nil
+	if blk, err := vm.getProposerBlock(id); err == nil {
+		return blk, nil
 	}
 
 	// check whether block is core one, with no proposerBlockHeader
@@ -176,7 +170,7 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 func (vm *VM) SetPreference(preferred ids.ID) error {
 	vm.preferred = preferred
 
-	proBlk, err := vm.getProposerBlock(preferred)
+	blk, err := vm.getProposerBlock(preferred)
 	if err == database.ErrNotFound {
 		// pre snowman++ case
 		return vm.ChainVM.SetPreference(preferred)
@@ -184,7 +178,9 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	if err != nil {
 		return err
 	}
-	return vm.ChainVM.SetPreference(proBlk.coreBlk.ID())
+
+	// check whether block is core one, with no proposerBlockHeader
+	return vm.ChainVM.SetPreference(blk.coreBlk.ID())
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
@@ -229,8 +225,11 @@ func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
 	}
 	// if the block already exists, then make sure the status is set correctly
 	blk, err := vm.getProposerBlock(slb.ID())
-	if err != nil {
-		return blk, err
+	if err == nil {
+		return blk, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
 	}
 
 	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())

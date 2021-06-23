@@ -4,7 +4,6 @@
 package proposer
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
@@ -17,12 +16,14 @@ import (
 
 const (
 	maxWindows     = 5
-	windowDuration = 3 * time.Second
+	WindowDuration = 3 * time.Second
+	MaxDelay       = maxWindows * WindowDuration
 )
 
 var _ Windower = &windower{}
 
 type Windower interface {
+	PChainHeight() (uint64, error)
 	Delay(
 		chainHeight,
 		pChainHeight uint64,
@@ -49,6 +50,10 @@ func New(vm validators.VM, subnetID, chainID ids.ID) Windower {
 		//       is well specified and deterministic.
 		sampler: sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
+}
+
+func (w *windower) PChainHeight() (uint64, error) {
+	return w.vm.GetCurrentHeight()
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
@@ -94,7 +99,6 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 	}
 
 	seed := chainHeight ^ w.chainSource
-	fmt.Println(seed)
 	w.sampler.Seed(int64(seed))
 
 	indices, err := w.sampler.Sample(numToSample)
@@ -108,7 +112,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 		if nodeID == validatorID {
 			return delay, nil
 		}
-		delay += windowDuration
+		delay += WindowDuration
 	}
 	return delay, nil
 }

@@ -32,7 +32,7 @@ func (s *scheduler) coreVMChannel() chan<- common.Message { return s.fromCoreVM 
 func (s *scheduler) rescheduleBlkTicker() {
 	winStart := s.blkWinStart
 	var tickerDelay time.Duration
-	tNow := s.vm.clock.now()
+	tNow := s.vm.Clock.Time()
 	if winStart.After(tNow) {
 		tickerDelay = winStart.Sub(tNow)
 	} else {
