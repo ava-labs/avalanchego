@@ -19,7 +19,7 @@ type Scheduler interface {
 	Close()
 }
 
-// scheduler control the signal dispatching from coreVM to consensus engine
+// scheduler to control the signal dispatching from a vm to consensus engine
 type scheduler struct {
 	fromVM       <-chan common.Message
 	toEngine     chan<- common.Message
