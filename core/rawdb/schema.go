@@ -55,6 +55,9 @@ var (
 	// fastTrieProgressKey tracks the number of trie entries imported during fast sync.
 	fastTrieProgressKey = []byte("TrieSync")
 
+	// snapshotDisabledKey flags that the snapshot should not be maintained due to initial sync.
+	snapshotDisabledKey = []byte("SnapshotDisabled")
+
 	// snapshotRootKey tracks the hash of the last snapshot.
 	snapshotRootKey = []byte("SnapshotRoot")
 
@@ -125,17 +128,6 @@ const (
 	// freezerDifficultyTable indicates the name of the freezer total difficulty table.
 	freezerDifficultyTable = "diffs"
 )
-
-// Original code:
-// // freezerNoSnappy configures whether compression is disabled for the ancient-tables.
-// // Hashes and difficulties don't compress well.
-// var freezerNoSnappy = map[string]bool{
-// 	freezerHeaderTable:     false,
-// 	freezerHashTable:       true,
-// 	freezerBodiesTable:     false,
-// 	freezerReceiptTable:    false,
-// 	freezerDifficultyTable: true,
-// }
 
 // LegacyTxLookupEntry is the legacy TxLookupEntry definition with some unnecessary
 // fields.

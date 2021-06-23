@@ -192,30 +192,6 @@ func TestV3_Scrypt_2(t *testing.T) {
 	testDecryptV3(tests["test2"], t)
 }
 
-// ORIGINAL CODE - this tests eats up GB's of memory
-// func TestV1_1(t *testing.T) {
-// 	t.Parallel()
-// 	tests := loadKeyStoreTestV1("testdata/v1_test_vector.json", t)
-// 	testDecryptV1(tests["test1"], t)
-// }
-
-// ORIGINAL CODE - this tests eats up GB's of memory
-// func TestV1_2(t *testing.T) {
-// 	t.Parallel()
-// 	ks := &keyStorePassphrase{"testdata/v1", LightScryptN, LightScryptP, true}
-// 	addr := common.HexToAddress("cb61d5a9c4896fb9658090b597ef0e7be6f7b67e")
-// 	file := "testdata/v1/cb61d5a9c4896fb9658090b597ef0e7be6f7b67e/cb61d5a9c4896fb9658090b597ef0e7be6f7b67e"
-// 	k, err := ks.GetKey(addr, file, "g")
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	privHex := hex.EncodeToString(crypto.FromECDSA(k.PrivateKey))
-// 	expectedHex := "d1b1178d3529626a1a93e073f65028370d14c7eb0936eb42abef05db6f37ad7d"
-// 	if privHex != expectedHex {
-// 		t.Fatal(fmt.Errorf("Unexpected privkey: %v, expected %v", privHex, expectedHex))
-// 	}
-// }
-
 func testDecryptV3(test KeyStoreTestV3, t *testing.T) {
 	privBytes, _, err := decryptKeyV3(&test.Json, test.Password)
 	if err != nil {
@@ -227,17 +203,6 @@ func testDecryptV3(test KeyStoreTestV3, t *testing.T) {
 	}
 }
 
-// func testDecryptV1(test KeyStoreTestV1, t *testing.T) {
-// 	privBytes, _, err := decryptKeyV1(&test.Json, test.Password)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	privHex := hex.EncodeToString(privBytes)
-// 	if test.Priv != privHex {
-// 		t.Fatal(fmt.Errorf("Decrypted bytes not equal to test, expected %v have %v", test.Priv, privHex))
-// 	}
-// }
-
 func loadKeyStoreTestV3(file string, t *testing.T) map[string]KeyStoreTestV3 {
 	tests := make(map[string]KeyStoreTestV3)
 	err := common.LoadJSON(file, &tests)
@@ -246,15 +211,6 @@ func loadKeyStoreTestV3(file string, t *testing.T) map[string]KeyStoreTestV3 {
 	}
 	return tests
 }
-
-// func loadKeyStoreTestV1(file string, t *testing.T) map[string]KeyStoreTestV1 {
-// 	tests := make(map[string]KeyStoreTestV1)
-// 	err := common.LoadJSON(file, &tests)
-// 	if err != nil {
-// 		t.Fatal(err)
-// 	}
-// 	return tests
-// }
 
 func TestKeyForDirectICAP(t *testing.T) {
 	t.Parallel()

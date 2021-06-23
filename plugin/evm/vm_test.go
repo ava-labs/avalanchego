@@ -150,7 +150,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
 // the channel use to send messages to the engine, the vm, and atomic memory
-func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string) (chan engCommon.Message, *VM, []byte, *atomic.Memory) {
+func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory) {
 	vm, ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	if err := vm.Initialize(
 		ctx,
@@ -169,7 +169,7 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, confi
 		assert.NoError(t, vm.Bootstrapped())
 	}
 
-	return issuer, vm, genesisBytes, m
+	return issuer, vm, dbManager, m
 }
 
 func TestVMConfig(t *testing.T) {
@@ -209,10 +209,10 @@ func TestVMNilConfig(t *testing.T) {
 func TestVMContinuosProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
-	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": %v}", profilerDir, int64(profilerFrequency))
+	configJSON := fmt.Sprintf("{\"continuous-profiler-dir\": %q,\"continuous-profiler-frequency\": \"500ms\"}", profilerDir)
 	_, vm, _, _ := GenesisVM(t, false, genesisJSONApricotPhase0, configJSON, "")
 	assert.Equal(t, vm.config.ContinuousProfilerDir, profilerDir, "profiler dir should be set")
-	assert.Equal(t, vm.config.ContinuousProfilerFrequency, profilerFrequency, "profiler frequency should be set")
+	assert.Equal(t, vm.config.ContinuousProfilerFrequency.Duration, profilerFrequency, "profiler frequency should be set")
 
 	// Sleep for twice the frequency of the profiler to give it time
 	// to generate the first profile.
@@ -293,6 +293,8 @@ func TestVMGenesis(t *testing.T) {
 	}
 }
 
+// Simple test to ensure we can issue an import transaction followed by an export transaction
+// and they will be indexed correctly when accepted.
 func TestIssueAtomicTxs(t *testing.T) {
 	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "", "")
 
@@ -435,13 +437,16 @@ func TestIssueAtomicTxs(t *testing.T) {
 }
 
 func TestBuildEthTxBlock(t *testing.T) {
-	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "", "")
+	issuer, vm, dbManager, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "{\"pruning-enabled\":true}", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
@@ -518,6 +523,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk1.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -553,6 +563,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	newHead = <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk2.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	if status := blk2.Status(); status != choices.Accepted {
 		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
 	}
@@ -582,6 +597,21 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	if blk1Refreshed.ID() != blk1.ID() {
 		t.Fatalf("Found unexpected blkID for parent of blk2")
+	}
+
+	restartedVM := &VM{
+		txFee: testTxFee,
+	}
+	if err := restartedVM.Initialize(
+		NewContext(),
+		dbManager,
+		[]byte(genesisJSONApricotPhase2),
+		[]byte(""),
+		[]byte("{\"pruning-enabled\":true}"),
+		issuer,
+		[]*engCommon.Fx{},
+	); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -1461,7 +1491,7 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatalf("Unexpected error when setting preference that would trigger reorg: %s", err)
 	}
 
-	if err := vm1BlkC.Accept(); !strings.Contains(err.Error(), "expected accepted parent block hash") {
+	if err := vm1BlkC.Accept(); !strings.Contains(err.Error(), "expected accepted block to have parent") {
 		t.Fatalf("Unexpected error when setting block at finalized height: %s", err)
 	}
 }
@@ -1945,7 +1975,7 @@ func TestStickyPreference(t *testing.T) {
 	}
 
 	// Attempt to accept out of order
-	if err := vm1BlkD.Accept(); !strings.Contains(err.Error(), "expected accepted parent block hash") {
+	if err := vm1BlkD.Accept(); !strings.Contains(err.Error(), "expected accepted block to have parent") {
 		t.Fatalf("unexpected error when accepting out of order block: %s", err)
 	}
 
@@ -2957,10 +2987,10 @@ func TestApricotPhase1Transition(t *testing.T) {
 
 	// Confirm all txs are present
 	ethBlkTxs := vm1.chain.GetBlockByNumber(2).Transactions()
+	if len(ethBlkTxs) != 5 {
+		t.Fatalf("Expected 5 transactions in block, but found %d", len(ethBlkTxs))
+	}
 	for i, tx := range txs[:5] {
-		if len(ethBlkTxs) <= i {
-			t.Fatalf("missing transactions expected: %d but found: %d", len(txs), len(ethBlkTxs))
-		}
 		if ethBlkTxs[i].Hash() != tx.Hash() {
 			t.Fatalf("expected tx at index %d to have hash: %x but has: %x", i, txs[i].Hash(), tx.Hash())
 		}

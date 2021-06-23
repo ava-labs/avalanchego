@@ -57,9 +57,9 @@ type Miner struct {
 	worker *worker
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool, mcb *MinerCallbacks) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
 	return &Miner{
-		worker: newWorker(config, chainConfig, engine, eth, mux, mcb),
+		worker: newWorker(config, chainConfig, engine, eth, mux),
 	}
 }
 
@@ -75,8 +75,4 @@ func (miner *Miner) GenerateBlock() (*types.Block, error) {
 // to the given channel.
 func (miner *Miner) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return miner.worker.pendingLogsFeed.Subscribe(ch)
-}
-
-func (miner *Miner) SubscribeNewMinedBlockEvent() *event.TypeMuxSubscription {
-	return miner.worker.mux.Subscribe(core.NewMinedBlockEvent{})
 }

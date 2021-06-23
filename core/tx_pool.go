@@ -235,6 +235,7 @@ type TxPool struct {
 	gasPrice    *big.Int
 	txFeed      event.Feed
 	headFeed    event.Feed
+	reorgFeed   event.Feed
 	scope       event.SubscriptionScope
 	signer      types.Signer
 	mu          sync.RWMutex
@@ -428,6 +429,12 @@ func (pool *TxPool) SubscribeNewTxsEvent(ch chan<- NewTxsEvent) event.Subscripti
 // starts sending event to the given channel.
 func (pool *TxPool) SubscribeNewHeadEvent(ch chan<- NewTxPoolHeadEvent) event.Subscription {
 	return pool.scope.Track(pool.headFeed.Subscribe(ch))
+}
+
+// SubscribeNewReorgEvent registers a subscription of NewReorgEvent and
+// starts sending event to the given channel.
+func (pool *TxPool) SubscribeNewReorgEvent(ch chan<- NewTxPoolReorgEvent) event.Subscription {
+	return pool.scope.Track(pool.reorgFeed.Subscribe(ch))
 }
 
 // GasPrice returns the current gas price enforced by the transaction pool.
@@ -1118,6 +1125,10 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	}
 	pool.mu.Unlock()
 
+	if reset != nil && reset.newHead != nil {
+		pool.reorgFeed.Send(NewTxPoolReorgEvent{reset.newHead})
+	}
+
 	// Notify subsystems for newly added transactions
 	for _, tx := range promoted {
 		addr, _ := types.Sender(pool.signer, tx)
@@ -1470,8 +1481,6 @@ func (pool *TxPool) demoteUnexecutables() {
 				pool.enqueueTx(hash, tx, false, false)
 			}
 			pendingGauge.Dec(int64(len(gapped)))
-			// This might happen in a reorg, so log it to the metering
-			blockReorgInvalidatedTx.Mark(int64(len(gapped)))
 		}
 		// Delete the entire pending entry if it became empty.
 		if list.Empty() {

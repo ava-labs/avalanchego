@@ -22,18 +22,6 @@ func TestSubscribeTransactionsTest(t *testing.T) {
 	pendingTxsEventsChannel := make(chan []common.Hash)
 	pendingTxsEvents := eventSystem.SubscribePendingTxs(pendingTxsEventsChannel)
 
-	// Override SetOnSealFinish set in NewDefaultChain, so that each sealed block
-	// is set as the new preferred block within this test, but not immediately marked
-	// as accepted.
-	chain.SetOnSealFinish(func(block *types.Block) {
-		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
-			t.Fatal(err)
-		}
-		if err := chain.SetPreference(block); err != nil {
-			t.Fatal(err)
-		}
-	})
-
 	chain.Start()
 	defer chain.Stop()
 
@@ -85,6 +73,7 @@ func TestSubscribeTransactionsTest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndSetPreference(t, chain, block)
 
 	<-newTxPoolHeadChan
 

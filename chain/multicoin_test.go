@@ -29,12 +29,14 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/accounts/keystore"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/eth/ethconfig"
+	"github.com/ava-labs/coreth/node"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -94,9 +96,18 @@ func TestMulticoin(t *testing.T) {
 	}
 	code := common.Hex2Bytes(contract)
 
-	chain := NewETHChain(&config, nil, rawdb.NewMemoryDatabase(), eth.DefaultSettings, true)
-
-	if err := chain.Accept(chain.GetGenesisBlock()); err != nil {
+	var (
+		chain *ETHChain
+	)
+	chain, err = NewETHChain(
+		&config,
+		&node.Config{},
+		rawdb.NewMemoryDatabase(),
+		eth.DefaultSettings,
+		new(dummy.ConsensusCallbacks),
+		common.Hash{},
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -107,18 +118,6 @@ func TestMulticoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	chain.SetOnSealFinish(func(block *types.Block) {
-		if _, err := chain.InsertChain([]*types.Block{block}); err != nil {
-			t.Fatal(err)
-		}
-		if err := chain.SetPreference(block); err != nil {
-			t.Fatal(err)
-		}
-		if err := chain.Accept(block); err != nil {
-			t.Fatal(err)
-		}
-	})
 
 	// start the chain
 	chain.GetTxPool().SubscribeNewHeadEvent(newTxPoolHeadChan)
@@ -142,6 +141,7 @@ func TestMulticoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndAccept(t, chain, block)
 
 	<-newTxPoolHeadChan
 	log.Info("Generated block with new counter contract creation", "blkNumber", block.NumberU64())
@@ -168,6 +168,7 @@ func TestMulticoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndAccept(t, chain, block)
 
 	// Await block generation
 	<-newTxPoolHeadChan
@@ -214,6 +215,7 @@ func TestMulticoin(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		insertAndAccept(t, chain, block)
 
 		<-newTxPoolHeadChan
 		if txs := block.Transactions(); len(txs) != 2 {
@@ -250,6 +252,7 @@ func TestMulticoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndAccept(t, chain, block)
 
 	<-newTxPoolHeadChan
 
