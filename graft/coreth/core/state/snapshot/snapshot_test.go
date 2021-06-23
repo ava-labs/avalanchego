@@ -122,7 +122,7 @@ func TestDiskLayerExternalInvalidationFullFlatten(t *testing.T) {
 		t.Errorf("pre-cap layer count mismatch: have %d, want %d", n, 2)
 	}
 	// Commit the diff layer onto the disk and ensure it's persisted
-	if err := snaps.Cap(common.HexToHash("0x02"), 0); err != nil {
+	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatalf("failed to merge diff layer onto disk: %v", err)
 	}
 	// Since the base layer was modified, ensure that data retrieval on the external reference fail
@@ -175,7 +175,7 @@ func TestDiskLayerExternalInvalidationPartialFlatten(t *testing.T) {
 	if err := snaps.Cap(common.HexToHash("0x03"), 1); err != nil {
 		t.Fatalf("failed to merge accumulator onto disk: %v", err)
 	}
-	// Since the base layer was modified, ensure that data retrievald on the external reference fail
+	// Since the base layer was modified, ensure that data retrieval on the external reference fails
 	if acc, err := ref.Account(common.HexToHash("0x01")); err != ErrSnapshotStale {
 		t.Errorf("stale reference returned account: %v (err: %v)", acc, err)
 	}
@@ -233,7 +233,7 @@ func TestDiffLayerExternalInvalidationPartialFlatten(t *testing.T) {
 	if err := snaps.Cap(common.HexToHash("0x04"), 1); err != nil {
 		t.Fatalf("failed to flatten diff layer into accumulator: %v", err)
 	}
-	// Since the accumulator diff layer was modified, ensure that data retrievald on the external reference fail
+	// Since the accumulator diff layer was modified, ensure that data retrieval on the external reference fails
 	if acc, err := ref.Account(common.HexToHash("0x01")); err != ErrSnapshotStale {
 		t.Errorf("stale reference returned account: %v (err: %v)", acc, err)
 	}
@@ -301,11 +301,19 @@ func TestPostCapBasicDataAccess(t *testing.T) {
 		t.Error(err)
 	}
 	// Cap to a bad root should fail
-	if err := snaps.Cap(common.HexToHash("0x1337"), 0); err == nil {
+	if err := snaps.Flatten(common.HexToHash("0x1337")); err == nil {
 		t.Errorf("expected error, got none")
 	}
-	// Now, merge the a-chain
-	snaps.Cap(common.HexToHash("0xa3"), 0)
+	// Now, merge the a-chain layer by layer
+	if err := snaps.Flatten(common.HexToHash("0xa1")); err != nil {
+		t.Error(err)
+	}
+	if err := snaps.Flatten(common.HexToHash("0xa2")); err != nil {
+		t.Error(err)
+	}
+	if err := snaps.Flatten(common.HexToHash("0xa3")); err != nil {
+		t.Error(err)
+	}
 
 	// At this point, a2 got merged into a1. Thus, a1 is now modified, and as a1 is
 	// the parent of b2, b2 should no longer be able to iterate into parent.
@@ -327,16 +335,11 @@ func TestPostCapBasicDataAccess(t *testing.T) {
 	if err := shouldErr(snap, "0xa3"); err != nil {
 		t.Error(err)
 	}
-	// Now, merge it again, just for fun. It should now error, since a3
-	// is a disk layer
-	if err := snaps.Cap(common.HexToHash("0xa3"), 0); err == nil {
-		t.Error("expected error capping the disk layer, got none")
-	}
 }
 
 // TestSnaphots tests the functionality for retrieveing the snapshot
 // with given head root and the desired depth.
-func TestSnaphots(t *testing.T) {
+func TestSnapshots(t *testing.T) {
 	// setAccount is a helper to construct a random account entry and assign it to
 	// an account slot in a snapshot
 	setAccount := func(accKey string) map[common.Hash][]byte {
@@ -431,5 +434,47 @@ func TestSnaphots(t *testing.T) {
 		if bottommost.Root() != c.expectBottom {
 			t.Errorf("overflow test %d: snapshot mismatch, want %v, get %v", i, c.expectBottom, bottommost.Root())
 		}
+	}
+}
+
+// TestTreeFlattenDoesNotDropPendingLayers tests that Tree.Flatten correctly
+// retains layers built on top of the given root layer.
+//
+// i.e. For Tree `t` with layers [A, B, C, D, E], `t.Flatten(C)` results in:
+//   [C, D, E].
+func TestTreeFlattenDoesNotDropPendingLayers(t *testing.T) {
+	base := &diskLayer{
+		diskdb: rawdb.NewMemoryDatabase(),
+		root:   common.HexToHash("0x01"),
+		cache:  fastcache.New(1024 * 500),
+	}
+	snaps := &Tree{
+		layers: map[common.Hash]snapshot{
+			base.root: base,
+		},
+	}
+	accounts := map[common.Hash][]byte{
+		common.HexToHash("0xa1"): randomAccount(),
+	}
+
+	// Create N layers on top of base (N+1) total
+	parentHash := base.Root()
+	totalLayers := 10
+	flattenAt := 1
+	for i := 1; i < totalLayers; i++ {
+		if err := snaps.Update(common.Hash{byte(i)}, parentHash, nil, accounts, nil); err != nil {
+			t.Fatalf("failed to create a diff layer: %v", err)
+		}
+		parentHash = common.Hash{byte(i)}
+	}
+
+	// Flatten at an internal layer
+	if err := snaps.Flatten(common.Hash{byte(flattenAt)}); err != nil {
+		t.Fatalf("failed to flatten tree: %v", err)
+	}
+
+	// We should have no have the layer we flattened at and all following layers
+	if got := len(snaps.layers); got != (totalLayers - flattenAt) {
+		t.Fatalf("incorrect layer count: %d, wanted %d", got, totalLayers-flattenAt)
 	}
 }

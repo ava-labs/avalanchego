@@ -35,11 +35,11 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/coreth/signer/core"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/signer/core"
 )
 
 type ExternalBackend struct {
@@ -221,6 +221,20 @@ func (api *ExternalSigner) SignTx(account accounts.Account, tx *types.Transactio
 		GasPrice: hexutil.Big(*tx.GasPrice()),
 		To:       to,
 		From:     common.NewMixedcaseAddress(account.Address),
+	}
+	// We should request the default chain id that we're operating with
+	// (the chain we're executing on)
+	if chainID != nil {
+		args.ChainID = (*hexutil.Big)(chainID)
+	}
+	// However, if the user asked for a particular chain id, then we should
+	// use that instead.
+	if tx.Type() != types.LegacyTxType && tx.ChainId() != nil {
+		args.ChainID = (*hexutil.Big)(tx.ChainId())
+	}
+	if tx.Type() == types.AccessListTxType {
+		accessList := tx.AccessList()
+		args.AccessList = &accessList
 	}
 	var res signTransactionResult
 	if err := api.client.Call(&res, "account_signTransaction", args); err != nil {

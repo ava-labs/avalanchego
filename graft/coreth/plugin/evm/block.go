@@ -6,6 +6,7 @@ package evm
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -136,7 +137,7 @@ func (b *Block) Accept() error {
 
 	if bonusBlocks.Contains(b.id) {
 		log.Info("skipping atomic tx acceptance on bonus block", "block", b.id)
-		return nil
+		return vm.db.Commit()
 	}
 
 	// Note: since CommitBatch holds the database lock, this precludes any other
@@ -163,7 +164,7 @@ func (b *Block) Reject() error {
 		b.vm.mempool.RejectTx(tx.ID())
 	}
 
-	return nil
+	return b.vm.chain.Reject(b.ethBlock)
 }
 
 // SetStatus implements the InternalBlock interface allowing ChainState
@@ -191,6 +192,11 @@ func (b *Block) Height() uint64 {
 	return b.ethBlock.Number().Uint64()
 }
 
+// Timestamp implements the snowman.Block interface
+func (b *Block) Timestamp() time.Time {
+	return time.Unix(int64(b.ethBlock.Time()), 0)
+}
+
 // syntacticVerify verifies that a *Block is well-formed.
 func (b *Block) syntacticVerify() (params.Rules, error) {
 	if b == nil || b.ethBlock == nil {
@@ -208,8 +214,9 @@ func (b *Block) Verify() error {
 		return err
 	}
 
-	_, err := b.vm.chain.InsertChain([]*types.Block{b.ethBlock})
-	return err
+	// InsertBlock must be the last step in verification to prevent a memory leak in the management
+	// of tries that the chain maintains an active reference to.
+	return b.vm.chain.InsertBlock(b.ethBlock)
 }
 
 func (b *Block) VerifyWithoutWrites() error {

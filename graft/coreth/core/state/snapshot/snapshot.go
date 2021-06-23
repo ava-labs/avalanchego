@@ -159,11 +159,11 @@ type snapshot interface {
 	StorageIterator(account common.Hash, seek common.Hash) (StorageIterator, bool)
 }
 
-// SnapshotTree is an Ethereum state snapshot tree. It consists of one persistent
-// base layer backed by a key-value store, on top of which arbitrarily many in-
-// memory diff layers are topped. The memory diffs can form a tree with branching,
-// but the disk layer is singleton and common to all. If a reorg goes deeper than
-// the disk layer, everything needs to be deleted.
+// Tree is an Ethereum state snapshot tree. It consists of one persistent base
+// layer backed by a key-value store, on top of which arbitrarily many in-memory
+// diff layers are topped. The memory diffs can form a tree with branching, but
+// the disk layer is singleton and common to all. If a reorg goes deeper than the
+// disk layer, everything needs to be deleted.
 //
 // The goal of a state snapshot is twofold: to allow direct access to account and
 // storage data to avoid expensive multi-level trie lookups; and to allow sorted,
@@ -197,7 +197,11 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root comm
 		defer snap.waitBuild()
 	}
 	// Attempt to load a previously persisted snapshot and rebuild one if failed
-	head, err := loadSnapshot(diskdb, triedb, cache, root, recovery)
+	head, disabled, err := loadSnapshot(diskdb, triedb, cache, root, recovery)
+	if disabled {
+		log.Warn("Snapshot maintenance disabled (syncing)")
+		return snap, nil
+	}
 	if err != nil {
 		if rebuild {
 			log.Warn("Failed to load snapshot, regenerating", "err", err)
@@ -232,6 +236,55 @@ func (t *Tree) waitBuild() {
 	// Wait until the snapshot is generated
 	if done != nil {
 		<-done
+	}
+}
+
+// Disable interrupts any pending snapshot generator, deletes all the snapshot
+// layers in memory and marks snapshots disabled globally. In order to resume
+// the snapshot functionality, the caller must invoke Rebuild.
+func (t *Tree) Disable() {
+	// Interrupt any live snapshot layers
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	for _, layer := range t.layers {
+		switch layer := layer.(type) {
+		case *diskLayer:
+			// If the base layer is generating, abort it
+			if layer.genAbort != nil {
+				abort := make(chan *generatorStats)
+				layer.genAbort <- abort
+				<-abort
+			}
+			// Layer should be inactive now, mark it as stale
+			layer.lock.Lock()
+			layer.stale = true
+			layer.lock.Unlock()
+
+		case *diffLayer:
+			// If the layer is a simple diff, simply mark as stale
+			layer.lock.Lock()
+			atomic.StoreUint32(&layer.stale, 1)
+			layer.lock.Unlock()
+
+		default:
+			panic(fmt.Sprintf("unknown layer type: %T", layer))
+		}
+	}
+	t.layers = map[common.Hash]snapshot{}
+
+	// Delete all snapshot liveness information from the database
+	batch := t.diskdb.NewBatch()
+
+	rawdb.WriteSnapshotDisabled(batch)
+	rawdb.DeleteSnapshotRoot(batch)
+	rawdb.DeleteSnapshotJournal(batch)
+	rawdb.DeleteSnapshotGenerator(batch)
+	rawdb.DeleteSnapshotRecoveryNumber(batch)
+	// Note, we don't delete the sync progress
+
+	if err := batch.Write(); err != nil {
+		log.Crit("Failed to disable snapshots", "err", err)
 	}
 }
 
@@ -301,6 +354,77 @@ func (t *Tree) Update(blockRoot common.Hash, parentRoot common.Hash, destructs m
 	defer t.lock.Unlock()
 
 	t.layers[snap.root] = snap
+	return nil
+}
+
+// Flatten flattens the given root into its parent. If it's parent is not
+// a disk layer, Flatten will return an error. Layers built on top of the
+// root are not removed. It is the responsibility of the caller to call
+// Discard to clean up any additional layers built on the parent of [root].
+func (t *Tree) Flatten(root common.Hash) error {
+	// Retrieve the head snapshot to cap from
+	snap := t.Snapshot(root)
+	if snap == nil {
+		return fmt.Errorf("snapshot [%#x] missing", root)
+	}
+	diff, ok := snap.(*diffLayer)
+	// If [root] already reflects a disk layer, Flatten is a no-op.
+	if !ok {
+		return nil
+	}
+	if diff.parent == nil {
+		return fmt.Errorf("snapshot [%#x] missing parent", root)
+	}
+
+	if _, ok := diff.parent.(*diskLayer); !ok {
+		return fmt.Errorf("snapshot [%#x] parent is diff layer", root)
+	}
+	parentRoot := diff.parent.Root()
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	parentLayer := t.layers[parentRoot]
+	if parentLayer == nil {
+		return fmt.Errorf("snapshot missing parent layer: %s", parentRoot)
+	}
+
+	diff.lock.RLock()
+	base := diffToDisk(diff)
+	diff.lock.RUnlock()
+
+	// Remove parent layer
+	delete(t.layers, parentRoot)
+
+	t.layers[base.root] = base
+	// Replace root with base in parent pointers
+	for _, snap := range t.layers {
+		if diff, ok := snap.(*diffLayer); ok {
+			if base.root == diff.parent.Root() {
+				diff.parent = base
+			}
+		}
+	}
+
+	log.Debug("Flattened snapshot tree", "root", root, "parent", parentRoot, "size", len(t.layers))
+	return nil
+}
+
+func (t *Tree) Layers() map[common.Hash]snapshot {
+	return t.layers
+}
+
+// Discard removes layers that we no longer need
+func (t *Tree) Discard(root common.Hash) error {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	snap := t.layers[root]
+	if snap == nil {
+		return fmt.Errorf("snapshot [%#x] missing", root)
+	}
+
+	delete(t.layers, root)
 	return nil
 }
 
@@ -637,11 +761,9 @@ func (t *Tree) Rebuild(root common.Hash) {
 	defer t.lock.Unlock()
 
 	// Firstly delete any recovery flag in the database. Because now we are
-	// building a brand new snapshot.
+	// building a brand new snapshot. Also reenable the snapshot feature.
 	rawdb.DeleteSnapshotRecoveryNumber(t.diskdb)
-
-	// Track whether there's a wipe currently running and keep it alive if so
-	var wiper chan struct{}
+	rawdb.DeleteSnapshotDisabled(t.diskdb)
 
 	// Iterate over and mark all layers stale
 	for _, layer := range t.layers {
@@ -652,9 +774,7 @@ func (t *Tree) Rebuild(root common.Hash) {
 				abort := make(chan *generatorStats)
 				layer.genAbort <- abort
 
-				if stats := <-abort; stats != nil {
-					wiper = stats.wiping
-				}
+				<-abort
 			}
 			// Layer should be inactive now, mark it as stale
 			layer.lock.Lock()
@@ -675,7 +795,7 @@ func (t *Tree) Rebuild(root common.Hash) {
 	// generator will run a wiper first if there's not one running right now.
 	log.Info("Rebuilding state snapshot")
 	t.layers = map[common.Hash]snapshot{
-		root: generateSnapshot(t.diskdb, t.triedb, t.cache, root, wiper),
+		root: generateSnapshot(t.diskdb, t.triedb, t.cache, root),
 	}
 }
 

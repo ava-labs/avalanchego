@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	coreth "github.com/ava-labs/coreth/chain"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
@@ -92,10 +94,11 @@ const (
 
 var (
 	// Set last accepted key to be longer than the keys used to store accepted block IDs.
-	lastAcceptedKey = []byte("last_accepted_key")
-	acceptedPrefix  = []byte("snowman_accepted")
-	ethDBPrefix     = []byte("ethdb")
-	atomicTxPrefix  = []byte("atomicTxDB")
+	lastAcceptedKey        = []byte("last_accepted_key")
+	acceptedPrefix         = []byte("snowman_accepted")
+	ethDBPrefix            = []byte("ethdb")
+	atomicTxPrefix         = []byte("atomicTxDB")
+	pruneRejectedBlocksKey = []byte("pruned_rejected_blocks")
 )
 
 var (
@@ -270,7 +273,7 @@ func (vm *VM) Initialize(
 	vm.config.SetDefaults()
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
 		}
 	}
 
@@ -343,13 +346,11 @@ func (vm *VM) Initialize(
 	ethConfig.RPCTxFeeCap = vm.config.RPCTxFeeCap
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
+	ethConfig.Pruning = vm.config.Pruning
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
 	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
 
-	if err := ethConfig.SetGCMode("archive"); err != nil {
-		panic(err)
-	}
 	nodecfg := node.Config{
 		CorethVersion:         Version,
 		KeyStoreDir:           vm.config.KeystoreDirectory,
@@ -357,110 +358,37 @@ func (vm *VM) Initialize(
 		InsecureUnlockAllowed: vm.config.KeystoreInsecureUnlockAllowed,
 	}
 
+	vm.codec = Codec
+	// TODO: read size from settings
+	vm.mempool = NewMempool(defaultMempoolSize)
+
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
 	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
-	if lastAcceptedErr != nil && lastAcceptedErr != database.ErrNotFound {
-		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
-	}
-	initGenesis := lastAcceptedErr == database.ErrNotFound
-	vm.chain = coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), initGenesis)
-
-	var lastAccepted *types.Block
-	if lastAcceptedErr == nil {
-		if len(lastAcceptedBytes) != common.HashLength {
-			return fmt.Errorf("last accepted bytes should have been length %d, but found %d", common.HashLength, len(lastAcceptedBytes))
-		}
-		hash := common.BytesToHash(lastAcceptedBytes)
-		if block := vm.chain.GetBlockByHash(hash); block == nil {
-			return fmt.Errorf("last accepted block not found in chaindb")
-		} else {
-			lastAccepted = block
-		}
-	}
-
-	// Determine if db corruption has occurred.
+	var lastAcceptedHash common.Hash
 	switch {
-	case lastAccepted != nil && initGenesis:
-		return errors.New("database corruption detected, should be initializing genesis")
-	case lastAccepted == nil && !initGenesis:
-		return errors.New("database corruption detected, should not be initializing genesis")
-	case lastAccepted == nil && initGenesis:
-		log.Debug("lastAccepted is unavailable, setting to the genesis block")
-		lastAccepted = vm.chain.GetGenesisBlock()
+	case lastAcceptedErr == database.ErrNotFound:
+		// // Set [lastAcceptedHash] to the genesis block hash.
+		lastAcceptedHash = ethConfig.Genesis.ToBlock(nil).Hash()
+	case lastAcceptedErr != nil:
+		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
+	case len(lastAcceptedBytes) != common.HashLength:
+		return fmt.Errorf("last accepted bytes should have been length %d, but found %d", common.HashLength, len(lastAcceptedBytes))
+	default:
+		lastAcceptedHash = common.BytesToHash(lastAcceptedBytes)
 	}
-
-	if err := vm.chain.Accept(lastAccepted); err != nil {
-		return fmt.Errorf("could not initialize VM with last accepted blkID %s: %w", lastAccepted.Hash().Hex(), err)
+	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), vm.createConsensusCallbacks(), lastAcceptedHash)
+	if err != nil {
+		return err
 	}
+	vm.chain = ethChain
+	lastAccepted := vm.chain.LastAcceptedBlock()
 
 	// Kickoff gasPriceUpdate goroutine once the backend is initialized, if it
 	// exists
 	if gasPriceUpdate != nil {
 		go gasPriceUpdate()
 	}
-
-	vm.chain.SetOnFinalizeAndAssemble(func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
-		snapshot := state.Snapshot()
-		for {
-			tx, exists := vm.mempool.NextTx()
-			if !exists {
-				break
-			}
-			if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm, state); err != nil {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				state.RevertToSnapshot(snapshot)
-				continue
-			}
-			rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-			parentIntf, err := vm.GetBlockInternal(ids.ID(header.ParentHash))
-			if err != nil {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				return nil, fmt.Errorf("failed to get parent block: %w", err)
-			}
-			parent, ok := parentIntf.(*Block)
-			if !ok {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
-			}
-
-			if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				state.RevertToSnapshot(snapshot)
-				continue
-			}
-
-			atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
-			if err != nil {
-				// Discard the transaction from the mempool and error if the transaction
-				// cannot be marshalled. This should never happen.
-				vm.mempool.DiscardCurrentTx()
-				return nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
-			}
-			return atomicTxBytes, nil
-		}
-
-		if len(txs) == 0 {
-			// this could happen due to the async logic of geth tx pool
-			return nil, errEmptyBlock
-		}
-
-		return nil, nil
-	})
-	vm.chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		tx, err := vm.extractAtomicTx(block)
-		if err != nil {
-			return err
-		}
-		if tx == nil {
-			return nil
-		}
-		return tx.UnsignedAtomicTx.EVMStateTransfer(vm, state)
-	})
 	vm.notifyBuildBlockChan = toEngine
 
 	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
@@ -468,8 +396,6 @@ func (vm *VM) Initialize(
 	vm.buildStatus = dontBuild
 	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
 
-	// TODO: read size from settings
-	vm.mempool = NewMempool(defaultMempoolSize)
 	vm.chain.Start()
 
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
@@ -493,7 +419,6 @@ func (vm *VM) Initialize(
 
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
-	vm.codec = Codec
 
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
@@ -503,7 +428,106 @@ func (vm *VM) Initialize(
 	// ignored by the VM's codec.
 	vm.baseCodec = linearcodec.NewDefault()
 
+	if err := vm.pruneChain(); err != nil {
+		return err
+	}
+
 	return vm.fx.Initialize(vm)
+}
+
+func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
+	return &dummy.ConsensusCallbacks{
+		OnFinalizeAndAssemble: vm.onFinalizeAndAssemble,
+		OnExtraStateChange:    vm.onExtraStateChange,
+	}
+}
+
+func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
+	snapshot := state.Snapshot()
+	for {
+		tx, exists := vm.mempool.NextTx()
+		if !exists {
+			break
+		}
+		if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			state.RevertToSnapshot(snapshot)
+			continue
+		}
+		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
+		parentIntf, err := vm.GetBlockInternal(ids.ID(header.ParentHash))
+		if err != nil {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			return nil, fmt.Errorf("failed to get parent block: %w", err)
+		}
+		parent, ok := parentIntf.(*Block)
+		if !ok {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
+		}
+
+		if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			state.RevertToSnapshot(snapshot)
+			continue
+		}
+
+		atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
+		if err != nil {
+			// Discard the transaction from the mempool and error if the transaction
+			// cannot be marshalled. This should never happen.
+			vm.mempool.DiscardCurrentTx()
+			return nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
+		}
+		return atomicTxBytes, nil
+	}
+
+	if len(txs) == 0 {
+		// this could happen due to the async logic of geth tx pool
+		return nil, errEmptyBlock
+	}
+
+	return nil, nil
+}
+
+func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) error {
+	tx, err := vm.extractAtomicTx(block)
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		return nil
+	}
+	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
+}
+
+func (vm *VM) pruneChain() error {
+	if !vm.config.Pruning {
+		return nil
+	}
+	pruned, err := vm.db.Has(pruneRejectedBlocksKey)
+	if err != nil {
+		return fmt.Errorf("failed to check if the VM has pruned rejected blocks: %w", err)
+	}
+	if pruned {
+		return nil
+	}
+
+	lastAcceptedHeight := vm.LastAcceptedBlock().Height()
+	if err := vm.chain.RemoveRejectedBlocks(0, lastAcceptedHeight); err != nil {
+		return err
+	}
+	heightBytes := make([]byte, 8)
+	binary.PutUvarint(heightBytes, lastAcceptedHeight)
+	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err == nil {
+		return nil
+	} else {
+		return fmt.Errorf("failed to write pruned rejected blocks to db: %w", err)
+	}
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
@@ -666,7 +690,7 @@ func newHandler(name string, service interface{}, lockOption ...commonEng.LockOp
 
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
-	handler := vm.chain.NewRPCHandler(time.Duration(vm.config.APIMaxDuration))
+	handler := vm.chain.NewRPCHandler(vm.config.APIMaxDuration.Duration)
 	enabledAPIs := vm.config.EthAPIs()
 	vm.chain.AttachEthService(handler, enabledAPIs)
 
@@ -705,7 +729,7 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 	return map[string]*commonEng.HTTPHandler{
 		"/rpc":  {LockOptions: commonEng.NoLock, Handler: handler},
 		"/avax": avaxAPI,
-		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandler([]string{"*"})},
+		"/ws":   {LockOptions: commonEng.NoLock, Handler: handler.WebsocketHandlerWithDuration([]string{"*"}, vm.config.APIMaxDuration.Duration)},
 	}, nil
 }
 
@@ -1109,7 +1133,7 @@ func (vm *VM) startContinuousProfiler() {
 	}
 	vm.profiler = profiler.NewContinuous(
 		filepath.Join(vm.config.ContinuousProfilerDir),
-		vm.config.ContinuousProfilerFrequency,
+		vm.config.ContinuousProfilerFrequency.Duration,
 		vm.config.ContinuousProfilerMaxFiles,
 	)
 	defer vm.profiler.Shutdown()

@@ -47,7 +47,9 @@ const journalVersion uint64 = 0
 
 // journalGenerator is a disk layer entry containing the generator progress marker.
 type journalGenerator struct {
-	Wiping   bool // Whether the database was in progress of being wiped
+	// Indicator that whether the database was in progress of being wiped.
+	// It's deprecated but keep it here for background compatibility.
+	Wiping   bool
 	Done     bool // Whether the generator finished creating the snapshot
 	Marker   []byte
 	Accounts uint64
@@ -133,12 +135,17 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 }
 
 // loadSnapshot loads a pre-existing state snapshot backed by a key-value store.
-func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash, recovery bool) (snapshot, error) {
+func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash, recovery bool) (snapshot, bool, error) {
+	// If snapshotting is disabled (initial sync in progress), don't do anything,
+	// wait for the chain to permit us to do something meaningful
+	if rawdb.ReadSnapshotDisabled(diskdb) {
+		return nil, true, nil
+	}
 	// Retrieve the block number and hash of the snapshot, failing if no snapshot
 	// is present in the database (or crashed mid-update).
 	baseRoot := rawdb.ReadSnapshotRoot(diskdb)
 	if baseRoot == (common.Hash{}) {
-		return nil, errors.New("missing or corrupted snapshot")
+		return nil, false, errors.New("missing or corrupted snapshot")
 	}
 	base := &diskLayer{
 		diskdb: diskdb,
@@ -149,7 +156,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 	snapshot, generator, err := loadAndParseJournal(diskdb, base)
 	if err != nil {
 		log.Warn("Failed to load new-format journal", "error", err)
-		return nil, err
+		return nil, false, err
 	}
 	// Entire snapshot journal loaded, sanity check the head. If the loaded
 	// snapshot is not matched with current state root, print a warning log
@@ -164,7 +171,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 		// it's not in recovery mode, returns the error here for
 		// rebuilding the entire snapshot forcibly.
 		if !recovery {
-			return nil, fmt.Errorf("head doesn't match snapshot: have %#x, want %#x", head, root)
+			return nil, false, fmt.Errorf("head doesn't match snapshot: have %#x, want %#x", head, root)
 		}
 		// It's in snapshot recovery, the assumption is held that
 		// the disk layer is always higher than chain head. It can
@@ -174,14 +181,6 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 	}
 	// Everything loaded correctly, resume any suspended operations
 	if !generator.Done {
-		// If the generator was still wiping, restart one from scratch (fine for
-		// now as it's rare and the wiper deletes the stuff it touches anyway, so
-		// restarting won't incur a lot of extra database hops.
-		var wiper chan struct{}
-		if generator.Wiping {
-			log.Info("Resuming previous snapshot wipe")
-			wiper = wipeSnapshot(diskdb, false)
-		}
 		// Whether or not wiping was in progress, load any generator progress too
 		base.genMarker = generator.Marker
 		if base.genMarker == nil {
@@ -195,7 +194,6 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 			origin = binary.BigEndian.Uint64(generator.Marker)
 		}
 		go base.generate(&generatorStats{
-			wiping:   wiper,
 			origin:   origin,
 			start:    time.Now(),
 			accounts: generator.Accounts,
@@ -203,7 +201,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 			storage:  common.StorageSize(generator.Storage),
 		})
 	}
-	return snapshot, nil
+	return snapshot, false, nil
 }
 
 // loadDiffLayer reads the next sections of a snapshot journal, reconstructing a new

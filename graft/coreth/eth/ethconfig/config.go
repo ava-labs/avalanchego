@@ -27,7 +27,6 @@
 package ethconfig
 
 import (
-	"errors"
 	"math/big"
 	"time"
 
@@ -36,7 +35,6 @@ import (
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/eth/downloader"
 )
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
@@ -58,7 +56,6 @@ var DefaultConfig = NewDefaultConfig()
 
 func NewDefaultConfig() Config {
 	return Config{
-		SyncMode:                downloader.FastSync,
 		NetworkId:               1,
 		LightPeers:              100,
 		UltraLightFraction:      75,
@@ -68,7 +65,7 @@ func NewDefaultConfig() Config {
 		TrieCleanCacheRejournal: 60 * time.Minute,
 		TrieDirtyCache:          256,
 		TrieTimeout:             60 * time.Minute,
-		SnapshotCache:           102,
+		SnapshotCache:           0,
 		Miner: miner.Config{
 			GasFloor:              8000000,
 			GasCeil:               8000000,
@@ -82,28 +79,6 @@ func NewDefaultConfig() Config {
 	}
 }
 
-// Original Code:
-// func init() {
-// 	home := os.Getenv("HOME")
-// 	if home == "" {
-// 		if user, err := user.Current(); err == nil {
-// 			home = user.HomeDir
-// 		}
-// 	}
-// 	if runtime.GOOS == "darwin" {
-// 		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "Library", "Ethash")
-// 	} else if runtime.GOOS == "windows" {
-// 		localappdata := os.Getenv("LOCALAPPDATA")
-// 		if localappdata != "" {
-// 			DefaultConfig.Ethash.DatasetDir = filepath.Join(localappdata, "Ethash")
-// 		} else {
-// 			DefaultConfig.Ethash.DatasetDir = filepath.Join(home, "AppData", "Local", "Ethash")
-// 		}
-// 	} else {
-// 		DefaultConfig.Ethash.DatasetDir = filepath.Join(home, ".ethash")
-// 	}
-// }
-
 //go:generate gencodec -type Config -formats toml -out gen_config.go
 
 type Config struct {
@@ -113,16 +88,12 @@ type Config struct {
 
 	// Protocol options
 	NetworkId uint64 // Network ID to use for selecting peers to connect to
-	SyncMode  downloader.SyncMode
 
 	// This can be set to list of enrtree:// URLs which will be queried for
 	// for nodes to connect to.
 	DiscoveryURLs []string
 
-	NoPruning  bool // Whether to disable pruning and flush everything to disk
-	NoPrefetch bool // Whether to disable prefetching and only load state on demand
-
-	TxLookupLimit uint64 `toml:",omitempty"` // The maximum number of blocks from head whose tx indices are reserved.
+	Pruning bool // Whether to disable pruning and flush everything to disk
 
 	// Whitelist of required block number -> hash values to accept
 	Whitelist map[uint64]common.Hash `toml:"-"`
@@ -156,10 +127,6 @@ type Config struct {
 	// Mining options
 	Miner miner.Config
 
-	// Original Code:
-	// // Ethash options
-	// Ethash ethash.Config
-
 	// Transaction pool options
 	TxPool core.TxPoolConfig
 
@@ -185,25 +152,6 @@ type Config struct {
 	// send-transction variants. The unit is ether.
 	RPCTxFeeCap float64 `toml:",omitempty"`
 
-	// Original Code:
-	// // Checkpoint is a hardcoded checkpoint which can be nil.
-	// Checkpoint *params.TrustedCheckpoint `toml:",omitempty"`
-
-	// // CheckpointOracle is the configuration for checkpoint oracle.
-	// CheckpointOracle *params.CheckpointOracleConfig `toml:",omitempty"`
-
 	// AllowUnfinalizedQueries allow unfinalized queries
 	AllowUnfinalizedQueries bool
-}
-
-func (cfg *Config) SetGCMode(gcmode string) error {
-	switch gcmode {
-	case "full":
-		cfg.NoPruning = false
-	case "archive":
-		cfg.NoPruning = true
-	default:
-		return errors.New("invalid gcmode value")
-	}
-	return nil
 }

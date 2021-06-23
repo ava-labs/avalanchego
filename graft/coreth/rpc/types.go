@@ -45,18 +45,6 @@ type API struct {
 	Public    bool        // indication if the methods must be considered safe for public use
 }
 
-// Error wraps RPC errors, which contain an error code in addition to the message.
-type Error interface {
-	Error() string  // returns the message
-	ErrorCode() int // returns the code
-}
-
-// A DataError contains some data in addition to the error message.
-type DataError interface {
-	Error() string          // returns the message
-	ErrorData() interface{} // returns the error data
-}
-
 // ServerCodec implements reading, parsing and writing RPC messages for the server side of
 // a RPC session. Implementations must be go-routine safe since the codec can be called in
 // multiple go-routines concurrently.
@@ -70,6 +58,7 @@ type ServerCodec interface {
 // Implementations must be safe for concurrent use.
 type jsonWriter interface {
 	writeJSON(context.Context, interface{}) error
+	writeJSONSkipDeadline(context.Context, interface{}, bool) error
 	// Closed returns a channel which is closed when the connection is closed.
 	closed() <-chan interface{}
 	// RemoteAddr returns the peer address of the connection.

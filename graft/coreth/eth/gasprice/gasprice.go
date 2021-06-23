@@ -29,7 +29,6 @@ package gasprice
 import (
 	"context"
 	"math/big"
-	"sort"
 	"sync"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -110,54 +109,3 @@ func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
 func (gpo *Oracle) SetGasPrice(newGasPrice *big.Int) {
 	gpo.minGasPrice = newGasPrice
 }
-
-type getBlockPricesResult struct {
-	prices []*big.Int
-	err    error
-}
-
-type transactionsByGasPrice []*types.Transaction
-
-func (t transactionsByGasPrice) Len() int           { return len(t) }
-func (t transactionsByGasPrice) Swap(i, j int)      { t[i], t[j] = t[j], t[i] }
-func (t transactionsByGasPrice) Less(i, j int) bool { return t[i].GasPriceCmp(t[j]) < 0 }
-
-// getBlockPrices calculates the lowest transaction gas price in a given block
-// and sends it to the result channel. If the block is empty or all transactions
-// are sent by the miner itself(it doesn't make any sense to include this kind of
-// transaction prices for sampling), nil gasprice is returned.
-func (gpo *Oracle) getBlockPrices(ctx context.Context, signer types.Signer, blockNum uint64, limit int, result chan getBlockPricesResult, quit chan struct{}) {
-	block, err := gpo.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
-	if block == nil {
-		select {
-		case result <- getBlockPricesResult{nil, err}:
-		case <-quit:
-		}
-		return
-	}
-	blockTxs := block.Transactions()
-	txs := make([]*types.Transaction, len(blockTxs))
-	copy(txs, blockTxs)
-	sort.Sort(transactionsByGasPrice(txs))
-
-	var prices []*big.Int
-	for _, tx := range txs {
-		sender, err := types.Sender(signer, tx)
-		if err == nil && sender != block.Coinbase() {
-			prices = append(prices, tx.GasPrice())
-			if len(prices) >= limit {
-				break
-			}
-		}
-	}
-	select {
-	case result <- getBlockPricesResult{prices, nil}:
-	case <-quit:
-	}
-}
-
-type bigIntArray []*big.Int
-
-func (s bigIntArray) Len() int           { return len(s) }
-func (s bigIntArray) Less(i, j int) bool { return s[i].Cmp(s[j]) < 0 }
-func (s bigIntArray) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
