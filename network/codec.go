@@ -26,8 +26,12 @@ type Codec struct {
 // Pack attempts to pack a map of fields into a message.
 // The first byte of the message is the opcode of the message.
 // Uses [buffer] to hold the message's byte repr.
-// [buffer]'s contents may be overwritten.
+// [buffer]'s contents may be overwritten by this method.
 // [buffer] may be nil.
+// If [includeIsCompressedFlag], include a flag that marks whether the payload
+// is compressed or not.
+// If [compress] and [includeIsCompressedFlag], compress the payload.
+// TODO remove [includeIsCompressedFlag] after network upgrade.
 func (c Codec) Pack(
 	buffer []byte,
 	op Op,
@@ -68,8 +72,7 @@ func (c Codec) Pack(
 		fields: fieldValues,
 		bytes:  p.Bytes,
 	}
-	compressableType := op != Version && op != GetVersion // TODO in the future, always pack
-	if !compress || !compressableType {
+	if !compress || !includeIsCompressedFlag {
 		return msg, nil
 	}
 
