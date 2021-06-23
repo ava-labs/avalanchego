@@ -26,9 +26,19 @@ type Codec struct {
 // Pack attempts to pack a map of fields into a message.
 // The first byte of the message is the opcode of the message.
 // Uses [buffer] to hold the message's byte repr.
-// [buffer]'s contents may be overwritten.
+// [buffer]'s contents may be overwritten by this method.
 // [buffer] may be nil.
-func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, compress bool) (Msg, error) {
+// If [includeIsCompressedFlag], include a flag that marks whether the payload
+// is compressed or not.
+// If [compress] and [includeIsCompressedFlag], compress the payload.
+// TODO remove [includeIsCompressedFlag] after network upgrade.
+func (c Codec) Pack(
+	buffer []byte,
+	op Op,
+	fieldValues map[Field]interface{},
+	includeIsCompressedFlag bool,
+	compress bool,
+) (Msg, error) {
 	msgFields, ok := Messages[op]
 	if !ok {
 		return nil, errBadOp
@@ -42,10 +52,8 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 	p.PackByte(byte(op))
 
 	// If messages of this type may be compressed, pack whether the payload is compressed
-	compressableType := op != Version && op != GetVersion // TODO in the future, always pack
-	maybeCompress := compress && compressableType
-	if compressableType {
-		p.PackBool(maybeCompress)
+	if includeIsCompressedFlag {
+		p.PackBool(compress)
 	}
 
 	// Pack the payload
@@ -64,7 +72,7 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 		fields: fieldValues,
 		bytes:  p.Bytes,
 	}
-	if !maybeCompress {
+	if !compress || !includeIsCompressedFlag {
 		return msg, nil
 	}
 
@@ -95,18 +103,15 @@ func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
 
 	msgFields, ok := Messages[op]
 	if !ok { // Unknown message type
-		fmt.Printf("Unknown message type! %s\n", p.Err)
 		return nil, errBadOp
 	}
 
 	// See if messages of this type may be compressed
-	compressableType := op != Version && op != GetVersion
 	compressed := false
-	if compressableType {
+	if mayBeCompressed {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {
-		fmt.Printf("Error unpacking bytes %s\n", p.Err)
 		return nil, p.Err
 	}
 
@@ -132,7 +137,7 @@ func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
 	}
 
 	if p.Offset != len(p.Bytes) {
-		p.Add(fmt.Errorf("expected length %d got %d", len(b), p.Offset))
+		return nil, fmt.Errorf("expected length %d got %d", len(p.Bytes), p.Offset)
 	}
 
 	return &msg{

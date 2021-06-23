@@ -136,7 +136,7 @@ type peer struct {
 	idSet ids.Set
 
 	// True if we should compress messages sent to this peer
-	canHandleCompressed bool
+	canHandleCompressed utils.AtomicBool
 }
 
 // newPeer returns a properly initialized *peer.
@@ -281,11 +281,11 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		p.net.log.Verbo("parsing new message from %s:\n%s",
+		p.net.log.Verbo("parsing new message from %s:%s",
 			p.id,
-			formatting.DumpBytes{Bytes: msgBytes})
-
-		msg, err := p.net.b.Parse(msgBytes, p.canHandleCompressed)
+			formatting.DumpBytes{Bytes: msgBytes},
+		)
+		msg, err := p.net.b.Parse(msgBytes, p.canHandleCompressed.GetValue())
 		if err != nil {
 			p.net.log.Debug("failed to parse new message %s from %s:\n%s\n%s",
 				msg.Op(),
@@ -307,9 +307,7 @@ func (p *peer) WriteMessages() {
 
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
-		p.net.log.Verbo("sending new message to %s:\n%s",
-			p.id,
-			formatting.DumpBytes{Bytes: msg})
+		p.net.log.Verbo("sending new message to %s:\n%s", p.id, formatting.DumpBytes{Bytes: msg})
 
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
@@ -541,7 +539,7 @@ func (p *peer) close() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendGetVersion() {
-	msg, err := p.net.b.GetVersion()
+	msg, err := p.net.b.GetVersion(p.canHandleCompressed.GetValue())
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
@@ -572,6 +570,7 @@ func (p *peer) sendVersion() {
 		p.net.versionCompatibility.Version().String(),
 		myVersionTime,
 		myVersionSig,
+		p.canHandleCompressed.GetValue(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
@@ -591,7 +590,7 @@ func (p *peer) sendVersion() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendGetPeerList() {
-	msg, err := p.net.b.GetPeerList()
+	msg, err := p.net.b.GetPeerList(p.canHandleCompressed.GetValue())
 	p.net.log.AssertNoError(err)
 
 	lenMsg := len(msg.Bytes())
@@ -613,7 +612,8 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	msg, err := p.net.b.PeerList(peers, p.canHandleCompressed)
+	canHandleCompressed := p.canHandleCompressed.GetValue()
+	msg, err := p.net.b.PeerList(peers, canHandleCompressed, canHandleCompressed)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return
@@ -634,7 +634,7 @@ func (p *peer) sendPeerList() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPing() {
-	msg, err := p.net.b.Ping()
+	msg, err := p.net.b.Ping(p.canHandleCompressed.GetValue())
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
@@ -650,7 +650,7 @@ func (p *peer) sendPing() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPong() {
-	msg, err := p.net.b.Pong()
+	msg, err := p.net.b.Pong(p.canHandleCompressed.GetValue())
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
@@ -767,7 +767,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	// todo marker version should be constant
-	p.canHandleCompressed = peerVersion.Compare(version.NewDefaultVersion(1, 4, 9)) >= 0
+	p.canHandleCompressed.SetValue(peerVersion.Compare(version.NewDefaultVersion(1, 4, 9)) >= 0)
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
