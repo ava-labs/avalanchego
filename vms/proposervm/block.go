@@ -49,7 +49,8 @@ func (pb *ProposerBlock) Accept() error {
 	if err := pb.vm.State.PutBlock(pb.Block, choices.Accepted); err != nil {
 		return err
 	}
-	if err := pb.vm.State.SetLastAccepted(pb.ID()); err != nil {
+	blkID := pb.ID()
+	if err := pb.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
 	if err := pb.vm.db.Commit(); err != nil {
@@ -59,11 +60,7 @@ func (pb *ProposerBlock) Accept() error {
 		return err
 	}
 
-	// pb parent block should not be needed anymore.
-	// TODO: consider pruning option. This is only possible after fast-sync is
-	// implemented and is the standard way to sync
-	pb.vm.state.wipeFromCacheProBlk(pb.ParentID())
-	pb.vm.scheduler.newAcceptedBlk <- pb.vm.windower.getNextWindowStart(pb.Timestamp())
+	delete(pb.vm.verifiedBlocks, blkID)
 	return nil
 }
 
@@ -74,7 +71,12 @@ func (pb *ProposerBlock) Reject() error {
 	if err := pb.vm.State.PutBlock(pb.Block, choices.Rejected); err != nil {
 		return err
 	}
-	return pb.vm.db.Commit()
+	if err := pb.vm.db.Commit(); err != nil {
+		return err
+	}
+
+	delete(pb.vm.verifiedBlocks, pb.ID())
+	return nil
 }
 
 func (pb *ProposerBlock) Status() choices.Status {
@@ -84,10 +86,9 @@ func (pb *ProposerBlock) Status() choices.Status {
 // snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
 	parentID := pb.ParentID()
-	if res, err := pb.vm.state.getProBlock(parentID); err == nil {
+	if res, err := pb.vm.GetBlock(parentID); err == nil {
 		return res
 	}
-
 	return &missing.Block{BlkID: parentID}
 }
 
@@ -117,7 +118,7 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkBadTimestamp
 	}
 
-	if timestamp.After(pb.vm.now().Add(BlkSubmissionTolerance)) {
+	if timestamp.After(pb.vm.Time().Add(BlkSubmissionTolerance)) {
 		return ErrProBlkBadTimestamp // too much in the future
 	}
 
@@ -144,9 +145,7 @@ func (pb *ProposerBlock) Verify() error {
 		pb.vm.Tree.Add(pb.coreBlk)
 	}
 
-	if err := pb.vm.addVerifiedBlk(pb); err != nil {
-		return err
-	}
+	pb.vm.verifiedBlocks[pb.ID()] = pb
 	return nil
 }
 

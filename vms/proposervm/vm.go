@@ -16,7 +16,6 @@ package proposervm
 
 import (
 	"crypto"
-	"crypto/tls"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -29,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
@@ -38,50 +37,31 @@ import (
 )
 
 var (
-	genesisParentID  = ids.Empty
-	NoProposerBlocks = time.Unix(1<<63-62135596801, 999999999)
-
 	dbPrefix = []byte("proposervm")
+
+	_ block.ChainVM = &VM{}
 )
-
-// clock interface and implementation, to ease up UTs
-type clock interface {
-	now() time.Time
-}
-
-type clockImpl struct{}
-
-func (c clockImpl) now() time.Time {
-	return time.Now()
-}
 
 type VM struct {
 	block.ChainVM
+	activationTime time.Time
+
 	state.State
 	proposer.Windower
 	tree.Tree
+	scheduler *scheduler // TODO: refactor
+	timer.Clock
 
-	db *versiondb.Database
-
-	windower
-	clock
-
-	// node identity attributes
-	stakingCert tls.Certificate
-	nodeID      ids.ShortID
-
-	scheduler *scheduler
-
-	proBlkActivationTime time.Time
-
-	preferred ids.ID
+	ctx            *snow.Context
+	db             *versiondb.Database
+	verifiedBlocks map[ids.ID]*ProposerBlock
+	preferred      ids.ID
 }
 
-func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
+func New(vm block.ChainVM, activationTime time.Time) *VM {
 	return &VM{
-		ChainVM:              vm,
-		clock:                clockImpl{},
-		proBlkActivationTime: proBlkStart,
+		ChainVM:        vm,
+		activationTime: activationTime,
 	}
 }
 
@@ -101,24 +81,16 @@ func (vm *VM) Initialize(
 	vm.State = state.New(db)
 	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
-
-	vm.stakingCert = ctx.StakingCert
-
-	var err error
-	if vm.nodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(vm.stakingCert.Leaf.Raw)); err != nil {
-		return err
-	}
-
-	if err := vm.windower.initialize(vm, ctx); err != nil {
-		return err
-	}
+	vm.ctx = ctx
+	vm.db = db
+	vm.verifiedBlocks = make(map[ids.ID]*ProposerBlock)
 
 	vm.scheduler = &scheduler{}
 	if err := vm.scheduler.initialize(vm, toEngine); err != nil {
 		return err
 	}
 
-	err = vm.ChainVM.Initialize(
+	err := vm.ChainVM.Initialize(
 		ctx,
 		dbManager,
 		genesisBytes,
@@ -150,7 +122,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	h, err := vm.pChainHeight()
+	h, err := vm.ctx.ValidatorVM.GetCurrentHeight()
 	if err != nil {
 		return nil, err
 	}
@@ -159,31 +131,26 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		vm.preferred,
 		sb.Timestamp(),
 		h,
-		vm.stakingCert.Leaf,
+		vm.ctx.StakingCert.Leaf,
 		sb.Bytes(),
-		vm.stakingCert.PrivateKey.(crypto.Signer),
+		vm.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	proBlk := ProposerBlock{
+	blk, err := vm.getProposerBlock(slb.ID())
+	if err != nil {
+		return blk, nil
+	}
+
+	blk = &ProposerBlock{
 		Block:   slb,
 		vm:      vm,
 		coreBlk: sb,
 		status:  choices.Processing,
 	}
-
-	// TODO: Why is verify called here?
-	if err := proBlk.Verify(); err != nil {
-		return nil, err
-	}
-
-	if err := vm.state.storeProBlk(&proBlk); err != nil {
-		return nil, err
-	}
-
-	return &proBlk, nil
+	return blk, vm.storeProposerBlock(blk)
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
@@ -194,41 +161,8 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	return vm.ChainVM.ParseBlock(b)
 }
 
-func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
-	slb, err := statelessblock.Parse(b)
-	if err != nil {
-		return nil, err
-	}
-
-	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
-	if err != nil {
-		return nil, err
-	}
-
-	block := &ProposerBlock{
-		Block:   slb,
-		vm:      vm,
-		coreBlk: coreBlk,
-		status:  choices.Processing,
-	}
-
-	_, status, err := vm.State.GetBlock(slb.ID())
-	if err == nil {
-		block.status = status
-		return block, nil
-	}
-	if err != database.ErrNotFound {
-		return nil, err
-	}
-
-	if err := vm.State.PutBlock(slb, choices.Processing); err != nil {
-		return nil, err
-	}
-	return block, nil
-}
-
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	if res, err := vm.state.getProBlock(id); err == nil {
+	if res, err := vm.getProposerBlock(id); err == nil {
 		return res, nil
 	}
 
@@ -242,7 +176,7 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 func (vm *VM) SetPreference(preferred ids.ID) error {
 	vm.preferred = preferred
 
-	proBlk, err := vm.state.getProBlock(preferred)
+	proBlk, err := vm.getProposerBlock(preferred)
 	if err == database.ErrNotFound {
 		// pre snowman++ case
 		return vm.ChainVM.SetPreference(preferred)
@@ -263,4 +197,62 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	}
 	// pre snowman++ case
 	return vm.ChainVM.LastAccepted()
+}
+
+func (vm *VM) getProposerBlock(blkID ids.ID) (*ProposerBlock, error) {
+	blk, exists := vm.verifiedBlocks[blkID]
+	if exists {
+		return blk, nil
+	}
+	slb, status, err := vm.State.GetBlock(blkID)
+	if err != nil {
+		return nil, err
+	}
+
+	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+	if err != nil {
+		return nil, err
+	}
+
+	return &ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: coreBlk,
+		status:  status,
+	}, nil
+}
+
+func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
+	slb, err := statelessblock.Parse(b)
+	if err != nil {
+		return nil, err
+	}
+	// if the block already exists, then make sure the status is set correctly
+	blk, err := vm.getProposerBlock(slb.ID())
+	if err != nil {
+		return blk, err
+	}
+
+	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+	if err != nil {
+		return nil, err
+	}
+
+	blk = &ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: coreBlk,
+		status:  choices.Processing,
+	}
+	if err := vm.storeProposerBlock(blk); err != nil {
+		return nil, err
+	}
+	return blk, nil
+}
+
+func (vm *VM) storeProposerBlock(blk *ProposerBlock) error {
+	if err := vm.State.PutBlock(blk.Block, blk.status); err != nil {
+		return err
+	}
+	return vm.db.Commit()
 }
