@@ -43,8 +43,9 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 
 	// If messages of this type may be compressed, pack whether the payload is compressed
 	compressableType := op != Version && op != GetVersion // TODO in the future, always pack
+	compression := compress && compressableType
 	if compressableType {
-		p.PackBool(compress)
+		p.PackBool(compression)
 	}
 
 	// Pack the payload
@@ -63,9 +64,12 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 		fields: fieldValues,
 		bytes:  p.Bytes,
 	}
-	if !compress || !compressableType {
+	if !compression {
+		fmt.Printf("Not compressing message %s\n", msg.Op())
 		return msg, nil
 	}
+
+	fmt.Printf("Compressing message %s\n", msg.Op())
 
 	// If [compress], compress the payload (not the op code, not isCompressed).
 	// The slice below is guaranteed to be in-bounds because [p.Err] == nil
@@ -137,6 +141,6 @@ func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
 	return &msg{
 		op:     op,
 		fields: fieldValues,
-		bytes:  b,
+		bytes:  p.Bytes,
 	}, p.Err
 }

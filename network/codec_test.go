@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto/x509"
+	"fmt"
 	"math"
 	"net"
 	"testing"
@@ -198,9 +199,10 @@ func TestCodecPackParseGzip(t *testing.T) {
 		assert.EqualValues(t, packed.bytes, unpacked.bytes)
 	}
 
+	fmt.Println("TEST WITH COMPRESSION")
 	// Test with compression
 	for i, m := range msgs {
-		uncompressedPackedIntf, err := c.Pack(nil, m.op, m.fields, false)
+		uncompIntf, err := c.Pack(nil, m.op, m.fields, false)
 		assert.NoError(t, err, "failed to pack w/o compression on operation %s", m.op)
 
 		packedIntf, err := c.Pack(nil, m.op, m.fields, true)
@@ -209,22 +211,21 @@ func TestCodecPackParseGzip(t *testing.T) {
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), true)
 		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
-		uncompressed := uncompressedPackedIntf.(*msg)
+		uncomp := uncompIntf.(*msg)
 		packed := packedIntf.(*msg)
 		unpacked := unpackedIntf.(*msg)
 
-		assert.EqualValues(t, len(packed.fields), len(packed.fields))
+		assert.EqualValues(t, len(packed.fields), len(unpacked.fields))
 		for field := range packed.fields {
 			if field == SignedPeers {
 				continue // TODO get this to work
 			}
 			assert.EqualValues(t, packed.fields[field], unpacked.fields[field])
 		}
-		if len(uncompressed.bytes) > 2 {
-			assert.EqualValues(t, uncompressed.bytes[0], unpacked.bytes[0], "failed on %dth message", i)
-			assert.EqualValues(t, uncompressed.bytes[2:], unpacked.bytes[2:], "failed on %dth message", i)
-		} else {
-			assert.EqualValues(t, uncompressed.bytes, unpacked.bytes, "failed on %dth message", i)
+		fmt.Printf("checking %dth message %s op\n", i, m.Op())
+		assert.Equal(t, len(uncomp.bytes), len(unpacked.bytes))
+		if len(unpacked.bytes) > 2 {
+			assert.EqualValues(t, uncomp.bytes[2:], unpacked.bytes[2:], "failed on %dth message %s op", i, m.Op())
 		}
 	}
 }
