@@ -84,7 +84,9 @@ func (c Codec) Pack(buffer []byte, op Op, fieldValues map[Field]interface{}, com
 
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
-func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
+func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
+	b := make([]byte, len(bytes))
+	copy(b, bytes)
 	p := wrappers.Packer{Bytes: b}
 
 	// Unpack the op code (message type)
@@ -92,6 +94,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 
 	msgFields, ok := Messages[op]
 	if !ok { // Unknown message type
+		fmt.Printf("Unknown message type! %s\n", p.Err)
 		return nil, errBadOp
 	}
 
@@ -102,6 +105,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {
+		fmt.Printf("Error unpacking bytes %s\n", p.Err)
 		return nil, p.Err
 	}
 

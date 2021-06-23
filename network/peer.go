@@ -241,7 +241,7 @@ func (p *peer) ReadMessages() {
 	for {
 		read, err := reader.Read(readBuffer)
 		if err != nil {
-			p.net.log.Verbo("error on connection read to %s %s %s", p.id, p.getIP(), err)
+			p.net.log.Debug("error on connection read to %s %s %s", p.id, p.getIP(), err)
 			return
 		}
 
@@ -287,7 +287,8 @@ func (p *peer) ReadMessages() {
 
 		msg, err := p.net.b.Parse(msgBytes, p.canHandleCompressed)
 		if err != nil {
-			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
+			p.net.log.Debug("failed to parse new message %s from %s:\n%s\n%s",
+				msg.Op(),
 				p.id,
 				formatting.DumpBytes{Bytes: msgBytes},
 				err)
@@ -612,7 +613,7 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	msg, err := p.net.b.PeerList(peers)
+	msg, err := p.net.b.PeerList(peers, p.canHandleCompressed)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return

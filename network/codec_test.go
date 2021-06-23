@@ -199,13 +199,17 @@ func TestCodecPackParseGzip(t *testing.T) {
 	}
 
 	// Test with compression
-	for _, m := range msgs {
+	for i, m := range msgs {
+		uncompressedPackedIntf, err := c.Pack(nil, m.op, m.fields, false)
+		assert.NoError(t, err, "failed to pack w/o compression on operation %s", m.op)
+
 		packedIntf, err := c.Pack(nil, m.op, m.fields, true)
-		assert.NoError(t, err, "failed to pack on operation %s", m.op)
+		assert.NoError(t, err, "failed to pack w/ compression on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), true)
-		assert.NoError(t, err, "failed to pack on operation %s", m.op)
+		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
+		uncompressed := uncompressedPackedIntf.(*msg)
 		packed := packedIntf.(*msg)
 		unpacked := unpackedIntf.(*msg)
 
@@ -216,6 +220,11 @@ func TestCodecPackParseGzip(t *testing.T) {
 			}
 			assert.EqualValues(t, packed.fields[field], unpacked.fields[field])
 		}
-		assert.EqualValues(t, packed.bytes, unpacked.bytes)
+		if len(uncompressed.bytes) > 2 {
+			assert.EqualValues(t, uncompressed.bytes[0], unpacked.bytes[0], "failed on %dth message", i)
+			assert.EqualValues(t, uncompressed.bytes[2:], unpacked.bytes[2:], "failed on %dth message", i)
+		} else {
+			assert.EqualValues(t, uncompressed.bytes, unpacked.bytes, "failed on %dth message", i)
+		}
 	}
 }
