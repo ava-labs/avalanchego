@@ -40,12 +40,9 @@ func (t *tree) Add(blk snowman.Block) {
 func (t *tree) Contains(blk snowman.Block) bool {
 	parent := blk.Parent()
 	parentID := parent.ID()
-	children, exists := t.nodes[parentID]
-	if !exists {
-		return false
-	}
+	children := t.nodes[parentID]
 	blkID := blk.ID()
-	_, exists = children[blkID]
+	_, exists := children[blkID]
 	return exists
 }
 
