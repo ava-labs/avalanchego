@@ -135,7 +135,7 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 	}
 
 	if p.Offset != len(p.Bytes) {
-		p.Add(fmt.Errorf("expected length %d got %d", len(b), p.Offset))
+		return nil, fmt.Errorf("expected length %d got %d", len(p.Bytes), p.Offset)
 	}
 
 	return &msg{
