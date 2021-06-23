@@ -19,12 +19,12 @@ import (
 var TestCodec Codec
 
 func TestCodecPackInvalidOp(t *testing.T) {
-	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false)
+	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
-	_, err := TestCodec.Pack(nil, Get, make(map[Field]interface{}), false)
+	_, err := TestCodec.Pack(nil, Get, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 }
 
@@ -34,7 +34,7 @@ func TestCodecParseInvalidOp(t *testing.T) {
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
-	_, err := TestCodec.Parse([]byte{byte(GetVersion), 0x00}, true)
+	_, err := TestCodec.Parse([]byte{byte(GetVersion), 0x00}, false)
 	assert.Error(t, err)
 }
 
@@ -179,10 +179,10 @@ func TestCodecPackParseGzip(t *testing.T) {
 
 	// Test without compression
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(nil, m.op, m.fields, false)
+		packedIntf, err := c.Pack(nil, m.op, m.fields, false, false)
 		assert.NoError(t, err, "failed on operation %s", m.op)
 
-		unpackedIntf, err := c.Parse(packedIntf.Bytes(), true)
+		unpackedIntf, err := c.Parse(packedIntf.Bytes(), false)
 		assert.NoError(t, err)
 
 		packed := packedIntf.(*msg)
@@ -200,7 +200,7 @@ func TestCodecPackParseGzip(t *testing.T) {
 
 	// Test with compression
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(nil, m.op, m.fields, true)
+		packedIntf, err := c.Pack(nil, m.op, m.fields, true, canBeCompressed(m.op))
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), true)

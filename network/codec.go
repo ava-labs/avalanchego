@@ -105,9 +105,8 @@ func (c Codec) Parse(b []byte, mayBeCompressed bool) (Msg, error) {
 	}
 
 	// See if messages of this type may be compressed
-	compressableType := op != Version && op != GetVersion
 	compressed := false
-	if compressableType && mayBeCompressed {
+	if mayBeCompressed {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {

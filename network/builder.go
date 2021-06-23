@@ -74,13 +74,13 @@ func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag, com
 // Ping message
 func (b Builder) Ping(includeIsCompressedFlag bool) (Msg, error) {
 	buf := b.getByteSlice()
-	return b.Pack(buf, Ping, nil, includeIsCompressedFlag, b.shouldCompress(Ping))
+	return b.Pack(buf, Ping, nil, includeIsCompressedFlag, canBeCompressed(Ping))
 }
 
 // Pong message
 func (b Builder) Pong(includeIsCompressedFlag bool) (Msg, error) {
 	buf := b.getByteSlice()
-	return b.Pack(buf, Pong, nil, includeIsCompressedFlag, b.shouldCompress(Pong))
+	return b.Pack(buf, Pong, nil, includeIsCompressedFlag, canBeCompressed(Pong))
 }
 
 // GetAcceptedFrontier message
@@ -100,7 +100,7 @@ func (b Builder) GetAcceptedFrontier(
 			Deadline:  deadline,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(GetAcceptedFrontier),
+		canBeCompressed(GetAcceptedFrontier),
 	)
 }
 
@@ -126,7 +126,7 @@ func (b Builder) AcceptedFrontier(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(AcceptedFrontier),
+		canBeCompressed(AcceptedFrontier),
 	)
 }
 
@@ -154,7 +154,7 @@ func (b Builder) GetAccepted(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(GetAccepted),
+		canBeCompressed(GetAccepted),
 	)
 }
 
@@ -180,7 +180,7 @@ func (b Builder) Accepted(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(Accepted),
+		canBeCompressed(Accepted),
 	)
 }
 
@@ -203,7 +203,7 @@ func (b Builder) GetAncestors(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(GetAncestors),
+		canBeCompressed(GetAncestors),
 	)
 }
 
@@ -224,7 +224,7 @@ func (b Builder) MultiPut(
 			MultiContainerBytes: containers,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(MultiPut),
+		canBeCompressed(MultiPut),
 	)
 }
 
@@ -247,7 +247,7 @@ func (b Builder) Get(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(Get),
+		canBeCompressed(Get),
 	)
 }
 
@@ -270,7 +270,7 @@ func (b Builder) Put(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(Put),
+		canBeCompressed(Put),
 	)
 }
 
@@ -295,7 +295,7 @@ func (b Builder) PushQuery(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(PushQuery),
+		canBeCompressed(PushQuery),
 	)
 }
 
@@ -318,7 +318,7 @@ func (b Builder) PullQuery(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(PullQuery),
+		canBeCompressed(PullQuery),
 	)
 }
 
@@ -344,13 +344,13 @@ func (b Builder) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		b.shouldCompress(Chits),
+		canBeCompressed(Chits),
 	)
 }
 
 // Returns whether we should compress a message of the given type.
 // (Assuming the peer can handle compressed messages)
-func (Builder) shouldCompress(op Op) bool {
+func canBeCompressed(op Op) bool {
 	switch op {
 	case PushQuery, Put, MultiPut, PeerList:
 		return true
