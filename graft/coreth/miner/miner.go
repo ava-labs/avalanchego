@@ -57,9 +57,9 @@ type Miner struct {
 	worker *worker
 }
 
-func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, mcb *MinerCallbacks) *Miner {
+func New(eth Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine) *Miner {
 	return &Miner{
-		worker: newWorker(config, chainConfig, engine, eth, mux, mcb),
+		worker: newWorker(config, chainConfig, engine, eth, mux),
 	}
 }
 

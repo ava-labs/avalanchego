@@ -42,6 +42,7 @@ func TestPayment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	insertAndAccept(t, chain, block)
 	<-newTxPoolHeadChan
 
 	if txs := block.Transactions(); len(txs) != numTxs {

@@ -62,11 +62,6 @@ type environment struct {
 	start time.Time // Time that block building began
 }
 
-type MinerCallbacks struct {
-	OnSealFinish func(*types.Block)
-	OnSealDrop   func(*types.Block)
-}
-
 // worker is the main object which takes care of submitting new work to consensus engine
 // and gathering the sealing result.
 type worker struct {
@@ -84,19 +79,16 @@ type worker struct {
 	mux      *event.TypeMux // TODO replace
 	mu       sync.RWMutex   // The lock used to protect the coinbase and extra fields
 	coinbase common.Address
-
-	minerCallbacks *MinerCallbacks
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux, mcb *MinerCallbacks) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, eth Backend, mux *event.TypeMux) *worker {
 	worker := &worker{
-		config:         config,
-		chainConfig:    chainConfig,
-		engine:         engine,
-		eth:            eth,
-		mux:            mux,
-		chain:          eth.BlockChain(),
-		minerCallbacks: mcb,
+		config:      config,
+		chainConfig: chainConfig,
+		engine:      engine,
+		eth:         eth,
+		mux:         mux,
+		chain:       eth.BlockChain(),
 	}
 
 	return worker
@@ -321,9 +313,6 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 
 	log.Info("Commit new mining work", "number", block.Number(), "hash", hash, "uncles", 0, "txs", env.tcount,
 		"gas", block.GasUsed(), "fees", totalFees(block, receipts), "elapsed", common.PrettyDuration(time.Since(env.start)))
-	if w.minerCallbacks.OnSealFinish != nil {
-		w.minerCallbacks.OnSealFinish(block)
-	}
 
 	// Note: the miner no longer emits a NewMinedBlock event. Instead the caller
 	// is responsible for running any additional verification and then inserting
