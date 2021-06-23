@@ -67,7 +67,7 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.AcceptedFrontier(chainID, requestID, []ids.ID{containerID})
+	msg, err := TestBuilder.AcceptedFrontier(chainID, requestID, []ids.ID{containerID}, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, AcceptedFrontier, msg.Op())
@@ -164,7 +164,7 @@ func TestBuildPut(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	container := []byte{2}
 
-	msg, err := TestBuilder.Put(chainID, requestID, containerID, container)
+	msg, err := TestBuilder.Put(chainID, requestID, containerID, container, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Put, msg.Op())
@@ -190,7 +190,7 @@ func TestBuildPushQuery(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	container := []byte{2}
 
-	msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container)
+	msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, PushQuery, msg.Op())
@@ -242,7 +242,7 @@ func TestBuildChits(t *testing.T) {
 	containerID := ids.Empty.Prefix(1)
 	containerIDs := [][]byte{containerID[:]}
 
-	msg, err := TestBuilder.Chits(chainID, requestID, []ids.ID{containerID})
+	msg, err := TestBuilder.Chits(chainID, requestID, []ids.ID{containerID}, false)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, Chits, msg.Op())

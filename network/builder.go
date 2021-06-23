@@ -48,7 +48,7 @@ func (m Builder) GetPeerList() (Msg, error) {
 	return m.Pack(buf, GetPeerList, nil, false)
 }
 
-func (m Builder) PeerList(peers []utils.IPCertDesc) (Msg, error) {
+func (m Builder) PeerList(peers []utils.IPCertDesc, compress bool) (Msg, error) {
 	buf := m.getByteSlice()
 	return m.Pack(
 		buf,
@@ -56,7 +56,7 @@ func (m Builder) PeerList(peers []utils.IPCertDesc) (Msg, error) {
 		map[Field]interface{}{
 			SignedPeers: peers,
 		},
-		true,
+		compress,
 	)
 }
 
@@ -88,7 +88,7 @@ func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline 
 }
 
 // AcceptedFrontier message
-func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs []ids.ID) (Msg, error) {
+func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs []ids.ID, compress bool) (Msg, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
 		copy := containerID
@@ -103,7 +103,7 @@ func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		len(containerIDs) > 4,
+		compress,
 	)
 }
 
@@ -165,7 +165,7 @@ func (m Builder) GetAncestors(chainID ids.ID, requestID uint32, deadline uint64,
 }
 
 // MultiPut message
-func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte) (Msg, error) {
+func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte, compress bool) (Msg, error) {
 	buf := m.getByteSlice()
 	return m.Pack(
 		buf,
@@ -175,7 +175,7 @@ func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte)
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		true,
+		compress,
 	)
 }
 
@@ -196,7 +196,7 @@ func (m Builder) Get(chainID ids.ID, requestID uint32, deadline uint64, containe
 }
 
 // Put message
-func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) (Msg, error) {
+func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, container []byte, compress bool) (Msg, error) {
 	buf := m.getByteSlice()
 	return m.Pack(
 		buf,
@@ -207,12 +207,12 @@ func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, conta
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		true,
+		compress,
 	)
 }
 
 // PushQuery message
-func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID, container []byte) (Msg, error) {
+func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID, container []byte, compress bool) (Msg, error) {
 	buf := m.getByteSlice()
 	return m.Pack(
 		buf,
@@ -224,7 +224,7 @@ func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, co
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		true,
+		compress,
 	)
 }
 
@@ -245,7 +245,7 @@ func (m Builder) PullQuery(chainID ids.ID, requestID uint32, deadline uint64, co
 }
 
 // Chits message
-func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID) (Msg, error) {
+func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID, compress bool) (Msg, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
 		copy := containerID
@@ -260,6 +260,6 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID) 
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		len(containerIDs) > 4,
+		compress,
 	)
 }

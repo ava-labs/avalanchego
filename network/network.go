@@ -457,7 +457,9 @@ func (n *network) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID,
 func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
-	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs)
+	peer := n.getPeer(validatorID)
+	compress := peer != nil && peer.canHandleCompressed.GetValue()
+	msg, err := n.b.AcceptedFrontier(chainID, requestID, containerIDs, compress)
 	if err != nil {
 		n.log.Error("failed to build AcceptedFrontier(%s, %d, %s): %s",
 			chainID,
@@ -468,7 +470,6 @@ func (n *network) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requ
 		return // Packing message failed
 	}
 
-	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send AcceptedFrontier(%s, %s, %d, %s)",
@@ -592,14 +593,15 @@ func (n *network) GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestI
 func (n *network) MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
 	now := n.clock.Time()
 
-	msg, err := n.b.MultiPut(chainID, requestID, containers)
+	peer := n.getPeer(validatorID)
+	compress := peer != nil && peer.canHandleCompressed.GetValue()
+	msg, err := n.b.MultiPut(chainID, requestID, containers, compress)
 	if err != nil {
 		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
 		n.sendFailRateCalculator.Observe(1, now)
 		return
 	}
 
-	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send MultiPut(%s, %s, %d, %d)",
@@ -647,7 +649,9 @@ func (n *network) Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	now := n.clock.Time()
 
-	msg, err := n.b.Put(chainID, requestID, containerID, container)
+	peer := n.getPeer(validatorID)
+	compress := peer != nil && peer.canHandleCompressed.GetValue()
+	msg, err := n.b.Put(chainID, requestID, containerID, container, compress)
 	if err != nil {
 		n.log.Error("failed to build Put(%s, %d, %s): %s. len(container) : %d",
 			chainID,
@@ -659,7 +663,6 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 		return
 	}
 
-	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Put(%s, %s, %d, %s)",
@@ -682,7 +685,19 @@ func (n *network) Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32,
 func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
 	now := n.clock.Time()
 
-	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container)
+	compressedMsg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, true)
+	if err != nil {
+		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
+			chainID,
+			requestID,
+			containerID,
+			err,
+			len(container))
+		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
+		n.sendFailRateCalculator.Observe(1, now)
+		return nil // Packing message failed
+	}
+	uncompressedMsg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, false)
 	if err != nil {
 		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
 			chainID,
@@ -699,8 +714,15 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 	for _, peerElement := range n.getPeers(validatorIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		lenMsg := len(msg.Bytes())
-		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
+		compress := peer != nil && peer.canHandleCompressed.GetValue()
+		var msgToSend Msg
+		if compress {
+			msgToSend = compressedMsg
+		} else {
+			msgToSend = uncompressedMsg
+		}
+		msgLen := len(msgToSend.Bytes())
+		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msgToSend, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
 				chainID,
@@ -710,10 +732,10 @@ func (n *network) PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pushQuery.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
 		} else {
-			n.pushQuery.numSent.Inc()
 			sentTo = append(sentTo, vID)
+			n.pushQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			n.pushQuery.sentBytes.Add(float64(lenMsg))
+			n.pushQuery.sentBytes.Add(float64(msgLen))
 		}
 	}
 	return sentTo
@@ -741,9 +763,9 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 			n.pullQuery.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
 		} else {
+			sentTo = append(sentTo, vID)
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
-			sentTo = append(sentTo, vID)
 			n.pullQuery.sentBytes.Add(float64(lenMsg))
 		}
 	}
@@ -755,7 +777,9 @@ func (n *network) PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID
 func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
 	now := n.clock.Time()
 
-	msg, err := n.b.Chits(chainID, requestID, votes)
+	peer := n.getPeer(validatorID)
+	compress := peer == nil && peer.canHandleCompressed.GetValue()
+	msg, err := n.b.Chits(chainID, requestID, votes, compress)
 	if err != nil {
 		n.log.Error("failed to build Chits(%s, %d, %s): %s",
 			chainID,
@@ -766,7 +790,6 @@ func (n *network) Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint3
 		return
 	}
 
-	peer := n.getPeer(validatorID)
 	lenMsg := len(msg.Bytes())
 	if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, true) {
 		n.log.Debug("failed to send Chits(%s, %s, %d, %s)",
@@ -1012,7 +1035,12 @@ func (n *network) IP() utils.IPDesc {
 func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
-	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container)
+	compressedMsg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container, true)
+	if err != nil {
+		n.sendFailRateCalculator.Observe(1, now)
+		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
+	}
+	uncompressedMsg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container, false)
 	if err != nil {
 		n.sendFailRateCalculator.Observe(1, now)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
@@ -1033,7 +1061,15 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		return err
 	}
 	for _, index := range indices {
-		if allPeers[int(index)].Send(msg, false) {
+		peer := allPeers[int(index)]
+		compress := peer.canHandleCompressed.GetValue()
+		var msgToSend Msg
+		if compress {
+			msgToSend = compressedMsg
+		} else {
+			msgToSend = uncompressedMsg
+		}
+		if peer.Send(msgToSend, false) {
 			n.put.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 		} else {
@@ -1150,7 +1186,14 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		msg, err := n.b.PeerList(ipCerts)
+		compressedMsg, err := n.b.PeerList(ipCerts, true)
+		if err != nil {
+			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
+				err,
+				len(ipCerts))
+			continue
+		}
+		uncompressedMsg, err := n.b.PeerList(ipCerts, false)
 		if err != nil {
 			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
 				err,
@@ -1159,10 +1202,18 @@ func (n *network) gossipPeerList() {
 		}
 
 		for _, index := range stakerIndices {
-			stakers[int(index)].Send(msg, false)
+			if stakers[int(index)].canHandleCompressed.GetValue() {
+				stakers[int(index)].Send(compressedMsg, false)
+			} else {
+				stakers[int(index)].Send(uncompressedMsg, false)
+			}
 		}
 		for _, index := range nonStakerIndices {
-			nonStakers[int(index)].Send(msg, false)
+			if nonStakers[int(index)].canHandleCompressed.GetValue() {
+				nonStakers[int(index)].Send(compressedMsg, false)
+			} else {
+				nonStakers[int(index)].Send(uncompressedMsg, false)
+			}
 		}
 	}
 }

@@ -136,7 +136,7 @@ type peer struct {
 	idSet ids.Set
 
 	// True if we should compress messages sent to this peer
-	canHandleCompressed bool
+	canHandleCompressed utils.AtomicBool
 }
 
 // newPeer returns a properly initialized *peer.
@@ -281,11 +281,11 @@ func (p *peer) ReadMessages() {
 			return
 		}
 
-		p.net.log.Verbo("parsing new message from %s:\n%s",
+		p.net.log.Verbo("parsing new message from %s:%s",
 			p.id,
-			formatting.DumpBytes{Bytes: msgBytes})
-
-		msg, err := p.net.b.Parse(msgBytes, p.canHandleCompressed)
+			formatting.DumpBytes{Bytes: msgBytes},
+		)
+		msg, err := p.net.b.Parse(msgBytes, p.canHandleCompressed.GetValue())
 		if err != nil {
 			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
 				p.id,
@@ -306,9 +306,7 @@ func (p *peer) WriteMessages() {
 
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
-		p.net.log.Verbo("sending new message to %s:\n%s",
-			p.id,
-			formatting.DumpBytes{Bytes: msg})
+		p.net.log.Verbo("sending new message to %s:\n%s", p.id, formatting.DumpBytes{Bytes: msg})
 
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
@@ -612,7 +610,7 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	msg, err := p.net.b.PeerList(peers)
+	msg, err := p.net.b.PeerList(peers, p.canHandleCompressed.GetValue())
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return
@@ -766,7 +764,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	// todo marker version should be constant
-	p.canHandleCompressed = peerVersion.Compare(version.NewDefaultVersion(1, 4, 9)) >= 0
+	p.canHandleCompressed.SetValue(peerVersion.Compare(version.NewDefaultVersion(1, 4, 9)) >= 0)
 
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
