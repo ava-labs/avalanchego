@@ -354,15 +354,19 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 // from block at height [to] to block at height [from]. Blocks are traversed in reverse order.
 func (bc *BlockChain) removeIndices(from, to uint64) (int, error) {
 	indicesRemoved := 0
+	batch := bc.db.NewBatch()
 	for i := from; i > to; i-- {
 		b := bc.GetBlockByNumber(i)
 		if b == nil {
 			return indicesRemoved, fmt.Errorf("could not load canonical block at height %d", i)
 		}
 		for _, tx := range b.Transactions() {
-			rawdb.DeleteTxLookupEntry(bc.db, tx.Hash())
+			rawdb.DeleteTxLookupEntry(batch, tx.Hash())
 			indicesRemoved++
 		}
+	}
+	if err := batch.Write(); err != nil {
+		return 0, fmt.Errorf("failed to write batch while removing indices (from: %d, to: %d): %w", from, to, err)
 	}
 	return indicesRemoved, nil
 }
@@ -854,7 +858,11 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	// Update transaction lookup index
-	rawdb.WriteTxLookupEntriesByBlock(bc.db, block)
+	batch := bc.db.NewBatch()
+	rawdb.WriteTxLookupEntriesByBlock(batch, block)
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("failed to write tx lookup entries batch: %w", err)
+	}
 
 	// Fetch block logs
 	receipts := rawdb.ReadReceipts(bc.db, block.Hash(), block.NumberU64(), bc.chainConfig)
@@ -893,10 +901,11 @@ func (bc *BlockChain) Reject(block *types.Block) error {
 		}
 	}
 
-	// If pruning is enabled, delete the rejected block.
-	if bc.cacheConfig.Pruning {
-		// Remove the block since its data is no longer needed
-		rawdb.DeleteBlock(bc.db, block.Hash(), block.NumberU64())
+	// Remove the block since its data is no longer needed
+	batch := bc.db.NewBatch()
+	rawdb.DeleteBlock(batch, block.Hash(), block.NumberU64())
+	if err := batch.Write(); err != nil {
+		return fmt.Errorf("failed to write delete block batch: %w", err)
 	}
 
 	return nil
