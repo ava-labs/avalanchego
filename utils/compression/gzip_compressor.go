@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"io/ioutil"
 )
 
 // gzipCompressor implements Compressor
@@ -41,7 +42,7 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.resetReader(msg); err != nil {
 		return nil, err
 	}
-	decompressed, err := io.ReadAll(g.gzipReader)
+	decompressed, err := ioutil.ReadAll(g.gzipReader)
 	if err != nil {
 		return nil, err
 	}
