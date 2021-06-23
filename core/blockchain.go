@@ -1547,10 +1547,6 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report
 		previousRoot common.Hash
 		triedb       = bc.stateCache.TrieDB()
 	)
-	statedb, err = state.New(current.Root(), bc.stateCache, nil)
-	if err != nil {
-		return fmt.Errorf("no longer able to create state for current root (%s: %d)", current.Hash().Hex(), current.NumberU64())
-	}
 	// Note: we add 1 since in each iteration, we attempt to re-execute the next block.
 	log.Info("Re-executing blocks to generate state for last accepted block", "from", current.NumberU64()+1, "to", origin)
 	for current.NumberU64() < origin {
@@ -1566,11 +1562,11 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report
 		}
 		receipts, _, usedGas, err := bc.processor.Process(current, statedb, vm.Config{})
 		if err != nil {
-			return fmt.Errorf("re-processing block %d failed: %v", current.NumberU64(), err)
+			return fmt.Errorf("failed to re-process block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
 		}
 		// Validate the state using the default validator
 		if err := bc.validator.ValidateState(current, statedb, receipts, usedGas); err != nil {
-			return fmt.Errorf("re-processing block %d failed state check: %v", current.NumberU64(), err)
+			return fmt.Errorf("failed to validate state while re-processing block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
 		}
 		log.Debug("processed block", "block", current.Hash(), "number", current.NumberU64())
 		// Finalize the state so any modifications are written to the trie
