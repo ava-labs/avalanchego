@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package proposervm
 
 import (
@@ -12,8 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 type TestOptionsBlock struct {

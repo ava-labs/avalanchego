@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package proposervm
 
 // ProposerBlock is a decorator for a snowman.Block, created to handle block headers introduced with snowman++
