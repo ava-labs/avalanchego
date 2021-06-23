@@ -323,13 +323,12 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 	return batchGroups, nil
 }
 
-func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.AtomicRequests, batch ...database.Batch) error {
+func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.Requests, batch ...database.Batch) error {
 	formattedRequest := make(map[string]*gsharedmemoryproto.BatchMap)
-	keys, counter := make([][]byte, len(batchChainsAndInputs)), 0
+	keys := make([][]byte, 0, len(batchChainsAndInputs))
 	for key, value := range batchChainsAndInputs {
 		formattedValues := make([]*gsharedmemoryproto.AtomicRequest, 0, len(value))
-		keys[counter] = []byte(key.String())
-		counter++
+		keys = append(keys, []byte(key.String()))
 		for k, v := range value {
 			formattedElements := make([]*gsharedmemoryproto.Element, 0, len(v.Elems))
 			for _, formatElems := range v.Elems {
@@ -354,12 +353,10 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 		BatchChainsAndInputs: formattedRequest,
 		Continues:            true,
 		Id:                   stdatomic.AddInt64(&c.uniqueID, 1),
-		Keys:                 keys,
 	}
 
 	currentSize := 0
-	prevIndex := 0
-	for i, key := range keys {
+	for _, key := range keys {
 		sizeChange := baseElementSize + len(key)
 		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
 			if _, err := c.client.RemoveAndPutMultiple(context.Background(), req); err != nil {
@@ -367,11 +364,8 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 			}
 
 			currentSize = 0
-			prevIndex = i
 		}
 		currentSize += sizeChange
-
-		req.Keys = keys[prevIndex : i+1]
 	}
 
 	batchGroups, err := c.makeBatches(batch, currentSize)
@@ -385,7 +379,6 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 		if _, err := c.client.RemoveAndPutMultiple(context.Background(), req); err != nil {
 			return err
 		}
-		req.Keys = nil
 	}
 	if len(batchGroups) == 0 {
 		req.Continues = false
@@ -394,5 +387,4 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 		}
 	}
 	return nil
-
 }

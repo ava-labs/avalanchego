@@ -13,7 +13,7 @@ import (
 )
 
 // SharedMemoryTests is a list of all shared memory tests
-var SharedMemoryTests = []func(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, db database.Database, batchChainsAndInputs map[ids.ID][]*AtomicRequests){
+var SharedMemoryTests = []func(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, db database.Database, batchChainsAndInputs map[ids.ID][]*Requests){
 	TestSharedMemoryPutAndGet,
 	TestSharedMemoryLargePutGetAndRemove,
 	TestSharedMemoryIndexed,
@@ -25,7 +25,7 @@ var SharedMemoryTests = []func(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 	TestSharedMemoryLargeBatchSize,
 }
 
-func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	err := sm0.Put(chainID1, []*Element{{
@@ -41,7 +41,7 @@ func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 
 // TestSharedMemoryLargePutGetAndRemove tests to make sure that the interface
 // can support large values.
-func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 	rand.Seed(0)
 
@@ -91,7 +91,7 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 	assert.NoError(err)
 }
 
-func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	err := sm0.Put(chainID1, []*Element{{
@@ -143,7 +143,7 @@ func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 S
 	assert.Equal([][]byte{{5}, {1}}, values, "wrong indexed values returned")
 }
 
-func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	totalSize := 8 * 1024 * 1024 // 8 MiB
@@ -184,7 +184,7 @@ func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, 
 	assert.Len(values, len(elems), "wrong number of values returned")
 }
 
-func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	err := sm0.Put(chainID1, []*Element{
@@ -212,7 +212,7 @@ func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ S
 	assert.Error(err, "shouldn't be able to write duplicated keys")
 }
 
-func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	err := sm0.Remove(chainID1, [][]byte{{0}})
@@ -222,7 +222,7 @@ func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, 
 	assert.Error(err, "shouldn't be able to remove duplicated keys")
 }
 
-func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	err := db.Put([]byte{1}, []byte{2})
@@ -255,7 +255,7 @@ func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ Shared
 	assert.False(has)
 }
 
-func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	err := db.Put([]byte{1}, []byte{2})
@@ -285,8 +285,8 @@ func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	assert.False(has)
 }
 
-//TestPutAndRemoveBatch tests to make sure multiple put and remove requests work properly
-func TestPutAndRemoveBatch(t *testing.T, _, _ ids.ID, sm0, _ SharedMemory, db database.Database, batchChainsAndInputs map[ids.ID][]*AtomicRequests) {
+// TestPutAndRemoveBatch tests to make sure multiple put and remove requests work properly
+func TestPutAndRemoveBatch(t *testing.T, _, _ ids.ID, sm0, _ SharedMemory, db database.Database, batchChainsAndInputs map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 
 	err := sm0.RemoveAndPutMultiple(batchChainsAndInputs, db.NewBatch())
@@ -300,7 +300,7 @@ func TestPutAndRemoveBatch(t *testing.T, _, _ ids.ID, sm0, _ SharedMemory, db da
 
 // TestSharedMemoryLargeBatchSize tests to make sure that the interface can
 // support large batches.
-func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database, _ map[ids.ID][]*AtomicRequests) {
+func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database, _ map[ids.ID][]*Requests) {
 	assert := assert.New(t)
 	rand.Seed(0)
 

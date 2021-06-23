@@ -32,18 +32,16 @@ func TestSharedMemory(t *testing.T) {
 		sm0 := m.NewSharedMemory(chainID0)
 		sm1 := m.NewSharedMemory(chainID1)
 
-		batchChainsAndInputs := make(map[ids.ID][]*AtomicRequests)
+		batchChainsAndInputs := make(map[ids.ID][]*Requests)
 
 		byteArr := [][]byte{{0}, {1}, {2}}
 
-		chainID0Batch, chainID1Batch := batchChainsAndInputs[chainID0], batchChainsAndInputs[chainID1]
-
-		chainID0Batch = append(chainID0Batch, &AtomicRequests{Remove, byteArr[:], []*Element{{
+		batchChainsAndInputs[chainID0] = append([]*Requests{}, &Requests{Remove, byteArr, []*Element{{
 			Key:   []byte{0},
 			Value: []byte{1},
 		}}})
 
-		chainID1Batch = append(chainID1Batch, &AtomicRequests{Put, byteArr[:], []*Element{{
+		batchChainsAndInputs[chainID1] = append([]*Requests{}, &Requests{Put, byteArr, []*Element{{
 			Key:   []byte{0},
 			Value: []byte{1},
 		}}})

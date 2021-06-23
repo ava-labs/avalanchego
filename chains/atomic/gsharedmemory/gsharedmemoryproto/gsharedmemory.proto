@@ -51,7 +51,6 @@ message RemoveAndPutMultipleRequest {
     repeated Batch batches = 2;
     int64 id = 3;
     bool continues = 4;
-    repeated bytes keys = 5;
 }
 
 

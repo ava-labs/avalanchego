@@ -67,8 +67,8 @@ func (m *Memory) GetDatabase(sharedID ids.ID) (*versiondb.Database, database.Dat
 	return vdb, prefixdb.New(sharedID[:], vdb)
 }
 
-// GetPrefixDbInstanceFromVdb returns a new prefix db on an existing versiondb
-func (m *Memory) GetPrefixDbInstanceFromVdb(vdb *versiondb.Database, sharedID ids.ID) database.Database {
+// GetPrefixDBInstanceFromVdb returns a new prefix db on an existing versiondb
+func (m *Memory) GetPrefixDBInstanceFromVdb(vdb *versiondb.Database, sharedID ids.ID) database.Database {
 	return prefixdb.New(sharedID[:], vdb)
 }
 

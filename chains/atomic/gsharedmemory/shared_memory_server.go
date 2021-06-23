@@ -34,25 +34,89 @@ type Server struct {
 	removes     map[int64]*removeRequest
 
 	removeAndPutMultipleLock sync.Mutex
-	removeAndPutMultiple     map[int64]*removeAndPutMultipleRequest
+	removeAndPutMultiples    map[int64]*removeAndPutMultipleRequest
 }
 
 // NewServer returns shared memory connected to remote shared memory
 func NewServer(sm atomic.SharedMemory, db database.Database) *Server {
 	return &Server{
-		sm:                   sm,
-		db:                   db,
-		puts:                 make(map[int64]*putRequest),
-		gets:                 make(map[int64]*getRequest),
-		indexed:              make(map[int64]*indexedRequest),
-		removes:              make(map[int64]*removeRequest),
-		removeAndPutMultiple: make(map[int64]*removeAndPutMultipleRequest),
+		sm:                    sm,
+		db:                    db,
+		puts:                  make(map[int64]*putRequest),
+		gets:                  make(map[int64]*getRequest),
+		indexed:               make(map[int64]*indexedRequest),
+		removes:               make(map[int64]*removeRequest),
+		removeAndPutMultiples: make(map[int64]*removeAndPutMultipleRequest),
 	}
 }
 
 type removeAndPutMultipleRequest struct {
-	batchChainsAndInputs map[ids.ID][]*atomic.AtomicRequests
-	batch                database.Batch
+	batchChainsAndInputs map[ids.ID][]*atomic.Requests
+	batch                map[int64]database.Batch
+}
+
+func (s *Server) RemoveAndPutMultiple(
+	_ context.Context,
+	req *gsharedmemoryproto.RemoveAndPutMultipleRequest,
+) (*gsharedmemoryproto.RemoveAndPutMultipleResponse, error) {
+	s.removeAndPutMultipleLock.Lock()
+	defer s.removeAndPutMultipleLock.Unlock()
+
+	formattedRequest := make(map[ids.ID][]*atomic.Requests)
+	_, exists := s.removeAndPutMultiples[req.Id]
+	if !exists {
+		for peerChainID, value := range req.BatchChainsAndInputs {
+			chainID, err := ids.ToID([]byte(peerChainID))
+			if err != nil {
+				return nil, err
+			}
+
+			formattedValues := make([]*atomic.Requests, 0, len(value.Requests))
+			for k, v := range value.Requests {
+				formattedElements := make([]*atomic.Element, 0, len(v.Elems))
+				for _, formatElems := range v.Elems {
+					formattedElements = append(formattedElements, &atomic.Element{
+						Key:    formatElems.Key,
+						Value:  formatElems.Value,
+						Traits: formatElems.Traits,
+					})
+				}
+
+				formattedValues[k] = &atomic.Requests{
+					RequestType: atomic.SharedMemoryMethod(v.RequestType),
+					UtxoIDs:     v.UtxoIDs,
+					Elems:       formattedElements,
+				}
+			}
+
+			formattedRequest[chainID] = formattedValues
+		}
+	}
+
+	removeAndPut := &removeAndPutMultipleRequest{
+		batchChainsAndInputs: formattedRequest,
+		batch:                make(map[int64]database.Batch),
+	}
+
+	if err := s.parseBatches(removeAndPut.batch, req.Batches); err != nil {
+		delete(s.removeAndPutMultiples, req.Id)
+		return nil, err
+	}
+
+	if req.Continues {
+		s.removeAndPutMultiples[req.Id] = removeAndPut
+		return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, nil
+	}
+
+	delete(s.removeAndPutMultiples, req.Id)
+
+	batches := make([]database.Batch, len(removeAndPut.batch))
+	i := 0
+	for _, batch := range removeAndPut.batch {
+		batches[i] = batch
+		i++
+	}
+	return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, s.sm.RemoveAndPutMultiple(formattedRequest, batches...)
 }
 
 type putRequest struct {

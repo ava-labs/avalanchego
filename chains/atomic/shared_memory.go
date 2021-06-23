@@ -33,11 +33,10 @@ const (
 	Remove
 )
 
-type AtomicRequests struct {
+type Requests struct {
 	RequestType SharedMemoryMethod
 	UtxoIDs     [][]byte
 	Elems       []*Element
-	Keys        [][]*AtomicRequests
 }
 
 type dbElement struct {
@@ -84,7 +83,7 @@ type SharedMemory interface {
 	)
 	Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error
 
-	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*AtomicRequests, batches ...database.Batch) error
+	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error
 }
 
 // sharedMemory provides the API for a blockchain to interact with shared memory
@@ -207,11 +206,10 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
-func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*AtomicRequests, batches ...database.Batch) error {
-	var (
-		versionDbBatches []database.Batch
-		vdb              *versiondb.Database
-	)
+func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
+	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
+	var vdb *versiondb.Database
+
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
 		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 
@@ -221,7 +219,7 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 			vdb, db = sm.m.GetDatabase(sharedID)
 			defer sm.m.ReleaseDatabase(sharedID)
 		} else {
-			db = sm.m.GetPrefixDbInstanceFromVdb(vdb, sharedID)
+			db = sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
 		}
 
 		s := state{
@@ -249,7 +247,6 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 			default:
 				panic("Illegal type")
 			}
-
 		}
 
 		myBatch, err := vdb.CommitBatch()
@@ -257,15 +254,16 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 			return err
 		}
 
-		versionDbBatches = append(versionDbBatches, myBatch)
+		versionDBBatches = append(versionDBBatches, myBatch)
 	}
 
-	baseBatch, otherBatches := versionDbBatches[0], versionDbBatches[1:]
+	baseBatch, otherBatches := versionDBBatches[0], versionDBBatches[1:]
 
 	batches = append(batches, otherBatches...)
 
 	return WriteAll(baseBatch, batches...)
 }
+
 func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 	vdb, db := sm.m.GetDatabase(sharedID)
