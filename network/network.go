@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/triggers"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -409,10 +408,13 @@ func NewNetwork(
 			},
 		},
 	}
+	codec, err := newCodec(registerer)
+	if err != nil {
+		// TODO should NewNetwork just return an error?
+		log.Warn("initializing network metrics failed with: %s", err)
+	}
 	netw.b = Builder{
-		codec: codec{
-			compressor: compression.NewGzipCompressor(),
-		},
+		codec: codec,
 		getByteSlice: func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
 		},

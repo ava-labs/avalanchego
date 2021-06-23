@@ -8,10 +8,13 @@ import (
 	"compress/gzip"
 	"io"
 	"io/ioutil"
+	"sync"
 )
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
+	lock sync.Mutex
+
 	writerInitialized bool
 	readerInitialized bool
 
@@ -24,6 +27,9 @@ type gzipCompressor struct {
 
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
 	g.resetWriter()
 	if _, err := g.gzipWriter.Write(msg); err != nil {
 		return nil, err
@@ -39,6 +45,9 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 
 // Decompress decompresses [msg].
 func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
+	g.lock.Lock()
+	defer g.lock.Unlock()
+
 	if err := g.resetReader(msg); err != nil {
 		return nil, err
 	}

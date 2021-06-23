@@ -67,7 +67,7 @@ func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag bool
 			SignedPeers: peers,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(PeerList),
+		includeIsCompressedFlag && canBeCompressed(PeerList),
 	)
 }
 
@@ -100,7 +100,7 @@ func (b Builder) GetAcceptedFrontier(
 			Deadline:  deadline,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(GetAcceptedFrontier),
+		includeIsCompressedFlag && canBeCompressed(GetAcceptedFrontier),
 	)
 }
 
@@ -126,7 +126,7 @@ func (b Builder) AcceptedFrontier(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(AcceptedFrontier),
+		includeIsCompressedFlag && canBeCompressed(AcceptedFrontier),
 	)
 }
 
@@ -154,7 +154,7 @@ func (b Builder) GetAccepted(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(GetAccepted),
+		includeIsCompressedFlag && canBeCompressed(GetAccepted),
 	)
 }
 
@@ -180,7 +180,7 @@ func (b Builder) Accepted(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(Accepted),
+		includeIsCompressedFlag && canBeCompressed(Accepted),
 	)
 }
 
@@ -203,7 +203,7 @@ func (b Builder) GetAncestors(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(GetAncestors),
+		includeIsCompressedFlag && canBeCompressed(GetAncestors),
 	)
 }
 
@@ -224,7 +224,7 @@ func (b Builder) MultiPut(
 			MultiContainerBytes: containers,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(MultiPut),
+		includeIsCompressedFlag && canBeCompressed(MultiPut),
 	)
 }
 
@@ -247,7 +247,7 @@ func (b Builder) Get(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(Get),
+		includeIsCompressedFlag && canBeCompressed(Get),
 	)
 }
 
@@ -270,7 +270,7 @@ func (b Builder) Put(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(Put),
+		includeIsCompressedFlag && canBeCompressed(Put),
 	)
 }
 
@@ -295,7 +295,7 @@ func (b Builder) PushQuery(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(PushQuery),
+		includeIsCompressedFlag && canBeCompressed(PushQuery),
 	)
 }
 
@@ -318,7 +318,7 @@ func (b Builder) PullQuery(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(PullQuery),
+		includeIsCompressedFlag && canBeCompressed(PullQuery),
 	)
 }
 
@@ -344,7 +344,7 @@ func (b Builder) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		canBeCompressed(Chits),
+		includeIsCompressedFlag && canBeCompressed(Chits),
 	)
 }
 

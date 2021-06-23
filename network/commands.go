@@ -193,7 +193,8 @@ func (op Op) String() string {
 	}
 }
 
-// Public commands that may be sent between stakers
+// Types of messages that may be sent between nodes
+// Note: If you add a new Op below, you must also add it to ops (declared below)
 const (
 	// Handshake:
 	GetVersion Op = iota
@@ -219,6 +220,27 @@ const (
 	Version
 	PeerList
 )
+
+// List of all message types
+var ops = []Op{
+	GetVersion,
+	GetPeerList,
+	Ping,
+	Pong,
+	GetAcceptedFrontier,
+	AcceptedFrontier,
+	GetAccepted,
+	Accepted,
+	GetAncestors,
+	MultiPut,
+	Get,
+	Put,
+	PushQuery,
+	PullQuery,
+	Chits,
+	Version,
+	PeerList,
+}
 
 // Defines the messages that can be sent/received with this network
 var (

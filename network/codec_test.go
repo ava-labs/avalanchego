@@ -13,40 +13,51 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 )
 
-var TestCodec codec
-
 func TestCodecPackInvalidOp(t *testing.T) {
-	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false, false)
+	codec, err := newCodec(prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	_, err = codec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 
-	_, err = TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), true, true)
+	_, err = codec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), true, true)
 	assert.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
-	_, err := TestCodec.Pack(nil, Get, make(map[Field]interface{}), false, false)
+	codec, err := newCodec(prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	_, err = codec.Pack(nil, Get, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 
-	_, err = TestCodec.Pack(nil, Get, make(map[Field]interface{}), true, true)
+	_, err = codec.Pack(nil, Get, make(map[Field]interface{}), true, true)
 	assert.Error(t, err)
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
-	_, err := TestCodec.Parse([]byte{math.MaxUint8}, true)
+	codec, err := newCodec(prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	_, err = codec.Parse([]byte{math.MaxUint8}, true)
 	assert.Error(t, err)
 
-	_, err = TestCodec.Parse([]byte{math.MaxUint8}, false)
+	_, err = codec.Parse([]byte{math.MaxUint8}, false)
 	assert.Error(t, err)
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
-	_, err := TestCodec.Parse([]byte{byte(GetVersion), 0x00}, false)
+	codec, err := newCodec(prometheus.NewRegistry())
+	assert.NoError(t, err)
+
+	_, err = codec.Parse([]byte{byte(GetVersion), 0x00}, false)
 	assert.Error(t, err)
 
-	_, err = TestCodec.Parse([]byte{byte(GetVersion), 0x00, 0x01}, true)
+	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x01}, true)
 	assert.Error(t, err)
 }
 

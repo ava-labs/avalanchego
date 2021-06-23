@@ -9,7 +9,9 @@ import (
 	"math"
 
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -20,8 +22,31 @@ var (
 
 // codec defines the serialization and deserialization of network messages
 type codec struct {
-	// compressor must not be nil
+	// [metrics] must not be nil
+	metrics map[Op]prometheus.Histogram
+	// [compressor] must not be nil
 	compressor compression.Compressor
+}
+
+// If this method returns an error, the returned codec may still be used.
+// However, some metrics may not be registered with [metricsRegisterer]
+func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
+	c := codec{
+		metrics:    make(map[Op]prometheus.Histogram),
+		compressor: compression.NewGzipCompressor(),
+	}
+	errs := wrappers.Errs{}
+	for _, op := range ops {
+		c.metrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: constants.PlatformName,
+			Name:      fmt.Sprintf("%s_bytes_saved", op),
+			Help:      fmt.Sprintf("Number of bytes saved (not sent) due to compression of %s messages", op),
+		})
+		if err := metricsRegisterer.Register(c.metrics[op]); err != nil {
+			errs.Add(err)
+		}
+	}
+	return c, errs.Err
 }
 
 // Pack attempts to pack a map of fields into a message.
@@ -89,6 +114,8 @@ func (c codec) Pack(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
+	bytesSaved := len(payloadBytes) - len(compressedPayloadBytes) // may be negative
+	c.metrics[op].Observe(float64(bytesSaved))
 	// Remove the uncompressed payload (keep just the message type and isCompressed)
 	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen]
 	// Attach the compressed payload
