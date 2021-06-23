@@ -52,40 +52,32 @@ type ProposerBlock struct {
 }
 
 func (pb *ProposerBlock) Accept() error {
-	_, err := pb.vm.state.getLastAcceptedID()
-	switch err {
-	case nil:
-		if err := pb.vm.state.storeLastAcceptedID(pb.ID()); err != nil {
-			return err
-		}
-		if err := pb.coreBlk.Accept(); err != nil {
-			// TODO: attempt to restore previous accepted block and return
-			return err
-		}
-
-		pb.status = choices.Accepted
-		if err := pb.vm.state.storeProBlk(pb); err != nil {
-			return err
-		}
-
-		if err := pb.vm.propagateStatusFrom(pb); err != nil {
-			// TODO: attempt to restore previous accepted block and return
-			return err
-		}
-
-		pb.vm.updateWithAcceptedBlk(pb)
-
-		// pb parent block should not be needed anymore.
-		// TODO: consider pruning option
-		pb.vm.state.wipeFromCacheProBlk(pb.ParentID())
-		pb.vm.scheduler.newAcceptedBlk <- pb.vm.windower.getNextWindowStart(pb.Timestamp())
-
-		return nil
-	case ErrLastAcceptedIDNotFound: // pre snowman++ case
-		return pb.coreBlk.Accept()
-	default:
+	if err := pb.vm.State.PutBlock(pb.Block, choices.Accepted); err != nil {
 		return err
 	}
+	if err := pb.vm.State.SetLastAccepted(pb.ID()); err != nil {
+		return err
+	}
+	if err := pb.vm.db.Commit(); err != nil {
+		return err
+	}
+
+	if err := pb.coreBlk.Accept(); err != nil {
+		return err
+	}
+
+	if err := pb.vm.propagateStatusFrom(pb); err != nil {
+		return err
+	}
+
+	pb.vm.updateWithAcceptedBlk(pb)
+
+	// pb parent block should not be needed anymore.
+	// TODO: consider pruning option. This is only possible after fast-sync is
+	// implemented and is the standard way to sync
+	pb.vm.state.wipeFromCacheProBlk(pb.ParentID())
+	pb.vm.scheduler.newAcceptedBlk <- pb.vm.windower.getNextWindowStart(pb.Timestamp())
+	return nil
 }
 
 func (pb *ProposerBlock) Reject() error {
@@ -95,10 +87,10 @@ func (pb *ProposerBlock) Reject() error {
 	}
 
 	pb.status = choices.Rejected
-	if err := pb.vm.state.storeProBlk(pb); err != nil {
+	if err := pb.vm.State.PutBlock(pb.Block, choices.Rejected); err != nil {
 		return err
 	}
-	return nil
+	return pb.vm.db.Commit()
 }
 
 func (pb *ProposerBlock) coreReject() error {
@@ -125,30 +117,27 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 
 func (pb *ProposerBlock) Verify() error {
 	// validate parent
-	prntBlk, err := pb.vm.state.getProBlock(pb.ParentID())
+	parent, err := pb.vm.state.getProBlock(pb.ParentID())
 	if err != nil {
 		return ErrProBlkWrongParent
 	}
 
-	if prntBlk.coreBlk.ID() != pb.coreBlk.Parent().ID() {
+	if parent.coreBlk.ID() != pb.coreBlk.Parent().ID() {
 		return ErrProBlkWrongParent
 	}
 
 	pChainHeight := pb.PChainHeight()
 
 	// validate height
-	if pChainHeight < prntBlk.PChainHeight() {
-		return ErrProBlkWrongHeight
-	}
-
-	if h, err := pb.vm.pChainHeight(); err != nil || pChainHeight > h {
+	if pChainHeight < parent.PChainHeight() {
 		return ErrProBlkWrongHeight
 	}
 
 	timestamp := pb.Timestamp()
+	parentTimestamp := parent.Timestamp()
 
 	// validate timestamp
-	if timestamp.Before(prntBlk.Timestamp()) {
+	if timestamp.Before(parentTimestamp) {
 		return ErrProBlkBadTimestamp
 	}
 
@@ -158,8 +147,11 @@ func (pb *ProposerBlock) Verify() error {
 
 	nodeID := pb.Proposer()
 
-	blkWinDelay := pb.vm.BlkSubmissionDelay(pChainHeight, nodeID)
-	blkWinStart := timestamp.Add(blkWinDelay)
+	blkWinDelay, err := pb.vm.Windower.Delay(pb.coreBlk.Height(), pChainHeight, nodeID)
+	if err != nil {
+		return err
+	}
+	blkWinStart := parentTimestamp.Add(blkWinDelay)
 	if timestamp.Before(blkWinStart) {
 		return ErrProBlkBadTimestamp
 	}

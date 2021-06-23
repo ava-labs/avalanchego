@@ -17,10 +17,12 @@ package proposervm
 import (
 	"crypto"
 	"crypto/tls"
-	"crypto/x509"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -28,11 +30,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/ava-labs/avalanchego/vms/proposervm/state"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 var (
 	genesisParentID  = ids.Empty
 	NoProposerBlocks = time.Unix(1<<63-62135596801, 999999999)
+
+	dbPrefix = []byte("proposervm")
 )
 
 // clock interface and implementation, to ease up UTs
@@ -51,6 +59,8 @@ type VM struct {
 	state.State
 	proposer.Windower
 
+	db *versiondb.Database
+
 	windower
 	clock
 
@@ -62,10 +72,12 @@ type VM struct {
 
 	proBlkActivationTime time.Time
 	BlkTree
+
+	preferred ids.ID
 }
 
 func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
-	res := VM{
+	return &VM{
 		ChainVM:              vm,
 		clock:                clockImpl{},
 		proBlkActivationTime: proBlkStart,
@@ -82,10 +94,15 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
-	vm.state.init(dbManager.Current().Database)
+	rawDB := dbManager.Current().Database
+	prefixDB := prefixdb.New(dbPrefix, rawDB)
+	db := versiondb.New(prefixDB)
+	vm.State = state.New(db)
+	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
+
+	vm.stakingCert = ctx.StakingCert
 
 	var err error
-	vm.stakingCert = ctx.StakingCert
 	if vm.nodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(vm.stakingCert.Leaf.Raw)); err != nil {
 		return err
 	}
@@ -99,56 +116,34 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// TODO: comparison should be with genesis timestamp, not with Now()
-	if vm.now().After(vm.proBlkActivationTime) {
-		// proposerVM intercepts VM events for blocks and times event relay to consensus
-
-		// Assuming genesisBytes has not proposerBlockHeader
-		if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
-			configBytes, vm.scheduler.coreVMChannel(), fxs); err != nil {
-			return err
-		}
-
-		_, err := vm.state.getProGenesisBlk()
-		switch err {
-		case ErrGenesisNotFound:
-			// rebuild genesis and store it
-			coreGenID, err := vm.ChainVM.LastAccepted()
-			if err != nil {
-				return err
-			}
-			coreGenBlk, err := vm.ChainVM.GetBlock(coreGenID)
-			if err != nil {
-				return err
-			}
-			proGenHdr := NewProHeader(genesisParentID, coreGenBlk.Timestamp().Unix(), 0, x509.Certificate{})
-			proGenBlk, _ := NewProBlock(vm, proGenHdr, coreGenBlk, choices.Accepted, nil, false) // not signing block, cannot err
-			// Skipping verification for genesis block.
-			if err := vm.state.storeProGenID(proGenBlk.ID()); err != nil {
-				return err
-			}
-			if err := vm.state.storePreference(proGenBlk.ID()); err != nil {
-				return err
-			}
-			if err := vm.state.storeLastAcceptedID(proGenBlk.ID()); err != nil {
-				return err
-			}
-			if err := vm.state.storeProBlk(&proGenBlk); err != nil {
-				return err
-			}
-
-			vm.BlkTree.Initialize(vm, proGenBlk.ID())
-		case nil: // TODO: do checks on Preference and LastAcceptedID or just keep going?
-		default:
-			return err
-		}
-
-		vm.scheduler.rescheduleBlkTicker()
-		go vm.scheduler.handleBlockTiming()
-	} else if err := vm.ChainVM.Initialize(ctx, dbManager, genesisBytes, upgradeBytes,
-		configBytes, toEngine, fxs); err != nil {
+	err = vm.ChainVM.Initialize(
+		ctx,
+		dbManager,
+		genesisBytes,
+		upgradeBytes,
+		configBytes,
+		vm.scheduler.coreVMChannel(),
+		fxs,
+	)
+	if err != nil {
 		return err
 	}
+
+	lastAcceptedInner, err := vm.ChainVM.LastAccepted()
+	if err != nil {
+		return err
+	}
+
+	vm.BlkTree.Initialize(vm, lastAcceptedInner)
+
+	preferred, err := vm.LastAccepted()
+	if err != nil {
+		return err
+	}
+	vm.preferred = preferred
+
+	vm.scheduler.rescheduleBlkTicker()
+	go vm.scheduler.handleBlockTiming()
 
 	return nil
 }
@@ -160,25 +155,13 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	// TODO: comparison should be with genesis timestamp, not with Now()
-	if vm.now().After(vm.proBlkActivationTime) {
-		proParentID, err := vm.state.getPreferredID()
-		if err != nil {
-			return nil, err
-		}
-
-	proParentID, err := vm.state.getPreferredID()
-	if err != nil {
-		return nil, err
-	}
-
 	h, err := vm.pChainHeight()
 	if err != nil {
 		return nil, err
 	}
 
 	slb, err := statelessblock.Build(
-		proParentID,
+		vm.preferred,
 		sb.Timestamp(),
 		h,
 		vm.stakingCert.Leaf,
@@ -196,6 +179,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		status:  choices.Processing,
 	}
 
+	// TODO: Why is verify called here?
 	if err := proBlk.Verify(); err != nil {
 		return nil, err
 	}
@@ -210,33 +194,41 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	block, err := vm.parseProposerBlock(b)
 	if err == nil {
-		return &block, nil
+		return block, nil
 	}
 	return vm.ChainVM.ParseBlock(b)
 }
 
-func (vm *VM) parseProposerBlock(b []byte) (ProposerBlock, error) {
+func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
 	slb, err := statelessblock.Parse(b)
 	if err != nil {
-		return ProposerBlock{}, err
+		return nil, err
 	}
 
 	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
 	if err != nil {
-		return ProposerBlock{}, err
+		return nil, err
 	}
 
-	block := ProposerBlock{
+	block := &ProposerBlock{
 		Block:   slb,
 		vm:      vm,
 		coreBlk: coreBlk,
 		status:  choices.Processing,
 	}
 
-	if err := vm.state.storeProBlk(&block); err != nil {
-		return ProposerBlock{}, err
+	_, status, err := vm.State.GetBlock(slb.ID())
+	if err == nil {
+		block.status = status
+		return block, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
 	}
 
+	if err := vm.State.PutBlock(slb, choices.Processing); err != nil {
+		return nil, err
+	}
 	return block, nil
 }
 
@@ -281,13 +273,13 @@ func (vm *VM) SetPreference(id ids.ID) error {
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	res, err := vm.state.getLastAcceptedID()
-	switch err {
-	case nil:
+	res, err := vm.State.GetLastAccepted()
+	if err == nil {
 		return res, nil
-	case ErrLastAcceptedIDNotFound: // pre snowman++ case
-		return vm.ChainVM.LastAccepted()
-	default:
-		return res, err
 	}
+	if err != database.ErrNotFound {
+		return ids.ID{}, err
+	}
+	// pre snowman++ case
+	return vm.ChainVM.LastAccepted()
 }
