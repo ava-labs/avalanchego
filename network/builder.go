@@ -58,7 +58,7 @@ func (b Builder) GetPeerList(includeIsCompressedFlag bool) (Msg, error) {
 	return b.Pack(buf, GetPeerList, nil, includeIsCompressedFlag, false)
 }
 
-func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag, compress bool) (Msg, error) {
+func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag bool) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
 		buf,
@@ -67,7 +67,7 @@ func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag, com
 			SignedPeers: peers,
 		},
 		includeIsCompressedFlag,
-		compress,
+		canBeCompressed(PeerList),
 	)
 }
 

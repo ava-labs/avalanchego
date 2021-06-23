@@ -84,7 +84,7 @@ func (c Codec) Pack(
 	if err != nil {
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
-	// Remove the payload (keep just the message type and isCompressed)
+	// Remove the uncompressed payload (keep just the message type and isCompressed)
 	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen]
 	// Attach the compressed payload
 	msg.bytes = append(msg.bytes, compressedPayloadBytes...)
@@ -93,10 +93,12 @@ func (c Codec) Pack(
 
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
-func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
-	b := make([]byte, len(bytes))
-	copy(b, bytes)
-	p := wrappers.Packer{Bytes: b}
+// If [parseIsCompressedFlag], try to parse the flag that indicates
+// whether the message payload is compressed. Should only be true
+// if we expect this peer to send us compressed messages.
+// TODO remove [parseIsCompressedFlag] after network upgrade
+func (c Codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
+	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)
 	op := Op(p.UnpackByte())
@@ -108,7 +110,7 @@ func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
 
 	// See if messages of this type may be compressed
 	compressed := false
-	if mayBeCompressed {
+	if parseIsCompressedFlag {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {
@@ -124,9 +126,11 @@ func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
 			return nil, fmt.Errorf("couldn't decompress payload of %s message: %s", op, err)
 		}
 		// Replace the compressed payload with the decompressed payload.
-		// Remove the compressed payload (keep just the message type and isCompressed)
-		p.Bytes = p.Bytes[:wrappers.ByteLen+wrappers.BoolLen]
-		// Attach the decompressed payload.
+		// Remove the compressed payload and isCompressed; keep just the message type
+		p.Bytes = p.Bytes[:wrappers.ByteLen]
+		// Attach the isCompressed flag (now false)
+		p.Bytes = append(p.Bytes, 0)
+		// Attach the and decompressed payload.
 		p.Bytes = append(p.Bytes, payloadBytes...)
 	}
 
@@ -137,7 +141,7 @@ func (c Codec) Parse(bytes []byte, mayBeCompressed bool) (Msg, error) {
 	}
 
 	if p.Offset != len(p.Bytes) {
-		return nil, fmt.Errorf("expected length %d got %d", len(p.Bytes), p.Offset)
+		return nil, fmt.Errorf("expected length %d but got %d", len(p.Bytes), p.Offset)
 	}
 
 	return &msg{

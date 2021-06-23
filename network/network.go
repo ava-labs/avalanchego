@@ -536,7 +536,6 @@ func (n *network) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, request
 		} else {
 			msg = msgWithoutIsCompressedFlag
 		}
-
 		msgLen := len(msg.Bytes())
 		if peer == nil || !peer.connected.GetValue() || !peer.compatible.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send GetAccepted(%s, %s, %d, %s)",
@@ -1233,14 +1232,14 @@ func (n *network) gossipPeerList() {
 			continue
 		}
 
-		compressedMsg, err := n.b.PeerList(ipCerts, true, true)
+		msgWithIsCompressedFlag, err := n.b.PeerList(ipCerts, true)
 		if err != nil {
 			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
 				err,
 				len(ipCerts))
 			continue
 		}
-		msgWithoutIsCompressedFlag, err := n.b.PeerList(ipCerts, false, false)
+		msgWithoutIsCompressedFlag, err := n.b.PeerList(ipCerts, false)
 		if err != nil {
 			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
 				err,
@@ -1249,17 +1248,19 @@ func (n *network) gossipPeerList() {
 		}
 
 		for _, index := range stakerIndices {
-			if stakers[int(index)].canHandleCompressed.GetValue() {
-				stakers[int(index)].Send(compressedMsg, false)
+			peer := stakers[int(index)]
+			if peer.canHandleCompressed.GetValue() {
+				peer.Send(msgWithIsCompressedFlag, false)
 			} else {
-				stakers[int(index)].Send(msgWithoutIsCompressedFlag, false)
+				peer.Send(msgWithoutIsCompressedFlag, false)
 			}
 		}
 		for _, index := range nonStakerIndices {
-			if nonStakers[int(index)].canHandleCompressed.GetValue() {
-				nonStakers[int(index)].Send(compressedMsg, false)
+			peer := nonStakers[int(index)]
+			if peer.canHandleCompressed.GetValue() {
+				peer.Send(msgWithIsCompressedFlag, false)
 			} else {
-				nonStakers[int(index)].Send(msgWithoutIsCompressedFlag, false)
+				peer.Send(msgWithoutIsCompressedFlag, false)
 			}
 		}
 	}

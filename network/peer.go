@@ -612,8 +612,8 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	canHandleCompressed := p.canHandleCompressed.GetValue()
-	msg, err := p.net.b.PeerList(peers, canHandleCompressed, canHandleCompressed)
+	includeIsCompressedFlag := p.canHandleCompressed.GetValue()
+	msg, err := p.net.b.PeerList(peers, includeIsCompressedFlag)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return
