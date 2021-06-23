@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	errMissingField = errors.New("message missing field")
-	errBadOp        = errors.New("input field has invalid operation")
+	errMissingField      = errors.New("message missing field")
+	errBadOp             = errors.New("input field has invalid operation")
+	errCompressNeedsFlag = errors.New("compressed message requires isCompressed flag")
 )
 
 // Codec defines the serialization and deserialization of network messages
@@ -31,6 +32,7 @@ type Codec struct {
 // If [includeIsCompressedFlag], include a flag that marks whether the payload
 // is compressed or not.
 // If [compress] and [includeIsCompressedFlag], compress the payload.
+// If [compress] == true, [includeIsCompressedFlag] must be true
 // TODO remove [includeIsCompressedFlag] after network upgrade.
 func (c Codec) Pack(
 	buffer []byte,
@@ -39,6 +41,9 @@ func (c Codec) Pack(
 	includeIsCompressedFlag bool,
 	compress bool,
 ) (Msg, error) {
+	if compress && !includeIsCompressedFlag {
+		return nil, errCompressNeedsFlag
+	}
 	msgFields, ok := Messages[op]
 	if !ok {
 		return nil, errBadOp

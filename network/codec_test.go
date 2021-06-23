@@ -21,21 +21,49 @@ var TestCodec Codec
 func TestCodecPackInvalidOp(t *testing.T) {
 	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
+
+	_, err = TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), true, true)
+	assert.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
 	_, err := TestCodec.Pack(nil, Get, make(map[Field]interface{}), false, false)
+	assert.Error(t, err)
+
+	_, err = TestCodec.Pack(nil, Get, make(map[Field]interface{}), true, true)
 	assert.Error(t, err)
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
 	_, err := TestCodec.Parse([]byte{math.MaxUint8}, true)
 	assert.Error(t, err)
+
+	_, err = TestCodec.Parse([]byte{math.MaxUint8}, false)
+	assert.Error(t, err)
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
 	_, err := TestCodec.Parse([]byte{byte(GetVersion), 0x00}, false)
 	assert.Error(t, err)
+
+	_, err = TestCodec.Parse([]byte{byte(GetVersion), 0x00, 0x01}, true)
+	assert.Error(t, err)
+}
+
+// If [compress] == true and [includeIsCompressedFlag] == false, error
+func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
+	c := Codec{
+		compressor: compression.NewGzipCompressor(),
+	}
+	id := ids.GenerateTestID()
+	fields := map[Field]interface{}{
+		ChainID:      id[:],
+		RequestID:    uint32(1337),
+		ContainerIDs: [][]byte{id[:]},
+	}
+	// [compress] == true and [includeIsCompressedFlag] == false
+	_, err := c.Pack(nil, Chits, fields, false, true)
+	assert.EqualValues(t, errCompressNeedsFlag, err)
 }
 
 // Test packing and then parsing messages
