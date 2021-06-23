@@ -15,18 +15,11 @@ package proposervm
 
 import (
 	"errors"
-	"time"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-)
-
-const (
-	BlkSubmissionTolerance = 10 * time.Second
-	BlkSubmissionWinLength = 2 * time.Second
-	proBlkVersion          = 0
 )
 
 var (
@@ -52,6 +45,7 @@ type ProposerBlock struct {
 }
 
 func (pb *ProposerBlock) Accept() error {
+	pb.status = choices.Accepted
 	if err := pb.vm.State.PutBlock(pb.Block, choices.Accepted); err != nil {
 		return err
 	}
@@ -61,16 +55,9 @@ func (pb *ProposerBlock) Accept() error {
 	if err := pb.vm.db.Commit(); err != nil {
 		return err
 	}
-
-	if err := pb.coreBlk.Accept(); err != nil {
+	if err := pb.vm.Tree.Accept(pb.coreBlk); err != nil {
 		return err
 	}
-
-	if err := pb.vm.propagateStatusFrom(pb); err != nil {
-		return err
-	}
-
-	pb.vm.updateWithAcceptedBlk(pb)
 
 	// pb parent block should not be needed anymore.
 	// TODO: consider pruning option. This is only possible after fast-sync is
@@ -81,24 +68,13 @@ func (pb *ProposerBlock) Accept() error {
 }
 
 func (pb *ProposerBlock) Reject() error {
-	// coreBlock rejection is handled upon accept of siblings
-	if pb.status == choices.Rejected {
-		return nil // no-op
-	}
-
+	// we do not reject the inner block here because that block may be contained
+	// in the proposer block that causing this block to be rejected.
 	pb.status = choices.Rejected
 	if err := pb.vm.State.PutBlock(pb.Block, choices.Rejected); err != nil {
 		return err
 	}
 	return pb.vm.db.Commit()
-}
-
-func (pb *ProposerBlock) coreReject() error {
-	if err := pb.coreBlk.Reject(); err != nil {
-		return err
-	}
-	pb.vm.state.wipeFromCacheProBlk(pb.ID())
-	return nil
 }
 
 func (pb *ProposerBlock) Status() choices.Status {
@@ -161,15 +137,16 @@ func (pb *ProposerBlock) Verify() error {
 	}
 
 	// validate core block, only once
-	if !pb.vm.iscoreBlkVerified(pb) {
+	if !pb.vm.Tree.Contains(pb.coreBlk) {
 		if err := pb.coreBlk.Verify(); err != nil {
 			return err
 		}
+		pb.vm.Tree.Add(pb.coreBlk)
 	}
+
 	if err := pb.vm.addVerifiedBlk(pb); err != nil {
 		return err
 	}
-
 	return nil
 }
 

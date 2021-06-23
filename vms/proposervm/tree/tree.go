@@ -1,7 +1,7 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package proposervm
+package tree
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,7 +15,7 @@ type Tree interface {
 }
 
 type tree struct {
-	// parentID -> blockID -> block
+	// parentID -> childID -> childBlock
 	nodes map[ids.ID]map[ids.ID]snowman.Block
 }
 

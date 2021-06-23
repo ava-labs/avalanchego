@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
+	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -58,6 +59,7 @@ type VM struct {
 	block.ChainVM
 	state.State
 	proposer.Windower
+	tree.Tree
 
 	db *versiondb.Database
 
@@ -71,7 +73,6 @@ type VM struct {
 	scheduler *scheduler
 
 	proBlkActivationTime time.Time
-	BlkTree
 
 	preferred ids.ID
 }
@@ -99,6 +100,7 @@ func (vm *VM) Initialize(
 	db := versiondb.New(prefixDB)
 	vm.State = state.New(db)
 	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
+	vm.Tree = tree.New()
 
 	vm.stakingCert = ctx.StakingCert
 
@@ -128,13 +130,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-
-	lastAcceptedInner, err := vm.ChainVM.LastAccepted()
-	if err != nil {
-		return err
-	}
-
-	vm.BlkTree.Initialize(vm, lastAcceptedInner)
 
 	preferred, err := vm.LastAccepted()
 	if err != nil {
@@ -241,35 +236,21 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 	if coreBlk, err := vm.ChainVM.GetBlock(id); err == nil {
 		return coreBlk, nil
 	}
-
 	return nil, ErrProBlkNotFound
 }
 
-func (vm *VM) SetPreference(id ids.ID) error {
-	currPrefID, err := vm.state.getPreferredID()
-	switch err {
-	case nil:
-		proBlk, err := vm.state.getProBlock(id)
-		if err != nil {
-			return err
-		}
-		if err := vm.state.storePreference(id); err != nil {
-			return err
-		}
-		if err := vm.ChainVM.SetPreference(proBlk.coreBlk.ID()); err != nil {
-			// attempt restoring previous proposer block reference and return error
-			if err := vm.state.storePreference(currPrefID); err != nil {
-				// TODO log
-				return err
-			}
-			return err
-		}
-		return nil
-	case ErrPreferredIDNotFound: // pre snowman++ case
-		return vm.ChainVM.SetPreference(id)
-	default:
+func (vm *VM) SetPreference(preferred ids.ID) error {
+	vm.preferred = preferred
+
+	proBlk, err := vm.state.getProBlock(preferred)
+	if err == database.ErrNotFound {
+		// pre snowman++ case
+		return vm.ChainVM.SetPreference(preferred)
+	}
+	if err != nil {
 		return err
 	}
+	return vm.ChainVM.SetPreference(proBlk.coreBlk.ID())
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
