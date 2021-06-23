@@ -5,11 +5,7 @@ package sampler
 
 import (
 	"math"
-	"math/rand"
-	"time"
 )
-
-func init() { rand.Seed(time.Now().UnixNano()) }
 
 type defaultMap map[uint64]uint64
 
@@ -32,6 +28,8 @@ func (m defaultMap) get(key uint64, defaultVal uint64) uint64 {
 //
 // Sampling is performed in O(count) time and O(count) space.
 type uniformReplacer struct {
+	rng        rng
+	seededRNG  rng
 	length     uint64
 	drawn      defaultMap
 	drawsCount uint64
@@ -41,6 +39,8 @@ func (s *uniformReplacer) Initialize(length uint64) error {
 	if length > math.MaxInt64 {
 		return errOutOfRange
 	}
+	s.rng = globalRNG
+	s.seededRNG = newRNG()
 	s.length = length
 	s.drawn = make(defaultMap)
 	s.drawsCount = 0
@@ -61,6 +61,15 @@ func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
 	return results, nil
 }
 
+func (s *uniformReplacer) Seed(seed int64) {
+	s.rng = s.seededRNG
+	s.rng.Seed(seed)
+}
+
+func (s *uniformReplacer) ClearSeed() {
+	s.rng = globalRNG
+}
+
 func (s *uniformReplacer) Reset() {
 	for k := range s.drawn {
 		delete(s.drawn, k)
@@ -73,9 +82,7 @@ func (s *uniformReplacer) Next() (uint64, error) {
 		return 0, errOutOfRange
 	}
 
-	// We don't use a cryptographically secure source of randomness here, as
-	// there's no need to ensure a truly random sampling.
-	draw := uint64(rand.Int63n(int64(s.length-s.drawsCount))) + s.drawsCount // #nosec G404
+	draw := uint64(s.rng.Int63n(int64(s.length-s.drawsCount))) + s.drawsCount
 	ret := s.drawn.get(draw, draw)
 	s.drawn[draw] = s.drawn.get(s.drawsCount, s.drawsCount)
 	s.drawsCount++
