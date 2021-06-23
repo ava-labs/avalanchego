@@ -106,11 +106,10 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	vm.preferred = preferred
 
-	go scheduler.Dispatch(vm.Time().Add(time.Millisecond))
+	go scheduler.Dispatch(timer.MaxTime)
 
-	return nil
+	return vm.SetPreference(preferred)
 }
 
 // block.ChainVM interface implementation
@@ -167,6 +166,9 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 func (vm *VM) SetPreference(preferred ids.ID) error {
+	if vm.preferred == preferred {
+		return nil
+	}
 	vm.preferred = preferred
 
 	blk, err := vm.getProposerBlock(preferred)
