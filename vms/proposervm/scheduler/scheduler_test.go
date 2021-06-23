@@ -14,9 +14,9 @@ func TestDelayFromNew(t *testing.T) {
 	toEngine := make(chan common.Message, 10)
 	startTime := time.Now().Add(50 * time.Millisecond)
 
-	s, fromVM := New(toEngine, startTime)
+	s, fromVM := New(toEngine)
 	defer s.Close()
-	go s.Dispatch()
+	go s.Dispatch(startTime)
 
 	fromVM <- common.PendingTxs
 
@@ -31,9 +31,9 @@ func TestDelayFromSetTime(t *testing.T) {
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(toEngine, now)
+	s, fromVM := New(toEngine)
 	defer s.Close()
-	go s.Dispatch()
+	go s.Dispatch(now)
 
 	s.SetStartTime(startTime)
 
@@ -50,9 +50,9 @@ func TestReceipt(t *testing.T) {
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(toEngine, now)
+	s, fromVM := New(toEngine)
 	defer s.Close()
-	go s.Dispatch()
+	go s.Dispatch(now)
 
 	fromVM <- common.PendingTxs
 

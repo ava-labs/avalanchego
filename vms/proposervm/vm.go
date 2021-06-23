@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
@@ -49,7 +50,7 @@ type VM struct {
 	state.State
 	proposer.Windower
 	tree.Tree
-	scheduler *scheduler // TODO: refactor
+	scheduler.Scheduler
 	timer.Clock
 
 	ctx            *snow.Context
@@ -81,13 +82,12 @@ func (vm *VM) Initialize(
 	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
+
+	scheduler, vmToEngine := scheduler.New(toEngine)
+	vm.Scheduler = scheduler
+
 	vm.ctx = ctx
 	vm.verifiedBlocks = make(map[ids.ID]*ProposerBlock)
-
-	vm.scheduler = &scheduler{}
-	if err := vm.scheduler.initialize(vm, toEngine); err != nil {
-		return err
-	}
 
 	err := vm.ChainVM.Initialize(
 		ctx,
@@ -95,7 +95,7 @@ func (vm *VM) Initialize(
 		genesisBytes,
 		upgradeBytes,
 		configBytes,
-		vm.scheduler.coreVMChannel(),
+		vmToEngine,
 		fxs,
 	)
 	if err != nil {
@@ -108,8 +108,7 @@ func (vm *VM) Initialize(
 	}
 	vm.preferred = preferred
 
-	vm.scheduler.rescheduleBlkTicker()
-	go vm.scheduler.handleBlockTiming()
+	go scheduler.Dispatch(vm.Time().Add(time.Millisecond))
 
 	return nil
 }

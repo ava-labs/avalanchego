@@ -14,7 +14,7 @@ const (
 )
 
 type Scheduler interface {
-	Dispatch()
+	Dispatch(startTime time.Time)
 	SetStartTime(t time.Time)
 	Close()
 }
@@ -24,31 +24,29 @@ type scheduler struct {
 	fromVM       <-chan common.Message
 	toEngine     chan<- common.Message
 	newStartTime chan time.Time
-	startTime    time.Time
 }
 
-func New(toEngine chan<- common.Message, startTime time.Time) (Scheduler, chan<- common.Message) {
+func New(toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
 	vmToEngine := make(chan common.Message, fromVMSize)
 	return &scheduler{
 		fromVM:       vmToEngine,
 		toEngine:     toEngine,
 		newStartTime: make(chan time.Time),
-		startTime:    startTime,
 	}, vmToEngine
 }
 
-func (s *scheduler) Dispatch() {
+func (s *scheduler) Dispatch(startTime time.Time) {
 waitloop:
 	for {
-		timer := time.NewTimer(time.Until(s.startTime))
+		timer := time.NewTimer(time.Until(startTime))
 		select {
 		case <-timer.C:
-		case startTime, ok := <-s.newStartTime:
+		case newStartTime, ok := <-s.newStartTime:
 			if !ok {
 				timer.Stop()
 				return
 			}
-			s.startTime = startTime
+			startTime = newStartTime
 			timer.Stop()
 			continue waitloop
 		}
@@ -60,11 +58,11 @@ waitloop:
 				case s.toEngine <- msg:
 				default:
 				}
-			case startTime, ok := <-s.newStartTime:
+			case newStartTime, ok := <-s.newStartTime:
 				if !ok {
 					return
 				}
-				s.startTime = startTime
+				startTime = newStartTime
 				continue waitloop
 			}
 		}
