@@ -9,6 +9,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
+const (
+	fromVMSize = 1024
+)
+
 type Scheduler interface {
 	Dispatch()
 	SetStartTime(t time.Time)
@@ -24,7 +28,7 @@ type scheduler struct {
 }
 
 func New(toEngine chan<- common.Message, startTime time.Time) (Scheduler, chan<- common.Message) {
-	vmToEngine := make(chan common.Message, 1024)
+	vmToEngine := make(chan common.Message, fromVMSize)
 	return &scheduler{
 		fromVM:       vmToEngine,
 		toEngine:     toEngine,
