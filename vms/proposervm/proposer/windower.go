@@ -4,7 +4,6 @@
 package proposer
 
 import (
-	"fmt"
 	"sort"
 	"time"
 
@@ -100,7 +99,6 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 	}
 
 	seed := chainHeight ^ w.chainSource
-	fmt.Println(seed)
 	w.sampler.Seed(int64(seed))
 
 	indices, err := w.sampler.Sample(numToSample)

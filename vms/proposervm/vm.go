@@ -94,8 +94,8 @@ func (vm *VM) Initialize(
 ) error {
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
-	db := versiondb.New(prefixDB)
-	vm.State = state.New(db)
+	vm.db = versiondb.New(prefixDB)
+	vm.State = state.New(vm.db)
 	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 
@@ -247,10 +247,6 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 func (vm *VM) SetPreference(preferred ids.ID) error {
 	if slb, _, err := vm.State.GetBlock(preferred); err == nil {
 		vm.preferred = preferred
-		if err := vm.SetPreference(preferred); err != nil {
-			return err
-		}
-
 		coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
 		if err != nil {
 			return err

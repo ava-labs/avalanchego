@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"crypto"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -136,7 +138,10 @@ func TestProposerBlockParseFailure(t *testing.T) {
 
 // ProposerBlock.Verify tests section
 func TestProposerBlockVerificationParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	pChainHeight := uint64(100)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
@@ -144,11 +149,35 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk,
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case prntCoreBlk.ID():
+			return prntCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, prntCoreBlk.Bytes()):
+			return prntCoreBlk, nil
+		default:
+			return nil, fmt.Errorf("unknown block")
+		}
+	}
+
 	prntProBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -158,12 +187,12 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	childCoreBlk := &snowman.TestBlock{
 		ParentV:    prntCoreBlk,
 		BytesV:     []byte{2},
-		TimestampV: proVM.now(),
+		TimestampV: prntCoreBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	childSlb, err := statelessblock.Build(
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -190,7 +219,7 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(), // refer known parent
 		childCoreBlk.Timestamp(),
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -209,8 +238,10 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 }
 
 func TestProposerBlockVerificationTimestamp(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
 	pChainHeight := uint64(100)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
@@ -220,10 +251,33 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		},
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk,
-		TimestampV: proVM.now(),
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case prntCoreBlk.ID():
+			return prntCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, prntCoreBlk.Bytes()):
+			return prntCoreBlk, nil
+		default:
+			return nil, fmt.Errorf("unknown block")
+		}
+	}
+
 	prntProBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -235,8 +289,8 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
 		ParentV: prntCoreBlk,
+		BytesV:  []byte{2},
 	}
 
 	// child block timestamp cannot be lower than parent timestamp
@@ -244,7 +298,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childSlb, err := statelessblock.Build(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -275,7 +329,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		beforeWinStart,
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -294,7 +348,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		atWindowStart,
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -313,7 +367,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterWindowStart,
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -331,7 +385,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		AtSubWindowEnd,
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -349,7 +403,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterSubWinEnd,
-		100, // pChainHeight
+		pChainHeight,
 		proVM.stakingCert.Leaf,
 		childCoreBlk.Bytes(),
 		proVM.stakingCert.PrivateKey.(crypto.Signer),
@@ -367,15 +421,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
-	pChainHeight := uint64(10)
+	pChainHeight := uint64(100)
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
-	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-		res := make(map[ids.ShortID]uint64)
-		res[proVM.nodeID] = uint64(10)
-		return res, nil
-	}
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
@@ -383,24 +431,49 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{1},
-		ParentV: coreGenBlk,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk,
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case prntCoreBlk.ID():
+			return prntCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, prntCoreBlk.Bytes()):
+			return prntCoreBlk, nil
+		default:
+			return nil, fmt.Errorf("unknown block")
+		}
+	}
+
 	prntProBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
-
 	prntBlkPChainHeight := pChainHeight
+
 	childCoreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		BytesV:  []byte{2},
-		ParentV: prntCoreBlk,
+		ParentV:    prntCoreBlk,
+		BytesV:     []byte{2},
+		TimestampV: prntProBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 
 	// child P-Chain height must not precede parent P-Chain height
@@ -480,25 +553,6 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("ProBlock's P-Chain-Height can be larger or equal than parent ProBlock's one")
 	}
-
-	// block P-Chain height cannot be larger than current P-Chain height
-	childSlb, err = statelessblock.Build(
-		prntProBlk.ID(),
-		childCoreBlk.Timestamp(),
-		currPChainHeight+1,
-		proVM.stakingCert.Leaf,
-		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
-	)
-	if err != nil {
-		t.Fatal("could not build stateless block")
-	}
-	childProBlk.Block = childSlb
-	if err := childProBlk.Verify(); err == nil {
-		t.Fatal("ProBlock's P-Chain-Height cannot be higher than current P chain height")
-	} else if err != ErrProBlkWrongHeight {
-		t.Fatal("Proposer block has wrong height should have different error")
-	}
 }
 
 func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
@@ -511,13 +565,37 @@ func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2021),
+			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		ParentV: coreGenBlk,
-		VerifyV: nil,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk,
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
+	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, fmt.Errorf("unknown block")
+		}
+	}
 
 	builtBlk, err := proVM.BuildBlock()
 	if err != nil {
@@ -540,18 +618,44 @@ func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
 // ProposerBlock.Accept tests section
 func TestProposerBlockAcceptSetLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Unix(0, 0)) // enable ProBlks
+	pChainHeight := uint64(2000)
+	valVM.CantGetCurrentHeight = true
+	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
-	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(2021),
+			IDV:     ids.Empty.Prefix(1111),
 			StatusV: choices.Processing,
 		},
-		ParentV: coreGenBlk,
-		VerifyV: nil,
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk,
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
+	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, fmt.Errorf("unknown block")
+		}
+	}
 
 	builtBlk, err := proVM.BuildBlock()
 	if err != nil {

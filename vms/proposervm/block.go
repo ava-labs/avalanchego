@@ -107,32 +107,31 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 }
 
 func (pb *ProposerBlock) Verify() error {
-	// validate parent
 	parent, err := pb.vm.GetBlock(pb.ParentID())
 	if err != nil {
 		return ErrProBlkWrongParent
 	}
-
-	proParent, ok := parent.(*ProposerBlock)
-	if !ok {
-		return ErrProBlkWrongParent
-	}
-
-	if proParent.coreBlk.ID() != pb.coreBlk.Parent().ID() {
-		return ErrProBlkWrongParent
-	}
-
 	pChainHeight := pb.PChainHeight()
 
-	// validate height
-	if pChainHeight < proParent.PChainHeight() {
-		return ErrProBlkWrongHeight
+	// validate parent
+	switch proParent, ok := parent.(*ProposerBlock); ok {
+	case true:
+		if proParent.coreBlk.ID() != pb.coreBlk.Parent().ID() {
+			return ErrProBlkWrongParent
+		}
+		if pChainHeight < proParent.PChainHeight() {
+			return ErrProBlkWrongHeight
+		}
+	case false:
+		if parent.ID() != pb.coreBlk.Parent().ID() {
+			return ErrProBlkWrongParent
+		}
 	}
 
+	// validate timestamp
 	timestamp := pb.Timestamp()
 	parentTimestamp := parent.Timestamp()
 
-	// validate timestamp
 	if timestamp.Before(parentTimestamp) {
 		return ErrProBlkBadTimestamp
 	}
@@ -142,7 +141,6 @@ func (pb *ProposerBlock) Verify() error {
 	}
 
 	nodeID := pb.Proposer()
-
 	blkWinDelay, err := pb.vm.Windower.Delay(pb.coreBlk.Height(), pChainHeight, nodeID)
 	if err != nil {
 		return err
