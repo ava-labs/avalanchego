@@ -17,12 +17,14 @@ import (
 
 const (
 	maxWindows     = 5
-	windowDuration = 3 * time.Second
+	WindowDuration = 3 * time.Second
+	MaxDelay       = 10 * time.Second
 )
 
 var _ Windower = &windower{}
 
 type Windower interface {
+	PChainHeight() (uint64, error)
 	Delay(
 		chainHeight,
 		pChainHeight uint64,
@@ -49,6 +51,10 @@ func New(vm validators.VM, subnetID, chainID ids.ID) Windower {
 		//       is well specified and deterministic.
 		sampler: sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
+}
+
+func (w *windower) PChainHeight() (uint64, error) {
+	return w.vm.GetCurrentHeight()
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
@@ -108,7 +114,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 		if nodeID == validatorID {
 			return delay, nil
 		}
-		delay += windowDuration
+		delay += WindowDuration
 	}
 	return delay, nil
 }

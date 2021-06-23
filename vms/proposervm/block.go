@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 var (
@@ -62,8 +63,20 @@ func (pb *ProposerBlock) Accept() error {
 	// pb parent block should not be needed anymore.
 	// TODO: consider pruning option. This is only possible after fast-sync is
 	// implemented and is the standard way to sync
-	pb.vm.state.wipeFromCacheProBlk(pb.ParentID())
-	pb.vm.scheduler.newAcceptedBlk <- pb.vm.windower.getNextWindowStart(pb.Timestamp())
+
+	// reschedule for next windows
+	pChainHeight, err := pb.vm.PChainHeight()
+	if err != nil {
+		return err
+	}
+
+	nodeID := pb.Proposer()
+	blkWinDelay, err := pb.vm.Windower.Delay(pb.coreBlk.Height(), pChainHeight, nodeID)
+	if err != nil {
+		return err
+	}
+	nextBlkWinStart := pb.Timestamp().Add(blkWinDelay)
+	pb.vm.scheduler.newAcceptedBlk <- nextBlkWinStart
 	return nil
 }
 
@@ -84,8 +97,10 @@ func (pb *ProposerBlock) Status() choices.Status {
 // snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
 	parentID := pb.ParentID()
-	if res, err := pb.vm.state.getProBlock(parentID); err == nil {
-		return res
+	if blk, err := pb.vm.GetBlock(parentID); err != nil {
+		if _, ok := blk.(*ProposerBlock); ok {
+			return blk.Parent()
+		}
 	}
 
 	return &missing.Block{BlkID: parentID}
@@ -93,19 +108,24 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 
 func (pb *ProposerBlock) Verify() error {
 	// validate parent
-	parent, err := pb.vm.state.getProBlock(pb.ParentID())
+	parent, err := pb.vm.GetBlock(pb.ParentID())
 	if err != nil {
 		return ErrProBlkWrongParent
 	}
 
-	if parent.coreBlk.ID() != pb.coreBlk.Parent().ID() {
+	proParent, ok := parent.(*ProposerBlock)
+	if !ok {
+		return ErrProBlkWrongParent
+	}
+
+	if proParent.coreBlk.ID() != pb.coreBlk.Parent().ID() {
 		return ErrProBlkWrongParent
 	}
 
 	pChainHeight := pb.PChainHeight()
 
 	// validate height
-	if pChainHeight < parent.PChainHeight() {
+	if pChainHeight < proParent.PChainHeight() {
 		return ErrProBlkWrongHeight
 	}
 
@@ -117,7 +137,7 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkBadTimestamp
 	}
 
-	if timestamp.After(pb.vm.now().Add(BlkSubmissionTolerance)) {
+	if timestamp.After(pb.vm.now().Add(proposer.MaxDelay)) {
 		return ErrProBlkBadTimestamp // too much in the future
 	}
 
@@ -142,10 +162,6 @@ func (pb *ProposerBlock) Verify() error {
 			return err
 		}
 		pb.vm.Tree.Add(pb.coreBlk)
-	}
-
-	if err := pb.vm.addVerifiedBlk(pb); err != nil {
-		return err
 	}
 	return nil
 }

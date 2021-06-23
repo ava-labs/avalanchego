@@ -38,10 +38,8 @@ import (
 )
 
 var (
-	genesisParentID  = ids.Empty
 	NoProposerBlocks = time.Unix(1<<63-62135596801, 999999999)
-
-	dbPrefix = []byte("proposervm")
+	dbPrefix         = []byte("proposervm")
 )
 
 // clock interface and implementation, to ease up UTs
@@ -63,7 +61,6 @@ type VM struct {
 
 	db *versiondb.Database
 
-	windower
 	clock
 
 	// node identity attributes
@@ -109,10 +106,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	if err := vm.windower.initialize(vm, ctx); err != nil {
-		return err
-	}
-
 	vm.scheduler = &scheduler{}
 	if err := vm.scheduler.initialize(vm, toEngine); err != nil {
 		return err
@@ -150,7 +143,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	h, err := vm.pChainHeight()
+	h, err := vm.PChainHeight()
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +172,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	if err := vm.state.storeProBlk(&proBlk); err != nil {
+	if err := vm.PutBlock(slb, proBlk.Status()); err != nil {
 		return nil, err
 	}
 
@@ -228,7 +221,19 @@ func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	if res, err := vm.state.getProBlock(id); err == nil {
+	if slb, status, err := vm.State.GetBlock(id); err == nil {
+		coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+		if err != nil {
+			return nil, err
+		}
+
+		res := &ProposerBlock{
+			Block:   slb,
+			vm:      vm,
+			coreBlk: coreBlk,
+			status:  status,
+		}
+
 		return res, nil
 	}
 
@@ -240,17 +245,22 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 func (vm *VM) SetPreference(preferred ids.ID) error {
-	vm.preferred = preferred
+	if slb, _, err := vm.State.GetBlock(preferred); err == nil {
+		vm.preferred = preferred
+		if err := vm.SetPreference(preferred); err != nil {
+			return err
+		}
 
-	proBlk, err := vm.state.getProBlock(preferred)
-	if err == database.ErrNotFound {
-		// pre snowman++ case
-		return vm.ChainVM.SetPreference(preferred)
+		coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+		if err != nil {
+			return err
+		} // TODO: update block status in DB as well
+
+		return vm.ChainVM.SetPreference(coreBlk.ID())
 	}
-	if err != nil {
-		return err
-	}
-	return vm.ChainVM.SetPreference(proBlk.coreBlk.ID())
+
+	// check whether block is core one, with no proposerBlockHeader
+	return vm.ChainVM.SetPreference(preferred)
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
