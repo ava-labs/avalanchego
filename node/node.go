@@ -60,8 +60,7 @@ import (
 
 // Networking constants
 const (
-	TCP           = "tcp"
-	EVMPluginFile = "evm"
+	TCP = "tcp"
 )
 
 var (
@@ -633,6 +632,10 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		vdrs = validators.NewManager()
 	}
 
+	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
+		return fmt.Errorf("couldn't initialize aliases: %w", err)
+	}
+
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -656,9 +659,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			CreationFee: n.Config.CreationTxFee,
 			Fee:         n.Config.TxFee,
 		}),
-		n.vmManager.RegisterFactory(evm.ID, &rpcchainvm.Factory{
-			Path: filepath.Join(n.Config.PluginDir, EVMPluginFile),
-		}),
 		n.vmManager.RegisterFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
@@ -668,7 +668,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return errs.Err
 	}
 
-	if err := n.registerCustomRPCVMs(); err != nil {
+	if err := n.registerRPCVMs(); err != nil {
 		return err
 	}
 
@@ -677,34 +677,38 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	return nil
 }
 
-func (n *Node) registerCustomRPCVMs() error {
+// registerRPCVMs iterates in plugin dir and registers rpc chain VMs.
+func (n *Node) registerRPCVMs() error {
 	files, err := ioutil.ReadDir(n.Config.PluginDir)
 	if err != nil {
 		return err
 	}
 
 	for _, file := range files {
-		// skip evm plugin
-		if file.IsDir() || file.Name() == EVMPluginFile {
+		if file.IsDir() {
 			continue
 		}
+		name := file.Name()
+		// Strip any extension from the file. This is to support windows .exe
+		// files.
+		name = name[:len(name)-len(filepath.Ext(name))]
 
-		// use file name as ID input
-		var bytes [32]byte
-		copy(bytes[:], file.Name())
-
-		vmID := ids.ID(bytes)
+		vmID, err := n.vmManager.Lookup(name)
+		if err != nil {
+			// there is no alias with plugin name, try to use full vmID.
+			vmID, err = ids.FromString(name)
+			if err != nil {
+				return fmt.Errorf("invalid vmID %s", name)
+			}
+		}
 
 		if err = n.vmManager.RegisterFactory(vmID, &rpcchainvm.Factory{
 			Path: filepath.Join(n.Config.PluginDir, file.Name()),
 		}); err != nil {
 			return err
 		}
-
-		if err = n.vmManager.Alias(vmID, file.Name()); err != nil {
-			return err
-		}
 	}
+
 	return nil
 }
 
@@ -1003,9 +1007,7 @@ func (n *Node) Initialize(
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
-		return fmt.Errorf("couldn't initialize aliases: %w", err)
-	}
+
 	if err := n.initIndexer(); err != nil {
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
