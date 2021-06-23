@@ -16,7 +16,6 @@ package proposervm
 
 import (
 	"crypto"
-	"crypto/tls"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -29,8 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
@@ -38,47 +38,31 @@ import (
 )
 
 var (
-	NoProposerBlocks = time.Unix(1<<63-62135596801, 999999999)
-	dbPrefix         = []byte("proposervm")
+	dbPrefix = []byte("proposervm")
+
+	_ block.ChainVM = &VM{}
 )
-
-// clock interface and implementation, to ease up UTs
-type clock interface {
-	now() time.Time
-}
-
-type clockImpl struct{}
-
-func (c clockImpl) now() time.Time {
-	return time.Now()
-}
 
 type VM struct {
 	block.ChainVM
+	activationTime time.Time
+
 	state.State
 	proposer.Windower
 	tree.Tree
+	scheduler.Scheduler
+	timer.Clock
 
-	db *versiondb.Database
-
-	clock
-
-	// node identity attributes
-	stakingCert tls.Certificate
-	nodeID      ids.ShortID
-
-	scheduler *scheduler
-
-	proBlkActivationTime time.Time
-
-	preferred ids.ID
+	ctx            *snow.Context
+	db             *versiondb.Database
+	verifiedBlocks map[ids.ID]*ProposerBlock
+	preferred      ids.ID
 }
 
-func NewProVM(vm block.ChainVM, proBlkStart time.Time) *VM {
+func New(vm block.ChainVM, activationTime time.Time) *VM {
 	return &VM{
-		ChainVM:              vm,
-		clock:                clockImpl{},
-		proBlkActivationTime: proBlkStart,
+		ChainVM:        vm,
+		activationTime: activationTime,
 	}
 }
 
@@ -99,25 +83,19 @@ func (vm *VM) Initialize(
 	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 
-	vm.stakingCert = ctx.StakingCert
+	scheduler, vmToEngine := scheduler.New(toEngine)
+	vm.Scheduler = scheduler
 
-	var err error
-	if vm.nodeID, err = ids.ToShortID(hashing.PubkeyBytesToAddress(vm.stakingCert.Leaf.Raw)); err != nil {
-		return err
-	}
+	vm.ctx = ctx
+	vm.verifiedBlocks = make(map[ids.ID]*ProposerBlock)
 
-	vm.scheduler = &scheduler{}
-	if err := vm.scheduler.initialize(vm, toEngine); err != nil {
-		return err
-	}
-
-	err = vm.ChainVM.Initialize(
+	err := vm.ChainVM.Initialize(
 		ctx,
 		dbManager,
 		genesisBytes,
 		upgradeBytes,
 		configBytes,
-		vm.scheduler.coreVMChannel(),
+		vmToEngine,
 		fxs,
 	)
 	if err != nil {
@@ -130,8 +108,7 @@ func (vm *VM) Initialize(
 	}
 	vm.preferred = preferred
 
-	vm.scheduler.rescheduleBlkTicker()
-	go vm.scheduler.handleBlockTiming()
+	go scheduler.Dispatch(vm.Time().Add(time.Millisecond))
 
 	return nil
 }
@@ -143,7 +120,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	h, err := vm.PChainHeight()
+	h, err := vm.ctx.ValidatorVM.GetCurrentHeight()
 	if err != nil {
 		return nil, err
 	}
@@ -152,89 +129,34 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		vm.preferred,
 		sb.Timestamp(),
 		h,
-		vm.stakingCert.Leaf,
+		vm.ctx.StakingCert.Leaf,
 		sb.Bytes(),
-		vm.stakingCert.PrivateKey.(crypto.Signer),
+		vm.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	proBlk := ProposerBlock{
+	blk := &ProposerBlock{
 		Block:   slb,
 		vm:      vm,
 		coreBlk: sb,
 		status:  choices.Processing,
 	}
-
-	// TODO: Why is verify called here?
-	if err := proBlk.Verify(); err != nil {
-		return nil, err
-	}
-
-	if err := vm.PutBlock(slb, proBlk.Status()); err != nil {
-		return nil, err
-	}
-
-	return &proBlk, nil
+	return blk, vm.storeProposerBlock(blk)
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	block, err := vm.parseProposerBlock(b)
+	blk, err := vm.parseProposerBlock(b)
 	if err == nil {
-		return block, nil
+		return blk, nil
 	}
 	return vm.ChainVM.ParseBlock(b)
 }
 
-func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
-	slb, err := statelessblock.Parse(b)
-	if err != nil {
-		return nil, err
-	}
-
-	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
-	if err != nil {
-		return nil, err
-	}
-
-	block := &ProposerBlock{
-		Block:   slb,
-		vm:      vm,
-		coreBlk: coreBlk,
-		status:  choices.Processing,
-	}
-
-	_, status, err := vm.State.GetBlock(slb.ID())
-	if err == nil {
-		block.status = status
-		return block, nil
-	}
-	if err != database.ErrNotFound {
-		return nil, err
-	}
-
-	if err := vm.State.PutBlock(slb, choices.Processing); err != nil {
-		return nil, err
-	}
-	return block, nil
-}
-
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	if slb, status, err := vm.State.GetBlock(id); err == nil {
-		coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
-		if err != nil {
-			return nil, err
-		}
-
-		res := &ProposerBlock{
-			Block:   slb,
-			vm:      vm,
-			coreBlk: coreBlk,
-			status:  status,
-		}
-
-		return res, nil
+	if blk, err := vm.getProposerBlock(id); err == nil {
+		return blk, nil
 	}
 
 	// check whether block is core one, with no proposerBlockHeader
@@ -245,18 +167,19 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 }
 
 func (vm *VM) SetPreference(preferred ids.ID) error {
-	if slb, _, err := vm.State.GetBlock(preferred); err == nil {
-		vm.preferred = preferred
-		coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
-		if err != nil {
-			return err
-		} // TODO: update block status in DB as well
+	vm.preferred = preferred
 
-		return vm.ChainVM.SetPreference(coreBlk.ID())
+	blk, err := vm.getProposerBlock(preferred)
+	if err == database.ErrNotFound {
+		// pre snowman++ case
+		return vm.ChainVM.SetPreference(preferred)
+	}
+	if err != nil {
+		return err
 	}
 
 	// check whether block is core one, with no proposerBlockHeader
-	return vm.ChainVM.SetPreference(preferred)
+	return vm.ChainVM.SetPreference(blk.coreBlk.ID())
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
@@ -269,4 +192,65 @@ func (vm *VM) LastAccepted() (ids.ID, error) {
 	}
 	// pre snowman++ case
 	return vm.ChainVM.LastAccepted()
+}
+
+func (vm *VM) getProposerBlock(blkID ids.ID) (*ProposerBlock, error) {
+	blk, exists := vm.verifiedBlocks[blkID]
+	if exists {
+		return blk, nil
+	}
+	slb, status, err := vm.State.GetBlock(blkID)
+	if err != nil {
+		return nil, err
+	}
+
+	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+	if err != nil {
+		return nil, err
+	}
+
+	return &ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: coreBlk,
+		status:  status,
+	}, nil
+}
+
+func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
+	slb, err := statelessblock.Parse(b)
+	if err != nil {
+		return nil, err
+	}
+	// if the block already exists, then make sure the status is set correctly
+	blk, err := vm.getProposerBlock(slb.ID())
+	if err == nil {
+		return blk, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+
+	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+	if err != nil {
+		return nil, err
+	}
+
+	blk = &ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: coreBlk,
+		status:  choices.Processing,
+	}
+	if err := vm.storeProposerBlock(blk); err != nil {
+		return nil, err
+	}
+	return blk, nil
+}
+
+func (vm *VM) storeProposerBlock(blk *ProposerBlock) error {
+	if err := vm.State.PutBlock(blk.Block, blk.status); err != nil {
+		return err
+	}
+	return vm.db.Commit()
 }

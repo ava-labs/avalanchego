@@ -56,16 +56,16 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 
 	coreBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
-		TimestampV: proVM.now(),
+		TimestampV: proVM.Time(),
 	}
 
 	slb, err := statelessblock.Build(
 		proVM.preferred,
 		coreBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -101,7 +101,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 
 	coreBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
-		TimestampV: proVM.now(),
+		TimestampV: proVM.Time(),
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -111,9 +111,9 @@ func TestProposerBlockParseFailure(t *testing.T) {
 		proVM.preferred,
 		coreBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -193,9 +193,9 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -220,9 +220,9 @@ func TestProposerBlockVerificationParent(t *testing.T) {
 		prntProBlk.ID(), // refer known parent
 		childCoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -299,9 +299,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -321,7 +321,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	}
 
 	// block cannot arrive before its creator window starts
-	blkWinDelay, err := proVM.Delay(childCoreBlk.Height(), pChainHeight, proVM.nodeID)
+	blkWinDelay, err := proVM.Delay(childCoreBlk.Height(), pChainHeight, proVM.ctx.NodeID)
 	if err != nil {
 		t.Fatal("Could not calculate submission window")
 	}
@@ -330,9 +330,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		prntProBlk.ID(),
 		beforeWinStart,
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -349,9 +349,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		prntProBlk.ID(),
 		atWindowStart,
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -359,7 +359,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	childProBlk.Block = childSlb
 
 	if err := childProBlk.Verify(); err != nil {
-		t.Fatal("Proposer block timestamp at submission window start should verify")
+		t.Fatalf("Proposer block timestamp at submission window start should verify")
 	}
 
 	// block can arrive after its creator window starts
@@ -368,9 +368,9 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		prntProBlk.ID(),
 		afterWindowStart,
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -381,14 +381,14 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	}
 
 	// block can arrive within submission window
-	AtSubWindowEnd := proVM.clock.now().Add(proposer.MaxDelay)
+	AtSubWindowEnd := proVM.Time().Add(proposer.MaxDelay)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		AtSubWindowEnd,
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -399,14 +399,14 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	}
 
 	// block timestamp cannot be too much in the future
-	afterSubWinEnd := proVM.clock.now().Add(proposer.MaxDelay).Add(time.Second)
+	afterSubWinEnd := proVM.Time().Add(proposer.MaxDelay).Add(time.Second)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterSubWinEnd,
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -481,9 +481,9 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight-1,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -506,9 +506,9 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -524,9 +524,9 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight+1,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -542,9 +542,9 @@ func TestProposerBlockVerificationPChainHeight(t *testing.T) {
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -602,10 +602,14 @@ func TestVerifyIsCalledOnceOnCoreBlocks(t *testing.T) {
 		t.Fatal("could not build block")
 	}
 
-	// set error on coreBlock.Verify and recall Verify()
-	coreBlk.VerifyV = errors.New("core block should be called only once")
 	if err := builtBlk.Verify(); err != nil {
-		t.Fatal("already verified block would not verify")
+		t.Fatal(err)
+	}
+
+	// set error on coreBlock.Verify and recall Verify()
+	coreBlk.VerifyV = errors.New("core block verify should only be called once")
+	if err := builtBlk.Verify(); err != nil {
+		t.Fatal(err)
 	}
 
 	// rebuild a block with the same core block

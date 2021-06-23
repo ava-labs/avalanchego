@@ -50,7 +50,8 @@ func (pb *ProposerBlock) Accept() error {
 	if err := pb.vm.State.PutBlock(pb.Block, choices.Accepted); err != nil {
 		return err
 	}
-	if err := pb.vm.State.SetLastAccepted(pb.ID()); err != nil {
+	blkID := pb.ID()
+	if err := pb.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
 	if err := pb.vm.db.Commit(); err != nil {
@@ -60,23 +61,7 @@ func (pb *ProposerBlock) Accept() error {
 		return err
 	}
 
-	// pb parent block should not be needed anymore.
-	// TODO: consider pruning option. This is only possible after fast-sync is
-	// implemented and is the standard way to sync
-
-	// reschedule for next windows
-	pChainHeight, err := pb.vm.PChainHeight()
-	if err != nil {
-		return err
-	}
-
-	nodeID := pb.Proposer()
-	blkWinDelay, err := pb.vm.Windower.Delay(pb.coreBlk.Height(), pChainHeight, nodeID)
-	if err != nil {
-		return err
-	}
-	nextBlkWinStart := pb.Timestamp().Add(blkWinDelay)
-	pb.vm.scheduler.newAcceptedBlk <- nextBlkWinStart
+	delete(pb.vm.verifiedBlocks, blkID)
 	return nil
 }
 
@@ -87,7 +72,12 @@ func (pb *ProposerBlock) Reject() error {
 	if err := pb.vm.State.PutBlock(pb.Block, choices.Rejected); err != nil {
 		return err
 	}
-	return pb.vm.db.Commit()
+	if err := pb.vm.db.Commit(); err != nil {
+		return err
+	}
+
+	delete(pb.vm.verifiedBlocks, pb.ID())
+	return nil
 }
 
 func (pb *ProposerBlock) Status() choices.Status {
@@ -97,12 +87,9 @@ func (pb *ProposerBlock) Status() choices.Status {
 // snowman.Block interface implementation
 func (pb *ProposerBlock) Parent() snowman.Block {
 	parentID := pb.ParentID()
-	if blk, err := pb.vm.GetBlock(parentID); err != nil {
-		if _, ok := blk.(*ProposerBlock); ok {
-			return blk.Parent()
-		}
+	if res, err := pb.vm.GetBlock(parentID); err == nil {
+		return res
 	}
-
 	return &missing.Block{BlkID: parentID}
 }
 
@@ -136,7 +123,7 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkBadTimestamp
 	}
 
-	if timestamp.After(pb.vm.now().Add(proposer.MaxDelay)) {
+	if timestamp.After(pb.vm.Time().Add(proposer.MaxDelay)) {
 		return ErrProBlkBadTimestamp // too much in the future
 	}
 
@@ -161,6 +148,8 @@ func (pb *ProposerBlock) Verify() error {
 		}
 		pb.vm.Tree.Add(pb.coreBlk)
 	}
+
+	pb.vm.verifiedBlocks[pb.ID()] = pb
 	return nil
 }
 

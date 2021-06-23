@@ -17,7 +17,7 @@ import (
 const (
 	maxWindows     = 5
 	WindowDuration = 3 * time.Second
-	MaxDelay       = 10 * time.Second
+	MaxDelay       = maxWindows * WindowDuration
 )
 
 var _ Windower = &windower{}

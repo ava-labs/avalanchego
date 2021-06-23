@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
@@ -666,7 +667,7 @@ func (m *manager) createSnowmanChain(
 
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	proposerVM := proposervm.NewProVM(vm, proposervm.NoProposerBlocks) // Todo: handle on VM basis
+	proposerVM := proposervm.New(vm, timer.MaxTime) // Todo: handle on VM basis
 	if err := proposerVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}

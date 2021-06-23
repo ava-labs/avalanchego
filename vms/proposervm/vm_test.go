@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -25,14 +27,6 @@ var (
 	errGetValidatorSet                  = errors.New("unexpectedly called GetValidatorSet")
 	errCurrentHeight                    = errors.New("unexpectedly called GetCurrentHeigh")
 )
-
-type testClock struct {
-	setTime time.Time
-}
-
-func (tC testClock) now() time.Time {
-	return tC.setTime
-}
 
 type TestValidatorVM struct {
 	T *testing.T
@@ -82,11 +76,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	coreVM.LastAcceptedF = func() (ids.ID, error) { return coreGenBlk.ID(), nil }
 	coreVM.GetBlockF = func(ids.ID) (snowman.Block, error) { return coreGenBlk, nil }
 
-	tc := &testClock{
-		setTime: time.Now(),
-	}
-	proVM := NewProVM(coreVM, proBlkStartTime)
-	proVM.clock = tc
+	proVM := New(coreVM, proBlkStartTime)
 
 	if pTestCert == nil {
 		var err error
@@ -101,6 +91,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	}
 
 	ctx := &snow.Context{
+		NodeID:      hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
 		StakingCert: *pTestCert,
 		ValidatorVM: valVM,
 	}
@@ -114,7 +105,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	valVM.CantGetValidatorSet = true
 	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)
-		res[proVM.nodeID] = uint64(10)
+		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.ShortID{1}] = uint64(5)
 		res[ids.ShortID{2}] = uint64(6)
 		res[ids.ShortID{3}] = uint64(7)
@@ -147,6 +138,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal("proposerVM could not build block")
 	}
+
 	builtBlk2, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("proposerVM could not build block")
@@ -376,7 +368,12 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
 
-	if _, err := proVM.BuildBlock(); err != ErrProBlkWrongParent {
+	blk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != ErrProBlkWrongParent {
 		t.Fatal("coreVM does not build on preferred coreBlock. It should err")
 	}
 }
@@ -406,7 +403,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 // 		pChainHeight,
 // 		proVM.stakingCert.Leaf,
 // 		coreGenBlk.Bytes(),
-// 		proVM.stakingCert.PrivateKey.(crypto.Signer),
+// 		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 // 	)
 // 	if err != nil {
 // 		t.Fatal("could not build stateless block")
@@ -456,7 +453,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    gencoreBlk,
 		HeightV:    gencoreBlk.Height() + 1,
-		TimestampV: proVM.now(),
+		TimestampV: proVM.Time(),
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
@@ -470,9 +467,9 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		coreBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -488,9 +485,9 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		coreBlk.Timestamp(),
 		200, // pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -586,9 +583,9 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.stakingCert.Leaf,
+		proVM.ctx.StakingCert.Leaf,
 		netcoreBlk.Bytes(),
-		proVM.stakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -728,7 +725,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 // VM backward compatibility tests section
 func TestPreSnowmanInitialize(t *testing.T) {
-	_, _, proVM, genesisBlk := initTestProposerVM(t, NoProposerBlocks) // disable ProBlks
+	_, _, proVM, genesisBlk := initTestProposerVM(t, timer.MaxTime) // disable ProBlks
 
 	// checks
 	blkID, err := proVM.LastAccepted()
