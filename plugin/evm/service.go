@@ -436,7 +436,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	if err != nil {
 		return fmt.Errorf("problem retrieving current state: %w", err)
 	}
-	if err := tx.UnsignedAtomicTx.EVMStateTransfer(service.vm, state); err != nil {
+	if err := tx.UnsignedAtomicTx.EVMStateTransfer(service.vm.ctx, state); err != nil {
 		return err
 	}
 

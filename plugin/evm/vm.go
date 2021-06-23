@@ -15,6 +15,7 @@ import (
 	"time"
 
 	coreth "github.com/ava-labs/coreth/chain"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
@@ -357,13 +358,18 @@ func (vm *VM) Initialize(
 		InsecureUnlockAllowed: vm.config.KeystoreInsecureUnlockAllowed,
 	}
 
+	vm.codec = Codec
+	// TODO: read size from settings
+	vm.mempool = NewMempool(defaultMempoolSize)
+
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
 	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
 	var lastAcceptedHash common.Hash
 	switch {
 	case lastAcceptedErr == database.ErrNotFound:
-		// Leave [lastAcceptedHash] as the empty value to indicate the chain should be built from genesis.
+		// // Set [lastAcceptedHash] to the genesis block hash.
+		lastAcceptedHash = ethConfig.Genesis.ToBlock(nil).Hash()
 	case lastAcceptedErr != nil:
 		return fmt.Errorf("failed to get last accepted block ID due to: %w", lastAcceptedErr)
 	case len(lastAcceptedBytes) != common.HashLength:
@@ -371,7 +377,7 @@ func (vm *VM) Initialize(
 	default:
 		lastAcceptedHash = common.BytesToHash(lastAcceptedBytes)
 	}
-	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), lastAcceptedHash)
+	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), vm.createConsensusCallbacks(), lastAcceptedHash)
 	if err != nil {
 		return err
 	}
@@ -383,68 +389,6 @@ func (vm *VM) Initialize(
 	if gasPriceUpdate != nil {
 		go gasPriceUpdate()
 	}
-
-	vm.chain.SetOnFinalizeAndAssemble(func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
-		snapshot := state.Snapshot()
-		for {
-			tx, exists := vm.mempool.NextTx()
-			if !exists {
-				break
-			}
-			if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm, state); err != nil {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				state.RevertToSnapshot(snapshot)
-				continue
-			}
-			rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-			parentIntf, err := vm.GetBlockInternal(ids.ID(header.ParentHash))
-			if err != nil {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				return nil, fmt.Errorf("failed to get parent block: %w", err)
-			}
-			parent, ok := parentIntf.(*Block)
-			if !ok {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
-			}
-
-			if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
-				// Discard the transaction from the mempool on failed verification.
-				vm.mempool.DiscardCurrentTx()
-				state.RevertToSnapshot(snapshot)
-				continue
-			}
-
-			atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
-			if err != nil {
-				// Discard the transaction from the mempool and error if the transaction
-				// cannot be marshalled. This should never happen.
-				vm.mempool.DiscardCurrentTx()
-				return nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
-			}
-			return atomicTxBytes, nil
-		}
-
-		if len(txs) == 0 {
-			// this could happen due to the async logic of geth tx pool
-			return nil, errEmptyBlock
-		}
-
-		return nil, nil
-	})
-	vm.chain.SetOnExtraStateChange(func(block *types.Block, state *state.StateDB) error {
-		tx, err := vm.extractAtomicTx(block)
-		if err != nil {
-			return err
-		}
-		if tx == nil {
-			return nil
-		}
-		return tx.UnsignedAtomicTx.EVMStateTransfer(vm, state)
-	})
 	vm.notifyBuildBlockChan = toEngine
 
 	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
@@ -452,8 +396,6 @@ func (vm *VM) Initialize(
 	vm.buildStatus = dontBuild
 	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
 
-	// TODO: read size from settings
-	vm.mempool = NewMempool(defaultMempoolSize)
 	vm.chain.Start()
 
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
@@ -477,7 +419,6 @@ func (vm *VM) Initialize(
 
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
-	vm.codec = Codec
 
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
@@ -492,6 +433,76 @@ func (vm *VM) Initialize(
 	}
 
 	return vm.fx.Initialize(vm)
+}
+
+func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
+	return &dummy.ConsensusCallbacks{
+		OnFinalizeAndAssemble: vm.onFinalizeAndAssemble,
+		OnExtraStateChange:    vm.onExtraStateChange,
+	}
+}
+
+func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
+	snapshot := state.Snapshot()
+	for {
+		tx, exists := vm.mempool.NextTx()
+		if !exists {
+			break
+		}
+		if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			state.RevertToSnapshot(snapshot)
+			continue
+		}
+		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
+		parentIntf, err := vm.GetBlockInternal(ids.ID(header.ParentHash))
+		if err != nil {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			return nil, fmt.Errorf("failed to get parent block: %w", err)
+		}
+		parent, ok := parentIntf.(*Block)
+		if !ok {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
+		}
+
+		if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+			// Discard the transaction from the mempool on failed verification.
+			vm.mempool.DiscardCurrentTx()
+			state.RevertToSnapshot(snapshot)
+			continue
+		}
+
+		atomicTxBytes, err := vm.codec.Marshal(codecVersion, tx)
+		if err != nil {
+			// Discard the transaction from the mempool and error if the transaction
+			// cannot be marshalled. This should never happen.
+			vm.mempool.DiscardCurrentTx()
+			return nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
+		}
+		return atomicTxBytes, nil
+	}
+
+	if len(txs) == 0 {
+		// this could happen due to the async logic of geth tx pool
+		return nil, errEmptyBlock
+	}
+
+	return nil, nil
+}
+
+func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) error {
+	tx, err := vm.extractAtomicTx(block)
+	if err != nil {
+		return err
+	}
+	if tx == nil {
+		return nil
+	}
+	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
 }
 
 func (vm *VM) pruneChain() error {
