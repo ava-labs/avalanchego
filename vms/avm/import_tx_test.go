@@ -5,7 +5,14 @@ package avm
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/database"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -276,6 +283,7 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}
 
+	txAssetID := avax.Asset{ID: avaxID}
 	tx := &Tx{UnsignedTx: &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -284,7 +292,7 @@ func TestIssueImportTx(t *testing.T) {
 		SourceChain: platformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
-			Asset:  avax.Asset{ID: avaxID},
+			Asset:  txAssetID,
 			In: &secp256k1fx.TransferInput{
 				Amt:   1000,
 				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -303,7 +311,7 @@ func TestIssueImportTx(t *testing.T) {
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: avaxID},
+		Asset:  txAssetID,
 		Out: &secp256k1fx.TransferOutput{
 			Amt: 1000,
 			OutputOwners: secp256k1fx.OutputOwners{
@@ -365,9 +373,34 @@ func TestIssueImportTx(t *testing.T) {
 	if err := parsedTx.Accept(); err != nil {
 		t.Fatal(err)
 	}
+
+	assertIndex(t, key.PublicKey().Address(), txAssetID.ID, tx.ID(), vm.db)
+
 	id := utxoID.InputID()
 	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
+	}
+}
+
+func assertIndex(t *testing.T, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID, db database.Database) {
+	addressDB := prefixdb.New(sourceAddress[:], db)
+	assetDB := prefixdb.New(assetID[:], addressDB)
+	idxBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(idxBytes, 1)
+
+	idxVal, err := assetDB.Get([]byte("idx"))
+	assert.NoError(t, err)
+	assert.EqualValues(t, idxBytes, idxVal)
+
+	binary.BigEndian.PutUint64(idxBytes, 0)
+	tx1Bytes, err := assetDB.Get(idxBytes)
+	assert.NoError(t, err)
+
+	var txID ids.ID
+	copy(txID[:], tx1Bytes)
+
+	if txID != transactionID {
+		t.Fatalf("txID %s not same as %s", txID, transactionID)
 	}
 }
 
