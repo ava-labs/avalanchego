@@ -21,6 +21,7 @@ message AtomicRequest {
     SharedMemoryMethod requestType = 1;
 	repeated bytes utxoIDs = 2;
 	repeated Element elems = 3;
+    bytes peerChainID = 4;
 }
 
 enum SharedMemoryMethod {

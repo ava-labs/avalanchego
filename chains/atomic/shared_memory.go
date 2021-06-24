@@ -6,6 +6,7 @@ package atomic
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -93,7 +94,7 @@ type sharedMemory struct {
 	thisChainID ids.ID
 }
 
-func fetchValueAndIndexDB(peerChainID, smChainID []byte, requestType SharedMemoryMethod, db database.Database) (database.Database, database.Database) {
+func fetchValueAndIndexDB(smChainID []byte, peerChainID []byte, requestType SharedMemoryMethod, db database.Database) (database.Database, database.Database) {
 	var valueDB, indexDB database.Database
 	switch requestType {
 	case Remove:
@@ -207,6 +208,8 @@ func (sm *sharedMemory) Indexed(
 }
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
+	fmt.Println("here ????", batchChainsAndInputs)
+
 	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
 	var vdb *versiondb.Database
 
@@ -257,9 +260,11 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 		versionDBBatches = append(versionDBBatches, myBatch)
 	}
 
-	baseBatch, otherBatches := versionDBBatches[0], versionDBBatches[1:]
+	baseBatch := versionDBBatches[0]
 
-	batches = append(batches, otherBatches...)
+	if len(versionDBBatches) > 1 {
+		batches = append(batches, versionDBBatches[1:]...)
+	}
 
 	return WriteAll(baseBatch, batches...)
 }

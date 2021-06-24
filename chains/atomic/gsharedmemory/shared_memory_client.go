@@ -327,7 +327,7 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 	formattedRequest := make(map[string]*gsharedmemoryproto.BatchMap)
 	keys := make([][]byte, 0, len(batchChainsAndInputs))
 	for key, value := range batchChainsAndInputs {
-		formattedValues := make([]*gsharedmemoryproto.AtomicRequest, 0, len(value))
+		formattedValues := make([]*gsharedmemoryproto.AtomicRequest, len(value))
 		keys = append(keys, []byte(key.String()))
 		for k, v := range value {
 			formattedElements := make([]*gsharedmemoryproto.Element, 0, len(v.Elems))
@@ -338,13 +338,12 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 					Traits: formatElems.Traits,
 				})
 			}
-
 			formattedValues[k] = &gsharedmemoryproto.AtomicRequest{
 				RequestType: gsharedmemoryproto.SharedMemoryMethod(v.RequestType),
 				UtxoIDs:     v.UtxoIDs,
 				Elems:       formattedElements,
+				PeerChainID: key[:],
 			}
-
 			formattedRequest[key.String()] = &gsharedmemoryproto.BatchMap{Requests: formattedValues}
 		}
 	}
@@ -354,7 +353,6 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 		Continues:            true,
 		Id:                   stdatomic.AddInt64(&c.uniqueID, 1),
 	}
-
 	currentSize := 0
 	for _, key := range keys {
 		sizeChange := baseElementSize + len(key)
@@ -380,6 +378,7 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.
 			return err
 		}
 	}
+
 	if len(batchGroups) == 0 {
 		req.Continues = false
 		if _, err := c.client.RemoveAndPutMultiple(context.Background(), req); err != nil {

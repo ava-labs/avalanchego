@@ -34,7 +34,7 @@ type Server struct {
 	removes     map[int64]*removeRequest
 
 	removeAndPutMultipleLock sync.Mutex
-	removeAndPutMultiples    map[int64]*removeAndPutMultipleRequest
+	removeAndPutMultiples    map[int64]map[ids.ID][]*atomic.Requests
 }
 
 // NewServer returns shared memory connected to remote shared memory
@@ -46,7 +46,7 @@ func NewServer(sm atomic.SharedMemory, db database.Database) *Server {
 		gets:                  make(map[int64]*getRequest),
 		indexed:               make(map[int64]*indexedRequest),
 		removes:               make(map[int64]*removeRequest),
-		removeAndPutMultiples: make(map[int64]*removeAndPutMultipleRequest),
+		removeAndPutMultiples: make(map[int64]map[ids.ID][]*atomic.Requests),
 	}
 }
 
@@ -62,17 +62,24 @@ func (s *Server) RemoveAndPutMultiple(
 	s.removeAndPutMultipleLock.Lock()
 	defer s.removeAndPutMultipleLock.Unlock()
 
-	formattedRequest := make(map[ids.ID][]*atomic.Requests)
-	_, exists := s.removeAndPutMultiples[req.Id]
+	//
+	formattedRequest, exists := s.removeAndPutMultiples[req.Id]
 	if !exists {
-		for peerChainID, value := range req.BatchChainsAndInputs {
-			chainID, err := ids.ToID([]byte(peerChainID))
-			if err != nil {
-				return nil, err
-			}
+		formattedRequest = make(map[ids.ID][]*atomic.Requests)
+		for _, value := range req.BatchChainsAndInputs {
+			var chainID ids.ID
 
-			formattedValues := make([]*atomic.Requests, 0, len(value.Requests))
+			formattedValues := make([]*atomic.Requests, len(value.Requests))
 			for k, v := range value.Requests {
+				if chainID.String() == "" {
+					chainIdentifier, err := ids.ToID(v.PeerChainID)
+					if err != nil {
+						return nil, err
+					}
+
+					chainID = chainIdentifier
+				}
+
 				formattedElements := make([]*atomic.Element, 0, len(v.Elems))
 				for _, formatElems := range v.Elems {
 					formattedElements = append(formattedElements, &atomic.Element{
@@ -104,7 +111,7 @@ func (s *Server) RemoveAndPutMultiple(
 	}
 
 	if req.Continues {
-		s.removeAndPutMultiples[req.Id] = removeAndPut
+		s.removeAndPutMultiples[req.Id] = formattedRequest
 		return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, nil
 	}
 
@@ -116,6 +123,7 @@ func (s *Server) RemoveAndPutMultiple(
 		batches[i] = batch
 		i++
 	}
+
 	return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, s.sm.RemoveAndPutMultiple(formattedRequest, batches...)
 }
 

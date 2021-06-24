@@ -45,7 +45,21 @@ func TestInterface(t *testing.T) {
 		sm0, conn0 := wrapSharedMemory(t, m.NewSharedMemory(chainID0), baseDB)
 		sm1, conn1 := wrapSharedMemory(t, m.NewSharedMemory(chainID1), baseDB)
 
-		test(t, chainID0, chainID1, sm0, sm1, testDB, nil)
+		batchChainsAndInputs := make(map[ids.ID][]*atomic.Requests)
+
+		byteArr := [][]byte{{0}, {1}, {2}}
+
+		batchChainsAndInputs[chainID0] = []*atomic.Requests{{RequestType: atomic.SharedMemoryMethod(0), UtxoIDs: byteArr, Elems: []*atomic.Element{{
+			Key:   []byte{2},
+			Value: []byte{9},
+		}}}}
+
+		batchChainsAndInputs[chainID1] = []*atomic.Requests{{RequestType: atomic.SharedMemoryMethod(0), UtxoIDs: byteArr, Elems: []*atomic.Element{{
+			Key:   []byte{0},
+			Value: []byte{1},
+		}}}}
+
+		test(t, chainID0, chainID1, sm0, sm1, testDB, batchChainsAndInputs)
 
 		err = conn0.Close()
 		assert.NoError(err)

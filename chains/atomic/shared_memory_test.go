@@ -36,15 +36,15 @@ func TestSharedMemory(t *testing.T) {
 
 		byteArr := [][]byte{{0}, {1}, {2}}
 
-		batchChainsAndInputs[chainID0] = append([]*Requests{}, &Requests{Remove, byteArr, []*Element{{
-			Key:   []byte{0},
-			Value: []byte{1},
-		}}})
+		batchChainsAndInputs[chainID1] = []*Requests{{Remove, byteArr, []*Element{{
+			Key:   []byte{2},
+			Value: []byte{9},
+		}}}}
 
-		batchChainsAndInputs[chainID1] = append([]*Requests{}, &Requests{Put, byteArr, []*Element{{
+		batchChainsAndInputs[chainID1] = []*Requests{{Put, byteArr, []*Element{{
 			Key:   []byte{0},
 			Value: []byte{1},
-		}}})
+		}}}}
 
 		test(t, chainID0, chainID1, sm0, sm1, testDB, batchChainsAndInputs)
 	}
