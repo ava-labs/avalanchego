@@ -89,6 +89,10 @@ func (vm *VM) Initialize(
 	scheduler, vmToEngine := scheduler.New(toEngine)
 	vm.Scheduler = scheduler
 
+	go ctx.Log.RecoverAndPanic(func() {
+		scheduler.Dispatch(timer.MaxTime)
+	})
+
 	vm.ctx = ctx
 	vm.verifiedBlocks = make(map[ids.ID]*ProposerBlock)
 
@@ -110,7 +114,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	go scheduler.Dispatch(timer.MaxTime)
+	// TODO: repair the DB if the underlying VM's Accept calls weren't persisted
 
 	return vm.SetPreference(preferred)
 }
@@ -162,10 +166,7 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 	}
 
 	// check whether block is core one, with no proposerBlockHeader
-	if coreBlk, err := vm.ChainVM.GetBlock(id); err == nil {
-		return coreBlk, nil
-	}
-	return nil, ErrProBlkNotFound
+	return vm.ChainVM.GetBlock(id)
 }
 
 func (vm *VM) SetPreference(preferred ids.ID) error {
@@ -183,8 +184,12 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		return err
 	}
 
-	// check whether block is core one, with no proposerBlockHeader
-	return vm.ChainVM.SetPreference(blk.coreBlk.ID())
+	if err := vm.ChainVM.SetPreference(blk.coreBlk.ID()); err != nil {
+		return err
+	}
+
+	// TODO: reset the scheduler
+	return nil
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {

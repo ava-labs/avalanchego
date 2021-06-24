@@ -29,7 +29,6 @@ import (
 var (
 	ErrInnerBlockNotOracle     = errors.New("core snowman block does not implement snowman.OracleBlock")
 	ErrProBlkWrongVersion      = errors.New("proposer block has unsupported version")
-	ErrProBlkNotFound          = errors.New("proposer block not found")
 	ErrProBlkWrongParent       = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
 	ErrProBlkBadTimestamp      = errors.New("proposer block timestamp outside tolerance window")
 	ErrInvalidTLSKey           = errors.New("invalid validator signing key")
