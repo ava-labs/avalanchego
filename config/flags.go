@@ -230,7 +230,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
-	fs.Int(SnowQuorumSizeKey, 14, "Alpha value to use for required number positive results")
+	fs.Int(SnowQuorumSizeKey, 16, "Alpha value to use for required number positive results")
 	fs.Int(SnowVirtuousCommitThresholdKey, 15, "Beta value to use for virtuous transactions")
 	fs.Int(SnowRogueCommitThresholdKey, 20, "Beta value to use for rogue transactions")
 	fs.Int(SnowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
