@@ -4,7 +4,15 @@
 package avm
 
 import (
+	"encoding/binary"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+
+	"github.com/ava-labs/avalanchego/codec"
+
+	"github.com/ava-labs/avalanchego/snow"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -19,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIndexTransaction(t *testing.T) {
+func TestIndexTransaction_Ordered(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
@@ -38,7 +46,135 @@ func TestIndexTransaction(t *testing.T) {
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
+	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	// get the key
+	key := keys[0]
+
+	var uniqueTxs []*UniqueTx
+	txAssetID := avax.Asset{ID: avaxID}
+
 	ctx.Lock.Lock()
+	for i := 0; i < 5; i++ {
+
+		// create utxoID and assetIDs
+		utxoID := avax.UTXOID{
+			TxID: ids.GenerateTestID(),
+		}
+
+		// build the transaction
+		tx := buildTX(utxoID, txAssetID)
+
+		// sign the transaction
+		if err := signTX(vm.codec, tx, key); err != nil {
+			t.Fatal(err)
+		}
+
+		// Provide the platform UTXO
+		utxo := buildPlatformUTXO(utxoID, txAssetID, key)
+
+		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// save utxo to state
+		inputID := utxo.InputID()
+		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+			t.Fatal("Error saving utxo", err)
+		}
+
+		// put utxo in shared memory
+		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+			Key:   inputID[:],
+			Value: utxoBytes,
+			Traits: [][]byte{
+				key.PublicKey().Address().Bytes(),
+			},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+
+		// issue transaction
+		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+			t.Fatalf("should have issued the transaction correctly but errored: %s", err)
+		}
+
+		ctx.Lock.Unlock()
+
+		msg := <-issuer
+		if msg != common.PendingTxs {
+			t.Fatalf("Wrong message")
+		}
+
+		ctx.Lock.Lock()
+
+		// get pending transactions
+		txs := vm.PendingTxs()
+		if len(txs) != 1 {
+			t.Fatalf("Should have returned %d tx(s)", 1)
+		}
+
+		parsedTx := txs[0]
+		uniqueParsedTX := parsedTx.(*UniqueTx)
+		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
+
+		// index the transaction
+		err = IndexTransaction(uniqueParsedTX)
+		assert.NoError(t, err)
+	}
+
+	// ensure length is 5
+	assert.Len(t, uniqueTxs, 5)
+	// for each *UniqueTx check its indexed at right index
+	for i, tx := range uniqueTxs {
+		assertIndex(t, vm.db, uint64(i), key.PublicKey().Address(), txAssetID.ID, tx.ID())
+	}
+}
+
+func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, key *crypto.PrivateKeySECP256K1R) *avax.UTXO {
+	return &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  txAssetID,
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1000,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{key.PublicKey().Address()},
+			},
+		},
+	}
+}
+
+func signTX(codec codec.Manager, tx *Tx, key *crypto.PrivateKeySECP256K1R) error {
+	return tx.SignSECP256K1Fx(codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
+}
+
+func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset) *Tx {
+	return &Tx{UnsignedTx: &ImportTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		SourceChain: platformChainID,
+		ImportedIns: []*avax.TransferableInput{{
+			UTXOID: utxoID,
+			Asset:  txAssetID,
+			In: &secp256k1fx.TransferInput{
+				Amt:   1000,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+	}}
+}
+
+func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message) *VM {
 	vm := &VM{}
 	if err := vm.Initialize(
 		ctx,
@@ -63,100 +199,22 @@ func TestIndexTransaction(t *testing.T) {
 	if err := vm.Bootstrapped(); err != nil {
 		t.Fatal(err)
 	}
+	return vm
+}
 
-	key := keys[0] // generate multiple transactions for multiple addresses to verify
+func assertIndex(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
+	addressDB := prefixdb.New(sourceAddress[:], db)
+	assetDB := prefixdb.New(assetID[:], addressDB)
 
-	utxoID := avax.UTXOID{
-		TxID: ids.ID{
-			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-		},
-	}
-
-	txAssetID := avax.Asset{ID: avaxID}
-	tx := &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		}},
-		SourceChain: platformChainID,
-		ImportedIns: []*avax.TransferableInput{{
-			UTXOID: utxoID,
-			Asset:  txAssetID,
-			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-			},
-		}},
-	}}
-	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
-		t.Fatal(err)
-	}
-
-	// Provide the platform UTXO:
-
-	utxo := &avax.UTXO{
-		UTXOID: utxoID,
-		Asset:  txAssetID,
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1000,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{key.PublicKey().Address()},
-			},
-		},
-	}
-
-	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	inputID := utxo.InputID()
-
-	if err := vm.state.PutUTXO(inputID, utxo); err != nil {
-		t.Fatal("Error saving utxo", err)
-	}
-
-	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-		Key:   inputID[:],
-		Value: utxoBytes,
-		Traits: [][]byte{
-			key.PublicKey().Address().Bytes(),
-		},
-	}}); err != nil {
-		t.Fatal(err)
-	}
-
-	if _, err := vm.IssueTx(tx.Bytes()); err != nil {
-		t.Fatalf("should have issued the transaction correctly but errored: %s", err)
-	}
-	ctx.Lock.Unlock()
-
-	msg := <-issuer
-	if msg != common.PendingTxs {
-		t.Fatalf("Wrong message")
-	}
-
-	ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		ctx.Lock.Unlock()
-	}()
-
-	txs := vm.PendingTxs()
-	if len(txs) != 1 {
-		t.Fatalf("Should have returned %d tx(s)", 1)
-	}
-
-	parsedTx := txs[0]
-
-	err = IndexTransaction(parsedTx.(*UniqueTx))
+	idxBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(idxBytes, index)
+	tx1Bytes, err := assetDB.Get(idxBytes)
 	assert.NoError(t, err)
 
-	assertIndex(t, key.PublicKey().Address(), txAssetID.ID, tx.ID(), vm.db)
+	var txID ids.ID
+	copy(txID[:], tx1Bytes)
+
+	if txID != transactionID {
+		t.Fatalf("txID %s not same as %s", txID, transactionID)
+	}
 }

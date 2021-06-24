@@ -5,14 +5,7 @@ package avm
 
 import (
 	"bytes"
-	"encoding/binary"
 	"testing"
-
-	"github.com/ava-labs/avalanchego/database"
-
-	"github.com/stretchr/testify/assert"
-
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
@@ -374,33 +367,11 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertIndex(t, key.PublicKey().Address(), txAssetID.ID, tx.ID(), vm.db)
+	assertIndex(t, vm.db, 0, key.PublicKey().Address(), txAssetID.ID, tx.ID())
 
 	id := utxoID.InputID()
 	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
-	}
-}
-
-func assertIndex(t *testing.T, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID, db database.Database) {
-	addressDB := prefixdb.New(sourceAddress[:], db)
-	assetDB := prefixdb.New(assetID[:], addressDB)
-	idxBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(idxBytes, 1)
-
-	idxVal, err := assetDB.Get([]byte("idx"))
-	assert.NoError(t, err)
-	assert.EqualValues(t, idxBytes, idxVal)
-
-	binary.BigEndian.PutUint64(idxBytes, 0)
-	tx1Bytes, err := assetDB.Get(idxBytes)
-	assert.NoError(t, err)
-
-	var txID ids.ID
-	copy(txID[:], tx1Bytes)
-
-	if txID != transactionID {
-		t.Fatalf("txID %s not same as %s", txID, transactionID)
 	}
 }
 
