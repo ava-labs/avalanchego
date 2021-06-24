@@ -68,10 +68,10 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter.Shutdown()
 
-	ticker := time.NewTicker(20 * time.Millisecond)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	select {
 	case <-ticker.C:
-		t.Fatalf("Handler shutdown was not called or timed out after 20ms during chainRouter shutdown")
+		t.Fatalf("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
 	case <-shutdownCalled:
 	}
 
