@@ -27,7 +27,12 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var pTestCert *tls.Certificate
+var (
+	pTestCert *tls.Certificate
+
+	genesisUnixTimestamp int64 = 1000
+	genesisTimestamp           = time.Unix(genesisUnixTimestamp, 0)
+)
 
 func init() {
 	var err error
@@ -38,18 +43,20 @@ func init() {
 }
 
 func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *validators.TestVM, *VM, *snowman.TestBlock) {
-	// setup
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
-			StatusV: choices.Unknown,
+			StatusV: choices.Accepted,
 		},
-		BytesV:  []byte{0},
-		HeightV: 0,
+		HeightV:    0,
+		TimestampV: genesisTimestamp,
+		BytesV:     []byte{0},
 	}
 
+	initialState := []byte("genesis state")
 	coreVM := &block.TestVM{}
-	coreVM.CantInitialize = true
+	coreVM.T = t
+
 	coreVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
 		return nil
 	}
@@ -61,21 +68,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	valVM := &validators.TestVM{
 		T: t,
 	}
-
-	ctx := &snow.Context{
-		NodeID:      hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
-		Log:         logging.NoLog{},
-		StakingCert: *pTestCert,
-		ValidatorVM: valVM,
-	}
-	dummyDBManager := manager.NewDefaultMemDBManager()
-	if err := proVM.Initialize(ctx, dummyDBManager, coreGenBlk.Bytes(), nil, nil, nil, nil); err != nil {
-		t.Fatal("failed to initialize proposerVM")
-	}
-
-	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
-	valVM.CantGetValidatorSet = true
 	valVM.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
@@ -84,6 +77,23 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		res[ids.ShortID{3}] = uint64(7)
 		return res, nil
 	}
+
+	ctx := &snow.Context{
+		NodeID:      hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
+		Log:         logging.NoLog{},
+		StakingCert: *pTestCert,
+		ValidatorVM: valVM,
+	}
+	dummyDBManager := manager.NewDefaultMemDBManager()
+	// make sure that DBs are compressed correctly
+	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
+	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil); err != nil {
+		t.Fatalf("failed to initialize proposerVM with %s", err)
+	}
+
+	// Initialize shouldn't be called again
+	coreVM.CantInitialize = true
+	coreVM.InitializeF = nil
 
 	return coreVM, valVM, proVM, coreGenBlk
 }
@@ -516,9 +526,10 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
-		BytesV:  []byte{111},
-		ParentV: gencoreBlk,
-		HeightV: gencoreBlk.Height() + 1,
+		BytesV:     []byte{111},
+		ParentV:    gencoreBlk,
+		HeightV:    gencoreBlk.Height() + 1,
+		TimestampV: genesisTimestamp,
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) {
@@ -535,9 +546,10 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 	// another block with same parent comes from network and is parsed
 	netcoreBlk := &snowman.TestBlock{
-		BytesV:  []byte{222},
-		ParentV: gencoreBlk,
-		HeightV: gencoreBlk.Height() + 1,
+		BytesV:     []byte{222},
+		ParentV:    gencoreBlk,
+		HeightV:    gencoreBlk.Height() + 1,
+		TimestampV: genesisTimestamp,
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
