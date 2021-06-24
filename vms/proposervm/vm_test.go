@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/tls"
-	"errors"
 	"testing"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -27,46 +27,21 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var (
-	pTestCert          *tls.Certificate = nil // package variable to init it only once
-	errGetValidatorSet                  = errors.New("unexpectedly called GetValidatorSet")
-	errCurrentHeight                    = errors.New("unexpectedly called GetCurrentHeigh")
-)
+var pTestCert *tls.Certificate
 
-type TestValidatorVM struct {
-	T *testing.T
-	CantGetValidatorSet,
-	CantGetCurrentHeight bool
-
-	GetValidatorsF    func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error)
-	GetCurrentHeightF func() (uint64, error)
+func init() {
+	var err error
+	pTestCert, err = staking.NewTLSCert()
+	if err != nil {
+		panic(err)
+	}
 }
 
-func (tVM *TestValidatorVM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-	if tVM.GetValidatorsF != nil {
-		return tVM.GetValidatorsF(height, subnetID)
-	}
-	if tVM.CantGetValidatorSet && tVM.T != nil {
-		tVM.T.Fatal(errGetValidatorSet)
-	}
-	return nil, errGetValidatorSet
-}
-
-func (tVM *TestValidatorVM) GetCurrentHeight() (uint64, error) {
-	if tVM.GetCurrentHeightF != nil {
-		return tVM.GetCurrentHeightF()
-	}
-	if tVM.CantGetCurrentHeight && tVM.T != nil {
-		tVM.T.Fatal(errCurrentHeight)
-	}
-	return 0, errCurrentHeight
-}
-
-func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *TestValidatorVM, *VM, *snowman.TestBlock) {
+func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *validators.TestVM, *VM, *snowman.TestBlock) {
 	// setup
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
-			IDV:     ids.Empty.Prefix(0000),
+			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Unknown,
 		},
 		BytesV:  []byte{0},
@@ -83,15 +58,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 
 	proVM := New(coreVM, proBlkStartTime)
 
-	if pTestCert == nil {
-		var err error
-		pTestCert, err = staking.NewTLSCert()
-		if err != nil {
-			t.Fatal("Could not generate dummy StakerCert")
-		}
-	}
-
-	valVM := &TestValidatorVM{
+	valVM := &validators.TestVM{
 		T: t,
 	}
 
@@ -109,7 +76,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	valVM.CantGetCurrentHeight = true
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
 	valVM.CantGetValidatorSet = true
-	valVM.GetValidatorsF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+	valVM.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.ShortID{1}] = uint64(5)
