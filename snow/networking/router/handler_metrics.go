@@ -128,30 +128,6 @@ func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Regi
 	return errs.Err
 }
 
-func (m *handlerMetrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus.Histogram, error) {
-	errs := wrappers.Errs{}
-
-	gauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: m.namespace,
-		Name:      fmt.Sprintf("tier_%d", tier),
-		Help:      fmt.Sprintf("Number of pending messages on tier %d of the multi-level message queue", tier),
-	})
-	if err := m.registerer.Register(gauge); err != nil {
-		errs.Add(fmt.Errorf("failed to register tier_%d statistics due to %w", tier, err))
-	}
-
-	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: m.namespace,
-		Name:      fmt.Sprintf("tier_%d_wait_time", tier),
-		Help:      fmt.Sprintf("Amount of time a message waits on tier %d queue before being processed", tier),
-		Buckets:   metric.NanosecondsBuckets,
-	})
-	if err := m.registerer.Register(histogram); err != nil {
-		errs.Add(fmt.Errorf("failed to register tier_%d_wait_time statistics due to %w", tier, err))
-	}
-	return gauge, histogram, errs.Err
-}
-
 func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) prometheus.Histogram {
 	switch msg {
 	case constants.GetAcceptedFrontierMsg:
