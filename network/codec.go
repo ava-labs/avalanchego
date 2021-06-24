@@ -83,12 +83,12 @@ func (c codec) Pack(
 	// Pack the op code (message type)
 	p.PackByte(byte(op))
 
-	// If messages of this type may be compressed, pack whether the payload is compressed
+	// Optionally, pack whether the payload is compressed
 	if includeIsCompressedFlag {
 		p.PackBool(compress)
 	}
 
-	// Pack the payload
+	// Pack the uncompressed payload
 	for _, field := range msgFields {
 		data, ok := fieldValues[field]
 		if !ok {
@@ -164,7 +164,7 @@ func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
 		p.Bytes = p.Bytes[:wrappers.ByteLen]
 		// Attach the isCompressed flag (now false)
 		p.Bytes = append(p.Bytes, 0)
-		// Attach the and decompressed payload.
+		// Attach the decompressed payload.
 		p.Bytes = append(p.Bytes, payloadBytes...)
 	}
 
