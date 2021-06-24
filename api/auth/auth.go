@@ -45,13 +45,13 @@ var (
 	errInvalidSigningMethod        = fmt.Errorf("auth token didn't specify the HS256 signing method correctly")
 	errTokenRevoked                = errors.New("the provided auth token was revoked")
 	errTokenInsufficientPermission = errors.New("the provided auth token does not allow access to this endpoint")
+	errWrongPassword               = errors.New("incorrect password")
+	errSamePassword                = errors.New("new password can't be same as old password")
+	errNoPassword                  = errors.New("no password")
+	errNoEndpoints                 = errors.New("must name at least one endpoint")
+	errTooManyEndpoints            = fmt.Errorf("can only name at most %d endpoints", maxEndpoints)
 
-	errWrongPassword = errors.New("incorrect password")
-	errSamePassword  = errors.New("new password can't be same as old password")
-	errNoPassword    = errors.New("no password")
-
-	errNoEndpoints      = errors.New("must name at least one endpoint")
-	errTooManyEndpoints = fmt.Errorf("can only name at most %d endpoints", maxEndpoints)
+	_ Auth = &auth{}
 )
 
 type Auth interface {

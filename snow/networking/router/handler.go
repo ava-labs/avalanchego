@@ -550,7 +550,6 @@ func (h *Handler) push(msg message) {
 
 	h.unprocessedMsgs.Push(msg)
 	h.unprocessedMsgsCond.Broadcast()
-
 }
 
 func (h *Handler) dispatchInternal() {

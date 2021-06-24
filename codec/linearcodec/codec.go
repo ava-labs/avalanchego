@@ -18,6 +18,13 @@ const (
 	defaultMaxSliceLength = 1 << 18
 )
 
+var (
+	_ Codec              = &linearCodec{}
+	_ codec.Codec        = &linearCodec{}
+	_ codec.Registry     = &linearCodec{}
+	_ codec.GeneralCodec = &linearCodec{}
+)
+
 // Codec marshals and unmarshals
 type Codec interface {
 	codec.Registry

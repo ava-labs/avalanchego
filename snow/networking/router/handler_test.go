@@ -43,10 +43,6 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		16,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -87,10 +83,6 @@ func TestHandlerDoesntDrop(t *testing.T) {
 		&engine,
 		validators,
 		nil,
-		16,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -124,10 +116,6 @@ func TestHandlerClosesOnError(t *testing.T) {
 		&engine,
 		validators.NewSet(),
 		nil,
-		16,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -135,7 +123,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 
 	handler.clock.Set(time.Now())
 
-	handler.toClose = func() {
+	handler.onCloseF = func() {
 		closed <- struct{}{}
 	}
 	go handler.Dispatch()
@@ -169,10 +157,6 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		&engine,
 		validators.NewSet(),
 		nil,
-		16,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

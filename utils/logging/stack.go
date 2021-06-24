@@ -18,7 +18,7 @@ type Stacktrace struct {
 func (st Stacktrace) String() string {
 	buf := make([]byte, 1<<16)
 	n := runtime.Stack(buf, st.Global)
-	return fmt.Sprintf("%s", buf[:n])
+	return string(buf[:n])
 }
 
 // RoutineID can print the current goroutine ID

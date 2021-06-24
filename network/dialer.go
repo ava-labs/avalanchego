@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var _ Dialer = &dialer{}
+
 // Dialer attempts to create a connection with the provided IP/port pair
 type Dialer interface {
 	// If [ctx] is canceled, gives up trying to connect to [ip]

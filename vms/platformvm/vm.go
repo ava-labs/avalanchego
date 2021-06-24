@@ -74,6 +74,7 @@ var (
 	_ validators.Connector = &VM{}
 	_ common.StaticVM      = &VM{}
 	_ secp256k1fx.VM       = &VM{}
+	_ Fx                   = &secp256k1fx.Fx{}
 )
 
 // VM implements the snowman.ChainVM interface
@@ -410,8 +411,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptAPIRequest)
-	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterAPIRequest)
+	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterRequest)
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}

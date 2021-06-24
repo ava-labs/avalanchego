@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 // The signature of a peer's certificate on the byte representation
@@ -44,12 +43,13 @@ type alias struct {
 type peer struct {
 	net *network // network this peer is part of
 
-	// if the version message has been received and is valid. is only modified
-	// on the connection's reader routine.
+	// True if this peer has sent us a valid Version message and
+	// is running a compatible version.
+	// Only modified on the connection's reader routine.
 	gotVersion utils.AtomicBool
 
-	// if the gotPeerList message has been received and is valid. is only
-	// modified on the connection's reader routine.
+	// True if this peer has sent us a valid PeerList message.
+	// Only modified on the connection's reader routine.
 	gotPeerList utils.AtomicBool
 
 	// only send the version to this peer on handling a getVersion message if
@@ -60,13 +60,12 @@ type peer struct {
 	// a peerlist hasn't already been sent.
 	peerListSent utils.AtomicBool
 
-	// if the version message has been received and is valid and the peerlist
-	// has been returned. is only modified on the connection's reader routine.
-	connected utils.AtomicBool
-
-	// if the peer is connected and the peer is able to follow the protocol. is
-	// only modified on the connection's reader routine.
-	compatible utils.AtomicBool
+	// True if the peer:
+	// * Has sent us a Version message
+	// * Has sent us a PeerList message
+	// * Is a compatible version
+	// Only modified on the connection's reader routine.
+	finishedHandshake utils.AtomicBool
 
 	// only close the peer once
 	once sync.Once
@@ -101,16 +100,17 @@ type peer struct {
 	// aliasLock must be held when accessing [aliases] or [aliasTimer].
 	aliasLock sync.Mutex
 
-	// id should be set when the peer is first created.
-	id ids.ShortID
+	// node ID of this peer.
+	nodeID ids.ShortID
 
 	// the connection object that is used to read/write messages from
 	conn net.Conn
 
-	// version that the peer reported during the handshake
+	// Version that this peer reported during the handshake.
+	// Set when we process the Version message from this peer.
 	versionStruct, versionStr utils.AtomicInterface
 
-	// unix time of the last message sent and received respectively
+	// Unix time of the last message sent and received respectively
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
@@ -189,13 +189,12 @@ func (p *peer) requestFinishHandshake() {
 	for {
 		select {
 		case <-finishHandshakeTicker.C:
-			connected := p.connected.GetValue()
-			closed := p.closed.GetValue()
-
-			if connected || closed {
+			if p.finishedHandshake.GetValue() {
 				return
 			}
-
+			if p.closed.GetValue() {
+				return
+			}
 			if !p.gotVersion.GetValue() {
 				p.sendGetVersion()
 			}
@@ -249,7 +248,7 @@ func (p *peer) ReadMessages() {
 			doneReadingMsgLen := err == nil
 			if doneReadingMsgLen {
 				if int64(msgLen) > p.net.maxMessageSize {
-					p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.id, p.getIP(), msgLen)
+					p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.nodeID, p.getIP(), msgLen)
 					return
 				}
 				// Done reading the message length.
@@ -257,19 +256,19 @@ func (p *peer) ReadMessages() {
 				// Note that when we are done handling this message, or give up
 				// trying to read it, we must call [p.net.msgThrottler.Release]
 				// to give back the bytes used by this message.
-				p.net.msgThrottler.Acquire(uint64(msgLen), p.id)
+				p.net.msgThrottler.Acquire(uint64(msgLen), p.nodeID)
 				break
 			}
 			if len(pendingBuffer.Bytes) >= wrappers.IntLen {
 				// We should be able to parse the message length by now but we can't
-				p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
+				p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 				return
 			}
 
 			// Read more of the message length.
 			numBytesRead, err := reader.Read(readBuffer)
 			if err != nil {
-				p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
+				p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 				return
 			}
 			pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:numBytesRead]...)
@@ -288,8 +287,8 @@ func (p *peer) ReadMessages() {
 				// Get more of the message
 				read, err := reader.Read(readBuffer)
 				if err != nil {
-					p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.id, p.getIP(), err)
-					p.net.msgThrottler.Release(uint64(msgLen), p.id)
+					p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
+					p.net.msgThrottler.Release(uint64(msgLen), p.nodeID)
 					return
 				}
 				pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:read]...)
@@ -303,7 +302,7 @@ func (p *peer) ReadMessages() {
 			pendingBuffer.Offset = 0
 
 			p.net.log.Verbo("parsing new message from %s%s at %s:\n%s",
-				constants.NodeIDPrefix, p.id, p.getIP(),
+				constants.NodeIDPrefix, p.nodeID, p.getIP(),
 				formatting.DumpBytes{Bytes: msgBytes},
 			)
 
@@ -311,12 +310,12 @@ func (p *peer) ReadMessages() {
 			msg, err := p.net.b.Parse(msgBytes)
 			if err != nil {
 				p.net.log.Verbo("failed to parse new message from %s%s at %s:\n%s\n%s",
-					constants.NodeIDPrefix, p.id, p.getIP(),
+					constants.NodeIDPrefix, p.nodeID, p.getIP(),
 					formatting.DumpBytes{Bytes: msgBytes},
 					err,
 				)
 				// Couldn't parse the message. Read the next one.
-				p.net.msgThrottler.Release(uint64(msgLen), p.id)
+				p.net.msgThrottler.Release(uint64(msgLen), p.nodeID)
 				break
 			}
 
@@ -338,7 +337,7 @@ func (p *peer) WriteMessages() {
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
-			p.id,
+			p.nodeID,
 			formatting.DumpBytes{Bytes: msg})
 
 		msgb := [wrappers.IntLen]byte{}
@@ -346,12 +345,12 @@ func (p *peer) WriteMessages() {
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
 			for len(byteSlice) > 0 {
 				if err := p.conn.SetWriteDeadline(time.Now().Add(p.net.pingPongTimeout)); err != nil {
-					p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.id, p.getIP(), err)
+					p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.nodeID, p.getIP(), err)
 					return
 				}
 				written, err := writer.Write(byteSlice)
 				if err != nil {
-					p.net.log.Verbo("error writing to %s at %s due to: %s", p.id, p.getIP(), err)
+					p.net.log.Verbo("error writing to %s at %s due to: %s", p.nodeID, p.getIP(), err)
 					return
 				}
 
@@ -361,7 +360,7 @@ func (p *peer) WriteMessages() {
 		}
 		// Make sure the peer got the entire message
 		if err := writer.Flush(); err != nil {
-			p.net.log.Verbo("couldn't flush writer to %s: %s", p.id, p.getIP(), err)
+			p.net.log.Verbo("couldn't flush writer to %s: %s", p.nodeID, p.getIP(), err)
 			return
 		}
 
@@ -389,13 +388,13 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	// If the peer was closed then the sender channel was closed and we are
 	// unable to send this message without panicking. So drop the message.
 	if p.closed.GetValue() {
-		p.net.log.Debug("dropping message to %s due to a closed connection", p.id)
+		p.net.log.Debug("dropping message to %s due to a closed connection", p.nodeID)
 		return false
 	}
 
 	// is it possible to send?
 	if dropMsg := p.dropMessagePeer(); dropMsg {
-		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
+		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.nodeID)
 		return false
 	}
 
@@ -409,7 +408,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	if dropMsg := p.dropMessage(newConnPendingBytes, newPendingBytes); dropMsg {
 		// we never sent the message, remove from pending totals
 		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
-		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.id)
+		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.nodeID)
 		return false
 	}
 
@@ -428,7 +427,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	default:
 		// we never sent the message, remove from pending totals
 		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
-		p.net.log.Debug("dropping message to %s due to a full send queue", p.id)
+		p.net.log.Debug("dropping message to %s due to a full send queue", p.nodeID)
 		p.net.byteSlicePool.Put(toSend)
 		return false
 	}
@@ -449,7 +448,7 @@ func (p *peer) handle(msg Msg) {
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
-		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op)
+		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
 		return
 	}
 	msgMetrics.numReceived.Inc()
@@ -459,31 +458,31 @@ func (p *peer) handle(msg Msg) {
 	switch op {
 	case Version:
 		p.handleVersion(msg)
-		p.net.msgThrottler.Release(msgLen, p.id)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	case GetVersion:
 		p.handleGetVersion(msg)
-		p.net.msgThrottler.Release(msgLen, p.id)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	case Ping:
 		p.handlePing(msg)
-		p.net.msgThrottler.Release(msgLen, p.id)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	case Pong:
 		p.handlePong(msg)
-		p.net.msgThrottler.Release(msgLen, p.id)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	case GetPeerList:
 		p.handleGetPeerList(msg)
-		p.net.msgThrottler.Release(msgLen, p.id)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	case PeerList:
 		p.handlePeerList(msg)
-		p.net.msgThrottler.Release(msgLen, p.id)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	}
-	if !p.connected.GetValue() {
-		p.net.log.Debug("dropping message from %s because the connection hasn't been established yet", p.id)
+	if !p.finishedHandshake.GetValue() {
+		p.net.log.Debug("dropping message from %s%s because handshake isn't finished", constants.NodeIDPrefix, p.nodeID)
 
 		// attempt to finish the handshake
 		if !p.gotVersion.GetValue() {
@@ -492,24 +491,7 @@ func (p *peer) handle(msg Msg) {
 		if !p.gotPeerList.GetValue() {
 			p.sendGetPeerList()
 		}
-		p.net.msgThrottler.Release(msgLen, p.id)
-		return
-	}
-
-	peerVersion := p.versionStruct.GetValue().(version.Application)
-	if p.net.versionCompatibility.Compatible(peerVersion) != nil {
-		p.net.log.Verbo("dropping message from un-upgraded validator %s", p.id)
-
-		if p.compatible.GetValue() {
-			p.net.stateLock.Lock()
-			defer p.net.stateLock.Unlock()
-
-			if p.compatible.GetValue() {
-				p.net.router.Disconnected(p.id)
-				p.compatible.SetValue(false)
-			}
-		}
-		p.net.msgThrottler.Release(msgLen, p.id)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	}
 
@@ -537,7 +519,7 @@ func (p *peer) handle(msg Msg) {
 	case Chits:
 		p.handleChits(msg)
 	default:
-		p.net.log.Debug("dropping an unknown message from %s with op %s", p.id, op)
+		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
 	}
 }
 
@@ -557,7 +539,8 @@ func (p *peer) dropMessage(connPendingLen, networkPendingLen int64) bool {
 // assumes the [stateLock] is not held
 func (p *peer) Close() { p.once.Do(p.close) }
 
-// assumes only `peer.Close` calls this
+// assumes only [peer.Close] calls this.
+// By the time this message returns, [p] has been removed from [p.net.peers]
 func (p *peer) close() {
 	// If the connection is closing, we can immediately cancel the ticker
 	// goroutines.
@@ -566,7 +549,7 @@ func (p *peer) close() {
 	p.closed.SetValue(true)
 
 	if err := p.conn.Close(); err != nil {
-		p.net.log.Debug("closing peer %s resulted in an error: %s", p.id, err)
+		p.net.log.Debug("closing peer %s resulted in an error: %s", p.nodeID, err)
 	}
 
 	p.senderLock.Lock()
@@ -713,7 +696,7 @@ func (p *peer) handleGetVersion(_ Msg) {
 func (p *peer) handleVersion(msg Msg) {
 	switch {
 	case p.gotVersion.GetValue():
-		p.net.log.Verbo("dropping duplicated version message from %s", p.id)
+		p.net.log.Verbo("dropping duplicated version message from %s", p.nodeID)
 		return
 	case msg.Get(NodeID).(uint32) == p.net.nodeID:
 		p.net.log.Debug("peer's node ID is our node ID")
@@ -730,14 +713,14 @@ func (p *peer) handleVersion(msg Msg) {
 	myTime := float64(p.net.clock.Unix())
 	peerTime := float64(msg.Get(MyTime).(uint64))
 	if math.Abs(peerTime-myTime) > p.net.maxClockDifference.Seconds() {
-		if p.net.beacons.Contains(p.id) {
+		if p.net.beacons.Contains(p.nodeID) {
 			p.net.log.Warn("beacon %s reports time (%d) that is too far out of sync with our's (%d)",
-				p.id,
+				p.nodeID,
 				uint64(peerTime),
 				uint64(myTime))
 		} else {
 			p.net.log.Debug("peer %s reports time (%d) that is too far out of sync with our's (%d)",
-				p.id,
+				p.nodeID,
 				uint64(peerTime),
 				uint64(myTime))
 		}
@@ -754,34 +737,28 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	if p.net.versionCompatibility.Version().Before(peerVersion) {
-		if p.net.beacons.Contains(p.id) {
+		if p.net.beacons.Contains(p.nodeID) {
 			p.net.log.Info("beacon %s attempting to connect with newer version %s. You may want to update your client",
-				p.id,
+				p.nodeID,
 				peerVersion)
 		} else {
 			p.net.log.Debug("peer %s attempting to connect with newer version %s. You may want to update your client",
-				p.id,
+				p.nodeID,
 				peerVersion)
 		}
 	}
 
-	if err := p.net.versionCompatibility.Connectable(peerVersion); err != nil {
-		p.net.log.Debug("peer version %s not compatible: %s", peerVersion, err)
-
-		if !p.net.beacons.Contains(p.id) {
-			p.discardIP()
-			return
-		}
-		p.net.log.Info("allowing beacon %s to connect with a lower version %s",
-			p.id,
-			peerVersion)
+	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
+		p.net.log.Verbo("peer version (%s) not compatible: %s", peerVersion, err)
+		p.discardIP()
+		return
 	}
 
 	peerIP := msg.Get(IP).(utils.IPDesc)
 
 	versionTime := msg.Get(VersionTime).(uint64)
 	p.net.stateLock.RLock()
-	latestPeerIP := p.net.latestPeerIP[p.id]
+	latestPeerIP := p.net.latestPeerIP[p.nodeID]
 	p.net.stateLock.RUnlock()
 	if latestPeerIP.time > versionTime {
 		p.discardIP()
@@ -789,7 +766,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 	if float64(versionTime)-myTime > p.net.maxClockDifference.Seconds() {
 		p.net.log.Debug("peer %s attempting to connect with version timestamp (%d) too far in the future",
-			p.id,
+			p.nodeID,
 			latestPeerIP.time,
 		)
 		p.discardIP()
@@ -812,7 +789,7 @@ func (p *peer) handleVersion(msg Msg) {
 	}
 
 	p.net.stateLock.Lock()
-	p.net.latestPeerIP[p.id] = signedPeerIP
+	p.net.latestPeerIP[p.nodeID] = signedPeerIP
 	p.net.stateLock.Unlock()
 
 	p.sigAndTime.SetValue(signedPeerIP)
@@ -836,7 +813,7 @@ func (p *peer) handleVersion(msg Msg) {
 	p.versionStr.SetValue(peerVersion.String())
 	p.gotVersion.SetValue(true)
 
-	p.tryMarkConnected()
+	p.tryMarkFinishedHandshake()
 }
 
 // assumes the [stateLock] is not held
@@ -919,7 +896,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 // assumes the [stateLock] is not held
 func (p *peer) handlePeerList(msg Msg) {
 	p.gotPeerList.SetValue(true)
-	p.tryMarkConnected()
+	p.tryMarkFinishedHandshake()
 
 	if p.net.isFetchOnly {
 		// If the node is in fetch only mode, drop all incoming peers
@@ -949,11 +926,11 @@ func (p *peer) handleGetAcceptedFrontier(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAcceptedFrontier(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -982,11 +959,11 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.AcceptedFrontier(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1016,12 +993,12 @@ func (p *peer) handleGetAccepted(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAccepted(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1050,11 +1027,11 @@ func (p *peer) handleAccepted(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Accepted(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1069,12 +1046,12 @@ func (p *peer) handleGet(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Get(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1088,12 +1065,12 @@ func (p *peer) handleGetAncestors(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAncestors(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1108,12 +1085,12 @@ func (p *peer) handlePut(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Put(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		containerID,
 		container,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1126,11 +1103,11 @@ func (p *peer) handleMultiPut(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.MultiPut(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		containers,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1146,13 +1123,13 @@ func (p *peer) handlePushQuery(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.PushQuery(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerID,
 		container,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1167,12 +1144,12 @@ func (p *peer) handlePullQuery(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.PullQuery(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
@@ -1201,20 +1178,20 @@ func (p *peer) handleChits(msg Msg) {
 
 	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Chits(
-		p.id,
+		p.nodeID,
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.id) },
+		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
 	)
 }
 
 // assumes the [stateLock] is held
-func (p *peer) tryMarkConnected() {
-	if !p.connected.GetValue() && // not already connected
-		p.gotVersion.GetValue() && // not waiting for version
-		p.gotPeerList.GetValue() && // not waiting for peerlist
-		!p.closed.GetValue() { // and not already disconnected
+func (p *peer) tryMarkFinishedHandshake() {
+	if !p.finishedHandshake.GetValue() && // not already marked as finished with handshake
+		p.gotVersion.GetValue() && // not waiting for Version
+		p.gotPeerList.GetValue() && // not waiting for PeerList
+		!p.closed.GetValue() { // not already disconnected
 		p.net.connected(p)
 	}
 }
@@ -1299,7 +1276,7 @@ func (p *peer) releaseNextAlias(now time.Time) *alias {
 	}
 	p.aliases = p.aliases[1:]
 
-	p.net.log.Verbo("released alias %s for peer %s", next.ip, p.id)
+	p.net.log.Verbo("released alias %s for peer %s", next.ip, p.nodeID)
 	return &next
 }
 
@@ -1334,7 +1311,7 @@ func (p *peer) releaseAllAliases() {
 	for _, alias := range p.aliases {
 		delete(p.net.peerAliasIPs, alias.ip.String())
 
-		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.id)
+		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.nodeID)
 	}
 	p.aliases = nil
 }

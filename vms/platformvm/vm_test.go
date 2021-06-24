@@ -2158,10 +2158,6 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		&engine,
 		vdrs,
 		msgChan,
-		1024,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

@@ -89,10 +89,6 @@ func TestTimeout(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -164,10 +160,6 @@ func TestReliableMessages(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -248,10 +240,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		router.DefaultMaxNonStakerPendingMsgs,
-		router.DefaultStakerPortion,
-		router.DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

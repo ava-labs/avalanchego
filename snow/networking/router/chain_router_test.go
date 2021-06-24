@@ -57,10 +57,6 @@ func TestShutdown(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -131,10 +127,6 @@ func TestShutdownTimesOut(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -231,10 +223,6 @@ func TestRouterTimeout(t *testing.T) {
 		&engine,
 		validators.NewSet(),
 		nil,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)
@@ -298,10 +286,6 @@ func TestRouterClearTimeouts(t *testing.T) {
 		&engine,
 		validators.NewSet(),
 		nil,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
 	)

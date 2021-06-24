@@ -255,7 +255,6 @@ func (cr *ChainRouter) removeChain(chainID ids.ID) {
 	if cr.onFatal != nil && cr.criticalChains.Contains(chainID) {
 		go cr.onFatal(1)
 	}
-
 }
 
 // GetAcceptedFrontier routes an incoming GetAcceptedFrontier request from the
@@ -921,18 +920,6 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 		return details, errUnhealthy
 	}
 	return details, nil
-}
-
-func (cr *ChainRouter) registerMsgDrop(isBootstrapped bool) {
-	if isBootstrapped {
-		cr.dropRateCalculator.Observe(1, cr.clock.Time())
-	}
-}
-
-func (cr *ChainRouter) registerMsgSuccess(isBootstrapped bool) {
-	if isBootstrapped {
-		cr.dropRateCalculator.Observe(0, cr.clock.Time())
-	}
 }
 
 // Assumes [cr.lock] is held

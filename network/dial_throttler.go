@@ -6,7 +6,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
+var (
+	_ DialThrottler = &dialThrottler{}
+	_ DialThrottler = &noDialThrottler{}
+)
+
 type DialThrottler interface {
+
 	// Block until the event associated with this Acquire can happen.
 	// If [ctx] is canceled, gives up and returns an error.
 	Acquire(ctx context.Context) error
