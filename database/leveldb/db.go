@@ -21,7 +21,7 @@ import (
 
 const (
 	// Name is the name of this database for database switches
-	Name = "level"
+	Name = "leveldb"
 
 	// BlockCacheSize is the number of bytes to use for block caching in
 	// leveldb.

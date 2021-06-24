@@ -22,7 +22,7 @@ import (
 
 const (
 	// Name is the name of this database for database switches
-	Name = "rocks"
+	Name = "rocksdb"
 
 	MemoryBudget   = 512 * 1024 * 1024 // 512 MiB
 	BitsPerKey     = 10                // 10 bits

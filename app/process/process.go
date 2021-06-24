@@ -107,8 +107,8 @@ func (a *App) Start() int {
 		err = fmt.Errorf(
 			"db-type was %q but should have been one of {%s, %s, %s}",
 			a.config.DBName,
-			rocksdb.Name,
 			leveldb.Name,
+			rocksdb.Name,
 			memdb.Name,
 		)
 	}

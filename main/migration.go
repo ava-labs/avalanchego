@@ -107,8 +107,8 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 		err = fmt.Errorf(
 			"db-type was %q but should have been one of {%s, %s, %s}",
 			m.rootConfig.DBName,
-			rocksdb.Name,
 			leveldb.Name,
+			rocksdb.Name,
 			memdb.Name,
 		)
 	}
