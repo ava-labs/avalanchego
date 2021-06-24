@@ -20,7 +20,13 @@ type Builder struct {
 // GetVersion message
 func (b Builder) GetVersion(includeIsCompressedFlag bool) (Msg, error) {
 	buf := b.getByteSlice()
-	return b.Pack(buf, GetVersion, nil, includeIsCompressedFlag, false)
+	return b.Pack(
+		buf,
+		GetVersion,
+		nil,
+		includeIsCompressedFlag,
+		includeIsCompressedFlag && canBeCompressed(GetVersion),
+	)
 }
 
 // Version message
@@ -48,7 +54,7 @@ func (b Builder) Version(
 			SigBytes:    sig,
 		},
 		includeIsCompressedFlag,
-		false,
+		includeIsCompressedFlag && canBeCompressed(Version),
 	)
 }
 
@@ -74,13 +80,25 @@ func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag bool
 // Ping message
 func (b Builder) Ping(includeIsCompressedFlag bool) (Msg, error) {
 	buf := b.getByteSlice()
-	return b.Pack(buf, Ping, nil, includeIsCompressedFlag, canBeCompressed(Ping))
+	return b.Pack(
+		buf,
+		Ping,
+		nil,
+		includeIsCompressedFlag,
+		includeIsCompressedFlag && canBeCompressed(Ping),
+	)
 }
 
 // Pong message
 func (b Builder) Pong(includeIsCompressedFlag bool) (Msg, error) {
 	buf := b.getByteSlice()
-	return b.Pack(buf, Pong, nil, includeIsCompressedFlag, canBeCompressed(Pong))
+	return b.Pack(
+		buf,
+		Pong,
+		nil,
+		includeIsCompressedFlag,
+		includeIsCompressedFlag && canBeCompressed(Pong),
+	)
 }
 
 // GetAcceptedFrontier message
