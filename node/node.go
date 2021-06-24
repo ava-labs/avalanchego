@@ -882,6 +882,14 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 			}
 		}
 	}
+	// use alises in given config
+	for vmID, aliases := range n.Config.VMAliases {
+		for _, alias := range aliases {
+			if err := n.vmManager.Alias(vmID, alias); err != nil {
+				return err
+			}
+		}
+	}
 	for url, aliases := range defaultAliases {
 		if err := n.APIServer.AddAliases(url, aliases...); err != nil {
 			return err
