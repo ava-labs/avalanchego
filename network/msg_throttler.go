@@ -23,7 +23,6 @@ type MsgThrottler interface {
 
 	// Mark that a message from [nodeID] of size [msgSize]
 	// has been removed from the incoming message buffer.
-	// TODO use duration
 	Release(msgSize uint64, nodeID ids.ShortID)
 }
 
