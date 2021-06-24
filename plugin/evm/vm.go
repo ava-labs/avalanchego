@@ -428,9 +428,13 @@ func (vm *VM) Initialize(
 	// ignored by the VM's codec.
 	vm.baseCodec = linearcodec.NewDefault()
 
-	if err := vm.pruneChain(); err != nil {
-		return err
-	}
+	// pruneChain removes all rejected blocks stored in the database.
+	//
+	// TODO: This function can take over 60 minutes to run on mainnet and
+	// should be converted to run asynchronously.
+	// if err := vm.pruneChain(); err != nil {
+	// 	return err
+	// }
 
 	return vm.fx.Initialize(vm)
 }
