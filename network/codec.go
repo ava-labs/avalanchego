@@ -32,7 +32,7 @@ type codec struct {
 // However, some metrics may not be registered with [metricsRegisterer]
 func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 	c := codec{
-		metrics:    make(map[Op]prometheus.Histogram),
+		metrics:    make(map[Op]prometheus.Histogram, len(ops)),
 		compressor: compression.NewGzipCompressor(),
 	}
 	errs := wrappers.Errs{}

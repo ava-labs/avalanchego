@@ -80,9 +80,8 @@ func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
 // Test packing and then parsing messages
 // when using a gzip compressor
 func TestCodecPackParseGzip(t *testing.T) {
-	c := codec{
-		compressor: compression.NewGzipCompressor(),
-	}
+	c, err := newCodec(prometheus.DefaultRegisterer)
+	assert.NoError(t, err)
 	id := ids.GenerateTestID()
 	cert := &x509.Certificate{}
 
