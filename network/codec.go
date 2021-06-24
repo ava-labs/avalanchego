@@ -20,16 +20,18 @@ var (
 	errCompressNeedsFlag = errors.New("compressed message requires isCompressed flag")
 )
 
-// codec defines the serialization and deserialization of network messages
+// codec defines the serialization and deserialization of network messages.
+// It's safe for multiple goroutines to call Pack and Parse concurrently.
 type codec struct {
-	// [metrics] must not be nil
+	// [metrics] must not be nil.
+	// Should only be written to on codec creation.
 	metrics map[Op]prometheus.Histogram
 	// [compressor] must not be nil
 	compressor compression.Compressor
 }
 
 // If this method returns an error, the returned codec may still be used.
-// However, some metrics may not be registered with [metricsRegisterer]
+// However, some metrics may not be registered with [metricsRegisterer].
 func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 	c := codec{
 		metrics:    make(map[Op]prometheus.Histogram, len(ops)),
