@@ -367,7 +367,8 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	assertIndex(t, vm.db, 0, key.PublicKey().Address(), txAssetID.ID, tx.ID())
+	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), txAssetID.ID, tx.ID())
+	assertLatestIdx(t, vm.db, key.PublicKey().Address(), txAssetID.ID, 1)
 
 	id := utxoID.InputID()
 	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {

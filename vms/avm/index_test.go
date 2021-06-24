@@ -133,8 +133,10 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	assert.Len(t, uniqueTxs, 5)
 	// for each *UniqueTx check its indexed at right index
 	for i, tx := range uniqueTxs {
-		assertIndex(t, vm.db, uint64(i), key.PublicKey().Address(), txAssetID.ID, tx.ID())
+		assertIndexedTX(t, vm.db, uint64(i), key.PublicKey().Address(), txAssetID.ID, tx.ID())
 	}
+
+	assertLatestIdx(t, vm.db, key.PublicKey().Address(), txAssetID.ID, 5)
 }
 
 func TestIndexTransaction_MultipleAddresses(t *testing.T) {
@@ -241,7 +243,8 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 	// for each *UniqueTx check its indexed at right index for the right address
 	for key, tx := range addressTxMap {
-		assertIndex(t, vm.db, uint64(0), key, txAssetID.ID, tx.ID())
+		assertIndexedTX(t, vm.db, uint64(0), key, txAssetID.ID, tx.ID())
+		assertLatestIdx(t, vm.db, key, txAssetID.ID, 1)
 	}
 }
 
@@ -309,7 +312,20 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 	return vm
 }
 
-func assertIndex(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
+func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.ShortID, assetID ids.ID, expectedIdx uint64) {
+	addressDB := prefixdb.New(sourceAddress[:], db)
+	assetDB := prefixdb.New(assetID[:], addressDB)
+
+	expectedIdxBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(expectedIdxBytes, expectedIdx)
+
+	idxBytes, err := assetDB.Get([]byte("idx"))
+	assert.NoError(t, err)
+
+	assert.EqualValues(t, expectedIdxBytes, idxBytes)
+}
+
+func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
