@@ -8,6 +8,7 @@ package gsubnetlookupproto
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -51,8 +52,7 @@ type SubnetLookupServer interface {
 }
 
 // UnimplementedSubnetLookupServer must be embedded to have forward compatible implementations.
-type UnimplementedSubnetLookupServer struct {
-}
+type UnimplementedSubnetLookupServer struct{}
 
 func (UnimplementedSubnetLookupServer) SubnetID(context.Context, *SubnetIDRequest) (*SubnetIDResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SubnetID not implemented")

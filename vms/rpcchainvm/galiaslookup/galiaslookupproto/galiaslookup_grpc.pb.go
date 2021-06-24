@@ -8,6 +8,7 @@ package galiaslookupproto
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -62,12 +63,12 @@ type AliasLookupServer interface {
 }
 
 // UnimplementedAliasLookupServer must be embedded to have forward compatible implementations.
-type UnimplementedAliasLookupServer struct {
-}
+type UnimplementedAliasLookupServer struct{}
 
 func (UnimplementedAliasLookupServer) Lookup(context.Context, *LookupRequest) (*LookupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Lookup not implemented")
 }
+
 func (UnimplementedAliasLookupServer) PrimaryAlias(context.Context, *PrimaryAliasRequest) (*PrimaryAliasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PrimaryAlias not implemented")
 }

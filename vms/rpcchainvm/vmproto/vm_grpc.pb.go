@@ -8,6 +8,7 @@ package vmproto
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -194,48 +195,60 @@ type VMServer interface {
 }
 
 // UnimplementedVMServer must be embedded to have forward compatible implementations.
-type UnimplementedVMServer struct {
-}
+type UnimplementedVMServer struct{}
 
 func (UnimplementedVMServer) Initialize(context.Context, *InitializeRequest) (*InitializeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Initialize not implemented")
 }
+
 func (UnimplementedVMServer) Bootstrapping(context.Context, *BootstrappingRequest) (*BootstrappingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapping not implemented")
 }
+
 func (UnimplementedVMServer) Bootstrapped(context.Context, *BootstrappedRequest) (*BootstrappedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Bootstrapped not implemented")
 }
+
 func (UnimplementedVMServer) Shutdown(context.Context, *ShutdownRequest) (*ShutdownResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Shutdown not implemented")
 }
+
 func (UnimplementedVMServer) CreateHandlers(context.Context, *CreateHandlersRequest) (*CreateHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateHandlers not implemented")
 }
+
 func (UnimplementedVMServer) CreateStaticHandlers(context.Context, *CreateStaticHandlersRequest) (*CreateStaticHandlersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStaticHandlers not implemented")
 }
+
 func (UnimplementedVMServer) BuildBlock(context.Context, *BuildBlockRequest) (*BuildBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildBlock not implemented")
 }
+
 func (UnimplementedVMServer) ParseBlock(context.Context, *ParseBlockRequest) (*ParseBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ParseBlock not implemented")
 }
+
 func (UnimplementedVMServer) GetBlock(context.Context, *GetBlockRequest) (*GetBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetBlock not implemented")
 }
+
 func (UnimplementedVMServer) SetPreference(context.Context, *SetPreferenceRequest) (*SetPreferenceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetPreference not implemented")
 }
+
 func (UnimplementedVMServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
 }
+
 func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
 }
+
 func (UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (*BlockAcceptResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockAccept not implemented")
 }
+
 func (UnimplementedVMServer) BlockReject(context.Context, *BlockRejectRequest) (*BlockRejectResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockReject not implemented")
 }

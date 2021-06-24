@@ -207,7 +207,6 @@ func (sm *sharedMemory) Indexed(
 }
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
-
 	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
 	var vdb *versiondb.Database
 

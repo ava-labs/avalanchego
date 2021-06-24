@@ -8,6 +8,7 @@ package rpcdbproto
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -172,42 +173,52 @@ type DatabaseServer interface {
 }
 
 // UnimplementedDatabaseServer must be embedded to have forward compatible implementations.
-type UnimplementedDatabaseServer struct {
-}
+type UnimplementedDatabaseServer struct{}
 
 func (UnimplementedDatabaseServer) Has(context.Context, *HasRequest) (*HasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Has not implemented")
 }
+
 func (UnimplementedDatabaseServer) Get(context.Context, *GetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
 }
+
 func (UnimplementedDatabaseServer) Put(context.Context, *PutRequest) (*PutResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Put not implemented")
 }
+
 func (UnimplementedDatabaseServer) Delete(context.Context, *DeleteRequest) (*DeleteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Delete not implemented")
 }
+
 func (UnimplementedDatabaseServer) Stat(context.Context, *StatRequest) (*StatResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stat not implemented")
 }
+
 func (UnimplementedDatabaseServer) Compact(context.Context, *CompactRequest) (*CompactResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Compact not implemented")
 }
+
 func (UnimplementedDatabaseServer) Close(context.Context, *CloseRequest) (*CloseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
 }
+
 func (UnimplementedDatabaseServer) WriteBatch(context.Context, *WriteBatchRequest) (*WriteBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteBatch not implemented")
 }
+
 func (UnimplementedDatabaseServer) NewIteratorWithStartAndPrefix(context.Context, *NewIteratorWithStartAndPrefixRequest) (*NewIteratorWithStartAndPrefixResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewIteratorWithStartAndPrefix not implemented")
 }
+
 func (UnimplementedDatabaseServer) IteratorNext(context.Context, *IteratorNextRequest) (*IteratorNextResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IteratorNext not implemented")
 }
+
 func (UnimplementedDatabaseServer) IteratorError(context.Context, *IteratorErrorRequest) (*IteratorErrorResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IteratorError not implemented")
 }
+
 func (UnimplementedDatabaseServer) IteratorRelease(context.Context, *IteratorReleaseRequest) (*IteratorReleaseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method IteratorRelease not implemented")
 }
