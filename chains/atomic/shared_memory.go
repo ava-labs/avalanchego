@@ -6,7 +6,6 @@ package atomic
 import (
 	"bytes"
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -208,7 +207,6 @@ func (sm *sharedMemory) Indexed(
 }
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
-	fmt.Println("here ????", batchChainsAndInputs)
 
 	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
 	var vdb *versiondb.Database
