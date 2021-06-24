@@ -299,6 +299,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 	// child block timestamp cannot be lower than parent timestamp
 	childCoreBlk.TimestampV = prntTimestamp.Add(-1 * time.Second)
+	proVM.Clock.Set(childCoreBlk.TimestampV)
 	childSlb, err := statelessblock.Build(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
@@ -330,6 +331,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 		t.Fatal("Could not calculate submission window")
 	}
 	beforeWinStart := prntTimestamp.Add(blkWinDelay).Add(-1 * time.Second)
+	proVM.Clock.Set(beforeWinStart)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		beforeWinStart,
@@ -349,6 +351,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 	// block can arrive at its creator window starts
 	atWindowStart := prntTimestamp.Add(blkWinDelay)
+	proVM.Clock.Set(atWindowStart)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		atWindowStart,
@@ -368,6 +371,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 	// block can arrive after its creator window starts
 	afterWindowStart := prntTimestamp.Add(blkWinDelay).Add(5 * time.Second)
+	proVM.Clock.Set(afterWindowStart)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterWindowStart,
@@ -386,6 +390,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 
 	// block can arrive within submission window
 	AtSubWindowEnd := proVM.Time().Add(proposer.MaxDelay)
+	proVM.Clock.Set(AtSubWindowEnd)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		AtSubWindowEnd,
@@ -403,7 +408,7 @@ func TestProposerBlockVerificationTimestamp(t *testing.T) {
 	}
 
 	// block timestamp cannot be too much in the future
-	afterSubWinEnd := proVM.Time().Add(proposer.MaxDelay).Add(time.Second)
+	afterSubWinEnd := proVM.Time().Add(syncBound).Add(time.Second)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterSubWinEnd,

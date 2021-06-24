@@ -18,12 +18,17 @@ package proposervm
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
+)
+
+const (
+	// allowable block issuance in the future
+	syncBound = 10 * time.Second
 )
 
 var (
@@ -49,16 +54,16 @@ type ProposerBlock struct {
 
 func (pb *ProposerBlock) Accept() error {
 	pb.status = choices.Accepted
-	if err := pb.vm.State.PutBlock(pb.Block, choices.Accepted); err != nil {
-		return err
-	}
 	blkID := pb.ID()
 	if err := pb.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	if err := pb.vm.db.Commit(); err != nil {
+	if err := pb.vm.storeProposerBlock(pb); err != nil {
 		return err
 	}
+
+	// mark the inner block as accepted and all the conflicting inner blocks as
+	// rejected
 	if err := pb.vm.Tree.Accept(pb.coreBlk); err != nil {
 		return err
 	}
@@ -71,10 +76,7 @@ func (pb *ProposerBlock) Reject() error {
 	// we do not reject the inner block here because that block may be contained
 	// in the proposer block that causing this block to be rejected.
 	pb.status = choices.Rejected
-	if err := pb.vm.State.PutBlock(pb.Block, choices.Rejected); err != nil {
-		return err
-	}
-	if err := pb.vm.db.Commit(); err != nil {
+	if err := pb.vm.storeProposerBlock(pb); err != nil {
 		return err
 	}
 
@@ -100,21 +102,20 @@ func (pb *ProposerBlock) Verify() error {
 	if err != nil {
 		return ErrProBlkWrongParent
 	}
+
 	pChainHeight := pb.PChainHeight()
+	coreParentID := pb.coreBlk.Parent().ID()
 
 	// validate parent
-	switch proParent, ok := parent.(*ProposerBlock); ok {
-	case true:
-		if proParent.coreBlk.ID() != pb.coreBlk.Parent().ID() {
+	if proposerParent, ok := parent.(*ProposerBlock); ok {
+		if proposerParent.coreBlk.ID() != coreParentID {
 			return ErrProBlkWrongParent
 		}
-		if pChainHeight < proParent.PChainHeight() {
+		if pChainHeight < proposerParent.PChainHeight() {
 			return ErrProBlkWrongHeight
 		}
-	case false:
-		if parent.ID() != pb.coreBlk.Parent().ID() {
-			return ErrProBlkWrongParent
-		}
+	} else if parent.ID() != coreParentID {
+		return ErrProBlkWrongParent
 	}
 
 	// validate timestamp
@@ -125,17 +126,23 @@ func (pb *ProposerBlock) Verify() error {
 		return ErrProBlkBadTimestamp
 	}
 
-	if timestamp.After(pb.vm.Time().Add(proposer.MaxDelay)) {
+	maxTimestamp := pb.vm.Time().Add(syncBound)
+	if timestamp.After(maxTimestamp) {
 		return ErrProBlkBadTimestamp // too much in the future
 	}
 
+	height := pb.coreBlk.Height()
 	nodeID := pb.Proposer()
-	blkWinDelay, err := pb.vm.Windower.Delay(pb.coreBlk.Height(), pChainHeight, nodeID)
+
+	// [Delay] will return an error if [pChainHeight] is greater than the
+	// current P-chain height
+	minDelay, err := pb.vm.Windower.Delay(height, pChainHeight, nodeID)
 	if err != nil {
 		return err
 	}
-	blkWinStart := parentTimestamp.Add(blkWinDelay)
-	if timestamp.Before(blkWinStart) {
+
+	minTimestamp := parentTimestamp.Add(minDelay)
+	if timestamp.Before(minTimestamp) {
 		return ErrProBlkBadTimestamp
 	}
 

@@ -165,7 +165,8 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 		return blk, nil
 	}
 
-	// check whether block is core one, with no proposerBlockHeader
+	// TODO: GetBlock should not return an inner block that was issued inside of
+	//       a proposer block
 	return vm.ChainVM.GetBlock(id)
 }
 
