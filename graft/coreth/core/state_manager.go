@@ -101,7 +101,9 @@ func (cm *cappedMemoryTrieWriter) InsertTrie(block *types.Block) error {
 func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	triedb := cm.Database.TrieDB()
 	root := block.Root()
-	triedb.Dereference(cm.lastAcceptedRoot)
+	if cm.lastAcceptedRoot != (common.Hash{}) {
+		triedb.Dereference(cm.lastAcceptedRoot)
+	}
 	cm.lastAcceptedRoot = root
 
 	// Commit this root if we haven't committed an accepted block root within
