@@ -6,6 +6,8 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -62,6 +64,17 @@ func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable
 		if assetID := out.AssetID(); !vm.verifyFxUsage(fxIndex, assetID) {
 			return errIncompatibleFx
 		}
+	}
+
+	// index output utxos
+	for _, utxo := range t.UTXOs() {
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			vm.ctx.Log.Debug("Skipping utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			continue
+		}
+
+		IndexTransferOutput(vm, utxo.AssetID(), out)
 	}
 	return nil
 }

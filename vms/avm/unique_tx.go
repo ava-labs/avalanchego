@@ -123,7 +123,19 @@ func (tx *UniqueTx) Accept() error {
 
 	defer tx.vm.db.Abort()
 
-	err := IndexTransaction(tx)
+	// Add new utxos
+	for _, utxo := range tx.UTXOs() {
+		if err := tx.vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
+			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
+			return err
+		}
+	}
+
+	//err := IndexTransaction(tx)
+	//if err != nil {
+	//	return err
+	//}
+	err := CommitIndex(tx.vm.addressAssetIDIndex, tx)
 	if err != nil {
 		return err
 	}
@@ -135,16 +147,9 @@ func (tx *UniqueTx) Accept() error {
 			continue
 		}
 		utxoID := utxo.InputID()
+		tx.vm.ctx.Log.Debug("Deleting UTXO %s for transaction %s", utxoID.String(), tx.ID().String())
 		if err := tx.vm.state.DeleteUTXO(utxoID); err != nil {
 			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
-			return err
-		}
-	}
-
-	// Add new utxos
-	for _, utxo := range tx.UTXOs() {
-		if err := tx.vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
-			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
 			return err
 		}
 	}
@@ -160,6 +165,9 @@ func (tx *UniqueTx) Accept() error {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
 		return err
 	}
+
+	// clear the index map
+	tx.vm.addressAssetIDIndex = make(map[ids.ShortID]map[ids.ID]struct{})
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)

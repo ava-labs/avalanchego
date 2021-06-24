@@ -6,6 +6,8 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -120,6 +122,7 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 
 	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.ImportedIns {
+		// move indexing of indexes here
 		utxo := avax.UTXO{}
 		if _, err := vm.codec.Unmarshal(allUTXOBytes[i], &utxo); err != nil {
 			return err
@@ -130,7 +133,18 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		if err := vm.verifyTransferOfUTXO(tx, in, cred, &utxo); err != nil {
 			return err
 		}
+
+		// Index the UTXO address -> []AssetIDs (Set)
+		// todo extract into common index.go
+		transferOutput, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			vm.ctx.Log.Debug("Skipping utxo %s for import indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			continue
+		}
+
+		IndexTransferOutput(vm, utxo.AssetID(), transferOutput)
 	}
+
 	return nil
 }
 

@@ -125,6 +125,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
+		// todo use the new mechanism
 		err = IndexTransaction(uniqueParsedTX)
 		assert.NoError(t, err)
 	}
@@ -234,6 +235,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction
+		// todo use the new mechanism
 		err = IndexTransaction(uniqueParsedTX)
 		assert.NoError(t, err)
 	}
