@@ -5,9 +5,15 @@ package network
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
@@ -26,24 +32,37 @@ type MsgThrottler interface {
 	Release(msgSize uint64, nodeID ids.ShortID)
 }
 
+// Returns a new MsgThrottler.
+// If this function returns an error, the returned MsgThrottler may still be used.
+// However, some of its metrics may not be registered.
 func newSybilMsgThrottler(
+	log logging.Logger,
+	metricsRegisterer prometheus.Registerer,
 	vdrs validators.Set,
 	maxUnprocessedVdrBytes uint64,
 	maxUnprocessedAtLargeBytes uint64,
-) MsgThrottler {
-	return &sybilMsgThrottler{
+) (MsgThrottler, error) {
+	t := &sybilMsgThrottler{
+		log:                    log,
+		cond:                   sync.Cond{L: &sync.Mutex{}},
 		vdrs:                   vdrs,
 		maxUnprocessedVdrBytes: maxUnprocessedVdrBytes,
 		remainingVdrBytes:      maxUnprocessedVdrBytes,
 		remainingAtLargeBytes:  maxUnprocessedAtLargeBytes,
 		vdrToBytesUsed:         make(map[ids.ShortID]uint64),
 	}
+	if err := t.metrics.initialize(metricsRegisterer); err != nil {
+		return nil, err
+	}
+	return t, nil
 }
 
 // msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
 type sybilMsgThrottler struct {
-	cond sync.Cond
+	log     logging.Logger
+	metrics sybilMsgThrottlerMetrics
+	cond    sync.Cond
 	// Primary network validator set
 	vdrs validators.Set
 	// Max number of unprocessed bytes from validators
@@ -61,11 +80,15 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.cond.L.Lock()
 	defer t.cond.L.Unlock()
 
+	t.metrics.awaitingAcquire.Inc()
+	startTime := time.Now()
+
 	for {
 		// See if we can take from the at-large byte allocation
 		if msgSize <= t.remainingAtLargeBytes {
 			// Take from the at-large byte allocation
 			t.remainingAtLargeBytes -= msgSize
+			t.log.Info("took %d bytes from at large allocation for %s", msgSize, nodeID) // todo remove
 			break
 		}
 
@@ -99,8 +122,14 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		t.remainingVdrBytes -= vdrBytesNeeded
 		t.remainingAtLargeBytes = 0
 		t.vdrToBytesUsed[nodeID] += vdrBytesNeeded
+		t.log.Info("took %d bytes from validator allocation for %s. vdr bytes used: %d", msgSize, nodeID, t.vdrToBytesUsed[nodeID]) // todo remove
 		break
 	}
+	t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
+	t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
+	t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
+	t.metrics.awaitingAcquire.Dec()
+	t.metrics.awaitingRelease.Inc()
 }
 
 func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
@@ -130,9 +159,60 @@ func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 		// Put no bytes in validator allocation
 		t.remainingAtLargeBytes += msgSize
 	}
+	t.log.Info("releasing %d bytes for %s. vdr bytes used: %d", msgSize, nodeID, t.vdrToBytesUsed[nodeID]) // todo remove
+
+	t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
+	t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
+	t.metrics.awaitingRelease.Dec()
 
 	// Notify that there are more bytes available
 	t.cond.Broadcast()
+}
+
+type sybilMsgThrottlerMetrics struct {
+	acquireLatency        prometheus.Histogram
+	remainingAtLargeBytes prometheus.Gauge
+	remainingVdrBytes     prometheus.Gauge
+	awaitingAcquire       prometheus.Gauge
+	awaitingRelease       prometheus.Gauge
+}
+
+func (m *sybilMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
+	m.acquireLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: constants.PlatformName,
+		Name:      "throttler_acquire_latency",
+		Help:      "Duration an incoming message waited to be read due to throttling",
+		Buckets:   metric.NanosecondsBuckets,
+	})
+	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: constants.PlatformName,
+		Name:      "throttler_remaining_at_large_bytes",
+		Help:      "Bytes remaining in the at large byte allocation",
+	})
+	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: constants.PlatformName,
+		Name:      "throttler_remaining_validator_bytes",
+		Help:      "Bytes remaining in the validator byte allocation",
+	})
+	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: constants.PlatformName,
+		Name:      "throttler_awaiting_acquire",
+		Help:      "Number of incoming messages waiting to be read",
+	})
+	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: constants.PlatformName,
+		Name:      "throttler_awaiting_release",
+		Help:      "Number of messages currently being read/handled",
+	})
+	errs := wrappers.Errs{}
+	errs.Add(
+		metricsRegisterer.Register(m.acquireLatency),
+		metricsRegisterer.Register(m.remainingAtLargeBytes),
+		metricsRegisterer.Register(m.remainingVdrBytes),
+		metricsRegisterer.Register(m.awaitingAcquire),
+		metricsRegisterer.Register(m.awaitingRelease),
+	)
+	return errs.Err
 }
 
 // noMsgThrottler implements MsgThrottler.
