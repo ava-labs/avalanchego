@@ -439,9 +439,11 @@ func (p *peer) handle(msg Msg) {
 	now := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, now.Unix())
 	atomic.StoreInt64(&p.net.lastMsgReceivedTime, now.Unix())
+	msgLen := uint64(len(msg.Bytes()))
 
 	if err := p.conn.SetReadDeadline(now.Add(p.net.pingPongTimeout)); err != nil {
 		p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		p.Close()
 		return
 	}
@@ -449,11 +451,11 @@ func (p *peer) handle(msg Msg) {
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
 		return
 	}
 	msgMetrics.numReceived.Inc()
-	msgLen := uint64(len(msg.Bytes()))
 	msgMetrics.receivedBytes.Add(float64(msgLen))
 
 	switch op {
@@ -483,7 +485,7 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 	if !p.finishedHandshake.GetValue() {
-		p.net.log.Debug("dropping message from %s%s because handshake isn't finished", constants.NodeIDPrefix, p.nodeID)
+		p.net.log.Debug("dropping %s from %s%s because handshake isn't finished", op, constants.NodeIDPrefix, p.nodeID)
 
 		// attempt to finish the handshake
 		if !p.gotVersion.GetValue() {
