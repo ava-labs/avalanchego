@@ -829,7 +829,7 @@ func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, vo
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
-	includeIsCompressedFlag := peer == nil && peer.canHandleCompressed.GetValue()
+	includeIsCompressedFlag := peer != nil && peer.canHandleCompressed.GetValue()
 	msg, err := n.b.Chits(chainID, requestID, votes, includeIsCompressedFlag)
 	if err != nil {
 		n.log.Error("failed to build Chits(%s, %d, %s): %s",
