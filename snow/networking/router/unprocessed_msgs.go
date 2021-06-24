@@ -66,17 +66,15 @@ func (u *unprocessedMsgsImpl) Len() int {
 	return len(u.msgs)
 }
 
+// canPop will return true for at least one message in [u.msgs]
 func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
-	recentCPUUtilized := u.cpuTracker.Utilization(msg.validatorID, u.clock.Time())
+	baseMaxCPU := 1 / float64(len(u.msgs))
 	weight, isVdr := u.vdrs.GetWeight(msg.validatorID)
-	if isVdr {
-		portionWeight := float64(weight) / float64(u.vdrs.Weight())
-		if recentCPUUtilized <= portionWeight {
-			return true
-		}
+	if !isVdr {
+		weight = 0
 	}
-	if recentCPUUtilized <= 1/float64(len(u.msgs)) {
-		return true
-	}
-	return false
+	portionWeight := float64(weight) / float64(u.vdrs.Weight())
+	recentCPUUtilized := u.cpuTracker.Utilization(msg.validatorID, u.clock.Time())
+	maxCPU := baseMaxCPU + (1-baseMaxCPU)*portionWeight
+	return recentCPUUtilized <= maxCPU
 }
