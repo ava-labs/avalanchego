@@ -362,6 +362,7 @@ func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 func (h *Handler) Timeout() {
 	h.push(message{
 		messageType: constants.TimeoutMsg,
+		validatorID: h.ctx.NodeID,
 	})
 }
 
@@ -497,6 +498,7 @@ func (h *Handler) Gossip() {
 	}
 	h.push(message{
 		messageType: constants.GossipMsg,
+		validatorID: h.ctx.NodeID,
 	})
 }
 
@@ -505,6 +507,7 @@ func (h *Handler) Notify(msg common.Message) {
 	h.push(message{
 		messageType:  constants.NotifyMsg,
 		notification: msg,
+		validatorID:  h.ctx.NodeID,
 	})
 }
 
@@ -565,6 +568,7 @@ func (h *Handler) dispatchInternal() {
 			h.push(message{
 				messageType:  constants.NotifyMsg,
 				notification: msg,
+				validatorID:  h.ctx.NodeID,
 			})
 		}
 	}

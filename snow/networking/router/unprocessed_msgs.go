@@ -4,6 +4,7 @@
 package router
 
 import (
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -14,7 +15,7 @@ type unprocessedMsgs interface {
 	// Add an unprocessed message
 	Push(message)
 	// Get and remove the unprocessed message that should
-	// be processed next
+	// be processed next. Must never be called when Len() == 0.
 	Pop() message
 	// Returns the number of unprocessed messages
 	Len() int
@@ -22,14 +23,16 @@ type unprocessedMsgs interface {
 
 func newUnprocessedMsgs(vdrs validators.Set, cpuTracker tracker.TimeTracker) unprocessedMsgs {
 	return &unprocessedMsgsImpl{
-		vdrs:       vdrs,
-		cpuTracker: cpuTracker,
+		vdrs:                  vdrs,
+		cpuTracker:            cpuTracker,
+		nodeToUnprocessedMsgs: make(map[ids.ShortID]int),
 	}
 }
 
 // Implements unprocessedMsgs.
 // Not safe for concurrent access.
 type unprocessedMsgsImpl struct {
+	nodeToUnprocessedMsgs map[ids.ShortID]int
 	// unprocessed messages
 	msgs []message
 	// Validator set for the chain associated with this
@@ -41,9 +44,10 @@ type unprocessedMsgsImpl struct {
 
 func (u *unprocessedMsgsImpl) Push(msg message) {
 	u.msgs = append(u.msgs, msg)
+	u.nodeToUnprocessedMsgs[msg.validatorID]++
 }
 
-// Must only be called when [u.Len()] != 0
+// Must never be called when [u.Len()] == 0
 func (u *unprocessedMsgsImpl) Pop() message {
 	// TODO make sure this always terminates
 	for {
@@ -53,6 +57,10 @@ func (u *unprocessedMsgsImpl) Pop() message {
 				u.msgs = nil // Give back memory if possible
 			} else {
 				u.msgs = u.msgs[1:]
+			}
+			u.nodeToUnprocessedMsgs[msg.validatorID]--
+			if u.nodeToUnprocessedMsgs[msg.validatorID] == 0 {
+				delete(u.nodeToUnprocessedMsgs, msg.validatorID)
 			}
 			return msg
 		}
@@ -68,8 +76,8 @@ func (u *unprocessedMsgsImpl) Len() int {
 // canPop will return true for at least one message in [u.msgs]
 func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
 	// Every node has some allowed CPU allocation depending on
-	// the number of pending messages.
-	baseMaxCPU := 1 / float64(len(u.msgs))
+	// the number of nodes with unprocessed messages.
+	baseMaxCPU := 1 / float64(len(u.nodeToUnprocessedMsgs))
 	weight, isVdr := u.vdrs.GetWeight(msg.validatorID)
 	if !isVdr {
 		weight = 0
@@ -81,6 +89,7 @@ func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
 	if totalVdrsWeight != 0 {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
+	// Validators are allowed to use more CPU
 	recentCPUUtilized := u.cpuTracker.Utilization(msg.validatorID, u.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
 	return recentCPUUtilized <= maxCPU
