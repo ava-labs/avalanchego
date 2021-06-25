@@ -113,8 +113,7 @@ type VM struct {
 
 	walletService WalletService
 
-	addressAssetIDIndex map[ids.ShortID]map[ids.ID]struct{}
-	addressTxsIndexer   AddressTxsIndexer
+	addressTxsIndexer AddressTxsIndexer
 }
 
 func (vm *VM) Connected(id ids.ShortID) error {
@@ -245,6 +244,7 @@ func (vm *VM) Initialize(
 	vm.walletService.vm = vm
 	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
+
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Info("Address transaction indexing is enabled.")
