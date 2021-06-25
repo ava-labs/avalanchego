@@ -87,11 +87,14 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		}
 	}
 
+	err := t.BaseTx.SemanticVerify(vm, tx, creds)
+	if err != nil {
+		return err
+	}
+
 	// index input and output UTXOs
 	IndexOutputUTXOs(vm, t.UTXOs())
-	IndexInputUTXOs(vm, t.InputUTXOs())
-
-	return t.BaseTx.SemanticVerify(vm, tx, creds)
+	return IndexInputUTXOs(vm, t.InputUTXOs())
 }
 
 // ExecuteWithSideEffects writes the batch with any additional side effects

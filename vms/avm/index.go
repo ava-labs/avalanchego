@@ -80,13 +80,20 @@ func IndexTransferOutput(vm *VM, assetID ids.ID, transferOutput *secp256k1fx.Tra
 	}
 }
 
-func IndexInputUTXOs(vm *VM, inputUTXOs []*avax.UTXOID) {
+func IndexInputUTXOs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 	for _, utxoID := range inputUTXOs {
 		// maybe this won't work and we'll need to get it from shared memory
 		// todo fix using shared memory?
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
-			vm.ctx.Log.Error("Error fetching input utxo %s, err: %s", utxoID.InputID().String(), err)
+			// should never happen
+			return err
+		}
+
+		// typically in case of missing utxo there is an err above
+		// this is just a catch all for the edge case
+		if utxo == nil {
+			return errMissingUTXO
 		}
 
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -97,6 +104,7 @@ func IndexInputUTXOs(vm *VM, inputUTXOs []*avax.UTXOID) {
 
 		IndexTransferOutput(vm, utxo.AssetID(), out)
 	}
+	return nil
 }
 
 func IndexOutputUTXOs(vm *VM, outputUTXOs []*avax.UTXO) {
