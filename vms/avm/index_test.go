@@ -125,9 +125,11 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		// todo use the new mechanism
-		err = IndexTransaction(uniqueParsedTX)
+		IndexInputUTXOs(vm, uniqueParsedTX.inputUTXOs)
+		IndexOutputUTXOs(vm, uniqueParsedTX.UTXOs())
+		err = CommitIndex(vm.addressAssetIDIndex, uniqueParsedTX)
 		assert.NoError(t, err)
+		ResetIndexMap(vm)
 	}
 
 	// ensure length is 5
@@ -235,9 +237,11 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction
-		// todo use the new mechanism
-		err = IndexTransaction(uniqueParsedTX)
+		IndexInputUTXOs(vm, uniqueParsedTX.InputUTXOs())
+		IndexOutputUTXOs(vm, uniqueParsedTX.UTXOs())
+		err = CommitIndex(vm.addressAssetIDIndex, uniqueParsedTX)
 		assert.NoError(t, err)
+		ResetIndexMap(vm)
 	}
 
 	// ensure length is same as keys length

@@ -167,7 +167,7 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	// clear the index map
-	tx.vm.addressAssetIDIndex = make(map[ids.ShortID]map[ids.ID]struct{})
+	ResetIndexMap(tx.vm)
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
