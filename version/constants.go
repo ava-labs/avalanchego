@@ -10,6 +10,7 @@ import (
 )
 
 var (
+	GitCommit                    string // Set in the build script (i.e. at compile time)
 	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 9)
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 5)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 3, 0)

@@ -15,9 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// GitCommit should be optionally set at compile time.
-var GitCommit string
-
 // main is the entry point to AvalancheGo.
 func main() {
 	fs := config.BuildFlagSet()
@@ -34,7 +31,7 @@ func main() {
 	}
 
 	if processConfig.DisplayVersionAndExit {
-		fmt.Print(version.String(GitCommit))
+		fmt.Print(version.String(version.GitCommit))
 		os.Exit(0)
 	}
 
