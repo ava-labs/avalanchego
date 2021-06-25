@@ -1325,6 +1325,8 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)
 
+	IndexingEnabled = true
+
 	ctx.Lock.Lock()
 	vm := &VM{}
 	err = vm.Initialize(
@@ -1356,6 +1358,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	key := keys[0]
 
+	assetID := avax.Asset{ID: avaxID}
 	tx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -1365,7 +1368,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 					TxID:        avaxID,
 					OutputIndex: 2,
 				},
-				Asset: avax.Asset{ID: avaxID},
+				Asset: assetID,
 				In: &secp256k1fx.TransferInput{
 					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1374,7 +1377,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: avaxID},
+			Asset: assetID,
 			Out: &secp256k1fx.TransferOutput{
 				Amt: startBalance - vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1431,6 +1434,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	if err := parsedTx.Accept(); err != nil {
 		t.Fatal(err)
 	}
+
+	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), parsedTx.ID())
+	assertLatestIdx(t, vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
 
 	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]}); err == nil {
 		t.Fatalf("should have failed to read the utxo")

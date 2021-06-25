@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+var IndexingEnabled = false
+
 // CommitIndex commits given addresses map to the database. The database structure is thus:
 // [address]
 // |  [assetID]
@@ -23,6 +25,10 @@ import (
 // |  | "0"   => txID1
 // |  | "1"   => txID1
 func CommitIndex(addresses map[ids.ShortID]map[ids.ID]struct{}, tx *UniqueTx) error {
+	if !IndexingEnabled {
+		return nil
+	}
+
 	txID := tx.ID()
 	tx.vm.ctx.Log.Debug("Retrieved address data for transaction %s, %s", txID.String(), addresses)
 	for address, assetIDMap := range addresses {
@@ -72,6 +78,10 @@ func CommitIndex(addresses map[ids.ShortID]map[ids.ID]struct{}, tx *UniqueTx) er
 // to the provided vm.addressAssetIDIndex
 // todo no need to pass whole VM, pass in just the map
 func IndexTransferOutput(vm *VM, assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
+	if !IndexingEnabled {
+		return
+	}
+
 	for _, address := range transferOutput.Addrs {
 		if _, exists := vm.addressAssetIDIndex[address]; !exists {
 			vm.addressAssetIDIndex[address] = make(map[ids.ID]struct{})
@@ -81,6 +91,10 @@ func IndexTransferOutput(vm *VM, assetID ids.ID, transferOutput *secp256k1fx.Tra
 }
 
 func IndexInputUTXOs(vm *VM, inputUTXOs []*avax.UTXOID) error {
+	if !IndexingEnabled {
+		return nil
+	}
+
 	for _, utxoID := range inputUTXOs {
 		// maybe this won't work and we'll need to get it from shared memory
 		// todo fix using shared memory?
@@ -108,6 +122,10 @@ func IndexInputUTXOs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 }
 
 func IndexOutputUTXOs(vm *VM, outputUTXOs []*avax.UTXO) {
+	if !IndexingEnabled {
+		return
+	}
+
 	for _, utxo := range outputUTXOs {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
