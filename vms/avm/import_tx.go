@@ -6,8 +6,6 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -133,18 +131,9 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		if err := vm.verifyTransferOfUTXO(tx, in, cred, &utxo); err != nil {
 			return err
 		}
-
-		// Index input UTXO
-		// Index the UTXO address -> []AssetIDs (Set)
-		transferOutput, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			vm.ctx.Log.Debug("Skipping input utxo %s for import indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
-			continue
-		}
-
-		vm.addressTxsIndexer.AddTransferOutput(utxo.AssetID(), transferOutput)
 	}
 
+	// index output UTXOs only since inputs belong to different chain
 	vm.addressTxsIndexer.AddUTXOs(t.UTXOs())
 
 	return nil

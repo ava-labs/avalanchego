@@ -92,8 +92,7 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		return err
 	}
 
-	// index input and output UTXOs
-	vm.addressTxsIndexer.AddUTXOs(t.UTXOs())
+	// index input UTXOs only since outputs will belong to different chain
 	return vm.addressTxsIndexer.AddUTXOIDs(vm, t.InputUTXOs())
 }
 
