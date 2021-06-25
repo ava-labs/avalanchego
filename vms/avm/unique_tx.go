@@ -135,7 +135,7 @@ func (tx *UniqueTx) Accept() error {
 	//if err != nil {
 	//	return err
 	//}
-	err := CommitIndex(tx.vm.addressAssetIDIndex, tx)
+	err := tx.vm.addressTxsIndexer.CommitIndex(tx.txID)
 	if err != nil {
 		return err
 	}
@@ -167,7 +167,7 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	// clear the index map
-	ResetIndexMap(tx.vm)
+	tx.vm.addressTxsIndexer.Reset()
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)

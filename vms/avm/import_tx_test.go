@@ -265,8 +265,6 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	IndexingEnabled = true
-
 	key := keys[0]
 
 	utxoID := avax.UTXOID{

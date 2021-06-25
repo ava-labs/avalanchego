@@ -113,6 +113,7 @@ type VM struct {
 	walletService WalletService
 
 	addressAssetIDIndex map[ids.ShortID]map[ids.ID]struct{}
+	addressTxsIndexer   AddressTxsIndexer
 }
 
 func (vm *VM) Connected(id ids.ShortID) error {
@@ -227,7 +228,8 @@ func (vm *VM) Initialize(
 	vm.walletService.vm = vm
 	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
-	vm.addressAssetIDIndex = make(map[ids.ShortID]map[ids.ID]struct{})
+	// use no op impl when disabled in config
+	vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log)
 
 	return vm.db.Commit()
 }

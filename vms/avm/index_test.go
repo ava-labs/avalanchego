@@ -60,9 +60,6 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	var uniqueTxs []*UniqueTx
 	txAssetID := avax.Asset{ID: avaxID}
 
-	// enable indexing
-	IndexingEnabled = true
-
 	ctx.Lock.Lock()
 	for i := 0; i < 5; i++ {
 		// create utxoID and assetIDs
@@ -128,12 +125,12 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		err = IndexInputUTXOs(vm, uniqueParsedTX.inputUTXOs)
+		err = vm.addressTxsIndexer.AddUTXOIDs(vm, uniqueParsedTX.inputUTXOs)
 		assert.NoError(t, err)
-		IndexOutputUTXOs(vm, uniqueParsedTX.UTXOs())
-		err = CommitIndex(vm.addressAssetIDIndex, uniqueParsedTX)
+		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
+		err = vm.addressTxsIndexer.CommitIndex(uniqueParsedTX.txID)
 		assert.NoError(t, err)
-		ResetIndexMap(vm)
+		vm.addressTxsIndexer.Reset()
 	}
 
 	// ensure length is 5
@@ -175,9 +172,6 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 	addressTxMap := map[ids.ShortID]*UniqueTx{}
 	txAssetID := avax.Asset{ID: avaxID}
-
-	// enable indexing
-	IndexingEnabled = true
 
 	ctx.Lock.Lock()
 	for _, key := range keys {
@@ -244,12 +238,12 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction
-		err = IndexInputUTXOs(vm, uniqueParsedTX.InputUTXOs())
+		err = vm.addressTxsIndexer.AddUTXOIDs(vm, uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
-		IndexOutputUTXOs(vm, uniqueParsedTX.UTXOs())
-		err = CommitIndex(vm.addressAssetIDIndex, uniqueParsedTX)
+		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
+		err = vm.addressTxsIndexer.CommitIndex(uniqueParsedTX.txID)
 		assert.NoError(t, err)
-		ResetIndexMap(vm)
+		vm.addressTxsIndexer.Reset()
 	}
 
 	// ensure length is same as keys length

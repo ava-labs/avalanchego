@@ -1325,8 +1325,6 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	avaxID := genesisTx.ID()
 	platformID := ids.Empty.Prefix(0)
 
-	IndexingEnabled = true
-
 	ctx.Lock.Lock()
 	vm := &VM{}
 	err = vm.Initialize(

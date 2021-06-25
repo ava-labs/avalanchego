@@ -142,10 +142,10 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			continue
 		}
 
-		IndexTransferOutput(vm, utxo.AssetID(), transferOutput)
+		vm.addressTxsIndexer.AddTransferOutput(utxo.AssetID(), transferOutput)
 	}
 
-	IndexOutputUTXOs(vm, t.UTXOs())
+	vm.addressTxsIndexer.AddUTXOs(t.UTXOs())
 
 	return nil
 }
