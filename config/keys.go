@@ -121,5 +121,5 @@ const (
 	ProfileContinuousEnabledKey               = "profile-continuous-enabled"
 	ProfileContinuousFreqKey                  = "profile-continuous-freq"
 	ProfileContinuousMaxFilesKey              = "profile-continuous-max-files"
-	VMAliasFileKey                            = "vm-aliases-file"
+	VMAliasesFileKey                          = "vm-aliases-file"
 )

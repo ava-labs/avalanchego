@@ -268,7 +268,7 @@ func TestReadVMAliases(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
 			aliasPath := path.Join(root, "aliases.json")
-			configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasFileKey, aliasPath)
+			configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
 			configFilePath := setupConfigJSON(t, root, configJSON)
 			setupFile(t, root, "aliases.json", test.givenJSON)
 			v := setupViper(configFilePath)
@@ -292,7 +292,7 @@ func TestReadVMAliasesDefaultDir(t *testing.T) {
 	configFilePath := setupConfigJSON(t, root, "{}")
 
 	v := setupViper(configFilePath)
-	assert.Equal(defaultVMAliasFilePath, v.GetString(VMAliasFileKey))
+	assert.Equal(defaultVMAliasFilePath, v.GetString(VMAliasesFileKey))
 
 	setupFile(t, root, "aliases.json", `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"]}`)
 	vmAliases, err := readVMAliases(v)
@@ -309,7 +309,7 @@ func TestReadVMAliasesDirNotExists(t *testing.T) {
 	root := t.TempDir()
 	aliasPath := "/not/exists"
 	// set it explicitly
-	configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasFileKey, aliasPath)
+	configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
 	configFilePath := setupConfigJSON(t, root, configJSON)
 	v := setupViper(configFilePath)
 	vmAliases, err := readVMAliases(v)

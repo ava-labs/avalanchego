@@ -514,14 +514,14 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 }
 
 func readVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
-	aliasFilePath := path.Clean(v.GetString(VMAliasFileKey))
+	aliasFilePath := path.Clean(v.GetString(VMAliasesFileKey))
 	exists, err := fileExists(aliasFilePath)
 	if err != nil {
 		return nil, err
 	}
 
 	if !exists {
-		if v.IsSet(VMAliasFileKey) {
+		if v.IsSet(VMAliasesFileKey) {
 			return nil, fmt.Errorf("vm alias file does not exist in %v", aliasFilePath)
 		}
 		return nil, nil
