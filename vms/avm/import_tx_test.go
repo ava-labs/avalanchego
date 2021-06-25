@@ -243,7 +243,7 @@ func TestIssueImportTx(t *testing.T) {
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		BuildAvmConfigBytes(),
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,

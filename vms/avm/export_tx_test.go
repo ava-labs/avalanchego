@@ -1326,13 +1326,15 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
+	avmConfigBytes := BuildAvmConfigBytes()
+
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		avmConfigBytes,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,
@@ -1439,6 +1441,12 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]}); err == nil {
 		t.Fatalf("should have failed to read the utxo")
 	}
+}
+
+func BuildAvmConfigBytes() []byte {
+	avmConfig := "{\"index-transactions\":true}"
+	avmConfigBytes := []byte(avmConfig)
+	return avmConfigBytes
 }
 
 func TestExportTxNotState(t *testing.T) {

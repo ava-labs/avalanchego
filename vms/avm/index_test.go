@@ -299,7 +299,7 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		BuildAvmConfigBytes(),
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,

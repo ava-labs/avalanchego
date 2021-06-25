@@ -26,6 +26,7 @@ type AddressTxsIndexer interface {
 }
 
 // statefulAddressTxsIndexer indexes transactions for given an address and an assetID
+// Assumes state lock is held when this is called
 type statefulAddressTxsIndexer struct {
 	// Maps address -> []AssetID Set
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
