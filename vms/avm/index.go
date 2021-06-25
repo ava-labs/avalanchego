@@ -6,6 +6,8 @@ package avm
 import (
 	"encoding/binary"
 
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -200,5 +202,36 @@ func IndexTransferOutput(vm *VM, assetID ids.ID, transferOutput *secp256k1fx.Tra
 			vm.addressAssetIDIndex[address] = make(map[ids.ID]struct{})
 		}
 		vm.addressAssetIDIndex[address][assetID] = struct{}{}
+	}
+}
+
+func IndexInputUTXOs(vm *VM, inputUTXOs []*avax.UTXOID) {
+	for _, utxoID := range inputUTXOs {
+		// maybe this won't work and we'll need to get it from shared memory
+		// todo fix using shared memory?
+		utxo, err := vm.getUTXO(utxoID)
+		if err != nil {
+			vm.ctx.Log.Error("Error fetching input utxo %s, err: %s", utxoID.InputID().String(), err)
+		}
+
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			vm.ctx.Log.Debug("Skipping input utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			continue
+		}
+
+		IndexTransferOutput(vm, utxo.AssetID(), out)
+	}
+}
+
+func IndexOutputUTXOs(vm *VM, outputUTXOs []*avax.UTXO) {
+	for _, utxo := range outputUTXOs {
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		if !ok {
+			vm.ctx.Log.Debug("Skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			continue
+		}
+
+		IndexTransferOutput(vm, utxo.AssetID(), out)
 	}
 }

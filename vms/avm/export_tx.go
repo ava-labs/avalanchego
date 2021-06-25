@@ -6,8 +6,6 @@ package avm
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -89,17 +87,9 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		}
 	}
 
-	// index output utxos
-	// todo extract into common index.go
-	for _, utxo := range t.UTXOs() {
-		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			vm.ctx.Log.Debug("Skipping utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
-			continue
-		}
-
-		IndexTransferOutput(vm, utxo.AssetID(), out)
-	}
+	// index input and output UTXOs
+	IndexOutputUTXOs(vm, t.UTXOs())
+	IndexInputUTXOs(vm, t.InputUTXOs())
 
 	return t.BaseTx.SemanticVerify(vm, tx, creds)
 }

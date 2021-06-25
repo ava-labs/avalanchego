@@ -134,16 +134,18 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 			return err
 		}
 
+		// Index input UTXO
 		// Index the UTXO address -> []AssetIDs (Set)
-		// todo extract into common index.go
 		transferOutput, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			vm.ctx.Log.Debug("Skipping utxo %s for import indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			vm.ctx.Log.Debug("Skipping input utxo %s for import indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
 			continue
 		}
 
 		IndexTransferOutput(vm, utxo.AssetID(), transferOutput)
 	}
+
+	IndexOutputUTXOs(vm, t.UTXOs())
 
 	return nil
 }
