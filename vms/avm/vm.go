@@ -6,6 +6,7 @@ package avm
 import (
 	"bytes"
 	"container/list"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -130,6 +131,14 @@ func (vm *VM) Disconnected(id ids.ShortID) error {
  ******************************************************************************
  */
 
+type Config struct {
+	IndexTransactions bool `json:"index-transactions"`
+}
+
+func (c Config) SetDefaults() {
+	c.IndexTransactions = false
+}
+
 // Initialize implements the avalanche.DAGVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
@@ -140,6 +149,14 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	avmConfig := Config{}
+	avmConfig.SetDefaults()
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &avmConfig); err != nil {
+			return err
+		}
+	}
+
 	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
 		return err
 	}
@@ -229,7 +246,14 @@ func (vm *VM) Initialize(
 	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
 	// use no op impl when disabled in config
-	vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log)
+	if avmConfig.IndexTransactions {
+		vm.ctx.Log.Info("Address transaction indexing is enabled.")
+		vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log)
+	} else {
+		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
+		vm.ctx.Log.Info("Address transaction indexing is disabled.")
+		vm.addressTxsIndexer = NewNoOpAddressTxsIndexer()
+	}
 
 	return vm.db.Commit()
 }
