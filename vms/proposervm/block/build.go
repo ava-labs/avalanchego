@@ -53,3 +53,31 @@ func Build(
 	block.id = hashing.ComputeHash256Array(block.bytes)
 	return &block, nil
 }
+
+func BuildPreFork(
+	parentID ids.ID,
+	timestamp time.Time,
+	// pChainHeight uint64,
+	// cert *x509.Certificate,
+	blockBytes []byte,
+	// key crypto.Signer,
+	id ids.ID,
+) (Block, error) {
+	block := statelessBlock{
+		StatelessBlock: statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: 0,
+			Certificate:  nil,
+			Block:        blockBytes,
+		},
+		timestamp: timestamp,
+		cert:      nil,
+		proposer:  ids.ShortEmpty,
+	}
+
+	block.Signature = nil
+	block.bytes = blockBytes
+	block.id = id
+	return &block, nil
+}
