@@ -19,15 +19,22 @@ import (
 
 var IndexingEnabled = false
 
-// AddressTxsIndexer indexes transactions for given an address and an assetID
-type AddressTxsIndexer struct {
+type AddressTxsIndexer interface {
+	AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput)
+	AddUTXOs(outputUTXOs []*avax.UTXO)
+	CommitIndex(txID ids.ID) error
+	Reset()
+}
+
+// StatefulAddressTxsIndexer indexes transactions for given an address and an assetID
+type StatefulAddressTxsIndexer struct {
 	// Maps address -> []AssetID Set
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	logger              logging.Logger
 }
 
-func (i *AddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
+func (i *StatefulAddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
 	for _, address := range transferOutput.Addrs {
 		if _, exists := i.addressAssetIDTxMap[address]; !exists {
 			i.addressAssetIDTxMap[address] = make(map[ids.ID]struct{})
@@ -36,7 +43,7 @@ func (i *AddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *se
 	}
 }
 
-func (i *AddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
+func (i *StatefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 	for _, utxo := range outputUTXOs {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
@@ -49,7 +56,7 @@ func (i *AddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 }
 
 // this feels weird
-func (i *AddressTxsIndexer) CommitIndex(txID ids.ID) error {
+func (i *StatefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
 	for address, assetIDMap := range i.addressAssetIDTxMap {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
 		for assetID := range assetIDMap {
@@ -93,12 +100,12 @@ func (i *AddressTxsIndexer) CommitIndex(txID ids.ID) error {
 	return nil
 }
 
-func (i *AddressTxsIndexer) Reset() {
+func (i *StatefulAddressTxsIndexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
-func NewAddressTxsIndexer(db *versiondb.Database, logger logging.Logger) *AddressTxsIndexer {
-	return &AddressTxsIndexer{
+func NewAddressTxsIndexer(db *versiondb.Database, logger logging.Logger) AddressTxsIndexer {
+	return &StatefulAddressTxsIndexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
 		logger:              logger,
