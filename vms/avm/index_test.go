@@ -68,7 +68,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		}
 
 		// build the transaction
-		tx := buildTX(utxoID, txAssetID)
+		tx := buildTX(utxoID, txAssetID, key.PublicKey().Address())
 
 		// sign the transaction
 		if err := signTX(vm.codec, tx, key); err != nil {
@@ -181,7 +181,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		}
 
 		// build the transaction
-		tx := buildTX(utxoID, txAssetID)
+		tx := buildTX(utxoID, txAssetID, key.PublicKey().Address())
 
 		// sign the transaction
 		if err := signTX(vm.codec, tx, key); err != nil {
@@ -274,22 +274,33 @@ func signTX(codec codec.Manager, tx *Tx, key *crypto.PrivateKeySECP256K1R) error
 	return tx.SignSECP256K1Fx(codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
 }
 
-func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset) *Tx {
-	return &Tx{UnsignedTx: &ImportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		}},
-		SourceChain: platformChainID,
-		ImportedIns: []*avax.TransferableInput{{
-			UTXOID: utxoID,
-			Asset:  txAssetID,
-			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ids.ShortID) *Tx {
+	return &Tx{
+		UnsignedTx: &BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				Ins: []*avax.TransferableInput{{
+					UTXOID: utxoID,
+					Asset:  txAssetID,
+					In: &secp256k1fx.TransferInput{
+						Amt:   1000,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+				Outs: []*avax.TransferableOutput{{
+					Asset: txAssetID,
+					Out: &secp256k1fx.TransferOutput{
+						Amt: 1000,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 1,
+							Addrs:     []ids.ShortID{address},
+						},
+					},
+				}},
 			},
-		}},
-	}}
+		},
+	}
 }
 
 func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message) *VM {
