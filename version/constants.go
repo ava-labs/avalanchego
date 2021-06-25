@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	VersionStr                   string // Printed when CLI arg --version is used
+	String                       string // Printed when CLI arg --version is used
 	GitCommit                    string // Set in the build script (i.e. at compile time)
 	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 9)
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 5)
@@ -56,7 +56,7 @@ func init() {
 		args = append(args, GitCommit)
 	}
 	format += "]\n"
-	VersionStr = fmt.Sprintf(format, args...)
+	String = fmt.Sprintf(format, args...)
 }
 
 func GetApricotPhase0Time(networkID uint32) time.Time {

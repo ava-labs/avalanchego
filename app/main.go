@@ -27,7 +27,7 @@ func main() {
 	}
 
 	if processConfig.DisplayVersionAndExit {
-		fmt.Print(version.VersionStr)
+		fmt.Print(version.String)
 		os.Exit(0)
 	}
 
