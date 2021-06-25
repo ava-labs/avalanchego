@@ -20,6 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -226,7 +227,20 @@ type network struct {
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool sync.Pool
 
-	msgThrottler MsgThrottler
+	msgThrottler throttling.MsgThrottler
+}
+
+type Config struct {
+	DialerConfig
+	HealthConfig
+	timer.AdaptiveTimeoutConfig
+	MetricsNamespace string
+	// [Registerer] is set in node's initMetricsAPI method
+	Registerer prometheus.Registerer
+	// See throttling.NewSybilMsgThrottler
+	MaxUnprocessedVdrBytes uint64
+	// See throttling.NewSybilMsgThrottler
+	MaxUnprocessedAtLargeBytes uint64
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -416,7 +430,7 @@ func NewNetwork(
 	}
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-	msgThrottler, err := newSybilMsgThrottler(netw.log, registerer, netw.vdrs, 256*1024*1024, 128*1024*1024) // todo replace magic number
+	msgThrottler, err := throttling.NewSybilMsgThrottler(netw.log, registerer, netw.vdrs, 256*1024*1024, 128*1024*1024) // todo replace magic number
 	if err != nil {
 		log.Warn("initializing throttler metrics failed with: %s", err)
 	}

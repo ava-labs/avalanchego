@@ -9,6 +9,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -25,7 +26,7 @@ type Dialer interface {
 type dialer struct {
 	log               logging.Logger
 	network           string
-	throttler         DialThrottler
+	throttler         throttling.DialThrottler
 	connectionTimeout time.Duration
 }
 
@@ -47,11 +48,11 @@ func NewDialerConfig(throttleRps uint32, dialTimeout time.Duration) DialerConfig
 // [dialerConfig.throttleRps] gives the max number of outgoing connection attempts/second.
 // If [dialerConfig.throttleRps] == 0, outgoing connections aren't rate-limited.
 func NewDialer(network string, dialerConfig DialerConfig, log logging.Logger) Dialer {
-	var throttler DialThrottler
+	var throttler throttling.DialThrottler
 	if dialerConfig.throttleRps <= 0 {
-		throttler = NewNoDialThrottler()
+		throttler = throttling.NewNoDialThrottler()
 	} else {
-		throttler = NewDialThrottler(int(dialerConfig.throttleRps))
+		throttler = throttling.NewDialThrottler(int(dialerConfig.throttleRps))
 	}
 	log.Debug(
 		"dialer has outgoing connection limit of %d/second and dial timeout %s",

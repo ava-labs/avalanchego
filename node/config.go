@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
-	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 // Config contains all of the configurations of an Avalanche node.
@@ -71,12 +70,10 @@ type Config struct {
 	HealthCheckFreq time.Duration
 
 	// Network configuration
-	NetworkConfig       timer.AdaptiveTimeoutConfig
-	NetworkHealthConfig network.HealthConfig
-	PeerListSize        uint32
-	PeerListGossipSize  uint32
-	PeerListGossipFreq  time.Duration
-	DialerConfig        network.DialerConfig
+	NetworkConfig      network.Config
+	PeerListSize       uint32
+	PeerListGossipSize uint32
+	PeerListGossipFreq time.Duration
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config

@@ -28,15 +28,18 @@ func TestShutdown(t *testing.T) {
 	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	err = tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutCoefficient: 1.25,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,15 +94,18 @@ func TestShutdownTimesOut(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	err = tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Second,
-		MinimumTimeout:     500 * time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutCoefficient: 1.25,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Second,
+			MinimumTimeout:     500 * time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,15 +169,18 @@ func TestRouterTimeout(t *testing.T) {
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     10 * time.Millisecond,
-		MinimumTimeout:     10 * time.Millisecond,
-		MaximumTimeout:     maxTimeout,
-		TimeoutCoefficient: 1,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist.NewNoBenchlist())
+	err := tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     10 * time.Millisecond,
+			MinimumTimeout:     10 * time.Millisecond,
+			MaximumTimeout:     maxTimeout,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,15 +272,18 @@ func TestRouterTimeout(t *testing.T) {
 func TestRouterClearTimeouts(t *testing.T) {
 	// Create a timeout manager
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     3 * time.Second,
-		MinimumTimeout:     3 * time.Second,
-		MaximumTimeout:     5 * time.Minute,
-		TimeoutCoefficient: 1,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist.NewNoBenchlist())
+	err := tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     3 * time.Second,
+			MinimumTimeout:     3 * time.Second,
+			MaximumTimeout:     5 * time.Minute,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

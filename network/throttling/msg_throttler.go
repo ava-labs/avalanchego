@@ -1,7 +1,7 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package throttling
 
 import (
 	"sync"
@@ -35,7 +35,7 @@ type MsgThrottler interface {
 // Returns a new MsgThrottler.
 // If this function returns an error, the returned MsgThrottler may still be used.
 // However, some of its metrics may not be registered.
-func newSybilMsgThrottler(
+func NewSybilMsgThrottler(
 	log logging.Logger,
 	metricsRegisterer prometheus.Registerer,
 	vdrs validators.Set,
@@ -221,6 +221,10 @@ func (m *sybilMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Regis
 		metricsRegisterer.Register(m.awaitingRelease),
 	)
 	return errs.Err
+}
+
+func NewNoThrottler() MsgThrottler {
+	return &noMsgThrottler{}
 }
 
 // noMsgThrottler implements MsgThrottler.

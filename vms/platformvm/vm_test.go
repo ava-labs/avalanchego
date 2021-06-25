@@ -2077,15 +2077,18 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 
 	timeoutManager := timeout.Manager{}
 	benchlist := benchlist.NewNoBenchlist()
-	err = timeoutManager.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutHalflife:    5 * time.Minute,
-		TimeoutCoefficient: 1.25,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = timeoutManager.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

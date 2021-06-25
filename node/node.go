@@ -166,7 +166,7 @@ func (n *Node) initNetworking() error {
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
 
-	dialer := network.NewDialer(TCP, n.Config.DialerConfig, n.Log)
+	dialer := network.NewDialer(TCP, n.Config.NetworkConfig.DialerConfig, n.Log)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -248,14 +248,14 @@ func (n *Node) initNetworking() error {
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
 		n.Config.SendQueueSize,
-		n.Config.NetworkHealthConfig,
+		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
 		tlsKey,
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
-		n.Config.DialerConfig,
+		n.Config.NetworkConfig.DialerConfig,
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
@@ -552,7 +552,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, n.benchlistManager); err != nil {
+	if err := timeoutManager.Initialize(
+		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
+		n.benchlistManager,
+		n.Config.NetworkConfig.MetricsNamespace,
+		n.Config.NetworkConfig.Registerer,
+	); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
@@ -711,7 +716,6 @@ func (n *Node) initMetricsAPI() error {
 	// It is assumed by components of the system that the Metrics interface is
 	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
-	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
 	n.Config.NetworkConfig.Registerer = registry
 
 	if !n.Config.MetricsAPIEnabled {

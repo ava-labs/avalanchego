@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 )
 
@@ -350,43 +351,50 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// Health
 	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
 	// Network Health Check
-	nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey)
-	nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey)
-	nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull = v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey)
-	nodeConfig.NetworkHealthConfig.MinConnectedPeers = v.GetUint(NetworkHealthMinPeersKey)
-	nodeConfig.NetworkHealthConfig.MaxSendFailRate = v.GetFloat64(NetworkHealthMaxSendFailRateKey)
-	nodeConfig.NetworkHealthConfig.MaxSendFailRateHalflife = healthCheckAveragerHalflife
+	healthConfig := network.HealthConfig{}
+	healthConfig.MaxTimeSinceMsgSent = v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey)
+	healthConfig.MaxTimeSinceMsgReceived = v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey)
+	healthConfig.MaxPortionSendQueueBytesFull = v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey)
+	healthConfig.MinConnectedPeers = v.GetUint(NetworkHealthMinPeersKey)
+	healthConfig.MaxSendFailRate = v.GetFloat64(NetworkHealthMaxSendFailRateKey)
+	healthConfig.MaxSendFailRateHalflife = healthCheckAveragerHalflife
 	switch {
-	case nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgSent < 0:
+	case healthConfig.MaxTimeSinceMsgSent < 0:
 		return node.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)
-	case nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgReceived < 0:
+	case healthConfig.MaxTimeSinceMsgReceived < 0:
 		return node.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
-	case nodeConfig.NetworkHealthConfig.MaxSendFailRate < 0 || nodeConfig.NetworkHealthConfig.MaxSendFailRate > 1:
+	case healthConfig.MaxSendFailRate < 0 || healthConfig.MaxSendFailRate > 1:
 		return node.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxSendFailRateKey)
-	case nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull < 0 || nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull > 1:
+	case healthConfig.MaxPortionSendQueueBytesFull < 0 || healthConfig.MaxPortionSendQueueBytesFull > 1:
 		return node.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	}
+	nodeConfig.NetworkConfig.HealthConfig = healthConfig
 
 	// Network Timeout
-	nodeConfig.NetworkConfig.InitialTimeout = v.GetDuration(NetworkInitialTimeoutKey)
-	nodeConfig.NetworkConfig.MinimumTimeout = v.GetDuration(NetworkMinimumTimeoutKey)
-	nodeConfig.NetworkConfig.MaximumTimeout = v.GetDuration(NetworkMaximumTimeoutKey)
-	nodeConfig.NetworkConfig.TimeoutHalflife = v.GetDuration(NetworkTimeoutHalflifeKey)
-	nodeConfig.NetworkConfig.TimeoutCoefficient = v.GetFloat64(NetworkTimeoutCoefficientKey)
+	timeoutConfig := timer.AdaptiveTimeoutConfig{}
+	timeoutConfig.InitialTimeout = v.GetDuration(NetworkInitialTimeoutKey)
+	timeoutConfig.MinimumTimeout = v.GetDuration(NetworkMinimumTimeoutKey)
+	timeoutConfig.MaximumTimeout = v.GetDuration(NetworkMaximumTimeoutKey)
+	timeoutConfig.TimeoutHalflife = v.GetDuration(NetworkTimeoutHalflifeKey)
+	timeoutConfig.TimeoutCoefficient = v.GetFloat64(NetworkTimeoutCoefficientKey)
 
 	switch {
-	case nodeConfig.NetworkConfig.MinimumTimeout < 1:
+	case timeoutConfig.MinimumTimeout < 1:
 		return node.Config{}, errors.New("minimum timeout must be positive")
-	case nodeConfig.NetworkConfig.MinimumTimeout > nodeConfig.NetworkConfig.MaximumTimeout:
+	case timeoutConfig.MinimumTimeout > timeoutConfig.MaximumTimeout:
 		return node.Config{}, errors.New("maximum timeout can't be less than minimum timeout")
-	case nodeConfig.NetworkConfig.InitialTimeout < nodeConfig.NetworkConfig.MinimumTimeout ||
-		nodeConfig.NetworkConfig.InitialTimeout > nodeConfig.NetworkConfig.MaximumTimeout:
+	case timeoutConfig.InitialTimeout < timeoutConfig.MinimumTimeout ||
+		timeoutConfig.InitialTimeout > timeoutConfig.MaximumTimeout:
 		return node.Config{}, errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]")
-	case nodeConfig.NetworkConfig.TimeoutHalflife <= 0:
+	case timeoutConfig.TimeoutHalflife <= 0:
 		return node.Config{}, errors.New("network timeout halflife must be positive")
-	case nodeConfig.NetworkConfig.TimeoutCoefficient < 1:
+	case timeoutConfig.TimeoutCoefficient < 1:
 		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
+	nodeConfig.NetworkConfig.AdaptiveTimeoutConfig = timeoutConfig
+
+	// Metrics Namespace
+	nodeConfig.NetworkConfig.MetricsNamespace = constants.PlatformName
 
 	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
 	// [PeerListGossipFreq]
@@ -395,7 +403,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Outbound connection throttling
-	nodeConfig.DialerConfig = network.NewDialerConfig(
+	nodeConfig.NetworkConfig.DialerConfig = network.NewDialerConfig(
 		v.GetUint32(OutboundConnectionThrottlingRps),
 		v.GetDuration(OutboundConnectionTimeout),
 	)
