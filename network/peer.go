@@ -451,8 +451,8 @@ func (p *peer) handle(msg Msg) {
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
+		p.net.msgThrottler.Release(msgLen, p.nodeID)
 		return
 	}
 	msgMetrics.numReceived.Inc()

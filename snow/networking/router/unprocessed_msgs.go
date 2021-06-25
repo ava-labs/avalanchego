@@ -46,7 +46,6 @@ func (u *unprocessedMsgsImpl) Push(msg message) {
 // Must only be called when [u.Len()] != 0
 func (u *unprocessedMsgsImpl) Pop() message {
 	// TODO make sure this always terminates
-	// Is it possible that calls to Utilization sum to more than 1?
 	for {
 		msg := u.msgs[0]
 		if u.canPop(&msg) {
@@ -68,13 +67,21 @@ func (u *unprocessedMsgsImpl) Len() int {
 
 // canPop will return true for at least one message in [u.msgs]
 func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
+	// Every node has some allowed CPU allocation depending on
+	// the number of pending messages.
 	baseMaxCPU := 1 / float64(len(u.msgs))
 	weight, isVdr := u.vdrs.GetWeight(msg.validatorID)
 	if !isVdr {
 		weight = 0
 	}
-	portionWeight := float64(weight) / float64(u.vdrs.Weight())
+	// The sum of validator weights should never be 0, but handle
+	// that case for completeness here to avoid divide by 0.
+	portionWeight := float64(0)
+	totalVdrsWeight := u.vdrs.Weight()
+	if totalVdrsWeight != 0 {
+		portionWeight = float64(weight) / float64(totalVdrsWeight)
+	}
 	recentCPUUtilized := u.cpuTracker.Utilization(msg.validatorID, u.clock.Time())
-	maxCPU := baseMaxCPU + (1-baseMaxCPU)*portionWeight
+	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
 	return recentCPUUtilized <= maxCPU
 }

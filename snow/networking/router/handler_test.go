@@ -78,10 +78,12 @@ func TestHandlerDoesntDrop(t *testing.T) {
 	}
 
 	handler := &Handler{}
-	validators := validators.NewSet()
-	err := handler.Initialize(
+	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
+	err = handler.Initialize(
 		&engine,
-		validators,
+		vdrs,
 		nil,
 		"",
 		prometheus.NewRegistry(),
@@ -111,10 +113,13 @@ func TestHandlerClosesOnError(t *testing.T) {
 		return errors.New("Engine error should cause handler to close")
 	}
 
+	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	handler := &Handler{}
-	err := handler.Initialize(
+	err = handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		"",
 		prometheus.NewRegistry(),
@@ -152,10 +157,13 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		return nil
 	}
 
+	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	handler := &Handler{}
-	err := handler.Initialize(
+	err = handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		"",
 		prometheus.NewRegistry(),

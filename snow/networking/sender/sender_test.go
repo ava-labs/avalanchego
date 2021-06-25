@@ -44,9 +44,11 @@ func TestSenderContext(t *testing.T) {
 
 func TestTimeout(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err = tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:     time.Millisecond,
 		MinimumTimeout:     time.Millisecond,
 		MaximumTimeout:     10 * time.Second,
@@ -113,12 +115,14 @@ func TestTimeout(t *testing.T) {
 
 func TestReliableMessages(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.ShortID{1}, 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err = tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:     time.Millisecond,
 		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
+		MaximumTimeout:     time.Millisecond,
 		TimeoutHalflife:    5 * time.Minute,
 		TimeoutCoefficient: 1.25,
 		MetricsNamespace:   "",
@@ -194,8 +198,10 @@ func TestReliableMessages(t *testing.T) {
 func TestReliableMessagesToMyself(t *testing.T) {
 	benchlist := benchlist.NewNoBenchlist()
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err = tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:     10 * time.Millisecond,
 		MinimumTimeout:     10 * time.Millisecond,
 		MaximumTimeout:     10 * time.Millisecond, // Timeout fires immediately

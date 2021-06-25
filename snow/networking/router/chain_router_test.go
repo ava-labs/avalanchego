@@ -24,9 +24,11 @@ import (
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err = tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:     time.Millisecond,
 		MinimumTimeout:     time.Millisecond,
 		MaximumTimeout:     10 * time.Second,
@@ -84,10 +86,12 @@ func TestShutdown(t *testing.T) {
 
 func TestShutdownTimesOut(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
+	err = tm.Initialize(&timer.AdaptiveTimeoutConfig{
 		InitialTimeout:     time.Second,
 		MinimumTimeout:     500 * time.Millisecond,
 		MaximumTimeout:     10 * time.Second,
@@ -219,9 +223,12 @@ func TestRouterTimeout(t *testing.T) {
 	engine.ContextF = snow.DefaultContextTest
 
 	handler := &Handler{}
+	vdrs := validators.NewSet()
+	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	err = handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		"",
 		prometheus.NewRegistry(),
@@ -281,10 +288,13 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	engine.ContextF = snow.DefaultContextTest
 
+	vdrs := validators.NewSet()
+	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
 		"",
 		prometheus.NewRegistry(),
