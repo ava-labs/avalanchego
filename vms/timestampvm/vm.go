@@ -22,14 +22,14 @@ import (
 const (
 	dataLen      = 32
 	codecVersion = 0
+	version      = "native"
 )
 
 var (
 	errNoPendingBlocks = errors.New("there is no block to propose")
 	errBadGenesisBytes = errors.New("genesis data should be bytes (max length 32)")
 
-	_ block.ChainVM   = &VM{}
-	_ common.StaticVM = &VM{}
+	_ block.ChainVM = &VM{}
 )
 
 // VM implements the snowman.VM interface
@@ -109,6 +109,10 @@ func (vm *VM) Initialize(
 		}
 	}
 	return nil
+}
+
+func (vm *VM) Version() (string, error) {
+	return version, nil
 }
 
 // CreateHandlers returns a map where:

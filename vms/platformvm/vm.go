@@ -62,6 +62,8 @@ const (
 
 	// Maximum future start time for staking/delegating
 	maxFutureStartTime = 24 * 7 * 2 * time.Hour
+
+	vmVersion = "native"
 )
 
 var (
@@ -72,7 +74,6 @@ var (
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
-	_ common.StaticVM      = &VM{}
 	_ secp256k1fx.VM       = &VM{}
 	_ Fx                   = &secp256k1fx.Fx{}
 )
@@ -402,6 +403,10 @@ func (vm *VM) NotifyBlockReady() {
 	default:
 		vm.ctx.Log.Debug("dropping message to consensus engine")
 	}
+}
+
+func (vm *VM) Version() (string, error) {
+	return vmVersion, nil
 }
 
 // CreateHandlers returns a map where:

@@ -378,6 +378,13 @@ func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmpr
 	}, nil
 }
 
+func (vm *VMServer) Version(_ context.Context, req *vmproto.VersionRequest) (*vmproto.VersionResponse, error) {
+	version, err := vm.vm.Version()
+	return &vmproto.HealthResponse{
+		Version: version,
+	}, err
+}
+
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {

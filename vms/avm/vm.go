@@ -48,6 +48,8 @@ const (
 	maxUTXOsToFetch    = 1024
 
 	codecVersion = 0
+
+	version = "native"
 )
 
 var (
@@ -58,9 +60,8 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM    = &VM{}
-	_ common.StaticVM = &VM{}
-	_ secp256k1fx.VM  = &VM{}
+	_ vertex.DAGVM   = &VM{}
+	_ secp256k1fx.VM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -265,6 +266,11 @@ func (vm *VM) Shutdown() error {
 	vm.ctx.Lock.Lock()
 
 	return vm.baseDB.Close()
+}
+
+// Get implements the avalanche.DAGVM interface
+func (vm *VM) Version() (string, error) {
+	return version, nil
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
