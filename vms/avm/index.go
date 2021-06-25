@@ -26,15 +26,15 @@ type AddressTxsIndexer interface {
 	Reset()
 }
 
-// StatefulAddressTxsIndexer indexes transactions for given an address and an assetID
-type StatefulAddressTxsIndexer struct {
+// statefulAddressTxsIndexer indexes transactions for given an address and an assetID
+type statefulAddressTxsIndexer struct {
 	// Maps address -> []AssetID Set
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	logger              logging.Logger
 }
 
-func (i *StatefulAddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
+func (i *statefulAddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
 	for _, address := range transferOutput.Addrs {
 		if _, exists := i.addressAssetIDTxMap[address]; !exists {
 			i.addressAssetIDTxMap[address] = make(map[ids.ID]struct{})
@@ -43,7 +43,7 @@ func (i *StatefulAddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOu
 	}
 }
 
-func (i *StatefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
+func (i *statefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 	for _, utxo := range outputUTXOs {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
@@ -56,7 +56,7 @@ func (i *StatefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 }
 
 // this feels weird
-func (i *StatefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
+func (i *statefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
 	for address, assetIDMap := range i.addressAssetIDTxMap {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
 		for assetID := range assetIDMap {
@@ -100,16 +100,38 @@ func (i *StatefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
 	return nil
 }
 
-func (i *StatefulAddressTxsIndexer) Reset() {
+func (i *statefulAddressTxsIndexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
 func NewAddressTxsIndexer(db *versiondb.Database, logger logging.Logger) AddressTxsIndexer {
-	return &StatefulAddressTxsIndexer{
+	return &statefulAddressTxsIndexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
 		logger:              logger,
 	}
+}
+
+func NewNoOpAddressTxsIndexer() AddressTxsIndexer {
+	return &noOpAddressTxsIndexer{}
+}
+
+type noOpAddressTxsIndexer struct{}
+
+func (n noOpAddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
+	// no op
+}
+
+func (n noOpAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
+	// no op
+}
+
+func (n noOpAddressTxsIndexer) CommitIndex(txID ids.ID) error {
+	return nil
+}
+
+func (n noOpAddressTxsIndexer) Reset() {
+	// no op
 }
 
 // CommitIndex commits given addresses map to the database. The database structure is thus:
