@@ -259,6 +259,7 @@ func (n *Node) initNetworking() error {
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		n.Config.NetworkConfig.MsgThrottlerConfig,
 	)
 
 	return nil
@@ -590,10 +591,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		FetchOnly:                              n.Config.FetchOnly,
 		FetchOnlyFrom:                          fetchOnlyFrom,
 		StakingEnabled:                         n.Config.EnableStaking,
-		MaxPendingMsgs:                         n.Config.MaxPendingMsgs,
-		MaxNonStakerPendingMsgs:                n.Config.MaxNonStakerPendingMsgs,
-		StakerMSGPortion:                       n.Config.StakerMSGPortion,
-		StakerCPUPortion:                       n.Config.StakerCPUPortion,
 		Log:                                    n.Log,
 		LogFactory:                             n.LogFactory,
 		VMManager:                              n.vmManager,

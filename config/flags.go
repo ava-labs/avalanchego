@@ -13,6 +13,7 @@ import (
 
 	"github.com/kardianos/osext"
 
+	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -149,11 +150,15 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(BenchlistMinFailingDurationKey, 5*time.Minute, "Minimum amount of time messages to a peer must be failing before the peer is benched.")
 
 	// Router
-	fs.Uint(MaxPendingMsgsKey, 4096, "Maximum number of pending messages. Messages after this will be dropped.")
 	fs.Duration(ConsensusGossipFrequencyKey, 10*time.Second, "Frequency of gossiping accepted frontiers.")
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
+
+	// Throttling
+	fs.Uint64(ThrottlingMaxUnprocessedAtLargeBytesKey, 128*1024*1024, "Size, in bytes, of at-large byte allocation in message throttler.")
+	fs.Uint64(ThrottlingMaxUnprocessedVdrBytesKey, 128*1024*1024, "Size, in bytes, of validator byte allocation in message throttler.")
+	fs.Uint64(ThrottlingMaxNonVdrBytesKey, uint64(network.DefaultMaxMessageSize), "Max number of bytes in unprocessed incoming messages from a given non-validator.")
 
 	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")

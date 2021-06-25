@@ -47,9 +47,7 @@ const (
 	StakingCertPathKey                        = "staking-tls-cert-file"
 	StakingDisabledWeightKey                  = "staking-disabled-weight"
 	MaxNonStakerPendingMsgsKey                = "max-non-staker-pending-msgs"
-	StakerMsgReservedKey                      = "staker-msg-reserved"
 	StakerCPUReservedKey                      = "staker-cpu-reserved"
-	MaxPendingMsgsKey                         = "max-pending-msgs"
 	NetworkInitialTimeoutKey                  = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                  = "network-minimum-timeout"
 	NetworkMaximumTimeoutKey                  = "network-maximum-timeout"
@@ -121,4 +119,7 @@ const (
 	ProfileContinuousEnabledKey               = "profile-continuous-enabled"
 	ProfileContinuousFreqKey                  = "profile-continuous-freq"
 	ProfileContinuousMaxFilesKey              = "profile-continuous-max-files"
+	ThrottlingMaxUnprocessedAtLargeBytesKey   = "throttling-max-unprocessed-at-large-bytes"
+	ThrottlingMaxUnprocessedVdrBytesKey       = "throttling-max-unprocessed-validator-bytes"
+	ThrottlingMaxNonVdrBytesKey               = "throttling-max-non-validator-bytes"
 )

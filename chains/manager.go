@@ -126,10 +126,6 @@ type ChainConfig struct {
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled            bool // True iff the network has staking enabled
-	MaxPendingMsgs            uint32
-	MaxNonStakerPendingMsgs   uint32
-	StakerMSGPortion          float64
-	StakerCPUPortion          float64
 	Log                       logging.Logger
 	LogFactory                logging.Factory
 	VMManager                 vms.Manager // Manage mappings from vm ID --> vm

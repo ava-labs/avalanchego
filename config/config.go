@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/staking"
@@ -339,14 +340,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
 
 	// Throttling
-	nodeConfig.MaxNonStakerPendingMsgs = v.GetUint32(MaxNonStakerPendingMsgsKey)
-	nodeConfig.StakerMSGPortion = v.GetFloat64(StakerMsgReservedKey)
-	nodeConfig.StakerCPUPortion = v.GetFloat64(StakerCPUReservedKey)
 	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
-	nodeConfig.MaxPendingMsgs = v.GetUint32(MaxPendingMsgsKey)
-	if nodeConfig.MaxPendingMsgs < nodeConfig.MaxNonStakerPendingMsgs {
-		return node.Config{}, errors.New("maximum pending messages must be >= maximum non-staker pending messages")
-	}
+	throttlingConfig := throttling.MsgThrottlerConfig{}
+	throttlingConfig.MaxUnprocessedAtLargeBytes = v.GetUint64(ThrottlingMaxUnprocessedAtLargeBytesKey)
+	throttlingConfig.MaxUnprocessedVdrBytes = v.GetUint64(ThrottlingMaxUnprocessedVdrBytesKey)
+	throttlingConfig.MaxNonVdrBytes = v.GetUint64(ThrottlingMaxNonVdrBytesKey)
+	nodeConfig.NetworkConfig.MsgThrottlerConfig = throttlingConfig
 
 	// Health
 	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)

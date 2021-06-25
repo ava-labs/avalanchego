@@ -32,6 +32,12 @@ type MsgThrottler interface {
 	Release(msgSize uint64, nodeID ids.ShortID)
 }
 
+type MsgThrottlerConfig struct {
+	MaxUnprocessedVdrBytes     uint64
+	MaxUnprocessedAtLargeBytes uint64
+	MaxNonVdrBytes             uint64 // TODO use this
+}
+
 // Returns a new MsgThrottler.
 // If this function returns an error, the returned MsgThrottler may still be used.
 // However, some of its metrics may not be registered.
@@ -39,16 +45,15 @@ func NewSybilMsgThrottler(
 	log logging.Logger,
 	metricsRegisterer prometheus.Registerer,
 	vdrs validators.Set,
-	maxUnprocessedVdrBytes uint64,
-	maxUnprocessedAtLargeBytes uint64,
+	config MsgThrottlerConfig,
 ) (MsgThrottler, error) {
 	t := &sybilMsgThrottler{
 		log:                    log,
 		cond:                   sync.Cond{L: &sync.Mutex{}},
 		vdrs:                   vdrs,
-		maxUnprocessedVdrBytes: maxUnprocessedVdrBytes,
-		remainingVdrBytes:      maxUnprocessedVdrBytes,
-		remainingAtLargeBytes:  maxUnprocessedAtLargeBytes,
+		maxUnprocessedVdrBytes: config.MaxUnprocessedVdrBytes,
+		remainingVdrBytes:      config.MaxUnprocessedVdrBytes,
+		remainingAtLargeBytes:  config.MaxUnprocessedAtLargeBytes,
 		vdrToBytesUsed:         make(map[ids.ShortID]uint64),
 	}
 	if err := t.metrics.initialize(metricsRegisterer); err != nil {

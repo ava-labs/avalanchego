@@ -233,6 +233,7 @@ type network struct {
 type Config struct {
 	DialerConfig
 	HealthConfig
+	throttling.MsgThrottlerConfig
 	timer.AdaptiveTimeoutConfig
 	MetricsNamespace string
 	// [Registerer] is set in node's initMetricsAPI method
@@ -274,6 +275,7 @@ func NewDefaultNetwork(
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
+	msgThrottlerConfig throttling.MsgThrottlerConfig,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -318,6 +320,7 @@ func NewDefaultNetwork(
 		dialerConfig,
 		tlsKey,
 		isFetchOnly,
+		msgThrottlerConfig,
 	)
 }
 
@@ -365,6 +368,7 @@ func NewNetwork(
 	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
+	msgThrottlerConfig throttling.MsgThrottlerConfig,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -430,7 +434,7 @@ func NewNetwork(
 	}
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-	msgThrottler, err := throttling.NewSybilMsgThrottler(netw.log, registerer, netw.vdrs, 256*1024*1024, 128*1024*1024) // todo replace magic number
+	msgThrottler, err := throttling.NewSybilMsgThrottler(netw.log, registerer, netw.vdrs, msgThrottlerConfig) // todo replace magic number
 	if err != nil {
 		log.Warn("initializing throttler metrics failed with: %s", err)
 	}

@@ -60,11 +60,7 @@ type Config struct {
 	DisabledStakingWeight uint64
 
 	// Throttling
-	MaxNonStakerPendingMsgs uint32
-	StakerMSGPortion        float64
-	StakerCPUPortion        float64
-	SendQueueSize           uint32
-	MaxPendingMsgs          uint32
+	SendQueueSize uint32
 
 	// Health
 	HealthCheckFreq time.Duration
