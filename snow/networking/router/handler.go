@@ -175,61 +175,61 @@ func (h *Handler) handleConsensusMsg(msg message, startTime time.Time) error {
 	var err error
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
-		err = h.engine.GetAcceptedFrontier(msg.validatorID, msg.requestID)
+		err = h.engine.GetAcceptedFrontier(msg.nodeID, msg.requestID)
 	case constants.AcceptedFrontierMsg:
-		err = h.engine.AcceptedFrontier(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.AcceptedFrontier(msg.nodeID, msg.requestID, msg.containerIDs)
 	case constants.GetAcceptedFrontierFailedMsg:
-		err = h.engine.GetAcceptedFrontierFailed(msg.validatorID, msg.requestID)
+		err = h.engine.GetAcceptedFrontierFailed(msg.nodeID, msg.requestID)
 	case constants.GetAcceptedMsg:
-		err = h.engine.GetAccepted(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.GetAccepted(msg.nodeID, msg.requestID, msg.containerIDs)
 	case constants.AcceptedMsg:
-		err = h.engine.Accepted(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.Accepted(msg.nodeID, msg.requestID, msg.containerIDs)
 	case constants.GetAcceptedFailedMsg:
-		err = h.engine.GetAcceptedFailed(msg.validatorID, msg.requestID)
+		err = h.engine.GetAcceptedFailed(msg.nodeID, msg.requestID)
 	case constants.GetAncestorsMsg:
-		err = h.engine.GetAncestors(msg.validatorID, msg.requestID, msg.containerID)
+		err = h.engine.GetAncestors(msg.nodeID, msg.requestID, msg.containerID)
 	case constants.GetAncestorsFailedMsg:
-		err = h.engine.GetAncestorsFailed(msg.validatorID, msg.requestID)
+		err = h.engine.GetAncestorsFailed(msg.nodeID, msg.requestID)
 	case constants.MultiPutMsg:
-		err = h.engine.MultiPut(msg.validatorID, msg.requestID, msg.containers)
+		err = h.engine.MultiPut(msg.nodeID, msg.requestID, msg.containers)
 	case constants.GetMsg:
-		err = h.engine.Get(msg.validatorID, msg.requestID, msg.containerID)
+		err = h.engine.Get(msg.nodeID, msg.requestID, msg.containerID)
 	case constants.GetFailedMsg:
-		err = h.engine.GetFailed(msg.validatorID, msg.requestID)
+		err = h.engine.GetFailed(msg.nodeID, msg.requestID)
 	case constants.PutMsg:
-		err = h.engine.Put(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+		err = h.engine.Put(msg.nodeID, msg.requestID, msg.containerID, msg.container)
 	case constants.PushQueryMsg:
-		err = h.engine.PushQuery(msg.validatorID, msg.requestID, msg.containerID, msg.container)
+		err = h.engine.PushQuery(msg.nodeID, msg.requestID, msg.containerID, msg.container)
 	case constants.PullQueryMsg:
-		err = h.engine.PullQuery(msg.validatorID, msg.requestID, msg.containerID)
+		err = h.engine.PullQuery(msg.nodeID, msg.requestID, msg.containerID)
 	case constants.QueryFailedMsg:
-		err = h.engine.QueryFailed(msg.validatorID, msg.requestID)
+		err = h.engine.QueryFailed(msg.nodeID, msg.requestID)
 	case constants.ChitsMsg:
-		err = h.engine.Chits(msg.validatorID, msg.requestID, msg.containerIDs)
+		err = h.engine.Chits(msg.nodeID, msg.requestID, msg.containerIDs)
 	case constants.ConnectedMsg:
-		err = h.engine.Connected(msg.validatorID)
+		err = h.engine.Connected(msg.nodeID)
 	case constants.DisconnectedMsg:
-		err = h.engine.Disconnected(msg.validatorID)
+		err = h.engine.Disconnected(msg.nodeID)
 	}
 	endTime := h.clock.Time()
 	timeConsumed := endTime.Sub(startTime)
 	histogram := h.metrics.getMSGHistogram(msg.messageType)
 	histogram.Observe(float64(timeConsumed))
-	h.cpuTracker.UtilizeTime(msg.validatorID, startTime, endTime)
+	h.cpuTracker.UtilizeTime(msg.nodeID, startTime, endTime)
 	return err
 }
 
 // GetAcceptedFrontier passes a GetAcceptedFrontier message received from the
 // network to the consensus engine.
 func (h *Handler) GetAcceptedFrontier(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	deadline time.Time,
 	onDoneHandling func(),
 ) {
 	h.push(message{
 		messageType:    constants.GetAcceptedFrontierMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		deadline:       deadline,
 		received:       h.clock.Time(),
@@ -240,14 +240,14 @@ func (h *Handler) GetAcceptedFrontier(
 // AcceptedFrontier passes a AcceptedFrontier message received from the network
 // to the consensus engine.
 func (h *Handler) AcceptedFrontier(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	containerIDs []ids.ID,
 	onDoneHandling func(),
 ) {
 	h.push(message{
 		messageType:    constants.AcceptedFrontierMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		containerIDs:   containerIDs,
 		received:       h.clock.Time(),
@@ -257,10 +257,10 @@ func (h *Handler) AcceptedFrontier(
 
 // GetAcceptedFrontierFailed passes a GetAcceptedFrontierFailed message received
 // from the network to the consensus engine.
-func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) {
+func (h *Handler) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32) {
 	h.push(message{
 		messageType: constants.GetAcceptedFrontierFailedMsg,
-		validatorID: validatorID,
+		nodeID:      nodeID,
 		requestID:   requestID,
 	})
 }
@@ -268,7 +268,7 @@ func (h *Handler) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID u
 // GetAccepted passes a GetAccepted message received from the
 // network to the consensus engine.
 func (h *Handler) GetAccepted(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	deadline time.Time,
 	containerIDs []ids.ID,
@@ -276,7 +276,7 @@ func (h *Handler) GetAccepted(
 ) {
 	h.push(message{
 		messageType:    constants.GetAcceptedMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		deadline:       deadline,
 		containerIDs:   containerIDs,
@@ -288,14 +288,14 @@ func (h *Handler) GetAccepted(
 // Accepted passes a Accepted message received from the network to the consensus
 // engine.
 func (h *Handler) Accepted(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	containerIDs []ids.ID,
 	onDoneHandling func(),
 ) {
 	h.push(message{
 		messageType:    constants.AcceptedMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		containerIDs:   containerIDs,
 		received:       h.clock.Time(),
@@ -305,17 +305,17 @@ func (h *Handler) Accepted(
 
 // GetAcceptedFailed passes a GetAcceptedFailed message received from the
 // network to the consensus engine.
-func (h *Handler) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) {
+func (h *Handler) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) {
 	h.push(message{
 		messageType: constants.GetAcceptedFailedMsg,
-		validatorID: validatorID,
+		nodeID:      nodeID,
 		requestID:   requestID,
 	})
 }
 
 // GetAncestors passes a GetAncestors message received from the network to the consensus engine.
 func (h *Handler) GetAncestors(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	deadline time.Time,
 	containerID ids.ID,
@@ -323,7 +323,7 @@ func (h *Handler) GetAncestors(
 ) {
 	h.push(message{
 		messageType:    constants.GetAncestorsMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		deadline:       deadline,
 		containerID:    containerID,
@@ -334,14 +334,14 @@ func (h *Handler) GetAncestors(
 
 // MultiPut passes a MultiPut message received from the network to the consensus engine.
 func (h *Handler) MultiPut(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	containers [][]byte,
 	onDoneHandling func(),
 ) {
 	h.push(message{
 		messageType:    constants.MultiPutMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		containers:     containers,
 		received:       h.clock.Time(),
@@ -350,10 +350,10 @@ func (h *Handler) MultiPut(
 }
 
 // GetAncestorsFailed passes a GetAncestorsFailed message to the consensus engine.
-func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) {
+func (h *Handler) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) {
 	h.push(message{
 		messageType: constants.GetAncestorsFailedMsg,
-		validatorID: validatorID,
+		nodeID:      nodeID,
 		requestID:   requestID,
 	})
 }
@@ -362,13 +362,13 @@ func (h *Handler) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) 
 func (h *Handler) Timeout() {
 	h.push(message{
 		messageType: constants.TimeoutMsg,
-		validatorID: h.ctx.NodeID,
+		nodeID:      h.ctx.NodeID,
 	})
 }
 
 // Get passes a Get message received from the network to the consensus engine.
 func (h *Handler) Get(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	deadline time.Time,
 	containerID ids.ID,
@@ -376,7 +376,7 @@ func (h *Handler) Get(
 ) {
 	h.push(message{
 		messageType:    constants.GetMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		deadline:       deadline,
 		containerID:    containerID,
@@ -387,7 +387,7 @@ func (h *Handler) Get(
 
 // Put passes a Put message received from the network to the consensus engine.
 func (h *Handler) Put(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	containerID ids.ID,
 	container []byte,
@@ -395,7 +395,7 @@ func (h *Handler) Put(
 ) {
 	h.push(message{
 		messageType:    constants.PutMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		containerID:    containerID,
 		container:      container,
@@ -405,17 +405,17 @@ func (h *Handler) Put(
 }
 
 // GetFailed passes a GetFailed message to the consensus engine.
-func (h *Handler) GetFailed(validatorID ids.ShortID, requestID uint32) {
+func (h *Handler) GetFailed(nodeID ids.ShortID, requestID uint32) {
 	h.push(message{
 		messageType: constants.GetFailedMsg,
-		validatorID: validatorID,
+		nodeID:      nodeID,
 		requestID:   requestID,
 	})
 }
 
 // PushQuery passes a PushQuery message received from the network to the consensus engine.
 func (h *Handler) PushQuery(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	deadline time.Time,
 	containerID ids.ID,
@@ -424,7 +424,7 @@ func (h *Handler) PushQuery(
 ) {
 	h.push(message{
 		messageType:    constants.PushQueryMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		deadline:       deadline,
 		containerID:    containerID,
@@ -436,7 +436,7 @@ func (h *Handler) PushQuery(
 
 // PullQuery passes a PullQuery message received from the network to the consensus engine.
 func (h *Handler) PullQuery(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	requestID uint32,
 	deadline time.Time,
 	containerID ids.ID,
@@ -444,7 +444,7 @@ func (h *Handler) PullQuery(
 ) {
 	h.push(message{
 		messageType:    constants.PullQueryMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		deadline:       deadline,
 		containerID:    containerID,
@@ -454,10 +454,10 @@ func (h *Handler) PullQuery(
 }
 
 // Chits passes a Chits message received from the network to the consensus engine.
-func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID, onDoneHandling func()) {
+func (h *Handler) Chits(nodeID ids.ShortID, requestID uint32, votes []ids.ID, onDoneHandling func()) {
 	h.push(message{
 		messageType:    constants.ChitsMsg,
-		validatorID:    validatorID,
+		nodeID:         nodeID,
 		requestID:      requestID,
 		containerIDs:   votes,
 		received:       h.clock.Time(),
@@ -466,27 +466,27 @@ func (h *Handler) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.I
 }
 
 // QueryFailed passes a QueryFailed message received from the network to the consensus engine.
-func (h *Handler) QueryFailed(validatorID ids.ShortID, requestID uint32) {
+func (h *Handler) QueryFailed(nodeID ids.ShortID, requestID uint32) {
 	h.push(message{
 		messageType: constants.QueryFailedMsg,
-		validatorID: validatorID,
+		nodeID:      nodeID,
 		requestID:   requestID,
 	})
 }
 
 // Connected passes a new connection notification to the consensus engine
-func (h *Handler) Connected(validatorID ids.ShortID) {
+func (h *Handler) Connected(nodeID ids.ShortID) {
 	h.push(message{
 		messageType: constants.ConnectedMsg,
-		validatorID: validatorID,
+		nodeID:      nodeID,
 	})
 }
 
 // Disconnected passes a new connection notification to the consensus engine
-func (h *Handler) Disconnected(validatorID ids.ShortID) {
+func (h *Handler) Disconnected(nodeID ids.ShortID) {
 	h.push(message{
 		messageType: constants.DisconnectedMsg,
-		validatorID: validatorID,
+		nodeID:      nodeID,
 	})
 }
 
@@ -498,7 +498,7 @@ func (h *Handler) Gossip() {
 	}
 	h.push(message{
 		messageType: constants.GossipMsg,
-		validatorID: h.ctx.NodeID,
+		nodeID:      h.ctx.NodeID,
 	})
 }
 
@@ -507,7 +507,7 @@ func (h *Handler) Notify(msg common.Message) {
 	h.push(message{
 		messageType:  constants.NotifyMsg,
 		notification: msg,
-		validatorID:  h.ctx.NodeID,
+		nodeID:       h.ctx.NodeID,
 	})
 }
 
@@ -568,7 +568,7 @@ func (h *Handler) dispatchInternal() {
 			h.push(message{
 				messageType:  constants.NotifyMsg,
 				notification: msg,
-				validatorID:  h.ctx.NodeID,
+				nodeID:       h.ctx.NodeID,
 			})
 		}
 	}

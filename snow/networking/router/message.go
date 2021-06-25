@@ -14,8 +14,10 @@ import (
 )
 
 type message struct {
-	messageType    constants.MsgType
-	validatorID    ids.ShortID
+	// Must always be set
+	messageType constants.MsgType
+	// Must always be set
+	nodeID         ids.ShortID
 	requestID      uint32
 	containerID    ids.ID
 	container      []byte
@@ -42,7 +44,7 @@ func (m message) IsPeriodic() bool {
 
 func (m message) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("(%s, ValidatorID: %s, RequestID: %d", m.messageType, m.validatorID, m.requestID))
+	sb.WriteString(fmt.Sprintf("(%s, NodeID: %s%s, RequestID: %d", m.messageType, constants.NodeIDPrefix, m.nodeID, m.requestID))
 	if !m.received.IsZero() {
 		sb.WriteString(fmt.Sprintf(", Received: %d", m.received.Unix()))
 	}
