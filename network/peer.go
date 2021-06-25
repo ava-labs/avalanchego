@@ -286,8 +286,7 @@ func (p *peer) ReadMessages() {
 		)
 		msg, err := p.net.b.Parse(msgBytes, p.canHandleCompressed.GetValue())
 		if err != nil {
-			p.net.log.Verbo("failed to parse new %s message from %s:\n%s\n%s",
-				msg.Op(),
+			p.net.log.Verbo("failed to parse new message from %s:\n%s\n%s",
 				p.nodeID,
 				formatting.DumpBytes{Bytes: msgBytes},
 				err)
