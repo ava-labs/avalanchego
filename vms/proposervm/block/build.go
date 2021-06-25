@@ -16,13 +16,14 @@ import (
 func Build(
 	parentID ids.ID,
 	timestamp time.Time,
+	forkTime time.Time,
 	pChainHeight uint64,
 	cert *x509.Certificate,
 	blockBytes []byte,
 	key crypto.Signer,
 ) (Block, error) {
-	block := statelessBlock{
-		StatelessBlock: statelessUnsignedBlock{
+	block := StatelessPostForkBlock{
+		StatelessBlock: statelessUnsignedPostForkBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
 			PChainHeight: pChainHeight,
@@ -30,6 +31,7 @@ func Build(
 			Block:        blockBytes,
 		},
 		timestamp: timestamp,
+		forkTime:  forkTime,
 		cert:      cert,
 		proposer:  hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw)),
 	}
@@ -57,27 +59,20 @@ func Build(
 func BuildPreFork(
 	parentID ids.ID,
 	timestamp time.Time,
-	// pChainHeight uint64,
-	// cert *x509.Certificate,
+	forkTime time.Time,
 	blockBytes []byte,
-	// key crypto.Signer,
 	id ids.ID,
 ) (Block, error) {
-	block := statelessBlock{
-		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: 0,
-			Certificate:  nil,
-			Block:        blockBytes,
+	block := StatelessPreForkBlock{
+		StatelessBlock: statelessUnsignedPreForkBlock{
+			Block: blockBytes,
 		},
+		id:        id,
+		parentID:  parentID,
 		timestamp: timestamp,
-		cert:      nil,
-		proposer:  ids.ShortEmpty,
+		forkTime:  forkTime,
+		bytes:     blockBytes,
 	}
 
-	block.Signature = nil
-	block.bytes = blockBytes
-	block.id = id
 	return &block, nil
 }

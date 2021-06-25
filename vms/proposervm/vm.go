@@ -127,6 +127,7 @@ func (vm *VM) Initialize(
 		slb, err := statelessblock.BuildPreFork(
 			vm.preferred,
 			corePref.Timestamp(),
+			vm.activationTime,
 			corePref.Bytes(),
 			corePref.ID())
 		if err != nil {
@@ -167,6 +168,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		slb, err = statelessblock.BuildPreFork(
 			vm.preferred,
 			sb.Timestamp(), // assuming in-house built blocks are verified, hence safe to call Timestamp
+			vm.activationTime,
 			sb.Bytes(),
 			sb.ID())
 		if err != nil {
@@ -181,6 +183,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		slb, err = statelessblock.Build(
 			vm.preferred,
 			sb.Timestamp(),
+			vm.activationTime,
 			h,
 			vm.ctx.StakingCert.Leaf,
 			sb.Bytes(),
@@ -215,6 +218,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	slb, err := statelessblock.BuildPreFork(
 		vm.preferred,
 		sb.Timestamp(), // TODO: not safe calling Timestamp here. What to do? Update during verify? Use parent one?
+		vm.activationTime,
 		sb.Bytes(),
 		sb.ID())
 	if err != nil {
@@ -242,6 +246,7 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 	slb, err := statelessblock.BuildPreFork(
 		vm.preferred,
 		sb.Timestamp(), // TODO: not necessarily safe calling Timestamp here. What to do? Update during verify? Use parent one?
+		vm.activationTime,
 		sb.Bytes(),
 		sb.ID())
 	if err != nil {

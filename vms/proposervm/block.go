@@ -33,9 +33,9 @@ const (
 
 var (
 	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
+	ErrUnknownBlockType    = errors.New("unknown proposer block types")
 	ErrProBlkWrongParent   = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
 	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
-	ErrInvalidSignature    = errors.New("proposer block signature does not verify")
 	ErrProBlkWrongHeight   = errors.New("proposer block has wrong height")
 	ErrFork                = errors.New("proposer block fork not acceptable")
 )
@@ -94,36 +94,33 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 }
 
 func (pb *ProposerBlock) Verify() error {
-	parent, err := pb.vm.GetBlock(pb.ParentID())
+	parent, err := pb.vm.getProposerBlock(pb.ParentID())
 	if err != nil {
 		return ErrProBlkWrongParent
 	}
+	coreParentID := pb.coreBlk.Parent().ID()
 
-	// validate fork
-	if parent.Timestamp().Before(pb.vm.activationTime) {
-		if !pb.IsPreFork() {
+	if _, ok := pb.Block.(*block.StatelessPreForkBlock); ok {
+		if !parent.Timestamp().Before(pb.vm.activationTime) {
 			return ErrFork
 		}
-	} else if pb.IsPreFork() {
-		return ErrFork
-	}
-
-	if !pb.IsPreFork() {
-		pChainHeight := pb.PChainHeight()
-		coreParentID := pb.coreBlk.Parent().ID()
-
-		// validate parent
-		if proposerParent, ok := parent.(*ProposerBlock); ok {
-			if proposerParent.coreBlk.ID() != coreParentID {
-				return ErrProBlkWrongParent
-			}
-			if pChainHeight < proposerParent.PChainHeight() {
-				return ErrProBlkWrongHeight
-			}
-		} else if parent.ID() != coreParentID {
+		if parent.ID() != coreParentID {
 			return ErrProBlkWrongParent
 		}
+	} else if _, ok = pb.Block.(*block.StatelessPostForkBlock); ok {
+		if parent.Timestamp().Before(pb.vm.activationTime) {
+			return ErrFork
+		}
 
+		pChainHeight := pb.PChainHeight()
+
+		// validate parent
+		if parent.coreBlk.ID() != coreParentID {
+			return ErrProBlkWrongParent
+		}
+		if pChainHeight < parent.PChainHeight() {
+			return ErrProBlkWrongHeight
+		}
 		// validate timestamp
 		timestamp := pb.Timestamp()
 		parentTimestamp := parent.Timestamp()
@@ -151,10 +148,12 @@ func (pb *ProposerBlock) Verify() error {
 		if timestamp.Before(minTimestamp) {
 			return ErrProBlkBadTimestamp
 		}
+	} else {
+		return ErrUnknownBlockType
+	}
 
-		if err := pb.Block.Verify(); err != nil {
-			return ErrInvalidSignature
-		}
+	if err := pb.Block.Verify(); err != nil {
+		return err
 	}
 
 	// validate core block, only once

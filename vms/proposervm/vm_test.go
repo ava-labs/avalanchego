@@ -450,6 +450,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	slb1, err := statelessblock.Build(
 		proVM.preferred,
 		coreBlk.Timestamp(),
+		proVM.activationTime,
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
@@ -468,6 +469,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	slb2, err := statelessblock.Build(
 		proVM.preferred,
 		coreBlk.Timestamp(),
+		proVM.activationTime,
 		200, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
@@ -573,6 +575,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	netSlb, err := statelessblock.Build(
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		netcoreBlk.Bytes(),

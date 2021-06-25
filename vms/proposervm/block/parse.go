@@ -14,7 +14,7 @@ import (
 var errWrongVersion = errors.New("wrong version")
 
 func Parse(bytes []byte) (Block, error) {
-	block := statelessBlock{
+	block := StatelessPostForkBlock{
 		id:    hashing.ComputeHash256Array(bytes),
 		bytes: bytes,
 	}

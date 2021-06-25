@@ -67,6 +67,7 @@ func TestProposerBlockHeaderIsMarshalled(t *testing.T) {
 	slb, err := statelessblock.Build(
 		proVM.preferred,
 		coreBlk.Timestamp(),
+		proVM.activationTime,
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
@@ -115,6 +116,7 @@ func TestProposerBlockParseFailure(t *testing.T) {
 	slb, err := statelessblock.Build(
 		proVM.preferred,
 		coreBlk.Timestamp(),
+		proVM.activationTime,
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
@@ -197,6 +199,7 @@ func TestBlockVerify_ParentChecks(t *testing.T) {
 	childSlb, err := statelessblock.Build(
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -224,6 +227,7 @@ func TestBlockVerify_ParentChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(), // refer known parent
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -304,6 +308,7 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	childSlb, err := statelessblock.Build(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -336,6 +341,7 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		beforeWinStart,
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -356,6 +362,7 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		atWindowStart,
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -376,6 +383,7 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterWindowStart,
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -395,6 +403,7 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		AtSubWindowEnd,
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -413,6 +422,7 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterSubWinEnd,
+		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -490,6 +500,7 @@ func TestBlockVerify_PChainHeightChecks(t *testing.T) {
 	childSlb, err := statelessblock.Build(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		prntBlkPChainHeight-1,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -515,6 +526,7 @@ func TestBlockVerify_PChainHeightChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		prntBlkPChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -533,6 +545,7 @@ func TestBlockVerify_PChainHeightChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		prntBlkPChainHeight+1,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -551,6 +564,7 @@ func TestBlockVerify_PChainHeightChecks(t *testing.T) {
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		currPChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		childCoreBlk.Bytes(),
@@ -771,6 +785,18 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, prntCoreBlk.Bytes()):
+			return prntCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
 	prntProBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -785,6 +811,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	childSlb, err := statelessblock.BuildPreFork(
 		ids.Empty, // refer unknown parent
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		childCoreBlk.Bytes(),
 		childCoreBlk.ID(),
 	)
@@ -810,6 +837,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	childSlb, err = statelessblock.BuildPreFork(
 		prntProBlk.ID(), // refer known parent
 		childCoreBlk.Timestamp(),
+		proVM.activationTime,
 		childCoreBlk.Bytes(),
 		childCoreBlk.ID(),
 	)
@@ -848,6 +876,7 @@ func TestBlockVerify_PreForkParent(t *testing.T) {
 	slb, err := statelessblock.BuildPreFork(
 		proVM.preferred,
 		coreBlk.Timestamp(),
+		proVM.activationTime,
 		coreBlk.Bytes(),
 		coreBlk.ID(),
 	)
@@ -868,6 +897,7 @@ func TestBlockVerify_PreForkParent(t *testing.T) {
 	slb, err = statelessblock.Build(
 		proVM.preferred,
 		coreBlk.Timestamp(),
+		proVM.activationTime,
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		coreBlk.Bytes(),
@@ -939,6 +969,7 @@ func TestBlockVerify_AtForkParent(t *testing.T) {
 	slb, err := statelessblock.BuildPreFork(
 		proParentBlk.ID(),
 		coreChildBlk.Timestamp(),
+		proVM.activationTime,
 		coreChildBlk.Bytes(),
 		coreChildBlk.ID(),
 	)
@@ -960,6 +991,7 @@ func TestBlockVerify_AtForkParent(t *testing.T) {
 	slb, err = statelessblock.Build(
 		proParentBlk.ID(),
 		coreChildBlk.Timestamp(),
+		proVM.activationTime,
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		coreChildBlk.Bytes(),
@@ -1031,6 +1063,7 @@ func TestBlockVerify_PostForkParent(t *testing.T) {
 	slb, err := statelessblock.BuildPreFork(
 		proParentBlk.ID(),
 		coreChildBlk.Timestamp(),
+		proVM.activationTime,
 		coreChildBlk.Bytes(),
 		coreChildBlk.ID(),
 	)
@@ -1052,6 +1085,7 @@ func TestBlockVerify_PostForkParent(t *testing.T) {
 	slb, err = statelessblock.Build(
 		proParentBlk.ID(),
 		coreChildBlk.Timestamp(),
+		proVM.activationTime,
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		coreChildBlk.Bytes(),
