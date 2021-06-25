@@ -76,6 +76,9 @@ type sybilMsgThrottler struct {
 	vdrToBytesUsed map[ids.ShortID]uint64
 }
 
+// Returns when we can read a message of size [msgSize] from node [nodeID].
+// Release([msgSize], [nodeID]) must be called (!) when done with the message
+// or when we give up trying to read the message, if applicable.
 func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.cond.L.Lock()
 	defer t.cond.L.Unlock()
@@ -83,12 +86,11 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.metrics.awaitingAcquire.Inc()
 	startTime := time.Now()
 
-	for {
+	for { // [t.cond.L] is held while in this loop
 		// See if we can take from the at-large byte allocation
 		if msgSize <= t.remainingAtLargeBytes {
 			// Take from the at-large byte allocation
 			t.remainingAtLargeBytes -= msgSize
-			t.log.Info("took %d bytes from at large allocation for %s", msgSize, nodeID) // todo remove
 			break
 		}
 
@@ -111,7 +113,15 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		}
 
 		// Number of bytes this node can take from validator allocation.
-		vdrBytesAllowed := uint64(float64(t.maxUnprocessedVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
+		vdrBytesAllowed := uint64(0)
+		// [totalVdrWeight] should always be > 0 but handle this case
+		// for completeness to prevent divide by 0
+		totalVdrWeight := t.vdrs.Weight()
+		if totalVdrWeight != 0 {
+			vdrBytesAllowed = uint64(float64(t.maxUnprocessedVdrBytes) * float64(weight) / float64(totalVdrWeight))
+		} else {
+			t.log.Warn("total validator weight is 0") // this should never happen
+		}
 		if t.vdrToBytesUsed[nodeID]+vdrBytesNeeded > vdrBytesAllowed {
 			// Wait until there are more bytes in an allocation.
 			t.cond.Wait()
@@ -122,7 +132,6 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		t.remainingVdrBytes -= vdrBytesNeeded
 		t.remainingAtLargeBytes = 0
 		t.vdrToBytesUsed[nodeID] += vdrBytesNeeded
-		t.log.Info("took %d bytes from validator allocation for %s. vdr bytes used: %d", msgSize, nodeID, t.vdrToBytesUsed[nodeID]) // todo remove
 		break
 	}
 	t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
@@ -159,7 +168,6 @@ func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 		// Put no bytes in validator allocation
 		t.remainingAtLargeBytes += msgSize
 	}
-	t.log.Info("releasing %d bytes for %s. vdr bytes used: %d", msgSize, nodeID, t.vdrToBytesUsed[nodeID]) // todo remove
 
 	t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
 	t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
