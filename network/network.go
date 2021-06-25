@@ -227,6 +227,7 @@ type network struct {
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool sync.Pool
 
+	// Rate-limits incoming messages
 	msgThrottler throttling.MsgThrottler
 }
 
