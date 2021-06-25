@@ -31,7 +31,7 @@ func main() {
 	}
 
 	if processConfig.DisplayVersionAndExit {
-		fmt.Print(version.String(version.GitCommit))
+		fmt.Print(version.VersionStr)
 		os.Exit(0)
 	}
 
