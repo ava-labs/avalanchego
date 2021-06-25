@@ -32,16 +32,12 @@ const (
 )
 
 var (
-	ErrInnerBlockNotOracle     = errors.New("core snowman block does not implement snowman.OracleBlock")
-	ErrProBlkWrongVersion      = errors.New("proposer block has unsupported version")
-	ErrProBlkWrongParent       = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
-	ErrProBlkBadTimestamp      = errors.New("proposer block timestamp outside tolerance window")
-	ErrInvalidTLSKey           = errors.New("invalid validator signing key")
-	ErrInvalidNodeID           = errors.New("could not retrieve nodeID from proposer block certificate")
-	ErrInvalidSignature        = errors.New("proposer block signature does not verify")
-	ErrProBlkWrongHeight       = errors.New("proposer block has wrong height")
-	ErrProBlkFailedParsing     = errors.New("could not parse proposer block")
-	ErrFailedHandlingConflicts = errors.New("could not handle conflict on accept")
+	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
+	ErrUnknownBlockType    = errors.New("unknown proposer block types")
+	ErrProBlkWrongParent   = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
+	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
+	ErrProBlkWrongHeight   = errors.New("proposer block has wrong height")
+	ErrFork                = errors.New("proposer block fork not acceptable")
 )
 
 type ProposerBlock struct {
@@ -98,56 +94,66 @@ func (pb *ProposerBlock) Parent() snowman.Block {
 }
 
 func (pb *ProposerBlock) Verify() error {
-	parent, err := pb.vm.GetBlock(pb.ParentID())
+	parent, err := pb.vm.getProposerBlock(pb.ParentID())
 	if err != nil {
 		return ErrProBlkWrongParent
 	}
-
-	pChainHeight := pb.PChainHeight()
 	coreParentID := pb.coreBlk.Parent().ID()
 
-	// validate parent
-	if proposerParent, ok := parent.(*ProposerBlock); ok {
-		if proposerParent.coreBlk.ID() != coreParentID {
+	if _, ok := pb.Block.(*block.StatelessPreForkBlock); ok {
+		if !parent.Timestamp().Before(pb.vm.activationTime) {
+			return ErrFork
+		}
+		if parent.ID() != coreParentID {
 			return ErrProBlkWrongParent
 		}
-		if pChainHeight < proposerParent.PChainHeight() {
+	} else if _, ok = pb.Block.(*block.StatelessPostForkBlock); ok {
+		if parent.Timestamp().Before(pb.vm.activationTime) {
+			return ErrFork
+		}
+
+		pChainHeight := pb.PChainHeight()
+
+		// validate parent
+		if parent.coreBlk.ID() != coreParentID {
+			return ErrProBlkWrongParent
+		}
+		if pChainHeight < parent.PChainHeight() {
 			return ErrProBlkWrongHeight
 		}
-	} else if parent.ID() != coreParentID {
-		return ErrProBlkWrongParent
-	}
+		// validate timestamp
+		timestamp := pb.Timestamp()
+		parentTimestamp := parent.Timestamp()
 
-	// validate timestamp
-	timestamp := pb.Timestamp()
-	parentTimestamp := parent.Timestamp()
+		if timestamp.Before(parentTimestamp) {
+			return ErrProBlkBadTimestamp
+		}
 
-	if timestamp.Before(parentTimestamp) {
-		return ErrProBlkBadTimestamp
-	}
+		maxTimestamp := pb.vm.Time().Add(syncBound)
+		if timestamp.After(maxTimestamp) {
+			return ErrProBlkBadTimestamp // too much in the future
+		}
 
-	maxTimestamp := pb.vm.Time().Add(syncBound)
-	if timestamp.After(maxTimestamp) {
-		return ErrProBlkBadTimestamp // too much in the future
-	}
+		height := pb.coreBlk.Height()
+		nodeID := pb.Proposer()
 
-	height := pb.coreBlk.Height()
-	nodeID := pb.Proposer()
+		// [Delay] will return an error if [pChainHeight] is greater than the
+		// current P-chain height
+		minDelay, err := pb.vm.Windower.Delay(height, pChainHeight, nodeID)
+		if err != nil {
+			return err
+		}
 
-	// [Delay] will return an error if [pChainHeight] is greater than the
-	// current P-chain height
-	minDelay, err := pb.vm.Windower.Delay(height, pChainHeight, nodeID)
-	if err != nil {
-		return err
-	}
-
-	minTimestamp := parentTimestamp.Add(minDelay)
-	if timestamp.Before(minTimestamp) {
-		return ErrProBlkBadTimestamp
+		minTimestamp := parentTimestamp.Add(minDelay)
+		if timestamp.Before(minTimestamp) {
+			return ErrProBlkBadTimestamp
+		}
+	} else {
+		return ErrUnknownBlockType
 	}
 
 	if err := pb.Block.Verify(); err != nil {
-		return ErrInvalidSignature
+		return err
 	}
 
 	// validate core block, only once

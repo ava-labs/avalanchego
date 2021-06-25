@@ -109,14 +109,51 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	preferred, err := vm.LastAccepted()
-	if err != nil {
+	// TODO: repair the DB if the underlying VM's Accept calls weren't persisted
+
+	prefID, err := vm.LastAccepted()
+	switch err {
+	case nil:
+	case database.ErrNotFound:
+		// store genesis
+		corePrefID, err := vm.ChainVM.LastAccepted()
+		if err != nil {
+			return err
+		}
+		corePref, err := vm.ChainVM.GetBlock(corePrefID)
+		if err != nil {
+			return err
+		}
+		slb, err := statelessblock.BuildPreFork(
+			vm.preferred,
+			corePref.Timestamp(),
+			vm.activationTime,
+			corePref.Bytes(),
+			corePref.ID())
+		if err != nil {
+			return err
+		}
+
+		proGen := &ProposerBlock{
+			Block:   slb,
+			vm:      vm,
+			coreBlk: corePref,
+			status:  choices.Processing,
+		}
+		if err := vm.storeProposerBlock(proGen); err != nil {
+			return err
+		}
+
+		prefID = proGen.ID()
+		if err := vm.SetLastAccepted(prefID); err != nil {
+			return err
+		}
+	default:
 		return err
 	}
 
-	// TODO: repair the DB if the underlying VM's Accept calls weren't persisted
-
-	return vm.SetPreference(preferred)
+	vm.preferred = prefID
+	return vm.SetPreference(prefID)
 }
 
 // block.ChainVM interface implementation
@@ -126,21 +163,35 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 		return nil, err
 	}
 
-	h, err := vm.ctx.ValidatorVM.GetCurrentHeight()
-	if err != nil {
-		return nil, err
-	}
+	var slb statelessblock.Block
+	if sb.Parent().Timestamp().Before(vm.activationTime) {
+		slb, err = statelessblock.BuildPreFork(
+			vm.preferred,
+			sb.Timestamp(), // assuming in-house built blocks are verified, hence safe to call Timestamp
+			vm.activationTime,
+			sb.Bytes(),
+			sb.ID())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		h, err := vm.ctx.ValidatorVM.GetCurrentHeight()
+		if err != nil {
+			return nil, err
+		}
 
-	slb, err := statelessblock.Build(
-		vm.preferred,
-		sb.Timestamp(),
-		h,
-		vm.ctx.StakingCert.Leaf,
-		sb.Bytes(),
-		vm.ctx.StakingCert.PrivateKey.(crypto.Signer),
-	)
-	if err != nil {
-		return nil, err
+		slb, err = statelessblock.Build(
+			vm.preferred,
+			sb.Timestamp(),
+			vm.activationTime,
+			h,
+			vm.ctx.StakingCert.Leaf,
+			sb.Bytes(),
+			vm.ctx.StakingCert.PrivateKey.(crypto.Signer),
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	blk := &ProposerBlock{
@@ -153,11 +204,34 @@ func (vm *VM) BuildBlock() (snowman.Block, error) {
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
+	// Invariant: always return a proposerBlk
 	blk, err := vm.parseProposerBlock(b)
 	if err == nil {
 		return blk, nil
 	}
-	return vm.ChainVM.ParseBlock(b)
+
+	sb, err := vm.ChainVM.ParseBlock(b)
+	if err != nil {
+		return nil, err
+	}
+
+	slb, err := statelessblock.BuildPreFork(
+		vm.preferred,
+		sb.Timestamp(), // TODO: not safe calling Timestamp here. What to do? Update during verify? Use parent one?
+		vm.activationTime,
+		sb.Bytes(),
+		sb.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	blk = &ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: sb,
+		status:  choices.Processing,
+	}
+	return blk, nil
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
@@ -165,9 +239,31 @@ func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
 		return blk, nil
 	}
 
-	// TODO: GetBlock should not return an inner block that was issued inside of
-	//       a proposer block
-	return vm.ChainVM.GetBlock(id)
+	sb, err := vm.ChainVM.GetBlock(id)
+	if err != nil {
+		return nil, err
+	}
+	slb, err := statelessblock.BuildPreFork(
+		vm.preferred,
+		sb.Timestamp(), // TODO: not necessarily safe calling Timestamp here. What to do? Update during verify? Use parent one?
+		vm.activationTime,
+		sb.Bytes(),
+		sb.ID())
+	if err != nil {
+		return nil, err
+	}
+
+	blk := &ProposerBlock{
+		Block:   slb,
+		vm:      vm,
+		coreBlk: sb,
+		status:  choices.Processing,
+	}
+	if err := vm.storeProposerBlock(blk); err != nil {
+		return nil, err
+	}
+
+	return blk, nil
 }
 
 func (vm *VM) SetPreference(preferred ids.ID) error {
@@ -177,10 +273,6 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	vm.preferred = preferred
 
 	blk, err := vm.getProposerBlock(preferred)
-	if err == database.ErrNotFound {
-		// pre snowman++ case
-		return vm.ChainVM.SetPreference(preferred)
-	}
 	if err != nil {
 		return err
 	}
@@ -194,15 +286,7 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	res, err := vm.State.GetLastAccepted()
-	if err == nil {
-		return res, nil
-	}
-	if err != database.ErrNotFound {
-		return ids.ID{}, err
-	}
-	// pre snowman++ case
-	return vm.ChainVM.LastAccepted()
+	return vm.State.GetLastAccepted()
 }
 
 func (vm *VM) getProposerBlock(blkID ids.ID) (*ProposerBlock, error) {

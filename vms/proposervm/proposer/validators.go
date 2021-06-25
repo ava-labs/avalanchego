@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var None = ids.ShortEmpty
+
 type validatorData struct {
 	id     ids.ShortID
 	weight uint64

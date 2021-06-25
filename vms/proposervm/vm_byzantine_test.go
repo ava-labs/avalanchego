@@ -75,9 +75,13 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	}
 
 	parsedBlock, err := proVM.ParseBlock(yBlockBytes)
-	if err == nil {
-		if err := parsedBlock.Verify(); err == nil {
-			t.Fatal("should have marked the parsed block as invalid")
-		}
+	if err != nil {
+		// If there was an error parsing, then this is fine.
+		return
+	}
+
+	// If there wasn't an error parsing - verify must return an error
+	if err := parsedBlock.Verify(); err == nil {
+		t.Fatal("should have marked the parsed block as invalid")
 	}
 }
