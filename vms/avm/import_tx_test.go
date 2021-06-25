@@ -367,6 +367,7 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// todo fix this, its failing, why?
 	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), avaxID, tx.ID())
 	assertLatestIdx(t, vm.db, key.PublicKey().Address(), avaxID, 1)
 
