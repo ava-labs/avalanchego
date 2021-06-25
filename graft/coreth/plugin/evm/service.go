@@ -100,6 +100,16 @@ func (service *AvaxAPI) parseAssetID(assetID string) (ids.ID, error) {
 	}
 }
 
+type VersionReply struct {
+	Version string `json:"version"`
+}
+
+// ClientVersion returns the version of the VM running
+func (service *AvaxAPI) Version(r *http.Request, args *struct{}, reply *VersionReply) error {
+	reply.Version = Version
+	return nil
+}
+
 // ExportKeyArgs are arguments for ExportKey
 type ExportKeyArgs struct {
 	api.UserPass
