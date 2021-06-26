@@ -670,6 +670,10 @@ func (vm *VM) getBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 	return ids.ID(ethBlock.Hash()), nil
 }
 
+func (vm *VM) Version() (string, error) {
+	return Version, nil
+}
+
 // NewHandler returns a new Handler for a service where:
 //   * The handler's functionality is defined by [service]
 //     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)

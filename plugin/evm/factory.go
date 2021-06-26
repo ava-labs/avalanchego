@@ -13,7 +13,7 @@ var (
 	// ID this VM should be referenced by
 	ID = ids.ID{'e', 'v', 'm'}
 
-	_ vms.VMFactory = &Factory{}
+	_ vms.Factory = &Factory{}
 )
 
 type Factory struct{}
