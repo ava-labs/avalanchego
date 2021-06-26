@@ -151,7 +151,7 @@ service VM {
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
     rpc Health(HealthRequest) returns (HealthResponse);
-    rpc Health(VersionRequest) returns (VersionResponse);
+    rpc Version(VersionRequest) returns (VersionResponse);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);

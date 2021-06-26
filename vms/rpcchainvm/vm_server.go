@@ -380,7 +380,7 @@ func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmpr
 
 func (vm *VMServer) Version(_ context.Context, req *vmproto.VersionRequest) (*vmproto.VersionResponse, error) {
 	version, err := vm.vm.Version()
-	return &vmproto.HealthResponse{
+	return &vmproto.VersionResponse{
 		Version: version,
 	}, err
 }
