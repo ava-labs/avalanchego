@@ -158,7 +158,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	// Throttling
 	fs.Uint64(ThrottlingMaxUnprocessedAtLargeBytesKey, 128*1024*1024, "Size, in bytes, of at-large byte allocation in message throttler.")
 	fs.Uint64(ThrottlingMaxUnprocessedVdrBytesKey, 128*1024*1024, "Size, in bytes, of validator byte allocation in message throttler.")
-	fs.Uint64(ThrottlingMaxNonVdrBytesKey, uint64(network.DefaultMaxMessageSize), "Max number of bytes in unprocessed incoming messages from a given non-validator.")
+	fs.Uint64(ThrottlingNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the throttler's at-large allocation.")
 
 	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")

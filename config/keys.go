@@ -121,5 +121,5 @@ const (
 	ProfileContinuousMaxFilesKey              = "profile-continuous-max-files"
 	ThrottlingMaxUnprocessedAtLargeBytesKey   = "throttling-max-unprocessed-at-large-bytes"
 	ThrottlingMaxUnprocessedVdrBytesKey       = "throttling-max-unprocessed-validator-bytes"
-	ThrottlingMaxNonVdrBytesKey               = "throttling-max-non-validator-bytes"
+	ThrottlingNodeMaxAtLargeBytesKey          = "throttling-node-max-at-large-bytes"
 )

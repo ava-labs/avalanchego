@@ -344,7 +344,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	throttlingConfig := throttling.MsgThrottlerConfig{}
 	throttlingConfig.MaxUnprocessedAtLargeBytes = v.GetUint64(ThrottlingMaxUnprocessedAtLargeBytesKey)
 	throttlingConfig.MaxUnprocessedVdrBytes = v.GetUint64(ThrottlingMaxUnprocessedVdrBytesKey)
-	throttlingConfig.MaxNonVdrBytes = v.GetUint64(ThrottlingMaxNonVdrBytesKey)
+	throttlingConfig.MaxNodeAtLargeBytes = v.GetUint64(ThrottlingNodeMaxAtLargeBytesKey)
 	nodeConfig.NetworkConfig.MsgThrottlerConfig = throttlingConfig
 
 	// Health
