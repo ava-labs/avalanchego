@@ -149,7 +149,6 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		// TODO put function below
 		handler.MultiPut(ids.ShortID{}, 1, nil, func() {})
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
