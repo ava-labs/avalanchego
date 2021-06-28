@@ -35,7 +35,7 @@ type MsgThrottler interface {
 type MsgThrottlerConfig struct {
 	MaxUnprocessedVdrBytes     uint64
 	MaxUnprocessedAtLargeBytes uint64
-	MaxNonVdrBytes             uint64 // TODO use this
+	MaxNonVdrBytes             uint64
 }
 
 // Returns a new MsgThrottler.
@@ -54,6 +54,7 @@ func NewSybilMsgThrottler(
 		maxUnprocessedVdrBytes: config.MaxUnprocessedVdrBytes,
 		remainingVdrBytes:      config.MaxUnprocessedVdrBytes,
 		remainingAtLargeBytes:  config.MaxUnprocessedAtLargeBytes,
+		maxNonVdrBytes:         config.MaxNonVdrBytes,
 		vdrToBytesUsed:         make(map[ids.ShortID]uint64),
 	}
 	if err := t.metrics.initialize(metricsRegisterer); err != nil {
@@ -72,6 +73,9 @@ type sybilMsgThrottler struct {
 	vdrs validators.Set
 	// Max number of unprocessed bytes from validators
 	maxUnprocessedVdrBytes uint64
+	// Max number of bytes that can be used by a given non-validator
+	// TODO use this
+	maxNonVdrBytes uint64
 	// Number of bytes left in the validator byte allocation.
 	// Initialized to [maxUnprocessedVdrBytes].
 	remainingVdrBytes uint64
