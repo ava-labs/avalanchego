@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
+var _ unprocessedMsgs = &unprocessedMsgsImpl{}
+
 type unprocessedMsgs interface {
 	// Add an unprocessed message
 	Push(message)
