@@ -480,7 +480,7 @@ func (ta *Topological) update(vtx Vertex) error {
 	for _, dep := range deps {
 		if status := dep.Status(); status == choices.Rejected {
 			// My parent is rejected, so I should be rejected
-			ta.ctx.Log.Trace("rejecting vertex %s due to a rejected parent", vtxID)
+			ta.ctx.Log.Trace("rejecting vertex %s due to rejected parent %s", vtxID, dep.ID())
 			if err := vtx.Reject(); err != nil {
 				return err
 			}

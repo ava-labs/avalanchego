@@ -529,8 +529,8 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be called before
-	// child.Accept to honor EventDispatcher.Accept's invariant.
+	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be
+	// called before child.Accept to honor EventDispatcher.Accept's invariant.
 	if err := ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
@@ -562,7 +562,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 			continue
 		}
 
-		ts.ctx.Log.Trace("rejecting block %s due to a conflicting acceptance", childID)
+		ts.ctx.Log.Trace("rejecting block %s due to conflict with accepted block %s", childID, pref)
 		if err := child.Reject(); err != nil {
 			return err
 		}
