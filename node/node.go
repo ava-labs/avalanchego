@@ -557,7 +557,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		n.Config.NetworkConfig.MetricsNamespace,
-		n.Config.NetworkConfig.Registerer,
+		n.Config.NetworkConfig.MetricsRegisterer,
 	); err != nil {
 		return err
 	}
@@ -574,7 +574,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
 		n.Config.NetworkConfig.MetricsNamespace,
-		n.Config.NetworkConfig.Registerer,
+		n.Config.NetworkConfig.MetricsRegisterer,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
@@ -713,7 +713,7 @@ func (n *Node) initMetricsAPI() error {
 	// It is assumed by components of the system that the Metrics interface is
 	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
-	n.Config.NetworkConfig.Registerer = registry
+	n.Config.NetworkConfig.MetricsRegisterer = registry
 
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")

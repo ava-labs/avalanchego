@@ -238,11 +238,7 @@ type Config struct {
 	timer.AdaptiveTimeoutConfig
 	MetricsNamespace string
 	// [Registerer] is set in node's initMetricsAPI method
-	Registerer prometheus.Registerer
-	// See throttling.NewSybilMsgThrottler
-	MaxUnprocessedVdrBytes uint64
-	// See throttling.NewSybilMsgThrottler
-	MaxUnprocessedAtLargeBytes uint64
+	MetricsRegisterer prometheus.Registerer
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
