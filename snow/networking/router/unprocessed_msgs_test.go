@@ -29,7 +29,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 		nodeID:      vdr1ID,
 	}
 
-	// Push then pop should work regardless of utilization
+	// Push then pop should work regardless of utilization when there are
+	// no other messages on [u.msgs]
 	cpuTracker.On("Utilization", vdr1ID, mock.Anything).Return(0.1).Once()
 	u.Push(msg1)
 	assert.EqualValues(1, u.nodeToUnprocessedMsgs[vdr1ID])
@@ -109,7 +110,7 @@ func TestUnprocessedMsgs(t *testing.T) {
 
 	// msg1 should get popped first because nonVdrNodeID1 and nonVdrNodeID2
 	// exceeded their limit
-	cpuTracker.On("Utilization", nonVdrNodeID1, mock.Anything).Return(.34).Twice()
+	cpuTracker.On("Utilization", nonVdrNodeID1, mock.Anything).Return(.34).Once()
 	cpuTracker.On("Utilization", nonVdrNodeID2, mock.Anything).Return(.34).Times(3)
 	cpuTracker.On("Utilization", vdr1ID, mock.Anything).Return(0.0).Once()
 
@@ -117,10 +118,11 @@ func TestUnprocessedMsgs(t *testing.T) {
 	gotMsg1 = u.Pop()
 	assert.EqualValues(msg1, gotMsg1)
 	// u.msgs is [msg3, msg4]
-	gotMsg3 := u.Pop()
-	assert.EqualValues(msg3, gotMsg3)
-	// u.msgs is [msg4]
+	cpuTracker.On("Utilization", nonVdrNodeID1, mock.Anything).Return(.51).Twice()
 	gotMsg4 := u.Pop()
 	assert.EqualValues(msg4, gotMsg4)
+	// u.msgs is [msg3]
+	gotMsg3 := u.Pop()
+	assert.EqualValues(msg3, gotMsg3)
 	assert.EqualValues(0, u.Len())
 }

@@ -54,7 +54,9 @@ func (u *unprocessedMsgsImpl) Push(msg message) {
 	u.nodeToUnprocessedMsgs[msg.nodeID]++
 }
 
-// Must never be called when [u.Len()] == 0
+// Must never be called when [u.Len()] == 0.
+// FIFO, but skip over messages whose sender
+// has used
 func (u *unprocessedMsgsImpl) Pop() message {
 	n := len(u.msgs)
 	i := 0
