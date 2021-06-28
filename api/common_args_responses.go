@@ -69,9 +69,15 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+type JSONTx struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
 // FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
 type FormattedTx struct {
-	Tx       string              `json:"tx"`
+	Tx       string              `json:"tx,omitempty"`
+	JSON     JSONTx              `json:"json,omitempty"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 

@@ -90,7 +90,7 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	w.vm.ctx.Log.Info("AVM Wallet: IssueTx called with %s", args.Tx)
 
-	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx) // fix to proper type
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}

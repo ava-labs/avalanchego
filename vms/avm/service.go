@@ -61,7 +61,7 @@ type FormattedAssetID struct {
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
 
-	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx) // todo fix to proper type
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -111,9 +111,15 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownTx
 	}
-
 	var err error
-	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
+	if args.Encoding == formatting.JSON {
+		reply.JSON = api.JSONTx{
+			ID:     tx.txID.String(),
+			Status: tx.status.String(),
+		}
+	} else {
+		reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
+	}
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}

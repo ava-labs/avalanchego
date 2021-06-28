@@ -47,6 +47,8 @@ const (
 	CB58 Encoding = iota
 	// Hex specifies a hex plus 4 byte checksum encoding format
 	Hex
+	// JSON specifies the JSON encoding format
+	JSON
 )
 
 // String ...
@@ -56,6 +58,8 @@ func (enc Encoding) String() string {
 		return "hex"
 	case CB58:
 		return "cb58"
+	case JSON:
+		return "json"
 	default:
 		return errInvalidEncoding.Error()
 	}
@@ -63,7 +67,7 @@ func (enc Encoding) String() string {
 
 func (enc Encoding) valid() bool {
 	switch enc {
-	case Hex, CB58:
+	case Hex, CB58, JSON:
 		return true
 	}
 	return false
@@ -88,6 +92,8 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 		*enc = Hex
 	case "\"cb58\"":
 		*enc = CB58
+	case "\"json\"":
+		*enc = JSON
 	default:
 		return errInvalidEncoding
 	}
@@ -113,6 +119,10 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 		return fmt.Sprintf("0x%x", checked), nil
 	case CB58:
 		return base58.Encode(checked), nil
+	case JSON:
+		// b, err := json.Marshal(bytes)
+		return "json goes here", nil
+
 	default:
 		return "", errInvalidEncoding
 	}

@@ -83,6 +83,7 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 		return nil, err
 	}
 
+	// we type cast to string because Encoding in [GetTxArgs] above is [Hex]
 	txBytes, err := formatting.Decode(res.Encoding, res.Tx)
 	if err != nil {
 		return nil, err
