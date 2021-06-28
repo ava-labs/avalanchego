@@ -152,7 +152,6 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.preferred = prefID
 	return vm.SetPreference(prefID)
 }
 

@@ -45,7 +45,6 @@ func TestPreForkBuild(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	forkTime := timestamp.Add(10 * time.Second)
-	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 	innerBlockID := ids.ID{10}
 	assert := assert.New(t)
@@ -54,7 +53,7 @@ func TestPreForkBuild(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal(parentID, builtBlock.ParentID())
-	assert.Equal(pChainHeight, builtBlock.PChainHeight())
+	assert.Equal(zeroPChainHeight, builtBlock.PChainHeight())
 	assert.Equal(timestamp, builtBlock.Timestamp())
 	assert.Equal(innerBlockBytes, builtBlock.Block())
 

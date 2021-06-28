@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
@@ -298,8 +297,18 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.subnets[chainParams.SubnetID] = sb
 	}
 
-	if chainParams.SubnetID == constants.PrimaryNetworkID && chainParams.ID == constants.PlatformChainID {
-		if valVM, ok := chain.Engine.GetVM().(validators.VM); ok {
+	if chainParams.SubnetID == constants.PrimaryNetworkID &&
+		chainParams.ID == constants.PlatformChainID {
+		// extract platformVM, whether it is naked or wrapped in proposerVM
+		// TODO: change once proVM is enabled for all snowman-like VMs
+		var platVM block.ChainVM
+		if proVM, ok := chain.Engine.GetVM().(*proposervm.VM); ok {
+			platVM = proVM.ChainVM
+		} else if vm, ok := chain.Engine.GetVM().(block.ChainVM); ok {
+			platVM = vm
+		}
+
+		if valVM, ok := platVM.(validators.VM); ok {
 			m.validatorVM = valVM
 		} else {
 			m.Log.Fatal("platformVM  %s does not implement validatorsVM interface", chainParams.ID)
@@ -666,9 +675,15 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the ProposerVM and the vm wrapped inside it
+	// TODO: temporary skip proposerVM wrap for platformVM, till options are duly handled
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	proposerVM := proposervm.New(vm, timer.MaxTime) // Todo: handle on VM basis
-	if err := proposerVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+	var theVM block.ChainVM = nil
+	if ctx.ChainID != constants.PlatformChainID {
+		theVM = proposervm.New(vm, time.Unix(0, 0)) // enable proBlocks
+	} else {
+		theVM = vm
+	}
+	if err := theVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
@@ -720,7 +735,7 @@ func (m *manager) createSnowmanChain(
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
-			VM:           proposerVM,
+			VM:           theVM,
 			Bootstrapped: m.unblockChains,
 		},
 		Params:    consensusParams,
