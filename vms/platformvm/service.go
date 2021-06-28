@@ -1785,19 +1785,20 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return errors.New("argument 'blockchainID' not given")
 	}
 
+	// if its aliased then vm created this chain.
+	if aliasedID, err := service.vm.Chains.Lookup(args.BlockchainID); err == nil {
+		if service.nodeValidates(aliasedID) {
+			reply.Status = Validating
+			return nil
+		}
+
+		reply.Status = Syncing
+		return nil
+	}
+
 	blockchainID, err := ids.FromString(args.BlockchainID)
 	if err != nil {
 		return fmt.Errorf("problem parsing blockchainID %q: %w", args.BlockchainID, err)
-	}
-
-	if service.nodeValidates(blockchainID) {
-		reply.Status = Validating
-		return nil
-	}
-
-	if _, err := service.vm.Chains.Lookup(args.BlockchainID); err == nil {
-		reply.Status = Syncing
-		return nil
 	}
 
 	lastAcceptedID, err := service.vm.LastAccepted()
