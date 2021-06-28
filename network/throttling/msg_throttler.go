@@ -34,9 +34,9 @@ type MsgThrottler interface {
 
 // See sybilMsgThrottler
 type MsgThrottlerConfig struct {
-	MaxUnprocessedVdrBytes     uint64
-	MaxUnprocessedAtLargeBytes uint64
-	NodeMaxAtLargeBytes        uint64
+	MaxVdrBytes         uint64
+	MaxAtLargeBytes     uint64
+	NodeMaxAtLargeBytes uint64
 }
 
 // Returns a new MsgThrottler.
@@ -52,10 +52,10 @@ func NewSybilMsgThrottler(
 		log:                    log,
 		cond:                   sync.Cond{L: &sync.Mutex{}},
 		vdrs:                   vdrs,
-		maxUnprocessedVdrBytes: config.MaxUnprocessedVdrBytes,
-		remainingVdrBytes:      config.MaxUnprocessedVdrBytes,
-		remainingAtLargeBytes:  config.MaxUnprocessedAtLargeBytes,
-		maxAtLargeBytes:        config.NodeMaxAtLargeBytes,
+		maxVdrBytes:            config.MaxVdrBytes,
+		remainingVdrBytes:      config.MaxVdrBytes,
+		remainingAtLargeBytes:  config.MaxAtLargeBytes,
+		nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
 		nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
 		nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
 	}
@@ -74,11 +74,12 @@ type sybilMsgThrottler struct {
 	// Primary network validator set
 	vdrs validators.Set
 	// Max number of unprocessed bytes from validators
-	maxUnprocessedVdrBytes uint64
-	// Max number of bytes that can taken from the at-large byte allocation.
-	maxAtLargeBytes uint64
+	maxVdrBytes uint64
+	// Max number of bytes that can be taken from the
+	// at-large byte allocation by a given node.
+	nodeMaxAtLargeBytes uint64
 	// Number of bytes left in the validator byte allocation.
-	// Initialized to [maxUnprocessedVdrBytes].
+	// Initialized to [maxVdrBytes].
 	remainingVdrBytes uint64
 	// Number of bytes left in the at-large byte allocation
 	remainingAtLargeBytes uint64
@@ -101,7 +102,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	for { // [t.cond.L] is held while in this loop
 		atLargeBytesUsed := t.nodeToAtLargeBytesUsed[nodeID]
 		// See if we can take from the at-large byte allocation
-		if msgSize <= t.remainingAtLargeBytes && atLargeBytesUsed+msgSize <= t.maxAtLargeBytes {
+		if msgSize <= t.remainingAtLargeBytes && atLargeBytesUsed+msgSize <= t.nodeMaxAtLargeBytes {
 			// Take from the at-large byte allocation
 			t.remainingAtLargeBytes -= msgSize
 			t.nodeToAtLargeBytesUsed[nodeID] += msgSize
@@ -119,7 +120,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 
 		// From the at-large allocation, take all the bytes we can
 		// without exceeding the per-node limit on taking from it
-		atLargeBytesToUse := t.maxAtLargeBytes - atLargeBytesUsed
+		atLargeBytesToUse := t.nodeMaxAtLargeBytes - atLargeBytesUsed
 		if atLargeBytesToUse > t.remainingAtLargeBytes {
 			atLargeBytesToUse = t.remainingAtLargeBytes
 		}
@@ -137,7 +138,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		// for completeness to prevent divide by 0
 		totalVdrWeight := t.vdrs.Weight()
 		if totalVdrWeight != 0 {
-			vdrBytesAllowed = uint64(float64(t.maxUnprocessedVdrBytes) * float64(weight) / float64(totalVdrWeight))
+			vdrBytesAllowed = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(totalVdrWeight))
 		} else {
 			t.log.Warn("total validator weight is 0") // this should never happen
 		}

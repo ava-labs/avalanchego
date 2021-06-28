@@ -17,9 +17,9 @@ import (
 func TestSybilMsgThrottler(t *testing.T) {
 	assert := assert.New(t)
 	config := MsgThrottlerConfig{
-		MaxUnprocessedVdrBytes:     1024,
-		MaxUnprocessedAtLargeBytes: 1024,
-		NodeMaxAtLargeBytes:        1024,
+		MaxVdrBytes:         1024,
+		MaxAtLargeBytes:     1024,
+		NodeMaxAtLargeBytes: 1024,
 	}
 	vdrs := validators.NewSet()
 	vdr1ID := ids.GenerateTestShortID()
@@ -36,9 +36,9 @@ func TestSybilMsgThrottler(t *testing.T) {
 
 	// Make sure NewSybilMsgThrottler works
 	throttler := throttlerIntf.(*sybilMsgThrottler)
-	assert.Equal(config.MaxUnprocessedVdrBytes, throttler.maxUnprocessedVdrBytes)
-	assert.Equal(config.MaxUnprocessedVdrBytes, throttler.remainingVdrBytes)
-	assert.Equal(config.MaxUnprocessedAtLargeBytes, throttler.remainingAtLargeBytes)
+	assert.Equal(config.MaxVdrBytes, throttler.maxVdrBytes)
+	assert.Equal(config.MaxVdrBytes, throttler.remainingVdrBytes)
+	assert.Equal(config.MaxAtLargeBytes, throttler.remainingAtLargeBytes)
 	assert.NotNil(throttler.nodeToVdrBytesUsed)
 	assert.NotNil(throttler.log)
 	assert.NotNil(throttler.vdrs)
@@ -48,44 +48,44 @@ func TestSybilMsgThrottler(t *testing.T) {
 	// Take from at-large allocation.
 	// Should return immediately.
 	throttlerIntf.Acquire(1, vdr1ID)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes-1, throttler.remainingAtLargeBytes)
-	assert.EqualValues(config.MaxUnprocessedVdrBytes, throttler.remainingVdrBytes)
+	assert.EqualValues(config.MaxAtLargeBytes-1, throttler.remainingAtLargeBytes)
+	assert.EqualValues(config.MaxVdrBytes, throttler.remainingVdrBytes)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 1)
 	assert.EqualValues(1, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Release the bytes
 	throttlerIntf.Release(1, vdr1ID)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes, throttler.remainingAtLargeBytes)
-	assert.EqualValues(config.MaxUnprocessedVdrBytes, throttler.remainingVdrBytes)
+	assert.EqualValues(config.MaxAtLargeBytes, throttler.remainingAtLargeBytes)
+	assert.EqualValues(config.MaxVdrBytes, throttler.remainingVdrBytes)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 0)
 
 	// Use all the at-large allocation bytes and 1 of the validator allocation bytes
 	// Should return immediately.
-	throttlerIntf.Acquire(config.MaxUnprocessedAtLargeBytes+1, vdr1ID)
+	throttlerIntf.Acquire(config.MaxAtLargeBytes+1, vdr1ID)
 	assert.EqualValues(0, throttler.remainingAtLargeBytes)
-	assert.EqualValues(config.MaxUnprocessedVdrBytes-1, throttler.remainingVdrBytes)
+	assert.EqualValues(config.MaxVdrBytes-1, throttler.remainingVdrBytes)
 	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], 1)
 	assert.Len(throttler.nodeToVdrBytesUsed, 1)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 1)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	assert.EqualValues(config.MaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// The other validator should be able to acquire half the validator allocation.
 	// Should return immediately.
-	throttlerIntf.Acquire(config.MaxUnprocessedAtLargeBytes/2, vdr2ID)
-	assert.EqualValues(config.MaxUnprocessedVdrBytes/2-1, throttler.remainingVdrBytes)
+	throttlerIntf.Acquire(config.MaxAtLargeBytes/2, vdr2ID)
+	assert.EqualValues(config.MaxVdrBytes/2-1, throttler.remainingVdrBytes)
 	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], 1)
-	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr2ID], config.MaxUnprocessedVdrBytes/2)
+	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr2ID], config.MaxVdrBytes/2)
 	assert.Len(throttler.nodeToVdrBytesUsed, 2)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 1)
 
 	// vdr1 should be able to acquire the rest of the validator allocation
 	// Should return immediately.
-	throttlerIntf.Acquire(config.MaxUnprocessedAtLargeBytes/2-1, vdr1ID)
-	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], config.MaxUnprocessedVdrBytes/2)
+	throttlerIntf.Acquire(config.MaxAtLargeBytes/2-1, vdr1ID)
+	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], config.MaxVdrBytes/2)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 1)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	assert.EqualValues(config.MaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Trying to take more bytes for either node should block
 	vdr1Done := make(chan struct{})
@@ -122,12 +122,12 @@ func TestSybilMsgThrottler(t *testing.T) {
 	case <-time.After(50 * time.Millisecond):
 	}
 
-	// Release config.MaxUnprocessedAtLargeBytes+1 bytes
+	// Release config.MaxAtLargeBytes+1 bytes
 	// When the choice exists, bytes should be given back to the validator allocation
 	// rather than the at-large allocation
 	// vdr1's validator allocation should now be unused and
 	// the at-large allocation should have 510 bytes
-	throttlerIntf.Release(config.MaxUnprocessedAtLargeBytes+1, vdr1ID)
+	throttlerIntf.Release(config.MaxAtLargeBytes+1, vdr1ID)
 
 	// The Acquires that blocked above should have returned
 	<-vdr1Done
@@ -136,17 +136,17 @@ func TestSybilMsgThrottler(t *testing.T) {
 
 	assert.EqualValues(config.NodeMaxAtLargeBytes/2, throttler.remainingVdrBytes)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 3) // vdr1, vdr2, nonVdrID
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes/2, throttler.nodeToAtLargeBytesUsed[vdr1ID])
+	assert.EqualValues(config.MaxAtLargeBytes/2, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 	assert.EqualValues(1, throttler.nodeToAtLargeBytesUsed[vdr2ID])
 	assert.EqualValues(1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
 	assert.Len(throttler.nodeToVdrBytesUsed, 1)
 	assert.EqualValues(throttler.nodeToVdrBytesUsed[vdr1ID], 0)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes/2-2, throttler.remainingAtLargeBytes)
+	assert.EqualValues(config.MaxAtLargeBytes/2-2, throttler.remainingAtLargeBytes)
 
 	// Non-validator should be able to take the rest of the at-large bytes
-	throttlerIntf.Acquire(config.MaxUnprocessedAtLargeBytes/2-2, nonVdrID)
+	throttlerIntf.Acquire(config.MaxAtLargeBytes/2-2, nonVdrID)
 	assert.EqualValues(0, throttler.remainingAtLargeBytes)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes/2-1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
+	assert.EqualValues(config.MaxAtLargeBytes/2-1, throttler.nodeToAtLargeBytesUsed[nonVdrID])
 
 	// But should block on subsequent Acquires
 	go func() {
@@ -160,31 +160,31 @@ func TestSybilMsgThrottler(t *testing.T) {
 	}
 
 	// Release all of vdr2's messages
-	throttlerIntf.Release(config.MaxUnprocessedAtLargeBytes/2, vdr2ID)
+	throttlerIntf.Release(config.MaxAtLargeBytes/2, vdr2ID)
 	throttlerIntf.Release(1, vdr2ID)
 
 	<-nonVdrDone
 
 	assert.EqualValues(0, throttler.nodeToAtLargeBytesUsed[vdr2ID])
-	assert.EqualValues(config.MaxUnprocessedVdrBytes, throttler.remainingVdrBytes)
+	assert.EqualValues(config.MaxVdrBytes, throttler.remainingVdrBytes)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
 	assert.EqualValues(0, throttler.remainingAtLargeBytes)
 
 	// Release all of vdr1's messages
 	throttlerIntf.Release(1, vdr1ID)
-	throttlerIntf.Release(config.MaxUnprocessedAtLargeBytes/2-1, vdr1ID)
+	throttlerIntf.Release(config.MaxAtLargeBytes/2-1, vdr1ID)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
-	assert.EqualValues(config.MaxUnprocessedVdrBytes, throttler.remainingVdrBytes)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes/2, throttler.remainingAtLargeBytes)
+	assert.EqualValues(config.MaxVdrBytes, throttler.remainingVdrBytes)
+	assert.EqualValues(config.MaxAtLargeBytes/2, throttler.remainingAtLargeBytes)
 	assert.EqualValues(0, throttler.nodeToAtLargeBytesUsed[vdr1ID])
 
 	// Release nonVdr's messages
 	throttlerIntf.Release(1, nonVdrID)
 	throttlerIntf.Release(1, nonVdrID)
-	throttlerIntf.Release(config.MaxUnprocessedAtLargeBytes/2-2, nonVdrID)
+	throttlerIntf.Release(config.MaxAtLargeBytes/2-2, nonVdrID)
 	assert.Len(throttler.nodeToVdrBytesUsed, 0)
-	assert.EqualValues(config.MaxUnprocessedVdrBytes, throttler.remainingVdrBytes)
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes, throttler.remainingAtLargeBytes)
+	assert.EqualValues(config.MaxVdrBytes, throttler.remainingVdrBytes)
+	assert.EqualValues(config.MaxAtLargeBytes, throttler.remainingAtLargeBytes)
 	assert.Len(throttler.nodeToAtLargeBytesUsed, 0)
 	assert.EqualValues(0, throttler.nodeToAtLargeBytesUsed[nonVdrID])
 }
@@ -192,9 +192,9 @@ func TestSybilMsgThrottler(t *testing.T) {
 func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	assert := assert.New(t)
 	config := MsgThrottlerConfig{
-		MaxUnprocessedVdrBytes:     100,
-		MaxUnprocessedAtLargeBytes: 100,
-		NodeMaxAtLargeBytes:        10,
+		MaxVdrBytes:         100,
+		MaxAtLargeBytes:     100,
+		NodeMaxAtLargeBytes: 10,
 	}
 	vdrs := validators.NewSet()
 	vdr1ID := ids.GenerateTestShortID()
@@ -243,5 +243,5 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	assert.EqualValues(1, throttler.nodeToVdrBytesUsed[vdr1ID])
 	assert.EqualValues(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID1])
 	assert.EqualValues(config.NodeMaxAtLargeBytes, throttler.nodeToAtLargeBytesUsed[nonVdrNodeID2])
-	assert.EqualValues(config.MaxUnprocessedAtLargeBytes-config.NodeMaxAtLargeBytes*3, throttler.remainingAtLargeBytes)
+	assert.EqualValues(config.MaxAtLargeBytes-config.NodeMaxAtLargeBytes*3, throttler.remainingAtLargeBytes)
 }
