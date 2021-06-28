@@ -131,10 +131,6 @@ func (tx *UniqueTx) Accept() error {
 		}
 	}
 
-	//err := IndexTransaction(tx)
-	//if err != nil {
-	//	return err
-	//}
 	err := tx.vm.addressTxsIndexer.CommitIndex(tx.txID)
 	if err != nil {
 		return err
