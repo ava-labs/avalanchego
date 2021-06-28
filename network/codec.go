@@ -52,22 +52,16 @@ func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 		c.compressTimeMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: constants.PlatformName,
 			Name:      fmt.Sprintf("%s_compress_time", op),
-			Help:      fmt.Sprintf("Time to compress (ns) %s messages", op),
+			Help:      fmt.Sprintf("Time (in ns) to compress %s messages", op),
 		})
 		c.decompressTimeMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
 			Namespace: constants.PlatformName,
 			Name:      fmt.Sprintf("%s_decompress_time", op),
-			Help:      fmt.Sprintf("Time to decompress (ns) %s messages", op),
+			Help:      fmt.Sprintf("Time (in ns) to decompress %s messages", op),
 		})
-		if err := metricsRegisterer.Register(c.bytesSavedMetrics[op]); err != nil {
-			errs.Add(err)
-		}
-		if err := metricsRegisterer.Register(c.compressTimeMetrics[op]); err != nil {
-			errs.Add(err)
-		}
-		if err := metricsRegisterer.Register(c.decompressTimeMetrics[op]); err != nil {
-			errs.Add(err)
-		}
+		errs.Add(metricsRegisterer.Register(c.bytesSavedMetrics[op]))
+		errs.Add(metricsRegisterer.Register(c.compressTimeMetrics[op]))
+		errs.Add(metricsRegisterer.Register(c.decompressTimeMetrics[op]))
 	}
 	return c, errs.Err
 }
@@ -133,14 +127,12 @@ func (c codec) Pack(
 	// The slice below is guaranteed to be in-bounds because [p.Err] == nil
 	// implies that len(msg.bytes) >= 2
 	payloadBytes := msg.bytes[wrappers.BoolLen+wrappers.ByteLen:]
-	t0 := time.Now()
-
+	startTime := time.Now()
 	compressedPayloadBytes, err := c.compressor.Compress(payloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
-
-	c.compressTimeMetrics[op].Observe(float64(time.Since(t0).Nanoseconds()))
+	c.compressTimeMetrics[op].Observe(float64(time.Since(startTime)))
 	bytesSaved := len(payloadBytes) - len(compressedPayloadBytes) // may be negative
 	c.bytesSavedMetrics[op].Observe(float64(bytesSaved))
 	// Remove the uncompressed payload (keep just the message type and isCompressed)
@@ -180,13 +172,12 @@ func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
 	if compressed {
 		// The slice below is guaranteed to be in-bounds because [p.Err] == nil
 		compressedPayloadBytes := p.Bytes[wrappers.ByteLen+wrappers.BoolLen:]
-		t0 := time.Now()
+		startTime := time.Now()
 		payloadBytes, err := c.compressor.Decompress(compressedPayloadBytes)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't decompress payload of %s message: %s", op, err)
 		}
-
-		c.decompressTimeMetrics[op].Observe(float64(time.Since(t0).Nanoseconds()))
+		c.decompressTimeMetrics[op].Observe(float64(time.Since(startTime)))
 		// Replace the compressed payload with the decompressed payload.
 		// Remove the compressed payload and isCompressed; keep just the message type
 		p.Bytes = p.Bytes[:wrappers.ByteLen]
