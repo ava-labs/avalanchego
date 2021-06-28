@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
@@ -21,8 +22,13 @@ type unprocessedMsgs interface {
 	Len() int
 }
 
-func newUnprocessedMsgs(vdrs validators.Set, cpuTracker tracker.TimeTracker) unprocessedMsgs {
+func newUnprocessedMsgs(
+	log logging.Logger,
+	vdrs validators.Set,
+	cpuTracker tracker.TimeTracker,
+) unprocessedMsgs {
 	return &unprocessedMsgsImpl{
+		log:                   log,
 		vdrs:                  vdrs,
 		cpuTracker:            cpuTracker,
 		nodeToUnprocessedMsgs: make(map[ids.ShortID]int),
@@ -32,6 +38,7 @@ func newUnprocessedMsgs(vdrs validators.Set, cpuTracker tracker.TimeTracker) unp
 // Implements unprocessedMsgs.
 // Not safe for concurrent access.
 type unprocessedMsgsImpl struct {
+	log logging.Logger
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.ShortID]int
 	// unprocessed messages
@@ -50,11 +57,16 @@ func (u *unprocessedMsgsImpl) Push(msg message) {
 
 // Must never be called when [u.Len()] == 0
 func (u *unprocessedMsgsImpl) Pop() message {
-	// TODO make sure this always terminates
+	n := len(u.msgs)
+	i := 0
 	for {
+		if i == n {
+			// This should never happen but handle anyway
+			u.log.Warn("canPop is false for all %d unprocessed messages", n)
+		}
 		msg := u.msgs[0]
 		// See if it's OK to process [msg] next
-		if u.canPop(&msg) {
+		if u.canPop(&msg) || i == n {
 			if len(u.msgs) == 1 {
 				u.msgs = nil // Give back memory if possible
 			} else {
@@ -69,6 +81,7 @@ func (u *unprocessedMsgsImpl) Pop() message {
 		// Push [msg] to back of [u.msgs]
 		u.msgs = append(u.msgs, msg)
 		u.msgs = u.msgs[1:]
+		i++
 	}
 }
 
