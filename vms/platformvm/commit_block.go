@@ -30,6 +30,7 @@ func (c *CommitBlock) Verify() error {
 	blkID := c.ID()
 
 	if err := c.DoubleDecisionBlock.Verify(); err != nil {
+		c.vm.ctx.Log.Trace("rejecting block %s due to a failed verification: %s", blkID, err)
 		if err := c.Reject(); err != nil {
 			c.vm.ctx.Log.Error("failed to reject commit block %s due to %s", blkID, err)
 		}
@@ -44,6 +45,7 @@ func (c *CommitBlock) Verify() error {
 	// The parent of a Commit block should always be a proposal
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
+		c.vm.ctx.Log.Trace("rejecting block %s due to an incorrect parent type", blkID)
 		if err := c.Reject(); err != nil {
 			c.vm.ctx.Log.Error("failed to reject commit block %s due to %s", blkID, err)
 		}

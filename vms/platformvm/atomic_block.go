@@ -71,6 +71,7 @@ func (ab *AtomicBlock) Verify() error {
 	blkID := ab.ID()
 
 	if err := ab.CommonDecisionBlock.Verify(); err != nil {
+		ab.vm.ctx.Log.Trace("rejecting block %s due to a failed verification: %s", blkID, err)
 		if err := ab.Reject(); err != nil {
 			ab.vm.ctx.Log.Error(
 				"failed to reject atomic block %s due to %s",

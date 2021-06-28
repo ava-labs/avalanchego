@@ -27,6 +27,9 @@ func (NoLog) Warn(format string, args ...interface{}) {}
 // Info ...
 func (NoLog) Info(format string, args ...interface{}) {}
 
+// Trace ...
+func (NoLog) Trace(format string, args ...interface{}) {}
+
 // Debug ...
 func (NoLog) Debug(format string, args ...interface{}) {}
 
