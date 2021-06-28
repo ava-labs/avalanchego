@@ -32,6 +32,7 @@ type statefulAddressTxsIndexer struct {
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	logger              logging.Logger
+	m                   metrics
 }
 
 // AddTransferOutput IndexTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
@@ -131,6 +132,7 @@ func (i *statefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
 			}
 		}
 	}
+	i.m.numTxsIndexed.Observe(1)
 	return nil
 }
 
@@ -138,11 +140,12 @@ func (i *statefulAddressTxsIndexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
-func NewAddressTxsIndexer(db *versiondb.Database, logger logging.Logger) AddressTxsIndexer {
+func NewAddressTxsIndexer(db *versiondb.Database, logger logging.Logger, m metrics) AddressTxsIndexer {
 	return &statefulAddressTxsIndexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
 		logger:              logger,
+		m:                   m,
 	}
 }
 

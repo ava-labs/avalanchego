@@ -248,7 +248,7 @@ func (vm *VM) Initialize(
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Info("Address transaction indexing is enabled.")
-		vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log)
+		vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log, vm.metrics)
 	} else {
 		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
 		vm.ctx.Log.Info("Address transaction indexing is disabled.")
