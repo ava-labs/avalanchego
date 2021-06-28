@@ -62,6 +62,7 @@ type metrics struct {
 	timeSinceLastMsgReceived prometheus.Gauge
 	sendQueuePortionFull     prometheus.Gauge
 	sendFailRate             prometheus.Gauge
+	failedToParse            prometheus.Counter
 
 	getVersion, version,
 	getPeerlist, peerList,
@@ -100,6 +101,11 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		Name:      "send_fail_rate",
 		Help:      "Portion of messages that recently failed to be sent over the network",
 	})
+	m.failedToParse = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "msgs_failed_to_parse",
+		Help:      "Number of messages that could not be parsed",
+	})
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -108,6 +114,7 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.timeSinceLastMsgSent),
 		registerer.Register(m.sendQueuePortionFull),
 		registerer.Register(m.sendFailRate),
+		registerer.Register(m.failedToParse),
 
 		m.getVersion.initialize(GetVersion, registerer),
 		m.version.initialize(Version, registerer),

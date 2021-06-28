@@ -282,6 +282,7 @@ func (p *peer) ReadMessages() {
 			p.net.log.Verbo("failed to parse message from %s%s at %s:\n%s\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes}, err)
 			// Couldn't parse the message. Read the next one.
 			p.net.msgThrottler.Release(uint64(msgLen), p.nodeID)
+			p.net.metrics.failedToParse.Inc()
 			continue
 		}
 
@@ -855,7 +856,6 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 		time: peer.Time,
 	}
 
-	// TODO: only try to connect once
 	p.net.track(peer.IPDesc, nodeID)
 }
 
