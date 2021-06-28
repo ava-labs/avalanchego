@@ -351,8 +351,6 @@ func (n *Node) Dispatch() error {
 	for _, peerIP := range n.Config.BootstrapIPs {
 		if !peerIP.Equal(n.Config.StakingIP.IP()) {
 			n.Net.TrackIP(peerIP)
-		} else {
-			n.Log.Error("can't add self as a bootstrapper")
 		}
 	}
 
