@@ -15,9 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// GitCommit should be optionally set at compile time.
-var GitCommit string
-
 // main is the entry point to AvalancheGo.
 func main() {
 	fs := config.BuildFlagSet()
@@ -34,7 +31,7 @@ func main() {
 	}
 
 	if processConfig.DisplayVersionAndExit {
-		fmt.Print(version.String(GitCommit))
+		fmt.Print(version.String)
 		os.Exit(0)
 	}
 
@@ -46,13 +43,10 @@ func main() {
 
 	fmt.Println(process.Header)
 
-	// Set the log directory for this process by adding a suffix
-	// "-daemon" to the log directory given in the config
-	logConfigCopy := nodeConfig.LoggingConfig
-	logConfigCopy.Directory += "-daemon"
-	logFactory := logging.NewFactory(logConfigCopy)
+	// Set the log directory for this process
+	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
 
-	log, err := logFactory.Make("main")
+	log, err := logFactory.Make("daemon")
 	if err != nil {
 		logFactory.Close()
 

@@ -63,7 +63,9 @@ func NewService(
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
 type GetNodeVersionReply struct {
-	Version string `json:"version"`
+	Version         string `json:"version"`
+	GitCommit       string `json:"gitCommit"`
+	DatabaseVersion string `json:"databaseVersion"`
 }
 
 // GetNodeVersion returns the version this node is running
@@ -71,6 +73,8 @@ func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNode
 	service.log.Info("Info: GetNodeVersion called")
 
 	reply.Version = service.version.String()
+	reply.GitCommit = version.GitCommit
+	reply.DatabaseVersion = version.CurrentDatabase.String()
 	return nil
 }
 
