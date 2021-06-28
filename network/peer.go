@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"crypto/x509"
 	"encoding/binary"
+	"io"
 	"math"
 	"net"
 	"sync"
@@ -222,51 +223,50 @@ func (p *peer) monitorAliases() {
 	p.aliasTimer.Dispatch()
 }
 
-// attempt to read messages from the peer
+// Read and handle messages from this peer.
+// When this method returns, the connection is closed.
 func (p *peer) ReadMessages() {
 	defer p.Close()
 
-	if err := p.conn.SetReadDeadline(p.net.clock.Time().Add(p.net.pingPongTimeout)); err != nil {
-		p.net.log.Verbo("error on setting the connection read timeout %s", err)
-		return
-	}
-
-	var (
-		msgLen        uint32
-		pendingBuffer wrappers.Packer
-	)
-	readBuffer := make([]byte, p.net.readBufferSize)
+	// Continuously read and handle messages from this peer.
 	reader := bufio.NewReader(p.conn)
-	// Continuously read and handle messages from this peer. When we exit this
-	// loop, this connection is closed.
+	msgLenBytes := make([]byte, 4)
 	for {
+		// Time out and close connection if we can't read message length
+		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
+			p.net.log.Verbo(
+				"error setting the connection read timeout on %s%s at %s %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), err,
+			)
+			return
+		}
+
 		// Read the length of the next message from the peer
-		// and wait until the throttler says to proceed
+		var msgLen uint32
+		msgLenBytesRead := 0
 		for {
 			// See if we can parse the message length
-			msgLen, err := pendingBuffer.PeekInt()
-			doneReadingMsgLen := err == nil
+			doneReadingMsgLen := msgLenBytesRead == wrappers.IntLen
 			if !doneReadingMsgLen {
-				if len(pendingBuffer.Bytes) >= wrappers.IntLen {
-					// We should be able to parse the message length by now but we can't
-					p.net.log.Verbo("can't parse msg length from %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
-					return
-				}
 				// Read more of the message length.
-				numBytesRead, err := reader.Read(readBuffer)
+				numBytesRead, err := io.ReadFull(reader, msgLenBytes)
 				if err != nil {
 					p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 					return
 				}
-				pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:numBytesRead]...)
+				msgLenBytesRead += numBytesRead
 				continue
 			}
-			// Done reading the message length.
+
+			// Parse the message length
+			msgLen = binary.BigEndian.Uint32(msgLenBytes)
+
 			// Make sure the message length is valid.
 			if int64(msgLen) > p.net.maxMessageSize {
 				p.net.log.Verbo("%s%s at %s gave too large message length %d", constants.NodeIDPrefix, p.nodeID, p.getIP(), msgLen)
 				return
 			}
+
 			// Wait until the throttler says we can proceed to read the message.
 			// Note that when we are done handling this message, or give up
 			// trying to read it, we must call [p.net.msgThrottler.Release]
@@ -275,33 +275,34 @@ func (p *peer) ReadMessages() {
 			break
 		}
 
-		// Read the message body
+		// Time out and close connection if we can't read message
+		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
+			p.net.log.Verbo(
+				"error setting the connection read timeout on %s%s at %s %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), err,
+			)
+			return
+		}
+
+		// Read and handle the message
+		msgBytes := make([]byte, msgLen)
+		msgBytesRead := 0
 		for {
 			// See if we're done reading the message
-			msgBytes := pendingBuffer.UnpackBytes()
-			doneReadingMsg := !pendingBuffer.Errored()
+			doneReadingMsg := msgLen == uint32(msgBytesRead)
 			if !doneReadingMsg {
-				// Reset the offset and error
-				pendingBuffer.Offset = 0
-				pendingBuffer.Err = nil
-
-				// Get more of the message
-				read, err := reader.Read(readBuffer)
+				// Read more of the message
+				numBytesRead, err := reader.Read(msgBytes[msgBytesRead:])
 				if err != nil {
 					p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 					p.net.msgThrottler.Release(uint64(msgLen), p.nodeID)
 					return
 				}
-				pendingBuffer.Bytes = append(pendingBuffer.Bytes, readBuffer[:read]...)
+				msgBytesRead += numBytesRead
 				continue
 			}
 
-			// We read the full message body.
-			// Set [pendingBuffer.Bytes] to the rest of the bytes that were read.
-			pendingBuffer.Bytes = pendingBuffer.Bytes[pendingBuffer.Offset:]
-			// Reset the offset to the start of the next message
-			pendingBuffer.Offset = 0
-
+			// We read the full message.
 			p.net.log.Verbo("parsing new message from %s%s at %s:\n%s",
 				constants.NodeIDPrefix, p.nodeID, p.getIP(),
 				formatting.DumpBytes{Bytes: msgBytes},
@@ -322,9 +323,9 @@ func (p *peer) ReadMessages() {
 
 			// Handle the message. Note that when we are done handling
 			// this message, we must call [p.net.msgThrottler.Release]
-			// to give back the bytes used by this message.
+			// to release the bytes used by this message. See MsgThrottler.
 			p.handle(msg)
-			break
+			break // Read the next message length
 		}
 	}
 }
@@ -345,7 +346,7 @@ func (p *peer) WriteMessages() {
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
 			for len(byteSlice) > 0 {
-				if err := p.conn.SetWriteDeadline(time.Now().Add(p.net.pingPongTimeout)); err != nil {
+				if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
 					p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.nodeID, p.getIP(), err)
 					return
 				}
@@ -1325,6 +1326,10 @@ func (p *peer) releaseAllAliases() {
 		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.nodeID)
 	}
 	p.aliases = nil
+}
+
+func (p *peer) nextTimeout() time.Time {
+	return p.net.clock.Time().Add(p.net.pingPongTimeout)
 }
 
 func ipAndTimeBytes(ip utils.IPDesc, timestamp uint64) []byte {
