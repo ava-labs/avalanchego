@@ -411,7 +411,7 @@ func NewNetwork(
 	codec, err := newCodec(registerer)
 	if err != nil {
 		// TODO should NewNetwork just return an error?
-		log.Warn("initializing network metrics failed with: %s", err)
+		log.Warn("initializing network bytesSavedMetrics failed with: %s", err)
 	}
 	netw.b = Builder{
 		codec: codec,
@@ -423,7 +423,7 @@ func NewNetwork(
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 
 	if err := netw.initialize(registerer); err != nil {
-		log.Warn("initializing network metrics failed with: %s", err)
+		log.Warn("initializing network bytesSavedMetrics failed with: %s", err)
 	}
 	return netw
 }
