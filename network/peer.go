@@ -449,7 +449,7 @@ func (p *peer) handle(msg Msg) {
 		return
 	}
 	if !p.finishedHandshake.GetValue() {
-		p.net.log.Debug("dropping %s from %s%s because handshake isn't finished", op, constants.NodeIDPrefix, p.nodeID)
+		p.net.log.Debug("dropping %s from %s%s at %s because handshake isn't finished", op, constants.NodeIDPrefix, p.nodeID, p.getIP())
 
 		// attempt to finish the handshake
 		if !p.gotVersion.GetValue() {

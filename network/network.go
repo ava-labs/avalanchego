@@ -1514,6 +1514,7 @@ func (n *network) connected(p *peer) {
 	}
 
 	n.router.Connected(p.nodeID)
+	n.metrics.connected.Inc()
 }
 
 // should only be called after the peer is marked as connected.
@@ -1546,6 +1547,7 @@ func (n *network) disconnected(p *peer) {
 	if p.finishedHandshake.GetValue() {
 		n.router.Disconnected(p.nodeID)
 	}
+	n.metrics.disconnected.Inc()
 }
 
 // holds onto the peer object as a result of helper functions

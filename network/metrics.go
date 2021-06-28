@@ -63,6 +63,8 @@ type metrics struct {
 	sendQueuePortionFull     prometheus.Gauge
 	sendFailRate             prometheus.Gauge
 	failedToParse            prometheus.Counter
+	connected                prometheus.Counter
+	disconnected             prometheus.Counter
 
 	getVersion, version,
 	getPeerlist, peerList,
@@ -106,6 +108,16 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		Name:      "msgs_failed_to_parse",
 		Help:      "Number of messages that could not be parsed",
 	})
+	m.connected = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "times_connected",
+		Help:      "Times this node successfully completed a handshake with a peer",
+	})
+	m.disconnected = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "times_disconnected",
+		Help:      "Times this node disconnected from a peer it had completed a handshake with",
+	})
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -115,6 +127,8 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.sendQueuePortionFull),
 		registerer.Register(m.sendFailRate),
 		registerer.Register(m.failedToParse),
+		registerer.Register(m.connected),
+		registerer.Register(m.disconnected),
 
 		m.getVersion.initialize(GetVersion, registerer),
 		m.version.initialize(Version, registerer),
