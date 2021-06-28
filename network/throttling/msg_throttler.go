@@ -34,8 +34,8 @@ type MsgThrottler interface {
 
 // See sybilMsgThrottler
 type MsgThrottlerConfig struct {
-	MaxVdrBytes         uint64
-	MaxAtLargeBytes     uint64
+	VdrAllocSize        uint64
+	AtLargeAllocSize    uint64
 	NodeMaxAtLargeBytes uint64
 }
 
@@ -52,9 +52,9 @@ func NewSybilMsgThrottler(
 		log:                    log,
 		cond:                   sync.Cond{L: &sync.Mutex{}},
 		vdrs:                   vdrs,
-		maxVdrBytes:            config.MaxVdrBytes,
-		remainingVdrBytes:      config.MaxVdrBytes,
-		remainingAtLargeBytes:  config.MaxAtLargeBytes,
+		maxVdrBytes:            config.VdrAllocSize,
+		remainingVdrBytes:      config.VdrAllocSize,
+		remainingAtLargeBytes:  config.AtLargeAllocSize,
 		nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
 		nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
 		nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),

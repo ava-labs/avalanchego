@@ -342,8 +342,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// Throttling
 	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
 	throttlingConfig := throttling.MsgThrottlerConfig{}
-	throttlingConfig.MaxAtLargeBytes = v.GetUint64(ThrottlingMaxAtLargeBytesKey)
-	throttlingConfig.MaxVdrBytes = v.GetUint64(ThrottlingMaxVdrBytesKey)
+	throttlingConfig.AtLargeAllocSize = v.GetUint64(ThrottlingAtLargeAllocSizeKey)
+	throttlingConfig.VdrAllocSize = v.GetUint64(ThrottlingVdrAllocSizeKey)
 	throttlingConfig.NodeMaxAtLargeBytes = v.GetUint64(ThrottlingNodeMaxAtLargeBytesKey)
 	nodeConfig.NetworkConfig.MsgThrottlerConfig = throttlingConfig
 

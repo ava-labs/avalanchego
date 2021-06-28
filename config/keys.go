@@ -119,7 +119,7 @@ const (
 	ProfileContinuousEnabledKey               = "profile-continuous-enabled"
 	ProfileContinuousFreqKey                  = "profile-continuous-freq"
 	ProfileContinuousMaxFilesKey              = "profile-continuous-max-files"
-	ThrottlingMaxAtLargeBytesKey              = "throttling-max-at-large-bytes"
-	ThrottlingMaxVdrBytesKey                  = "throttling-max-validator-bytes"
+	ThrottlingAtLargeAllocSizeKey             = "throttling-at-large-alloc-size"
+	ThrottlingVdrAllocSizeKey                 = "throttling-valiadtor-alloc-size"
 	ThrottlingNodeMaxAtLargeBytesKey          = "throttling-node-max-at-large-bytes"
 )

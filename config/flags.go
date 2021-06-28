@@ -156,8 +156,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
 
 	// Throttling
-	fs.Uint64(ThrottlingMaxAtLargeBytesKey, 128*1024*1024, "Size, in bytes, of at-large byte allocation in message throttler.")
-	fs.Uint64(ThrottlingMaxVdrBytesKey, 128*1024*1024, "Size, in bytes, of validator byte allocation in message throttler.")
+	fs.Uint64(ThrottlingAtLargeAllocSizeKey, 128*1024*1024, "Size, in bytes, of at-large byte allocation in message throttler.")
+	fs.Uint64(ThrottlingVdrAllocSizeKey, 128*1024*1024, "Size, in bytes, of validator byte allocation in message throttler.")
 	fs.Uint64(ThrottlingNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the message throttler's at-large allocation.")
 
 	// HTTP APIs

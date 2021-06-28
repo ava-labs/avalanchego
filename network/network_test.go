@@ -267,8 +267,8 @@ func initCerts(t *testing.T) {
 var defaultTestDialerConfig = NewDialerConfig(0, 30*time.Second)
 
 var defaultMsgThrottlingConfig = throttling.MsgThrottlerConfig{
-	MaxVdrBytes:         128 * 1024 * 1024, // 128 MB
-	MaxAtLargeBytes:     128 * 1024 * 1024,
+	VdrAllocSize:        128 * 1024 * 1024, // 128 MB
+	AtLargeAllocSize:    128 * 1024 * 1024,
 	NodeMaxAtLargeBytes: uint64(2 * DefaultMaxMessageSize),
 }
 
