@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -152,17 +151,6 @@ func (p *Packer) UnpackInt() uint32 {
 	val := binary.BigEndian.Uint32(p.Bytes[p.Offset:])
 	p.Offset += IntLen
 	return val
-}
-
-func (p *Packer) PeekInt() (uint32, error) {
-	switch {
-	case p.Offset < 0:
-		return 0, fmt.Errorf("expected Offset to be positive but is %d", p.Offset)
-	case len(p.Bytes)-p.Offset < IntLen:
-		return 0, fmt.Errorf("need at least %d remaining bytes in slice but have %d", IntLen, len(p.Bytes)-p.Offset)
-	}
-	val := binary.BigEndian.Uint32(p.Bytes[p.Offset:])
-	return val, nil
 }
 
 // PackLong append a long to the byte array
