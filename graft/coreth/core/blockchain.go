@@ -839,7 +839,7 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	if canonical != block.Hash() {
 		log.Debug("Accepting block in non-canonical chain", "number", block.Number(), "hash", block.Hash())
 		if err := bc.setPreference(block); err != nil {
-			return fmt.Errorf("could not set block %d:%s as preferred: %w", block.Number(), block.Hash(), err)
+			return fmt.Errorf("could not set new preferred block %d:%s as preferred: %w", block.Number(), block.Hash(), err)
 		}
 	}
 
@@ -865,14 +865,7 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	// Fetch block logs
-	receipts := rawdb.ReadReceipts(bc.db, block.Hash(), block.NumberU64(), bc.chainConfig)
-	var logs []*types.Log
-	for _, receipt := range receipts {
-		for _, log := range receipt.Logs {
-			l := *log
-			logs = append(logs, &l)
-		}
-	}
+	logs := bc.gatherBlockLogs(block.Hash(), block.NumberU64(), false)
 
 	// Update accepted feeds
 	bc.chainAcceptedFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
@@ -927,11 +920,28 @@ func (bc *BlockChain) writeKnownBlock(block *types.Block) error {
 	return nil
 }
 
+// writeCanonicalBlockWithLogs writes the new head [block] and emits events
+// for the new head block.
+func (bc *BlockChain) writeCanonicalBlockWithLogs(block *types.Block, logs []*types.Log) {
+	bc.writeHeadBlock(block)
+	bc.chainFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
+	if len(logs) > 0 {
+		bc.logsFeed.Send(logs)
+	}
+	bc.chainHeadFeed.Send(ChainHeadEvent{Block: block})
+}
+
+// newTip returns a boolean indicating if the block should be appended to
+// the canonical chain.
+func (bc *BlockChain) newTip(block *types.Block) bool {
+	return block.ParentHash() == bc.CurrentBlock().Hash()
+}
+
 // writeBlockWithState writes the block and all associated state to the database,
 // but it expects the chain mutex to be held.
 // writeBlockWithState expects to be the last verification step during InsertBlock
 // since it creates a reference that will only be cleaned up by Accept/Reject.
-func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB, emitHeadEvent bool) (status WriteStatus, err error) {
+func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.Receipt, logs []*types.Log, state *state.StateDB) (WriteStatus, error) {
 	bc.wg.Add(1)
 	defer bc.wg.Done()
 
@@ -958,8 +968,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		log.Crit("Failed to write block into disk", "err", err)
 	}
 	// Commit all cached state changes into underlying memory database.
-	_, err = state.Commit(bc.chainConfig.IsEIP158(block.Number()))
-	if err != nil {
+	if _, err := state.Commit(bc.chainConfig.IsEIP158(block.Number())); err != nil {
 		return NonStatTy, err
 	}
 
@@ -972,36 +981,15 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		return NonStatTy, err
 	}
 
-	// If a new block references the current block, we consider it canonical.
-	// Otherwise, we mark it as a side chain block.
-	currentBlock := bc.CurrentBlock()
-	if block.ParentHash() == currentBlock.Hash() {
-		status = CanonStatTy
-	} else {
-		status = SideStatTy
-	}
-	// Set new head.
-	if status == CanonStatTy {
-		bc.writeHeadBlock(block)
+	// If [block] represents a new tip of the canonical chain, we optimistically add it before
+	// setPreference is called. Otherwise, we consider it a side chain block.
+	if bc.newTip(block) {
+		bc.writeCanonicalBlockWithLogs(block, logs)
+		return CanonStatTy, nil
 	}
 
-	if status == CanonStatTy {
-		bc.chainFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
-		if len(logs) > 0 {
-			bc.logsFeed.Send(logs)
-		}
-		// In theory we should fire a ChainHeadEvent when we inject
-		// a canonical block, but sometimes we can insert a batch of
-		// canonicial blocks. Avoid firing too much ChainHeadEvents,
-		// we will fire an accumulated ChainHeadEvent and disable fire
-		// event here.
-		if emitHeadEvent {
-			bc.chainHeadFeed.Send(ChainHeadEvent{Block: block})
-		}
-	} else {
-		bc.chainSideFeed.Send(ChainSideEvent{Block: block})
-	}
-	return status, nil
+	bc.chainSideFeed.Send(ChainSideEvent{Block: block})
+	return SideStatTy, nil
 }
 
 // InsertChain attempts to insert the given batch of blocks in to the canonical
@@ -1064,6 +1052,23 @@ func (bc *BlockChain) InsertBlock(block *types.Block) error {
 	return err
 }
 
+// gatherBlockLogs fetches logs from a previously inserted block.
+func (bc *BlockChain) gatherBlockLogs(hash common.Hash, number uint64, removed bool) []*types.Log {
+	receipts := rawdb.ReadReceipts(bc.db, hash, number, bc.chainConfig)
+	var logs []*types.Log
+	for _, receipt := range receipts {
+		for _, log := range receipt.Logs {
+			l := *log
+			if removed {
+				l.Removed = true
+			}
+			logs = append(logs, &l)
+		}
+	}
+
+	return logs
+}
+
 func (bc *BlockChain) insertBlock(block *types.Block) error {
 	senderCacher.recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
 
@@ -1075,7 +1080,14 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 	switch {
 	// If the block is already known, no need to re-insert
 	case errors.Is(err, ErrKnownBlock):
-		log.Debug("Ignoring already known block", "number", block.Number(), "hash", block.Hash())
+		// If [block] represents a new tip of the canonical chain, otherwise we ignore the already
+		// known block.
+		if bc.newTip(block) {
+			log.Debug("Setting head to be known block", "number", block.Number(), "hash", block.Hash())
+			bc.writeCanonicalBlockWithLogs(block, bc.gatherBlockLogs(block.Hash(), block.NumberU64(), false))
+		} else {
+			log.Debug("Ignoring already known block", "number", block.Number(), "hash", block.Hash())
+		}
 		return nil
 	// Pruning of the EVM is disabled, so we should never encounter this case.
 	// Because side chain insertion can have complex side effects, we error when
@@ -1145,7 +1157,7 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 	// writeBlockWithState creates a reference that will be cleaned up in Accept/Reject
 	// so we need to ensure an error cannot occur later in verification, since that would
 	// cause the referenced root to never be dereferenced.
-	status, err := bc.writeBlockWithState(block, receipts, logs, statedb, true)
+	status, err := bc.writeBlockWithState(block, receipts, logs, statedb)
 	if err != nil {
 		return err
 	}
@@ -1180,6 +1192,8 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 // potential missing transactions and post an event about them.
 func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	var (
+		newHeadHeight = newBlock.NumberU64()
+
 		newChain    types.Blocks
 		oldChain    types.Blocks
 		commonBlock *types.Block
@@ -1195,18 +1209,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			if number == nil {
 				return
 			}
-			receipts := rawdb.ReadReceipts(bc.db, hash, *number, bc.chainConfig)
-
-			var logs []*types.Log
-			for _, receipt := range receipts {
-				for _, log := range receipt.Logs {
-					l := *log
-					if removed {
-						l.Removed = true
-					}
-					logs = append(logs, &l)
-				}
-			}
+			logs := bc.gatherBlockLogs(hash, *number, removed)
 			if len(logs) > 0 {
 				if removed {
 					deletedLogs = append(deletedLogs, logs)
@@ -1305,8 +1308,12 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	}
 	// Delete any canonical number assignments above the new head
 	indexesBatch := bc.db.NewBatch()
-	number := bc.CurrentBlock().NumberU64()
-	for i := number + 1; ; i++ {
+
+	// Use [newHeadHeight] to determine which canonical hashes to remove
+	// in case the new chain is shorter than the old chain, in which case
+	// there may be hashes set on the canonical chain that were invalidated
+	// but not yet overwritten by the re-org.s
+	for i := newHeadHeight + 1; ; i++ {
 		hash := rawdb.ReadCanonicalHash(bc.db, i)
 		if hash == (common.Hash{}) {
 			break

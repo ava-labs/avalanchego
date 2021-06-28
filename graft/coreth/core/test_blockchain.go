@@ -74,6 +74,23 @@ var tests = []ChainTest{
 		"TestEmptyBlocks",
 		TestEmptyBlocks,
 	},
+	{
+		"TestReorgReInsert",
+		TestReorgReInsert,
+	},
+}
+
+func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
+	newDB := rawdb.NewMemoryDatabase()
+	iter := db.NewIterator(nil, nil)
+	defer iter.Release()
+	for iter.Next() {
+		if err := newDB.Put(iter.Key(), iter.Value()); err != nil {
+			return nil, err
+		}
+	}
+
+	return newDB, nil
 }
 
 // checkBlockChainState creates a new BlockChain instance and checks that exporting each block from
@@ -137,6 +154,11 @@ func checkBlockChainState(
 		t.Fatalf("Check state failed for newly generated blockchain due to: %s", err)
 	}
 
+	// Copy the database over to prevent any issues when re-using [originalDB] after this call.
+	originalDB, err = copyMemDB(originalDB)
+	if err != nil {
+		t.Fatal(err)
+	}
 	restartedChain, err := create(originalDB, chainConfig, lastAcceptedBlock.Hash())
 	if err != nil {
 		t.Fatal(err)
@@ -832,6 +854,96 @@ func TestEmptyBlocks(t *testing.T, create func(db ethdb.Database, chainConfig *p
 
 	// Nothing to assert about the state
 	checkState := func(sdb *state.StateDB) error {
+		return nil
+	}
+
+	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+}
+
+func TestReorgReInsert(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		// We use two separate databases since GenerateChain commits the state roots to its underlying
+		// database.
+		genDB   = rawdb.NewMemoryDatabase()
+		chainDB = rawdb.NewMemoryDatabase()
+	)
+
+	// Ensure that key1 has some funds in the genesis block.
+	genesisBalance := big.NewInt(1000000000)
+	gspec := &Genesis{
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+	}
+	genesis := gspec.MustCommit(genDB)
+	_ = gspec.MustCommit(chainDB)
+
+	signer := types.HomesteadSigner{}
+	numBlocks := 3
+	chain, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, numBlocks, func(i int, gen *BlockGen) {
+		// Generate a transaction to create a unique block
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
+
+	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockchain.Stop()
+
+	// Insert and accept first block
+	if err := blockchain.InsertBlock(chain[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := blockchain.Accept(chain[0]); err != nil {
+		t.Fatal(err)
+	}
+	// Insert block and then set preference back (rewind) to last accepted blck
+	if err := blockchain.InsertBlock(chain[1]); err != nil {
+		t.Fatal(err)
+	}
+	if err := blockchain.SetPreference(chain[0]); err != nil {
+		t.Fatal(err)
+	}
+	// Re-insert and accept block
+	if err := blockchain.InsertBlock(chain[1]); err != nil {
+		t.Fatal(err)
+	}
+	if err := blockchain.Accept(chain[1]); err != nil {
+		t.Fatal(err)
+	}
+	// Build on top of the re-inserted block and accept
+	if err := blockchain.InsertBlock(chain[2]); err != nil {
+		t.Fatal(err)
+	}
+	if err := blockchain.Accept(chain[2]); err != nil {
+		t.Fatal(err)
+	}
+
+	// Nothing to assert about the state
+	checkState := func(sdb *state.StateDB) error {
+		nonce1 := sdb.GetNonce(addr1)
+		if nonce1 != 3 {
+			return fmt.Errorf("expected addr1 nonce: 3, found nonce: %d", nonce1)
+		}
+		balance1 := sdb.GetBalance(addr1)
+		transferredFunds := big.NewInt(30000)
+		expectedBalance := new(big.Int).Sub(genesisBalance, transferredFunds)
+		if balance1.Cmp(expectedBalance) != 0 {
+			return fmt.Errorf("expected balance1: %d, found balance: %d", expectedBalance, balance1)
+		}
+		nonce2 := sdb.GetNonce(addr2)
+		if nonce2 != 0 {
+			return fmt.Errorf("expected addr2 nonce: 0, found nonce %d", nonce2)
+		}
+		balance2 := sdb.GetBalance(addr2)
+		if balance2.Cmp(transferredFunds) != 0 {
+			return fmt.Errorf("expected balance2: %d, found %d", transferredFunds, balance2)
+		}
 		return nil
 	}
 
