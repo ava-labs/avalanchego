@@ -435,7 +435,7 @@ func NewNetwork(
 	}
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-	msgThrottler, err := throttling.NewSybilMsgThrottler(netw.log, registerer, netw.vdrs, msgThrottlerConfig) // todo replace magic number
+	msgThrottler, err := throttling.NewSybilMsgThrottler(netw.log, registerer, netw.vdrs, msgThrottlerConfig)
 	if err != nil {
 		log.Warn("initializing throttler metrics failed with: %s", err)
 	}
