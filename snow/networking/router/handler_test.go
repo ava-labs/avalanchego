@@ -184,3 +184,38 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	case <-closed:
 	}
 }
+
+// Test that messages from the VM are handled
+func TestHandlerDispatchInternal(t *testing.T) {
+	engine := common.EngineTest{T: t}
+	engine.Default(false)
+	engine.ContextF = snow.DefaultContextTest
+	calledNotify := make(chan struct{}, 1)
+	engine.NotifyF = func(common.Message) error {
+		calledNotify <- struct{}{}
+		return nil
+	}
+
+	handler := &Handler{}
+	msgFromVMChan := make(chan common.Message)
+	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
+	err = handler.Initialize(
+		&engine,
+		vdrs,
+		msgFromVMChan,
+		"",
+		prometheus.NewRegistry(),
+	)
+	assert.NoError(t, err)
+
+	go handler.Dispatch()
+	msgFromVMChan <- 0
+
+	select {
+	case <-time.After(20 * time.Millisecond):
+		t.Fatalf("should have called notify")
+	case <-calledNotify:
+	}
+}

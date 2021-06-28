@@ -98,7 +98,6 @@ func (h *Handler) Dispatch() {
 				h.unprocessedMsgsCond.L.Unlock()
 				return
 			}
-			// [h.unprocessedMsgsCond.L] must be held in this inner for loop
 			if h.unprocessedMsgs.Len() == 0 {
 				// Signalled in [h.push] and [h.StartShutdown]
 				h.unprocessedMsgsCond.Wait()
@@ -113,17 +112,16 @@ func (h *Handler) Dispatch() {
 
 		// If this message's deadline has passed, don't process it.
 		if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
-			h.ctx.Log.Verbo("Dropping message due to timeout: %s", msg)
+			h.ctx.Log.Verbo("Dropping message from %s%s due to timeout. msg: %s", constants.NodeIDPrefix, msg.nodeID, msg)
 			h.metrics.dropped.Inc()
 			h.metrics.expired.Inc()
 			msg.doneHandling()
 			continue
 		}
 
-		// Process the message
-		err := h.handleMsg(msg)
+		// Process the message.
 		// If there was an error, shut down this chain
-		if err != nil {
+		if err := h.handleMsg(msg); err != nil {
 			h.ctx.Log.Fatal("chain shutting down due to error %q while processing message: %s", err, msg)
 			h.StartShutdown()
 			return
@@ -517,7 +515,7 @@ func (h *Handler) Notify(msg common.Message) {
 // [h.closed] is closed when this handler/engine are done shutting down.
 func (h *Handler) StartShutdown() {
 	h.closing.SetValue(true)
-	// If we're waiting, in [Dispatch], wake up.
+	// If we're waiting in [Dispatch] wake up.
 	h.unprocessedMsgsCond.Broadcast()
 	// Don't process any more bootstrap messages.
 	// If [h.engine] is processing a bootstrap message, stop.
@@ -548,6 +546,15 @@ func (h *Handler) shutdown() {
 
 // Assumes [h.unprocessedMsgsCond.L] is not held
 func (h *Handler) push(msg message) {
+	if msg.nodeID == ids.ShortEmpty {
+		// This should never happen
+		h.ctx.Log.Warn("message does not have node ID of sender. Message: %s", msg)
+	}
+	if msg.messageType == constants.NullMsg {
+		// This should never happen
+		h.ctx.Log.Warn("message has message type %s", constants.NullMsg)
+	}
+
 	h.unprocessedMsgsCond.L.Lock()
 	defer h.unprocessedMsgsCond.L.Unlock()
 
