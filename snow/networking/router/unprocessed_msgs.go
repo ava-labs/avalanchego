@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-// TODO move to different package?
 type unprocessedMsgs interface {
 	// Add an unprocessed message
 	Push(message)
