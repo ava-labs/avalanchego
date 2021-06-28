@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -25,7 +26,9 @@ var (
 type codec struct {
 	// [bytesSavedMetrics] must not be nil.
 	// Should only be written to on codec creation.
-	bytesSavedMetrics map[Op]prometheus.Histogram
+	bytesSavedMetrics     map[Op]prometheus.Histogram
+	compressTimeMetrics   map[Op]prometheus.Histogram
+	decompressTimeMetrics map[Op]prometheus.Histogram
 	// [compressor] must not be nil
 	compressor compression.Compressor
 }
@@ -34,8 +37,10 @@ type codec struct {
 // However, some metrics may not be registered with [metricsRegisterer].
 func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 	c := codec{
-		bytesSavedMetrics: make(map[Op]prometheus.Histogram, len(ops)),
-		compressor:        compression.NewGzipCompressor(),
+		bytesSavedMetrics:     make(map[Op]prometheus.Histogram, len(ops)),
+		compressTimeMetrics:   make(map[Op]prometheus.Histogram, len(ops)),
+		decompressTimeMetrics: make(map[Op]prometheus.Histogram, len(ops)),
+		compressor:            compression.NewGzipCompressor(),
 	}
 	errs := wrappers.Errs{}
 	for _, op := range ops {
@@ -44,7 +49,23 @@ func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 			Name:      fmt.Sprintf("%s_bytes_saved", op),
 			Help:      fmt.Sprintf("Number of bytes saved (not sent) due to compression of %s messages", op),
 		})
+		c.compressTimeMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: constants.PlatformName,
+			Name:      fmt.Sprintf("%s_compress_time", op),
+			Help:      fmt.Sprintf("Time to compress (ns) %s messages", op),
+		})
+		c.decompressTimeMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
+			Namespace: constants.PlatformName,
+			Name:      fmt.Sprintf("%s_decompress_time", op),
+			Help:      fmt.Sprintf("Time to decompress (ns) %s messages", op),
+		})
 		if err := metricsRegisterer.Register(c.bytesSavedMetrics[op]); err != nil {
+			errs.Add(err)
+		}
+		if err := metricsRegisterer.Register(c.compressTimeMetrics[op]); err != nil {
+			errs.Add(err)
+		}
+		if err := metricsRegisterer.Register(c.decompressTimeMetrics[op]); err != nil {
 			errs.Add(err)
 		}
 	}
@@ -112,10 +133,14 @@ func (c codec) Pack(
 	// The slice below is guaranteed to be in-bounds because [p.Err] == nil
 	// implies that len(msg.bytes) >= 2
 	payloadBytes := msg.bytes[wrappers.BoolLen+wrappers.ByteLen:]
+	t0 := time.Now()
+
 	compressedPayloadBytes, err := c.compressor.Compress(payloadBytes)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
+
+	c.compressTimeMetrics[op].Observe(float64(time.Since(t0).Nanoseconds()))
 	bytesSaved := len(payloadBytes) - len(compressedPayloadBytes) // may be negative
 	c.bytesSavedMetrics[op].Observe(float64(bytesSaved))
 	// Remove the uncompressed payload (keep just the message type and isCompressed)
@@ -155,10 +180,13 @@ func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
 	if compressed {
 		// The slice below is guaranteed to be in-bounds because [p.Err] == nil
 		compressedPayloadBytes := p.Bytes[wrappers.ByteLen+wrappers.BoolLen:]
+		t0 := time.Now()
 		payloadBytes, err := c.compressor.Decompress(compressedPayloadBytes)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't decompress payload of %s message: %s", op, err)
 		}
+
+		c.decompressTimeMetrics[op].Observe(float64(time.Since(t0).Nanoseconds()))
 		// Replace the compressed payload with the decompressed payload.
 		// Remove the compressed payload and isCompressed; keep just the message type
 		p.Bytes = p.Bytes[:wrappers.ByteLen]
