@@ -49,16 +49,16 @@ type Handler struct {
 }
 
 // Initialize this consensus handler
-// engine must be initialized before initializing the handler
+// [engine] must be initialized before initializing this handler
 func (h *Handler) Initialize(
 	engine common.Engine,
 	validators validators.Set,
 	msgFromVMChan <-chan common.Message,
-	namespace string,
-	metrics prometheus.Registerer,
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
 ) error {
 	h.ctx = engine.Context()
-	if err := h.metrics.Initialize(namespace, metrics); err != nil {
+	if err := h.metrics.Initialize(metricsNamespace, metricsRegisterer); err != nil {
 		return fmt.Errorf("initializing handler metrics errored with: %s", err)
 	}
 	h.closed = make(chan struct{})
@@ -69,7 +69,7 @@ func (h *Handler) Initialize(
 	h.unprocessedMsgsCond = sync.NewCond(&lock)
 	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval)
 	var err error
-	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, namespace, metrics)
+	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, metricsNamespace, metricsRegisterer)
 	return err
 }
 
@@ -82,7 +82,7 @@ func (h *Handler) Engine() common.Engine { return h.engine }
 // SetEngine sets the engine for this handler to dispatch to
 func (h *Handler) SetEngine(engine common.Engine) { h.engine = engine }
 
-// Dispatch waits for incoming messages from the network
+// Dispatch waits for incoming messages from the router
 // and, when they arrive, sends them to the consensus engine
 func (h *Handler) Dispatch() {
 	defer h.shutdown()
@@ -90,7 +90,7 @@ func (h *Handler) Dispatch() {
 	// Handle messages from the VM
 	go h.dispatchInternal()
 
-	// Handle messages from the network
+	// Handle messages from the router
 	for {
 		// Wait until there is an unprocessed message
 		h.unprocessedMsgsCond.L.Lock()
@@ -155,7 +155,12 @@ func (h *Handler) handleMsg(msg message) error {
 		err = h.engine.Timeout()
 		h.metrics.timeout.Observe(float64(h.clock.Time().Sub(startTime)))
 	default:
-		err = h.handleConsensusMsg(msg, startTime)
+		err = h.handleConsensusMsg(msg)
+		endTime := h.clock.Time()
+		handleDuration := endTime.Sub(startTime)
+		histogram := h.metrics.getMSGHistogram(msg.messageType)
+		histogram.Observe(float64(handleDuration))
+		h.cpuTracker.UtilizeTime(msg.nodeID, startTime, endTime)
 	}
 
 	msg.doneHandling()
@@ -169,7 +174,7 @@ func (h *Handler) handleMsg(msg message) error {
 }
 
 // Assumes [h.ctx.Lock] is locked
-func (h *Handler) handleConsensusMsg(msg message, startTime time.Time) error {
+func (h *Handler) handleConsensusMsg(msg message) error {
 	var err error
 	switch msg.messageType {
 	case constants.GetAcceptedFrontierMsg:
@@ -209,11 +214,6 @@ func (h *Handler) handleConsensusMsg(msg message, startTime time.Time) error {
 	case constants.DisconnectedMsg:
 		err = h.engine.Disconnected(msg.nodeID)
 	}
-	endTime := h.clock.Time()
-	timeConsumed := endTime.Sub(startTime)
-	histogram := h.metrics.getMSGHistogram(msg.messageType)
-	histogram.Observe(float64(timeConsumed))
-	h.cpuTracker.UtilizeTime(msg.nodeID, startTime, endTime)
 	return err
 }
 
@@ -500,15 +500,6 @@ func (h *Handler) Gossip() {
 	})
 }
 
-// Notify ...
-func (h *Handler) Notify(msg common.Message) {
-	h.push(message{
-		messageType:  constants.NotifyMsg,
-		notification: msg,
-		nodeID:       h.ctx.NodeID,
-	})
-}
-
 // StartShutdown starts the shutdown process for this handler/engine.
 // [h] must never be invoked again after calling this method.
 // This method causes [shutdown] to eventually be called.
@@ -527,7 +518,7 @@ func (h *Handler) StartShutdown() {
 	h.engine.Halt()
 }
 
-// Shuts down [h.engine] and calls [h.onCloseF].
+// Calls [h.engine.Shutdown] and [h.onCloseF]; closes [h.closed].
 func (h *Handler) shutdown() {
 	h.ctx.Lock.Lock()
 	defer h.ctx.Lock.Unlock()

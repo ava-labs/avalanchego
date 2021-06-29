@@ -409,14 +409,14 @@ func (cr *ChainRouter) Accepted(
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
-		onFinishedHandling()
 		// We didn't request this message. Ignore.
+		onFinishedHandling()
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.GetAcceptedMsg {
-		onFinishedHandling()
 		// We got back a reply of wrong type. Ignore.
+		onFinishedHandling()
 		return
 	}
 	cr.timedRequests.Delete(uniqueRequestID)
@@ -500,8 +500,8 @@ func (cr *ChainRouter) MultiPut(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		onFinishedHandling()
 		cr.log.Debug("MultiPut(%s, %s, %d, %d) dropped due to unknown chain", validatorID, chainID, requestID, len(containers))
+		onFinishedHandling()
 		return
 	}
 
@@ -510,14 +510,14 @@ func (cr *ChainRouter) MultiPut(
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
-		onFinishedHandling()
 		// We didn't request this message. Ignore.
+		onFinishedHandling()
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.GetAncestorsMsg {
-		onFinishedHandling()
 		// We got back a reply of wrong type. Ignore.
+		onFinishedHandling()
 		return
 	}
 	cr.timedRequests.Delete(uniqueRequestID)
@@ -575,8 +575,8 @@ func (cr *ChainRouter) Get(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		onFinishedHandling()
 		cr.log.Debug("Get(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+		onFinishedHandling()
 		return
 	}
 
@@ -623,14 +623,14 @@ func (cr *ChainRouter) Put(
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
-		onFinishedHandling()
 		// We didn't request this message. Ignore.
+		onFinishedHandling()
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.GetMsg {
-		onFinishedHandling()
 		// We got back a reply of wrong type. Ignore.
+		onFinishedHandling()
 		return
 	}
 	cr.timedRequests.Delete(uniqueRequestID)
@@ -687,9 +687,9 @@ func (cr *ChainRouter) PushQuery(
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		onFinishedHandling()
 		cr.log.Debug("PushQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
 		cr.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
+		onFinishedHandling()
 		return
 	}
 
@@ -712,8 +712,8 @@ func (cr *ChainRouter) PullQuery(
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		onFinishedHandling()
 		cr.log.Debug("PullQuery(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, containerID)
+		onFinishedHandling()
 		return
 	}
 
@@ -736,8 +736,8 @@ func (cr *ChainRouter) Chits(
 	// Get the chain, if it exists
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		onFinishedHandling()
 		cr.log.Debug("Chits(%s, %s, %d, %s) dropped due to unknown chain", validatorID, chainID, requestID, votes)
+		onFinishedHandling()
 		return
 	}
 

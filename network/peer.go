@@ -259,10 +259,15 @@ func (p *peer) ReadMessages() {
 		// to give back the bytes used by this message.
 		p.net.msgThrottler.Acquire(uint64(msgLen), p.nodeID)
 
+		// Invariant: When done processing this message, onFinishedHandling() is called.
+		// If this is not honored, the message throttler will leak until no new messages can be read.
+		// You can look at message throttler metrics to verify that there is no leak.
+		onFinishedHandling := func() { p.net.msgThrottler.Release(uint64(msgLen), p.nodeID) }
+
 		// Time out and close connection if we can't read message
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
 			p.net.log.Verbo("error setting the connection read timeout on %s%s at %s %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
-			p.net.msgThrottler.Release(uint64(msgLen), p.nodeID)
+			onFinishedHandling()
 			return
 		}
 
@@ -270,7 +275,7 @@ func (p *peer) ReadMessages() {
 		msgBytes := make([]byte, msgLen)
 		if _, err := io.ReadFull(reader, msgBytes); err != nil {
 			p.net.log.Verbo("error reading from %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
-			p.net.msgThrottler.Release(uint64(msgLen), p.nodeID)
+			onFinishedHandling()
 			return
 		}
 
@@ -281,7 +286,7 @@ func (p *peer) ReadMessages() {
 		if err != nil {
 			p.net.log.Verbo("failed to parse message from %s%s at %s:\n%s\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes}, err)
 			// Couldn't parse the message. Read the next one.
-			p.net.msgThrottler.Release(uint64(msgLen), p.nodeID)
+			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			continue
 		}
@@ -289,7 +294,7 @@ func (p *peer) ReadMessages() {
 		// Handle the message. Note that when we are done handling
 		// this message, we must call [p.net.msgThrottler.Release]
 		// to release the bytes used by this message. See MsgThrottler.
-		p.handle(msg)
+		p.handle(msg, onFinishedHandling)
 	}
 }
 
@@ -399,53 +404,46 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handle(msg Msg) {
+func (p *peer) handle(msg Msg, onFinishedHandling func()) {
 	now := p.net.clock.Time()
 	atomic.StoreInt64(&p.lastReceived, now.Unix())
 	atomic.StoreInt64(&p.net.lastMsgReceivedTime, now.Unix())
 	msgLen := uint64(len(msg.Bytes()))
 
-	if err := p.conn.SetReadDeadline(now.Add(p.net.pingPongTimeout)); err != nil {
-		p.net.log.Verbo("error on setting the connection read timeout %s, closing the connection", err)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
-		p.Close()
-		return
-	}
-
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
 		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	}
 	msgMetrics.numReceived.Inc()
 	msgMetrics.receivedBytes.Add(float64(msgLen))
 
-	switch op {
+	switch op { // Network-related message types
 	case Version:
 		p.handleVersion(msg)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	case GetVersion:
 		p.handleGetVersion(msg)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	case Ping:
 		p.handlePing(msg)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	case Pong:
 		p.handlePong(msg)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	case GetPeerList:
 		p.handleGetPeerList(msg)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	case PeerList:
 		p.handlePeerList(msg)
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	}
 	if !p.finishedHandshake.GetValue() {
@@ -458,35 +456,36 @@ func (p *peer) handle(msg Msg) {
 		if !p.gotPeerList.GetValue() {
 			p.sendGetPeerList()
 		}
-		p.net.msgThrottler.Release(msgLen, p.nodeID)
+		onFinishedHandling()
 		return
 	}
 
-	switch op {
+	switch op { // Consensus-related messages
 	case GetAcceptedFrontier:
-		p.handleGetAcceptedFrontier(msg)
+		p.handleGetAcceptedFrontier(msg, onFinishedHandling)
 	case AcceptedFrontier:
-		p.handleAcceptedFrontier(msg)
+		p.handleAcceptedFrontier(msg, onFinishedHandling)
 	case GetAccepted:
-		p.handleGetAccepted(msg)
+		p.handleGetAccepted(msg, onFinishedHandling)
 	case Accepted:
-		p.handleAccepted(msg)
+		p.handleAccepted(msg, onFinishedHandling)
 	case Get:
-		p.handleGet(msg)
+		p.handleGet(msg, onFinishedHandling)
 	case GetAncestors:
-		p.handleGetAncestors(msg)
+		p.handleGetAncestors(msg, onFinishedHandling)
 	case Put:
-		p.handlePut(msg)
+		p.handlePut(msg, onFinishedHandling)
 	case MultiPut:
-		p.handleMultiPut(msg)
+		p.handleMultiPut(msg, onFinishedHandling)
 	case PushQuery:
-		p.handlePushQuery(msg)
+		p.handlePushQuery(msg, onFinishedHandling)
 	case PullQuery:
-		p.handlePullQuery(msg)
+		p.handlePullQuery(msg, onFinishedHandling)
 	case Chits:
-		p.handleChits(msg)
+		p.handleChits(msg, onFinishedHandling)
 	default:
 		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
+		onFinishedHandling()
 	}
 }
 
@@ -884,28 +883,26 @@ func (p *peer) handlePing(_ Msg) {
 func (p *peer) handlePong(_ Msg) {}
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetAcceptedFrontier(msg Msg) {
+func (p *peer) handleGetAcceptedFrontier(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
 	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
 
-	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAcceptedFrontier(
 		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleAcceptedFrontier(msg Msg) {
+func (p *peer) handleAcceptedFrontier(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	msgLen := uint64(len(msg.Bytes()))
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
@@ -914,11 +911,11 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			return
 		}
 		if p.idSet.Contains(containerID) {
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			return
 		}
@@ -931,17 +928,16 @@ func (p *peer) handleAcceptedFrontier(msg Msg) {
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGetAccepted(msg Msg) {
+func (p *peer) handleGetAccepted(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
 	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(Deadline).(uint64)))
-	msgLen := uint64(len(msg.Bytes()))
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
@@ -950,12 +946,12 @@ func (p *peer) handleGetAccepted(msg Msg) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			return
 		}
 		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			return
 		}
 		containerIDs[i] = containerID
@@ -968,16 +964,15 @@ func (p *peer) handleGetAccepted(msg Msg) {
 		requestID,
 		deadline,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleAccepted(msg Msg) {
+func (p *peer) handleAccepted(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	msgLen := uint64(len(msg.Bytes()))
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
@@ -986,12 +981,12 @@ func (p *peer) handleAccepted(msg Msg) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			return
 		}
 		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			return
 		}
 		containerIDs[i] = containerID
@@ -1003,12 +998,12 @@ func (p *peer) handleAccepted(msg Msg) {
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleGet(msg Msg) {
+func (p *peer) handleGet(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
@@ -1016,18 +1011,17 @@ func (p *peer) handleGet(msg Msg) {
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Get(
 		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
-func (p *peer) handleGetAncestors(msg Msg) {
+func (p *peer) handleGetAncestors(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
@@ -1035,19 +1029,18 @@ func (p *peer) handleGetAncestors(msg Msg) {
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.GetAncestors(
 		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePut(msg Msg) {
+func (p *peer) handlePut(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
@@ -1055,36 +1048,33 @@ func (p *peer) handlePut(msg Msg) {
 	p.net.log.AssertNoError(err)
 	container := msg.Get(ContainerBytes).([]byte)
 
-	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.Put(
 		p.nodeID,
 		chainID,
 		requestID,
 		containerID,
 		container,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleMultiPut(msg Msg) {
+func (p *peer) handleMultiPut(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
 	containers := msg.Get(MultiContainerBytes).([][]byte)
 
-	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.MultiPut(
 		p.nodeID,
 		chainID,
 		requestID,
 		containers,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
-// assumes the [stateLock] is not held
-func (p *peer) handlePushQuery(msg Msg) {
+func (p *peer) handlePushQuery(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
@@ -1093,7 +1083,6 @@ func (p *peer) handlePushQuery(msg Msg) {
 	p.net.log.AssertNoError(err)
 	container := msg.Get(ContainerBytes).([]byte)
 
-	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.PushQuery(
 		p.nodeID,
 		chainID,
@@ -1101,12 +1090,12 @@ func (p *peer) handlePushQuery(msg Msg) {
 		deadline,
 		containerID,
 		container,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePullQuery(msg Msg) {
+func (p *peer) handlePullQuery(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
@@ -1114,23 +1103,21 @@ func (p *peer) handlePullQuery(msg Msg) {
 	containerID, err := ids.ToID(msg.Get(ContainerID).([]byte))
 	p.net.log.AssertNoError(err)
 
-	msgLen := uint64(len(msg.Bytes()))
 	p.net.router.PullQuery(
 		p.nodeID,
 		chainID,
 		requestID,
 		deadline,
 		containerID,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handleChits(msg Msg) {
+func (p *peer) handleChits(msg Msg, onFinishedHandling func()) {
 	chainID, err := ids.ToID(msg.Get(ChainID).([]byte))
 	p.net.log.AssertNoError(err)
 	requestID := msg.Get(RequestID).(uint32)
-	msgLen := uint64(len(msg.Bytes()))
 
 	containerIDsBytes := msg.Get(ContainerIDs).([][]byte)
 	containerIDs := make([]ids.ID, len(containerIDsBytes))
@@ -1139,12 +1126,12 @@ func (p *peer) handleChits(msg Msg) {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			return
 		}
 		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
-			p.net.msgThrottler.Release(msgLen, p.nodeID)
+			onFinishedHandling()
 			return
 		}
 		containerIDs[i] = containerID
@@ -1156,7 +1143,7 @@ func (p *peer) handleChits(msg Msg) {
 		chainID,
 		requestID,
 		containerIDs,
-		func() { p.net.msgThrottler.Release(msgLen, p.nodeID) },
+		onFinishedHandling,
 	)
 }
 
