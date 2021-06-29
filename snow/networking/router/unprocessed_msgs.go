@@ -111,6 +111,11 @@ func (u *unprocessedMsgsImpl) Len() int {
 
 // canPop will return true for at least one message in [u.msgs]
 func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
+	// If the deadline to handle [msg] has passed, always pop it.
+	// It will be dropped immediately.
+	if !msg.deadline.IsZero() && u.clock.Time().After(msg.deadline) {
+		return true
+	}
 	// Every node has some allowed CPU allocation depending on
 	// the number of nodes with unprocessed messages.
 	baseMaxCPU := 1 / float64(len(u.nodeToUnprocessedMsgs))
