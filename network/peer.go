@@ -522,7 +522,7 @@ func (p *peer) close() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendGetVersion() {
-	msg, err := p.net.b.GetVersion(p.canHandleCompressed.GetValue())
+	msg, err := p.net.b.GetVersion()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)

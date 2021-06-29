@@ -27,29 +27,15 @@ func init() {
 }
 
 func TestBuildGetVersion(t *testing.T) {
-	{
-		msg, err := TestBuilder.GetVersion(false)
-		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-		assert.Equal(t, GetVersion, msg.Op())
+	msg, err := TestBuilder.GetVersion()
+	assert.NoError(t, err)
+	assert.NotNil(t, msg)
+	assert.Equal(t, GetVersion, msg.Op())
 
-		parsedMsg, err := TestBuilder.Parse(msg.Bytes(), false)
-		assert.NoError(t, err)
-		assert.NotNil(t, parsedMsg)
-		assert.Equal(t, GetVersion, parsedMsg.Op())
-	}
-
-	{
-		msg, err := TestBuilder.GetVersion(true)
-		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-		assert.Equal(t, GetVersion, msg.Op())
-
-		parsedMsg, err := TestBuilder.Parse(msg.Bytes(), true)
-		assert.NoError(t, err)
-		assert.NotNil(t, parsedMsg)
-		assert.Equal(t, GetVersion, parsedMsg.Op())
-	}
+	parsedMsg, err := TestBuilder.Parse(msg.Bytes(), false)
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedMsg)
+	assert.Equal(t, GetVersion, parsedMsg.Op())
 }
 
 func TestBuildVersion(t *testing.T) {

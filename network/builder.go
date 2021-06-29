@@ -18,14 +18,14 @@ type Builder struct {
 }
 
 // GetVersion message
-func (b Builder) GetVersion(includeIsCompressedFlag bool) (Msg, error) {
+func (b Builder) GetVersion() (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
 		buf,
 		GetVersion,
 		nil,
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(GetVersion),
+		false,
+		false,
 	)
 }
 
@@ -54,7 +54,7 @@ func (b Builder) Version(
 			SigBytes:    sig,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(Version),
+		includeIsCompressedFlag && Version.canBeCompressed(),
 	)
 }
 
@@ -73,7 +73,7 @@ func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag bool
 			SignedPeers: peers,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(PeerList),
+		includeIsCompressedFlag && PeerList.canBeCompressed(),
 	)
 }
 
@@ -85,7 +85,7 @@ func (b Builder) Ping(includeIsCompressedFlag bool) (Msg, error) {
 		Ping,
 		nil,
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(Ping),
+		includeIsCompressedFlag && Ping.canBeCompressed(),
 	)
 }
 
@@ -97,7 +97,7 @@ func (b Builder) Pong(includeIsCompressedFlag bool) (Msg, error) {
 		Pong,
 		nil,
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(Pong),
+		includeIsCompressedFlag && Pong.canBeCompressed(),
 	)
 }
 
@@ -118,7 +118,7 @@ func (b Builder) GetAcceptedFrontier(
 			Deadline:  deadline,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(GetAcceptedFrontier),
+		includeIsCompressedFlag && GetAcceptedFrontier.canBeCompressed(),
 	)
 }
 
@@ -144,7 +144,7 @@ func (b Builder) AcceptedFrontier(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(AcceptedFrontier),
+		includeIsCompressedFlag && AcceptedFrontier.canBeCompressed(),
 	)
 }
 
@@ -172,7 +172,7 @@ func (b Builder) GetAccepted(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(GetAccepted),
+		includeIsCompressedFlag && GetAccepted.canBeCompressed(),
 	)
 }
 
@@ -198,7 +198,7 @@ func (b Builder) Accepted(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(Accepted),
+		includeIsCompressedFlag && Accepted.canBeCompressed(),
 	)
 }
 
@@ -221,7 +221,7 @@ func (b Builder) GetAncestors(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(GetAncestors),
+		includeIsCompressedFlag && GetAncestors.canBeCompressed(),
 	)
 }
 
@@ -242,7 +242,7 @@ func (b Builder) MultiPut(
 			MultiContainerBytes: containers,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(MultiPut),
+		includeIsCompressedFlag && MultiPut.canBeCompressed(),
 	)
 }
 
@@ -265,7 +265,7 @@ func (b Builder) Get(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(Get),
+		includeIsCompressedFlag && Get.canBeCompressed(),
 	)
 }
 
@@ -288,7 +288,7 @@ func (b Builder) Put(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(Put),
+		includeIsCompressedFlag && Put.canBeCompressed(),
 	)
 }
 
@@ -313,7 +313,7 @@ func (b Builder) PushQuery(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(PushQuery),
+		includeIsCompressedFlag && PushQuery.canBeCompressed(),
 	)
 }
 
@@ -336,7 +336,7 @@ func (b Builder) PullQuery(
 			ContainerID: containerID[:],
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(PullQuery),
+		includeIsCompressedFlag && PullQuery.canBeCompressed(),
 	)
 }
 
@@ -362,17 +362,6 @@ func (b Builder) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && canBeCompressed(Chits),
+		includeIsCompressedFlag && Chits.canBeCompressed(),
 	)
-}
-
-// Returns whether we should compress a message of the given type.
-// (Assuming the peer can handle compressed messages)
-func canBeCompressed(op Op) bool {
-	switch op {
-	case PushQuery, Put, MultiPut, PeerList:
-		return true
-	default:
-		return false
-	}
 }
