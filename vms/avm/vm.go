@@ -252,7 +252,7 @@ func (vm *VM) Initialize(
 	} else {
 		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
 		vm.ctx.Log.Info("Address transaction indexing is disabled.")
-		vm.addressTxsIndexer = NewNoOpAddressTxsIndexer()
+		vm.addressTxsIndexer = NewNoIndexer()
 	}
 
 	return vm.db.Commit()

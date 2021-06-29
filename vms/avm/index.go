@@ -17,6 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Maintains an index of an address --> IDs of transactions that changed that address's balance.
+// This includes both transactions that increased the address's balance and those that decreased it.
+// An address's balance is said to have changed by a transaction if either:
+// 1) An input UTXO to the transaction was at least partially owned by the address
+// 2) An output of the transaction is at least partially owned by the address.
 type AddressTxsIndexer interface {
 	AddUTXOs(outputUTXOs []*avax.UTXO)
 	AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error
@@ -24,19 +29,18 @@ type AddressTxsIndexer interface {
 	Reset()
 }
 
-// statefulAddressTxsIndexer indexes transactions for given an address and an assetID
-// Assumes state lock is held when this is called
-type statefulAddressTxsIndexer struct {
+// indexer implements AddressTxsIndexer
+type indexer struct {
 	// Maps address -> []AssetID Set
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	log                 logging.Logger
-	m                   metrics
+	metrics             metrics
 }
 
-// AddTransferOutput IndexTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
+// AddTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
 // to the provided vm.addressAssetIDIndex
-func (i *statefulAddressTxsIndexer) addTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
+func (i *indexer) addTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
 	for _, address := range transferOutput.Addrs {
 		if _, exists := i.addressAssetIDTxMap[address]; !exists {
 			i.addressAssetIDTxMap[address] = make(map[ids.ID]struct{})
@@ -45,18 +49,12 @@ func (i *statefulAddressTxsIndexer) addTransferOutput(assetID ids.ID, transferOu
 	}
 }
 
-func (i *statefulAddressTxsIndexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
+func (i *indexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 	for _, utxoID := range inputUTXOs {
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
 			// should never happen
 			return err
-		}
-
-		// typically in case of missing utxo there is an err above
-		// this is just a catch all for the edge case
-		if utxo == nil {
-			return errMissingUTXO
 		}
 
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -70,7 +68,7 @@ func (i *statefulAddressTxsIndexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID
 	return nil
 }
 
-func (i *statefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
+func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 	for _, utxo := range outputUTXOs {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
@@ -90,7 +88,7 @@ func (i *statefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 // |  | "idx" => 2 		Running transaction index key, represents the next index
 // |  | "0"   => txID1
 // |  | "1"   => txID1
-func (i *statefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
+func (i *indexer) CommitIndex(txID ids.ID) error {
 	for address, assetIDMap := range i.addressAssetIDTxMap {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
 		for assetID := range assetIDMap {
@@ -130,45 +128,39 @@ func (i *statefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
 			}
 		}
 	}
-	i.m.numTxsIndexed.Observe(1)
+	i.metrics.numTxsIndexed.Observe(1)
 	return nil
 }
 
-func (i *statefulAddressTxsIndexer) Reset() {
+func (i *indexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
-func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m metrics) AddressTxsIndexer {
-	return &statefulAddressTxsIndexer{
+func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, metrics metrics) AddressTxsIndexer {
+	return &indexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
 		log:                 log,
-		m:                   m,
+		metrics:             metrics,
 	}
 }
 
-type noOpAddressTxsIndexer struct{}
+type noIndexer struct{}
 
-func NewNoOpAddressTxsIndexer() AddressTxsIndexer {
-	return &noOpAddressTxsIndexer{}
+func NewNoIndexer() AddressTxsIndexer {
+	return &noIndexer{}
 }
 
-func (i *noOpAddressTxsIndexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
+func (i *noIndexer) AddUTXOIDs(*VM, []*avax.UTXOID) error {
 	return nil
 }
 
-func (i *noOpAddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
-	// no op
-}
+func (i *noIndexer) AddTransferOutput(ids.ID, *secp256k1fx.TransferOutput) {}
 
-func (i *noOpAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
-	// no op
-}
+func (i *noIndexer) AddUTXOs([]*avax.UTXO) {}
 
-func (i *noOpAddressTxsIndexer) CommitIndex(txID ids.ID) error {
+func (i *noIndexer) CommitIndex(ids.ID) error {
 	return nil
 }
 
-func (i *noOpAddressTxsIndexer) Reset() {
-	// no op
-}
+func (i *noIndexer) Reset() {}
