@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -41,8 +42,8 @@ import (
 const (
 	defaultInitialReconnectDelay                     = time.Second
 	defaultMaxReconnectDelay                         = time.Hour
-	DefaultMaxMessageSize                     uint32 = 2 * 1024 * 1024   // 2 MB
-	defaultMaxNetworkPendingSendBytes                = 512 * 1024 * 1024 // 512 MB
+	DefaultMaxMessageSize                     uint32 = 2 * units.MiB
+	defaultMaxNetworkPendingSendBytes                = 512 * units.MiB
 	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
 	defaultMaxClockDifference                        = time.Minute
 	defaultPeerListStakerGossipFraction              = 2
@@ -50,7 +51,7 @@ const (
 	defaultAllowPrivateIPs                           = true
 	defaultPingPongTimeout                           = 30 * time.Second
 	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
-	defaultReadBufferSize                            = 16 * 1024 // 16 KB
+	defaultReadBufferSize                            = 16 * units.KiB
 	defaultReadHandshakeTimeout                      = 15 * time.Second
 	defaultConnMeterCacheSize                        = 1024
 	defaultByteSliceCap                              = 128
