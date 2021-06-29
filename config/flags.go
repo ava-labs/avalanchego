@@ -27,10 +27,12 @@ var (
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
 	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
-	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
-	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
-	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs", "chains")
-	defaultVMConfigDir     = filepath.Join(defaultDataDir, "configs", "vms")
+	defaultStakingPath     = filepath.Join(defaultDataDir, "staking")
+	defaultStakingKeyPath  = filepath.Join(defaultStakingPath, "staker.key")
+	defaultStakingCertPath = filepath.Join(defaultStakingPath, "staker.crt")
+	defaultConfigDir       = filepath.Join(defaultDataDir, "configs")
+	defaultChainConfigDir  = filepath.Join(defaultConfigDir, "chains")
+	defaultVMConfigDir     = filepath.Join(defaultConfigDir, "vms")
 	defaultVMAliasFilePath = filepath.Join(defaultVMConfigDir, "aliases.json")
 
 	// Places to look for the build directory
