@@ -47,7 +47,7 @@ func newUnprocessedMsgs(
 // Not safe for concurrent access.
 // TODO: Use a better data structure for this.
 // We can do something better than pushing to the back
-// of a queue.
+// of a queue. A multi-level queue?
 type unprocessedMsgsImpl struct {
 	log     logging.Logger
 	metrics unprocessedMsgsMetrics
@@ -83,7 +83,7 @@ func (u *unprocessedMsgsImpl) Pop() message {
 		msg := u.msgs[0]
 		// See if it's OK to process [msg] next
 		if u.canPop(&msg) || i == n { // i should never == n but handle anyway as a fail-safe
-			if len(u.msgs) == 1 {
+			if cap(u.msgs) == 1 {
 				u.msgs = nil // Give back memory if possible
 			} else {
 				u.msgs = u.msgs[1:]
