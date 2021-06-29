@@ -35,7 +35,6 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 type handlerMetrics struct {
 	namespace  string
 	registerer prometheus.Registerer
-	pending    prometheus.Gauge
 	expired    prometheus.Counter
 	getAcceptedFrontier, acceptedFrontier, getAcceptedFrontierFailed,
 	getAccepted, accepted, getAcceptedFailed,
@@ -55,13 +54,6 @@ func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Regi
 	m.namespace = namespace
 	m.registerer = registerer
 	errs := wrappers.Errs{}
-
-	m.pending = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "pending",
-		Help:      "Number of pending events",
-	})
-	errs.Add(registerer.Register(m.pending))
 
 	m.expired = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,

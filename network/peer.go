@@ -699,6 +699,7 @@ func (p *peer) handleVersion(msg Msg) {
 	if err != nil {
 		p.net.log.Debug("peer version could not be parsed: %s", err)
 		p.discardIP()
+		p.net.metrics.failedToParse.Inc()
 		return
 	}
 
@@ -912,11 +913,13 @@ func (p *peer) handleAcceptedFrontier(msg Msg, onFinishedHandling func()) {
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
-			onFinishedHandling()
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
+			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		containerIDs[i] = containerID
@@ -947,11 +950,13 @@ func (p *peer) handleGetAccepted(msg Msg, onFinishedHandling func()) {
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		containerIDs[i] = containerID
@@ -982,11 +987,13 @@ func (p *peer) handleAccepted(msg Msg, onFinishedHandling func()) {
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		containerIDs[i] = containerID
@@ -1127,11 +1134,13 @@ func (p *peer) handleChits(msg Msg, onFinishedHandling func()) {
 		if err != nil {
 			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
 			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
 			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
 			onFinishedHandling()
+			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		containerIDs[i] = containerID
