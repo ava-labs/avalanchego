@@ -266,6 +266,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			}
 		}
 		sb = newSubnet(onBootstrapped, chainParams.ID)
+		m.subnets[chainParams.SubnetID] = sb
 	} else {
 		sb.addChain(chainParams.ID)
 	}
@@ -286,10 +287,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		}
 		m.Log.Error("error creating chain %s: %s", chainParams.ID, err)
 		return
-	}
-
-	if !exists {
-		m.subnets[chainParams.SubnetID] = sb
 	}
 
 	m.chainsLock.Lock()
