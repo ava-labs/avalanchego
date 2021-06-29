@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"errors"
-	"math/rand"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
 var (
@@ -1473,7 +1473,7 @@ func RandomizedConsistencyTest(t *testing.T, factory Factory) {
 	}
 	seed := int64(0)
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 
 	n := Network{}
 	n.Initialize(params, numColors)

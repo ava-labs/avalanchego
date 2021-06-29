@@ -274,8 +274,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
@@ -284,8 +284,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
