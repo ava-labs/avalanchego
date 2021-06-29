@@ -30,7 +30,7 @@ type statefulAddressTxsIndexer struct {
 	// Maps address -> []AssetID Set
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
-	logger              logging.Logger
+	log                 logging.Logger
 	m                   metrics
 }
 
@@ -61,7 +61,7 @@ func (i *statefulAddressTxsIndexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID
 
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			i.logger.Debug("Skipping input utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			i.log.Verbo("Skipping input utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
 			continue
 		}
 
@@ -74,7 +74,7 @@ func (i *statefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 	for _, utxo := range outputUTXOs {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			i.logger.Debug("Skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			i.log.Verbo("Skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
 			continue
 		}
 
@@ -101,7 +101,7 @@ func (i *statefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
 			switch {
 			case err != nil && err != database.ErrNotFound:
 				// Unexpected error
-				i.logger.Fatal("Error checking idx value exists: %s", err)
+				i.log.Fatal("Error checking idx value exists: %s", err)
 				return err
 			case err == database.ErrNotFound:
 				// idx not found; this must be the first entry.
@@ -111,22 +111,21 @@ func (i *statefulAddressTxsIndexer) CommitIndex(txID ids.ID) error {
 			default:
 				// Parse [idxBytes]
 				idx = binary.BigEndian.Uint64(idxBytes)
-				i.logger.Debug("fetched index %d", idx)
+				i.log.Verbo("fetched index %d", idx)
 			}
 
-			i.logger.Debug("Writing at index %d txID %s", idx, txID)
+			i.log.Debug("Writing at index %d txID %s", idx, txID)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
-				i.logger.Fatal("Failed to save transaction to the address, assetID prefix DB %s", err)
+				i.log.Fatal("Failed to save transaction to the address, assetID prefix DB %s", err)
 				return err
 			}
 
 			// increment and store the index for next use
 			idx++
 			binary.BigEndian.PutUint64(idxBytes, idx)
-			i.logger.Debug("New index %d", idx)
 
 			if err := assetPrefixDB.Put(idxKey, idxBytes); err != nil {
-				i.logger.Fatal("Failed to save transaction index to the address, assetID prefix DB: %s", err)
+				i.log.Fatal("Failed to save transaction index to the address, assetID prefix DB: %s", err)
 				return err
 			}
 		}
@@ -139,11 +138,11 @@ func (i *statefulAddressTxsIndexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
-func NewAddressTxsIndexer(db *versiondb.Database, logger logging.Logger, m metrics) AddressTxsIndexer {
+func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m metrics) AddressTxsIndexer {
 	return &statefulAddressTxsIndexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
-		logger:              logger,
+		log:                 log,
 		m:                   m,
 	}
 }
