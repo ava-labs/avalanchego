@@ -158,12 +158,15 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 // accept the provided tx.
 func (c *common) acceptTx(tx Tx) error {
 	txID := tx.ID()
+	c.ctx.Log.Trace("accepting transaction %s", txID)
+
 	// Notify those listening that this tx has been accepted.
 	// Note that DecisionDispatcher.Accept must be called before
 	// tx.Accept to honor EventDispatcher.Accept's invariant.
 	if err := c.ctx.DecisionDispatcher.Accept(c.ctx, txID, tx.Bytes()); err != nil {
 		return err
 	}
+
 	if err := tx.Accept(); err != nil {
 		return err
 	}
@@ -182,13 +185,14 @@ func (c *common) acceptTx(tx Tx) error {
 
 // reject the provided tx.
 func (c *common) rejectTx(tx Tx) error {
+	txID := tx.ID()
+	c.ctx.Log.Trace("rejecting transaction %s due to a conflicting acceptance", txID)
+
 	// Reject is called before notifying the IPC so that rejections that
 	// cause fatal errors aren't sent to an IPC peer.
 	if err := tx.Reject(); err != nil {
 		return err
 	}
-
-	txID := tx.ID()
 
 	// Notify the IPC that the tx was rejected
 	if err := c.ctx.DecisionDispatcher.Reject(c.ctx, txID, tx.Bytes()); err != nil {

@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 // Tests is a list of all database tests
@@ -553,8 +555,8 @@ func TestBatchInner(t *testing.T, db Database) {
 // amount of entries.
 //nolint:interfacer // This function must match the test function definition
 func TestBatchLargeSize(t *testing.T, db Database) {
-	totalSize := 8 * 1024 * 1024 // 8 MiB
-	elementSize := 4 * 1024      // 4 KiB
+	totalSize := 8 * units.MiB   // 8 MiB
+	elementSize := 4 * units.KiB // 4 KiB
 	pairSize := 2 * elementSize  // 8 KiB
 
 	bytes := make([]byte, totalSize)
