@@ -5,6 +5,7 @@ package network
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/x509"
 	"encoding/binary"
 	"io"
@@ -304,6 +305,7 @@ func (p *peer) WriteMessages() {
 
 	p.sendVersion()
 
+	var reader bytes.Reader
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
 		p.net.log.Verbo("sending new message to %s:\n%s",
@@ -313,20 +315,16 @@ func (p *peer) WriteMessages() {
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
 		for _, byteSlice := range [][]byte{msgb[:], msg} {
-			for len(byteSlice) > 0 {
-				if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
-					p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.nodeID, p.getIP(), err)
-					return
-				}
-				written, err := writer.Write(byteSlice)
-				if err != nil {
-					p.net.log.Verbo("error writing to %s at %s due to: %s", p.nodeID, p.getIP(), err)
-					return
-				}
-
-				p.tickerOnce.Do(p.StartTicker)
-				byteSlice = byteSlice[written:]
+			reader.Reset(byteSlice)
+			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
+				p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.nodeID, p.getIP(), err)
+				return
 			}
+			if _, err := io.CopyN(writer, &reader, int64(len((byteSlice)))); err != nil {
+				p.net.log.Verbo("error writing to %s at %s due to: %s", p.nodeID, p.getIP(), err)
+				return
+			}
+			p.tickerOnce.Do(p.StartTicker)
 		}
 		// Make sure the peer got the entire message
 		if err := writer.Flush(); err != nil {
@@ -415,6 +413,7 @@ func (p *peer) handle(msg Msg, onFinishedHandling func()) {
 	if msgMetrics == nil {
 		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
 		onFinishedHandling()
+		p.net.metrics.failedToParse.Inc()
 		return
 	}
 	msgMetrics.numReceived.Inc()
