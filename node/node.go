@@ -540,6 +540,15 @@ func (n *Node) initVMManager(genesisBytes []byte) error {
 			}
 		}
 	}
+
+	// use aliases in given config
+	for vmID, aliases := range n.Config.VMAliases {
+		for _, alias := range aliases {
+			if err := n.vmManager.Alias(vmID, alias); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 

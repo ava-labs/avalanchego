@@ -504,7 +504,39 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.ProfilerConfig.Freq = v.GetDuration(ProfileContinuousFreqKey)
 	nodeConfig.ProfilerConfig.MaxNumFiles = v.GetInt(ProfileContinuousMaxFilesKey)
 
+	// VM Aliases
+	vmAliases, err := readVMAliases(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+	nodeConfig.VMAliases = vmAliases
 	return nodeConfig, nil
+}
+
+func readVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
+	aliasFilePath := path.Clean(v.GetString(VMAliasesFileKey))
+	exists, err := fileExists(aliasFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		if v.IsSet(VMAliasesFileKey) {
+			return nil, fmt.Errorf("vm alias file does not exist in %v", aliasFilePath)
+		}
+		return nil, nil
+	}
+
+	fileBytes, err := ioutil.ReadFile(aliasFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	vmAliasMap := make(map[ids.ID][]string)
+	if err := json.Unmarshal(fileBytes, &vmAliasMap); err != nil {
+		return nil, fmt.Errorf("problem unmarshaling vmAliases: %w", err)
+	}
+	return vmAliasMap, nil
 }
 
 // getChainConfigs reads & puts chainConfigs to node config
