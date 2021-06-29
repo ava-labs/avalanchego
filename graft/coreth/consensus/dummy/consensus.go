@@ -24,7 +24,6 @@ type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
 
 type ConsensusCallbacks struct {
-	OnSeal                func(*types.Block) error
 	OnAPIs                OnAPIsCallbackType
 	OnFinalize            OnFinalizeCallbackType
 	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
@@ -144,8 +143,6 @@ func (self *DummyEngine) Finalize(
 	if self.cb.OnFinalize != nil {
 		self.cb.OnFinalize(chain, header, state, txs, uncles)
 	}
-	// commit the final state root
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 }
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
@@ -166,13 +163,6 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		header, txs, uncles, receipts, new(trie.Trie), extdata,
 		chain.Config().IsApricotPhase1(new(big.Int).SetUint64(header.Time)),
 	), nil
-}
-
-func (self *DummyEngine) Seal(chain consensus.ChainHeaderReader, block *types.Block) (err error) {
-	if self.cb.OnSeal != nil {
-		err = self.cb.OnSeal(block)
-	}
-	return
 }
 
 func (self *DummyEngine) CalcDifficulty(chain consensus.ChainHeaderReader, time uint64, parent *types.Header) *big.Int {
