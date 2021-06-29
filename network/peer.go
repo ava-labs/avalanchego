@@ -314,7 +314,7 @@ func (p *peer) WriteMessages() {
 
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
-		for _, byteSlice := range [][]byte{msgb[:], msg} {
+		for _, byteSlice := range [2][]byte{msgb[:], msg} {
 			reader.Reset(byteSlice)
 			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
 				p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.nodeID, p.getIP(), err)
