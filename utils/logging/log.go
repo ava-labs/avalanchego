@@ -213,6 +213,9 @@ func (l *Log) Warn(format string, args ...interface{}) { l.log(Warn, format, arg
 // Info implements the Logger interface
 func (l *Log) Info(format string, args ...interface{}) { l.log(Info, format, args...) }
 
+// Trace implements the Logger interface
+func (l *Log) Trace(format string, args ...interface{}) { l.log(Trace, format, args...) }
+
 // Debug implements the Logger interface
 func (l *Log) Debug(format string, args ...interface{}) { l.log(Debug, format, args...) }
 

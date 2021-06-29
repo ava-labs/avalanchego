@@ -263,7 +263,7 @@ func initCerts(t *testing.T) {
 	tlsConfig2 = TLSConfig(*cert2)
 }
 
-var dialerConfig = NewDialerConfig(0, 30*time.Second)
+var defaultTestDialerConfig = NewDialerConfig(0, 30*time.Second)
 
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)
@@ -334,7 +334,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -468,7 +468,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -500,7 +500,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -645,7 +645,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -677,7 +677,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -823,7 +823,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -855,7 +855,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1006,7 +1006,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1038,7 +1038,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1163,7 +1163,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1195,7 +1195,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1451,7 +1451,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1483,7 +1483,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1515,7 +1515,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1547,7 +1547,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1900,7 +1900,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1932,7 +1932,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1964,7 +1964,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -1996,7 +1996,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -2265,7 +2265,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -2297,7 +2297,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -2329,7 +2329,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		dialerConfig,
+		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
@@ -2439,9 +2439,9 @@ func TestValidatorIPs(t *testing.T) {
 	thirdValidatorPeer := createPeer(ids.ShortID{0x03}, thirdValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, thirdValidatorPeer, true)
 
-	assert.True(t, dummyNetwork.vdrs.Contains(firstValidatorPeer.id))
-	assert.True(t, dummyNetwork.vdrs.Contains(secondValidatorPeer.id))
-	assert.True(t, dummyNetwork.vdrs.Contains(thirdValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(firstValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(secondValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(thirdValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err := dummyNetwork.validatorIPs()
@@ -2472,9 +2472,9 @@ func TestValidatorIPs(t *testing.T) {
 		Port: 4,
 	}
 	disconnectedValidatorPeer := createPeer(ids.ShortID{0x01}, disconnectedValidatorIPDesc, appVersion)
-	disconnectedValidatorPeer.connected.SetValue(false)
+	disconnectedValidatorPeer.finishedHandshake.SetValue(false)
 	addPeerToNetwork(&dummyNetwork, disconnectedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2492,7 +2492,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	zeroValidatorPeer := createPeer(ids.ShortID{0x01}, zeroIPValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, zeroValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(zeroValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(zeroValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2511,7 +2511,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	nonValidatorPeer := createPeer(ids.ShortID{0x04}, nonValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, nonValidatorPeer, false)
-	assert.False(t, dummyNetwork.vdrs.Contains(nonValidatorPeer.id))
+	assert.False(t, dummyNetwork.vdrs.Contains(nonValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2531,7 +2531,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	maskedValidatorPeer := createPeer(ids.ShortID{0x01}, maskedValidatorIPDesc, maskedVersion)
 	addPeerToNetwork(&dummyNetwork, maskedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(maskedValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(maskedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2557,7 +2557,7 @@ func TestValidatorIPs(t *testing.T) {
 		time: uint64(0),
 	})
 	addPeerToNetwork(&dummyNetwork, wrongCertValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(wrongCertValidatorPeer.id))
+	assert.True(t, dummyNetwork.vdrs.Contains(wrongCertValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2579,7 +2579,7 @@ func TestValidatorIPs(t *testing.T) {
 		}
 		peer := createPeer(ids.ShortID{byte(i)}, ipDesc, appVersion)
 		addPeerToNetwork(&dummyNetwork, peer, true)
-		assert.True(t, dummyNetwork.vdrs.Contains(peer.id))
+		assert.True(t, dummyNetwork.vdrs.Contains(peer.nodeID))
 	}
 
 	// test
@@ -2590,13 +2590,194 @@ func TestValidatorIPs(t *testing.T) {
 	assert.True(t, len(IPs) == dummyNetwork.peerListSize)
 }
 
+// Test that a node will not finish the handshake if the peer's version
+// is incompatible
+func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
+	initCerts(t)
+
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	// Node 0 considers node 1  incompatible
+	net0Version := version.NewDefaultApplication("app", 1, 4, 7)
+	net0MinCompatibleVersion := version.NewDefaultApplication("app", 1, 4, 5)
+	// Node 1 considers node 0 compatible
+	net1Version := version.NewDefaultApplication("app", 1, 4, 4)
+	net1MinCompatibleVersion := version.NewDefaultApplication("app", 1, 4, 4)
+
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
+
+	ip0 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		0,
+	)
+	ip1 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		1,
+	)
+
+	id0 := certToID(cert0.Leaf)
+	id1 := certToID(cert1.Leaf)
+
+	listener0 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller0 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener1 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller1 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		outbounds: make(map[string]*testListener),
+		closer:    func(net.Addr, net.Addr) { listener0.Close() },
+	}
+
+	caller0.outbounds[ip1.IP().String()] = listener1
+	caller1.outbounds[ip0.IP().String()] = listener0
+
+	vdrs := validators.NewSet()
+	assert.NoError(t, vdrs.AddWeight(id1, 1))
+	assert.NoError(t, vdrs.AddWeight(id0, 1))
+
+	net0Compatibility := version.NewCompatibility(
+		net0Version,
+		net0MinCompatibleVersion,
+		time.Now(),
+		net0MinCompatibleVersion,
+		net0MinCompatibleVersion,
+		time.Now(),
+		net0MinCompatibleVersion,
+	)
+	net1Compatibility := version.NewCompatibility(
+		net1Version,
+		net1MinCompatibleVersion,
+		time.Now(),
+		net1MinCompatibleVersion,
+		net1MinCompatibleVersion,
+		time.Now(),
+		net1MinCompatibleVersion,
+	)
+
+	net0 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id0,
+		ip0,
+		networkID,
+		net0Compatibility,
+		version.NewDefaultApplicationParser(),
+		listener0,
+		caller0,
+		serverUpgrader0,
+		clientUpgrader0,
+		vdrs,
+		vdrs,
+		&testHandler{},
+		time.Duration(0),
+		0,
+		defaultSendQueueSize,
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultTestDialerConfig,
+		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+	)
+	assert.NotNil(t, net0)
+
+	net1 := NewDefaultNetwork(
+		prometheus.NewRegistry(),
+		log,
+		id1,
+		ip1,
+		networkID,
+		net1Compatibility,
+		version.NewDefaultApplicationParser(),
+		listener1,
+		caller1,
+		serverUpgrader1,
+		clientUpgrader1,
+		vdrs,
+		vdrs,
+		&testHandler{},
+		time.Duration(0),
+		0,
+		defaultSendQueueSize,
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultTestDialerConfig,
+		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+	)
+	assert.NotNil(t, net1)
+
+	go func() {
+		err := net0.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net1.Dispatch()
+		assert.Error(t, err)
+	}()
+
+	// net1 connects to net0
+	// they start the handshake and exchange versions
+	// net1 sees net0 as incompatible and closes the connection
+	net1.Track(ip0.IP(), id0)
+
+	select {
+	case <-time.After(5 * time.Second):
+		t.Error("should have closed immediately because net1 sees net0 as incompatible")
+	case <-listener0.closed:
+	}
+
+	// Cleanup
+	err := net0.Close()
+	assert.NoError(t, err)
+	err = net1.Close()
+	assert.NoError(t, err)
+}
+
 // Helper method for TestValidatorIPs
 func createPeer(peerID ids.ShortID, peerIPDesc utils.IPDesc, peerVersion version.Application) *peer {
 	newPeer := peer{
-		ip: peerIPDesc,
-		id: peerID,
+		ip:     peerIPDesc,
+		nodeID: peerID,
 	}
-	newPeer.connected.SetValue(true)
+	newPeer.finishedHandshake.SetValue(true)
 	newPeer.versionStruct.SetValue(peerVersion)
 	newPeer.sigAndTime.SetValue(signedPeerIP{
 		ip:   newPeer.ip,
@@ -2610,7 +2791,7 @@ func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool)
 	targetNetwork.peers.add(peerToAdd)
 
 	if isValidator {
-		validator := validators.NewValidator(peerToAdd.id, uint64(10))
+		validator := validators.NewValidator(peerToAdd.nodeID, uint64(10))
 		currentValidators := targetNetwork.vdrs.List()
 		currentValidators = append(currentValidators, validator)
 		_ = targetNetwork.vdrs.Set(currentValidators)

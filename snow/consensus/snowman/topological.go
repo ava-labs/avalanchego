@@ -525,20 +525,20 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 	// We are finalizing the block's child, so we need to get the preference
 	pref := n.sb.Preference()
 
-	ts.ctx.Log.Verbo("Accepting block with ID %s", pref)
-
 	// Get the child and accept it
 	child := n.children[pref]
 	// Notify anyone listening that this block was accepted.
 	bytes := child.Bytes()
-	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be called before
-	// child.Accept to honor EventDispatcher.Accept's invariant.
+	// Note that DecisionDispatcher.Accept / DecisionDispatcher.Accept must be
+	// called before child.Accept to honor EventDispatcher.Accept's invariant.
 	if err := ts.ctx.DecisionDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
 	if err := ts.ctx.ConsensusDispatcher.Accept(ts.ctx, pref, bytes); err != nil {
 		return err
 	}
+
+	ts.ctx.Log.Trace("accepting block %s", pref)
 	if err := child.Accept(); err != nil {
 		return err
 	}
@@ -562,6 +562,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 			continue
 		}
 
+		ts.ctx.Log.Trace("rejecting block %s due to conflict with accepted block %s", childID, pref)
 		if err := child.Reject(); err != nil {
 			return err
 		}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -252,7 +253,7 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 
 func setupViper(configFilePath string) *viper.Viper {
 	v := viper.New()
-	fs := avalancheFlagSet()
+	fs := BuildFlagSet()
 	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.PanicOnError) // flags are now reset
 	pflag.CommandLine.AddGoFlagSet(fs)
 	pflag.Parse()

@@ -18,6 +18,11 @@ const (
 	DefaultSize = 1 << 10
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+)
+
 // Database is an ephemeral key-value store that implements the Database
 // interface.
 type Database struct {
