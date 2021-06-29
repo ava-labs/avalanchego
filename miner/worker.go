@@ -275,10 +275,6 @@ func (w *worker) commit(env *environment) (*types.Block, error) {
 		return nil, err
 	}
 
-	if err := w.engine.Seal(w.chain, block); err != nil {
-		return nil, err
-	}
-
 	return w.handleResult(env, block, time.Now(), receipts)
 }
 
