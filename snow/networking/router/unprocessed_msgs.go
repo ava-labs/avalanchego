@@ -45,15 +45,19 @@ func newUnprocessedMsgs(
 
 // Implements unprocessedMsgs.
 // Not safe for concurrent access.
+// TODO: Use a better data structure for this.
+// We can do something better than pushing to the back
+// of a queue.
 type unprocessedMsgsImpl struct {
 	log     logging.Logger
 	metrics unprocessedMsgsMetrics
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.ShortID]int
-	// unprocessed messages
+	// Unprocessed messages
 	msgs []message
 	// Validator set for the chain associated with this
-	vdrs       validators.Set
+	vdrs validators.Set
+	// Tracks CPU utilization of each node
 	cpuTracker tracker.TimeTracker
 	// Useful for faking time in tests
 	clock timer.Clock
@@ -67,19 +71,18 @@ func (u *unprocessedMsgsImpl) Push(msg message) {
 }
 
 // Must never be called when [u.Len()] == 0.
-// FIFO, but skip over messages whose sender
-// has used
+// FIFO, but skip over messages whose senders whose messages
+// have caused us to use excessive CPU recently.
 func (u *unprocessedMsgsImpl) Pop() message {
 	n := len(u.msgs)
 	i := 0
 	for {
 		if i == n {
-			// This should never happen but handle anyway
 			u.log.Warn("canPop is false for all %d unprocessed messages", n)
 		}
 		msg := u.msgs[0]
 		// See if it's OK to process [msg] next
-		if u.canPop(&msg) || i == n {
+		if u.canPop(&msg) || i == n { // i should never == n but handle anyway as a fail-safe
 			if len(u.msgs) == 1 {
 				u.msgs = nil // Give back memory if possible
 			} else {
@@ -93,7 +96,8 @@ func (u *unprocessedMsgsImpl) Pop() message {
 			u.metrics.len.Dec()
 			return msg
 		}
-		// Push [msg] to back of [u.msgs]
+		// [msg.nodeID] is causing excessive CPU usage.
+		// Push [msg] to back of [u.msgs] and handle it later.
 		u.msgs = append(u.msgs, msg)
 		u.msgs = u.msgs[1:]
 		i++
@@ -121,7 +125,7 @@ func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
 	if totalVdrsWeight != 0 {
 		portionWeight = float64(weight) / float64(totalVdrsWeight)
 	}
-	// Validators are allowed to use more CPU
+	// Validators are allowed to use more CPU. More weight --> more CPU use allowed.
 	recentCPUUtilized := u.cpuTracker.Utilization(msg.nodeID, u.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
 	return recentCPUUtilized <= maxCPU
