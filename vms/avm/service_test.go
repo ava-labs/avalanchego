@@ -607,7 +607,7 @@ func TestServiceGetTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx)
+	txBytes, err := formatting.Decode(reply.Encoding, reply.Tx.(string))
 	if err != nil {
 		t.Fatal(err)
 	}

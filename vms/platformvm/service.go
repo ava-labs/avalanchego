@@ -2024,7 +2024,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("Platform: IssueTx called")
 
-	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx.(string))
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}

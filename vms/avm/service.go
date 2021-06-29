@@ -60,8 +60,10 @@ type FormattedAssetID struct {
 // IssueTx attempts to issue a transaction into consensus
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
-
-	txBytes, err := formatting.Decode(args.Encoding, args.Tx) // todo fix to proper type
+	if args.Tx == nil {
+		return fmt.Errorf("transaction cannot be nil")
+	}
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx.(string)) // todo fix to proper type
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -113,7 +115,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
-		reply.JSON = api.JSONTx{
+		reply.Tx = api.JSONTx{
 			ID:     tx.txID.String(),
 			Status: tx.status.String(),
 		}

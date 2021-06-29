@@ -409,7 +409,7 @@ func (c *Client) GetTx(txID ids.ID) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return formatting.Decode(res.Encoding, res.Tx)
+	return formatting.Decode(res.Encoding, res.Tx.(string))
 }
 
 // GetTxStatus returns the status of the transaction corresponding to [txID]
