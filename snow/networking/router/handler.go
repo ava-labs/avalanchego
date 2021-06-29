@@ -68,8 +68,9 @@ func (h *Handler) Initialize(
 	var lock sync.Mutex
 	h.unprocessedMsgsCond = sync.NewCond(&lock)
 	h.cpuTracker = tracker.NewCPUTracker(uptime.IntervalFactory{}, defaultCPUInterval)
-	h.unprocessedMsgs = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker)
-	return nil
+	var err error
+	h.unprocessedMsgs, err = newUnprocessedMsgs(h.ctx.Log, h.validators, h.cpuTracker, namespace, metrics)
+	return err
 }
 
 // Context of this Handler
@@ -113,7 +114,6 @@ func (h *Handler) Dispatch() {
 		// If this message's deadline has passed, don't process it.
 		if !msg.deadline.IsZero() && h.clock.Time().After(msg.deadline) {
 			h.ctx.Log.Verbo("Dropping message from %s%s due to timeout. msg: %s", constants.NodeIDPrefix, msg.nodeID, msg)
-			h.metrics.dropped.Inc()
 			h.metrics.expired.Inc()
 			msg.doneHandling()
 			continue

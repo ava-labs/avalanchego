@@ -4,11 +4,15 @@
 package router
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ unprocessedMsgs = &unprocessedMsgsImpl{}
@@ -27,19 +31,23 @@ func newUnprocessedMsgs(
 	log logging.Logger,
 	vdrs validators.Set,
 	cpuTracker tracker.TimeTracker,
-) unprocessedMsgs {
-	return &unprocessedMsgsImpl{
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) (unprocessedMsgs, error) {
+	u := &unprocessedMsgsImpl{
 		log:                   log,
 		vdrs:                  vdrs,
 		cpuTracker:            cpuTracker,
 		nodeToUnprocessedMsgs: make(map[ids.ShortID]int),
 	}
+	return u, u.metrics.initialize(metricsNamespace, metricsRegisterer)
 }
 
 // Implements unprocessedMsgs.
 // Not safe for concurrent access.
 type unprocessedMsgsImpl struct {
-	log logging.Logger
+	log     logging.Logger
+	metrics unprocessedMsgsMetrics
 	// Node ID --> Messages this node has in [msgs]
 	nodeToUnprocessedMsgs map[ids.ShortID]int
 	// unprocessed messages
@@ -54,6 +62,8 @@ type unprocessedMsgsImpl struct {
 func (u *unprocessedMsgsImpl) Push(msg message) {
 	u.msgs = append(u.msgs, msg)
 	u.nodeToUnprocessedMsgs[msg.nodeID]++
+	u.metrics.nodesWithUnprocessedMsgs.Set(float64(len(u.nodeToUnprocessedMsgs)))
+	u.metrics.len.Inc()
 }
 
 // Must never be called when [u.Len()] == 0.
@@ -79,12 +89,15 @@ func (u *unprocessedMsgsImpl) Pop() message {
 			if u.nodeToUnprocessedMsgs[msg.nodeID] == 0 {
 				delete(u.nodeToUnprocessedMsgs, msg.nodeID)
 			}
+			u.metrics.nodesWithUnprocessedMsgs.Set(float64(len(u.nodeToUnprocessedMsgs)))
+			u.metrics.len.Dec()
 			return msg
 		}
 		// Push [msg] to back of [u.msgs]
 		u.msgs = append(u.msgs, msg)
 		u.msgs = u.msgs[1:]
 		i++
+		u.metrics.numExcessiveCPU.Inc()
 	}
 }
 
@@ -112,4 +125,37 @@ func (u *unprocessedMsgsImpl) canPop(msg *message) bool {
 	recentCPUUtilized := u.cpuTracker.Utilization(msg.nodeID, u.clock.Time())
 	maxCPU := baseMaxCPU + (1.0-baseMaxCPU)*portionWeight
 	return recentCPUUtilized <= maxCPU
+}
+
+type unprocessedMsgsMetrics struct {
+	len                      prometheus.Gauge
+	nodesWithUnprocessedMsgs prometheus.Gauge
+	numExcessiveCPU          prometheus.Counter
+}
+
+func (m *unprocessedMsgsMetrics) initialize(
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) error {
+	namespace := fmt.Sprintf("%s_%s", metricsNamespace, "unprocessed_msgs")
+	m.len = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "len",
+		Help:      "Messages ready to be processed",
+	})
+	m.nodesWithUnprocessedMsgs = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "nodes",
+		Help:      "Nodes from which there are at least 1 message ready to be processed",
+	})
+	m.numExcessiveCPU = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "excessive_cpu",
+		Help:      "Times we deferred handling a message from a node because the node was using excessive CPU",
+	})
+	errs := wrappers.Errs{}
+	errs.Add(metricsRegisterer.Register(m.len))
+	errs.Add(metricsRegisterer.Register(m.nodesWithUnprocessedMsgs))
+	errs.Add(metricsRegisterer.Register(m.numExcessiveCPU))
+	return errs.Err
 }

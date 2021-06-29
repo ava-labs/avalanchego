@@ -164,10 +164,8 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.metrics.awaitingRelease.Inc()
 }
 
+// Must correspond to a previous call of Acquire([msgSize], [nodeID])
 func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
-	if msgSize == 0 {
-		return // This should never happen
-	}
 	t.cond.L.Lock()
 	defer t.cond.L.Unlock()
 

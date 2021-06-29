@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -267,8 +268,8 @@ func initCerts(t *testing.T) {
 var defaultTestDialerConfig = NewDialerConfig(0, 30*time.Second)
 
 var defaultMsgThrottlingConfig = throttling.MsgThrottlerConfig{
-	VdrAllocSize:        128 * 1024 * 1024, // 128 MB
-	AtLargeAllocSize:    128 * 1024 * 1024,
+	VdrAllocSize:        64 * units.MiB,
+	AtLargeAllocSize:    64 * units.MiB,
 	NodeMaxAtLargeBytes: uint64(2 * DefaultMaxMessageSize),
 }
 

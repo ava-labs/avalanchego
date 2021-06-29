@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -22,7 +23,8 @@ func TestUnprocessedMsgs(t *testing.T) {
 	vdr1ID, vdr2ID := ids.GenerateTestShortID(), ids.GenerateTestShortID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
-	uIntf := newUnprocessedMsgs(logging.NoLog{}, vdrs, cpuTracker)
+	uIntf, err := newUnprocessedMsgs(logging.NoLog{}, vdrs, cpuTracker, "", prometheus.NewRegistry())
+	assert.NoError(err)
 	u := uIntf.(*unprocessedMsgsImpl)
 	msg1 := message{
 		messageType: constants.PutMsg,
