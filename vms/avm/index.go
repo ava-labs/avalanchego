@@ -18,7 +18,6 @@ import (
 )
 
 type AddressTxsIndexer interface {
-	AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput)
 	AddUTXOs(outputUTXOs []*avax.UTXO)
 	AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error
 	CommitIndex(txID ids.ID) error
@@ -37,7 +36,7 @@ type statefulAddressTxsIndexer struct {
 
 // AddTransferOutput IndexTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
 // to the provided vm.addressAssetIDIndex
-func (i *statefulAddressTxsIndexer) AddTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
+func (i *statefulAddressTxsIndexer) addTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
 	for _, address := range transferOutput.Addrs {
 		if _, exists := i.addressAssetIDTxMap[address]; !exists {
 			i.addressAssetIDTxMap[address] = make(map[ids.ID]struct{})
@@ -66,7 +65,7 @@ func (i *statefulAddressTxsIndexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID
 			continue
 		}
 
-		i.AddTransferOutput(utxo.AssetID(), out)
+		i.addTransferOutput(utxo.AssetID(), out)
 	}
 	return nil
 }
@@ -79,7 +78,7 @@ func (i *statefulAddressTxsIndexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 			continue
 		}
 
-		i.AddTransferOutput(utxo.AssetID(), out)
+		i.addTransferOutput(utxo.AssetID(), out)
 	}
 }
 
