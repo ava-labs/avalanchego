@@ -89,9 +89,9 @@ func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 // |  | "0"   => txID1
 // |  | "1"   => txID1
 func (i *indexer) Write(txID ids.ID) error {
-	for address, assetIDMap := range i.addressAssetIDTxMap {
+	for address, assetIDs := range i.addressAssetIDTxMap {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
-		for assetID := range assetIDMap {
+		for assetID := range assetIDs {
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
 			var idx uint64
