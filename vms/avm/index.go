@@ -19,19 +19,20 @@ import (
 
 // Maintains an index of an address --> IDs of transactions that changed that address's balance.
 // This includes both transactions that increased the address's balance and those that decreased it.
-// An address's balance is said to have changed by a transaction if either:
+// A transaction is said to change an address's balance if either hold:
 // 1) An input UTXO to the transaction was at least partially owned by the address
-// 2) An output of the transaction is at least partially owned by the address.
+// 2) An output of the transaction is at least partially owned by the address
 type AddressTxsIndexer interface {
 	AddUTXOs(outputUTXOs []*avax.UTXO)
 	AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error
-	CommitIndex(txID ids.ID) error
-	Reset()
+	Write(txID ids.ID) error
 }
 
 // indexer implements AddressTxsIndexer
 type indexer struct {
-	// Maps address -> []AssetID Set
+	// Address -> AssetID --> Present if the address's balance
+	// of the asset has changed since last Commit
+	// TODO is this description right?
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	log                 logging.Logger
@@ -40,8 +41,8 @@ type indexer struct {
 
 // AddTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
 // to the provided vm.addressAssetIDIndex
-func (i *indexer) addTransferOutput(assetID ids.ID, transferOutput *secp256k1fx.TransferOutput) {
-	for _, address := range transferOutput.Addrs {
+func (i *indexer) addTransferOutput(assetID ids.ID, addrs []ids.ShortID) {
+	for _, address := range addrs {
 		if _, exists := i.addressAssetIDTxMap[address]; !exists {
 			i.addressAssetIDTxMap[address] = make(map[ids.ID]struct{})
 		}
@@ -53,8 +54,7 @@ func (i *indexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 	for _, utxoID := range inputUTXOs {
 		utxo, err := vm.getUTXO(utxoID)
 		if err != nil {
-			// should never happen
-			return err
+			return err // should never happen
 		}
 
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
@@ -63,7 +63,7 @@ func (i *indexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 			continue
 		}
 
-		i.addTransferOutput(utxo.AssetID(), out)
+		i.addTransferOutput(utxo.AssetID(), out.Addrs)
 	}
 	return nil
 }
@@ -76,11 +76,11 @@ func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 			continue
 		}
 
-		i.addTransferOutput(utxo.AssetID(), out)
+		i.addTransferOutput(utxo.AssetID(), out.Addrs)
 	}
 }
 
-// CommitIndex commits given txID and already indexed data to the database.
+// Commit commits given txID and already indexed data to the database.
 // The database structure is thus:
 // [address]
 // |  [assetID]
@@ -88,7 +88,7 @@ func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 // |  | "idx" => 2 		Running transaction index key, represents the next index
 // |  | "0"   => txID1
 // |  | "1"   => txID1
-func (i *indexer) CommitIndex(txID ids.ID) error {
+func (i *indexer) Write(txID ids.ID) error {
 	for address, assetIDMap := range i.addressAssetIDTxMap {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
 		for assetID := range assetIDMap {
@@ -127,6 +127,7 @@ func (i *indexer) CommitIndex(txID ids.ID) error {
 				return err
 			}
 		}
+		delete(i.addressAssetIDTxMap, address)
 	}
 	i.metrics.numTxsIndexed.Observe(1)
 	return nil
@@ -159,8 +160,6 @@ func (i *noIndexer) AddTransferOutput(ids.ID, *secp256k1fx.TransferOutput) {}
 
 func (i *noIndexer) AddUTXOs([]*avax.UTXO) {}
 
-func (i *noIndexer) CommitIndex(ids.ID) error {
+func (i *noIndexer) Write(ids.ID) error {
 	return nil
 }
-
-func (i *noIndexer) Reset() {}

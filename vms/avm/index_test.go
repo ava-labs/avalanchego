@@ -128,9 +128,8 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		err = vm.addressTxsIndexer.AddUTXOIDs(vm, uniqueParsedTX.inputUTXOs)
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.CommitIndex(uniqueParsedTX.txID)
+		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
 		assert.NoError(t, err)
-		vm.addressTxsIndexer.Reset()
 	}
 
 	// ensure length is 5
@@ -241,9 +240,8 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		err = vm.addressTxsIndexer.AddUTXOIDs(vm, uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.CommitIndex(uniqueParsedTX.txID)
+		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
 		assert.NoError(t, err)
-		vm.addressTxsIndexer.Reset()
 	}
 
 	// ensure length is same as keys length

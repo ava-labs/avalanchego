@@ -131,7 +131,7 @@ func (tx *UniqueTx) Accept() error {
 		}
 	}
 
-	err := tx.vm.addressTxsIndexer.CommitIndex(tx.txID)
+	err := tx.vm.addressTxsIndexer.Write(tx.txID)
 	if err != nil {
 		return err
 	}
@@ -161,9 +161,6 @@ func (tx *UniqueTx) Accept() error {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
 		return err
 	}
-
-	// clear the index map
-	tx.vm.addressTxsIndexer.Reset()
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
