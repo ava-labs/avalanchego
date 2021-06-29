@@ -44,9 +44,9 @@ Install AvalancheGo using an `apt` repository.
 
 #### Adding the APT Repository
 
-On Debian-based linux distributions, run:
+If you have already added the APT repository, you do not need to add it again.
 
-Note that you only need to add the APT repository once.
+To add the repository on Ubuntu Bionic distributions, run:
 
 ```sh
 sudo su -
@@ -55,11 +55,22 @@ echo "deb https://downloads.avax.network/apt bionic main" > /etc/apt/sources.lis
 exit
 ```
 
-#### Installing the Latest Version
+To add the repository on Ubuntu Focal distributions, run:
 
 ```sh
-sudo apt-get update
-sudo apt-get install avalanchego
+sudo su -
+wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
+echo "deb https://downloads.avax.network/apt focal main" > /etc/apt/sources.list.d/avalanche.list
+exit
+```
+
+#### Installing the Latest Version
+
+After adding the APT repository, install avalanchego by running:
+
+```sh
+sudo apt update
+sudo apt install avalanchego
 ```
 
 ### Binary Install
