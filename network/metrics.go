@@ -106,7 +106,7 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	m.failedToParse = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
 		Name:      "msgs_failed_to_parse",
-		Help:      "Number of messages that could not be parsed",
+		Help:      "Number of messages that could not be parsed or were invalidly formed",
 	})
 	m.connected = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
