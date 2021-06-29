@@ -44,7 +44,9 @@ Install AvalancheGo using an `apt` repository.
 
 #### Adding the APT Repository
 
-On debian based linux distributions, run:
+On Debian-based linux distributions, run:
+
+Note that you only need to add the APT repository once.
 
 ```sh
 sudo su -
