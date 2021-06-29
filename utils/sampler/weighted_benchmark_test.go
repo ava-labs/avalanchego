@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
 	"testing"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -118,7 +117,7 @@ func WeightedPowBenchmarkSampler(
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(uint64(rand.Int63n(int64(totalWeight)))) // #nosec G404
+		_, _ = s.Sample(uint64(globalRNG.Int63n(int64(totalWeight))))
 	}
 	return true
 }
@@ -137,7 +136,7 @@ func WeightedSingletonBenchmarkSampler(b *testing.B, s Weighted, size int) bool 
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, _ = s.Sample(uint64(rand.Int63n(math.MaxInt64))) // #nosec G404
+		_, _ = s.Sample(uint64(globalRNG.Int63n(math.MaxInt64)))
 	}
 	return true
 }

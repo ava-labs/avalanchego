@@ -26,6 +26,6 @@ dockerhub_repo="avaplatform/avalanchego"
 avalanche_image_name="avalanchego"
 
 # Current branch
-current_branch=$(git rev-parse --abbrev-ref HEAD)
+current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 
 git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}

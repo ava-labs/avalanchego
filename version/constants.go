@@ -4,14 +4,17 @@
 package version
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 var (
-	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 8)
-	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 0)
+	String                       string // Printed when CLI arg --version is used
+	GitCommit                    string // Set in the build script (i.e. at compile time)
+	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 9)
+	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 5)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 3, 0)
 	MinimumUnmaskedVersion       = NewDefaultApplication(constants.PlatformName, 1, 1, 0)
 	PrevMinimumUnmaskedVersion   = NewDefaultApplication(constants.PlatformName, 1, 0, 0)
@@ -41,6 +44,20 @@ var (
 	}
 	ApricotPhase2DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
+
+func init() {
+	format := "%s [database=%s"
+	args := []interface{}{
+		Current,
+		CurrentDatabase,
+	}
+	if GitCommit != "" {
+		format += ", commit=%s"
+		args = append(args, GitCommit)
+	}
+	format += "]\n"
+	String = fmt.Sprintf(format, args...)
+}
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase0Times[networkID]; exists {

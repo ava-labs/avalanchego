@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ Bootstrapable = &BootstrapableTest{}
+
 // BootstrapableTest is a test engine that supports bootstrapping
 type BootstrapableTest struct {
 	T *testing.T

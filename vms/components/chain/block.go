@@ -37,7 +37,7 @@ func (bw *BlockWrapper) Verify() error {
 }
 
 // Accept accepts the underlying block, removes it from verifiedBlocks, caches it as a decided
-// block, and updates the last acceptd block.
+// block, and updates the last accepted block.
 func (bw *BlockWrapper) Accept() error {
 	blkID := bw.ID()
 	delete(bw.state.verifiedBlocks, blkID)

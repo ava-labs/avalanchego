@@ -4,10 +4,11 @@
 package snowstorm
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/sampler"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -33,21 +34,21 @@ func TestConflictGraphEquality(t *testing.T) {
 	seed := int64(0)
 
 	nDirected := Network{}
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	nDirected.Initialize(params, numColors, colorsPerConsumer, maxInputConflicts)
 
 	nInput := Network{}
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	nInput.Initialize(params, numColors, colorsPerConsumer, maxInputConflicts)
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		if err := nDirected.AddNode(&Directed{}); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		if err := nInput.AddNode(&Input{}); err != nil {
 			t.Fatal(err)
@@ -58,12 +59,12 @@ func TestConflictGraphEquality(t *testing.T) {
 		!nDirected.Disagreement() &&
 		!nInput.Finalized() &&
 		!nInput.Disagreement(); numRounds++ {
-		rand.Seed(int64(numRounds) + seed)
+		sampler.Seed(int64(numRounds) + seed)
 		if err := nDirected.Round(); err != nil {
 			t.Fatal(err)
 		}
 
-		rand.Seed(int64(numRounds) + seed)
+		sampler.Seed(int64(numRounds) + seed)
 		if err := nInput.Round(); err != nil {
 			t.Fatal(err)
 		}
