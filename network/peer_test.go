@@ -81,7 +81,7 @@ func TestPeer_Close(t *testing.T) {
 		appVersion,
 	)
 
-	netwrk := NewDefaultNetwork(
+	netwrk, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id,
@@ -111,6 +111,7 @@ func TestPeer_Close(t *testing.T) {
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, netwrk)
 
 	ip1 := utils.NewDynamicIPDesc(

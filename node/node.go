@@ -231,7 +231,7 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
-	n.Net = network.NewDefaultNetwork(
+	n.Net, err = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
@@ -262,7 +262,7 @@ func (n *Node) initNetworking() error {
 		n.Config.ConsensusGossipOnAcceptSize,
 	)
 
-	return nil
+	return err
 }
 
 type insecureValidatorManager struct {
