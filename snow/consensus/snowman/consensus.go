@@ -26,18 +26,22 @@ type Consensus interface {
 	// Returns the number of blocks processing
 	NumProcessing() int
 
+	// TODO: use ID here?
 	// Adds a new decision. Assumes the dependency has already been added.
 	// Returns if a critical error has occurred.
 	Add(Block) error
 
+	// TODO: use ID here?
 	// AcceptedOrProcessing returns true if the block has been accepted or is
 	// currently processing
 	AcceptedOrProcessing(Block) bool
 
+	// TODO: use ID here?
 	// DecidedOrProcessing returns true if the block has been decided or is
 	// currently processing.
 	DecidedOrProcessing(Block) bool
 
+	// TODO: use ID here?
 	// IsPreferred returns true if the block is currently on the preferred
 	// chain.
 	IsPreferred(Block) bool
