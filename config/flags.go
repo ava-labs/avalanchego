@@ -27,9 +27,13 @@ var (
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
 	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
-	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
-	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
-	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs", "chains")
+	defaultStakingPath     = filepath.Join(defaultDataDir, "staking")
+	defaultStakingKeyPath  = filepath.Join(defaultStakingPath, "staker.key")
+	defaultStakingCertPath = filepath.Join(defaultStakingPath, "staker.crt")
+	defaultConfigDir       = filepath.Join(defaultDataDir, "configs")
+	defaultChainConfigDir  = filepath.Join(defaultConfigDir, "chains")
+	defaultVMConfigDir     = filepath.Join(defaultConfigDir, "vms")
+	defaultVMAliasFilePath = filepath.Join(defaultVMConfigDir, "aliases.json")
 
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
@@ -92,7 +96,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Logging
 	fs.String(LogsDirKey, "", "Logging directory for Avalanche")
-	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, info, warn, error, fatal, off}")
+	fs.String(LogLevelKey, "info", "The log level. Should be one of {verbo, debug, trace, info, warn, error, fatal, off}")
 	fs.String(LogDisplayLevelKey, "", "The log display level. If left blank, will inherit the value of log-level. Otherwise, should be one of {verbo, debug, info, warn, error, fatal, off}")
 	fs.String(LogDisplayHighlightKey, "auto", "Whether to color/highlight display logs. Default highlights when the output is a terminal. Otherwise, should be one of {auto, plain, colors}")
 
@@ -227,7 +231,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 
 	// Consensus
 	fs.Int(SnowSampleSizeKey, 20, "Number of nodes to query for each network poll")
-	fs.Int(SnowQuorumSizeKey, 14, "Alpha value to use for required number positive results")
+	fs.Int(SnowQuorumSizeKey, 16, "Alpha value to use for required number positive results")
 	fs.Int(SnowVirtuousCommitThresholdKey, 15, "Beta value to use for virtuous transactions")
 	fs.Int(SnowRogueCommitThresholdKey, 20, "Beta value to use for rogue transactions")
 	fs.Int(SnowAvalancheNumParentsKey, 5, "Number of vertexes for reference from each new vertex")
@@ -258,6 +262,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
+	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, "Specifies a JSON file that maps vmIDs with custom aliases.")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

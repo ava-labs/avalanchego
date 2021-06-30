@@ -38,6 +38,47 @@ Build Avalanche using the build script:
 
 The Avalanche binary, named `avalanchego`, is in the `build` directory.
 
+### Binary Repository
+
+Install AvalancheGo using an `apt` repository.
+
+#### Adding the APT Repository
+
+If you have already added the APT repository, you do not need to add it again.
+
+To add the repository on Ubuntu Bionic distributions, run:
+
+```sh
+sudo su -
+wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
+echo "deb https://downloads.avax.network/apt bionic main" > /etc/apt/sources.list.d/avalanche.list
+exit
+```
+
+To add the repository on Ubuntu Focal distributions, run:
+
+```sh
+sudo su -
+wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
+echo "deb https://downloads.avax.network/apt focal main" > /etc/apt/sources.list.d/avalanche.list
+exit
+```
+
+#### Installing the Latest Version
+
+After adding the APT repository, install avalanchego by running:
+
+```sh
+sudo apt update
+sudo apt install avalanchego
+```
+
+### Binary Install
+
+Download the [latest build](https://github.com/ava-labs/avalanchego/releases/latest) for your operating system and architecture.
+
+The Avalanche binary to be executed is named `avalanchego`.
+
 ### Docker Install
 
 Make sure docker is installed on the machine - so commands like `docker run` etc. are available.

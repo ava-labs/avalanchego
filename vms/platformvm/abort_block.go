@@ -30,6 +30,7 @@ func (a *AbortBlock) Verify() error {
 	blkID := a.ID()
 
 	if err := a.DoubleDecisionBlock.Verify(); err != nil {
+		a.vm.ctx.Log.Trace("rejecting block %s due to a failed verification: %s", blkID, err)
 		if err := a.Reject(); err != nil {
 			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", blkID, err)
 		}
@@ -44,6 +45,7 @@ func (a *AbortBlock) Verify() error {
 	// The parent of an Abort block should always be a proposal
 	parent, ok := parentIntf.(*ProposalBlock)
 	if !ok {
+		a.vm.ctx.Log.Trace("rejecting block %s due to an incorrect parent type", blkID)
 		if err := a.Reject(); err != nil {
 			a.vm.ctx.Log.Error("failed to reject abort block %s due to %s", blkID, err)
 		}

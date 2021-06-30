@@ -12,9 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// GitCommit should be optionally set at compile time.
-var GitCommit string
-
 func main() {
 	fs := config.BuildFlagSet()
 	v, err := config.BuildViper(fs, os.Args[1:])
@@ -30,7 +27,7 @@ func main() {
 	}
 
 	if processConfig.DisplayVersionAndExit {
-		fmt.Print(version.String(GitCommit))
+		fmt.Print(version.String)
 		os.Exit(0)
 	}
 

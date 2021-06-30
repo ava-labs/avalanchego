@@ -271,6 +271,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			}
 		}
 		sb = newSubnet(onBootstrapped, chainParams.ID)
+		m.subnets[chainParams.SubnetID] = sb
 	} else {
 		sb.addChain(chainParams.ID)
 	}
