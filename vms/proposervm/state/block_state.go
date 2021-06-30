@@ -100,7 +100,7 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	}
 	blkWrapper.block = blk
 
-	s.cache.Put(blkID, blkWrapper)
+	s.cache.Put(blkID, &blkWrapper)
 	return blk, blkWrapper.Status, nil
 }
 

@@ -374,71 +374,46 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 }
 
 // VM.ParseBlock tests section
-// func TestParseBlockRecordsButDoesNotVerifyParsedBlock(t *testing.T) {
-// 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
-// 	pChainHeight := uint64(100)
-// 	valVM.CantGetCurrentHeight = true
-// 	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
+	coreVM, _, proVM, _ := initTestProposerVM(t, time.Time{}) // enable ProBlks
 
-// 	coreBlk := &snowman.TestBlock{
-// 		TestDecidable: choices.TestDecidable{
-// 			IDV:     ids.Empty.Prefix(222),
-// 			StatusV: choices.Processing,
-// 		},
-// 		BytesV:     []byte{2},
-// 		ParentV:    coreGenBlk,
-// 		HeightV:    coreGenBlk.Height() + 1,
-// 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
-// 	}
-// 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreBlk := &snowman.TestBlock{
+		BytesV:     []byte{1},
+		TimestampV: proVM.Time(),
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		return nil, fmt.Errorf("Block marshalling failed")
+	}
+	slb, err := statelessblock.Build(
+		proVM.preferred,
+		coreBlk.Timestamp(),
+		proVM.activationTime,
+		100, // pChainHeight,
+		proVM.ctx.StakingCert.Leaf,
+		coreBlk.Bytes(),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
+	)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
+	proBlk := ProposerBlock{
+		Block:   slb,
+		vm:      proVM,
+		coreBlk: coreBlk,
+		status:  choices.Processing,
+	}
 
-// 	slb, err := statelessblock.Build(
-// 		proVM.preferred,
-// 		coreGenBlk.Timestamp(),
-// 		pChainHeight,
-// 		proVM.stakingCert.Leaf,
-// 		coreGenBlk.Bytes(),
-// 		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
-// 	)
-// 	if err != nil {
-// 		t.Fatal("could not build stateless block")
-// 	}
-// 	proBlk := ProposerBlock{
-// 		Block:   slb,
-// 		vm:      proVM,
-// 		coreBlk: coreGenBlk,
-// 		status:  choices.Processing,
-// 	}
-// 	// test
-// 	coreVM.CantParseBlock = true
-// 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-// 		switch {
-// 		case bytes.Equal(b, coreGenBlk.Bytes()):
-// 			return coreGenBlk, nil
-// 		default:
-// 			t.Fatalf("Wrong bytes")
-// 			return nil, nil
-// 		}
-// 	}
+	// test
+	parsedBlk, err := proVM.ParseBlock(proBlk.Bytes())
+	if err == nil {
+		t.Fatal("failed parsing proposervm.Block. Error:", err)
+	}
 
-// 	parsedBlk, err := proVM.ParseBlock(proBlk.Bytes())
-// 	if err != nil {
-// 		t.Fatal("proposerVM could not parse block")
-// 	}
-// 	if err := parsedBlk.Verify(); err == nil {
-// 		t.Fatal("parsed block should not necessarily verify upon parse")
-// 	}
-
-// 	// test
-// 	coreVM.CantGetBlock = false // forbid calls to coreVM to show caching
-// 	storedBlk, err := proVM.GetBlock(parsedBlk.ID())
-// 	if err != nil {
-// 		t.Fatal("proposerVM has not cached parsed block")
-// 	}
-// 	if storedBlk != parsedBlk {
-// 		t.Fatal("proposerVM retrieved wrong block")
-// 	}
-// }
+	if parsedBlk != nil {
+		t.Fatal("upon failure proposervm.VM.ParseBlock should return nil snowman.Block")
+	}
+}
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	coreVM, _, proVM, gencoreBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
