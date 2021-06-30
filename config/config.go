@@ -388,6 +388,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
 
+	nodeConfig.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
+
 	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
 	// [PeerListGossipFreq]
 	nodeConfig.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)

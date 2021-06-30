@@ -263,6 +263,7 @@ func NewDefaultNetwork(
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
+	compressionEnabled bool,
 ) (Network, error) {
 	return NewNetwork(
 		registerer,
@@ -307,6 +308,7 @@ func NewDefaultNetwork(
 		dialerConfig,
 		tlsKey,
 		isFetchOnly,
+		compressionEnabled,
 	)
 }
 
@@ -354,6 +356,7 @@ func NewNetwork(
 	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
+	compressionEnabled bool,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
@@ -411,7 +414,7 @@ func NewNetwork(
 				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
-		compressionEnabled: true, // todo make configurable
+		compressionEnabled: compressionEnabled,
 	}
 	codec, err := newCodec(registerer)
 	if err != nil {

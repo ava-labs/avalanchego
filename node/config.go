@@ -77,6 +77,7 @@ type Config struct {
 	PeerListGossipSize  uint32
 	PeerListGossipFreq  time.Duration
 	DialerConfig        network.DialerConfig
+	CompressionEnabled  bool
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
