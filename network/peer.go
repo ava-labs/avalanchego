@@ -553,7 +553,6 @@ func (p *peer) sendVersion() {
 		p.net.versionCompatibility.Version().String(),
 		myVersionTime,
 		myVersionSig,
-		p.canHandleCompressed.GetValue(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
@@ -573,7 +572,7 @@ func (p *peer) sendVersion() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendGetPeerList() {
-	msg, err := p.net.b.GetPeerList(p.canHandleCompressed.GetValue())
+	msg, err := p.net.b.GetPeerList()
 	p.net.log.AssertNoError(err)
 
 	lenMsg := len(msg.Bytes())
@@ -595,7 +594,8 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
-	msg, err := p.net.b.PeerList(peers, p.canHandleCompressed.GetValue())
+	canHandleCompressed := p.canHandleCompressed.GetValue()
+	msg, err := p.net.b.PeerList(peers, canHandleCompressed, canHandleCompressed && p.net.compressionEnabled)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList message due to %s", err)
 		return
@@ -616,7 +616,7 @@ func (p *peer) sendPeerList() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPing() {
-	msg, err := p.net.b.Ping(p.canHandleCompressed.GetValue())
+	msg, err := p.net.b.Ping()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)
@@ -632,7 +632,7 @@ func (p *peer) sendPing() {
 
 // assumes the [stateLock] is not held
 func (p *peer) sendPong() {
-	msg, err := p.net.b.Pong(p.canHandleCompressed.GetValue())
+	msg, err := p.net.b.Pong()
 	p.net.log.AssertNoError(err)
 	lenMsg := len(msg.Bytes())
 	sent := p.Send(msg, true)

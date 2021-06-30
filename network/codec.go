@@ -123,7 +123,7 @@ func (c codec) Pack(
 		fields: fieldValues,
 		bytes:  p.Bytes,
 	}
-	if !compress || !includeIsCompressedFlag {
+	if !compress {
 		return msg, nil
 	}
 

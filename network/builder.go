@@ -24,8 +24,8 @@ func (b Builder) GetVersion() (Msg, error) {
 		buf,
 		GetVersion,
 		nil,
-		false,
-		false,
+		false, // GetVersion messages can't be compressed
+		false, // GetVersion messages can't be compressed
 	)
 }
 
@@ -38,7 +38,6 @@ func (b Builder) Version(
 	myVersion string,
 	myVersionTime uint64,
 	sig []byte,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -53,18 +52,19 @@ func (b Builder) Version(
 			VersionTime: myVersionTime,
 			SigBytes:    sig,
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && Version.canBeCompressed(),
+		false, // Version Messages can't be compressed
+		false, // Version Messages can't be compressed
 	)
 }
 
 // GetPeerList message
-func (b Builder) GetPeerList(includeIsCompressedFlag bool) (Msg, error) {
+func (b Builder) GetPeerList() (Msg, error) {
 	buf := b.getByteSlice()
-	return b.Pack(buf, GetPeerList, nil, includeIsCompressedFlag, false)
+	// GetPeerList messages can't be compressed
+	return b.Pack(buf, GetPeerList, nil, false, false)
 }
 
-func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag bool) (Msg, error) {
+func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag, compress bool) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
 		buf,
@@ -72,32 +72,32 @@ func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag bool
 		map[Field]interface{}{
 			SignedPeers: peers,
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && PeerList.canBeCompressed(),
+		includeIsCompressedFlag, // PeerList messages may be compressed
+		compress,
 	)
 }
 
 // Ping message
-func (b Builder) Ping(includeIsCompressedFlag bool) (Msg, error) {
+func (b Builder) Ping() (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
 		buf,
 		Ping,
 		nil,
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && Ping.canBeCompressed(),
+		false, // Ping messages can't be compressed
+		false,
 	)
 }
 
 // Pong message
-func (b Builder) Pong(includeIsCompressedFlag bool) (Msg, error) {
+func (b Builder) Pong() (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
 		buf,
 		Pong,
 		nil,
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && Pong.canBeCompressed(),
+		false, // Ping messages can't be compressed
+		false,
 	)
 }
 
@@ -106,7 +106,6 @@ func (b Builder) GetAcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	deadline uint64,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -117,8 +116,8 @@ func (b Builder) GetAcceptedFrontier(
 			RequestID: requestID,
 			Deadline:  deadline,
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && GetAcceptedFrontier.canBeCompressed(),
+		false, // GetAcceptedFrontier messages can't be compressed
+		false,
 	)
 }
 
@@ -127,7 +126,6 @@ func (b Builder) AcceptedFrontier(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
@@ -143,8 +141,8 @@ func (b Builder) AcceptedFrontier(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && AcceptedFrontier.canBeCompressed(),
+		false, // AcceptedFrontier messages can't be compressed
+		false,
 	)
 }
 
@@ -154,7 +152,6 @@ func (b Builder) GetAccepted(
 	requestID uint32,
 	deadline uint64,
 	containerIDs []ids.ID,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
@@ -171,8 +168,8 @@ func (b Builder) GetAccepted(
 			Deadline:     deadline,
 			ContainerIDs: containerIDBytes,
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && GetAccepted.canBeCompressed(),
+		false, // GetAccepted messages can't be compressed
+		false,
 	)
 }
 
@@ -181,7 +178,6 @@ func (b Builder) Accepted(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
@@ -197,8 +193,8 @@ func (b Builder) Accepted(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && Accepted.canBeCompressed(),
+		false, // Accepted messages can't be compressed
+		false,
 	)
 }
 
@@ -208,7 +204,6 @@ func (b Builder) GetAncestors(
 	requestID uint32,
 	deadline uint64,
 	containerID ids.ID,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -220,8 +215,8 @@ func (b Builder) GetAncestors(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && GetAncestors.canBeCompressed(),
+		false, // GetAncestors messages can't be compressed
+		false,
 	)
 }
 
@@ -231,6 +226,7 @@ func (b Builder) MultiPut(
 	requestID uint32,
 	containers [][]byte,
 	includeIsCompressedFlag bool,
+	compressed bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -242,7 +238,7 @@ func (b Builder) MultiPut(
 			MultiContainerBytes: containers,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && MultiPut.canBeCompressed(),
+		compressed,
 	)
 }
 
@@ -252,7 +248,6 @@ func (b Builder) Get(
 	requestID uint32,
 	deadline uint64,
 	containerID ids.ID,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -264,8 +259,8 @@ func (b Builder) Get(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && Get.canBeCompressed(),
+		false, // Get messages can't be compressed
+		false,
 	)
 }
 
@@ -276,6 +271,7 @@ func (b Builder) Put(
 	containerID ids.ID,
 	container []byte,
 	includeIsCompressedFlag bool,
+	compress bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -288,7 +284,7 @@ func (b Builder) Put(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && Put.canBeCompressed(),
+		compress,
 	)
 }
 
@@ -300,6 +296,7 @@ func (b Builder) PushQuery(
 	containerID ids.ID,
 	container []byte,
 	includeIsCompressedFlag bool,
+	compress bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -313,7 +310,7 @@ func (b Builder) PushQuery(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		includeIsCompressedFlag && PushQuery.canBeCompressed(),
+		compress,
 	)
 }
 
@@ -323,7 +320,6 @@ func (b Builder) PullQuery(
 	requestID uint32,
 	deadline uint64,
 	containerID ids.ID,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	buf := b.getByteSlice()
 	return b.Pack(
@@ -335,8 +331,8 @@ func (b Builder) PullQuery(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && PullQuery.canBeCompressed(),
+		false, // PullQuery messages can't be compressed
+		false,
 	)
 }
 
@@ -345,7 +341,6 @@ func (b Builder) Chits(
 	chainID ids.ID,
 	requestID uint32,
 	containerIDs []ids.ID,
-	includeIsCompressedFlag bool,
 ) (Msg, error) {
 	containerIDBytes := make([][]byte, len(containerIDs))
 	for i, containerID := range containerIDs {
@@ -361,7 +356,7 @@ func (b Builder) Chits(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		includeIsCompressedFlag,
-		includeIsCompressedFlag && Chits.canBeCompressed(),
+		false, // Chits messages can't be compressed
+		false,
 	)
 }
