@@ -505,9 +505,15 @@ func (h *Handler) Gossip() {
 // This method causes [shutdown] to eventually be called.
 // [h.closed] is closed when this handler/engine are done shutting down.
 func (h *Handler) StartShutdown() {
+	// Must hold [h.unprocessedMsgsCond.L] here to ensure
+	// there's no race condition in Dispatch where we check
+	// the value of [h.closing].
+	h.unprocessedMsgsCond.L.Lock()
 	h.closing.SetValue(true)
+	h.unprocessedMsgsCond.L.Unlock()
+
 	// If we're waiting in [Dispatch] wake up.
-	h.unprocessedMsgsCond.Broadcast()
+	h.unprocessedMsgsCond.Signal()
 	// Don't process any more bootstrap messages.
 	// If [h.engine] is processing a bootstrap message, stop.
 	// We do this because if we didn't, and the engine was in the
@@ -550,7 +556,7 @@ func (h *Handler) push(msg message) {
 	defer h.unprocessedMsgsCond.L.Unlock()
 
 	h.unprocessedMsgs.Push(msg)
-	h.unprocessedMsgsCond.Broadcast()
+	h.unprocessedMsgsCond.Signal()
 }
 
 func (h *Handler) dispatchInternal() {

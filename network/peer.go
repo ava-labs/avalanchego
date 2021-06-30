@@ -411,9 +411,8 @@ func (p *peer) handle(msg Msg, onFinishedHandling func()) {
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
-		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
+		p.net.log.Error("dropping an unknown message from %s with op %s", p.nodeID, op)
 		onFinishedHandling()
-		p.net.metrics.failedToParse.Inc()
 		return
 	}
 	msgMetrics.numReceived.Inc()

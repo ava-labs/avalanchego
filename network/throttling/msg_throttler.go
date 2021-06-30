@@ -50,7 +50,7 @@ func NewSybilMsgThrottler(
 ) (MsgThrottler, error) {
 	t := &sybilMsgThrottler{
 		log:                    log,
-		cond:                   sync.Cond{L: &sync.Mutex{}},
+		cond:                   sync.NewCond(&sync.Mutex{}),
 		vdrs:                   vdrs,
 		maxVdrBytes:            config.VdrAllocSize,
 		remainingVdrBytes:      config.VdrAllocSize,
@@ -70,7 +70,7 @@ func NewSybilMsgThrottler(
 type sybilMsgThrottler struct {
 	log     logging.Logger
 	metrics sybilMsgThrottlerMetrics
-	cond    sync.Cond
+	cond    *sync.Cond
 	// Primary network validator set
 	vdrs validators.Set
 	// Max number of unprocessed bytes from validators
