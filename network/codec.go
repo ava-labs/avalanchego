@@ -33,8 +33,6 @@ type codec struct {
 	compressor compression.Compressor
 }
 
-// If this method returns an error, the returned codec may still be used.
-// However, some metrics may not be registered with [metricsRegisterer].
 func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 	compressor, err := compression.NewGzipCompressor()
 	if err != nil {

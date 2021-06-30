@@ -240,7 +240,8 @@ func TestCodecPackParseGzip(t *testing.T) {
 
 	// Test with compression
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(nil, m.op, m.fields, true, m.op.canBeCompressed())
+		compress := m.op == Put || m.op == PushQuery || m.op == PeerList || m.op == MultiPut
+		packedIntf, err := c.Pack(nil, m.op, m.fields, true, compress)
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), true)

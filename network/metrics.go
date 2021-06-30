@@ -73,7 +73,6 @@ type metrics struct {
 }
 
 func (m *metrics) initialize(registerer prometheus.Registerer) error {
-	// Set up bytesSavedMetrics
 	m.numPeers = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
 		Name:      "peers",

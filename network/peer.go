@@ -594,6 +594,8 @@ func (p *peer) sendPeerList() {
 		return
 	}
 
+	// Compress this message only if the peer can handle compressed
+	// messages and we have compression enabled
 	canHandleCompressed := p.canHandleCompressed.GetValue()
 	msg, err := p.net.b.PeerList(peers, canHandleCompressed, canHandleCompressed && p.net.compressionEnabled)
 	if err != nil {
@@ -742,7 +744,6 @@ func (p *peer) handleVersion(msg Msg) {
 		return
 	}
 
-	// todo marker version should be constant
 	p.canHandleCompressed.SetValue(peerVersion.Compare(minVersionCanHandleCompressed) >= 0)
 
 	signedPeerIP := signedPeerIP{

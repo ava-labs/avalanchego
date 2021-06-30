@@ -193,17 +193,6 @@ func (op Op) String() string {
 	}
 }
 
-// Returns whether we should compress a message of the given type.
-// (Assuming the peer can handle compressed messages)
-func (op Op) canBeCompressed() bool {
-	switch op {
-	case PushQuery, Put, MultiPut, PeerList:
-		return true
-	default:
-		return false
-	}
-}
-
 // Types of messages that may be sent between nodes
 // Note: If you add a new Op below, you must also add it to ops (declared below)
 const (

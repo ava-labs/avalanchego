@@ -64,10 +64,7 @@ func (g *gzipCompressor) resetWriter() {
 
 func (g *gzipCompressor) resetReader(msg []byte) error {
 	g.bytesReader.Reset(msg)
-	if err := g.gzipReader.Reset(g.bytesReader); err != nil {
-		return err
-	}
-	return nil
+	return g.gzipReader.Reset(g.bytesReader)
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
