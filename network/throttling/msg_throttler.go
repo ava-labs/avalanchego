@@ -101,61 +101,46 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	startTime := time.Now()
 
 	for { // [t.cond.L] is held while in this loop
-		atLargeBytesUsed := t.nodeToAtLargeBytesUsed[nodeID]
-		// See if we can take from the at-large byte allocation
-		if msgSize <= t.remainingAtLargeBytes && atLargeBytesUsed+msgSize <= t.nodeMaxAtLargeBytes {
-			// Take from the at-large byte allocation
-			t.remainingAtLargeBytes -= msgSize
-			t.nodeToAtLargeBytesUsed[nodeID] += msgSize
-			break
-		}
+		// Number of bytes this node can take from at-large allocation.
+		atLargeBytesAllowed := math.Min64(
+			t.nodeMaxAtLargeBytes-t.nodeToAtLargeBytesUsed[nodeID],
+			t.remainingAtLargeBytes,
+		)
 
-		// See if we can use the validator byte allocation
+		// Calculate [nodeID]'s validator allocation size based on its weight
+		vdrAllocationSize := uint64(0)
 		weight, isVdr := t.vdrs.GetWeight(nodeID)
-		if !isVdr {
-			// This node isn't a validator.
-			// Wait until there are more bytes in an allocation.
-			t.cond.Wait()
-			continue
+		if isVdr && weight != 0 {
+			vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
 		}
-
-		// From the at-large allocation, take all the bytes we can
-		// without exceeding the per-node limit on taking from it
-		atLargeBytesToUse := t.nodeMaxAtLargeBytes - atLargeBytesUsed
-		if atLargeBytesToUse > t.remainingAtLargeBytes {
-			atLargeBytesToUse = t.remainingAtLargeBytes
-		}
-		// Need [vdrBytesNeeded] from the validator allocation.
-		vdrBytesNeeded := msgSize - atLargeBytesToUse
-		if t.remainingVdrBytes < vdrBytesNeeded {
-			// Wait until there are more bytes in an allocation.
-			t.cond.Wait()
-			continue
-		}
-
-		// Number of bytes this node can take from validator allocation.
-		vdrBytesAllowed := uint64(0)
-		// [totalVdrWeight] should always be > 0 but handle this case
-		// for completeness to prevent divide by 0
-		totalVdrWeight := t.vdrs.Weight()
-		if totalVdrWeight != 0 {
-			vdrBytesAllowed = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(totalVdrWeight))
+		vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
+		// [vdrBytesAllowed] is the number of bytes this node
+		// can take from validator allocation.
+		vdrBytesAllowed := vdrAllocationSize
+		if vdrBytesAlreadyUsed >= vdrAllocationSize {
+			// We're using all the bytes we can from the validator allocation
+			vdrBytesAllowed = 0
 		} else {
-			t.log.Warn("total validator weight is 0") // this should never happen
+			vdrBytesAllowed -= vdrBytesAlreadyUsed
 		}
-		if t.nodeToVdrBytesUsed[nodeID]+vdrBytesNeeded > vdrBytesAllowed {
-			// Wait until there are more bytes in an allocation.
+
+		// Can't acquire enough bytes yet. Wait until more are released.
+		if vdrBytesAllowed+atLargeBytesAllowed < msgSize {
 			t.cond.Wait()
 			continue
 		}
 
-		// Use some of [remainingAtLargeBytes] and some of [remainingVdrBytes]
-		t.remainingVdrBytes -= vdrBytesNeeded
-		if atLargeBytesToUse != 0 {
-			t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesToUse
+		atLargeBytesUsed := math.Min64(msgSize, atLargeBytesAllowed)
+		t.remainingAtLargeBytes -= atLargeBytesUsed
+		if atLargeBytesUsed != 0 {
+			t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesUsed
 		}
-		t.remainingAtLargeBytes -= atLargeBytesToUse
-		t.nodeToVdrBytesUsed[nodeID] += vdrBytesNeeded
+
+		vdrBytesUsed := msgSize - atLargeBytesUsed
+		t.remainingVdrBytes -= vdrBytesUsed
+		if vdrBytesUsed != 0 {
+			t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
+		}
 		break
 	}
 	t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
