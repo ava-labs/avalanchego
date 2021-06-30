@@ -39,7 +39,7 @@ type indexer struct {
 	metrics             metrics
 }
 
-// AddTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
+// addTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
 // to the provided vm.addressAssetIDIndex
 func (i *indexer) addTransferOutput(assetID ids.ID, addrs []ids.ShortID) {
 	for _, address := range addrs {
@@ -50,6 +50,8 @@ func (i *indexer) addTransferOutput(assetID ids.ID, addrs []ids.ShortID) {
 	}
 }
 
+// AddUTXOIDs adds given inputUTXOs to the indexer if they are of type secp256k1fx.TransferOutput
+// function calls vm.getUTXO to get the UTXO from the *avax.UTXOID
 func (i *indexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 	for _, utxoID := range inputUTXOs {
 		utxo, err := vm.getUTXO(utxoID)
@@ -68,6 +70,7 @@ func (i *indexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 	return nil
 }
 
+// AddUTXOs adds given outputUTXOs to the indexer if they are of type secp256k1fx.TransferOutput
 func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 	for _, utxo := range outputUTXOs {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
