@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -231,6 +232,16 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
+	msgThrottler, err := throttling.NewSybilMsgThrottler(
+		n.Log,
+		n.Config.NetworkConfig.MetricsRegisterer,
+		primaryNetworkValidators,
+		n.Config.NetworkConfig.MsgThrottlerConfig,
+	)
+	if err != nil {
+		n.Log.Warn("initializing throttler metrics failed with: %s", err)
+	}
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
@@ -260,7 +271,7 @@ func (n *Node) initNetworking() error {
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
-		n.Config.NetworkConfig.MsgThrottlerConfig,
+		msgThrottler,
 	)
 
 	return nil

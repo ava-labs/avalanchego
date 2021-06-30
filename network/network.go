@@ -273,7 +273,7 @@ func NewDefaultNetwork(
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
-	msgThrottlerConfig throttling.MsgThrottlerConfig,
+	msgThrottler throttling.MsgThrottler,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -318,7 +318,7 @@ func NewDefaultNetwork(
 		dialerConfig,
 		tlsKey,
 		isFetchOnly,
-		msgThrottlerConfig,
+		msgThrottler,
 	)
 }
 
@@ -366,7 +366,7 @@ func NewNetwork(
 	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
-	msgThrottlerConfig throttling.MsgThrottlerConfig,
+	msgThrottler throttling.MsgThrottler,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -424,6 +424,7 @@ func NewNetwork(
 				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
+		msgThrottler: msgThrottler,
 	}
 	netw.b = Builder{
 		getByteSlice: func() []byte {
@@ -432,11 +433,6 @@ func NewNetwork(
 	}
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-	msgThrottler, err := throttling.NewSybilMsgThrottler(netw.log, registerer, netw.vdrs, msgThrottlerConfig)
-	if err != nil {
-		log.Warn("initializing throttler metrics failed with: %s", err)
-	}
-	netw.msgThrottler = msgThrottler
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}

@@ -110,7 +110,7 @@ func TestPeer_Close(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, netwrk)
 

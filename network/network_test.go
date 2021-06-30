@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -267,11 +266,7 @@ func initCerts(t *testing.T) {
 
 var defaultTestDialerConfig = NewDialerConfig(0, 30*time.Second)
 
-var defaultMsgThrottlingConfig = throttling.MsgThrottlerConfig{
-	VdrAllocSize:        64 * units.MiB,
-	AtLargeAllocSize:    64 * units.MiB,
-	NodeMaxAtLargeBytes: uint64(2 * DefaultMaxMessageSize),
-}
+var defaultMsgThrottler = throttling.NewNoThrottler()
 
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)
@@ -346,7 +341,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net)
 
@@ -481,7 +476,7 @@ func TestEstablishConnection(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -514,7 +509,7 @@ func TestEstablishConnection(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -660,7 +655,7 @@ func TestDoubleTrack(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -693,7 +688,7 @@ func TestDoubleTrack(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -840,7 +835,7 @@ func TestDoubleClose(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -873,7 +868,7 @@ func TestDoubleClose(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -1025,7 +1020,7 @@ func TestTrackConnected(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -1058,7 +1053,7 @@ func TestTrackConnected(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -1184,7 +1179,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -1217,7 +1212,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -1474,7 +1469,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -1507,7 +1502,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -1540,7 +1535,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net2)
 
@@ -1573,7 +1568,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net3)
 
@@ -1927,7 +1922,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -1960,7 +1955,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -1993,7 +1988,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net2)
 
@@ -2026,7 +2021,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net3)
 
@@ -2296,7 +2291,7 @@ func TestPeerSignature(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -2329,7 +2324,7 @@ func TestPeerSignature(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
@@ -2362,7 +2357,7 @@ func TestPeerSignature(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net2)
 
@@ -2739,7 +2734,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net0)
 
@@ -2772,7 +2767,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
-		defaultMsgThrottlingConfig,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, net1)
 
