@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
@@ -169,33 +170,21 @@ func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	t.cond.L.Lock()
 	defer t.cond.L.Unlock()
 
-	// Try to release these bytes back to the validator allocation
+	// Release as many bytes as possible back to [nodeID]'s validator allocation
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
-	switch { // This switch is exhaustive
-	case vdrBytesUsed > msgSize:
-		// Put all bytes back in validator allocation
-		t.remainingVdrBytes += msgSize
-		t.nodeToVdrBytesUsed[nodeID] -= msgSize
-	case vdrBytesUsed == msgSize:
-		// Put all bytes back in validator allocation
-		t.remainingVdrBytes += msgSize
+	vdrBytesReturned := math.Min64(msgSize, vdrBytesUsed)
+	t.remainingVdrBytes += vdrBytesReturned
+	t.nodeToVdrBytesUsed[nodeID] -= vdrBytesReturned
+	if t.nodeToVdrBytesUsed[nodeID] == 0 {
 		delete(t.nodeToVdrBytesUsed, nodeID)
-	case vdrBytesUsed < msgSize && vdrBytesUsed > 0:
-		// Put some bytes back in validator allocation
-		t.remainingVdrBytes += vdrBytesUsed
-		t.remainingAtLargeBytes += msgSize - vdrBytesUsed
-		t.nodeToAtLargeBytesUsed[nodeID] -= msgSize - vdrBytesUsed
-		if t.nodeToAtLargeBytesUsed[nodeID] == 0 {
-			delete(t.nodeToAtLargeBytesUsed, nodeID)
-		}
-		delete(t.nodeToVdrBytesUsed, nodeID)
-	case vdrBytesUsed < msgSize && vdrBytesUsed == 0:
-		// Put no bytes in validator allocation
-		t.remainingAtLargeBytes += msgSize
-		t.nodeToAtLargeBytesUsed[nodeID] -= msgSize
-		if t.nodeToAtLargeBytesUsed[nodeID] == 0 {
-			delete(t.nodeToAtLargeBytesUsed, nodeID)
-		}
+	}
+
+	// Release the rest of the bytes, if any, back to the at-large allocation
+	atLargeBytesReturned := msgSize - vdrBytesReturned
+	t.remainingAtLargeBytes += atLargeBytesReturned
+	t.nodeToAtLargeBytesUsed[nodeID] -= atLargeBytesReturned
+	if t.nodeToAtLargeBytesUsed[nodeID] == 0 {
+		delete(t.nodeToAtLargeBytesUsed, nodeID)
 	}
 
 	t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
