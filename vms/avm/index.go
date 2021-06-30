@@ -4,7 +4,11 @@
 package avm
 
 import (
+	"bytes"
 	"encoding/binary"
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -26,6 +30,7 @@ type AddressTxsIndexer interface {
 	AddUTXOs(outputUTXOs []*avax.UTXO)
 	AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error
 	Write(txID ids.ID) error
+	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 }
 
 // indexer implements AddressTxsIndexer
@@ -136,6 +141,47 @@ func (i *indexer) Write(txID ids.ID) error {
 	return nil
 }
 
+// Read reads list of transaction IDs for a given address and assetID. These are the transactions that modified the
+// balance of the address and assetID (credit/debit). The returned txIDs will always be <= pageSize. In case of an error
+// [nil, err] is returned.
+func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
+	// setup prefix DBs
+	addressTxDB := prefixdb.New(address[:], i.db)
+	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
+
+	// get cursor in bytes
+	cursorBytes := make([]byte, wrappers.LongLen)
+	binary.BigEndian.PutUint64(cursorBytes, cursor)
+
+	// start reading from the cursor bytes, numeric keys maintain the order (see Write)
+	iter := assetPrefixDB.NewIteratorWithStart(cursorBytes)
+	var txIDs []ids.ID
+	for iter.Next() {
+		// if the key is literally "idx", skip
+		if bytes.Equal(idxKey, iter.Key()) {
+			continue
+		}
+
+		// get the value, make sure its in the right format
+		txIDBytes := iter.Value()
+		if len(txIDBytes) != hashing.HashLen {
+			return nil, fmt.Errorf("invalid tx ID %s", txIDBytes)
+		}
+
+		// get the ID and append to our list
+		var txID ids.ID
+		copy(txID[:], txIDBytes)
+
+		txIDs = append(txIDs, txID)
+
+		// ensure list never grows beyond pageSize
+		if uint64(len(txIDs)) >= pageSize {
+			break
+		}
+	}
+	return txIDs, nil
+}
+
 func (i *indexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
@@ -165,4 +211,8 @@ func (i *noIndexer) AddUTXOs([]*avax.UTXO) {}
 
 func (i *noIndexer) Write(ids.ID) error {
 	return nil
+}
+
+func (i *noIndexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
+	return nil, nil
 }

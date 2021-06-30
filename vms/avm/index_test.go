@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 
@@ -254,6 +256,38 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	}
 }
 
+func TestIndexer_Read(t *testing.T) {
+	// setup vm, db etc
+	_, vm, _, _, _ := setup(t, true)
+	vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log, vm.metrics)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+
+	// generate test address and asset IDs
+	assetID := ids.GenerateTestID()
+	addr := ids.GenerateTestShortID()
+
+	// setup some fake txs under the above generated address and asset IDs
+	testTxCount := 25
+	testTxs := setupTestTxsInDB(t, vm.db, addr, assetID, testTxCount)
+	assert.Len(t, testTxs, 25)
+
+	// read the pages, 5 items at a time
+	var cursor uint64 = 0
+	var pageSize uint64 = 5
+	for cursor < 25 {
+		txIDs, err := vm.addressTxsIndexer.Read(addr, assetID, cursor, pageSize)
+		assert.NoError(t, err)
+		assert.Len(t, txIDs, 5)
+		assert.Equal(t, txIDs, testTxs[cursor:cursor+pageSize])
+		cursor += pageSize
+	}
+}
+
 func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, key *crypto.PrivateKeySECP256K1R) *avax.UTXO {
 	return &avax.UTXO{
 		UTXOID: utxoID,
@@ -357,4 +391,36 @@ func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAdd
 	if txID != transactionID {
 		t.Fatalf("txID %s not same as %s", txID, transactionID)
 	}
+}
+
+// Sets up test tx IDs in DB in the following structure for the indexer to pick them up:
+// [address] prefix DB
+//		[assetID] prefix DB
+//			- "idx": 2
+//			- 0: txID1
+//			- 1: txID1
+func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
+	var testTxs []ids.ID
+	for i := 0; i < txCount; i++ {
+		testTxs = append(testTxs, ids.GenerateTestID())
+	}
+
+	addressPrefixDB := prefixdb.New(address[:], db)
+	assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
+	var idx uint64 = 0
+	idxBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(idxBytes, idx)
+	for _, txID := range testTxs {
+		txID := txID
+		err := assetPrefixDB.Put(idxBytes, txID[:])
+		assert.NoError(t, err)
+		idx++
+		binary.BigEndian.PutUint64(idxBytes, idx)
+	}
+	_, err := db.CommitBatch()
+	assert.NoError(t, err)
+
+	err = assetPrefixDB.Put([]byte("idx"), idxBytes)
+	assert.NoError(t, err)
+	return testTxs
 }

@@ -5,16 +5,11 @@ package avm
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/ava-labs/avalanchego/database/versiondb"
-
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -402,6 +397,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	_, vm, s, _, _ := setup(t, true)
+	vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log, vm.metrics)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -438,38 +434,6 @@ func TestServiceGetTxs(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, getTxsReply.TxIDs, 10)
 	assert.Equal(t, getTxsReply.TxIDs, testTxs[10:20])
-}
-
-// Sets up test tx IDs in DB in the following structure for the indexer to pick them up:
-// [address] prefix DB
-//		[assetID] prefix DB
-//			- "idx": 2
-//			- 0: txID1
-//			- 1: txID1
-func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID, assetID ids.ID, txCount int) []ids.ID {
-	var testTxs []ids.ID
-	for i := 0; i < txCount; i++ {
-		testTxs = append(testTxs, ids.GenerateTestID())
-	}
-
-	addressPrefixDB := prefixdb.New(address[:], db)
-	assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
-	var idx uint64 = 0
-	idxBytes := make([]byte, 8)
-	binary.BigEndian.PutUint64(idxBytes, idx)
-	for _, txID := range testTxs {
-		txID := txID
-		err := assetPrefixDB.Put(idxBytes, txID[:])
-		assert.NoError(t, err)
-		idx++
-		binary.BigEndian.PutUint64(idxBytes, idx)
-	}
-	_, err := db.CommitBatch()
-	assert.NoError(t, err)
-
-	err = assetPrefixDB.Put([]byte("idx"), idxBytes)
-	assert.NoError(t, err)
-	return testTxs
 }
 
 func TestServiceGetAllBalances(t *testing.T) {

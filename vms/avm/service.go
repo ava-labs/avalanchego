@@ -4,15 +4,11 @@
 package avm
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
 	"strings"
-
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,9 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -122,35 +116,16 @@ func (service *Service) GetTxs(r *http.Request, args *GetTxsArgs, reply *GetTxsR
 		return fmt.Errorf("specified `assetID` is invalid: %w", err)
 	}
 
-	addressTxDB := prefixdb.New(address[:], service.vm.db)
-	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
-
 	cursor := uint64(args.Cursor)
+
 	service.vm.ctx.Log.Debug("Fetching transactions, cursor %d", cursor)
-	cursorBytes := make([]byte, wrappers.LongLen)
-	binary.BigEndian.PutUint64(cursorBytes, cursor)
-
-	iter := assetPrefixDB.NewIteratorWithStart(cursorBytes)
-	for iter.Next() {
-		if bytes.Equal(idxKey, iter.Key()) {
-			continue
-		}
-
-		txIDBytes := iter.Value()
-		if len(txIDBytes) != hashing.HashLen {
-			return fmt.Errorf("invalid tx ID %s", txIDBytes)
-		}
-
-		var txID ids.ID
-		copy(txID[:], txIDBytes)
-
-		reply.TxIDs = append(reply.TxIDs, txID)
-		if uint64(len(reply.TxIDs)) >= pageSize {
-			break
-		}
+	// Read transactions from the indexer
+	reply.TxIDs, err = service.vm.addressTxsIndexer.Read(address, assetID, cursor, pageSize)
+	if err != nil {
+		return err
 	}
-
 	service.vm.ctx.Log.Debug("Fetched %d transactions for address", len(reply.TxIDs))
+
 	// To get the next set of tx IDs, the user should provide this cursor.
 	// e.g. if they provided cursor 5, and read 6 tx IDs, they should start
 	// next time from index (cursor) 11.
