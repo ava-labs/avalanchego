@@ -25,10 +25,28 @@ type LinkedHashmap interface {
 
 	Oldest() (val interface{}, exists bool)
 	Newest() (val interface{}, exists bool)
+	NewIterator() Iter
+}
+
+// Iterates over the keys and values in a LinkedHashmap
+// from oldest to newest elements.
+// Assumes the underlying LinkedHashmap is not modified while
+// the iterator is in use, except to delete elements that
+// have already been iterated over.
+// TODO is this the right spec?
+type Iter interface {
+	Next() bool
+	Key() ids.ID
+	Value() interface{}
+}
+
+type keyValue struct {
+	key   ids.ID
+	value interface{}
 }
 
 type linkedHashmap struct {
-	lock      sync.Mutex
+	lock      sync.RWMutex
 	entryMap  map[ids.ID]*list.Element
 	entryList *list.List
 }
@@ -85,15 +103,21 @@ func (lh *linkedHashmap) Newest() (interface{}, bool) {
 func (lh *linkedHashmap) put(key ids.ID, value interface{}) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.MoveToBack(e)
-		e.Value = value
+		e.Value = keyValue{
+			key:   key,
+			value: value,
+		}
 	} else {
-		lh.entryMap[key] = lh.entryList.PushBack(value)
+		lh.entryMap[key] = lh.entryList.PushBack(keyValue{
+			key:   key,
+			value: value,
+		})
 	}
 }
 
 func (lh *linkedHashmap) get(key ids.ID) (interface{}, bool) {
 	if e, ok := lh.entryMap[key]; ok {
-		return e.Value, true
+		return e.Value.(keyValue).value, true
 	}
 	return nil, false
 }
@@ -109,14 +133,65 @@ func (lh *linkedHashmap) len() int { return len(lh.entryMap) }
 
 func (lh *linkedHashmap) oldest() (interface{}, bool) {
 	if val := lh.entryList.Front(); val != nil {
-		return val.Value, true
+		return val.Value.(keyValue).value, true
 	}
 	return nil, false
 }
 
 func (lh *linkedHashmap) newest() (interface{}, bool) {
 	if val := lh.entryList.Back(); val != nil {
-		return val.Value, true
+		return val.Value.(keyValue).value, true
 	}
 	return nil, false
 }
+
+func (lh *linkedHashmap) NewIterator() Iter {
+	return &iterator{lh: lh}
+}
+
+type iterator struct {
+	lh                     *linkedHashmap
+	key                    ids.ID
+	value                  interface{}
+	next                   *list.Element
+	initialized, exhausted bool
+}
+
+func (it *iterator) Next() bool {
+	// If the iterator has been exhausted, there is no next value.
+	if it.exhausted {
+		it.key = ids.Empty
+		it.value = nil
+		it.next = nil
+		return false
+	}
+
+	it.lh.lock.RLock()
+	defer it.lh.lock.RUnlock()
+
+	// If the iterator was not yet initialized, do it now.
+	if !it.initialized {
+		it.initialized = true
+		oldest := it.lh.entryList.Front()
+		if oldest == nil {
+			it.exhausted = true
+			it.key = ids.Empty
+			it.value = nil
+			it.next = nil
+			return false
+		}
+		it.next = oldest
+	}
+
+	// It's important to ensure that [it.next] is not nil
+	// by not deleting elements that have not yet been iterated
+	// over from [it.lh]
+	it.key = it.next.Value.(keyValue).key
+	it.value = it.next.Value.(keyValue).value
+	it.next = it.next.Next() // Next time, return next element
+	it.exhausted = it.next == nil
+	return true
+}
+
+func (it *iterator) Key() ids.ID        { return it.key }
+func (it *iterator) Value() interface{} { return it.value }
