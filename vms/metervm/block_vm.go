@@ -15,7 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-var _ block.ChainVM = &blockVM{}
+var (
+	_ block.ChainVM = &blockVM{}
+	_ snowman.Block = &meterBlock{}
+)
 
 func NewBlockVM(vm block.ChainVM) block.ChainVM {
 	return &blockVM{
@@ -49,24 +52,48 @@ func (vm *blockVM) BuildBlock() (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.BuildBlock()
 	end := vm.clock.Time()
-	vm.blockMetrics.buildBlock.Observe(float64(end.Sub(start)))
-	return blk, err
+	duration := float64(end.Sub(start))
+	if err != nil {
+		vm.blockMetrics.buildBlockErr.Observe(duration)
+		return nil, err
+	}
+	vm.blockMetrics.buildBlock.Observe(duration)
+	return &meterBlock{
+		Block: blk,
+		vm:    vm,
+	}, nil
 }
 
 func (vm *blockVM) ParseBlock(b []byte) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.ParseBlock(b)
 	end := vm.clock.Time()
-	vm.blockMetrics.parseBlock.Observe(float64(end.Sub(start)))
-	return blk, err
+	duration := float64(end.Sub(start))
+	if err != nil {
+		vm.blockMetrics.parseBlockErr.Observe(duration)
+		return nil, err
+	}
+	vm.blockMetrics.parseBlock.Observe(duration)
+	return &meterBlock{
+		Block: blk,
+		vm:    vm,
+	}, nil
 }
 
 func (vm *blockVM) GetBlock(id ids.ID) (snowman.Block, error) {
 	start := vm.clock.Time()
 	blk, err := vm.ChainVM.GetBlock(id)
 	end := vm.clock.Time()
-	vm.blockMetrics.getBlock.Observe(float64(end.Sub(start)))
-	return blk, err
+	duration := float64(end.Sub(start))
+	if err != nil {
+		vm.blockMetrics.getBlockErr.Observe(duration)
+		return nil, err
+	}
+	vm.blockMetrics.getBlock.Observe(duration)
+	return &meterBlock{
+		Block: blk,
+		vm:    vm,
+	}, nil
 }
 
 func (vm *blockVM) SetPreference(id ids.ID) error {
@@ -83,4 +110,41 @@ func (vm *blockVM) LastAccepted() (ids.ID, error) {
 	end := vm.clock.Time()
 	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
 	return lastAcceptedID, err
+}
+
+type meterBlock struct {
+	snowman.Block
+
+	vm *blockVM
+}
+
+func (mb *meterBlock) Verify() error {
+	start := mb.vm.clock.Time()
+	err := mb.Block.Verify()
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
+	if err != nil {
+		mb.vm.blockMetrics.verifyErr.Observe(duration)
+	} else {
+		mb.vm.verify.Observe(duration)
+	}
+	return err
+}
+
+func (mb *meterBlock) Accept() error {
+	start := mb.vm.clock.Time()
+	err := mb.Block.Accept()
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
+	mb.vm.blockMetrics.accept.Observe(duration)
+	return err
+}
+
+func (mb *meterBlock) Reject() error {
+	start := mb.vm.clock.Time()
+	err := mb.Block.Reject()
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
+	mb.vm.blockMetrics.reject.Observe(duration)
+	return err
 }
