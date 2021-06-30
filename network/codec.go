@@ -181,8 +181,9 @@ func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
 		// Replace the compressed payload with the decompressed payload.
 		// Remove the compressed payload and isCompressed; keep just the message type
 		p.Bytes = p.Bytes[:wrappers.ByteLen]
-		// Attach the isCompressed flag (now false)
-		p.Bytes = append(p.Bytes, 0)
+		// Rewind offset by 1 because we removed the bool flag
+		// since the data now is uncompressed
+		p.Offset -= wrappers.BoolLen
 		// Attach the decompressed payload.
 		p.Bytes = append(p.Bytes, payloadBytes...)
 	}
