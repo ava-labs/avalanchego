@@ -6,7 +6,6 @@ package compression
 import (
 	"bytes"
 	"compress/gzip"
-	"io"
 	"io/ioutil"
 	"sync"
 )
@@ -14,9 +13,6 @@ import (
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
 	lock sync.Mutex
-
-	writerInitialized bool
-	readerInitialized bool
 
 	writeBuffer *bytes.Buffer
 	gzipWriter  *gzip.Writer
@@ -62,36 +58,26 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 }
 
 func (g *gzipCompressor) resetWriter() {
-	if !g.writerInitialized {
-		var buf bytes.Buffer
-		g.writeBuffer = &buf
-		g.gzipWriter = gzip.NewWriter(g.writeBuffer)
-		g.writerInitialized = true
-	} else {
-		g.writeBuffer.Reset()
-		g.gzipWriter.Reset(g.writeBuffer)
-	}
+	g.writeBuffer.Reset()
+	g.gzipWriter.Reset(g.writeBuffer)
 }
 
 func (g *gzipCompressor) resetReader(msg []byte) error {
-	if !g.readerInitialized {
-		g.bytesReader = bytes.NewReader(msg)
-		gzipReader, err := gzip.NewReader(g.bytesReader)
-		if err != nil {
-			return err
-		}
-		g.gzipReader = gzipReader
-		g.readerInitialized = true
-	} else {
-		g.bytesReader.Reset(msg)
-		if err := g.gzipReader.Reset(g.bytesReader); err != nil && err != io.EOF {
-			return err
-		}
+	g.bytesReader.Reset(msg)
+	if err := g.gzipReader.Reset(g.bytesReader); err != nil {
+		return err
 	}
 	return nil
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
-func NewGzipCompressor() Compressor {
-	return &gzipCompressor{}
+func NewGzipCompressor() (Compressor, error) {
+	var buf bytes.Buffer
+	c := &gzipCompressor{
+		bytesReader: &bytes.Reader{},
+		writeBuffer: &buf,
+	}
+	c.gzipWriter = gzip.NewWriter(c.writeBuffer)
+	c.gzipReader = &gzip.Reader{}
+	return c, nil
 }

@@ -63,8 +63,10 @@ func TestCodecParseExtraSpace(t *testing.T) {
 
 // If [compress] == true and [includeIsCompressedFlag] == false, error
 func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
+	compressor, err := compression.NewGzipCompressor()
+	assert.NoError(t, err)
 	c := codec{
-		compressor: compression.NewGzipCompressor(),
+		compressor: compressor,
 	}
 	id := ids.GenerateTestID()
 	fields := map[Field]interface{}{
@@ -73,7 +75,7 @@ func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
 		ContainerIDs: [][]byte{id[:]},
 	}
 	// [compress] == true and [includeIsCompressedFlag] == false
-	_, err := c.Pack(nil, Chits, fields, false, true)
+	_, err = c.Pack(nil, Chits, fields, false, true)
 	assert.EqualValues(t, errCompressNeedsFlag, err)
 }
 

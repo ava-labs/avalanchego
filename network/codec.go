@@ -36,11 +36,15 @@ type codec struct {
 // If this method returns an error, the returned codec may still be used.
 // However, some metrics may not be registered with [metricsRegisterer].
 func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
+	compressor, err := compression.NewGzipCompressor()
+	if err != nil {
+		return codec{}, fmt.Errorf("couldn't create compressor: %s", err)
+	}
 	c := codec{
 		bytesSavedMetrics:     make(map[Op]prometheus.Histogram, len(ops)),
 		compressTimeMetrics:   make(map[Op]prometheus.Histogram, len(ops)),
 		decompressTimeMetrics: make(map[Op]prometheus.Histogram, len(ops)),
-		compressor:            compression.NewGzipCompressor(),
+		compressor:            compressor,
 	}
 	errs := wrappers.Errs{}
 	for _, op := range ops {

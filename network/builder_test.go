@@ -19,7 +19,10 @@ import (
 var TestBuilder Builder
 
 func init() {
-	codec, _ := newCodec(prometheus.NewRegistry())
+	codec, err := newCodec(prometheus.NewRegistry())
+	if err != nil {
+		panic(err)
+	}
 	TestBuilder = Builder{
 		codec:        codec,
 		getByteSlice: func() []byte { return nil },
