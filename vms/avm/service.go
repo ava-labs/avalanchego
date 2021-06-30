@@ -115,9 +115,53 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
+		// reference spent input utxos concatenated with output index
+		//inputs := make([]api.JSONTxOutput, len(tx.InputUTXOs()))
+		//for _, utxo := range tx.InputUTXOs() {
+		//	jsonTxOutput := api.JSONTxOutput{
+		//		AssetID: utxo.
+		//	}
+		//
+		//}
+
+		outputs := make([]api.JSONTxOutput, len(tx.UTXOs()))
+		for _, utxo := range tx.UTXOs() {
+			jsonTxOutput := api.JSONTxOutput{
+				AssetID: utxo.AssetID().String(),
+				ID:      utxo.UTXOID.String(),
+			}
+
+			jsonTxOutput.TypeID, err = service.vm.getFx(utxo.Out)
+			jsonTxOutput.OutputIndex = utxo.OutputIndex
+			if err != nil {
+				return err
+			}
+
+			if out, ok := utxo.Out.(*secp256k1fx.TransferOutput); ok {
+				jsonTxOutput.Amount = out.Amount()
+				jsonTxOutput.Threshold = out.Threshold
+				jsonTxOutput.Locktime = out.Locktime
+				var owners []string
+				for _, owner := range out.Addrs {
+					addr, err := service.vm.FormatLocalAddress(owner)
+					if err != nil {
+						return err
+					}
+					owners = append(owners, addr)
+				}
+				// include memo
+				// full base tx support
+				// implement all utxos method
+				jsonTxOutput.Owners = owners
+			}
+
+			outputs = append(outputs, jsonTxOutput)
+		}
+
 		reply.Tx = api.JSONTx{
-			ID:     tx.txID.String(),
-			Status: tx.status.String(),
+			ID:      tx.txID.String(),
+			Status:  tx.status.String(),
+			Outputs: outputs,
 		}
 	} else {
 		reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())

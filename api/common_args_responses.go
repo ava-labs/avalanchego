@@ -69,9 +69,22 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+type JSONTxOutput struct {
+	ID          string   `json:"id"`
+	AssetID     string   `json:"assetID"`
+	Amount      uint64   `json:"amount"`
+	Owners      []string `json:"owners"`
+	Threshold   uint32   `json:"threshold"`
+	Locktime    uint64   `json:"locktime"`
+	TypeID      int      `json:"typeID"`
+	OutputIndex uint32   `json:"outputIndex"`
+}
+
 type JSONTx struct {
-	ID     string `json:"id"`
-	Status string `json:"status"`
+	ID      string         `json:"id"`
+	Status  string         `json:"status"`
+	Outputs []JSONTxOutput `json:"outputs"`
+	Inputs  []JSONTxOutput `json:"inputs"`
 }
 
 type FormattedTx struct {
