@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Maintains an index of an address --> IDs of transactions that changed that address's balance.
+// AddressTxsIndexer Maintains an index of an address --> IDs of transactions that changed that address's balance.
 // This includes both transactions that increased the address's balance and those that decreased it.
 // A transaction is said to change an address's balance if either hold:
 // 1) An input UTXO to the transaction was at least partially owned by the address
@@ -31,7 +31,7 @@ type AddressTxsIndexer interface {
 // indexer implements AddressTxsIndexer
 type indexer struct {
 	// Address -> AssetID --> Present if the address's balance
-	// of the asset has changed since last Commit
+	// of the asset has changed since last Write
 	// TODO is this description right?
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
