@@ -260,7 +260,7 @@ func NewDefaultNetwork(
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
-) Network {
+) (Network, error) {
 	return NewNetwork(
 		registerer,
 		log,
@@ -351,7 +351,7 @@ func NewNetwork(
 	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
-) Network {
+) (Network, error) {
 	// #nosec G404
 	netw := &network{
 		log:                  log,
@@ -411,8 +411,8 @@ func NewNetwork(
 	}
 	codec, err := newCodec(registerer)
 	if err != nil {
-		// TODO should NewNetwork just return an error?
 		log.Warn("initializing network bytesSavedMetrics failed with: %s", err)
+		return nil, err
 	}
 	netw.b = Builder{
 		codec: codec,
@@ -425,8 +425,9 @@ func NewNetwork(
 
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network bytesSavedMetrics failed with: %s", err)
+		return nil, err
 	}
-	return netw
+	return netw, nil
 }
 
 // GetAcceptedFrontier implements the Sender interface.
