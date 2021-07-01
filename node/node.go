@@ -29,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -167,8 +169,6 @@ func (n *Node) initNetworking() error {
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
 
-	dialer := network.NewDialer(TCP, n.Config.DialerConfig, n.Log)
-
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
 		return errInvalidTLSKey
@@ -231,6 +231,16 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
+	msgThrottler, err := throttling.NewSybilMsgThrottler(
+		n.Log,
+		n.Config.NetworkConfig.MetricsRegisterer,
+		primaryNetworkValidators,
+		n.Config.NetworkConfig.MsgThrottlerConfig,
+	)
+	if err != nil {
+		n.Log.Warn("initializing throttler metrics failed with: %s", err)
+	}
+
 	n.Net = network.NewDefaultNetwork(
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
@@ -240,7 +250,7 @@ func (n *Node) initNetworking() error {
 		versionManager,
 		version.NewDefaultApplicationParser(),
 		listener,
-		dialer,
+		dialer.NewDialer(TCP, n.Config.NetworkConfig.DialerConfig, n.Log),
 		serverUpgrader,
 		clientUpgrader,
 		primaryNetworkValidators,
@@ -249,17 +259,17 @@ func (n *Node) initNetworking() error {
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
 		n.Config.SendQueueSize,
-		n.Config.NetworkHealthConfig,
+		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
 		tlsKey,
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
-		n.Config.DialerConfig,
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		msgThrottler,
 	)
 
 	return nil
@@ -578,7 +588,12 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, n.benchlistManager); err != nil {
+	if err := timeoutManager.Initialize(
+		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
+		n.benchlistManager,
+		n.Config.NetworkConfig.MetricsNamespace,
+		n.Config.NetworkConfig.MetricsRegisterer,
+	); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
@@ -594,7 +609,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
 		n.Config.NetworkConfig.MetricsNamespace,
-		n.Config.NetworkConfig.Registerer,
+		n.Config.NetworkConfig.MetricsRegisterer,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
@@ -611,10 +626,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		FetchOnly:                              n.Config.FetchOnly,
 		FetchOnlyFrom:                          fetchOnlyFrom,
 		StakingEnabled:                         n.Config.EnableStaking,
-		MaxPendingMsgs:                         n.Config.MaxPendingMsgs,
-		MaxNonStakerPendingMsgs:                n.Config.MaxNonStakerPendingMsgs,
-		StakerMSGPortion:                       n.Config.StakerMSGPortion,
-		StakerCPUPortion:                       n.Config.StakerCPUPortion,
 		Log:                                    n.Log,
 		LogFactory:                             n.LogFactory,
 		VMManager:                              n.vmManager,
@@ -773,8 +784,7 @@ func (n *Node) initMetricsAPI() error {
 	// It is assumed by components of the system that the Metrics interface is
 	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
-	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
-	n.Config.NetworkConfig.Registerer = registry
+	n.Config.NetworkConfig.MetricsRegisterer = registry
 
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")

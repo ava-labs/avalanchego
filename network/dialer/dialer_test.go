@@ -1,7 +1,7 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package dialer
 
 import (
 	"context"
@@ -64,7 +64,7 @@ func TestDialerCancelDial(t *testing.T) {
 	}
 
 	// Create a dialer that should allow 10 outgoing connections per second
-	dialer := NewDialer("tcp", NewDialerConfig(10, 30*time.Second), logging.NoLog{})
+	dialer := NewDialer("tcp", NewConfig(10, 30*time.Second), logging.NoLog{})
 	// Make 5 outgoing connections. Should not be throttled.
 	for i := 0; i < 5; i++ {
 		startTime := time.Now()
