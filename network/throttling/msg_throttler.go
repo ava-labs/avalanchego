@@ -166,7 +166,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
 	}
-	vdrBytesUsed := math.Min64(bytesNeeded, vdrBytesAllowed)
+	vdrBytesUsed := math.Min64(t.remainingVdrBytes, bytesNeeded, vdrBytesAllowed)
 	if vdrBytesUsed > 0 {
 		// Mark that [nodeID] used [vdrBytesUsed] from its validator allocation
 		t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
