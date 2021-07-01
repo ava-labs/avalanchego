@@ -10,11 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// Hashmap provides an O(1) mapping from an [ids.ID] to any value.
+// Hashmap provides an O(1) mapping from a comparable key to any value.
+// Comparable is defined by https://golang.org/ref/spec#Comparison_operators.
 type Hashmap interface {
-	Put(key ids.ID, val interface{})
-	Get(key ids.ID) (val interface{}, exists bool)
-	Delete(key ids.ID)
+	Put(key, val interface{})
+	Get(key interface{}) (val interface{}, exists bool)
+	Delete(key interface{})
 	Len() int
 }
 
@@ -33,46 +34,45 @@ type LinkedHashmap interface {
 // Assumes the underlying LinkedHashmap is not modified while
 // the iterator is in use, except to delete elements that
 // have already been iterated over.
-// TODO is this the right spec?
 type Iter interface {
 	Next() bool
-	Key() ids.ID
+	Key() interface{}
 	Value() interface{}
 }
 
 type keyValue struct {
-	key   ids.ID
+	key   interface{}
 	value interface{}
 }
 
 type linkedHashmap struct {
 	lock      sync.RWMutex
-	entryMap  map[ids.ID]*list.Element
+	entryMap  map[interface{}]*list.Element
 	entryList *list.List
 }
 
 func New() LinkedHashmap {
 	return &linkedHashmap{
-		entryMap:  make(map[ids.ID]*list.Element),
+		entryMap:  make(map[interface{}]*list.Element),
 		entryList: list.New(),
 	}
 }
 
-func (lh *linkedHashmap) Put(key ids.ID, val interface{}) {
+func (lh *linkedHashmap) Put(key, val interface{}) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	lh.put(key, val)
 }
 
-func (lh *linkedHashmap) Get(key ids.ID) (interface{}, bool) {
+func (lh *linkedHashmap) Get(key interface{}) (interface{}, bool) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	return lh.get(key)
 }
 
-func (lh *linkedHashmap) Delete(key ids.ID) {
+func (lh *linkedHashmap) Delete(key interface{}) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
@@ -100,7 +100,7 @@ func (lh *linkedHashmap) Newest() (interface{}, bool) {
 	return lh.newest()
 }
 
-func (lh *linkedHashmap) put(key ids.ID, value interface{}) {
+func (lh *linkedHashmap) put(key, value interface{}) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.MoveToBack(e)
 		e.Value = keyValue{
@@ -115,14 +115,14 @@ func (lh *linkedHashmap) put(key ids.ID, value interface{}) {
 	}
 }
 
-func (lh *linkedHashmap) get(key ids.ID) (interface{}, bool) {
+func (lh *linkedHashmap) get(key interface{}) (interface{}, bool) {
 	if e, ok := lh.entryMap[key]; ok {
 		return e.Value.(keyValue).value, true
 	}
 	return nil, false
 }
 
-func (lh *linkedHashmap) delete(key ids.ID) {
+func (lh *linkedHashmap) delete(key interface{}) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.Remove(e)
 		delete(lh.entryMap, key)
@@ -151,7 +151,7 @@ func (lh *linkedHashmap) NewIterator() Iter {
 
 type iterator struct {
 	lh                     *linkedHashmap
-	key                    ids.ID
+	key                    interface{}
 	value                  interface{}
 	next                   *list.Element
 	initialized, exhausted bool
@@ -193,5 +193,5 @@ func (it *iterator) Next() bool {
 	return true
 }
 
-func (it *iterator) Key() ids.ID        { return it.key }
+func (it *iterator) Key() interface{}   { return it.key }
 func (it *iterator) Value() interface{} { return it.value }
