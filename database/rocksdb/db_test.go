@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package leveldb
+package rocksdb
 
 import (
 	"testing"
@@ -15,10 +15,8 @@ func TestInterface(t *testing.T) {
 		folder := t.TempDir()
 		db, err := New(folder, logging.NoLog{})
 		if err != nil {
-			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
+			t.Fatalf("rocksdb.New(%q, logging.NoLog{}) errored with %s", folder, err)
 		}
-
-		defer db.Close()
 
 		test(t, db)
 
@@ -39,7 +37,7 @@ func BenchmarkInterface(b *testing.B) {
 				b.Fatal(err)
 			}
 
-			bench(b, db, "leveldb", keys, values)
+			bench(b, db, "rocksdb", keys, values)
 
 			// The database may have been closed by the test, so we don't care if it
 			// errors here.

@@ -5,7 +5,10 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -89,10 +92,26 @@ func (m *migrationManager) verifyDiskStorage() error {
 // Should migrate if the previous database version exists and
 // if the latest database version has not finished bootstrapping.
 func (m *migrationManager) shouldMigrate() (bool, error) {
-	if !m.rootConfig.DBEnabled {
+	var (
+		dbManager manager.Manager
+		err       error
+	)
+	switch m.rootConfig.DBName {
+	case rocksdb.Name:
+		dbManager, err = manager.NewRocksDB(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
+	case leveldb.Name:
+		dbManager, err = manager.NewLevelDB(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
+	case memdb.Name:
 		return false, nil
+	default:
+		err = fmt.Errorf(
+			"db-type was %q but should have been one of {%s, %s, %s}",
+			m.rootConfig.DBName,
+			leveldb.Name,
+			rocksdb.Name,
+			memdb.Name,
+		)
 	}
-	dbManager, err := manager.New(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
 	if err != nil {
 		return false, fmt.Errorf("couldn't create db manager at %s: %w", m.rootConfig.DBPath, err)
 	}
