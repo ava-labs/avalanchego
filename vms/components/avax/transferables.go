@@ -115,8 +115,8 @@ func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Manager) bo
 type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
-
-	In TransferableIn `serialize:"true" json:"input"`
+	FxID   string         `serialize:"false" json:"fxID"`
+	In     TransferableIn `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.
