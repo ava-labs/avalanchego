@@ -104,15 +104,23 @@ type sybilMsgThrottler struct {
 	nodeToVdrBytesUsed map[ids.ShortID]uint64
 	// Node ID --> Bytes they've taken from the at-large allocation
 	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
-	// Node ID --> IDs of messages this node is waiting to acquire
+	// Node ID --> IDs of messages this node is waiting to acquire,
+	// order from oldest to most recent.
 	nodeToWaitingMsgIDs map[ids.ShortID][]ids.ID
 	// Msg ID --> *msgMetadata
 	waitingToAcquire linkedhashmap.LinkedHashmap
-	// Note that the relative order of messages from a given node
-	// are the same in nodeToWaitingMsgIDs[nodeID] and waitingToAcquire[nodeID].
+	// Invariant: The relative order of messages from a given node
+	// are the same in nodeToWaitingMsgIDs[nodeID] and waitingToAcquire.
 	// That is, if nodeToAtLargeBytesUsed[nodeID] is [msg0, msg1, msg2]
 	// then	waitingToAcquire is [..., msg0, ..., msg1, ..., msg2, ...]
-	// where each ... is 0 or more messages
+	// where each ... is 0 or more messages.
+	//
+	// Invariant: waitingToAcquire.Get(nodeToWaitingMsgIDs[nodeID][0])
+	// is the info about the message [nodeID] that has been blocking
+	// on reading longest
+	//
+	// Invariant: len(nodeToWaitingMsgIDs[nodeID]) >= 1 for some nodeID
+	// implies waitingToAcquire.Len() >= 1, and vice versa.
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
