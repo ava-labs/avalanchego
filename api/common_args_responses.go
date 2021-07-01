@@ -79,8 +79,13 @@ type JSONTx struct {
 	Inputs []interface{} `json:"inputs"`
 }
 
-type FormattedTx struct {
+type GetTxReply struct {
 	Tx       interface{}         `json:"tx,omitempty"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
+type FormattedTx struct {
+	Tx       string              `json:"tx,omitempty"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
@@ -116,7 +121,7 @@ type GetUTXOsReply struct {
 	// Number of UTXOs returned
 	NumFetched json.Uint64 `json:"numFetched"`
 	// The UTXOs
-	UTXOs []interface{} `json:"utxos"`
+	UTXOs []string `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
 	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
 	// again and set [StartIndex] to this value.

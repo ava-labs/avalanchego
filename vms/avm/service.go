@@ -60,10 +60,8 @@ type FormattedAssetID struct {
 // IssueTx attempts to issue a transaction into consensus
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
 	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
-	if args.Tx == nil {
-		return fmt.Errorf("transaction cannot be nil")
-	}
-	txBytes, err := formatting.Decode(args.Encoding, args.Tx.(string)) // todo fix to proper type
+
+	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
@@ -99,7 +97,7 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 }
 
 // GetTx returns the specified transaction
-func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.FormattedTx) error {
+func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.GetTxReply) error {
 	service.vm.ctx.Log.Info("AVM: GetTx called with %s", args.TxID)
 
 	if args.TxID == ids.Empty {
@@ -230,7 +228,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	reply.UTXOs = make([]interface{}, len(utxos))
+	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
@@ -823,7 +821,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey interface{} `json:"privateKey"`
+	PrivateKey string `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -851,7 +849,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
 	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
-	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr.(string) // since encoding above is CB58
+	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
 
