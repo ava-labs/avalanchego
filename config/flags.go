@@ -27,9 +27,13 @@ var (
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
 	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")
-	defaultStakingKeyPath  = filepath.Join(defaultDataDir, "staking", "staker.key")
-	defaultStakingCertPath = filepath.Join(defaultDataDir, "staking", "staker.crt")
-	defaultChainConfigDir  = filepath.Join(defaultDataDir, "configs", "chains")
+	defaultStakingPath     = filepath.Join(defaultDataDir, "staking")
+	defaultStakingKeyPath  = filepath.Join(defaultStakingPath, "staker.key")
+	defaultStakingCertPath = filepath.Join(defaultStakingPath, "staker.crt")
+	defaultConfigDir       = filepath.Join(defaultDataDir, "configs")
+	defaultChainConfigDir  = filepath.Join(defaultConfigDir, "chains")
+	defaultVMConfigDir     = filepath.Join(defaultConfigDir, "vms")
+	defaultVMAliasFilePath = filepath.Join(defaultVMConfigDir, "aliases.json")
 
 	// Places to look for the build directory
 	defaultBuildDirs = []string{}
@@ -259,6 +263,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
+	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, "Specifies a JSON file that maps vmIDs with custom aliases.")
 }
 
 // BuildFlagSet returns a complete set of flags for avalanchego

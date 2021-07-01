@@ -122,4 +122,5 @@ const (
 	ThrottlingAtLargeAllocSizeKey             = "throttling-at-large-alloc-size"
 	ThrottlingVdrAllocSizeKey                 = "throttling-validator-alloc-size"
 	ThrottlingNodeMaxAtLargeBytesKey          = "throttling-node-max-at-large-bytes"
+	VMAliasesFileKey                          = "vm-aliases-file"
 )

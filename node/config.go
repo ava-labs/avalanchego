@@ -166,4 +166,7 @@ type Config struct {
 	// Max time to spend fetching a container and its
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration
+
+	// VM Aliases
+	VMAliases map[ids.ID][]string
 }
