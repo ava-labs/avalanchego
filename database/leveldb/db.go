@@ -61,7 +61,7 @@ type Database struct {
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, log logging.Logger) (*Database, error) {
+func New(file string, log logging.Logger) (database.Database, error) {
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
 		OpenFilesCacheCapacity: HandleCap,
