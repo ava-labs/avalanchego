@@ -84,9 +84,7 @@ func NewRocksDB(
 	includePreviousVersions bool,
 ) (Manager, error) {
 	return new(
-		func(path string, log logging.Logger) (database.Database, error) {
-			return rocksdb.New(path, log)
-		},
+		rocksdb.New,
 		dbDirPath,
 		log,
 		currentVersion,
@@ -105,9 +103,7 @@ func NewLevelDB(
 	includePreviousVersions bool,
 ) (Manager, error) {
 	return new(
-		func(path string, log logging.Logger) (database.Database, error) {
-			return leveldb.New(path, log)
-		},
+		leveldb.New,
 		dbDirPath,
 		log,
 		currentVersion,
