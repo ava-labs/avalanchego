@@ -69,19 +69,9 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// JSONTx JSON representation of the transaction object
-type JSONTx struct {
-	ID     string `json:"id"`
-	Status string `json:"status"`
-	// Outputs we use []interface{} here since we cannot reference []*avax.UTXO due to circular dependency problem
-	Outputs []interface{} `json:"outputs"`
-	// Inputs we use []interface{} here since we cannot reference []*avax.UTXOID due to circular dependency problem
-	Inputs []interface{} `json:"inputs"`
-}
-
 type GetTxReply struct {
 	// Tx is in [string] format when [GetTxArgs.Encoding] is [Encoding.Hex] or [Encoding.CB58]
-	// Tx is an JSONTx object when [GetTxArgs.Encoding] is [Encoding.JSON]
+	// Tx is a Tx object when [GetTxArgs.Encoding] is [Encoding.JSON]
 	Tx       interface{}         `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
 }

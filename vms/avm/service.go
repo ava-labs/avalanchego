@@ -135,34 +135,6 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	return nil
 }
 
-func ToJsonTx(tx UniqueTx, vm *VM) (*api.JSONTx, error) {
-	outputUtxos := tx.UTXOs()
-	outputs := make([]interface{}, len(outputUtxos))
-	for _, utxo := range outputUtxos {
-		fxIdx, err := vm.getFx(utxo.Out)
-		if err != nil {
-			return nil, err
-		}
-		fx := vm.fxs[fxIdx]
-		utxo.FxID = fx.ID.String()
-		outputs = append(outputs, *utxo)
-	}
-
-	inputUtxos := tx.InputUTXOs()
-	inputs := make([]interface{}, len(inputUtxos))
-	for _, utxoID := range inputUtxos {
-		inputs = append(inputs, *utxoID)
-	}
-
-	jsonTx := api.JSONTx{
-		ID:      tx.ID().String(),
-		Status:  tx.Status().String(),
-		Outputs: outputs,
-		Inputs:  inputs,
-	}
-	return &jsonTx, nil
-}
-
 // GetUTXOs gets all utxos for passed in addresses
 func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply *api.GetUTXOsReply) error {
 	service.vm.ctx.Log.Info("AVM: GetUTXOs called for with %s", args.Addresses)
