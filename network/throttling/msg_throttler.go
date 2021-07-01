@@ -34,9 +34,13 @@ type MsgThrottler interface {
 	Release(msgSize uint64, nodeID ids.ShortID)
 }
 
+// Information about a message waiting to be read.
 type msgMetadata struct {
-	bytesNeeded        uint64
-	nodeID             ids.ShortID
+	// Need this many more bytes before Acquire returns
+	bytesNeeded uint64
+	// The sender of this incoming message
+	nodeID ids.ShortID
+	// Closed when the message can be read.
 	closeOnAcquireChan chan struct{}
 }
 
@@ -78,9 +82,10 @@ func NewSybilMsgThrottler(
 // msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
 type sybilMsgThrottler struct {
-	log     logging.Logger
-	metrics sybilMsgThrottlerMetrics
-	lock    sync.RWMutex
+	log       logging.Logger
+	metrics   sybilMsgThrottlerMetrics
+	lock      sync.RWMutex
+	nextMsgID uint64
 	// Primary network validator set
 	vdrs validators.Set
 	// Max number of unprocessed bytes from validators
@@ -97,11 +102,14 @@ type sybilMsgThrottler struct {
 	nodeToVdrBytesUsed map[ids.ShortID]uint64
 	// Node ID --> Bytes they've taken from the at-large allocation
 	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
-	// Node ID --> Messages from this node waiting to acquire
+	// Node ID --> IDs of messages this node is waiting to acquire
 	nodeToWaitingMsgIDs map[ids.ShortID][]ids.ID
-	// Msg ID --> Msg
+	// Msg ID --> *msgMetadata
 	waitingToAcquire linkedhashmap.LinkedHashmap
-	nextMsgID        uint64
+	// Note that the relative order of messages from a given node
+	// are the same in nodeToWaitingMsgIDs[nodeID] and waitingToAcquire[nodeID].
+	// That is, if nodeToAtLargeBytesUsed[nodeID] is [msg0, msg1, msg2]
+	// then	waitingToAcquire is [..., msg0, ..., msg1, ..., msg2, ...]
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
@@ -115,27 +123,30 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		t.metrics.awaitingRelease.Inc()
 		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
 	}()
-	bytesNeeded := msgSize
 
+	bytesNeeded := msgSize
 	t.lock.Lock()
 	// Take as many bytes as we can from the at-large allocation.
-	atLargeBytesAllowed := math.Min64(
+	atLargeBytesUsed := math.Min64(
+		// only give as many bytes as needed
+		bytesNeeded,
+		// don't exceed per-node limit
 		t.nodeMaxAtLargeBytes-t.nodeToAtLargeBytesUsed[nodeID],
+		// don't give more bytes than are in the allocation
 		t.remainingAtLargeBytes,
 	)
-	atLargeBytesUsed := math.Min64(bytesNeeded, atLargeBytesAllowed)
-	t.remainingAtLargeBytes -= atLargeBytesUsed
-	t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
-	bytesNeeded -= atLargeBytesUsed
-	if atLargeBytesUsed != 0 {
+	if atLargeBytesUsed > 0 {
+		t.remainingAtLargeBytes -= atLargeBytesUsed
+		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
+		bytesNeeded -= atLargeBytesUsed
 		t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesUsed
-	}
-	if bytesNeeded == 0 { // If we've acquired enough bytes, return
-		t.lock.Unlock()
-		return
+		if bytesNeeded == 0 { // If we acquired enough bytes, return
+			t.lock.Unlock()
+			return
+		}
 	}
 
-	// Take as many bytes as we can from [nodeID]'s validator allocation, if any.
+	// Take as many bytes as we can from [nodeID]'s validator allocation.
 	// Calculate [nodeID]'s validator allocation size based on its weight
 	vdrAllocationSize := uint64(0)
 	weight, isVdr := t.vdrs.GetWeight(nodeID)
@@ -147,7 +158,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	// may take from its validator allocation.
 	vdrBytesAllowed := vdrAllocationSize
 	if vdrBytesAlreadyUsed >= vdrAllocationSize {
-		// We're using all the bytes we can from the validator allocation
+		// We're already using all the bytes we can from the validator allocation
 		vdrBytesAllowed = 0
 	} else {
 		vdrBytesAllowed -= vdrBytesAlreadyUsed
@@ -159,7 +170,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 		t.remainingVdrBytes -= vdrBytesUsed
 		t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
 		bytesNeeded -= vdrBytesUsed
-		if bytesNeeded == 0 { // If we've acquired enough bytes, return
+		if bytesNeeded == 0 { // If we acquired enough bytes, return
 			t.lock.Unlock()
 			return
 		}
@@ -167,6 +178,9 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 
 	// We still haven't acquired enough bytes to read the message.
 	// Wait until more bytes are released.
+
+	// [closeOnAcquireChan] is closed when [msgSize] bytes have
+	// been acquired and the message can be read.
 	closeOnAcquireChan := make(chan struct{})
 	t.nextMsgID++
 	msgID := ids.Empty.Prefix(t.nextMsgID)
@@ -181,10 +195,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.nodeToWaitingMsgIDs[nodeID] = append(t.nodeToWaitingMsgIDs[nodeID], msgID)
 	t.lock.Unlock()
 
-	<-closeOnAcquireChan // We've acquired the bytes
-
-	t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
-	t.metrics.awaitingRelease.Inc()
+	<-closeOnAcquireChan // We've acquired enough bytes
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
