@@ -93,7 +93,6 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 	if err := m.Alias(vmID, vmID.String()); err != nil {
 		return err
 	}
-
 	m.vmFactories[vmID] = factory
 
 	// add the static API endpoints
