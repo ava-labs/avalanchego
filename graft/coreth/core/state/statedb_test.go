@@ -43,6 +43,10 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb/memorydb"
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -1016,4 +1020,51 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(1))
 	_, _ = stateDB.Commit(false)
 	assertBalances(11, 267, 512)
+}
+
+func TestGenerateMulticoinAccounts(t *testing.T) {
+	var (
+		diskdb = memorydb.New()
+		triedb = trie.NewDatabase(diskdb)
+
+		accID   = []byte("acc-1")
+		accHash = crypto.Keccak256Hash(accID)
+
+		coinID    = []byte{'c', 'o', 'i', 'n', '1'}
+		conIDHash = crypto.Keccak256Hash(coinID)
+
+		balanceAsHash = common.HexToHash("0x000000000000000000000000000000000000000000000000000000000000000f")
+	)
+
+	// Create a state trie with a multicoin balance
+	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	stTrie.Update(coinID, balanceAsHash.Bytes())
+	stTrie.Commit(nil)
+
+	// Create an account trie with an account containing our state trie
+	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
+	acc := &snapshot.Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: crypto.Keccak256Hash(nil).Bytes(), IsMultiCoin: true}
+	val, _ := rlp.EncodeToBytes(acc)
+	accTrie.Update(accID, val)
+	root, _ := accTrie.Commit(nil)
+
+	// Build snapshot from scratch
+	snaps, err := snapshot.New(diskdb, triedb, 16, common.Hash{}, root, false, true, true)
+	if err != nil {
+		t.Error("Unexpected error while rebuilding snapshot:", err)
+	}
+
+	// Get latest snapshot and make sure it has the correct account and storage
+	snap := snaps.Snapshot(root)
+	acc, _ = snap.Account(accHash)
+	if !acc.IsMultiCoin {
+		t.Error("Expected account to be multicoin")
+	}
+
+	// Load the coin1 balance from the account's storage and make sure it has
+	// the correct value
+	storageBytes, _ := snap.Storage(accHash, conIDHash)
+	if !bytes.Equal(storageBytes, balanceAsHash.Bytes()) {
+		t.Error("Incorrect storage bytes")
+	}
 }
