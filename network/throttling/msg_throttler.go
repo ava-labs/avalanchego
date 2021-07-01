@@ -81,6 +81,8 @@ func NewSybilMsgThrottler(
 
 // msgThrottler implements MsgThrottler.
 // It gives more space to validators with more stake.
+// Messages are guaranteed to make progress toward
+// acquiring enough bytes to be read.
 type sybilMsgThrottler struct {
 	log       logging.Logger
 	metrics   sybilMsgThrottlerMetrics
