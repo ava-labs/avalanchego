@@ -112,6 +112,7 @@ type sybilMsgThrottler struct {
 	// are the same in nodeToWaitingMsgIDs[nodeID] and waitingToAcquire[nodeID].
 	// That is, if nodeToAtLargeBytesUsed[nodeID] is [msg0, msg1, msg2]
 	// then	waitingToAcquire is [..., msg0, ..., msg1, ..., msg2, ...]
+	// where each ... is 0 or more messages
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
