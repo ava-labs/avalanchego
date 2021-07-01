@@ -62,7 +62,6 @@ func NewSybilMsgThrottler(
 ) (MsgThrottler, error) {
 	t := &sybilMsgThrottler{
 		log:                    log,
-		lock:                   sync.RWMutex{},
 		vdrs:                   vdrs,
 		maxVdrBytes:            config.VdrAllocSize,
 		remainingVdrBytes:      config.VdrAllocSize,
@@ -71,7 +70,7 @@ func NewSybilMsgThrottler(
 		nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
 		nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
 		waitingToAcquire:       linkedhashmap.New(),
-		nodeToWaitingMsgIDs:    make(map[ids.ShortID][]ids.ID),
+		nodeToWaitingMsgIDs:    make(map[ids.ShortID][]uint64),
 	}
 	if err := t.metrics.initialize(metricsRegisterer); err != nil {
 		return nil, err
@@ -106,7 +105,7 @@ type sybilMsgThrottler struct {
 	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
 	// Node ID --> IDs of messages this node is waiting to acquire,
 	// order from oldest to most recent.
-	nodeToWaitingMsgIDs map[ids.ShortID][]ids.ID
+	nodeToWaitingMsgIDs map[ids.ShortID][]uint64
 	// Msg ID --> *msgMetadata
 	waitingToAcquire linkedhashmap.LinkedHashmap
 	// Invariant: The relative order of messages from a given node
@@ -194,7 +193,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	// been acquired and the message can be read.
 	closeOnAcquireChan := make(chan struct{})
 	t.nextMsgID++
-	msgID := ids.Empty.Prefix(t.nextMsgID)
+	msgID := t.nextMsgID
 	t.waitingToAcquire.Put(
 		msgID,
 		&msgMetadata{
@@ -212,12 +211,11 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
 func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	t.lock.Lock()
-	defer t.lock.Unlock()
 	defer func() {
-		// The lock is held here because defers are executed LIFO
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
 		t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
 		t.metrics.awaitingRelease.Dec()
+		t.lock.Unlock()
 	}()
 
 	// [vdrBytesToReturn] is the number of bytes from [msgSize]
