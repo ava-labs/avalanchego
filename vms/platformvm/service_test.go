@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -54,7 +55,7 @@ func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	ks, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
 	if err != nil {
 		t.Fatal(err)
 	}
