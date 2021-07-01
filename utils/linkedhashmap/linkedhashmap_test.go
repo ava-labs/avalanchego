@@ -85,3 +85,87 @@ func TestLinkedHashmap(t *testing.T) {
 	assert.True(exists, "should have found the value")
 	assert.Equal(1, val1, "wrong value")
 }
+
+func TestIterator(t *testing.T) {
+	assert := assert.New(t)
+	id1, id2, id3 := ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID()
+
+	// Case: No elements
+	{
+		lh := New()
+		iter := lh.NewIterator()
+		assert.NotNil(iter)
+		// Should immediately be exhausted
+		assert.False(iter.Next())
+		assert.False(iter.Next())
+		// Should be empty
+		assert.EqualValues(ids.Empty, iter.Key())
+		assert.Nil(iter.Value())
+	}
+
+	// Case: 1 element
+	{
+		lh := New()
+		iter := lh.NewIterator()
+		assert.NotNil(iter)
+		lh.Put(id1, 1)
+		assert.True(iter.Next())
+		assert.EqualValues(id1, iter.Key())
+		assert.EqualValues(1, iter.Value())
+		// Should be empty
+		assert.False(iter.Next())
+		// Re-assign id1 --> 10
+		lh.Put(id1, 10)
+		iter = lh.NewIterator() // New iterator
+		assert.True(iter.Next())
+		assert.EqualValues(id1, iter.Key())
+		assert.EqualValues(10, iter.Value())
+		// Should be empty
+		assert.False(iter.Next())
+		// Delete id1
+		lh.Delete(id1)
+		iter = lh.NewIterator()
+		assert.NotNil(iter)
+		// Should immediately be exhausted
+		assert.False(iter.Next())
+	}
+
+	// Case: Multiple elements
+	{
+		lh := New()
+		lh.Put(id1, 1)
+		lh.Put(id2, 2)
+		lh.Put(id3, 3)
+		iter := lh.NewIterator()
+		// Should give back all 3 elements
+		assert.True(iter.Next())
+		assert.EqualValues(id1, iter.Key())
+		assert.EqualValues(1, iter.Value())
+		assert.True(iter.Next())
+		assert.EqualValues(id2, iter.Key())
+		assert.EqualValues(2, iter.Value())
+		assert.True(iter.Next())
+		assert.EqualValues(id3, iter.Key())
+		assert.EqualValues(3, iter.Value())
+		// Should be exhausted
+		assert.False(iter.Next())
+	}
+
+	// Case: Delete element that has been iterated over
+	{
+		lh := New()
+		lh.Put(id1, 1)
+		lh.Put(id2, 2)
+		lh.Put(id3, 3)
+		iter := lh.NewIterator()
+		assert.True(iter.Next())
+		assert.True(iter.Next())
+		lh.Delete(id1)
+		lh.Delete(id2)
+		assert.True(iter.Next())
+		assert.EqualValues(id3, iter.Key())
+		assert.EqualValues(3, iter.Value())
+		// Should be exhausted
+		assert.False(iter.Next())
+	}
+}
