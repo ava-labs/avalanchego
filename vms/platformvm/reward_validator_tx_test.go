@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -375,7 +376,7 @@ func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 
 func TestUptimeDisallowed(t *testing.T) {
 	_, genesisBytes := defaultGenesis()
-	db := manager.NewDefaultMemDBManager()
+	db := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	firstDB := db.NewPrefixDBManager([]byte{})
 	firstVM := &VM{Factory: Factory{

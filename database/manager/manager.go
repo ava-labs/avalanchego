@@ -12,10 +12,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -71,10 +73,54 @@ type manager struct {
 	databases []*VersionedDatabase
 }
 
-// New creates a database manager at [filePath] by creating a database instance from each directory
-// with a version <= [currentVersion]. If [includePreviousVersions], opens previous database
-// versions and includes them in the returned Manager.
-func New(
+// NewRocksDB creates a database manager of rocksDBs at [filePath] by creating a
+// database instance from each directory with a version <= [currentVersion]. If
+// [includePreviousVersions], opens previous database versions and includes them
+// in the returned Manager.
+func NewRocksDB(
+	dbDirPath string,
+	log logging.Logger,
+	currentVersion version.Version,
+	includePreviousVersions bool,
+) (Manager, error) {
+	return new(
+		func(path string, log logging.Logger) (database.Database, error) {
+			return rocksdb.New(path, log)
+		},
+		dbDirPath,
+		log,
+		currentVersion,
+		includePreviousVersions,
+	)
+}
+
+// NewLevelDB creates a database manager of levelDBs at [filePath] by creating a
+// database instance from each directory with a version <= [currentVersion]. If
+// [includePreviousVersions], opens previous database versions and includes them
+// in the returned Manager.
+func NewLevelDB(
+	dbDirPath string,
+	log logging.Logger,
+	currentVersion version.Version,
+	includePreviousVersions bool,
+) (Manager, error) {
+	return new(
+		func(path string, log logging.Logger) (database.Database, error) {
+			return leveldb.New(path, log)
+		},
+		dbDirPath,
+		log,
+		currentVersion,
+		includePreviousVersions,
+	)
+}
+
+// new creates a database manager at [filePath] by creating a database instance
+// from each directory with a version <= [currentVersion]. If
+// [includePreviousVersions], opens previous database versions and includes them
+// in the returned Manager.
+func new(
+	newDB func(string, logging.Logger) (database.Database, error),
 	dbDirPath string,
 	log logging.Logger,
 	currentVersion version.Version,
@@ -82,7 +128,7 @@ func New(
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
 	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
-	currentDB, err := leveldb.New(currentDBPath, log, 0, 0, 0)
+	currentDB, err := newDB(currentDBPath, log)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create db at %s: %w", currentDBPath, err)
 	}
@@ -134,7 +180,7 @@ func New(
 			return filepath.SkipDir
 		}
 
-		db, err := leveldb.New(path, log, 0, 0, 0)
+		db, err := newDB(path, log)
 		if err != nil {
 			return fmt.Errorf("couldn't create db at %s: %w", path, err)
 		}
@@ -158,14 +204,14 @@ func New(
 	return manager, nil
 }
 
-// NewDefaultMemDBManager returns a database manager with a single memdb instance
-// with the current database version
-func NewDefaultMemDBManager() Manager {
+// NewMemDB returns a database manager with a single memdb instance with
+// [currentVersion].
+func NewMemDB(currentVersion version.Version) Manager {
 	return &manager{
 		databases: []*VersionedDatabase{
 			{
 				Database: memdb.New(),
-				Version:  version.DefaultVersion1_0_0,
+				Version:  currentVersion,
 			},
 		},
 	}

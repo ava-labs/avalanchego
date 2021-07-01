@@ -168,7 +168,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.NetworkID = networkID
 
 	// DB:
-	nodeConfig.DBEnabled = v.GetBool(DBEnabledKey)
+	nodeConfig.DBName = v.GetString(DBTypeKey)
 	nodeConfig.DBPath = filepath.Join(
 		os.ExpandEnv(v.GetString(DBPathKey)),
 		constants.NetworkName(nodeConfig.NetworkID),
