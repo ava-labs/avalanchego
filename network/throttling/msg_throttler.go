@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -33,6 +34,12 @@ type MsgThrottler interface {
 	Release(msgSize uint64, nodeID ids.ShortID)
 }
 
+type msgMetadata struct {
+	bytesNeeded        uint64
+	nodeID             ids.ShortID
+	closeOnAcquireChan chan struct{}
+}
+
 // See sybilMsgThrottler
 type MsgThrottlerConfig struct {
 	VdrAllocSize        uint64
@@ -51,7 +58,7 @@ func NewSybilMsgThrottler(
 ) (MsgThrottler, error) {
 	t := &sybilMsgThrottler{
 		log:                    log,
-		cond:                   sync.NewCond(&sync.Mutex{}),
+		lock:                   sync.RWMutex{},
 		vdrs:                   vdrs,
 		maxVdrBytes:            config.VdrAllocSize,
 		remainingVdrBytes:      config.VdrAllocSize,
@@ -59,6 +66,8 @@ func NewSybilMsgThrottler(
 		nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
 		nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
 		nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+		waitingToAcquire:       linkedhashmap.New(),
+		nodeToWaitingMsgIDs:    make(map[ids.ShortID][]ids.ID),
 	}
 	if err := t.metrics.initialize(metricsRegisterer); err != nil {
 		return nil, err
@@ -71,7 +80,7 @@ func NewSybilMsgThrottler(
 type sybilMsgThrottler struct {
 	log     logging.Logger
 	metrics sybilMsgThrottlerMetrics
-	cond    *sync.Cond
+	lock    sync.RWMutex
 	// Primary network validator set
 	vdrs validators.Set
 	// Max number of unprocessed bytes from validators
@@ -88,96 +97,197 @@ type sybilMsgThrottler struct {
 	nodeToVdrBytesUsed map[ids.ShortID]uint64
 	// Node ID --> Bytes they've taken from the at-large allocation
 	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
+	// Node ID --> Messages from this node waiting to acquire
+	nodeToWaitingMsgIDs map[ids.ShortID][]ids.ID
+	// Msg ID --> Msg
+	waitingToAcquire linkedhashmap.LinkedHashmap
+	nextMsgID        uint64
 }
 
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
 func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
-	t.cond.L.Lock()
-	defer t.cond.L.Unlock()
-
 	t.metrics.awaitingAcquire.Inc()
 	startTime := time.Now()
+	defer func() {
+		t.metrics.awaitingAcquire.Dec()
+		t.metrics.awaitingRelease.Inc()
+		t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
+	}()
+	bytesNeeded := msgSize
 
-	for { // [t.cond.L] is held while in this loop
-		// Number of bytes this node can take from at-large allocation.
-		atLargeBytesAllowed := math.Min64(
-			t.nodeMaxAtLargeBytes-t.nodeToAtLargeBytesUsed[nodeID],
-			t.remainingAtLargeBytes,
-		)
-
-		// Calculate [nodeID]'s validator allocation size based on its weight
-		vdrAllocationSize := uint64(0)
-		weight, isVdr := t.vdrs.GetWeight(nodeID)
-		if isVdr && weight != 0 {
-			vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
-		}
-		vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
-		// [vdrBytesAllowed] is the number of bytes this node
-		// can take from validator allocation.
-		vdrBytesAllowed := vdrAllocationSize
-		if vdrBytesAlreadyUsed >= vdrAllocationSize {
-			// We're using all the bytes we can from the validator allocation
-			vdrBytesAllowed = 0
-		} else {
-			vdrBytesAllowed -= vdrBytesAlreadyUsed
-		}
-
-		// Can't acquire enough bytes yet. Wait until more are released.
-		if vdrBytesAllowed+atLargeBytesAllowed < msgSize {
-			t.cond.Wait()
-			continue
-		}
-
-		atLargeBytesUsed := math.Min64(msgSize, atLargeBytesAllowed)
-		t.remainingAtLargeBytes -= atLargeBytesUsed
-		if atLargeBytesUsed != 0 {
-			t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesUsed
-		}
-
-		vdrBytesUsed := msgSize - atLargeBytesUsed
-		t.remainingVdrBytes -= vdrBytesUsed
-		if vdrBytesUsed != 0 {
-			t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
-		}
-		break
-	}
-	t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
+	t.lock.Lock()
+	// Take as many bytes as we can from the at-large allocation.
+	atLargeBytesAllowed := math.Min64(
+		t.nodeMaxAtLargeBytes-t.nodeToAtLargeBytesUsed[nodeID],
+		t.remainingAtLargeBytes,
+	)
+	atLargeBytesUsed := math.Min64(bytesNeeded, atLargeBytesAllowed)
+	t.remainingAtLargeBytes -= atLargeBytesUsed
 	t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
-	t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
-	t.metrics.awaitingAcquire.Dec()
+	bytesNeeded -= atLargeBytesUsed
+	if atLargeBytesUsed != 0 {
+		t.nodeToAtLargeBytesUsed[nodeID] += atLargeBytesUsed
+	}
+	if bytesNeeded == 0 { // If we've acquired enough bytes, return
+		t.lock.Unlock()
+		return
+	}
+
+	// Take as many bytes as we can from [nodeID]'s validator allocation, if any.
+	// Calculate [nodeID]'s validator allocation size based on its weight
+	vdrAllocationSize := uint64(0)
+	weight, isVdr := t.vdrs.GetWeight(nodeID)
+	if isVdr && weight != 0 {
+		vdrAllocationSize = uint64(float64(t.maxVdrBytes) * float64(weight) / float64(t.vdrs.Weight()))
+	}
+	vdrBytesAlreadyUsed := t.nodeToVdrBytesUsed[nodeID]
+	// [vdrBytesAllowed] is the number of bytes this node
+	// may take from its validator allocation.
+	vdrBytesAllowed := vdrAllocationSize
+	if vdrBytesAlreadyUsed >= vdrAllocationSize {
+		// We're using all the bytes we can from the validator allocation
+		vdrBytesAllowed = 0
+	} else {
+		vdrBytesAllowed -= vdrBytesAlreadyUsed
+	}
+	vdrBytesUsed := math.Min64(bytesNeeded, vdrBytesAllowed)
+	if vdrBytesUsed > 0 {
+		// Mark that [nodeID] used [vdrBytesUsed] from its validator allocation
+		t.nodeToVdrBytesUsed[nodeID] += vdrBytesUsed
+		t.remainingVdrBytes -= vdrBytesUsed
+		t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
+		bytesNeeded -= vdrBytesUsed
+		if bytesNeeded == 0 { // If we've acquired enough bytes, return
+			t.lock.Unlock()
+			return
+		}
+	}
+
+	// We still haven't acquired enough bytes to read the message.
+	// Wait until more bytes are released.
+	closeOnAcquireChan := make(chan struct{})
+	t.nextMsgID++
+	msgID := ids.Empty.Prefix(t.nextMsgID)
+	t.waitingToAcquire.Put(
+		msgID,
+		&msgMetadata{
+			bytesNeeded:        bytesNeeded,
+			nodeID:             nodeID,
+			closeOnAcquireChan: closeOnAcquireChan,
+		},
+	)
+	t.nodeToWaitingMsgIDs[nodeID] = append(t.nodeToWaitingMsgIDs[nodeID], msgID)
+	t.lock.Unlock()
+
+	<-closeOnAcquireChan // We've acquired the bytes
+
+	t.metrics.acquireLatency.Observe(float64(time.Since(startTime)))
 	t.metrics.awaitingRelease.Inc()
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
 func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
-	t.cond.L.Lock()
-	defer t.cond.L.Unlock()
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	defer func() {
+		// The lock is held here because defers are executed LIFO
+		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
+		t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
+		t.metrics.awaitingRelease.Dec()
+	}()
 
-	// Release as many bytes as possible back to [nodeID]'s validator allocation
+	// [vdrBytesToReturn] is the number of bytes from [msgSize]
+	// that will be given back to [nodeID]'s validator allocation
+	// or messages from [nodeID] currently waiting to acquire bytes.
 	vdrBytesUsed := t.nodeToVdrBytesUsed[nodeID]
-	vdrBytesReturned := math.Min64(msgSize, vdrBytesUsed)
-	t.remainingVdrBytes += vdrBytesReturned
-	t.nodeToVdrBytesUsed[nodeID] -= vdrBytesReturned
-	if t.nodeToVdrBytesUsed[nodeID] == 0 {
-		delete(t.nodeToVdrBytesUsed, nodeID)
+	vdrBytesToReturn := math.Min64(msgSize, vdrBytesUsed)
+
+	// [atLargeBytesToReturn] is the number of bytes from [msgSize]
+	// that will be given to the at-large allocation or a message
+	// from any node currently waiting to acquire bytes.
+	atLargeBytesToReturn := msgSize - vdrBytesToReturn
+	if atLargeBytesToReturn > 0 {
+		// Mark that [nodeID] has released these bytes.
+		t.remainingAtLargeBytes += atLargeBytesToReturn
+		t.nodeToAtLargeBytesUsed[nodeID] -= atLargeBytesToReturn
+		if t.nodeToAtLargeBytesUsed[nodeID] == 0 {
+			delete(t.nodeToAtLargeBytesUsed, nodeID)
+		}
+
+		// Iterates over messages waiting to acquire bytes from oldest
+		// (waiting the longest) to newest. Try to give bytes to the
+		// oldest message, then next oldest, etc. until there are no
+		// waiting messages or we exhaust the bytes.
+		iter := t.waitingToAcquire.NewIterator()
+		for t.remainingAtLargeBytes > 0 && iter.Next() {
+			msg := iter.Value().(*msgMetadata)
+			// From the at-large allocation, take the maximum number of bytes
+			// without exceeding the per-node limit on taking from at-large pool.
+			atLargeBytesGiven := math.Min64(
+				// don't give [msg] too many bytes
+				msg.bytesNeeded,
+				// don't exceed per-node limit
+				t.nodeMaxAtLargeBytes-t.nodeToAtLargeBytesUsed[msg.nodeID],
+				// don't give more bytes than are in the allocation
+				t.remainingAtLargeBytes,
+			)
+			if atLargeBytesGiven > 0 {
+				// Mark that we gave [atLargeBytesGiven] to [msg]
+				t.nodeToAtLargeBytesUsed[msg.nodeID] += atLargeBytesGiven
+				t.remainingAtLargeBytes -= atLargeBytesGiven
+				atLargeBytesToReturn -= atLargeBytesGiven
+				msg.bytesNeeded -= atLargeBytesGiven
+			}
+			if msg.bytesNeeded == 0 {
+				// [msg] has acquired enough bytes to be read.
+				// Unblock the corresponding thread in Acquire
+				close(msg.closeOnAcquireChan)
+				// Mark that this message is no longer waiting to acquire bytes
+				t.nodeToWaitingMsgIDs[msg.nodeID] = t.nodeToWaitingMsgIDs[msg.nodeID][1:]
+				if len(t.nodeToWaitingMsgIDs[msg.nodeID]) == 0 {
+					delete(t.nodeToWaitingMsgIDs, msg.nodeID)
+				}
+				t.waitingToAcquire.Delete(iter.Key())
+			}
+		}
 	}
 
-	// Release the rest of the bytes, if any, back to the at-large allocation
-	atLargeBytesReturned := msgSize - vdrBytesReturned
-	t.remainingAtLargeBytes += atLargeBytesReturned
-	t.nodeToAtLargeBytesUsed[nodeID] -= atLargeBytesReturned
-	if t.nodeToAtLargeBytesUsed[nodeID] == 0 {
-		delete(t.nodeToAtLargeBytesUsed, nodeID)
+	for vdrBytesToReturn > 0 && len(t.nodeToWaitingMsgIDs[nodeID]) > 0 {
+		// Get the next message from [nodeID] waiting to acquire
+		msgID := t.nodeToWaitingMsgIDs[nodeID][0]
+		msgIntf, exists := t.waitingToAcquire.Get(msgID)
+		if !exists {
+			// This should never happen
+			t.log.Warn("couldn't find message %s from %s%s", msgID, constants.NodeIDPrefix, nodeID)
+			break
+		}
+		// Give [msg] all the bytes we can
+		msg := msgIntf.(*msgMetadata)
+		bytesToGive := math.Min64(msg.bytesNeeded, vdrBytesToReturn)
+		msg.bytesNeeded -= bytesToGive
+		vdrBytesToReturn -= bytesToGive
+		if msg.bytesNeeded == 0 {
+			// Unblock the corresponding thread in Acquire
+			close(msg.closeOnAcquireChan)
+			// Mark that this message is no longer waiting to acquire bytes
+			t.nodeToWaitingMsgIDs[nodeID] = t.nodeToWaitingMsgIDs[nodeID][1:]
+			if len(t.nodeToWaitingMsgIDs[nodeID]) == 0 {
+				delete(t.nodeToWaitingMsgIDs, nodeID)
+			}
+			t.waitingToAcquire.Delete(msgID)
+		}
 	}
-
-	t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
-	t.metrics.remainingVdrBytes.Set(float64(t.remainingVdrBytes))
-	t.metrics.awaitingRelease.Dec()
-
-	// Notify that there are more bytes available
-	t.cond.Broadcast()
+	if vdrBytesToReturn > 0 {
+		// We gave back all the bytes we could to waiting messages from [nodeID]
+		// but some are still left.
+		t.nodeToVdrBytesUsed[nodeID] -= vdrBytesToReturn
+		if t.nodeToVdrBytesUsed[nodeID] == 0 {
+			delete(t.nodeToVdrBytesUsed, nodeID)
+		}
+		t.remainingVdrBytes += vdrBytesToReturn
+	}
 }
 
 type sybilMsgThrottlerMetrics struct {

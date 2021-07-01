@@ -18,12 +18,16 @@ func Max64(a, b uint64) uint64 {
 	return a
 }
 
-// Min64 ...
-func Min64(a, b uint64) uint64 {
-	if a < b {
-		return a
+// Min64 returns the minimum of [nums]
+// If len([nums]) == 0, returns math.MaxUint64
+func Min64(nums ...uint64) uint64 {
+	min := uint64(math.MaxUint64)
+	for _, num := range nums {
+		if num < min {
+			min = num
+		}
 	}
-	return b
+	return min
 }
 
 // Add64 ...
