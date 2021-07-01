@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -401,7 +402,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Outbound connection throttling
-	nodeConfig.NetworkConfig.DialerConfig = network.NewDialerConfig(
+	nodeConfig.NetworkConfig.DialerConfig = dialer.NewConfig(
 		v.GetUint32(OutboundConnectionThrottlingRps),
 		v.GetDuration(OutboundConnectionTimeout),
 	)

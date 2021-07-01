@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package dialer
 
 import (
 	"context"
@@ -30,13 +30,13 @@ type dialer struct {
 	connectionTimeout time.Duration
 }
 
-type DialerConfig struct {
+type Config struct {
 	throttleRps       uint32
 	connectionTimeout time.Duration
 }
 
-func NewDialerConfig(throttleRps uint32, dialTimeout time.Duration) DialerConfig {
-	return DialerConfig{
+func NewConfig(throttleRps uint32, dialTimeout time.Duration) Config {
+	return Config{
 		throttleRps,
 		dialTimeout,
 	}
@@ -47,7 +47,7 @@ func NewDialerConfig(throttleRps uint32, dialTimeout time.Duration) DialerConfig
 // [dialerConfig.connectionTimeout] gives the timeout when dialing an IP.
 // [dialerConfig.throttleRps] gives the max number of outgoing connection attempts/second.
 // If [dialerConfig.throttleRps] == 0, outgoing connections aren't rate-limited.
-func NewDialer(network string, dialerConfig DialerConfig, log logging.Logger) Dialer {
+func NewDialer(network string, dialerConfig Config, log logging.Logger) Dialer {
 	var throttler throttling.DialThrottler
 	if dialerConfig.throttleRps <= 0 {
 		throttler = throttling.NewNoDialThrottler()

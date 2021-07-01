@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -168,8 +169,6 @@ func (n *Node) initNetworking() error {
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
 
-	dialer := network.NewDialer(TCP, n.Config.NetworkConfig.DialerConfig, n.Log)
-
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
 		return errInvalidTLSKey
@@ -251,7 +250,7 @@ func (n *Node) initNetworking() error {
 		versionManager,
 		version.NewDefaultApplicationParser(),
 		listener,
-		dialer,
+		dialer.NewDialer(TCP, n.Config.NetworkConfig.DialerConfig, n.Log),
 		serverUpgrader,
 		clientUpgrader,
 		primaryNetworkValidators,
@@ -267,7 +266,6 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
-		n.Config.NetworkConfig.DialerConfig,
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
