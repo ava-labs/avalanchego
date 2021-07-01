@@ -113,12 +113,18 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
-		jsonTx, err := ToJsonTx(tx, service.vm)
-		if err != nil {
-			return err
+		outputs := make([]*avax.UTXO, len(tx.UTXOs()))
+		for _, utxo := range tx.UTXOs() {
+			fxIdx, err := service.vm.getFx(utxo.Out)
+			if err != nil {
+				return err
+			}
+			fx := service.vm.fxs[fxIdx]
+			utxo.FxID = fx.ID.String()
+			outputs = append(outputs, utxo)
+			service.vm.ctx.Log.Info("Setting FXID to %s", fx.ID.String())
 		}
-
-		reply.Tx = jsonTx
+		reply.Tx = tx
 	} else {
 		reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	}
