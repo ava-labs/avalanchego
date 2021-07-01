@@ -49,8 +49,8 @@ type TransferableOut interface {
 // TransferableOutput ...
 type TransferableOutput struct {
 	Asset `serialize:"true"`
-
-	Out TransferableOut `serialize:"true" json:"output"`
+	FxID  string          `serialize:"true" json:"fxID"`
+	Out   TransferableOut `serialize:"true" json:"output"`
 }
 
 // Output returns the feature extension output that this Output is using.

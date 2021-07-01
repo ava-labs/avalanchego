@@ -69,22 +69,14 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-type JSONTxOutput struct {
-	ID          string   `json:"id"`
-	AssetID     string   `json:"assetID"`
-	Amount      uint64   `json:"amount"`
-	Owners      []string `json:"owners"`
-	Threshold   uint32   `json:"threshold"`
-	Locktime    uint64   `json:"locktime"`
-	TypeID      int      `json:"typeID"`
-	OutputIndex uint32   `json:"outputIndex"`
-}
-
+// JSONTx JSON representation of the transaction object
 type JSONTx struct {
-	ID      string         `json:"id"`
-	Status  string         `json:"status"`
-	Outputs []JSONTxOutput `json:"outputs"`
-	Inputs  []JSONTxOutput `json:"inputs"`
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	// Outputs we use []interface{} here since we cannot reference []*avax.UTXO due to circular dependency problem
+	Outputs []interface{} `json:"outputs"`
+	// Inputs we use []interface{} here since we cannot reference []*avax.UTXOID due to circular dependency problem
+	Inputs []interface{} `json:"inputs"`
 }
 
 type FormattedTx struct {
@@ -124,7 +116,7 @@ type GetUTXOsReply struct {
 	// Number of UTXOs returned
 	NumFetched json.Uint64 `json:"numFetched"`
 	// The UTXOs
-	UTXOs []string `json:"utxos"`
+	UTXOs []interface{} `json:"utxos"`
 	// The last UTXO that was returned, and the address it corresponds to.
 	// Used for pagination. To get the rest of the UTXOs, call GetUTXOs
 	// again and set [StartIndex] to this value.

@@ -115,54 +115,12 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
-		// reference spent input utxos concatenated with output index
-		//inputs := make([]api.JSONTxOutput, len(tx.InputUTXOs()))
-		//for _, utxo := range tx.InputUTXOs() {
-		//	jsonTxOutput := api.JSONTxOutput{
-		//		AssetID: utxo.
-		//	}
-		//
-		//}
-
-		outputs := make([]api.JSONTxOutput, len(tx.UTXOs()))
-		for _, utxo := range tx.UTXOs() {
-			jsonTxOutput := api.JSONTxOutput{
-				AssetID: utxo.AssetID().String(),
-				ID:      utxo.UTXOID.String(),
-			}
-
-			jsonTxOutput.TypeID, err = service.vm.getFx(utxo.Out)
-			jsonTxOutput.OutputIndex = utxo.OutputIndex
-			if err != nil {
-				return err
-			}
-
-			if out, ok := utxo.Out.(*secp256k1fx.TransferOutput); ok {
-				jsonTxOutput.Amount = out.Amount()
-				jsonTxOutput.Threshold = out.Threshold
-				jsonTxOutput.Locktime = out.Locktime
-				var owners []string
-				for _, owner := range out.Addrs {
-					addr, err := service.vm.FormatLocalAddress(owner)
-					if err != nil {
-						return err
-					}
-					owners = append(owners, addr)
-				}
-				// include memo
-				// full base tx support
-				// implement all utxos method
-				jsonTxOutput.Owners = owners
-			}
-
-			outputs = append(outputs, jsonTxOutput)
+		jsonTx, err := ToJsonTx(tx, service.vm)
+		if err != nil {
+			return err
 		}
 
-		reply.Tx = api.JSONTx{
-			ID:      tx.txID.String(),
-			Status:  tx.status.String(),
-			Outputs: outputs,
-		}
+		reply.Tx = jsonTx
 	} else {
 		reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	}
@@ -171,6 +129,34 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 	}
 	reply.Encoding = args.Encoding
 	return nil
+}
+
+func ToJsonTx(tx UniqueTx, vm *VM) (*api.JSONTx, error) {
+	outputUtxos := tx.UTXOs()
+	outputs := make([]interface{}, len(outputUtxos))
+	for _, utxo := range outputUtxos {
+		fxIdx, err := vm.getFx(utxo.Out)
+		if err != nil {
+			return nil, err
+		}
+		fx := vm.fxs[fxIdx]
+		utxo.FxID = fx.ID.String()
+		outputs = append(outputs, *utxo)
+	}
+
+	inputUtxos := tx.InputUTXOs()
+	inputs := make([]interface{}, len(inputUtxos))
+	for _, utxoID := range inputUtxos {
+		inputs = append(inputs, *utxoID)
+	}
+
+	jsonTx := api.JSONTx{
+		ID:      tx.ID().String(),
+		Status:  tx.Status().String(),
+		Outputs: outputs,
+		Inputs:  inputs,
+	}
+	return &jsonTx, nil
 }
 
 // GetUTXOs gets all utxos for passed in addresses
@@ -244,7 +230,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	reply.UTXOs = make([]string, len(utxos))
+	reply.UTXOs = make([]interface{}, len(utxos))
 	for i, utxo := range utxos {
 		b, err := service.vm.codec.Marshal(codecVersion, utxo)
 		if err != nil {
@@ -837,7 +823,7 @@ type ExportKeyArgs struct {
 // ExportKeyReply is the response for ExportKey
 type ExportKeyReply struct {
 	// The decrypted PrivateKey for the Address provided in the arguments
-	PrivateKey string `json:"privateKey"`
+	PrivateKey interface{} `json:"privateKey"`
 }
 
 // ExportKey returns a private key from the provided user
@@ -865,7 +851,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
 	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
-	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
+	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr.(string) // since encoding above is CB58
 	return db.Close()
 }
 

@@ -18,8 +18,8 @@ var (
 type UTXO struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
-
-	Out verify.State `serialize:"true" json:"output"`
+	FxID   string       `serialize:"true" json:"fxID"`
+	Out    verify.State `serialize:"true" json:"output"`
 }
 
 // Verify implements the verify.Verifiable interface
