@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	snowEngine "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -39,7 +40,7 @@ func TestProposerBlockOptionsHandling(t *testing.T) {
 
 	// test
 	_, err := proBlk.Options()
-	if err != ErrInnerBlockNotOracle {
+	if err != snowEngine.ErrInnerBlockNotOracle {
 		t.Fatal("Proposer block should signal that it wraps a block not implementing Options interface with ErrNotOracleBlock error")
 	}
 

@@ -4,6 +4,7 @@
 package snowman
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
 
 const (
@@ -28,7 +28,10 @@ const (
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
-var _ Engine = &Transitive{}
+var (
+	_                      Engine = &Transitive{}
+	ErrInnerBlockNotOracle        = errors.New("core snowman block does not implement snowman.OracleBlock")
+)
 
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
@@ -109,7 +112,7 @@ func (t *Transitive) finishBootstrapping() error {
 	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
 		options, err := oracleBlk.Options()
 		switch {
-		case err == proposervm.ErrInnerBlockNotOracle:
+		case err == ErrInnerBlockNotOracle:
 			// if there aren't blocks we need to deliver on startup, we need to set
 			// the preference to the last accepted block
 			if err := t.VM.SetPreference(lastAcceptedID); err != nil {
@@ -671,7 +674,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	dropped := []snowman.Block{}
 	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options()
-		if err != proposervm.ErrInnerBlockNotOracle {
+		if err != ErrInnerBlockNotOracle {
 			if err != nil {
 				return err
 			}

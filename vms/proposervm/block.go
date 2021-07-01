@@ -22,6 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	snowEngine "github.com/ava-labs/avalanchego/snow/engine/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -32,12 +33,11 @@ const (
 )
 
 var (
-	ErrInnerBlockNotOracle = errors.New("core snowman block does not implement snowman.OracleBlock")
-	ErrUnknownBlockType    = errors.New("unknown proposer block types")
-	ErrProBlkWrongParent   = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
-	ErrProBlkBadTimestamp  = errors.New("proposer block timestamp outside tolerance window")
-	ErrProBlkWrongHeight   = errors.New("proposer block has wrong height")
-	ErrFork                = errors.New("proposer block fork not acceptable")
+	ErrUnknownBlockType   = errors.New("unknown proposer block types")
+	ErrProBlkWrongParent  = errors.New("proposer block's parent does not wrap proposer block's core block's parent")
+	ErrProBlkBadTimestamp = errors.New("proposer block timestamp outside tolerance window")
+	ErrProBlkWrongHeight  = errors.New("proposer block has wrong height")
+	ErrFork               = errors.New("proposer block fork not acceptable")
 )
 
 type ProposerBlock struct {
@@ -178,5 +178,5 @@ func (pb *ProposerBlock) Options() ([2]snowman.Block, error) {
 		return oracleBlk.Options()
 	}
 
-	return [2]snowman.Block{}, ErrInnerBlockNotOracle
+	return [2]snowman.Block{}, snowEngine.ErrInnerBlockNotOracle
 }
