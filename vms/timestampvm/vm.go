@@ -16,13 +16,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/core"
 )
 
 const (
 	dataLen      = 32
 	codecVersion = 0
-	version      = "native"
 )
 
 var (
@@ -112,7 +112,7 @@ func (vm *VM) Initialize(
 }
 
 func (vm *VM) Version() (string, error) {
-	return version, nil
+	return version.Current.String(), nil
 }
 
 // CreateHandlers returns a map where:

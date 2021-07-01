@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -62,8 +63,6 @@ const (
 
 	// Maximum future start time for staking/delegating
 	maxFutureStartTime = 24 * 7 * 2 * time.Hour
-
-	vmVersion = "native"
 )
 
 var (
@@ -406,7 +405,7 @@ func (vm *VM) NotifyBlockReady() {
 }
 
 func (vm *VM) Version() (string, error) {
-	return vmVersion, nil
+	return version.Current.String(), nil
 }
 
 // CreateHandlers returns a map where:

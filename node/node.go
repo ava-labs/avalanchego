@@ -838,7 +838,7 @@ func (n *Node) initInfoAPI() error {
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
 		n.Log,
-		version.Current,
+		version.CurrentApp,
 		n.ID,
 		n.Config.NetworkID,
 		n.chainManager,
@@ -973,7 +973,7 @@ func (n *Node) Initialize(
 	}
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
-	n.Log.Info("node version is: %s", version.Current)
+	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 

@@ -56,11 +56,11 @@ type manager struct {
 	// alias of the VM. That is, [VM].String() is an alias for the VM, too.
 	ids.Aliaser
 
-	// Key: The key underlying a VM's ID
+	// Key: A VM's ID
 	// Value: A factory that creates new instances of that VM
 	factories map[ids.ID]Factory
 
-	// Key: The key underlying a VM's ID
+	// Key: A VM's ID
 	// Value: version the VM returned
 	versions map[ids.ID]string
 
@@ -126,8 +126,7 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 		m.log.Error("fetching version for %q errored with: %s", vmID, err)
 
 		if err := commonVM.Shutdown(); err != nil {
-			m.log.Error("shutting down VM errored with: %s", err)
-			return err
+			return fmt.Errorf("shutting down VM errored with: %s", err)
 		}
 		return nil
 	}
@@ -138,8 +137,7 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 		m.log.Error("creating static API endpoints for %q errored with: %s", vmID, err)
 
 		if err := commonVM.Shutdown(); err != nil {
-			m.log.Error("shutting down VM errored with: %s", err)
-			return err
+			return fmt.Errorf("shutting down VM errored with: %s", err)
 		}
 		return nil
 	}
@@ -152,13 +150,19 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 	for extension, service := range handlers {
 		m.log.Verbo("adding static API endpoint: %s%s", defaultEndpoint, extension)
 		if err := m.apiServer.AddRoute(service, lock, defaultEndpoint, extension, m.log); err != nil {
-			m.log.Warn("failed to add static API endpoint %s%s: %s", defaultEndpoint, extension, err)
-			return err
+			return fmt.Errorf(
+				"failed to add static API endpoint %s%s: %s",
+				defaultEndpoint,
+				extension,
+				err,
+			)
 		}
 	}
 	return nil
 }
 
+// Versions returns the primary alias of the VM mapped to the reported version
+// of the VM for all the registered VMs that reported versions.
 func (m *manager) Versions() (map[string]string, error) {
 	versions := make(map[string]string, len(m.versions))
 	for vmID, version := range m.versions {

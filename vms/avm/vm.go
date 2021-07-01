@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -48,8 +49,6 @@ const (
 	maxUTXOsToFetch    = 1024
 
 	codecVersion = 0
-
-	version = "native"
 )
 
 var (
@@ -270,7 +269,7 @@ func (vm *VM) Shutdown() error {
 
 // Get implements the avalanche.DAGVM interface
 func (vm *VM) Version() (string, error) {
-	return version, nil
+	return version.Current.String(), nil
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface
