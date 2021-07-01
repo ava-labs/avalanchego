@@ -80,7 +80,9 @@ type JSONTx struct {
 }
 
 type GetTxReply struct {
-	Tx       interface{}         `json:"tx,omitempty"`
+	// Tx is in [string] format when [GetTxArgs.Encoding] is [Encoding.Hex] or [Encoding.CB58]
+	// Tx is an JSONTx object when [GetTxArgs.Encoding] is [Encoding.JSON]
+	Tx       interface{}         `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
