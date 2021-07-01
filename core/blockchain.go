@@ -1192,7 +1192,8 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 // potential missing transactions and post an event about them.
 func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	var (
-		newHeadHeight = newBlock.NumberU64()
+		newHead = newBlock
+		oldHead = oldBlock
 
 		newChain    types.Blocks
 		oldChain    types.Blocks
@@ -1295,7 +1296,7 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		logFn(msg, "number", commonBlock.Number(), "hash", commonBlock.Hash(),
 			"drop", len(oldChain), "dropfrom", oldChain[0].Hash(), "add", len(newChain), "addfrom", newChain[0].Hash())
 	} else {
-		log.Warn("Unlikely reorg (rewind to ancestor) occurred", "oldnum", oldBlock.Number(), "oldhash", oldBlock.Hash(), "newnum", newBlock.Number(), "newhash", newBlock.Hash())
+		log.Warn("Unlikely reorg (rewind to ancestor) occurred", "oldnum", oldHead.Number(), "oldhash", oldHead.Hash(), "newnum", newHead.Number(), "newhash", newHead.Hash())
 	}
 	// Insert the new chain(except the head block(reverse order)),
 	// taking care of the proper incremental order.
@@ -1309,11 +1310,11 @@ func (bc *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	// Delete any canonical number assignments above the new head
 	indexesBatch := bc.db.NewBatch()
 
-	// Use [newHeadHeight] to determine which canonical hashes to remove
+	// Use the height of [newHead] to determine which canonical hashes to remove
 	// in case the new chain is shorter than the old chain, in which case
 	// there may be hashes set on the canonical chain that were invalidated
-	// but not yet overwritten by the re-org.s
-	for i := newHeadHeight + 1; ; i++ {
+	// but not yet overwritten by the re-org.
+	for i := newHead.NumberU64() + 1; ; i++ {
 		hash := rawdb.ReadCanonicalHash(bc.db, i)
 		if hash == (common.Hash{}) {
 			break
