@@ -387,6 +387,7 @@ func (vm *VM) IssueTx(b []byte) (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
+	vm.addressTxsIndexer.Reset()
 	if err := tx.verifyWithoutCacheWrites(); err != nil {
 		return ids.ID{}, err
 	}

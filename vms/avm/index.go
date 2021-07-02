@@ -31,6 +31,7 @@ type AddressTxsIndexer interface {
 	AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error
 	Write(txID ids.ID) error
 	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
+	Reset()
 }
 
 // indexer implements AddressTxsIndexer
@@ -143,7 +144,7 @@ func (i *indexer) Write(txID ids.ID) error {
 
 // Read returns IDs of transactions that changed [address]'s balance of [assetID],
 // starting at [cursor], in order of transaction acceptance. e.g. if [cursor] == 1, does
-// not return the first transaction that changed the balance. This is for for pagination. 
+// not return the first transaction that changed the balance. This is for for pagination.
 // Returns at most [pageSize] elements.
 func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
 	// setup prefix DBs
@@ -213,6 +214,8 @@ func (i *noIndexer) AddUTXOs([]*avax.UTXO) {}
 func (i *noIndexer) Write(ids.ID) error {
 	return nil
 }
+
+func (i *noIndexer) Reset() {}
 
 func (i *noIndexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
 	return nil, nil
