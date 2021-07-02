@@ -98,7 +98,6 @@ type GetTxsReply struct {
 }
 
 // GetTxs returns list of transactions for a given address
-// prefix db by assetId, API will provide a field in request to allow filtering by assetId, else default to AVAX
 func (service *Service) GetTxs(r *http.Request, args *GetTxsArgs, reply *GetTxsReply) error {
 	pageSize := uint64(args.PageSize)
 	if pageSize == 0 || pageSize > maxPageSize {
@@ -111,6 +110,7 @@ func (service *Service) GetTxs(r *http.Request, args *GetTxsArgs, reply *GetTxsR
 		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
 	}
 
+	// Lookup assetID
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
 		return fmt.Errorf("specified `assetID` is invalid: %w", err)
