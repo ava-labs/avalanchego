@@ -354,7 +354,7 @@ func (b *Bootstrapper) checkFinish() error {
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedBlocks
 
-	// Note that executedVts < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
+	// Note that executedBlocks < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
 	if b.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {

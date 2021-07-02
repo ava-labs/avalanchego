@@ -20,6 +20,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -127,7 +129,7 @@ type network struct {
 	versionCompatibility               version.Compatibility
 	parser                             version.ApplicationParser
 	listener                           net.Listener
-	dialer                             Dialer
+	dialer                             dialer.Dialer
 	serverUpgrader                     Upgrader
 	clientUpgrader                     Upgrader
 	vdrs                               validators.Set // set of current validators in the Avalanche network
@@ -149,7 +151,6 @@ type network struct {
 	// Gossip a peer list to this many peers when gossiping
 	peerListGossipSize           int
 	peerListStakerGossipFraction int
-	dialerConfig                 DialerConfig
 	getVersionTimeout            time.Duration
 	allowPrivateIPs              bool
 	gossipAcceptedFrontierSize   uint
@@ -226,6 +227,19 @@ type network struct {
 	// Contains []byte. Used as an optimization.
 	// Can be accessed by multiple goroutines concurrently.
 	byteSlicePool sync.Pool
+
+	// Rate-limits incoming messages
+	msgThrottler throttling.MsgThrottler
+}
+
+type Config struct {
+	HealthConfig
+	throttling.MsgThrottlerConfig
+	timer.AdaptiveTimeoutConfig
+	DialerConfig     dialer.Config
+	MetricsNamespace string
+	// [Registerer] is set in node's initMetricsAPI method
+	MetricsRegisterer prometheus.Registerer
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -239,7 +253,7 @@ func NewDefaultNetwork(
 	versionCompatibility version.Compatibility,
 	parser version.ApplicationParser,
 	listener net.Listener,
-	dialer Dialer,
+	dialer dialer.Dialer,
 	serverUpgrader,
 	clientUpgrader Upgrader,
 	vdrs validators.Set,
@@ -255,10 +269,10 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
-	dialerConfig DialerConfig,
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
+	msgThrottler throttling.MsgThrottler,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -300,9 +314,9 @@ func NewDefaultNetwork(
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
-		dialerConfig,
 		tlsKey,
 		isFetchOnly,
+		msgThrottler,
 	)
 }
 
@@ -316,7 +330,7 @@ func NewNetwork(
 	versionCompatibility version.Compatibility,
 	parser version.ApplicationParser,
 	listener net.Listener,
-	dialer Dialer,
+	dialer dialer.Dialer,
 	serverUpgrader,
 	clientUpgrader Upgrader,
 	vdrs validators.Set,
@@ -347,9 +361,9 @@ func NewNetwork(
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
-	dialerConfig DialerConfig,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
+	msgThrottler throttling.MsgThrottler,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -381,7 +395,6 @@ func NewNetwork(
 		peerListGossipFreq:                 peerListGossipFreq,
 		peerListGossipSize:                 peerListGossipSize,
 		peerListStakerGossipFraction:       peerListStakerGossipFraction,
-		dialerConfig:                       dialerConfig,
 		getVersionTimeout:                  getVersionTimeout,
 		allowPrivateIPs:                    allowPrivateIPs,
 		gossipAcceptedFrontierSize:         gossipAcceptedFrontierSize,
@@ -407,6 +420,7 @@ func NewNetwork(
 				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
+		msgThrottler: msgThrottler,
 	}
 	netw.b = Builder{
 		getByteSlice: func() []byte {
@@ -415,7 +429,6 @@ func NewNetwork(
 	}
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-
 	if err := netw.initialize(registerer); err != nil {
 		log.Warn("initializing network metrics failed with: %s", err)
 	}
@@ -1490,6 +1503,7 @@ func (n *network) connected(p *peer) {
 	}
 
 	n.router.Connected(p.nodeID)
+	n.metrics.connected.Inc()
 }
 
 // should only be called after the peer is marked as connected.
@@ -1522,6 +1536,7 @@ func (n *network) disconnected(p *peer) {
 	if p.finishedHandshake.GetValue() {
 		n.router.Disconnected(p.nodeID)
 	}
+	n.metrics.disconnected.Inc()
 }
 
 // holds onto the peer object as a result of helper functions

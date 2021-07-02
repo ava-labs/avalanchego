@@ -106,10 +106,10 @@ func TestPeer_Close(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		NewDialerConfig(0, 30*time.Second),
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		defaultMsgThrottler,
 	)
 	assert.NotNil(t, netwrk)
 

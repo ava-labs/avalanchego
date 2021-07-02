@@ -24,7 +24,6 @@ linters:
     - gosimple
     - govet
     - ineffassign
-    - interfacer
     - misspell
     - nakedret
     - nolintlint
@@ -40,6 +39,7 @@ linters:
     # - lll
     # - gomnd
     # - goprintffuncname
+    # - interfacer
     # - staticcheck
     # - structcheck
     # - goerr113

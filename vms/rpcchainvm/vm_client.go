@@ -449,6 +449,17 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 	)
 }
 
+func (vm *VMClient) Version() (string, error) {
+	resp, err := vm.client.Version(
+		context.Background(),
+		&vmproto.VersionRequest{},
+	)
+	if err != nil {
+		return "", err
+	}
+	return resp.Version, nil
+}
+
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
 	vm *VMClient

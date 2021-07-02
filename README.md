@@ -18,6 +18,7 @@ Note that as network usage increases, hardware requirements may change.
 - Software Dependencies:
   - [Go](https://golang.org/doc/install) version >= 1.15.5 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
   - [gcc](https://gcc.gnu.org/)
+  - g++
 
 ### Native Install
 
