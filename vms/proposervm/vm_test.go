@@ -583,125 +583,133 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	}
 }
 
-// // VM persistency test section
-// func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
-// 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+// VM persistency test section
+func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 
-// 	// build two blocks on top of genesis
-// 	coreBlk1 := &snowman.TestBlock{
-// 		TestDecidable: choices.TestDecidable{
-// 			IDV: ids.GenerateTestID(),
-// 		},
-// 		ParentV: coreGenBlk,
-// 		BytesV:  []byte{1},
-// 		VerifyV: nil,
-// 	}
-// 	coreBlk2 := &snowman.TestBlock{
-// 		TestDecidable: choices.TestDecidable{
-// 			IDV: ids.GenerateTestID(),
-// 		},
-// 		ParentV: coreBlk1,
-// 		BytesV:  []byte{2},
-// 		VerifyV: nil,
-// 	}
-// 	coreBuildCalls := 0
-// 	coreVM.BuildBlockF = func() (snowman.Block, error) {
-// 		switch coreBuildCalls {
-// 		case 0:
-// 			coreBuildCalls++
-// 			return coreBlk1, nil
-// 		case 1:
-// 			coreBuildCalls++
-// 			return coreBlk2, nil
-// 		default:
-// 			t.Fatal("BuildBlock of coreVM called too many times")
-// 		}
-// 		return nil, nil
-// 	}
-// 	proBlk1, err := proVM.BuildBlock()
-// 	if err != nil {
-// 		t.Fatal("Could not build block")
-// 	}
+	// build two blocks on top of genesis
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.GenerateTestID(),
+		},
+		ParentV:    coreGenBlk,
+		BytesV:     []byte{1},
+		VerifyV:    nil,
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+	coreBlk2 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.GenerateTestID(),
+		},
+		ParentV:    coreBlk1,
+		BytesV:     []byte{2},
+		VerifyV:    nil,
+		TimestampV: coreBlk1.Timestamp(),
+	}
+	coreBuildCalls := 0
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		switch coreBuildCalls {
+		case 0:
+			coreBuildCalls++
+			return coreBlk1, nil
+		case 1:
+			coreBuildCalls++
+			return coreBlk2, nil
+		default:
+			t.Fatal("BuildBlock of coreVM called too many times")
+		}
+		return nil, nil
+	}
+	coreVM.CantParseBlock = true
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk1.Bytes()):
+			return coreBlk1, nil
+		case bytes.Equal(b, coreBlk2.Bytes()):
+			return coreBlk2, nil
+		default:
+			t.Fatal("ParseBlock of coreVM called with unknown block")
+			return nil, nil
+		}
+	}
 
-// 	// update preference to build next block
-// 	if err := proVM.SetPreference(proBlk1.ID()); err != nil {
-// 		t.Fatal("Could not set preference")
-// 	}
+	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
+	proBlk1, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build block")
+	}
 
-// 	proBlk2, err := proVM.BuildBlock()
-// 	if err != nil {
-// 		t.Fatal("Could not build block")
-// 	}
+	// update preference to build next block
+	if err := proVM.SetPreference(proBlk1.ID()); err != nil {
+		t.Fatal("Could not set preference")
+	}
 
-// 	// while inner cache, as it would happen upon node shutdown
-// 	proVM.state.wipeCache()
+	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
+	proBlk2, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatalf("failed to build block with %s", err)
+	}
+	// update preference to build next block
+	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
+		t.Fatal("Could not set preference")
+	}
 
-// 	// build a new block to show ops can resume smoothly
-// 	coreBlk3 := &snowman.TestBlock{
-// 		TestDecidable: choices.TestDecidable{
-// 			IDV: ids.GenerateTestID(),
-// 		},
-// 		ParentV: coreBlk2,
-// 		BytesV:  []byte{3},
-// 		VerifyV: nil,
-// 	}
-// 	coreVM.BuildBlockF = func() (snowman.Block, error) {
-// 		return coreBlk3, nil
-// 	}
-// 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-// 		switch {
-// 		case bytes.Equal(b, coreGenBlk.BytesV):
-// 			return coreGenBlk, nil
-// 		case bytes.Equal(b, coreBlk1.BytesV):
-// 			return coreBlk1, nil
-// 		case bytes.Equal(b, coreBlk2.BytesV):
-// 			return coreBlk2, nil
-// 		default:
-// 			t.Fatal("ParseBlock of coreVM called with unknown block")
-// 		}
-// 		return nil, nil
-// 	}
+	// forcefully wipe cache, as it would happen upon node shutdown
+	proVM.WipeCache()
 
-// 	// update preference to build next block
-// 	if err := proVM.SetPreference(proBlk2.ID()); err != nil {
-// 		t.Fatal("Could not set preference")
-// 	}
+	// build a new block to show ops can resume smoothly
+	coreBlk3 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV: ids.GenerateTestID(),
+		},
+		ParentV:    coreBlk2,
+		BytesV:     []byte{3},
+		VerifyV:    nil,
+		TimestampV: coreBlk2.Timestamp(),
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) {
+		return coreBlk3, nil
+	}
 
-// 	proBlk3, err := proVM.BuildBlock()
-// 	if err != nil {
-// 		t.Fatal("Could not build block")
-// 	}
+	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
+	proBlk3, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("Could not build block")
+	}
 
-// 	if proBlk3.Parent().ID() != proBlk2.ID() {
-// 		t.Fatal("Error in building Block")
-// 	}
+	if proBlk3.Parent().ID() != proBlk2.ID() {
+		t.Fatal("Error in building Block")
+	}
 
-// 	// while inner cache, as it would happen upon node shutdown
-// 	proVM.state.wipeCache()
+	// while inner cache, as it would happen upon node shutdown
+	proVM.WipeCache()
 
-// 	// check that getBlock still works on older blocks
-// 	rtrvdProBlk2, err := proVM.GetBlock(proBlk2.ID())
-// 	if err != nil {
-// 		t.Fatal("Could not get block after whiping off proposerVM cache")
-// 	}
-// 	if rtrvdProBlk2.ID() != proBlk2.ID() {
-// 		t.Fatal("blocks do not match following cache whiping")
-// 	}
-// 	if err = rtrvdProBlk2.Verify(); err != nil {
-// 		t.Fatal("block retrieved after cache whiping does not verify")
-// 	}
+	// check that getBlock still works on older blocks
+	rtrvdProBlk2, err := proVM.GetBlock(proBlk2.ID())
+	if err != nil {
+		t.Fatal("Could not get block after whiping off proposerVM cache")
+	}
+	if rtrvdProBlk2.ID() != proBlk2.ID() {
+		t.Fatal("blocks do not match following cache whiping")
+	}
+	if err = rtrvdProBlk2.Verify(); err != nil {
+		t.Fatal("block retrieved after cache whiping does not verify")
+	}
 
-// 	rtrvdProBlk1, err := proVM.GetBlock(proBlk1.ID())
-// 	if err != nil {
-// 		t.Fatal("Could not get block after whiping off proposerVM cache")
-// 	}
-// 	if rtrvdProBlk1.ID() != proBlk1.ID() {
-// 		t.Fatal("blocks do not match following cache whiping")
-// 	}
-// 	if err = rtrvdProBlk1.Verify(); err != nil {
-// 		t.Fatal("block retrieved after cache whiping does not verify")
-// 	}
-// }
+	rtrvdProBlk1, err := proVM.GetBlock(proBlk1.ID())
+	if err != nil {
+		t.Fatal("Could not get block after whiping off proposerVM cache")
+	}
+	if rtrvdProBlk1.ID() != proBlk1.ID() {
+		t.Fatal("blocks do not match following cache whiping")
+	}
+	if err = rtrvdProBlk1.Verify(); err != nil {
+		t.Fatal("block retrieved after cache whiping does not verify")
+	}
+}
 
 // Pre Fork tests section
 func TestPreFork_Initialize(t *testing.T) {

@@ -31,6 +31,7 @@ type BlockState interface {
 	GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 	PutBlock(blk block.Block, status choices.Status) error
 	DeleteBlock(blkID ids.ID) error
+	WipeCache() // useful for UTs
 }
 
 type blockState struct {
@@ -38,6 +39,10 @@ type blockState struct {
 	// in storage.
 	cache cache.Cacher
 	db    database.Database
+}
+
+func (s *blockState) WipeCache() {
+	s.cache.Flush()
 }
 
 type blockWrapper struct {

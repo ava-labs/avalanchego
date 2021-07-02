@@ -21,11 +21,16 @@ var (
 type ChainState interface {
 	SetLastAccepted(blkID ids.ID) error
 	GetLastAccepted() (ids.ID, error)
+	WipeCache() // useful for UTs
 }
 
 type chainState struct {
 	lastAccepted ids.ID
 	db           database.Database
+}
+
+func (s *chainState) WipeCache() {
+	s.lastAccepted = ids.Empty
 }
 
 func NewChainState(db database.Database) ChainState {

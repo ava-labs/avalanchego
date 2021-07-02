@@ -18,11 +18,17 @@ var (
 type State interface {
 	ChainState
 	BlockState
+	WipeCache() // useful for UTs
 }
 
 type state struct {
 	ChainState
 	BlockState
+}
+
+func (s *state) WipeCache() {
+	s.BlockState.WipeCache()
+	s.ChainState.WipeCache()
 }
 
 func New(db database.Database) State {
