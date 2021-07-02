@@ -599,7 +599,7 @@ func TestServiceGetTx(t *testing.T) {
 
 	txID := genesisTx.ID()
 
-	reply := api.FormattedTx{}
+	reply := api.GetTxReply{}
 	err := s.GetTx(nil, &api.GetTxArgs{
 		TxID: txID,
 	}, &reply)
@@ -623,7 +623,7 @@ func TestServiceGetNilTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := api.FormattedTx{}
+	reply := api.GetTxReply{}
 	err := s.GetTx(nil, &api.GetTxArgs{}, &reply)
 	assert.Error(t, err, "Nil TxID should have returned an error")
 }
@@ -637,7 +637,7 @@ func TestServiceGetUnknownTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	reply := api.FormattedTx{}
+	reply := api.GetTxReply{}
 	err := s.GetTx(nil, &api.GetTxArgs{TxID: ids.Empty}, &reply)
 	assert.Error(t, err, "Unknown TxID should have returned an error")
 }
