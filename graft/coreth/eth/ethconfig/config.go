@@ -65,7 +65,7 @@ func NewDefaultConfig() Config {
 		TrieCleanCacheRejournal: 60 * time.Minute,
 		TrieDirtyCache:          256,
 		TrieTimeout:             60 * time.Minute,
-		SnapshotCache:           0,
+		SnapshotCache:           128,
 		Miner: miner.Config{
 			GasFloor:              8000000,
 			GasCeil:               8000000,

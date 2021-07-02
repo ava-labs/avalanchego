@@ -44,8 +44,8 @@ type diskLayer struct {
 	triedb *trie.Database      // Trie node cache for reconstruction purposes
 	cache  *fastcache.Cache    // Cache to avoid hitting the disk for direct access
 
-	root  common.Hash // Root hash of the base snapshot
-	stale bool        // Signals that the layer became stale (state progressed)
+	blockHash, root common.Hash // Root hash of the base snapshot
+	stale           bool        // Signals that the layer became stale (state progressed)
 
 	genMarker  []byte                    // Marker for the state that's indexed during initial layer generation
 	genPending chan struct{}             // Notification channel when generation is done (test synchronicity)
@@ -57,6 +57,11 @@ type diskLayer struct {
 // Root returns  root hash for which this snapshot was made.
 func (dl *diskLayer) Root() common.Hash {
 	return dl.root
+}
+
+// BlockHash returns the block hash for which this snapshot was made
+func (dl *diskLayer) BlockHash() common.Hash {
+	return dl.blockHash
 }
 
 // Parent always returns nil as there's no layer below the disk.
@@ -171,6 +176,6 @@ func (dl *diskLayer) Storage(accountHash, storageHash common.Hash) ([]byte, erro
 // Update creates a new layer on top of the existing snapshot diff tree with
 // the specified data items. Note, the maps are retained by the method to avoid
 // copying everything.
-func (dl *diskLayer) Update(blockHash common.Hash, destructs map[common.Hash]struct{}, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) *diffLayer {
-	return newDiffLayer(dl, blockHash, destructs, accounts, storage)
+func (dl *diskLayer) Update(blockHash, blockRoot common.Hash, destructs map[common.Hash]struct{}, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) *diffLayer {
+	return newDiffLayer(dl, blockHash, blockRoot, destructs, accounts, storage)
 }

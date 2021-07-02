@@ -72,13 +72,41 @@ func WriteSnapshotRoot(db ethdb.KeyValueWriter, root common.Hash) {
 	}
 }
 
-// DeleteSnapshotRoot deletes the hash of the block whose state is contained in
+// DeleteSnapshotRoot deletes the root of the block whose state is contained in
 // the persisted snapshot. Since snapshots are not immutable, this  method can
 // be used during updates, so a crash or failure will mark the entire snapshot
 // invalid.
 func DeleteSnapshotRoot(db ethdb.KeyValueWriter) {
 	if err := db.Delete(snapshotRootKey); err != nil {
 		log.Crit("Failed to remove snapshot root", "err", err)
+	}
+}
+
+// ReadSnapshotBlockHash retrieves the hash of the block whose state is contained in
+// the persisted snapshot.
+func ReadSnapshotBlockHash(db ethdb.KeyValueReader) common.Hash {
+	data, _ := db.Get(snapshotBlockHashKey)
+	if len(data) != common.HashLength {
+		return common.Hash{}
+	}
+	return common.BytesToHash(data)
+}
+
+// WriteSnapshotRoot stores the root of the block whose state is contained in
+// the persisted snapshot.
+func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) {
+	if err := db.Put(snapshotBlockHashKey, blockHash[:]); err != nil {
+		log.Crit("Failed to store snapshot block hash", "err", err)
+	}
+}
+
+// DeleteSnapshotBlockHash deletes the hash of the block whose state is contained in
+// the persisted snapshot. Since snapshots are not immutable, this  method can
+// be used during updates, so a crash or failure will mark the entire snapshot
+// invalid.
+func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) {
+	if err := db.Delete(snapshotBlockHashKey); err != nil {
+		log.Crit("Failed to remove snapshot block hash", "err", err)
 	}
 }
 
