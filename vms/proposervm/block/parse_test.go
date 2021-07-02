@@ -17,7 +17,6 @@ import (
 func TestParse(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
-	forkTime := timestamp.Add(-1 * time.Second)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 
@@ -29,7 +28,7 @@ func TestParse(t *testing.T) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	builtBlock, err := Build(parentID, timestamp, forkTime, pChainHeight, cert, innerBlockBytes, key)
+	builtBlock, err := Build(parentID, timestamp, pChainHeight, cert, innerBlockBytes, key)
 	assert.NoError(err)
 
 	builtBlockBytes := builtBlock.Bytes()

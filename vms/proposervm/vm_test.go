@@ -107,6 +107,10 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	coreVM.CantInitialize = true
 	coreVM.InitializeF = nil
 
+	if err := proVM.SetPreference(coreGenBlk.IDV); err != nil {
+		t.Fatal(err)
+	}
+
 	return coreVM, valVM, proVM, coreGenBlk
 }
 
@@ -168,12 +172,12 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	}
 
 	// checks
-	proBlock, ok := snowBlock.(*ProposerBlock)
+	proBlock, ok := snowBlock.(*postForkBlock)
 	if !ok {
 		t.Fatal("proposerVM.BuildBlock() does not return a proposervm.Block")
 	}
 
-	if proBlock.coreBlk != coreBlk {
+	if proBlock.innerBlk != coreBlk {
 		t.Fatal("different block was expected to be built")
 	}
 }
@@ -191,13 +195,13 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk,
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
 	proBlk1, err := proVM.BuildBlock()
 	if err != nil {
-		t.Fatal("Could not build proBlk1")
+		t.Fatalf("Could not build proBlk1 due to %s", err)
 	}
 
 	coreBlk2 := &snowman.TestBlock{
@@ -208,7 +212,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		BytesV:     []byte{2},
 		ParentV:    coreGenBlk,
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
 	proBlk2, err := proVM.BuildBlock()
@@ -261,14 +265,15 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		BytesV:     []byte{3},
 		ParentV:    prefcoreBlk,
 		HeightV:    prefcoreBlk.Height() + 1,
-		TimestampV: prefcoreBlk.Timestamp().Add(2 * proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
 
+	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	builtBlk, err := proVM.BuildBlock()
 	if err != nil {
-		t.Fatal("could not build block")
+		t.Fatalf("unexpectedly could not build block due to %s", err)
 	}
 
 	// ...show that parent is the preferred one
@@ -288,7 +293,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		BytesV:     []byte{1},
 		ParentV:    coreGenBlk,
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
@@ -305,7 +310,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		BytesV:     []byte{2},
 		ParentV:    coreGenBlk,
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk2, nil }
 	proBlk2, err := proVM.BuildBlock()
@@ -358,17 +363,18 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		BytesV:     []byte{3},
 		ParentV:    wronglyPreferredcoreBlk,
 		HeightV:    wronglyPreferredcoreBlk.Height() + 1,
-		TimestampV: wronglyPreferredcoreBlk.Timestamp().Add(2 * proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk3, nil }
 
+	proVM.Set(proVM.Time().Add(proposer.MaxDelay))
 	blk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := blk.Verify(); err != ErrProBlkWrongParent {
+	if err := blk.Verify(); err == nil {
 		t.Fatal("coreVM does not build on preferred coreBlock. It should err")
 	}
 }
@@ -377,7 +383,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	coreVM, _, proVM, _ := initTestProposerVM(t, time.Time{}) // enable ProBlks
 
-	coreBlk := &snowman.TestBlock{
+	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
 		TimestampV: proVM.Time(),
 	}
@@ -387,31 +393,26 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	}
 	slb, err := statelessblock.Build(
 		proVM.preferred,
-		coreBlk.Timestamp(),
-		proVM.activationTime,
+		innerBlk.Timestamp(),
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
-		coreBlk.Bytes(),
+		innerBlk.Bytes(),
 		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
-	proBlk := ProposerBlock{
-		Block:   slb,
-		vm:      proVM,
-		coreBlk: coreBlk,
-		status:  choices.Processing,
+	proBlk := postForkBlock{
+		Block:    slb,
+		vm:       proVM,
+		innerBlk: innerBlk,
+		status:   choices.Processing,
 	}
 
 	// test
-	parsedBlk, err := proVM.ParseBlock(proBlk.Bytes())
-	if err == nil {
-		t.Fatal("failed parsing proposervm.Block. Error:", err)
-	}
 
-	if parsedBlk != nil {
-		t.Fatal("upon failure proposervm.VM.ParseBlock should return nil snowman.Block")
+	if _, err := proVM.ParseBlock(proBlk.Bytes()); err == nil {
+		t.Fatal("failed parsing proposervm.Block. Error:", err)
 	}
 }
 
@@ -419,7 +420,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	coreVM, _, proVM, gencoreBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 
 	// create two Proposer blocks at the same height
-	coreBlk := &snowman.TestBlock{
+	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
 		ParentV:    gencoreBlk,
 		HeightV:    gencoreBlk.Height() + 1,
@@ -427,48 +428,46 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	}
 	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
-		if !bytes.Equal(b, coreBlk.Bytes()) {
+		if !bytes.Equal(b, innerBlk.Bytes()) {
 			t.Fatalf("Wrong bytes")
 		}
-		return coreBlk, nil
+		return innerBlk, nil
 	}
 
 	slb1, err := statelessblock.Build(
 		proVM.preferred,
-		coreBlk.Timestamp(),
-		proVM.activationTime,
+		innerBlk.Timestamp(),
 		100, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
-		coreBlk.Bytes(),
+		innerBlk.Bytes(),
 		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
-	proBlk1 := ProposerBlock{
-		Block:   slb1,
-		vm:      proVM,
-		coreBlk: coreBlk,
-		status:  choices.Processing,
+	proBlk1 := postForkBlock{
+		Block:    slb1,
+		vm:       proVM,
+		innerBlk: innerBlk,
+		status:   choices.Processing,
 	}
 
 	slb2, err := statelessblock.Build(
 		proVM.preferred,
-		coreBlk.Timestamp(),
-		proVM.activationTime,
+		innerBlk.Timestamp(),
 		200, // pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
-		coreBlk.Bytes(),
+		innerBlk.Bytes(),
 		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
-	proBlk2 := ProposerBlock{
-		Block:   slb2,
-		vm:      proVM,
-		coreBlk: coreBlk,
-		status:  choices.Processing,
+	proBlk2 := postForkBlock{
+		Block:    slb2,
+		vm:       proVM,
+		innerBlk: innerBlk,
+		status:   choices.Processing,
 	}
 
 	if proBlk1.ID() == proBlk2.ID() {
@@ -563,7 +562,6 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	netSlb, err := statelessblock.Build(
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
-		proVM.activationTime,
 		pChainHeight,
 		proVM.ctx.StakingCert.Leaf,
 		netcoreBlk.Bytes(),
@@ -572,11 +570,11 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
-	netProBlk := ProposerBlock{
-		Block:   netSlb,
-		vm:      proVM,
-		coreBlk: netcoreBlk,
-		status:  choices.Processing,
+	netProBlk := postForkBlock{
+		Block:    netSlb,
+		vm:       proVM,
+		innerBlk: netcoreBlk,
+		status:   choices.Processing,
 	}
 
 	// prove that also block from network verifies
@@ -720,7 +718,7 @@ func TestPreFork_Initialize(t *testing.T) {
 		t.Fatal("Block should be returned without calling core vm")
 	}
 
-	if _, ok := rtvdBlk.(*ProposerBlock); !ok {
+	if _, ok := rtvdBlk.(*preForkBlock); !ok {
 		t.Fatal("Block retrieved from proposerVM should be proposerBlocks")
 	}
 	if !bytes.Equal(rtvdBlk.Bytes(), coreGenBlk.Bytes()) {
@@ -750,7 +748,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("proposerVM could not build block")
 	}
-	if _, ok := builtBlk.(*ProposerBlock); !ok {
+	if _, ok := builtBlk.(*preForkBlock); !ok {
 		t.Fatal("Block built by proposerVM should be proposerBlocks")
 	}
 	if builtBlk.ID() != coreBlk.ID() {
@@ -795,7 +793,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not parse naked core block")
 	}
-	if _, ok := parsedBlk.(*ProposerBlock); !ok {
+	if _, ok := parsedBlk.(*preForkBlock); !ok {
 		t.Fatal("Block parsed by proposerVM should be proposerBlocks")
 	}
 	if parsedBlk.ID() != coreBlk.ID() {
@@ -824,7 +822,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 func TestPreFork_SetPreference(t *testing.T) {
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime) // disable ProBlks
 
-	coreBlk := &snowman.TestBlock{
+	coreBlk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(333),
 			StatusV: choices.Processing,
@@ -832,10 +830,10 @@ func TestPreFork_SetPreference(t *testing.T) {
 		BytesV:     []byte{3},
 		ParentV:    coreGenBlk,
 		HeightV:    coreGenBlk.Height() + 1,
-		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.CantBuildBlock = true
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk0, nil }
 	builtBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")
@@ -846,8 +844,8 @@ func TestPreFork_SetPreference(t *testing.T) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
-		case bytes.Equal(b, coreBlk.Bytes()):
-			return coreBlk, nil
+		case bytes.Equal(b, coreBlk0.Bytes()):
+			return coreBlk0, nil
 		default:
 			return nil, fmt.Errorf("Unknown block")
 		}
@@ -856,7 +854,18 @@ func TestPreFork_SetPreference(t *testing.T) {
 		t.Fatal("Could not set preference on proposer Block")
 	}
 
-	// show that subsequent block is built on top of preferred block
+	coreBlk1 := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(444),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{3},
+		ParentV:    coreBlk0,
+		HeightV:    coreBlk0.Height() + 1,
+		TimestampV: coreBlk0.Timestamp(),
+	}
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk1, nil }
 	nextBlk, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("Could not build proposer block")

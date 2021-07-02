@@ -18,7 +18,6 @@ package proposervm
 // implemented via the proposer block header
 
 import (
-	"crypto"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -58,7 +57,7 @@ type VM struct {
 
 	ctx            *snow.Context
 	db             *versiondb.Database
-	verifiedBlocks map[ids.ID]*ProposerBlock
+	verifiedBlocks map[ids.ID]*postForkBlock
 	preferred      ids.ID
 }
 
@@ -94,9 +93,9 @@ func (vm *VM) Initialize(
 	})
 
 	vm.ctx = ctx
-	vm.verifiedBlocks = make(map[ids.ID]*ProposerBlock)
+	vm.verifiedBlocks = make(map[ids.ID]*postForkBlock)
 
-	err := vm.ChainVM.Initialize(
+	return vm.ChainVM.Initialize(
 		ctx,
 		dbManager,
 		genesisBytes,
@@ -105,164 +104,32 @@ func (vm *VM) Initialize(
 		vmToEngine,
 		fxs,
 	)
-	if err != nil {
-		return err
-	}
-
-	// TODO: repair the DB if the underlying VM's Accept calls weren't persisted
-
-	prefID, err := vm.LastAccepted()
-	switch err {
-	case nil:
-	case database.ErrNotFound:
-		// store genesis
-		corePrefID, err := vm.ChainVM.LastAccepted()
-		if err != nil {
-			return err
-		}
-		corePref, err := vm.ChainVM.GetBlock(corePrefID)
-		if err != nil {
-			return err
-		}
-		slb, err := statelessblock.BuildPreFork(
-			vm.preferred,
-			corePref.Timestamp(),
-			vm.activationTime,
-			corePref.Bytes(),
-			corePref.ID())
-		if err != nil {
-			return err
-		}
-
-		proGen := &ProposerBlock{
-			Block:   slb,
-			vm:      vm,
-			coreBlk: corePref,
-			status:  choices.Processing,
-		}
-		if err := vm.storeProposerBlock(proGen); err != nil {
-			return err
-		}
-
-		prefID = proGen.ID()
-		if err := vm.SetLastAccepted(prefID); err != nil {
-			return err
-		}
-	default:
-		return err
-	}
-
-	return vm.SetPreference(prefID)
 }
 
 // block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
-	sb, err := vm.ChainVM.BuildBlock()
+	preferredBlock, err := vm.getBlock(vm.preferred)
 	if err != nil {
 		return nil, err
 	}
 
-	var slb statelessblock.Block
-	if sb.Parent().Timestamp().Before(vm.activationTime) {
-		slb, err = statelessblock.BuildPreFork(
-			vm.preferred,
-			sb.Timestamp(), // assuming in-house built blocks are verified, hence safe to call Timestamp
-			vm.activationTime,
-			sb.Bytes(),
-			sb.ID())
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		h, err := vm.ctx.ValidatorVM.GetCurrentHeight()
-		if err != nil {
-			return nil, err
-		}
-
-		slb, err = statelessblock.Build(
-			vm.preferred,
-			sb.Timestamp(),
-			vm.activationTime,
-			h,
-			vm.ctx.StakingCert.Leaf,
-			sb.Bytes(),
-			vm.ctx.StakingCert.PrivateKey.(crypto.Signer),
-		)
-		if err != nil {
-			return nil, err
-		}
+	innerBlock, err := vm.ChainVM.BuildBlock()
+	if err != nil {
+		return nil, err
 	}
 
-	blk := &ProposerBlock{
-		Block:   slb,
-		vm:      vm,
-		coreBlk: sb,
-		status:  choices.Processing,
-	}
-	return blk, vm.storeProposerBlock(blk)
+	return preferredBlock.buildChild(innerBlock)
 }
 
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
-	// Invariant: always return a proposerBlk
-	blk, err := vm.parseProposerBlock(b)
-	if err == nil {
+	if blk, err := vm.parsePostForkBlock(b); err == nil {
 		return blk, nil
 	}
-
-	sb, err := vm.ChainVM.ParseBlock(b)
-	if err != nil {
-		return nil, err
-	}
-
-	slb, err := statelessblock.BuildPreFork(
-		vm.preferred,
-		sb.Timestamp(), // TODO: not safe calling Timestamp here. What to do? Update during verify? Use parent one?
-		vm.activationTime,
-		sb.Bytes(),
-		sb.ID())
-	if err != nil {
-		return nil, err
-	}
-
-	blk = &ProposerBlock{
-		Block:   slb,
-		vm:      vm,
-		coreBlk: sb,
-		status:  choices.Processing,
-	}
-	return blk, nil
+	return vm.parsePreForkBlock(b)
 }
 
 func (vm *VM) GetBlock(id ids.ID) (snowman.Block, error) {
-	if blk, err := vm.getProposerBlock(id); err == nil {
-		return blk, nil
-	}
-
-	sb, err := vm.ChainVM.GetBlock(id)
-	if err != nil {
-		return nil, err
-	}
-	slb, err := statelessblock.BuildPreFork(
-		vm.preferred,
-		sb.Timestamp(), // TODO: not necessarily safe calling Timestamp here. What to do? Update during verify? Use parent one?
-		vm.activationTime,
-		sb.Bytes(),
-		sb.ID())
-	if err != nil {
-		return nil, err
-	}
-
-	blk := &ProposerBlock{
-		Block:   slb,
-		vm:      vm,
-		coreBlk: sb,
-		status:  choices.Processing,
-	}
-	if err := vm.storeProposerBlock(blk); err != nil {
-		return nil, err
-	}
-
-	return blk, nil
+	return vm.getBlock(id)
 }
 
 func (vm *VM) SetPreference(preferred ids.ID) error {
@@ -271,53 +138,81 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	}
 	vm.preferred = preferred
 
-	blk, err := vm.getProposerBlock(preferred)
-	if err != nil {
-		return err
+	if blk, err := vm.getPostForkBlock(preferred); err == nil {
+		if err := vm.ChainVM.SetPreference(blk.innerBlk.ID()); err != nil {
+			return err
+		}
+
+		// TODO: reset the scheduler
+		return nil
 	}
 
-	if err := vm.ChainVM.SetPreference(blk.coreBlk.ID()); err != nil {
-		return err
-	}
-
-	// TODO: reset the scheduler
-	return nil
+	return vm.ChainVM.SetPreference(preferred)
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
-	return vm.State.GetLastAccepted()
+	lastAccepted, err := vm.State.GetLastAccepted()
+	if err == database.ErrNotFound {
+		return vm.ChainVM.LastAccepted()
+	}
+	return lastAccepted, err
 }
 
-func (vm *VM) getProposerBlock(blkID ids.ID) (*ProposerBlock, error) {
+func (vm *VM) getBlock(id ids.ID) (Block, error) {
+	if blk, err := vm.getPostForkBlock(id); err == nil {
+		return blk, nil
+	}
+	return vm.getPreForkBlock(id)
+}
+
+func (vm *VM) getPreForkBlock(blkID ids.ID) (*preForkBlock, error) {
+	blk, err := vm.ChainVM.GetBlock(blkID)
+	return &preForkBlock{
+		Block: blk,
+		vm:    vm,
+	}, err
+}
+
+func (vm *VM) getPostForkBlock(blkID ids.ID) (*postForkBlock, error) {
 	blk, exists := vm.verifiedBlocks[blkID]
 	if exists {
 		return blk, nil
 	}
-	slb, status, err := vm.State.GetBlock(blkID)
+	statelessBlock, status, err := vm.State.GetBlock(blkID)
 	if err != nil {
 		return nil, err
 	}
 
-	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+	innerBlkBytes := statelessBlock.Block()
+	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	return &ProposerBlock{
-		Block:   slb,
-		vm:      vm,
-		coreBlk: coreBlk,
-		status:  status,
+	return &postForkBlock{
+		Block:    statelessBlock,
+		vm:       vm,
+		innerBlk: innerBlk,
+		status:   status,
 	}, nil
 }
 
-func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
-	slb, err := statelessblock.Parse(b)
+func (vm *VM) parsePreForkBlock(b []byte) (*preForkBlock, error) {
+	blk, err := vm.ChainVM.ParseBlock(b)
+	return &preForkBlock{
+		Block: blk,
+		vm:    vm,
+	}, err
+}
+
+func (vm *VM) parsePostForkBlock(b []byte) (*postForkBlock, error) {
+	statelessBlock, err := statelessblock.Parse(b)
 	if err != nil {
 		return nil, err
 	}
 	// if the block already exists, then make sure the status is set correctly
-	blk, err := vm.getProposerBlock(slb.ID())
+	blkID := statelessBlock.ID()
+	blk, err := vm.getPostForkBlock(blkID)
 	if err == nil {
 		return blk, nil
 	}
@@ -325,24 +220,22 @@ func (vm *VM) parseProposerBlock(b []byte) (*ProposerBlock, error) {
 		return nil, err
 	}
 
-	coreBlk, err := vm.ChainVM.ParseBlock(slb.Block())
+	innerBlkBytes := statelessBlock.Block()
+	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	blk = &ProposerBlock{
-		Block:   slb,
-		vm:      vm,
-		coreBlk: coreBlk,
-		status:  choices.Processing,
+	blk = &postForkBlock{
+		Block:    statelessBlock,
+		vm:       vm,
+		innerBlk: innerBlk,
+		status:   choices.Processing,
 	}
-	if err := vm.storeProposerBlock(blk); err != nil {
-		return nil, err
-	}
-	return blk, nil
+	return blk, vm.storePostForkBlock(blk)
 }
 
-func (vm *VM) storeProposerBlock(blk *ProposerBlock) error {
+func (vm *VM) storePostForkBlock(blk *postForkBlock) error {
 	if err := vm.State.PutBlock(blk.Block, blk.status); err != nil {
 		return err
 	}

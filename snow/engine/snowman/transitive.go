@@ -4,7 +4,6 @@
 package snowman
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -28,10 +27,7 @@ const (
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
-var (
-	_                      Engine = &Transitive{}
-	ErrInnerBlockNotOracle        = errors.New("core snowman block does not implement snowman.OracleBlock")
-)
+var _ Engine = &Transitive{}
 
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
@@ -112,7 +108,7 @@ func (t *Transitive) finishBootstrapping() error {
 	if oracleBlk, ok := lastAccepted.(snowman.OracleBlock); ok {
 		options, err := oracleBlk.Options()
 		switch {
-		case err == ErrInnerBlockNotOracle:
+		case err == snowman.ErrNotOracle:
 			// if there aren't blocks we need to deliver on startup, we need to set
 			// the preference to the last accepted block
 			if err := t.VM.SetPreference(lastAcceptedID); err != nil {
@@ -674,7 +670,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	dropped := []snowman.Block{}
 	if blk, ok := blk.(snowman.OracleBlock); ok {
 		options, err := blk.Options()
-		if err != ErrInnerBlockNotOracle {
+		if err != snowman.ErrNotOracle {
 			if err != nil {
 				return err
 			}

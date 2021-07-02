@@ -23,7 +23,6 @@ func TestBlockState(t *testing.T) {
 
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
-	forkTime := timestamp.Add(-1 * time.Second)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
 
@@ -33,7 +32,7 @@ func TestBlockState(t *testing.T) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	b, err := block.Build(parentID, timestamp, forkTime, pChainHeight, cert, innerBlockBytes, key)
+	b, err := block.Build(parentID, timestamp, pChainHeight, cert, innerBlockBytes, key)
 	assert.NoError(err)
 
 	db := memdb.New()

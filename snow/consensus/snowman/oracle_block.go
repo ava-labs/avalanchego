@@ -3,6 +3,10 @@
 
 package snowman
 
+import "errors"
+
+var ErrNotOracle = errors.New("block isn't an oracle")
+
 // OracleBlock is a block that only has two valid children. The children should
 // be returned in preferential order.
 //
