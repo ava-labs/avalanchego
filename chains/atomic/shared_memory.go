@@ -208,6 +208,7 @@ func (sm *sharedMemory) Indexed(
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
 	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
+	sharedIDVersionDB := make(map[ids.ID]*versiondb.Database, len(batchChainsAndInputs))
 	var vdb *versiondb.Database
 
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
@@ -217,6 +218,7 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 
 		if vdb == nil {
 			vdb, db = sm.m.GetDatabase(sharedID)
+			sharedIDVersionDB[sharedID] = vdb
 			defer sm.m.ReleaseDatabase(sharedID)
 		} else {
 			db = sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
@@ -249,6 +251,9 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 			}
 		}
 
+	}
+
+	for _, vdb := range sharedIDVersionDB {
 		myBatch, err := vdb.CommitBatch()
 		if err != nil {
 			return err
