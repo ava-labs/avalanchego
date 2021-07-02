@@ -485,7 +485,7 @@ func TestTouchDelete(t *testing.T) {
 	s := newStateTest()
 	s.state.GetOrNewStateObject(common.Address{})
 	root, _ := s.state.Commit(false)
-	s.state, _ = New(root, s.state.db, s.state.snaps)
+	s.state, _ = NewWithSnapshot(root, s.state.db, s.state.snap)
 
 	snapshot := s.state.Snapshot()
 	s.state.AddBalance(common.Address{}, new(big.Int))
@@ -687,7 +687,7 @@ func TestDeleteCreateRevert(t *testing.T) {
 	state.SetBalance(addr, big.NewInt(1))
 
 	root, _ := state.Commit(false)
-	state, _ = New(root, state.db, state.snaps)
+	state, _ = NewWithSnapshot(root, state.db, state.snap)
 
 	// Simulate self-destructing in one transaction, then create-reverting in another
 	state.Suicide(addr)
@@ -699,7 +699,7 @@ func TestDeleteCreateRevert(t *testing.T) {
 
 	// Commit the entire state and make sure we don't crash and have the correct state
 	root, _ = state.Commit(true)
-	state, _ = New(root, state.db, state.snaps)
+	state, _ = NewWithSnapshot(root, state.db, state.snap)
 
 	if state.getStateObject(addr) != nil {
 		t.Fatalf("self-destructed contract came alive")
@@ -934,7 +934,7 @@ func TestMultiCoinOperations(t *testing.T) {
 
 	s.state.GetOrNewStateObject(addr)
 	root, _ := s.state.Commit(false)
-	s.state, _ = New(root, s.state.db, s.state.snaps)
+	s.state, _ = NewWithSnapshot(root, s.state.db, s.state.snap)
 
 	s.state.AddBalance(addr, new(big.Int))
 
@@ -959,7 +959,8 @@ func TestMultiCoinSnapshot(t *testing.T) {
 
 	// Create empty snapshot.Tree and StateDB
 	root := common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-	snapTree := snapshot.NewTestTree(db, root)
+	// Use the root as both the stateRoot and blockHash for this test.
+	snapTree := snapshot.NewTestTree(db, root, root)
 
 	addr := common.Address{1}
 	assetID1 := common.Hash{1}

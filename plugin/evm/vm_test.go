@@ -1288,8 +1288,11 @@ func TestBonusBlocksTxs(t *testing.T) {
 //   A
 //  / \
 // B   C
-//     |
-//     D
+//
+// verifies block B and C, then Accepts block B. Then we test to ensure
+// that the VM defends against any attempt to set the preference or to
+// accept block C, which should be an orphaned block at this point and
+// get rejected.
 func TestReorgProtection(t *testing.T) {
 	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
 	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -1448,10 +1451,6 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Accept(); err != nil {
-		t.Fatalf("VM1 failed to accept block: %s", err)
-	}
-
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
@@ -1479,8 +1478,14 @@ func TestReorgProtection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error parsing block from vm2: %s", err)
 	}
+
 	if err := vm1BlkC.Verify(); err != nil {
 		t.Fatalf("Block failed verification on VM1: %s", err)
+	}
+
+	// Accept B, such that block C should get Rejected.
+	if err := vm1BlkB.Accept(); err != nil {
+		t.Fatalf("VM1 failed to accept block: %s", err)
 	}
 
 	// The below (setting preference blocks that have a common ancestor
@@ -2562,6 +2567,10 @@ func TestAcceptReorg(t *testing.T) {
 	blkCHash := vm1BlkC.(*chain.BlockWrapper).Block.(*Block).ethBlock.Hash()
 	if b := vm1.chain.BlockChain().CurrentBlock(); b.Hash() != blkCHash {
 		t.Fatalf("expected current block to have hash %s but got %s", blkCHash.Hex(), b.Hash().Hex())
+	}
+
+	if err := vm1BlkB.Reject(); err != nil {
+		t.Fatal(err)
 	}
 
 	if err := vm1BlkD.Accept(); err != nil {

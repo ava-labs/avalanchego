@@ -76,7 +76,7 @@ func TestGeneration(t *testing.T) {
 	if have, want := root, common.HexToHash("0xa819054cfef894169a5b56ccc4e5e06f14829d4a57498e8b9fb13ff21491828d"); have != want {
 		t.Fatalf("have %#x want %#x", have, want)
 	}
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -141,7 +141,7 @@ func TestGenerateExistentState(t *testing.T) {
 	root, _ := accTrie.Commit(nil) // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -232,7 +232,7 @@ func (t *testHelper) makeStorageTrie(keys []string, vals []string) []byte {
 func (t *testHelper) Generate() (common.Hash, *diskLayer) {
 	root, _ := t.accTrie.Commit(nil)
 	t.triedb.Commit(root, false, nil)
-	snap := generateSnapshot(t.diskdb, t.triedb, 16, root)
+	snap := generateSnapshot(t.diskdb, t.triedb, 16, common.HexToHash("0xdeadbeef"), root)
 	return root, snap
 }
 
@@ -410,7 +410,7 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 	triedb.Commit(common.HexToHash("0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978"), false, nil)
 	diskdb.Delete(common.HexToHash("0x65145f923027566669a1ae5ccac66f945b55ff6eaeb17d2ea8e048b7d381f2d7").Bytes())
 
-	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978"))
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), common.HexToHash("0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978"))
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -466,7 +466,7 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 	// Delete a storage trie root and ensure the generator chokes
 	diskdb.Delete(common.HexToHash("0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67").Bytes())
 
-	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"))
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"))
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -521,7 +521,7 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	// Delete a storage trie leaf and ensure the generator chokes
 	diskdb.Delete(common.HexToHash("0x16691bc8a441197767e40bb66f521b92952edaf1462813f4f5bcca39aae72ffa").Bytes())
 
-	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"))
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"))
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -585,7 +585,7 @@ func TestGenerateWithExtraAccounts(t *testing.T) {
 		t.Fatalf("expected snap storage to exist")
 	}
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -643,7 +643,7 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -696,7 +696,7 @@ func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -740,7 +740,7 @@ func TestGenerateWithMalformedSnapdata(t *testing.T) {
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
