@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -72,7 +73,6 @@ var (
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
-	_ common.StaticVM      = &VM{}
 	_ secp256k1fx.VM       = &VM{}
 	_ Fx                   = &secp256k1fx.Fx{}
 )
@@ -402,6 +402,10 @@ func (vm *VM) NotifyBlockReady() {
 	default:
 		vm.ctx.Log.Debug("dropping message to consensus engine")
 	}
+}
+
+func (vm *VM) Version() (string, error) {
+	return version.Current.String(), nil
 }
 
 // CreateHandlers returns a map where:

@@ -14,6 +14,9 @@ import (
 )
 
 const (
+	// Name is the name of this database for database switches
+	Name = "memdb"
+
 	// DefaultSize is the default initial size of the memory database
 	DefaultSize = 1 << 10
 )
@@ -21,6 +24,7 @@ const (
 var (
 	_ database.Database = &Database{}
 	_ database.Batch    = &batch{}
+	_ database.Iterator = &iterator{}
 )
 
 // Database is an ephemeral key-value store that implements the Database
