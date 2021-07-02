@@ -1,7 +1,10 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package avm
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package index
 
 import (
 	"bytes"
@@ -28,11 +31,13 @@ import (
 // 2) An output of the transaction is at least partially owned by the address
 type AddressTxsIndexer interface {
 	AddUTXOs(outputUTXOs []*avax.UTXO)
-	AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error
+	AddUTXOIDs(getUTXOFn func(utxoid *avax.UTXOID) (*avax.UTXO, error), inputUTXOs []*avax.UTXOID) error
 	Write(txID ids.ID) error
 	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 	Reset()
 }
+
+var idxKey = []byte("idx")
 
 // indexer implements AddressTxsIndexer
 type indexer struct {
@@ -58,9 +63,9 @@ func (i *indexer) addTransferOutput(assetID ids.ID, addrs []ids.ShortID) {
 
 // AddUTXOIDs adds given inputUTXOs to the indexer if they are of type secp256k1fx.TransferOutput
 // function calls vm.getUTXO to get the UTXO from the *avax.UTXOID
-func (i *indexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
+func (i *indexer) AddUTXOIDs(getUTXOFn func(utxoid *avax.UTXOID) (*avax.UTXO, error), inputUTXOs []*avax.UTXOID) error {
 	for _, utxoID := range inputUTXOs {
-		utxo, err := vm.getUTXO(utxoID)
+		utxo, err := getUTXOFn(utxoID)
 		if err != nil {
 			return err // should never happen
 		}
@@ -185,12 +190,12 @@ func (i *indexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
-func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, metrics metrics) AddressTxsIndexer {
+func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m metrics) AddressTxsIndexer {
 	return &indexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
 		log:                 log,
-		metrics:             metrics,
+		metrics:             m,
 	}
 }
 
@@ -200,7 +205,7 @@ func NewNoIndexer() AddressTxsIndexer {
 	return &noIndexer{}
 }
 
-func (i *noIndexer) AddUTXOIDs(*VM, []*avax.UTXOID) error {
+func (i *noIndexer) AddUTXOIDs(func(utxoid *avax.UTXOID) (*avax.UTXO, error), []*avax.UTXOID) error {
 	return nil
 }
 

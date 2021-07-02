@@ -13,6 +13,8 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/avm/index"
+
 	"github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -113,7 +115,7 @@ type VM struct {
 
 	walletService WalletService
 
-	addressTxsIndexer AddressTxsIndexer
+	addressTxsIndexer index.AddressTxsIndexer
 }
 
 func (vm *VM) Connected(id ids.ShortID) error {
@@ -248,11 +250,16 @@ func (vm *VM) Initialize(
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Info("Address transaction indexing is enabled.")
-		vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log, vm.metrics)
+		m, err := index.NewMetrics(ctx.Namespace, ctx.Metrics)
+		if err != nil {
+			vm.ctx.Log.Fatal("Failed to initialize indexing metrics: %s", err)
+			return err
+		}
+		vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m)
 	} else {
 		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
 		vm.ctx.Log.Info("Address transaction indexing is disabled.")
-		vm.addressTxsIndexer = NewNoIndexer()
+		vm.addressTxsIndexer = index.NewNoIndexer()
 	}
 
 	return vm.db.Commit()

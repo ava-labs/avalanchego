@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/avm/index"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -397,7 +399,9 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	_, vm, s, _, _ := setup(t, true)
-	vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log, vm.metrics)
+	m, err := index.NewMetrics(vm.ctx.Namespace, vm.ctx.Metrics)
+	assert.NoError(t, err)
+	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)

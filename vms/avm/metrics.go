@@ -14,8 +14,6 @@ type metrics struct {
 	numTxRefreshes, numTxRefreshHits, numTxRefreshMisses prometheus.Counter
 
 	apiRequestMetric metric.APIInterceptor
-
-	numTxsIndexed prometheus.Histogram
 }
 
 func (m *metrics) Initialize(
@@ -37,11 +35,6 @@ func (m *metrics) Initialize(
 		Name:      "tx_refresh_misses",
 		Help:      "Number of times unique txs have not been unique and weren't cached",
 	})
-	m.numTxsIndexed = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "txs_indexed",
-		Help:      "Number of transactions indexed",
-	})
 
 	apiRequestMetric, err := metric.NewAPIInterceptor(namespace, registerer)
 	m.apiRequestMetric = apiRequestMetric
@@ -51,7 +44,6 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numTxRefreshes),
 		registerer.Register(m.numTxRefreshHits),
 		registerer.Register(m.numTxRefreshMisses),
-		registerer.Register(m.numTxsIndexed),
 	)
 	return errs.Err
 }

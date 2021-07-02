@@ -1,11 +1,19 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package avm
 
 import (
 	"encoding/binary"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/vms/avm/index"
 
 	"github.com/ava-labs/avalanchego/version"
 
@@ -129,7 +137,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOIDs(vm, uniqueParsedTX.inputUTXOs)
+		err = vm.addressTxsIndexer.AddUTXOIDs(vm.getUTXO, uniqueParsedTX.inputUTXOs)
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
 		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
@@ -241,7 +249,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOIDs(vm, uniqueParsedTX.InputUTXOs())
+		err = vm.addressTxsIndexer.AddUTXOIDs(vm.getUTXO, uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
 		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
@@ -261,7 +269,9 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 func TestIndexer_Read(t *testing.T) {
 	// setup vm, db etc
 	_, vm, _, _, _ := setup(t, true)
-	vm.addressTxsIndexer = NewAddressTxsIndexer(vm.db, vm.ctx.Log, vm.metrics)
+	m, err := index.NewMetrics(vm.ctx.Namespace, vm.ctx.Metrics)
+	assert.NoError(t, err)
+	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
