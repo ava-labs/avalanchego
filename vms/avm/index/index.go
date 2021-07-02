@@ -86,7 +86,7 @@ func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 	for _, utxo := range outputUTXOs {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			i.log.Verbo("Skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			i.log.Verbo("Skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID())
 			continue
 		}
 
@@ -113,7 +113,7 @@ func (i *indexer) Write(txID ids.ID) error {
 			switch {
 			case err != nil && err != database.ErrNotFound:
 				// Unexpected error
-				i.log.Fatal("Error checking idx value exists: %s", err)
+				i.log.Fatal("Error checking idx value exists when writing txID [%s], address [%s]: %s", txID, address, err)
 				return err
 			case err == database.ErrNotFound:
 				// idx not found; this must be the first entry.
@@ -128,7 +128,7 @@ func (i *indexer) Write(txID ids.ID) error {
 
 			i.log.Debug("Writing at index %d txID %s", idx, txID)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
-				i.log.Fatal("Failed to save transaction to the address, assetID prefix DB %s", err)
+				i.log.Fatal("Failed to save txID [%s], idx [%d] to the address [%s], assetID [%s] prefix DB %s", txID, idx, address, assetID, err)
 				return err
 			}
 
@@ -137,7 +137,7 @@ func (i *indexer) Write(txID ids.ID) error {
 			binary.BigEndian.PutUint64(idxBytes, idx)
 
 			if err := assetPrefixDB.Put(idxKey, idxBytes); err != nil {
-				i.log.Fatal("Failed to save transaction index to the address, assetID prefix DB: %s", err)
+				i.log.Fatal("Failed to update index for txID [%s] to the address [%s], assetID [%s] prefix DB: %s", txID, address, assetID, err)
 				return err
 			}
 		}
