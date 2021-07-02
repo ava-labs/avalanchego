@@ -141,9 +141,10 @@ func (i *indexer) Write(txID ids.ID) error {
 	return nil
 }
 
-// Read reads list of transaction IDs for a given address and assetID. These are the transactions that modified the
-// balance of the address and assetID (credit/debit). The returned txIDs will always be <= pageSize. In case of an error
-// [nil, err] is returned.
+// Read returns IDs of transactions that changed [address]'s balance of [assetID],
+// starting at [cursor], in order of transaction acceptance. e.g. if [cursor] == 1, does
+// not return the first transaction that changed the balance. This is for for pagination. 
+// Returns at most [pageSize] elements.
 func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
 	// setup prefix DBs
 	addressTxDB := prefixdb.New(address[:], i.db)
