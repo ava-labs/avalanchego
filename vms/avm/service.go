@@ -98,9 +98,9 @@ type GetTxsReply struct {
 	Cursor json.Uint64 `json:"cursor"`
 }
 
-// GetTxs returns list of transactions for a given address
-func (service *Service) GetTxs(r *http.Request, args *GetTxsArgs, reply *GetTxsReply) error {
-	service.vm.ctx.Log.Info("AVM: GetTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
+// GetAddressTxs returns list of transactions for a given address
+func (service *Service) GetAddressTxs(r *http.Request, args *GetTxsArgs, reply *GetTxsReply) error {
+	service.vm.ctx.Log.Info("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
 	pageSize := uint64(args.PageSize)
 	if pageSize == 0 || pageSize > maxPageSize {
 		return fmt.Errorf("pageSize must be greater than zero and less than the maximum allowed size of %d", maxPageSize)

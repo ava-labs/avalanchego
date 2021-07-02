@@ -426,7 +426,7 @@ func TestServiceGetTxs(t *testing.T) {
 		AssetID:     assetID.String(),
 	}
 	getTxsReply := &GetTxsReply{}
-	err = s.GetTxs(nil, getTxsArgs, getTxsReply)
+	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
 	assert.NoError(t, err)
 	assert.Len(t, getTxsReply.TxIDs, 10)
 	assert.Equal(t, getTxsReply.TxIDs, testTxs[:10])
@@ -434,7 +434,7 @@ func TestServiceGetTxs(t *testing.T) {
 	// get the second page
 	getTxsArgs.Cursor = getTxsReply.Cursor
 	getTxsReply = &GetTxsReply{}
-	err = s.GetTxs(nil, getTxsArgs, getTxsReply)
+	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
 	assert.NoError(t, err)
 	assert.Len(t, getTxsReply.TxIDs, 10)
 	assert.Equal(t, getTxsReply.TxIDs, testTxs[10:20])
