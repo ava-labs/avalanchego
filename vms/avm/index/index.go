@@ -30,11 +30,25 @@ import (
 // 1) An input UTXO to the transaction was at least partially owned by the address
 // 2) An output of the transaction is at least partially owned by the address
 type AddressTxsIndexer interface {
-	AddUTXOs(outputUTXOs []*avax.UTXO)
-	AddUTXOIDs(getUTXOFn func(utxoid *avax.UTXOID) (*avax.UTXO, error), inputUTXOs []*avax.UTXOID) error
-	Write(txID ids.ID) error
-	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
+	// Reset clears the indexer state
 	Reset()
+
+	// AddUTXOs adds given slice of [outputUTXOs] to the indexer state
+	AddUTXOs(outputUTXOs []*avax.UTXO)
+
+	// AddUTXOIDs adds the given [inputUTXOIDs] to the indexer state.
+	// The [getUTXOFn] function is used to get the underlying [avax.UTXO] from each
+	// [avax.UTXOID] in the [inputUTXOIDs] slice.
+	AddUTXOIDs(getUTXOFn func(utxoID *avax.UTXOID) (*avax.UTXO, error), inputUTXOIDs []*avax.UTXOID) error
+
+	// Write persists the indexer state against the given [txID].
+	// Reset() must be called manually to reset the state for next write.
+	Write(txID ids.ID) error
+
+	// Read returns list of txIDs indexed against the specified [address] and [assetID]
+	// Returned slice length will be less than or equal to [pageSize].
+	// [cursor] defines the offset to read the entries from
+	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 }
 
 var idxKey = []byte("idx")
