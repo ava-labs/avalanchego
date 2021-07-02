@@ -104,27 +104,46 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 		return errNilTxID
 	}
 
+	// replace with service.vm.GetTxBytes instead
 	tx := UniqueTx{
 		vm:   service.vm,
 		txID: args.TxID,
 	}
+
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownTx
 	}
+
 	var err error
 	if args.Encoding == formatting.JSON {
-		outputs := make([]*avax.UTXO, len(tx.UTXOs()))
-		for _, utxo := range tx.UTXOs() {
-			fxIdx, err := service.vm.getFx(utxo.Out)
+		txBytes := tx.Bytes()
+		b := BaseTx{}
+		_, err = service.vm.codec.Unmarshal(txBytes, &b)
+		if err != nil {
+			return err
+		}
+
+		for _, in := range b.Ins {
+			fxIdx, err := service.vm.getFx(in.In)
 			if err != nil {
 				return err
 			}
+
 			fx := service.vm.fxs[fxIdx]
-			utxo.FxID = fx.ID.String()
-			outputs = append(outputs, utxo)
-			service.vm.ctx.Log.Info("Setting FXID to %s", fx.ID.String())
+			in.FxID = fx.ID
 		}
-		reply.Tx = tx
+
+		for _, out := range b.Outs {
+			fxIdx, err := service.vm.getFx(out.Out)
+			if err != nil {
+				return err
+			}
+
+			fx := service.vm.fxs[fxIdx]
+			out.FxID = fx.ID
+		}
+
+		reply.Tx = b
 	} else {
 		reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	}

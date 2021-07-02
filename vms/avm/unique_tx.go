@@ -50,6 +50,37 @@ type TxCachedState struct {
 	status choices.Status
 }
 
+func (tx *UniqueTx) InitializeInputsOutputs(vm *VM) error {
+	txBytes := tx.Bytes()
+	// need to return this or something
+	t := BaseTx{}
+	_, err := vm.codec.Unmarshal(txBytes, &t)
+	if err != nil {
+		return err
+	}
+
+	for _, in := range t.Ins {
+		fxIndex, err := vm.getFx(in.In)
+		if err != nil {
+			return err
+		}
+
+		fx := vm.fxs[fxIndex]
+		in.FxID = fx.ID
+	}
+
+	for _, out := range t.Outs {
+		fxIndex, err := vm.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+
+		fx := vm.fxs[fxIndex]
+		out.FxID = fx.ID
+	}
+	return nil
+}
+
 func (tx *UniqueTx) refresh() {
 	tx.vm.numTxRefreshes.Inc()
 

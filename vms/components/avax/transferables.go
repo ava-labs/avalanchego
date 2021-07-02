@@ -50,7 +50,7 @@ type TransferableOut interface {
 type TransferableOutput struct {
 	Asset `serialize:"true"`
 	// FxID has serialize false because we don't want this to be encoded in bytes
-	FxID string          `serialize:"false" json:"fxID"`
+	FxID ids.ID          `serialize:"false" json:"fxID"`
 	Out  TransferableOut `serialize:"true" json:"output"`
 }
 
@@ -116,7 +116,7 @@ type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
 	// FxID has serialize false because we don't want this to be encoded in bytes
-	FxID string         `serialize:"false" json:"fxID"`
+	FxID ids.ID         `serialize:"false" json:"fxID"`
 	In   TransferableIn `serialize:"true" json:"input"`
 }
 
