@@ -157,8 +157,10 @@ func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uin
 
 	// start reading from the cursor bytes, numeric keys maintain the order (see Write)
 	iter := assetPrefixDB.NewIteratorWithStart(cursorBytes)
+	defer iter.Release()
+
 	var txIDs []ids.ID
-	for iter.Next() {
+	for uint64(len(txIDs)) < pageSize && iter.Next() {
 		// if the key is literally "idx", skip
 		if bytes.Equal(idxKey, iter.Key()) {
 			continue
@@ -175,11 +177,6 @@ func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uin
 		copy(txID[:], txIDBytes)
 
 		txIDs = append(txIDs, txID)
-
-		// ensure list never grows beyond pageSize
-		if uint64(len(txIDs)) >= pageSize {
-			break
-		}
 	}
 	return txIDs, nil
 }
