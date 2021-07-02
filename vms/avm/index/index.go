@@ -47,7 +47,7 @@ type indexer struct {
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	log                 logging.Logger
-	metrics             metrics
+	metrics             Metrics
 }
 
 // addTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
@@ -190,7 +190,7 @@ func (i *indexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
-func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m metrics) AddressTxsIndexer {
+func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m Metrics) AddressTxsIndexer {
 	return &indexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
