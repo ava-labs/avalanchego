@@ -16,35 +16,38 @@ import (
 )
 
 // Aliases returns the default aliases based on the network ID
-func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map[ids.ID][]string, error) {
-	generalAliases := getGeneralAliases()
+func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, error) {
+	apiAliases := getAPIAliases()
 	chainAliases := map[ids.ID][]string{
 		constants.PlatformChainID: {"P", "platform"},
 	}
-	vmAliases := getChainAliases()
 	genesis := &platformvm.Genesis{} // TODO let's not re-create genesis to do aliasing
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 	if err := genesis.Initialize(); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, err
 	}
 
 	for _, chain := range genesis.Chains {
 		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
 		switch uChain.VMID {
 		case avm.ID:
-			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
+			apiAliases[ids.ChainAliasPrefix+chain.ID().String()] = []string{"X", "avm", ids.ChainAliasPrefix + "X", ids.ChainAliasPrefix + "/avm"}
 			chainAliases[chain.ID()] = GetXChainAliases()
 		case evm.ID:
-			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
+			apiAliases[ids.ChainAliasPrefix+chain.ID().String()] = []string{"C", "evm", ids.ChainAliasPrefix + "C", ids.ChainAliasPrefix + "evm"}
 			chainAliases[chain.ID()] = GetCChainAliases()
 		case timestampvm.ID:
-			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
+			apiAliases[ids.ChainAliasPrefix+chain.ID().String()] = []string{ids.ChainAliasPrefix + "timestamp"}
 			chainAliases[chain.ID()] = []string{"timestamp"}
 		}
 	}
-	return generalAliases, chainAliases, vmAliases, nil
+	return apiAliases, chainAliases, nil
+}
+
+func VMAliases() map[ids.ID][]string {
+	return getVMAliases()
 }
 
 func GetCChainAliases() []string {
@@ -55,17 +58,17 @@ func GetXChainAliases() []string {
 	return []string{"X", "avm"}
 }
 
-func getGeneralAliases() map[string][]string {
+func getAPIAliases() map[string][]string {
 	return map[string][]string{
-		"vm/" + platformvm.ID.String():             {"vm/platform"},
-		"vm/" + avm.ID.String():                    {"vm/avm"},
-		"vm/" + evm.ID.String():                    {"vm/evm"},
-		"vm/" + timestampvm.ID.String():            {"vm/timestamp"},
-		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
+		ids.VMAliasPrefix + platformvm.ID.String():                {ids.VMAliasPrefix + "platform"},
+		ids.VMAliasPrefix + avm.ID.String():                       {ids.VMAliasPrefix + "avm"},
+		ids.VMAliasPrefix + evm.ID.String():                       {ids.VMAliasPrefix + "evm"},
+		ids.VMAliasPrefix + timestampvm.ID.String():               {ids.VMAliasPrefix + "timestamp"},
+		ids.ChainAliasPrefix + constants.PlatformChainID.String(): {"P", "platform", ids.ChainAliasPrefix + "P", ids.ChainAliasPrefix + "platform"},
 	}
 }
 
-func getChainAliases() map[ids.ID][]string {
+func getVMAliases() map[ids.ID][]string {
 	return map[ids.ID][]string{
 		platformvm.ID:  {"platform"},
 		avm.ID:         {"avm"},
