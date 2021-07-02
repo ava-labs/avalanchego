@@ -1,4 +1,4 @@
-// +build !windows,!darwin
+// +build linux,amd64
 
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
