@@ -250,7 +250,6 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 				panic("Illegal type")
 			}
 		}
-
 	}
 
 	for _, vdb := range sharedIDVersionDB {
