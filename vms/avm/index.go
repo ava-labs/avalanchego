@@ -66,7 +66,7 @@ func (i *indexer) AddUTXOIDs(vm *VM, inputUTXOs []*avax.UTXOID) error {
 
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			i.log.Verbo("Skipping input utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID().String())
+			i.log.Verbo("Skipping input utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID())
 			continue
 		}
 
