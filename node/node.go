@@ -537,7 +537,7 @@ func (n *Node) initVMManager() error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
 	n.Log.Info("initializing VM aliases")
-	vmAliases := genesis.VMAliases()
+	vmAliases := genesis.GetVMAliases()
 
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {

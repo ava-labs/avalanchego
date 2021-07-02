@@ -46,10 +46,6 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, err
 	return apiAliases, chainAliases, nil
 }
 
-func VMAliases() map[ids.ID][]string {
-	return getVMAliases()
-}
-
 func GetCChainAliases() []string {
 	return []string{"C", "evm"}
 }
@@ -68,7 +64,7 @@ func getAPIAliases() map[string][]string {
 	}
 }
 
-func getVMAliases() map[ids.ID][]string {
+func GetVMAliases() map[ids.ID][]string {
 	return map[ids.ID][]string{
 		platformvm.ID:  {"platform"},
 		avm.ID:         {"avm"},
