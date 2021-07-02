@@ -24,6 +24,7 @@ var (
 	largerIndexPrefix  = []byte{3}
 
 	errDuplicatedOperation = errors.New("duplicated operation on provided value")
+	errEmptyBatch          = errors.New("there are no transactions in this batch")
 )
 
 type SharedMemoryMethod int
@@ -207,6 +208,11 @@ func (sm *sharedMemory) Indexed(
 }
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
+
+	if len(batchChainsAndInputs) == 0 {
+		return errEmptyBatch
+	}
+
 	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
 	sharedIDVersionDB := make(map[ids.ID]*versiondb.Database, len(batchChainsAndInputs))
 	var vdb *versiondb.Database
