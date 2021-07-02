@@ -420,12 +420,12 @@ func TestServiceGetTxs(t *testing.T) {
 	testTxs := setupTestTxsInDB(t, vm.db, addr, assetID, testTxCount)
 
 	// get the first page
-	getTxsArgs := &GetTxsArgs{
+	getTxsArgs := &GetAddressTxsArgs{
 		PageSize:    10,
 		JSONAddress: api.JSONAddress{Address: addrStr},
 		AssetID:     assetID.String(),
 	}
-	getTxsReply := &GetTxsReply{}
+	getTxsReply := &GetAddressTxsReply{}
 	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
 	assert.NoError(t, err)
 	assert.Len(t, getTxsReply.TxIDs, 10)
@@ -433,7 +433,7 @@ func TestServiceGetTxs(t *testing.T) {
 
 	// get the second page
 	getTxsArgs.Cursor = getTxsReply.Cursor
-	getTxsReply = &GetTxsReply{}
+	getTxsReply = &GetAddressTxsReply{}
 	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
 	assert.NoError(t, err)
 	assert.Len(t, getTxsReply.TxIDs, 10)

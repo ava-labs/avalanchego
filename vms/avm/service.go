@@ -82,7 +82,7 @@ type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
 
-type GetTxsArgs struct {
+type GetAddressTxsArgs struct {
 	api.JSONAddress
 	// Cursor used as a page index / offset
 	Cursor json.Uint64 `json:"cursor"`
@@ -92,14 +92,14 @@ type GetTxsArgs struct {
 	AssetID string `json:"assetID"`
 }
 
-type GetTxsReply struct {
+type GetAddressTxsReply struct {
 	TxIDs []ids.ID `json:"txIDs"`
 	// Cursor used as a page index / offset
 	Cursor json.Uint64 `json:"cursor"`
 }
 
 // GetAddressTxs returns list of transactions for a given address
-func (service *Service) GetAddressTxs(r *http.Request, args *GetTxsArgs, reply *GetTxsReply) error {
+func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
 	service.vm.ctx.Log.Info("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
 	pageSize := uint64(args.PageSize)
 	if pageSize == 0 || pageSize > maxPageSize {
