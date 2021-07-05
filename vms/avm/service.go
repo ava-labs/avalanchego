@@ -113,34 +113,13 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownTx
 	}
-
 	var err error
 	if args.Encoding == formatting.JSON {
-		txBytes := tx.Bytes()
-		b := BaseTx{}
-		_, err = service.vm.codec.Unmarshal(txBytes, &b)
+		b, _ := tx.UnsignedTx.(*BaseTx)
+		err = b.InitFx(service.vm)
 		if err != nil {
+			service.vm.ctx.Log.Error("Error initializing IOTx, %s", err)
 			return err
-		}
-
-		for _, in := range b.Ins {
-			fxIdx, err := service.vm.getFx(in.In)
-			if err != nil {
-				return err
-			}
-
-			fx := service.vm.fxs[fxIdx]
-			in.FxID = fx.ID
-		}
-
-		for _, out := range b.Outs {
-			fxIdx, err := service.vm.getFx(out.Out)
-			if err != nil {
-				return err
-			}
-
-			fx := service.vm.fxs[fxIdx]
-			out.FxID = fx.ID
 		}
 
 		reply.Tx = b

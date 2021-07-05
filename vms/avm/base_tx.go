@@ -21,6 +21,29 @@ type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 }
 
+func (t *BaseTx) InitFx(vm *VM) error {
+	for _, in := range t.Ins {
+		fxIdx, err := vm.getFx(in.In)
+		if err != nil {
+			return err
+		}
+
+		fx := vm.fxs[fxIdx]
+		in.FxID = fx.ID
+	}
+
+	for _, out := range t.Outs {
+		fxIdx, err := vm.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+
+		fx := vm.fxs[fxIdx]
+		out.FxID = fx.ID
+	}
+	return nil
+}
+
 // SyntacticVerify that this transaction is well-formed.
 func (t *BaseTx) SyntacticVerify(
 	ctx *snow.Context,
