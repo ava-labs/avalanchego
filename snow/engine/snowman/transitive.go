@@ -124,6 +124,8 @@ func (t *Transitive) finishBootstrapping() error {
 				}
 			}
 		}
+	} else if err := t.VM.SetPreference(lastAcceptedID); err != nil {
+		return err
 	}
 
 	t.Ctx.Log.Info("bootstrapping finished with %s as the last accepted block", lastAcceptedID)
