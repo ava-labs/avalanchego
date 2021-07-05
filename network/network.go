@@ -236,7 +236,8 @@ type network struct {
 
 type Config struct {
 	HealthConfig
-	throttling.MsgThrottlerConfig
+	InboundThrottlerConfig  throttling.MsgThrottlerConfig
+	OutboundThrottlerConfig throttling.MsgThrottlerConfig
 	timer.AdaptiveTimeoutConfig
 	DialerConfig     dialer.Config
 	MetricsNamespace string

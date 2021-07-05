@@ -235,7 +235,7 @@ func (n *Node) initNetworking() error {
 		n.Log,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
-		n.Config.NetworkConfig.MsgThrottlerConfig,
+		n.Config.NetworkConfig.InboundThrottlerConfig,
 	)
 	if err != nil {
 		return fmt.Errorf("initializing inbound message throttler failed with: %s", err)
@@ -245,7 +245,7 @@ func (n *Node) initNetworking() error {
 		n.Log,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
-		n.Config.NetworkConfig.MsgThrottlerConfig,
+		n.Config.NetworkConfig.OutboundThrottlerConfig,
 	)
 	if err != nil {
 		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
