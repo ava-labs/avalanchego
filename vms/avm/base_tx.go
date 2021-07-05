@@ -22,8 +22,6 @@ type BaseTx struct {
 }
 
 func (t *BaseTx) InitFx(vm *VM) error {
-	// todo genesis is only tx without inputs
-	// todo index loop might be better impl
 	for i, n := 0, len(t.Ins); i < n; i++ {
 		in := t.Ins[i]
 		fxIdx, err := vm.getFx(in.In)
