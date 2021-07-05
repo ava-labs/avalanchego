@@ -614,6 +614,32 @@ func TestServiceGetTx(t *testing.T) {
 	assert.Equal(t, genesisTx.Bytes(), txBytes, "Wrong tx returned from service.GetTx")
 }
 
+func TestServiceGetTxJSON(t *testing.T) {
+	_, vm, s, _, genesisTx := setup(t, true)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+
+	txID := genesisTx.ID()
+
+	reply := api.GetTxReply{}
+	err := s.GetTx(nil, &api.GetTxArgs{
+		Encoding: formatting.JSON,
+		TxID:     txID,
+	}, &reply)
+	assert.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replyTx, ok := reply.Tx.(CoreTx)
+	assert.True(t, ok)
+	assert.Equal(t, replyTx.ID(), txID)
+}
+
 func TestServiceGetNilTx(t *testing.T) {
 	_, vm, s, _, _ := setup(t, true)
 	defer func() {

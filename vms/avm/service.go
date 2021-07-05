@@ -115,7 +115,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
-		b, err := toDecoratedBaseTx(tx.UnsignedTx, service.vm)
+		b, err := decorateTx(tx.UnsignedTx, service.vm)
 		if err != nil {
 			return err
 		}
@@ -131,8 +131,11 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	return nil
 }
 
-func toDecoratedBaseTx(unsignedTx UnsignedTx, vm *VM) (*BaseTx, error) {
-	b, _ := unsignedTx.(*BaseTx)
+func decorateTx(unsignedTx UnsignedTx, vm *VM) (interface{}, error) {
+	b, ok := unsignedTx.(CoreTx)
+	if !ok {
+		return unsignedTx, nil // todo properly fix
+	}
 	if err := b.InitFx(vm); err != nil {
 		return nil, err
 	}

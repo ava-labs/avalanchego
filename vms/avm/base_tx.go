@@ -22,7 +22,10 @@ type BaseTx struct {
 }
 
 func (t *BaseTx) InitFx(vm *VM) error {
-	for _, in := range t.Ins {
+	// todo genesis is only tx without inputs
+	// todo index loop might be better impl
+	for i, n := 0, len(t.Ins); i < n; i++ {
+		in := t.Ins[i]
 		fxIdx, err := vm.getFx(in.In)
 		if err != nil {
 			return err
@@ -32,7 +35,8 @@ func (t *BaseTx) InitFx(vm *VM) error {
 		in.FxID = fx.ID
 	}
 
-	for _, out := range t.Outs {
+	for i, n := 0, len(t.Outs); i < n; i++ {
+		out := t.Outs[i]
 		fxIdx, err := vm.getFx(out.Out)
 		if err != nil {
 			return err
