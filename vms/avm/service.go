@@ -115,10 +115,8 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
-		b, _ := tx.UnsignedTx.(*BaseTx)
-		err = b.InitFx(service.vm)
+		b, err := toDecoratedBaseTx(tx.UnsignedTx, service.vm)
 		if err != nil {
-			service.vm.ctx.Log.Error("Error initializing IOTx, %s", err)
 			return err
 		}
 
@@ -131,6 +129,14 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	}
 	reply.Encoding = args.Encoding
 	return nil
+}
+
+func toDecoratedBaseTx(unsignedTx UnsignedTx, vm *VM) (*BaseTx, error) {
+	b, _ := unsignedTx.(*BaseTx)
+	if err := b.InitFx(vm); err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 // GetUTXOs gets all utxos for passed in addresses
