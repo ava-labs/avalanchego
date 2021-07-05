@@ -24,12 +24,9 @@ var (
 	largerIndexPrefix  = []byte{3}
 
 	errDuplicatedOperation = errors.New("duplicated operation on provided value")
-<<<<<<< HEAD
 	errEmptyBatch          = errors.New("there are no transactions in this batch")
-=======
 
 	_ SharedMemory = &sharedMemory{}
->>>>>>> 9861943e76bdb1330452b070f1ada4dbd404c6ac
 )
 
 type SharedMemoryMethod int
