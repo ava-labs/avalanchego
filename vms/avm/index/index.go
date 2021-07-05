@@ -30,16 +30,19 @@ import (
 // 1) An input UTXO to the transaction was at least partially owned by the address
 // 2) An output of the transaction is at least partially owned by the address
 type AddressTxsIndexer interface {
-	// Reset clears the indexer state
+	// Reset clears unwritten indexer state.
 	Reset()
 
 	// AddUTXOs adds given slice of [outputUTXOs] to the indexer state
 	AddUTXOs(outputUTXOs []*avax.UTXO)
 
-	// AddUTXOIDs adds the given [inputUTXOIDs] to the indexer state.
+	// AddUTXOsByID adds the given [inputUTXOIDs] to the indexer state.
 	// The [getUTXOFn] function is used to get the underlying [avax.UTXO] from each
 	// [avax.UTXOID] in the [inputUTXOIDs] slice.
-	AddUTXOIDs(getUTXOFn func(utxoID *avax.UTXOID) (*avax.UTXO, error), inputUTXOIDs []*avax.UTXOID) error
+	AddUTXOsByID(
+		getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
+		inputUTXOIDs []*avax.UTXOID,
+	) error
 
 	// Write persists the indexer state against the given [txID].
 	// Reset() must be called manually to reset the state for next write.
@@ -75,18 +78,21 @@ func (i *indexer) addTransferOutput(assetID ids.ID, addrs []ids.ShortID) {
 	}
 }
 
-// AddUTXOIDs adds given inputUTXOs to the indexer if they are of type secp256k1fx.TransferOutput
-// function calls vm.getUTXO to get the UTXO from the *avax.UTXOID
-func (i *indexer) AddUTXOIDs(getUTXOFn func(utxoid *avax.UTXOID) (*avax.UTXO, error), inputUTXOs []*avax.UTXOID) error {
+// AddUTXOsByID adds given the given UTXOs to the indexer's unwritten state.
+// [getUTXOF] is used to look up UTXOs by their ID.
+func (i *indexer) AddUTXOsByID(
+	getUTXOF func(utxoid *avax.UTXOID) (*avax.UTXO, error),
+	inputUTXOs []*avax.UTXOID,
+) error {
 	for _, utxoID := range inputUTXOs {
-		utxo, err := getUTXOFn(utxoID)
+		utxo, err := getUTXOF(utxoID)
 		if err != nil {
 			return err // should never happen
 		}
 
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			i.log.Verbo("Skipping input utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID())
+			i.log.Verbo("skipping utxo %s for indexing because it isn't a secp256k1fx.TransferOutput", utxo.InputID())
 			continue
 		}
 
@@ -95,9 +101,9 @@ func (i *indexer) AddUTXOIDs(getUTXOFn func(utxoid *avax.UTXOID) (*avax.UTXO, er
 	return nil
 }
 
-// AddUTXOs adds given outputUTXOs to the indexer if they are of type secp256k1fx.TransferOutput
-func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
-	for _, utxo := range outputUTXOs {
+// AddUTXOs adds given [utxos] to the indexer
+func (i *indexer) AddUTXOs(utxos []*avax.UTXO) {
+	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
 			i.log.Verbo("Skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID())
@@ -108,8 +114,9 @@ func (i *indexer) AddUTXOs(outputUTXOs []*avax.UTXO) {
 	}
 }
 
-// Commit commits given txID and already indexed data to the database.
-// The database structure is thus:
+// Write persists unpersisted data.
+// Associates all UTXOs in [i.addressAssetIDTxMap] with transaction [txID].
+// The database structure is:
 // [address]
 // |  [assetID]
 // |  |
@@ -163,7 +170,7 @@ func (i *indexer) Write(txID ids.ID) error {
 
 // Read returns IDs of transactions that changed [address]'s balance of [assetID],
 // starting at [cursor], in order of transaction acceptance. e.g. if [cursor] == 1, does
-// not return the first transaction that changed the balance. This is for for pagination.
+// not return the first transaction that changed the balance. (This is for for pagination.)
 // Returns at most [pageSize] elements.
 func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
 	// setup prefix DBs
@@ -204,6 +211,8 @@ func (i *indexer) Reset() {
 	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
+// Returns a new AddressTxsIndexer.
+// The returned indexer ignores UTXOs that are not type secp256k1fx.TransferOutput.
 func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m Metrics) AddressTxsIndexer {
 	return &indexer{
 		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
@@ -219,7 +228,7 @@ func NewNoIndexer() AddressTxsIndexer {
 	return &noIndexer{}
 }
 
-func (i *noIndexer) AddUTXOIDs(func(utxoid *avax.UTXOID) (*avax.UTXO, error), []*avax.UTXOID) error {
+func (i *noIndexer) AddUTXOsByID(func(utxoid *avax.UTXOID) (*avax.UTXO, error), []*avax.UTXOID) error {
 	return nil
 }
 
@@ -233,6 +242,6 @@ func (i *noIndexer) Write(ids.ID) error {
 
 func (i *noIndexer) Reset() {}
 
-func (i *noIndexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
+func (i *noIndexer) Read(ids.ShortID, ids.ID, uint64, uint64) ([]ids.ID, error) {
 	return nil, nil
 }

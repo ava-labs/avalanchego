@@ -137,7 +137,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOIDs(vm.getUTXO, uniqueParsedTX.inputUTXOs)
+		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.inputUTXOs)
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
 		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
@@ -249,7 +249,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOIDs(vm.getUTXO, uniqueParsedTX.InputUTXOs())
+		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
 		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
