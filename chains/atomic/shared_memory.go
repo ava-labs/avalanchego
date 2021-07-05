@@ -229,7 +229,7 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 			sharedIDVersionDB[sharedID] = vdb
 			defer sm.m.ReleaseDatabase(sharedID)
 		} else {
-			db = sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
+			db = prefixdb.New(sharedID[:], vdb)
 		}
 
 		s := state{
