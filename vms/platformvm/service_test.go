@@ -419,7 +419,7 @@ func TestGetTx(t *testing.T) {
 		} else if err := service.GetTx(nil, arg, &response); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else {
-			responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx.(string))
+			responseTxBytes, err := formatting.Decode(response.Encoding, response.Tx)
 			if err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)
 			}
