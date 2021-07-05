@@ -9,6 +9,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var (
+	_ Factory = &noEarlyTermFactory{}
+	_ Poll    = &noEarlyTermPoll{}
+)
+
 type noEarlyTermFactory struct{}
 
 // NewNoEarlyTermFactory returns a factory that returns polls with no early

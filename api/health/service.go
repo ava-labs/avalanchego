@@ -19,6 +19,8 @@ import (
 	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
+var _ Service = &apiServer{}
+
 // Service wraps a [healthlib.Service]. Handler() returns a handler
 // that handles incoming HTTP API requests. We have this in a separate
 // package from [healthlib] to avoid a circular import where this service

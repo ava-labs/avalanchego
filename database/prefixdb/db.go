@@ -15,6 +15,11 @@ const (
 	defaultBufCap = 256
 )
 
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+)
+
 // Database partitions a database into a sub-database by prefixing all keys with
 // a unique value.
 type Database struct {

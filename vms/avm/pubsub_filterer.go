@@ -6,6 +6,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
+var _ pubsub.Filterer = &filterer{}
+
 type filterer struct {
 	tx *Tx
 }

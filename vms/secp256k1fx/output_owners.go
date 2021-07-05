@@ -7,13 +7,15 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var (
-	errNilOutput            = errors.New("nil output")
-	errOutputUnspendable    = errors.New("output is unspendable")
-	errOutputUnoptimized    = errors.New("output representation should be optimized")
-	errAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
+	errNilOutput                         = errors.New("nil output")
+	errOutputUnspendable                 = errors.New("output is unspendable")
+	errOutputUnoptimized                 = errors.New("output representation should be optimized")
+	errAddrsNotSortedUnique              = errors.New("addresses not sorted and unique")
+	_                       verify.State = &OutputOwners{}
 )
 
 // OutputOwners ...

@@ -8,6 +8,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
+var (
+	_ ConnMeter = &connMeter{}
+	_ ConnMeter = &noConnMeter{}
+)
+
 // ConnMeter keeps track of how many times a peer from a given address
 // have attempted to connect to us in a given time period.
 type ConnMeter interface {

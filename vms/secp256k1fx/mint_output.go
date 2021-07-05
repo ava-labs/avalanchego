@@ -3,6 +3,10 @@
 
 package secp256k1fx
 
+import "github.com/ava-labs/avalanchego/vms/components/verify"
+
+var _ verify.State = &MintOutput{}
+
 // MintOutput ...
 type MintOutput struct {
 	OutputOwners `serialize:"true"`
