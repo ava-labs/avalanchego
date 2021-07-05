@@ -212,7 +212,7 @@ func (m *outboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Re
 }
 
 func NewNoOutboundThrottler() OutboundMsgThrottler {
-	return &outboundMsgThrottler{}
+	return &noOutboundMsgThrottler{}
 }
 
 // noOutboundMsgThrottler implements OutboundMsgThrottler.

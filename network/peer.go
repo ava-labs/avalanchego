@@ -75,7 +75,7 @@ type peer struct {
 	// if the close function has been called.
 	closed utils.AtomicBool
 
-	// lock to ensure that closing of the sender queue is handled safely
+	// Ensures that closing [p.sender] is handled safely
 	senderLock sync.Mutex
 
 	// queue of messages this connection is attempting to send the peer. Is
@@ -344,13 +344,13 @@ func (p *peer) WriteMessages() {
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
 func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
-	p.senderLock.Lock() // TODO can this be moved down?
+	p.senderLock.Lock()
 	defer p.senderLock.Unlock()
 
 	// If the peer was closed then the sender channel was closed and we are
 	// unable to send this message without panicking. So drop the message.
 	if p.closed.GetValue() {
-		p.net.log.Debug("dropping message to %s due to a closed connection", p.nodeID)
+		p.net.log.Debug("dropping message to %s%s at %s due to a closed connection", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		return false
 	}
 
@@ -360,7 +360,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	// See if we should drop message
 	dropMsg := !p.net.outboundMsgThrottler.Acquire(uint64(msgBytesLen), p.nodeID)
 	if dropMsg {
-		p.net.log.Debug("dropping message to %s due to rate-limiting", p.nodeID)
+		p.net.log.Debug("dropping message to %s%s at %s due to rate-limiting", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		return false
 	}
 	// Must call p.net.outboundMsgThrottler.Release(uint64(msgBytesLen), p.nodeID)
@@ -379,7 +379,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 		return true
 	default:
 		// we never sent the message, remove from pending totals
-		p.net.log.Debug("dropping message to %s due to a full send queue", p.nodeID)
+		p.net.log.Debug("dropping message to %s%s at %s due to a full send queue", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		p.net.byteSlicePool.Put(toSend)
 		p.net.outboundMsgThrottler.Release(uint64(msgBytesLen), p.nodeID)
 		return false
@@ -488,9 +488,20 @@ func (p *peer) close() {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.nodeID, err)
 	}
 
+	// Hold [p.senderLock] here while we close [p.sender] so that on the
+	// next iteration of WriteMessages, [p.closed] will be seen to be closed
+	// and we won't try to put anything onto [p.sender]
 	p.senderLock.Lock()
-	// The locks guarantee here that the sender routine will read that the peer
-	// has been closed and will therefore not attempt to write on this channel.
+	// Release all of the unsent messages back to the outbound message throttler
+releaseLoop:
+	for {
+		select {
+		case msg := <-p.sender:
+			p.net.outboundMsgThrottler.Release(uint64(len(msg)), p.nodeID)
+		default:
+			break releaseLoop
+		}
+	}
 	close(p.sender)
 	p.senderLock.Unlock()
 	p.net.disconnected(p)
