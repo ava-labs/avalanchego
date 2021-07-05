@@ -75,9 +75,6 @@ type peer struct {
 	// if the close function has been called.
 	closed utils.AtomicBool
 
-	// number of bytes currently in the send queue.
-	pendingBytes int64
-
 	// lock to ensure that closing of the sender queue is handled safely
 	senderLock sync.Mutex
 
@@ -308,12 +305,13 @@ func (p *peer) WriteMessages() {
 	var reader bytes.Reader
 	writer := bufio.NewWriter(p.conn)
 	for msg := range p.sender {
+		msgLen := uint32(len(msg))
 		p.net.log.Verbo("sending new message to %s:\n%s",
 			p.nodeID,
 			formatting.DumpBytes{Bytes: msg})
 
 		msgb := [wrappers.IntLen]byte{}
-		binary.BigEndian.PutUint32(msgb[:], uint32(len(msg)))
+		binary.BigEndian.PutUint32(msgb[:], msgLen)
 		for _, byteSlice := range [2][]byte{msgb[:], msg} {
 			reader.Reset(byteSlice)
 			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
@@ -332,16 +330,12 @@ func (p *peer) WriteMessages() {
 			return
 		}
 
-		p.senderLock.Lock()
-		atomic.AddInt64(&p.net.pendingBytes, -int64(len(msg)))
-		p.pendingBytes -= int64(len(msg))
-		p.senderLock.Unlock()
-
 		now := p.net.clock.Time().Unix()
 		atomic.StoreInt64(&p.lastSent, now)
 		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
 
 		p.net.byteSlicePool.Put(msg)
+		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 	}
 }
 
@@ -350,7 +344,7 @@ func (p *peer) WriteMessages() {
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
 func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
-	p.senderLock.Lock()
+	p.senderLock.Lock() // TODO can this be moved down?
 	defer p.senderLock.Unlock()
 
 	// If the peer was closed then the sender channel was closed and we are
@@ -360,25 +354,17 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 		return false
 	}
 
-	// is it possible to send?
-	if dropMsg := p.dropMessagePeer(); dropMsg {
-		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.nodeID)
-		return false
-	}
-
 	msgBytes := msg.Bytes()
 	msgBytesLen := int64(len(msgBytes))
 
-	// lets assume send will be successful, we add to the network pending bytes.
-	newPendingBytes := atomic.AddInt64(&p.net.pendingBytes, msgBytesLen)
-	newConnPendingBytes := p.pendingBytes + msgBytesLen
-
-	if dropMsg := p.dropMessage(newConnPendingBytes, newPendingBytes); dropMsg {
-		// we never sent the message, remove from pending totals
-		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
-		p.net.log.Debug("dropping message to %s due to a send queue with too many bytes", p.nodeID)
+	// See if we should drop message
+	dropMsg := !p.net.outboundMsgThrottler.Acquire(uint64(msgBytesLen), p.nodeID)
+	if dropMsg {
+		p.net.log.Debug("dropping message to %s due to rate-limiting", p.nodeID)
 		return false
 	}
+	// Must call p.net.outboundMsgThrottler.Release(uint64(msgBytesLen), p.nodeID)
+	// when done sending [msg] or when we give up sending [msg]
 
 	// If the flag says to not modify [msgBytes], copy it so that the copy,
 	// not [msgBytes], will be put back into the pool after it's written.
@@ -390,13 +376,12 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 
 	select {
 	case p.sender <- toSend:
-		p.pendingBytes = newConnPendingBytes
 		return true
 	default:
 		// we never sent the message, remove from pending totals
-		atomic.AddInt64(&p.net.pendingBytes, -msgBytesLen)
 		p.net.log.Debug("dropping message to %s due to a full send queue", p.nodeID)
 		p.net.byteSlicePool.Put(toSend)
+		p.net.outboundMsgThrottler.Release(uint64(msgBytesLen), p.nodeID)
 		return false
 	}
 }
@@ -487,19 +472,6 @@ func (p *peer) handle(msg Msg, onFinishedHandling func()) {
 	}
 }
 
-// Assumes the peer's mutex is held
-func (p *peer) dropMessagePeer() bool {
-	return p.pendingBytes > p.net.maxMessageSize
-}
-
-// Assumes the peer's mutex is held
-func (p *peer) dropMessage(connPendingLen, networkPendingLen int64) bool {
-	return networkPendingLen > p.net.networkPendingSendBytesToRateLimit && // Check to see if we should be enforcing any rate limiting
-		p.dropMessagePeer() && // this connection should have a minimum allowed bandwidth
-		(networkPendingLen > p.net.maxNetworkPendingSendBytes || // Check to see if this message would put too much memory into the network
-			connPendingLen > p.net.maxNetworkPendingSendBytes/20) // Check to see if this connection is using too much memory
-}
-
 // assumes the [stateLock] is not held
 func (p *peer) Close() { p.once.Do(p.close) }
 
@@ -520,7 +492,6 @@ func (p *peer) close() {
 	// The locks guarantee here that the sender routine will read that the peer
 	// has been closed and will therefore not attempt to write on this channel.
 	close(p.sender)
-	atomic.AddInt64(&p.net.pendingBytes, -p.pendingBytes)
 	p.senderLock.Unlock()
 	p.net.disconnected(p)
 }

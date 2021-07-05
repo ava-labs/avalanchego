@@ -164,9 +164,8 @@ type network struct {
 	isFetchOnly                  bool
 
 	// stateLock should never be held when grabbing a peer senderLock
-	stateLock    sync.RWMutex
-	pendingBytes int64
-	closed       utils.AtomicBool
+	stateLock sync.RWMutex
+	closed    utils.AtomicBool
 
 	// May contain peers that we have not finished the handshake with.
 	peers peersData
@@ -230,6 +229,9 @@ type network struct {
 
 	// Rate-limits incoming messages
 	inboundMsgThrottler throttling.InboundMsgThrottler
+
+	// Rate-limits outgoing messages
+	outboundMsgThrottler throttling.OutboundMsgThrottler
 }
 
 type Config struct {
@@ -272,7 +274,9 @@ func NewDefaultNetwork(
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
-	msgThrottler throttling.InboundMsgThrottler,
+	inboundMsgThrottler throttling.InboundMsgThrottler,
+	outboundMsgThrottler throttling.OutboundMsgThrottler,
+
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -316,7 +320,8 @@ func NewDefaultNetwork(
 		peerAliasTimeout,
 		tlsKey,
 		isFetchOnly,
-		msgThrottler,
+		inboundMsgThrottler,
+		outboundMsgThrottler,
 	)
 }
 
@@ -364,6 +369,7 @@ func NewNetwork(
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
+	outboundMsgThrottler throttling.OutboundMsgThrottler,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -420,7 +426,8 @@ func NewNetwork(
 				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
-		inboundMsgThrottler: inboundMsgThrottler,
+		inboundMsgThrottler:  inboundMsgThrottler,
+		outboundMsgThrottler: outboundMsgThrottler,
 	}
 	netw.b = Builder{
 		getByteSlice: func() []byte {
@@ -1621,7 +1628,6 @@ func (n *network) HealthCheck() (interface{}, error) {
 			connectedTo++
 		}
 	}
-	pendingSendBytes := atomic.LoadInt64(&n.pendingBytes)
 	sendFailRate := n.sendFailRateCalculator.Read()
 	n.stateLock.RUnlock()
 
@@ -1646,12 +1652,6 @@ func (n *network) HealthCheck() (interface{}, error) {
 	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent.Milliseconds()))
-
-	// Make sure the send queue isn't too full
-	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
-	healthy = healthy && portionFull <= n.healthConfig.MaxPortionSendQueueBytesFull
-	details["sendQueuePortionFull"] = portionFull
-	n.metrics.sendQueuePortionFull.Set(portionFull)
 
 	// Make sure the message send failed rate isn't too high
 	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate

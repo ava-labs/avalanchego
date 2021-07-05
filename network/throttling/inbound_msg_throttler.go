@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	_ InboundMsgThrottler = &noMsgThrottler{}
+	_ InboundMsgThrottler = &noInboundMsgThrottler{}
 	_ InboundMsgThrottler = &sybilInboundMsgThrottler{}
 )
 
@@ -321,28 +321,28 @@ type sybilInboundMsgThrottlerMetrics struct {
 func (m *sybilInboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
 	m.acquireLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_acquire_latency",
+		Name:      "incoming_throttler_acquire_latency",
 		Help:      "Duration an incoming message waited to be read due to throttling",
 		Buckets:   metric.NanosecondsBuckets,
 	})
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_remaining_at_large_bytes",
+		Name:      "incoming_throttler_remaining_at_large_bytes",
 		Help:      "Bytes remaining in the at large byte allocation",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_remaining_validator_bytes",
+		Name:      "incoming_throttler_remaining_validator_bytes",
 		Help:      "Bytes remaining in the validator byte allocation",
 	})
 	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_awaiting_acquire",
+		Name:      "incoming_throttler_awaiting_acquire",
 		Help:      "Number of incoming messages waiting to be read",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_awaiting_release",
+		Name:      "incoming_throttler_awaiting_release",
 		Help:      "Number of messages currently being read/handled",
 	})
 	errs := wrappers.Errs{}
@@ -356,14 +356,14 @@ func (m *sybilInboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheu
 	return errs.Err
 }
 
-func NewNoThrottler() InboundMsgThrottler {
-	return &noMsgThrottler{}
+func NewNoInboundThrottler() InboundMsgThrottler {
+	return &noInboundMsgThrottler{}
 }
 
 // noMsgThrottler implements MsgThrottler.
 // [Acquire] always returns immediately.
-type noMsgThrottler struct{}
+type noInboundMsgThrottler struct{}
 
-func (*noMsgThrottler) Acquire(uint64, ids.ShortID) {}
+func (*noInboundMsgThrottler) Acquire(uint64, ids.ShortID) {}
 
-func (*noMsgThrottler) Release(uint64, ids.ShortID) {}
+func (*noInboundMsgThrottler) Release(uint64, ids.ShortID) {}
