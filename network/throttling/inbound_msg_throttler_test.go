@@ -26,7 +26,7 @@ func TestSybilMsgThrottler(t *testing.T) {
 	vdr2ID := ids.GenerateTestShortID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
 	assert.NoError(vdrs.AddWeight(vdr2ID, 1))
-	throttlerIntf, err := NewSybilMsgThrottler(
+	throttlerIntf, err := NewSybilInboundMsgThrottler(
 		&logging.Log{},
 		prometheus.NewRegistry(),
 		vdrs,
@@ -34,8 +34,8 @@ func TestSybilMsgThrottler(t *testing.T) {
 	)
 	assert.NoError(err)
 
-	// Make sure NewSybilMsgThrottler works
-	throttler := throttlerIntf.(*sybilMsgThrottler)
+	// Make sure NewSybilInboundMsgThrottler works
+	throttler := throttlerIntf.(*sybilInboundMsgThrottler)
 	assert.Equal(config.VdrAllocSize, throttler.maxVdrBytes)
 	assert.Equal(config.VdrAllocSize, throttler.remainingVdrBytes)
 	assert.Equal(config.AtLargeAllocSize, throttler.remainingAtLargeBytes)
@@ -239,14 +239,14 @@ func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	vdrs := validators.NewSet()
 	vdr1ID := ids.GenerateTestShortID()
 	assert.NoError(vdrs.AddWeight(vdr1ID, 1))
-	throttlerIntf, err := NewSybilMsgThrottler(
+	throttlerIntf, err := NewSybilInboundMsgThrottler(
 		&logging.Log{},
 		prometheus.NewRegistry(),
 		vdrs,
 		config,
 	)
 	assert.NoError(err)
-	throttler := throttlerIntf.(*sybilMsgThrottler)
+	throttler := throttlerIntf.(*sybilInboundMsgThrottler)
 	nonVdrNodeID1 := ids.GenerateTestShortID()
 	throttlerIntf.Acquire(config.NodeMaxAtLargeBytes, nonVdrNodeID1)
 
@@ -308,14 +308,14 @@ func TestSybilMsgThrottlerFIFO(t *testing.T) {
 		if nodeID == nonVdrNodeID {
 			maxBytes = maxNonVdrBytes
 		}
-		throttlerIntf, err := NewSybilMsgThrottler(
+		throttlerIntf, err := NewSybilInboundMsgThrottler(
 			&logging.Log{},
 			prometheus.NewRegistry(),
 			vdrs,
 			config,
 		)
 		assert.NoError(err)
-		throttler := throttlerIntf.(*sybilMsgThrottler)
+		throttler := throttlerIntf.(*sybilInboundMsgThrottler)
 		// node uses up all but 1 byte
 		throttler.Acquire(maxBytes-1, nodeID)
 		// node uses the last byte

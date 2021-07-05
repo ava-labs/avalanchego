@@ -229,7 +229,7 @@ type network struct {
 	byteSlicePool sync.Pool
 
 	// Rate-limits incoming messages
-	msgThrottler throttling.MsgThrottler
+	inboundMsgThrottler throttling.InboundMsgThrottler
 }
 
 type Config struct {
@@ -272,7 +272,7 @@ func NewDefaultNetwork(
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
-	msgThrottler throttling.MsgThrottler,
+	msgThrottler throttling.InboundMsgThrottler,
 ) Network {
 	return NewNetwork(
 		registerer,
@@ -363,7 +363,7 @@ func NewNetwork(
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
-	msgThrottler throttling.MsgThrottler,
+	inboundMsgThrottler throttling.InboundMsgThrottler,
 ) Network {
 	// #nosec G404
 	netw := &network{
@@ -420,7 +420,7 @@ func NewNetwork(
 				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
-		msgThrottler: msgThrottler,
+		inboundMsgThrottler: inboundMsgThrottler,
 	}
 	netw.b = Builder{
 		getByteSlice: func() []byte {

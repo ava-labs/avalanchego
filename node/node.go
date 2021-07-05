@@ -231,7 +231,7 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
-	msgThrottler, err := throttling.NewSybilMsgThrottler(
+	msgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		n.Log,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,

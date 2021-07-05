@@ -19,12 +19,12 @@ import (
 )
 
 var (
-	_ MsgThrottler = &noMsgThrottler{}
-	_ MsgThrottler = &sybilMsgThrottler{}
+	_ InboundMsgThrottler = &noMsgThrottler{}
+	_ InboundMsgThrottler = &sybilInboundMsgThrottler{}
 )
 
-// MsgThrottler rate-limits incoming messages from the network.
-type MsgThrottler interface {
+// InboundMsgThrottler rate-limits incoming messages from the network.
+type InboundMsgThrottler interface {
 	// Blocks until node [nodeID] can put a message of
 	// size [msgSize] onto the incoming message buffer.
 	Acquire(msgSize uint64, nodeID ids.ShortID)
@@ -44,7 +44,7 @@ type msgMetadata struct {
 	closeOnAcquireChan chan struct{}
 }
 
-// See sybilMsgThrottler
+// See sybilInboundMsgThrottler
 type MsgThrottlerConfig struct {
 	VdrAllocSize        uint64
 	AtLargeAllocSize    uint64
@@ -54,13 +54,13 @@ type MsgThrottlerConfig struct {
 // Returns a new MsgThrottler.
 // If this function returns an error, the returned MsgThrottler may still be used.
 // However, some of its metrics may not be registered.
-func NewSybilMsgThrottler(
+func NewSybilInboundMsgThrottler(
 	log logging.Logger,
 	metricsRegisterer prometheus.Registerer,
 	vdrs validators.Set,
 	config MsgThrottlerConfig,
-) (MsgThrottler, error) {
-	t := &sybilMsgThrottler{
+) (InboundMsgThrottler, error) {
+	t := &sybilInboundMsgThrottler{
 		log:                    log,
 		vdrs:                   vdrs,
 		maxVdrBytes:            config.VdrAllocSize,
@@ -82,9 +82,9 @@ func NewSybilMsgThrottler(
 // It gives more space to validators with more stake.
 // Messages are guaranteed to make progress toward
 // acquiring enough bytes to be read.
-type sybilMsgThrottler struct {
+type sybilInboundMsgThrottler struct {
 	log       logging.Logger
-	metrics   sybilMsgThrottlerMetrics
+	metrics   sybilInboundMsgThrottlerMetrics
 	lock      sync.RWMutex
 	nextMsgID uint64
 	// Primary network validator set
@@ -125,7 +125,7 @@ type sybilMsgThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+func (t *sybilInboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.metrics.awaitingAcquire.Inc()
 	startTime := time.Now()
 	defer func() {
@@ -209,7 +209,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
-func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+func (t *sybilInboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
@@ -310,7 +310,7 @@ func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	}
 }
 
-type sybilMsgThrottlerMetrics struct {
+type sybilInboundMsgThrottlerMetrics struct {
 	acquireLatency        prometheus.Histogram
 	remainingAtLargeBytes prometheus.Gauge
 	remainingVdrBytes     prometheus.Gauge
@@ -318,7 +318,7 @@ type sybilMsgThrottlerMetrics struct {
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *sybilMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
+func (m *sybilInboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
 	m.acquireLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: constants.PlatformName,
 		Name:      "throttler_acquire_latency",
@@ -356,7 +356,7 @@ func (m *sybilMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Regis
 	return errs.Err
 }
 
-func NewNoThrottler() MsgThrottler {
+func NewNoThrottler() InboundMsgThrottler {
 	return &noMsgThrottler{}
 }
 
