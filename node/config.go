@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
-	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 // Config contains all of the configurations of an Avalanche node.
@@ -51,8 +50,8 @@ type Config struct {
 	// Path to database
 	DBPath string
 
-	// If false, uses an in memory database
-	DBEnabled bool
+	// Name of the database type to use
+	DBName string
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
@@ -61,22 +60,16 @@ type Config struct {
 	DisabledStakingWeight uint64
 
 	// Throttling
-	MaxNonStakerPendingMsgs uint32
-	StakerMSGPortion        float64
-	StakerCPUPortion        float64
-	SendQueueSize           uint32
-	MaxPendingMsgs          uint32
+	SendQueueSize uint32
 
 	// Health
 	HealthCheckFreq time.Duration
 
 	// Network configuration
-	NetworkConfig       timer.AdaptiveTimeoutConfig
-	NetworkHealthConfig network.HealthConfig
-	PeerListSize        uint32
-	PeerListGossipSize  uint32
-	PeerListGossipFreq  time.Duration
-	DialerConfig        network.DialerConfig
+	NetworkConfig      network.Config
+	PeerListSize       uint32
+	PeerListGossipSize uint32
+	PeerListGossipFreq time.Duration
 	CompressionEnabled  bool
 
 	// Benchlist Configuration
@@ -174,4 +167,7 @@ type Config struct {
 	// Max time to spend fetching a container and its
 	// ancestors while responding to a GetAncestors message
 	BootstrapMaxTimeGetAncestors time.Duration
+
+	// VM Aliases
+	VMAliases map[ids.ID][]string
 }

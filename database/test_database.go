@@ -8,12 +8,15 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 // Tests is a list of all database tests
 var Tests = []func(t *testing.T, db Database){
 	TestSimpleKeyValue,
+	TestKeyEmptyValue,
 	TestSimpleKeyValueClosed,
 	TestBatchPut,
 	TestBatchDelete,
@@ -80,6 +83,23 @@ func TestSimpleKeyValue(t *testing.T, db Database) {
 	} else if err := db.Delete(key); err != nil {
 		t.Fatalf("Unexpected error on db.Delete: %s", err)
 	}
+}
+
+func TestKeyEmptyValue(t *testing.T, db Database) {
+	assert := assert.New(t)
+
+	key := []byte("hello")
+	val := []byte(nil)
+
+	_, err := db.Get(key)
+	assert.Equal(ErrNotFound, err)
+
+	err = db.Put(key, val)
+	assert.NoError(err)
+
+	value, err := db.Get(key)
+	assert.NoError(err)
+	assert.Len(value, len(val))
 }
 
 // TestSimpleKeyValueClosed tests to make sure that Put + Get + Delete + Has
@@ -678,9 +698,14 @@ func TestIteratorPrefix(t *testing.T, db Database) {
 	key2 := []byte("goodbye")
 	value2 := []byte("world2")
 
+	key3 := []byte("joy")
+	value3 := []byte("world3")
+
 	if err := db.Put(key1, value1); err != nil {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	} else if err := db.Put(key2, value2); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	} else if err := db.Put(key3, value3); err != nil {
 		t.Fatalf("Unexpected error on batch.Put: %s", err)
 	}
 
@@ -828,20 +853,76 @@ func TestIteratorClosed(t *testing.T, db Database) {
 		t.Fatalf("Unexpected error on db.Close: %s", err)
 	}
 
-	iterator := db.NewIterator()
-	if iterator == nil {
-		t.Fatalf("db.NewIterator returned nil")
-	}
-	defer iterator.Release()
+	{
+		iterator := db.NewIterator()
+		if iterator == nil {
+			t.Fatalf("db.NewIterator returned nil")
+		}
+		defer iterator.Release()
 
-	if iterator.Next() {
-		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
-	} else if key := iterator.Key(); key != nil {
-		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
-	} else if value := iterator.Value(); value != nil {
-		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
-	} else if err := iterator.Error(); err != ErrClosed {
-		t.Fatalf("Expected %s on iterator.Error", ErrClosed)
+		if iterator.Next() {
+			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
+		} else if key := iterator.Key(); key != nil {
+			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
+		} else if value := iterator.Value(); value != nil {
+			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
+		} else if err := iterator.Error(); err != ErrClosed {
+			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
+		}
+	}
+
+	{
+		iterator := db.NewIteratorWithPrefix(nil)
+		if iterator == nil {
+			t.Fatalf("db.NewIteratorWithPrefix returned nil")
+		}
+		defer iterator.Release()
+
+		if iterator.Next() {
+			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
+		} else if key := iterator.Key(); key != nil {
+			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
+		} else if value := iterator.Value(); value != nil {
+			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
+		} else if err := iterator.Error(); err != ErrClosed {
+			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
+		}
+	}
+
+	{
+		iterator := db.NewIteratorWithStart(nil)
+		if iterator == nil {
+			t.Fatalf("db.NewIteratorWithStart returned nil")
+		}
+		defer iterator.Release()
+
+		if iterator.Next() {
+			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
+		} else if key := iterator.Key(); key != nil {
+			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
+		} else if value := iterator.Value(); value != nil {
+			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
+		} else if err := iterator.Error(); err != ErrClosed {
+			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
+		}
+	}
+
+	{
+		iterator := db.NewIteratorWithStartAndPrefix(nil, nil)
+		if iterator == nil {
+			t.Fatalf("db.NewIteratorWithStartAndPrefix returned nil")
+		}
+		defer iterator.Release()
+
+		if iterator.Next() {
+			t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
+		} else if key := iterator.Key(); key != nil {
+			t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
+		} else if value := iterator.Value(); value != nil {
+			t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
+		} else if err := iterator.Error(); err != ErrClosed {
+			t.Fatalf("Expected %s on iterator.Error", ErrClosed)
+		}
 	}
 }
 

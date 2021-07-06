@@ -24,6 +24,8 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/staking"
@@ -32,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 )
 
@@ -165,7 +168,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.NetworkID = networkID
 
 	// DB:
-	nodeConfig.DBEnabled = v.GetBool(DBEnabledKey)
+	nodeConfig.DBName = v.GetString(DBTypeKey)
 	nodeConfig.DBPath = filepath.Join(
 		os.ExpandEnv(v.GetString(DBPathKey)),
 		constants.NetworkName(nodeConfig.NetworkID),
@@ -338,42 +341,43 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
 
 	// Throttling
-	nodeConfig.MaxNonStakerPendingMsgs = v.GetUint32(MaxNonStakerPendingMsgsKey)
-	nodeConfig.StakerMSGPortion = v.GetFloat64(StakerMsgReservedKey)
-	nodeConfig.StakerCPUPortion = v.GetFloat64(StakerCPUReservedKey)
 	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
-	nodeConfig.MaxPendingMsgs = v.GetUint32(MaxPendingMsgsKey)
-	if nodeConfig.MaxPendingMsgs < nodeConfig.MaxNonStakerPendingMsgs {
-		return node.Config{}, errors.New("maximum pending messages must be >= maximum non-staker pending messages")
+	nodeConfig.NetworkConfig.MsgThrottlerConfig = throttling.MsgThrottlerConfig{
+		AtLargeAllocSize:    v.GetUint64(ThrottlingAtLargeAllocSizeKey),
+		VdrAllocSize:        v.GetUint64(ThrottlingVdrAllocSizeKey),
+		NodeMaxAtLargeBytes: v.GetUint64(ThrottlingNodeMaxAtLargeBytesKey),
 	}
 
 	// Health
 	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
 	// Network Health Check
-	nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgSent = v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey)
-	nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey)
-	nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull = v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey)
-	nodeConfig.NetworkHealthConfig.MinConnectedPeers = v.GetUint(NetworkHealthMinPeersKey)
-	nodeConfig.NetworkHealthConfig.MaxSendFailRate = v.GetFloat64(NetworkHealthMaxSendFailRateKey)
-	nodeConfig.NetworkHealthConfig.MaxSendFailRateHalflife = healthCheckAveragerHalflife
+	nodeConfig.NetworkConfig.HealthConfig = network.HealthConfig{
+		MaxTimeSinceMsgSent:          v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
+		MaxTimeSinceMsgReceived:      v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
+		MaxPortionSendQueueBytesFull: v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey),
+		MinConnectedPeers:            v.GetUint(NetworkHealthMinPeersKey),
+		MaxSendFailRate:              v.GetFloat64(NetworkHealthMaxSendFailRateKey),
+		MaxSendFailRateHalflife:      healthCheckAveragerHalflife,
+	}
 	switch {
-	case nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgSent < 0:
+	case nodeConfig.NetworkConfig.HealthConfig.MaxTimeSinceMsgSent < 0:
 		return node.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)
-	case nodeConfig.NetworkHealthConfig.MaxTimeSinceMsgReceived < 0:
+	case nodeConfig.NetworkConfig.HealthConfig.MaxTimeSinceMsgReceived < 0:
 		return node.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgReceivedKey)
-	case nodeConfig.NetworkHealthConfig.MaxSendFailRate < 0 || nodeConfig.NetworkHealthConfig.MaxSendFailRate > 1:
+	case nodeConfig.NetworkConfig.HealthConfig.MaxSendFailRate < 0 || nodeConfig.NetworkConfig.HealthConfig.MaxSendFailRate > 1:
 		return node.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxSendFailRateKey)
-	case nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull < 0 || nodeConfig.NetworkHealthConfig.MaxPortionSendQueueBytesFull > 1:
+	case nodeConfig.NetworkConfig.HealthConfig.MaxPortionSendQueueBytesFull < 0 || nodeConfig.NetworkConfig.HealthConfig.MaxPortionSendQueueBytesFull > 1:
 		return node.Config{}, fmt.Errorf("%s must be in [0,1]", NetworkHealthMaxPortionSendQueueFillKey)
 	}
 
 	// Network Timeout
-	nodeConfig.NetworkConfig.InitialTimeout = v.GetDuration(NetworkInitialTimeoutKey)
-	nodeConfig.NetworkConfig.MinimumTimeout = v.GetDuration(NetworkMinimumTimeoutKey)
-	nodeConfig.NetworkConfig.MaximumTimeout = v.GetDuration(NetworkMaximumTimeoutKey)
-	nodeConfig.NetworkConfig.TimeoutHalflife = v.GetDuration(NetworkTimeoutHalflifeKey)
-	nodeConfig.NetworkConfig.TimeoutCoefficient = v.GetFloat64(NetworkTimeoutCoefficientKey)
-
+	nodeConfig.NetworkConfig.AdaptiveTimeoutConfig = timer.AdaptiveTimeoutConfig{
+		InitialTimeout:     v.GetDuration(NetworkInitialTimeoutKey),
+		MinimumTimeout:     v.GetDuration(NetworkMinimumTimeoutKey),
+		MaximumTimeout:     v.GetDuration(NetworkMaximumTimeoutKey),
+		TimeoutHalflife:    v.GetDuration(NetworkTimeoutHalflifeKey),
+		TimeoutCoefficient: v.GetFloat64(NetworkTimeoutCoefficientKey),
+	}
 	switch {
 	case nodeConfig.NetworkConfig.MinimumTimeout < 1:
 		return node.Config{}, errors.New("minimum timeout must be positive")
@@ -390,6 +394,9 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	nodeConfig.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
 
+	// Metrics Namespace
+	nodeConfig.NetworkConfig.MetricsNamespace = constants.PlatformName
+
 	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
 	// [PeerListGossipFreq]
 	nodeConfig.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
@@ -397,7 +404,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Outbound connection throttling
-	nodeConfig.DialerConfig = network.NewDialerConfig(
+	nodeConfig.NetworkConfig.DialerConfig = dialer.NewConfig(
 		v.GetUint32(OutboundConnectionThrottlingRps),
 		v.GetDuration(OutboundConnectionTimeout),
 	)
@@ -506,7 +513,39 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.ProfilerConfig.Freq = v.GetDuration(ProfileContinuousFreqKey)
 	nodeConfig.ProfilerConfig.MaxNumFiles = v.GetInt(ProfileContinuousMaxFilesKey)
 
+	// VM Aliases
+	vmAliases, err := readVMAliases(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+	nodeConfig.VMAliases = vmAliases
 	return nodeConfig, nil
+}
+
+func readVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
+	aliasFilePath := path.Clean(v.GetString(VMAliasesFileKey))
+	exists, err := fileExists(aliasFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if !exists {
+		if v.IsSet(VMAliasesFileKey) {
+			return nil, fmt.Errorf("vm alias file does not exist in %v", aliasFilePath)
+		}
+		return nil, nil
+	}
+
+	fileBytes, err := ioutil.ReadFile(aliasFilePath)
+	if err != nil {
+		return nil, err
+	}
+
+	vmAliasMap := make(map[ids.ID][]string)
+	if err := json.Unmarshal(fileBytes, &vmAliasMap); err != nil {
+		return nil, fmt.Errorf("problem unmarshaling vmAliases: %w", err)
+	}
+	return vmAliasMap, nil
 }
 
 // getChainConfigs reads & puts chainConfigs to node config

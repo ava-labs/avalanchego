@@ -7,7 +7,7 @@
 # go.mod
 # ============= Compilation Stage ================
 FROM golang:1.15.5-alpine AS builder
-RUN apk add --no-cache bash git make gcc musl-dev linux-headers git ca-certificates
+RUN apk add --no-cache bash git make gcc musl-dev linux-headers git ca-certificates g++
 
 WORKDIR /build
 # Copy and download avalanche dependencies using go mod
@@ -24,6 +24,7 @@ RUN ./scripts/build.sh
 # ============= Cleanup Stage ================
 FROM alpine:3.13 AS execution
 
+RUN apk add --no-cache libstdc++
 # Maintain compatibility with previous images
 RUN mkdir -p /avalanchego/build
 WORKDIR /avalanchego/build
