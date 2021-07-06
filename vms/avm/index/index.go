@@ -28,16 +28,17 @@ import (
 // 2) An output of the transaction is at least partially owned by the address
 type AddressTxsIndexer interface {
 	// Reset clears unwritten indexer state.
-	Reset()
+	Reset(ids.ID)
 
 	// AddUTXOs adds given slice of [outputUTXOs] to the indexer state
-	AddUTXOs(outputUTXOs []*avax.UTXO)
+	AddUTXOs(txID ids.ID, outputUTXOs []*avax.UTXO)
 
 	// AddUTXOsByID adds the given [inputUTXOIDs] to the indexer state.
 	// The [getUTXOFn] function is used to get the underlying [avax.UTXO] from each
 	// [avax.UTXOID] in the [inputUTXOIDs] slice.
 	AddUTXOsByID(
 		getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
+		txID ids.ID,
 		inputUTXOIDs []*avax.UTXOID,
 	) error
 
@@ -55,9 +56,9 @@ var idxKey = []byte("idx")
 
 // indexer implements AddressTxsIndexer
 type indexer struct {
-	// Address -> AssetID --> Present if the address's balance
+	// txID -> Address -> AssetID --> Present if the address's balance
 	// of the asset has changed since last Write
-	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
+	addressAssetIDTxMap map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	log                 logging.Logger
 	metrics             Metrics
@@ -65,12 +66,17 @@ type indexer struct {
 
 // addTransferOutput indexes given assetID and any number of addresses linked to the transferOutput
 // to the provided vm.addressAssetIDIndex
-func (i *indexer) addTransferOutput(assetID ids.ID, addrs []ids.ShortID) {
+func (i *indexer) addTransferOutput(txID, assetID ids.ID, addrs []ids.ShortID) {
 	for _, address := range addrs {
-		if _, exists := i.addressAssetIDTxMap[address]; !exists {
-			i.addressAssetIDTxMap[address] = make(map[ids.ID]struct{})
+		if _, exists := i.addressAssetIDTxMap[txID]; !exists {
+			i.addressAssetIDTxMap[txID] = make(map[ids.ShortID]map[ids.ID]struct{})
 		}
-		i.addressAssetIDTxMap[address][assetID] = struct{}{}
+
+		if _, exists := i.addressAssetIDTxMap[txID][address]; !exists {
+			i.addressAssetIDTxMap[txID][address] = make(map[ids.ID]struct{})
+		}
+
+		i.addressAssetIDTxMap[txID][address][assetID] = struct{}{}
 	}
 }
 
@@ -78,6 +84,7 @@ func (i *indexer) addTransferOutput(assetID ids.ID, addrs []ids.ShortID) {
 // [getUTXOF] is used to look up UTXOs by their ID.
 func (i *indexer) AddUTXOsByID(
 	getUTXOF func(utxoid *avax.UTXOID) (*avax.UTXO, error),
+	txID ids.ID,
 	inputUTXOs []*avax.UTXOID,
 ) error {
 	for _, utxoID := range inputUTXOs {
@@ -92,13 +99,13 @@ func (i *indexer) AddUTXOsByID(
 			continue
 		}
 
-		i.addTransferOutput(utxo.AssetID(), out.Addrs)
+		i.addTransferOutput(txID, utxo.AssetID(), out.Addrs)
 	}
 	return nil
 }
 
 // AddUTXOs adds given [utxos] to the indexer
-func (i *indexer) AddUTXOs(utxos []*avax.UTXO) {
+func (i *indexer) AddUTXOs(txID ids.ID, utxos []*avax.UTXO) {
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
@@ -106,7 +113,7 @@ func (i *indexer) AddUTXOs(utxos []*avax.UTXO) {
 			continue
 		}
 
-		i.addTransferOutput(utxo.AssetID(), out.Addrs)
+		i.addTransferOutput(txID, utxo.AssetID(), out.Addrs)
 	}
 }
 
@@ -120,7 +127,15 @@ func (i *indexer) AddUTXOs(utxos []*avax.UTXO) {
 // |  | "0"   => txID1
 // |  | "1"   => txID1
 func (i *indexer) Write(txID ids.ID) error {
-	for address, assetIDs := range i.addressAssetIDTxMap {
+	// check if we have data to write for this [txID]
+	if _, exists := i.addressAssetIDTxMap[txID]; !exists {
+		i.log.Warn("No indexed data found for txID %s to write", txID)
+		return nil
+	}
+
+	// go through all addresses indexed against this [txID]
+	// and persist them, maintaining order
+	for address, assetIDs := range i.addressAssetIDTxMap[txID] {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
 		for assetID := range assetIDs {
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
@@ -138,11 +153,12 @@ func (i *indexer) Write(txID ids.ID) error {
 				idxBytes = make([]byte, wrappers.LongLen)
 				binary.BigEndian.PutUint64(idxBytes, idx)
 			default:
-				// Parse [idxBytes]
+				// index is found, parse stored [idxBytes]
 				idx = binary.BigEndian.Uint64(idxBytes)
 				i.log.Verbo("fetched index %d", idx)
 			}
 
+			// write the [txID] at the index
 			i.log.Debug("Writing at index %d txID %s", idx, txID)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
 				i.log.Fatal("Failed to save txID [%s], idx [%d] to the address [%s], assetID [%s] prefix DB %s", txID, idx, address, assetID, err)
@@ -158,8 +174,9 @@ func (i *indexer) Write(txID ids.ID) error {
 				return err
 			}
 		}
-		delete(i.addressAssetIDTxMap, address)
 	}
+	// delete already written [txID] from the map
+	delete(i.addressAssetIDTxMap, txID)
 	i.metrics.numTxsIndexed.Observe(1)
 	return nil
 }
@@ -203,15 +220,16 @@ func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uin
 	return txIDs, nil
 }
 
-func (i *indexer) Reset() {
-	i.addressAssetIDTxMap = make(map[ids.ShortID]map[ids.ID]struct{})
+// Reset resets the entries under given [txID]
+func (i *indexer) Reset(txID ids.ID) {
+	i.addressAssetIDTxMap[txID] = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
-// Returns a new AddressTxsIndexer.
+// NewAddressTxsIndexer Returns a new AddressTxsIndexer.
 // The returned indexer ignores UTXOs that are not type secp256k1fx.TransferOutput.
 func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m Metrics) AddressTxsIndexer {
 	return &indexer{
-		addressAssetIDTxMap: make(map[ids.ShortID]map[ids.ID]struct{}),
+		addressAssetIDTxMap: make(map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
 		log:                 log,
 		metrics:             m,
@@ -224,19 +242,19 @@ func NewNoIndexer() AddressTxsIndexer {
 	return &noIndexer{}
 }
 
-func (i *noIndexer) AddUTXOsByID(func(utxoid *avax.UTXOID) (*avax.UTXO, error), []*avax.UTXOID) error {
+func (i *noIndexer) AddUTXOsByID(func(utxoid *avax.UTXOID) (*avax.UTXO, error), ids.ID, []*avax.UTXOID) error {
 	return nil
 }
 
-func (i *noIndexer) AddTransferOutput(ids.ID, *secp256k1fx.TransferOutput) {}
+func (i *noIndexer) AddTransferOutput(ids.ID, ids.ID, *secp256k1fx.TransferOutput) {}
 
-func (i *noIndexer) AddUTXOs([]*avax.UTXO) {}
+func (i *noIndexer) AddUTXOs(ids.ID, []*avax.UTXO) {}
 
 func (i *noIndexer) Write(ids.ID) error {
 	return nil
 }
 
-func (i *noIndexer) Reset() {}
+func (i *noIndexer) Reset(ids.ID) {}
 
 func (i *noIndexer) Read(ids.ShortID, ids.ID, uint64, uint64) ([]ids.ID, error) {
 	return nil, nil

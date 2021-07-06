@@ -130,7 +130,7 @@ func (tx *UniqueTx) Accept() error {
 		}
 	}
 
-	err := tx.vm.addressTxsIndexer.Write(tx.txID)
+	err := tx.vm.addressTxsIndexer.Write(tx.ID())
 	if err != nil {
 		return err
 	}

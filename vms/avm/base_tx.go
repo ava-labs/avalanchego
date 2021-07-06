@@ -65,8 +65,8 @@ func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable
 	}
 
 	// index input and output UTXOs
-	vm.addressTxsIndexer.AddUTXOs(tx.UTXOs())
-	return vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, tx.InputUTXOs())
+	vm.addressTxsIndexer.AddUTXOs(tx.ID(), tx.UTXOs())
+	return vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, tx.ID(), tx.InputUTXOs())
 }
 
 // ExecuteWithSideEffects writes the batch with any additional side effects

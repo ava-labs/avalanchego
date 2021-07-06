@@ -137,10 +137,10 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.inputUTXOs)
+		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs)
 		assert.NoError(t, err)
-		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
+		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
+		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -249,10 +249,130 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.InputUTXOs())
+		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
-		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.Write(uniqueParsedTX.txID)
+		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
+		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
+		assert.NoError(t, err)
+	}
+
+	// ensure length is same as keys length
+	assert.Len(t, addressTxMap, len(keys))
+
+	// for each *UniqueTx check its indexed at right index for the right address
+	for key, tx := range addressTxMap {
+		assertIndexedTX(t, vm.db, uint64(0), key, txAssetID.ID, tx.ID())
+		assertLatestIdx(t, vm.db, key, txAssetID.ID, 1)
+	}
+}
+
+func TestIndexTransaction_UnorderedWrites(t *testing.T) {
+	genesisBytes := BuildGenesisTest(t)
+
+	issuer := make(chan common.Message, 1)
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+
+	m := &atomic.Memory{}
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := NewContext(t)
+	ctx.SharedMemory = m.NewSharedMemory(chainID)
+	peerSharedMemory := m.NewSharedMemory(platformChainID)
+
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+
+	avaxID := genesisTx.ID()
+	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	addressTxMap := map[ids.ShortID]*UniqueTx{}
+	txAssetID := avax.Asset{ID: avaxID}
+	txIDs := make([]ids.ID, len(keys))
+
+	ctx.Lock.Lock()
+	for _, key := range keys {
+		// create utxoID and assetIDs
+		utxoID := avax.UTXOID{
+			TxID: ids.GenerateTestID(),
+		}
+
+		// build the transaction
+		tx := buildTX(utxoID, txAssetID, key.PublicKey().Address())
+
+		// sign the transaction
+		if err := signTX(vm.codec, tx, key); err != nil {
+			t.Fatal(err)
+		}
+
+		// Provide the platform UTXO
+		utxo := buildPlatformUTXO(utxoID, txAssetID, key)
+
+		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// save utxo to state
+		inputID := utxo.InputID()
+		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+			t.Fatal("Error saving utxo", err)
+		}
+
+		// put utxo in shared memory
+		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+			Key:   inputID[:],
+			Value: utxoBytes,
+			Traits: [][]byte{
+				key.PublicKey().Address().Bytes(),
+			},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+
+		// issue transaction
+		if _, err := vm.IssueTx(tx.Bytes()); err != nil {
+			t.Fatalf("should have issued the transaction correctly but errored: %s", err)
+		}
+
+		ctx.Lock.Unlock()
+
+		msg := <-issuer
+		if msg != common.PendingTxs {
+			t.Fatalf("Wrong message")
+		}
+
+		ctx.Lock.Lock()
+
+		// get pending transactions
+		txs := vm.PendingTxs()
+		if len(txs) != 1 {
+			t.Fatalf("Should have returned %d tx(s)", 1)
+		}
+
+		parsedTx := txs[0]
+		uniqueParsedTX := parsedTx.(*UniqueTx)
+		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
+
+		// index the transaction, NOT calling Write(ids.ID) method
+		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
+		assert.NoError(t, err)
+		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
+		txIDs = append(txIDs, uniqueParsedTX.ID())
+	}
+
+	// Call Write(ids.ID) method to flush the transactions
+	// Reverse the order of writes to ensure overall order is still correct
+	for i := len(txIDs) - 1; i >= 0; i-- {
+		txID := txIDs[i]
+		err = vm.addressTxsIndexer.Write(txID)
 		assert.NoError(t, err)
 	}
 
