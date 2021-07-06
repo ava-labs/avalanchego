@@ -1,7 +1,6 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-
 package index
 
 import (
@@ -58,7 +57,6 @@ var idxKey = []byte("idx")
 type indexer struct {
 	// Address -> AssetID --> Present if the address's balance
 	// of the asset has changed since last Write
-	// TODO is this description right?
 	addressAssetIDTxMap map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	log                 logging.Logger
