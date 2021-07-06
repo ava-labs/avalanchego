@@ -430,7 +430,7 @@ func NewNetwork(
 			},
 		},
 		compressionEnabled: compressionEnabled,
-		msgThrottler: msgThrottler,
+		msgThrottler:       msgThrottler,
 	}
 	codec, err := newCodec(registerer)
 	if err != nil {

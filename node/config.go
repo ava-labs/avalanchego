@@ -70,7 +70,7 @@ type Config struct {
 	PeerListSize       uint32
 	PeerListGossipSize uint32
 	PeerListGossipFreq time.Duration
-	CompressionEnabled  bool
+	CompressionEnabled bool
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
