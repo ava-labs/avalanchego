@@ -323,10 +323,10 @@ func (p *peer) WriteMessages() {
 		msg := p.sendQueue[0]
 		p.sendQueue = p.sendQueue[1:]
 		p.sendQueueCond.L.Unlock()
+
 		msgLen := uint32(len(msg))
 		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 		p.net.log.Verbo("sending message to %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msg})
-
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], msgLen)
 		for _, byteSlice := range [2][]byte{msgb[:], msg} {
@@ -360,16 +360,6 @@ func (p *peer) WriteMessages() {
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
 func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
-	p.sendQueueCond.L.Lock()
-	defer p.sendQueueCond.L.Unlock()
-
-	// If the peer was closed then the sender channel was closed and we are
-	// unable to send this message without panicking. So drop the message.
-	if p.closed.GetValue() {
-		p.net.log.Debug("dropping message to %s%s at %s due to a closed connection", constants.NodeIDPrefix, p.nodeID, p.getIP())
-		return false
-	}
-
 	msgBytes := msg.Bytes()
 	msgLen := int64(len(msgBytes))
 
@@ -381,6 +371,15 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	}
 	// Invariant: must call p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 	// when done sending [msg] or when we give up sending [msg]
+
+	p.sendQueueCond.L.Lock()
+	defer p.sendQueueCond.L.Unlock()
+
+	if p.closed.GetValue() {
+		p.net.log.Debug("dropping message to %s%s at %s due to a closed connection", constants.NodeIDPrefix, p.nodeID, p.getIP())
+		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
+		return false
+	}
 
 	// If the flag says to not modify [msgBytes], copy it so that the copy,
 	// not [msgBytes], will be put back into the []byte pool after it's written.
@@ -506,7 +505,7 @@ func (p *peer) close() {
 	p.sendQueueCond.L.Unlock()
 	// Per [p.sendQueueCond]'s spec, it is signalled when [p.closed] is set to true
 	// so that we exit the WriteMessages goroutine.
-	// Since [p.closed] is true, nothing else will be put on [p.sendQueue]
+	// Since [p.closed] is now true, nothing else will be put on [p.sendQueue]
 	p.sendQueueCond.Signal()
 	p.net.disconnected(p)
 }

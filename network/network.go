@@ -163,7 +163,6 @@ type network struct {
 	b                            Builder
 	isFetchOnly                  bool
 
-	// stateLock should never be held when grabbing a peer senderLock
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
 
