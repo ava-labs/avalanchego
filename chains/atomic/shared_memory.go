@@ -209,22 +209,6 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
-<<<<<<< HEAD
-func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...database.Batch) error {
-	var (
-		versionDbBatches []database.Batch
-		vdb              *versiondb.Database
-	)
-	for peerChainID, keys := range requests {
-		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-
-		var db database.Database
-		if vdb == nil {
-			vdb, db = sm.m.GetDatabase(sharedID)
-			defer sm.m.ReleaseDatabase(sharedID)
-		} else {
-			db = sm.m.GetPrefixDbInstanceFromVdb(vdb, sharedID)
-=======
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
 
 	if len(batchChainsAndInputs) == 0 {
@@ -246,28 +230,11 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 			defer sm.m.ReleaseDatabase(sharedID)
 		} else {
 			db = prefixdb.New(sharedID[:], vdb)
->>>>>>> 5123f6f2eb7d01f926866a6ceae7a8b082883413
 		}
 
 		s := state{
 			c: sm.m.codec,
 		}
-<<<<<<< HEAD
-		if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
-			s.valueDB = prefixdb.New(smallerValuePrefix, db)
-			s.indexDB = prefixdb.New(smallerIndexPrefix, db)
-		} else {
-			s.valueDB = prefixdb.New(largerValuePrefix, db)
-			s.indexDB = prefixdb.New(largerIndexPrefix, db)
-		}
-
-		for _, key := range keys {
-			if err := s.RemoveValue(key); err != nil {
-				return err
-			}
-		}
-
-=======
 
 		for _, atomicRequest := range atomicRequests {
 			switch atomicRequest.RequestType {
@@ -294,21 +261,11 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 	}
 
 	for _, vdb := range sharedIDVersionDB {
->>>>>>> 5123f6f2eb7d01f926866a6ceae7a8b082883413
 		myBatch, err := vdb.CommitBatch()
 		if err != nil {
 			return err
 		}
 
-<<<<<<< HEAD
-		versionDbBatches = append(versionDbBatches, myBatch)
-
-	}
-
-	baseBatch, otherBatches := versionDbBatches[0], versionDbBatches[1:]
-
-	batches = append(batches, otherBatches...)
-=======
 		versionDBBatches = append(versionDBBatches, myBatch)
 	}
 
@@ -317,7 +274,6 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 	if len(versionDBBatches) > 1 {
 		batches = append(batches, versionDBBatches[1:]...)
 	}
->>>>>>> 5123f6f2eb7d01f926866a6ceae7a8b082883413
 
 	return WriteAll(baseBatch, batches...)
 }
