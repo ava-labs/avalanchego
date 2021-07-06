@@ -229,6 +229,7 @@ func TestSybilMsgThrottler(t *testing.T) {
 	assert.EqualValues(0, throttler.waitingToAcquire.Len())
 }
 
+// Ensure that the limit on taking from the at-large allocation is enforced
 func TestSybilMsgThrottlerMaxNonVdr(t *testing.T) {
 	assert := assert.New(t)
 	config := MsgThrottlerConfig{
