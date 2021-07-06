@@ -343,14 +343,14 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// Throttling
 	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
 	nodeConfig.NetworkConfig.InboundThrottlerConfig = throttling.MsgThrottlerConfig{
-		AtLargeAllocSize:    v.GetUint64(InboundThrottlingAtLargeAllocSizeKey),
-		VdrAllocSize:        v.GetUint64(InboundThrottlingVdrAllocSizeKey),
-		NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlingNodeMaxAtLargeBytesKey),
+		AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
+		VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
+		NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
 	}
 	nodeConfig.NetworkConfig.OutboundThrottlerConfig = throttling.MsgThrottlerConfig{
-		AtLargeAllocSize:    v.GetUint64(OutboundThrottlingAtLargeAllocSizeKey),
-		VdrAllocSize:        v.GetUint64(OutboundThrottlingVdrAllocSizeKey),
-		NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlingNodeMaxAtLargeBytesKey),
+		AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
+		VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
+		NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
 	}
 
 	// Health

@@ -325,27 +325,25 @@ func (p *peer) WriteMessages() {
 		p.sendQueueCond.L.Unlock()
 		msgLen := uint32(len(msg))
 		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
-		p.net.log.Verbo("sending new message to %s:\n%s",
-			p.nodeID,
-			formatting.DumpBytes{Bytes: msg})
+		p.net.log.Verbo("sending message to %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msg})
 
 		msgb := [wrappers.IntLen]byte{}
 		binary.BigEndian.PutUint32(msgb[:], msgLen)
 		for _, byteSlice := range [2][]byte{msgb[:], msg} {
 			reader.Reset(byteSlice)
 			if err := p.conn.SetWriteDeadline(p.nextTimeout()); err != nil {
-				p.net.log.Verbo("error setting write deadline to %s at %s due to: %s", p.nodeID, p.getIP(), err)
+				p.net.log.Verbo("error setting write deadline to %s%s at %s due to: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 				return
 			}
 			if _, err := io.CopyN(writer, &reader, int64(len((byteSlice)))); err != nil {
-				p.net.log.Verbo("error writing to %s at %s due to: %s", p.nodeID, p.getIP(), err)
+				p.net.log.Verbo("error writing to %s%s at %s due to: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 				return
 			}
 			p.tickerOnce.Do(p.StartTicker)
 		}
 		// Make sure the peer got the entire message
 		if err := writer.Flush(); err != nil {
-			p.net.log.Verbo("couldn't flush writer to %s: %s", p.nodeID, p.getIP(), err)
+			p.net.log.Verbo("couldn't flush writer to %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 			return
 		}
 
@@ -407,7 +405,7 @@ func (p *peer) handle(msg Msg, onFinishedHandling func()) {
 	op := msg.Op()
 	msgMetrics := p.net.message(op)
 	if msgMetrics == nil {
-		p.net.log.Error("dropping an unknown message from %s with op %s", p.nodeID, op)
+		p.net.log.Error("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
 		onFinishedHandling()
 		return
 	}
@@ -478,7 +476,7 @@ func (p *peer) handle(msg Msg, onFinishedHandling func()) {
 	case Chits:
 		p.handleChits(msg, onFinishedHandling)
 	default:
-		p.net.log.Debug("dropping an unknown message from %s with op %s", p.nodeID, op)
+		p.net.log.Debug("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
 		onFinishedHandling()
 	}
 }
@@ -496,7 +494,7 @@ func (p *peer) close() {
 	p.closed.SetValue(true)
 
 	if err := p.conn.Close(); err != nil {
-		p.net.log.Debug("closing peer %s resulted in an error: %s", p.nodeID, err)
+		p.net.log.Debug("closing connection to %s%s at %s resulted in an error: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 	}
 
 	p.sendQueueCond.L.Lock()
@@ -588,7 +586,7 @@ func (p *peer) sendPeerList() {
 
 	msg, err := p.net.b.PeerList(peers)
 	if err != nil {
-		p.net.log.Warn("failed to send PeerList message due to %s", err)
+		p.net.log.Warn("failed to send PeerList to %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 		return
 	}
 
@@ -648,14 +646,17 @@ func (p *peer) handleGetVersion(_ Msg) {
 func (p *peer) handleVersion(msg Msg) {
 	switch {
 	case p.gotVersion.GetValue():
-		p.net.log.Verbo("dropping duplicated version message from %s", p.nodeID)
+		p.net.log.Verbo("dropping duplicated version message from %s%s at %s", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		return
 	case msg.Get(NodeID).(uint32) == p.net.nodeID:
-		p.net.log.Debug("peer's node ID is our node ID")
+		p.net.log.Debug("peer at %s has same node ID as me", p.getIP())
 		p.discardMyIP()
 		return
 	case msg.Get(NetworkID).(uint32) != p.net.networkID:
-		p.net.log.Debug("peer's network ID (%d) doesn't match our's (%d)", msg.Get(NetworkID).(uint32), p.net.networkID)
+		p.net.log.Debug(
+			"network ID of %s%s at %s (%d) doesn't match our's (%d)",
+			constants.NodeIDPrefix, p.nodeID, p.getIP(), msg.Get(NetworkID).(uint32), p.net.networkID,
+		)
 		p.discardIP()
 		return
 	case p.closed.GetValue():
@@ -666,15 +667,15 @@ func (p *peer) handleVersion(msg Msg) {
 	peerTime := float64(msg.Get(MyTime).(uint64))
 	if math.Abs(peerTime-myTime) > p.net.maxClockDifference.Seconds() {
 		if p.net.beacons.Contains(p.nodeID) {
-			p.net.log.Warn("beacon %s reports time (%d) that is too far out of sync with our's (%d)",
-				p.nodeID,
-				uint64(peerTime),
-				uint64(myTime))
+			p.net.log.Warn(
+				"beacon %s%s at %s reports time (%d) that is too far out of sync with our's (%d)",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), uint64(peerTime), uint64(myTime),
+			)
 		} else {
-			p.net.log.Debug("peer %s reports time (%d) that is too far out of sync with our's (%d)",
-				p.nodeID,
-				uint64(peerTime),
-				uint64(myTime))
+			p.net.log.Debug(
+				"peer %s%s at %s reports time (%d) that is too far out of sync with our's (%d)",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), uint64(peerTime), uint64(myTime),
+			)
 		}
 		p.discardIP()
 		return
@@ -683,7 +684,7 @@ func (p *peer) handleVersion(msg Msg) {
 	peerVersionStr := msg.Get(VersionStr).(string)
 	peerVersion, err := p.net.parser.Parse(peerVersionStr)
 	if err != nil {
-		p.net.log.Debug("peer version could not be parsed: %s", err)
+		p.net.log.Debug("version of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 		p.discardIP()
 		p.net.metrics.failedToParse.Inc()
 		return
@@ -691,18 +692,20 @@ func (p *peer) handleVersion(msg Msg) {
 
 	if p.net.versionCompatibility.Version().Before(peerVersion) {
 		if p.net.beacons.Contains(p.nodeID) {
-			p.net.log.Info("beacon %s attempting to connect with newer version %s. You may want to update your client",
-				p.nodeID,
-				peerVersion)
+			p.net.log.Info(
+				"beacon %s%s at %s attempting to connect with newer version %s. You may want to update your client",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion,
+			)
 		} else {
-			p.net.log.Debug("peer %s attempting to connect with newer version %s. You may want to update your client",
-				p.nodeID,
-				peerVersion)
+			p.net.log.Debug(
+				"peer %s%s at %s attempting to connect with newer version %s. You may want to update your client",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion,
+			)
 		}
 	}
 
 	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
-		p.net.log.Verbo("peer version (%s) not compatible: %s", peerVersion, err)
+		p.net.log.Verbo("peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
 		p.discardIP()
 		return
 	}
@@ -718,9 +721,9 @@ func (p *peer) handleVersion(msg Msg) {
 		return
 	}
 	if float64(versionTime)-myTime > p.net.maxClockDifference.Seconds() {
-		p.net.log.Debug("peer %s attempting to connect with version timestamp (%d) too far in the future",
-			p.nodeID,
-			latestPeerIP.time,
+		p.net.log.Debug(
+			"peer %s%s at %s attempting to connect with version timestamp (%d) too far in the future",
+			constants.NodeIDPrefix, p.nodeID, p.getIP(), latestPeerIP.time,
 		)
 		p.discardIP()
 		return
@@ -730,7 +733,7 @@ func (p *peer) handleVersion(msg Msg) {
 	signed := ipAndTimeBytes(peerIP, versionTime)
 	err = p.cert.CheckSignature(p.cert.SignatureAlgorithm, signed, sig)
 	if err != nil {
-		p.net.log.Debug("signature verification failed for peer at %s: %s", peerIP, err)
+		p.net.log.Debug("signature verification failed for %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 		p.discardIP()
 		return
 	}
@@ -798,8 +801,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	if !p.net.vdrs.Contains(nodeID) {
 		p.net.log.Verbo(
 			"not peering to %s at %s because they are not a validator",
-			nodeID.PrefixedString(constants.NodeIDPrefix),
-			peer.IPDesc,
+			nodeID.PrefixedString(constants.NodeIDPrefix), peer.IPDesc,
 		)
 		return
 	}
@@ -809,8 +811,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	if foundPeer, ok := p.net.peers.getByID(nodeID); ok && !foundPeer.closed.GetValue() {
 		p.net.log.Verbo(
 			"not peering to %s because we are already connected to %s",
-			peer.IPDesc,
-			nodeID.PrefixedString(constants.NodeIDPrefix),
+			peer.IPDesc, nodeID.PrefixedString(constants.NodeIDPrefix),
 		)
 		return
 	}
@@ -818,10 +819,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	if p.net.latestPeerIP[nodeID].time > peer.Time {
 		p.net.log.Verbo(
 			"not peering to %s at %s: the given timestamp (%d) < latest (%d)",
-			nodeID.PrefixedString(constants.NodeIDPrefix),
-			peer.IPDesc,
-			peer.Time,
-			p.net.latestPeerIP[nodeID].time,
+			nodeID.PrefixedString(constants.NodeIDPrefix), peer.IPDesc, peer.Time, p.net.latestPeerIP[nodeID].time,
 		)
 		return
 	}
@@ -831,9 +829,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	if err != nil {
 		p.net.log.Debug(
 			"signature verification failed for %s at %s: %s",
-			nodeID.PrefixedString(constants.NodeIDPrefix),
-			peer.IPDesc,
-			err,
+			nodeID.PrefixedString(constants.NodeIDPrefix), peer.IPDesc, err,
 		)
 		return
 	}
@@ -897,13 +893,19 @@ func (p *peer) handleAcceptedFrontier(msg Msg, onFinishedHandling func()) {
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
-			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
+			p.net.log.Debug(
+				"error parsing ContainerID from %s%s at %s. ID: 0x%x. Error: %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
-			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
+			p.net.log.Debug(
+				"message from %s%s at %s contains duplicate of container ID %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
@@ -934,13 +936,19 @@ func (p *peer) handleGetAccepted(msg Msg, onFinishedHandling func()) {
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
-			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
+			p.net.log.Debug(
+				"error parsing ContainerID from %s%s at %s. ID: 0x%x. Error: %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
-			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
+			p.net.log.Debug(
+				"message from %s%s at %s contains duplicate of container ID %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
@@ -971,13 +979,19 @@ func (p *peer) handleAccepted(msg Msg, onFinishedHandling func()) {
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
-			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
+			p.net.log.Debug(
+				"error parsing ContainerID from %s%s at %s. ID: 0x%x. Error: %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
-			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
+			p.net.log.Debug(
+				"message from %s%s at %s contains duplicate of container ID %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
@@ -1118,13 +1132,19 @@ func (p *peer) handleChits(msg Msg, onFinishedHandling func()) {
 	for i, containerIDBytes := range containerIDsBytes {
 		containerID, err := ids.ToID(containerIDBytes)
 		if err != nil {
-			p.net.log.Debug("error parsing ContainerID 0x%x: %s", containerIDBytes, err)
+			p.net.log.Debug(
+				"error parsing ContainerID from %s%s at %s 0x%x: %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerIDBytes, err,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
 		}
 		if p.idSet.Contains(containerID) {
-			p.net.log.Debug("message contains duplicate of container ID %s", containerID)
+			p.net.log.Debug(
+				"message from %s%s at %s contains duplicate of container ID %s",
+				constants.NodeIDPrefix, p.nodeID, p.getIP(), containerID,
+			)
 			onFinishedHandling()
 			p.net.metrics.failedToParse.Inc()
 			return
@@ -1232,7 +1252,7 @@ func (p *peer) releaseNextAlias(now time.Time) *alias {
 	}
 	p.aliases = p.aliases[1:]
 
-	p.net.log.Verbo("released alias %s for peer %s", next.ip, p.nodeID)
+	p.net.log.Verbo("released alias %s for peer %s%s", next.ip, constants.NodeIDPrefix, p.nodeID)
 	return &next
 }
 
@@ -1267,7 +1287,7 @@ func (p *peer) releaseAllAliases() {
 	for _, alias := range p.aliases {
 		delete(p.net.peerAliasIPs, alias.ip.String())
 
-		p.net.log.Verbo("released alias %s for peer %s", alias.ip, p.nodeID)
+		p.net.log.Verbo("released alias %s for peer %s%s", alias.ip, constants.NodeIDPrefix, p.nodeID)
 	}
 	p.aliases = nil
 }
