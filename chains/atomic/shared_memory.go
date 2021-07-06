@@ -214,23 +214,12 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 	if len(batchChainsAndInputs) == 0 {
 		return errEmptyBatch
 	}
-
-	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
-	sharedIDVersionDB := make(map[ids.ID]*versiondb.Database, len(batchChainsAndInputs))
-	var vdb *versiondb.Database
+	vdb := versiondb.New(sm.m.db)
 
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
 		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 
-		var db database.Database
-
-		if vdb == nil {
-			vdb, db = sm.m.GetDatabase(sharedID)
-			sharedIDVersionDB[sharedID] = vdb
-			defer sm.m.ReleaseDatabase(sharedID)
-		} else {
-			db = prefixdb.New(sharedID[:], vdb)
-		}
+		db := prefixdb.New(sharedID[:], vdb)
 
 		s := state{
 			c: sm.m.codec,
@@ -260,22 +249,12 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 		}
 	}
 
-	for _, vdb := range sharedIDVersionDB {
-		myBatch, err := vdb.CommitBatch()
-		if err != nil {
-			return err
-		}
-
-		versionDBBatches = append(versionDBBatches, myBatch)
+	myBatch, err := vdb.CommitBatch()
+	if err != nil {
+		return err
 	}
 
-	baseBatch := versionDBBatches[0]
-
-	if len(versionDBBatches) > 1 {
-		batches = append(batches, versionDBBatches[1:]...)
-	}
-
-	return WriteAll(baseBatch, batches...)
+	return WriteAll(myBatch, batches...)
 }
 
 func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
