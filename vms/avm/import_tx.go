@@ -120,7 +120,6 @@ func (t *ImportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 
 	offset := t.BaseTx.NumCredentials()
 	for i, in := range t.ImportedIns {
-		// move indexing of indexes here
 		utxo := avax.UTXO{}
 		if _, err := vm.codec.Unmarshal(allUTXOBytes[i], &utxo); err != nil {
 			return err
