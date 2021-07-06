@@ -210,7 +210,6 @@ func (sm *sharedMemory) Indexed(
 }
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
-
 	if len(batchChainsAndInputs) == 0 {
 		return errEmptyBatch
 	}
