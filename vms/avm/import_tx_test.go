@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -237,13 +239,21 @@ func TestIssueImportTx(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
+
+	avmConfig := Config{
+		IndexTransactions: true,
+	}
+
+	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
+	assert.NoError(t, err)
+
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		BuildAvmConfigBytes(),
+		avmConfigBytes,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,

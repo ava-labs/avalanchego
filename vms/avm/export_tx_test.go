@@ -5,8 +5,11 @@ package avm
 
 import (
 	"bytes"
+	"encoding/json"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -1326,7 +1329,12 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
-	avmConfigBytes := BuildAvmConfigBytes()
+
+	avmConfig := Config{
+		IndexTransactions: true,
+	}
+	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
+	assert.NoError(t, err)
 
 	vm := &VM{}
 	err = vm.Initialize(
@@ -1443,10 +1451,13 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 }
 
-func BuildAvmConfigBytes() []byte {
-	avmConfig := "{\"index-transactions\":true}"
-	avmConfigBytes := []byte(avmConfig)
-	return avmConfigBytes
+func BuildAvmConfigBytes(config Config) ([]byte, error) {
+	avmConfigBytes, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
+
+	return avmConfigBytes, nil
 }
 
 func TestExportTxNotState(t *testing.T) {

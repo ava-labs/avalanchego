@@ -39,6 +39,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var indexEnabledAvmConfig = Config{
+	IndexTransactions: true,
+}
+
 func TestIndexTransaction_Ordered(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
@@ -58,7 +62,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
-	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer)
+	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -173,7 +177,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
-	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer)
+	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -285,7 +289,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
-	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer)
+	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -467,14 +471,16 @@ func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ids.ShortID) *Tx 
 	}
 }
 
-func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message) *VM {
+func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager, genesisBytes []byte, issuer chan common.Message, config Config) *VM {
 	vm := &VM{}
+	avmConfigBytes, err := BuildAvmConfigBytes(config)
+	assert.NoError(t, err)
 	if err := vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		BuildAvmConfigBytes(),
+		avmConfigBytes,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,
