@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -58,9 +59,8 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM    = &VM{}
-	_ common.StaticVM = &VM{}
-	_ secp256k1fx.VM  = &VM{}
+	_ vertex.DAGVM   = &VM{}
+	_ secp256k1fx.VM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -265,6 +265,11 @@ func (vm *VM) Shutdown() error {
 	vm.ctx.Lock.Lock()
 
 	return vm.baseDB.Close()
+}
+
+// Get implements the avalanche.DAGVM interface
+func (vm *VM) Version() (string, error) {
+	return version.Current.String(), nil
 }
 
 // CreateHandlers implements the avalanche.DAGVM interface

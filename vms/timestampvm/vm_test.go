@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var blockchainID = ids.ID{1, 2, 3}
@@ -38,7 +39,7 @@ func assertBlock(block *Block, parentID ids.ID, expectedData [dataLen]byte, pass
 // Assert that after initialization, the vm has the state we expect
 func TestGenesis(t *testing.T) {
 	// Initialize the vm
-	dbManager := manager.NewDefaultMemDBManager()
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
@@ -81,7 +82,7 @@ func TestGenesis(t *testing.T) {
 
 func TestHappyPath(t *testing.T) {
 	// Initialize the vm
-	dbManager := manager.NewDefaultMemDBManager()
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
@@ -214,7 +215,7 @@ func TestHappyPath(t *testing.T) {
 
 func TestService(t *testing.T) {
 	// Initialize the vm
-	dbManager := manager.NewDefaultMemDBManager()
+	dbManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	msgChan := make(chan common.Message, 1)
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()

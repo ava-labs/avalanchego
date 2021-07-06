@@ -133,6 +133,12 @@ message HealthResponse {
     string details = 1;
 }
 
+message VersionRequest {}
+
+message VersionResponse {
+    string version = 1;
+}
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
     rpc Bootstrapping(BootstrappingRequest) returns (BootstrappingResponse);
@@ -145,6 +151,7 @@ service VM {
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
     rpc Health(HealthRequest) returns (HealthResponse);
+    rpc Version(VersionRequest) returns (VersionResponse);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);

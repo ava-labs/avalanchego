@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -997,7 +998,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 	ctx := NewContext(t)
 
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -1179,7 +1180,7 @@ func TestIssueExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -1308,7 +1309,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	m := &atomic.Memory{}
 	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
