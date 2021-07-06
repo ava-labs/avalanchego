@@ -7,10 +7,11 @@
 package galiaslookupproto
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -255,13 +256,16 @@ func file_galiaslookup_proto_rawDescGZIP() []byte {
 	return file_galiaslookup_proto_rawDescData
 }
 
-var file_galiaslookup_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_galiaslookup_proto_goTypes = []interface{}{
-	(*LookupRequest)(nil),        // 0: galiaslookupproto.LookupRequest
-	(*LookupResponse)(nil),       // 1: galiaslookupproto.LookupResponse
-	(*PrimaryAliasRequest)(nil),  // 2: galiaslookupproto.PrimaryAliasRequest
-	(*PrimaryAliasResponse)(nil), // 3: galiaslookupproto.PrimaryAliasResponse
-}
+var (
+	file_galiaslookup_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+	file_galiaslookup_proto_goTypes  = []interface{}{
+		(*LookupRequest)(nil),        // 0: galiaslookupproto.LookupRequest
+		(*LookupResponse)(nil),       // 1: galiaslookupproto.LookupResponse
+		(*PrimaryAliasRequest)(nil),  // 2: galiaslookupproto.PrimaryAliasRequest
+		(*PrimaryAliasResponse)(nil), // 3: galiaslookupproto.PrimaryAliasResponse
+	}
+)
+
 var file_galiaslookup_proto_depIdxs = []int32{
 	0, // 0: galiaslookupproto.AliasLookup.Lookup:input_type -> galiaslookupproto.LookupRequest
 	2, // 1: galiaslookupproto.AliasLookup.PrimaryAlias:input_type -> galiaslookupproto.PrimaryAliasRequest

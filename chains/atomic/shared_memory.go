@@ -24,7 +24,23 @@ var (
 	largerIndexPrefix  = []byte{3}
 
 	errDuplicatedOperation = errors.New("duplicated operation on provided value")
+	errEmptyBatch          = errors.New("there are no transactions in this batch")
+
+	_ SharedMemory = &sharedMemory{}
 )
+
+type SharedMemoryMethod int
+
+const (
+	Put SharedMemoryMethod = iota
+	Remove
+)
+
+type Requests struct {
+	RequestType SharedMemoryMethod
+	UtxoIDs     [][]byte
+	Elems       []*Element
+}
 
 type dbElement struct {
 	// Present indicates the value was removed before existing.
@@ -69,6 +85,8 @@ type SharedMemory interface {
 		err error,
 	)
 	Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error
+
+	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error
 }
 
 // sharedMemory provides the API for a blockchain to interact with shared memory
@@ -76,6 +94,32 @@ type SharedMemory interface {
 type sharedMemory struct {
 	m           *Memory
 	thisChainID ids.ID
+}
+
+func fetchValueAndIndexDB(smChainID []byte, peerChainID []byte, requestType SharedMemoryMethod, db database.Database) (database.Database, database.Database) {
+	var valueDB, indexDB database.Database
+	switch requestType {
+	case Remove:
+		if bytes.Compare(smChainID, peerChainID) == -1 {
+			valueDB = prefixdb.New(smallerValuePrefix, db)
+			indexDB = prefixdb.New(smallerIndexPrefix, db)
+		} else {
+			valueDB = prefixdb.New(largerValuePrefix, db)
+			indexDB = prefixdb.New(largerIndexPrefix, db)
+		}
+	case Put:
+		if bytes.Compare(smChainID, peerChainID) == -1 {
+			valueDB = prefixdb.New(largerValuePrefix, db)
+			indexDB = prefixdb.New(largerIndexPrefix, db)
+		} else {
+			valueDB = prefixdb.New(smallerValuePrefix, db)
+			indexDB = prefixdb.New(smallerIndexPrefix, db)
+		}
+	default:
+		panic("Illegal type")
+	}
+
+	return valueDB, indexDB
 }
 
 func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...database.Batch) error {
@@ -86,13 +130,8 @@ func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
-		s.valueDB = prefixdb.New(largerValuePrefix, db)
-		s.indexDB = prefixdb.New(largerIndexPrefix, db)
-	} else {
-		s.valueDB = prefixdb.New(smallerValuePrefix, db)
-		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
-	}
+
+	s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
 
 	for _, elem := range elems {
 		if err := s.SetValue(elem); err != nil {
@@ -170,6 +209,7 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
+<<<<<<< HEAD
 func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...database.Batch) error {
 	var (
 		versionDbBatches []database.Batch
@@ -184,11 +224,35 @@ func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...
 			defer sm.m.ReleaseDatabase(sharedID)
 		} else {
 			db = sm.m.GetPrefixDbInstanceFromVdb(vdb, sharedID)
+=======
+func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
+
+	if len(batchChainsAndInputs) == 0 {
+		return errEmptyBatch
+	}
+
+	versionDBBatches := make([]database.Batch, 0, len(batchChainsAndInputs))
+	sharedIDVersionDB := make(map[ids.ID]*versiondb.Database, len(batchChainsAndInputs))
+	var vdb *versiondb.Database
+
+	for peerChainID, atomicRequests := range batchChainsAndInputs {
+		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
+
+		var db database.Database
+
+		if vdb == nil {
+			vdb, db = sm.m.GetDatabase(sharedID)
+			sharedIDVersionDB[sharedID] = vdb
+			defer sm.m.ReleaseDatabase(sharedID)
+		} else {
+			db = prefixdb.New(sharedID[:], vdb)
+>>>>>>> 5123f6f2eb7d01f926866a6ceae7a8b082883413
 		}
 
 		s := state{
 			c: sm.m.codec,
 		}
+<<<<<<< HEAD
 		if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
 			s.valueDB = prefixdb.New(smallerValuePrefix, db)
 			s.indexDB = prefixdb.New(smallerIndexPrefix, db)
@@ -203,11 +267,40 @@ func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...
 			}
 		}
 
+=======
+
+		for _, atomicRequest := range atomicRequests {
+			switch atomicRequest.RequestType {
+			case Remove:
+				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
+
+				for _, key := range atomicRequest.UtxoIDs {
+					if err := s.RemoveValue(key); err != nil {
+						return err
+					}
+				}
+			case Put:
+				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
+
+				for _, elem := range atomicRequest.Elems {
+					if err := s.SetValue(elem); err != nil {
+						return err
+					}
+				}
+			default:
+				panic("Illegal type")
+			}
+		}
+	}
+
+	for _, vdb := range sharedIDVersionDB {
+>>>>>>> 5123f6f2eb7d01f926866a6ceae7a8b082883413
 		myBatch, err := vdb.CommitBatch()
 		if err != nil {
 			return err
 		}
 
+<<<<<<< HEAD
 		versionDbBatches = append(versionDbBatches, myBatch)
 
 	}
@@ -215,6 +308,16 @@ func (sm *sharedMemory) RemoveMultiple(requests map[ids.ID][][]byte, batches ...
 	baseBatch, otherBatches := versionDbBatches[0], versionDbBatches[1:]
 
 	batches = append(batches, otherBatches...)
+=======
+		versionDBBatches = append(versionDBBatches, myBatch)
+	}
+
+	baseBatch := versionDBBatches[0]
+
+	if len(versionDBBatches) > 1 {
+		batches = append(batches, versionDBBatches[1:]...)
+	}
+>>>>>>> 5123f6f2eb7d01f926866a6ceae7a8b082883413
 
 	return WriteAll(baseBatch, batches...)
 }
@@ -227,13 +330,8 @@ func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...dat
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
-		s.valueDB = prefixdb.New(smallerValuePrefix, db)
-		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
-	} else {
-		s.valueDB = prefixdb.New(largerValuePrefix, db)
-		s.indexDB = prefixdb.New(largerIndexPrefix, db)
-	}
+
+	s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
 
 	for _, key := range keys {
 		if err := s.RemoveValue(key); err != nil {

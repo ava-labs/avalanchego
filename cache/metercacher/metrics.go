@@ -8,18 +8,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
-
-func newHistogramMetric(namespace, name string) prometheus.Histogram {
-	return prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      name,
-		Help:      fmt.Sprintf("Latency of a %s call in nanoseconds", name),
-		Buckets:   utils.NanosecondsBuckets,
-	})
-}
 
 func newCounterMetric(namespace, name string) prometheus.Counter {
 	return prometheus.NewCounter(prometheus.CounterOpts{
@@ -43,10 +34,10 @@ func (m *metrics) Initialize(
 	namespace string,
 	registerer prometheus.Registerer,
 ) error {
-	m.get = newHistogramMetric(namespace, "get")
-	m.put = newHistogramMetric(namespace, "put")
-	m.evict = newHistogramMetric(namespace, "evict")
-	m.flush = newHistogramMetric(namespace, "flush")
+	m.get = metric.NewNanosecondsLatencyMetric(namespace, "get")
+	m.put = metric.NewNanosecondsLatencyMetric(namespace, "put")
+	m.evict = metric.NewNanosecondsLatencyMetric(namespace, "evict")
+	m.flush = metric.NewNanosecondsLatencyMetric(namespace, "flush")
 	m.hit = newCounterMetric(namespace, "hit")
 	m.miss = newCounterMetric(namespace, "miss")
 

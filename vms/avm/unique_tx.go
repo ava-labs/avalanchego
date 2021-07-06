@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -19,6 +20,11 @@ var (
 	errMissingUTXO     = errors.New("missing utxo")
 	errUnknownTx       = errors.New("transaction is unknown")
 	errRejectedTx      = errors.New("transaction is rejected")
+)
+
+var (
+	_ snowstorm.Tx    = &UniqueTx{}
+	_ cache.Evictable = &UniqueTx{}
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -311,7 +317,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	tx.validity = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
 		tx.vm.codec,
-		tx.vm.ctx.AVAXAssetID,
+		tx.vm.feeAssetID,
 		tx.vm.txFee,
 		tx.vm.creationTxFee,
 		len(tx.vm.fxs),

@@ -6,41 +6,47 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"syscall"
 
 	"github.com/ava-labs/avalanchego/app/process"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
-
-// GitCommit should be optionally set at compile time.
-var GitCommit string
 
 // main is the entry point to AvalancheGo.
 func main() {
-	// Get the config
-	nodeConfig, processConfig, err := config.GetConfigs(GitCommit)
+	fs := config.BuildFlagSet()
+	v, err := config.BuildViper(fs, os.Args[1:])
 	if err != nil {
-		fmt.Printf("couldn't get config: %s", err)
+		fmt.Printf("couldn't configure flags: %s\n", err)
+		os.Exit(1)
+	}
+
+	processConfig, err := config.GetProcessConfig(v)
+	if err != nil {
+		fmt.Printf("couldn't load process config: %s\n", err)
 		os.Exit(1)
 	}
 
 	if processConfig.DisplayVersionAndExit {
-		fmt.Print(processConfig.VersionStr)
+		fmt.Print(version.String)
 		os.Exit(0)
+	}
+
+	nodeConfig, err := config.GetNodeConfig(v, processConfig.BuildDir)
+	if err != nil {
+		fmt.Printf("couldn't load node config: %s\n", err)
+		os.Exit(1)
 	}
 
 	fmt.Println(process.Header)
 
-	// Set the log directory for this process by adding a subdirectory
-	// "daemon" to the log directory given in the config
-	logConfigCopy := nodeConfig.LoggingConfig
-	logConfigCopy.Directory = filepath.Join(logConfigCopy.Directory, "daemon")
-	logFactory := logging.NewFactory(logConfigCopy)
+	// Set the log directory for this process
+	logFactory := logging.NewFactory(nodeConfig.LoggingConfig)
 
-	log, err := logFactory.Make()
+	log, err := logFactory.Make("daemon")
 	if err != nil {
 		logFactory.Close()
 
@@ -68,7 +74,12 @@ func main() {
 
 	// Run normally
 	exitCode, err := nodeManager.runNormal()
-	log.Debug("node returned exit code %s, error %v", exitCode, err)
+	if err != nil {
+		log.Error("running node returned error: %s", err)
+	} else {
+		log.Debug("node returned exit code %d", exitCode)
+	}
+
 	nodeManager.shutdown() // make sure all the nodes are stopped
 
 	logFactory.Close()

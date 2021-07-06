@@ -8,6 +8,7 @@ package gwriterproto
 
 import (
 	context "context"
+
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -51,8 +52,7 @@ type WriterServer interface {
 }
 
 // UnimplementedWriterServer must be embedded to have forward compatible implementations.
-type UnimplementedWriterServer struct {
-}
+type UnimplementedWriterServer struct{}
 
 func (UnimplementedWriterServer) Write(context.Context, *WriteRequest) (*WriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")

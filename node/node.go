@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
@@ -82,6 +83,9 @@ type Node struct {
 	// Storage for this node
 	DBManager manager.Manager
 	DB        database.Database
+
+	// Profiles the process. Nil if continuous profiling is disabled.
+	profiler profiler.ContinuousProfiler
 
 	// Indexes blocks, transactions and blocks
 	indexer indexer.Indexer
@@ -162,7 +166,7 @@ func (n *Node) initNetworking() error {
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
 
-	dialer := network.NewDialer(TCP)
+	dialer := network.NewDialer(TCP, n.Config.DialerConfig, n.Log)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -208,7 +212,7 @@ func (n *Node) initNetworking() error {
 		timer := timer.NewTimer(func() {
 			// If the timeout fires and we're already shutting down, nothing to do.
 			if !n.shuttingDown.GetValue() {
-				n.Log.Warn("Failed to connect to bootstrap nodes. Node shutting down...")
+				n.Log.Fatal("Failed to connect to bootstrap nodes. Node shutting down...")
 				go n.Shutdown(1)
 			}
 		})
@@ -251,7 +255,10 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
+		n.Config.DialerConfig,
 		n.Config.FetchOnly,
+		n.Config.ConsensusGossipAcceptedFrontierSize,
+		n.Config.ConsensusGossipOnAcceptSize,
 	)
 
 	return nil
@@ -575,39 +582,44 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		FetchOnly:                 n.Config.FetchOnly,
-		FetchOnlyFrom:             fetchOnlyFrom,
-		StakingEnabled:            n.Config.EnableStaking,
-		MaxPendingMsgs:            n.Config.MaxPendingMsgs,
-		MaxNonStakerPendingMsgs:   n.Config.MaxNonStakerPendingMsgs,
-		StakerMSGPortion:          n.Config.StakerMSGPortion,
-		StakerCPUPortion:          n.Config.StakerCPUPortion,
-		Log:                       n.Log,
-		LogFactory:                n.LogFactory,
-		VMManager:                 n.vmManager,
-		DecisionEvents:            n.DecisionDispatcher,
-		ConsensusEvents:           n.ConsensusDispatcher,
-		DBManager:                 n.DBManager,
-		Router:                    n.Config.ConsensusRouter,
-		Net:                       n.Net,
-		ConsensusParams:           n.Config.ConsensusParams,
-		EpochFirstTransition:      n.Config.EpochFirstTransition,
-		EpochDuration:             n.Config.EpochDuration,
-		Validators:                n.vdrs,
-		NodeID:                    n.ID,
-		NetworkID:                 n.Config.NetworkID,
-		Server:                    &n.APIServer,
-		Keystore:                  n.keystore,
-		AtomicMemory:              &n.sharedMemory,
-		AVAXAssetID:               avaxAssetID,
-		XChainID:                  xChainID,
-		CriticalChains:            criticalChains,
-		TimeoutManager:            timeoutManager,
-		HealthService:             n.healthService,
-		WhitelistedSubnets:        n.Config.WhitelistedSubnets,
-		RetryBootstrap:            n.Config.RetryBootstrap,
-		RetryBootstrapMaxAttempts: n.Config.RetryBootstrapMaxAttempts,
-		ShutdownNodeFunc:          n.Shutdown,
+		FetchOnly:                              n.Config.FetchOnly,
+		FetchOnlyFrom:                          fetchOnlyFrom,
+		StakingEnabled:                         n.Config.EnableStaking,
+		MaxPendingMsgs:                         n.Config.MaxPendingMsgs,
+		MaxNonStakerPendingMsgs:                n.Config.MaxNonStakerPendingMsgs,
+		StakerMSGPortion:                       n.Config.StakerMSGPortion,
+		StakerCPUPortion:                       n.Config.StakerCPUPortion,
+		Log:                                    n.Log,
+		LogFactory:                             n.LogFactory,
+		VMManager:                              n.vmManager,
+		DecisionEvents:                         n.DecisionDispatcher,
+		ConsensusEvents:                        n.ConsensusDispatcher,
+		DBManager:                              n.DBManager,
+		Router:                                 n.Config.ConsensusRouter,
+		Net:                                    n.Net,
+		ConsensusParams:                        n.Config.ConsensusParams,
+		EpochFirstTransition:                   n.Config.EpochFirstTransition,
+		EpochDuration:                          n.Config.EpochDuration,
+		Validators:                             n.vdrs,
+		NodeID:                                 n.ID,
+		NetworkID:                              n.Config.NetworkID,
+		Server:                                 &n.APIServer,
+		Keystore:                               n.keystore,
+		AtomicMemory:                           &n.sharedMemory,
+		AVAXAssetID:                            avaxAssetID,
+		XChainID:                               xChainID,
+		CriticalChains:                         criticalChains,
+		TimeoutManager:                         timeoutManager,
+		HealthService:                          n.healthService,
+		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
+		RetryBootstrap:                         n.Config.RetryBootstrap,
+		RetryBootstrapMaxAttempts:              n.Config.RetryBootstrapMaxAttempts,
+		ShutdownNodeFunc:                       n.Shutdown,
+		MeterVMEnabled:                         n.Config.MeterVMEnabled,
+		ChainConfigs:                           n.Config.ChainConfigs,
+		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
+		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
+		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
 	})
 
 	vdrs := n.vdrs
@@ -622,7 +634,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Register the VMs that Avalanche supports
 	errs := wrappers.Errs{}
 	errs.Add(
-		n.vmManager.RegisterVMFactory(platformvm.ID, &platformvm.Factory{
+		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
 			Chains:             n.chainManager,
 			Validators:         vdrs,
 			StakingEnabled:     n.Config.EnableStaking,
@@ -638,18 +650,17 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MaxStakeDuration:   n.Config.MaxStakeDuration,
 			StakeMintingPeriod: n.Config.StakeMintingPeriod,
 		}),
-		n.vmManager.RegisterVMFactory(avm.ID, &avm.Factory{
+		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			CreationFee: n.Config.CreationTxFee,
 			Fee:         n.Config.TxFee,
 		}),
-		n.vmManager.RegisterVMFactory(evm.ID, &rpcchainvm.Factory{
-			Path:   filepath.Join(n.Config.PluginDir, "evm"),
-			Config: n.Config.CorethConfig,
+		n.vmManager.RegisterFactory(evm.ID, &rpcchainvm.Factory{
+			Path: filepath.Join(n.Config.PluginDir, "evm"),
 		}),
-		n.vmManager.RegisterVMFactory(timestampvm.ID, &timestampvm.Factory{}),
-		n.vmManager.RegisterVMFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
-		n.vmManager.RegisterVMFactory(nftfx.ID, &nftfx.Factory{}),
-		n.vmManager.RegisterVMFactory(propertyfx.ID, &propertyfx.Factory{}),
+		n.vmManager.RegisterFactory(timestampvm.ID, &timestampvm.Factory{}),
+		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
+		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
+		n.vmManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
 	)
 	if errs.Errored() {
 		return errs.Err
@@ -728,11 +739,33 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir)
 	if err != nil {
 		return err
 	}
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "admin", "", n.HTTPLog)
+}
+
+// initProfiler initializes the continuous profiling
+func (n *Node) initProfiler() {
+	if !n.Config.ProfilerConfig.Enabled {
+		n.Log.Info("skipping profiler initialization because it has been disabled")
+		return
+	}
+
+	n.Log.Info("initializing continuous profiler")
+	n.profiler = profiler.NewContinuous(
+		filepath.Join(n.Config.ProfilerConfig.Dir, "continuous"),
+		n.Config.ProfilerConfig.Freq,
+		n.Config.ProfilerConfig.MaxNumFiles,
+	)
+	go n.Log.RecoverAndPanic(func() {
+		err := n.profiler.Dispatch()
+		if err != nil {
+			n.Log.Fatal("continuous profiler failed with %s", err)
+		}
+		n.Shutdown(1)
+	})
 }
 
 func (n *Node) initInfoAPI() error {
@@ -877,7 +910,7 @@ func (n *Node) Initialize(
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 
-	httpLog, err := logFactory.MakeSubdir("http")
+	httpLog, err := logFactory.Make("http")
 	if err != nil {
 		return fmt.Errorf("problem initializing HTTP logger: %w", err)
 	}
@@ -939,6 +972,9 @@ func (n *Node) Initialize(
 	if err := n.initIndexer(); err != nil {
 		return fmt.Errorf("couldn't initialize indexer: %w", err)
 	}
+
+	n.initProfiler()
+
 	// Start the Platform chain
 	n.initChains(n.Config.GenesisBytes)
 	return nil
@@ -963,6 +999,9 @@ func (n *Node) shutdown() {
 	}
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
+	}
+	if n.profiler != nil {
+		n.profiler.Shutdown()
 	}
 	if n.Net != nil {
 		// Close already logs its own error if one occurs, so the error is ignored here

@@ -23,6 +23,7 @@ var SharedMemoryTests = []func(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 	TestSharedMemoryCommitOnPut,
 	TestSharedMemoryCommitOnRemove,
 	TestSharedMemoryLargeBatchSize,
+	TestPutAndRemoveBatch,
 }
 
 func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
@@ -285,6 +286,38 @@ func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	assert.False(has)
 }
 
+// TestPutAndRemoveBatch tests to make sure multiple put and remove requests work properly
+func TestPutAndRemoveBatch(t *testing.T, chainID0, chainID1 ids.ID, _, sm1 SharedMemory, db database.Database) {
+	assert := assert.New(t)
+
+	batch := db.NewBatch()
+
+	err := batch.Put([]byte{0}, []byte{1})
+	assert.NoError(err)
+
+	batchChainsAndInputs := make(map[ids.ID][]*Requests)
+
+	byteArr := [][]byte{{0}, {1}, {2}}
+
+	batchChainsAndInputs[chainID0] = []*Requests{{Remove, byteArr, []*Element{{
+		Key:   []byte{2},
+		Value: []byte{9},
+	}}}}
+
+	batchChainsAndInputs[chainID1] = []*Requests{{Put, byteArr, []*Element{{
+		Key:   []byte{0},
+		Value: []byte{1},
+	}}}}
+
+	err = sm1.RemoveAndPutMultiple(batchChainsAndInputs, batch)
+
+	assert.NoError(err)
+
+	val, err := db.Get([]byte{0})
+	assert.NoError(err)
+	assert.Equal([]byte{1}, val)
+}
+
 // TestSharedMemoryLargeBatchSize tests to make sure that the interface can
 // support large batches.
 func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, db database.Database) {
@@ -352,6 +385,38 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	err = sm0.Remove(
 		chainID1,
 		[][]byte{{1}},
+		batch,
+	)
+
+	assert.NoError(err)
+
+	batch.Reset()
+
+	bytes = initialBytes
+	for len(bytes) > pairSize {
+		key := bytes[:elementSize]
+		bytes = bytes[pairSize:]
+
+		err := batch.Delete(key)
+		assert.NoError(err)
+	}
+
+	batchChainsAndInputs := make(map[ids.ID][]*Requests)
+
+	byteArr := [][]byte{{0}, {1}, {2}}
+
+	batchChainsAndInputs[chainID1] = []*Requests{{Remove, byteArr, []*Element{{
+		Key:   []byte{2},
+		Value: []byte{9},
+	}}}}
+
+	batchChainsAndInputs[chainID1] = []*Requests{{Put, byteArr, []*Element{{
+		Key:   []byte{0},
+		Value: []byte{1},
+	}}}}
+
+	err = sm0.RemoveAndPutMultiple(
+		batchChainsAndInputs,
 		batch,
 	)
 	assert.NoError(err)

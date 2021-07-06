@@ -88,6 +88,8 @@ type VM struct {
 	// Set to true once this VM is marked as `Bootstrapped` by the engine
 	bootstrapped bool
 
+	// asset id that will be used for fees
+	feeAssetID ids.ID
 	// fee that must be burned by every state creating transaction
 	creationTxFee uint64
 	// fee that must be burned by every non-state creating transaction
@@ -109,6 +111,14 @@ type VM struct {
 	fxs           []*parsedFx
 
 	walletService WalletService
+}
+
+func (vm *VM) Connected(id ids.ShortID) error {
+	return nil // noop
+}
+
+func (vm *VM) Disconnected(id ids.ShortID) error {
+	return nil // noop
 }
 
 /*
@@ -199,18 +209,8 @@ func (vm *VM) Initialize(
 	}
 	vm.state = state
 
-	if err := vm.initAliases(genesisBytes); err != nil {
+	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
-	}
-
-	initialized, err := vm.state.IsInitialized()
-	if err != nil {
-		return err
-	}
-	if !initialized {
-		if err := vm.initState(genesisBytes); err != nil {
-			return err
-		}
 	}
 
 	vm.timer = timer.NewTimer(func() {
@@ -232,8 +232,6 @@ func (vm *VM) Initialize(
 // Bootstrapping is called by the consensus engine when it starts bootstrapping
 // this chain
 func (vm *VM) Bootstrapping() error {
-	vm.metrics.numBootstrappingCalls.Inc()
-
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapping(); err != nil {
 			return err
@@ -245,8 +243,6 @@ func (vm *VM) Bootstrapping() error {
 // Bootstrapped is called by the consensus engine when it is done bootstrapping
 // this chain
 func (vm *VM) Bootstrapped() error {
-	vm.metrics.numBootstrappedCalls.Inc()
-
 	for _, fx := range vm.fxs {
 		if err := fx.Fx.Bootstrapped(); err != nil {
 			return err
@@ -273,15 +269,13 @@ func (vm *VM) Shutdown() error {
 
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
-	vm.metrics.numCreateHandlersCalls.Inc()
-
 	codec := cjson.NewCodec()
 
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
@@ -290,8 +284,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
@@ -318,8 +312,6 @@ func (vm *VM) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
 
 // Pending implements the avalanche.DAGVM interface
 func (vm *VM) PendingTxs() []snowstorm.Tx {
-	vm.metrics.numPendingCalls.Inc()
-
 	vm.timer.Cancel()
 
 	txs := vm.txs
@@ -329,15 +321,11 @@ func (vm *VM) PendingTxs() []snowstorm.Tx {
 
 // Parse implements the avalanche.DAGVM interface
 func (vm *VM) ParseTx(b []byte) (snowstorm.Tx, error) {
-	vm.metrics.numParseCalls.Inc()
-
 	return vm.parseTx(b)
 }
 
 // Get implements the avalanche.DAGVM interface
 func (vm *VM) GetTx(txID ids.ID) (snowstorm.Tx, error) {
-	vm.metrics.numGetCalls.Inc()
-
 	tx := &UniqueTx{
 		vm:   vm,
 		txID: txID,
@@ -531,13 +519,21 @@ func (vm *VM) FlushTxs() {
  ******************************************************************************
  */
 
-func (vm *VM) initAliases(genesisBytes []byte) error {
+func (vm *VM) initGenesis(genesisBytes []byte) error {
 	genesis := Genesis{}
 	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return err
 	}
 
-	for _, genesisTx := range genesis.Txs {
+	stateInitialized, err := vm.state.IsInitialized()
+	if err != nil {
+		return err
+	}
+
+	// secure this by defaulting to avaxAsset
+	vm.feeAssetID = vm.ctx.AVAXAssetID
+
+	for index, genesisTx := range genesis.Txs {
 		if len(genesisTx.Outs) != 0 {
 			return errGenesisAssetMustHaveState
 		}
@@ -550,48 +546,44 @@ func (vm *VM) initAliases(genesisBytes []byte) error {
 		}
 
 		txID := tx.ID()
+
 		if err := vm.Alias(txID, genesisTx.Alias); err != nil {
 			return err
 		}
+
+		if !stateInitialized {
+			if err := vm.initState(tx); err != nil {
+				return err
+			}
+		}
+		if index == 0 {
+			vm.ctx.Log.Info("Fee payments are using Asset with Alias: %s, AssetID: %s", genesisTx.Alias, txID)
+			vm.feeAssetID = txID
+		}
+	}
+
+	if !stateInitialized {
+		return vm.state.SetInitialized()
 	}
 
 	return nil
 }
 
-func (vm *VM) initState(genesisBytes []byte) error {
-	genesis := Genesis{}
-	if _, err := vm.genesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
+func (vm *VM) initState(tx Tx) error {
+	txID := tx.ID()
+	vm.ctx.Log.Info("initializing with AssetID %s", txID)
+	if err := vm.state.PutTx(txID, &tx); err != nil {
 		return err
 	}
-
-	for _, genesisTx := range genesis.Txs {
-		if len(genesisTx.Outs) != 0 {
-			return errGenesisAssetMustHaveState
-		}
-
-		tx := Tx{
-			UnsignedTx: &genesisTx.CreateAssetTx,
-		}
-		if err := tx.SignSECP256K1Fx(vm.genesisCodec, nil); err != nil {
+	if err := vm.state.PutStatus(txID, choices.Accepted); err != nil {
+		return err
+	}
+	for _, utxo := range tx.UTXOs() {
+		if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			return err
-		}
-
-		txID := tx.ID()
-		vm.ctx.Log.Info("initializing with AssetID %s", txID)
-		if err := vm.state.PutTx(txID, &tx); err != nil {
-			return err
-		}
-		if err := vm.state.PutStatus(txID, choices.Accepted); err != nil {
-			return err
-		}
-		for _, utxo := range tx.UTXOs() {
-			if err := vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
-				return err
-			}
 		}
 	}
-
-	return vm.state.SetInitialized()
+	return nil
 }
 
 func (vm *VM) parseTx(bytes []byte) (*UniqueTx, error) {

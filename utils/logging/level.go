@@ -8,21 +8,19 @@ import (
 	"strings"
 )
 
-// Level ...
 type Level int
 
-// Enum ...
 const (
 	Off Level = iota
 	Fatal
 	Error
 	Warn
 	Info
+	Trace
 	Debug
 	Verbo
 )
 
-// ToLevel ...
 func ToLevel(l string) (Level, error) {
 	switch strings.ToUpper(l) {
 	case "OFF":
@@ -35,6 +33,8 @@ func ToLevel(l string) (Level, error) {
 		return Warn, nil
 	case "INFO":
 		return Info, nil
+	case "TRACE":
+		return Trace, nil
 	case "DEBUG":
 		return Debug, nil
 	case "VERBO":
@@ -44,7 +44,6 @@ func ToLevel(l string) (Level, error) {
 	}
 }
 
-// Color ...
 func (l Level) Color() Color {
 	switch l {
 	case Fatal:
@@ -54,7 +53,11 @@ func (l Level) Color() Color {
 	case Warn:
 		return Yellow
 	case Info:
-		return White
+		// Rather than using white, use the default to better support terminals
+		// with a white background.
+		return Reset
+	case Trace:
+		return LightPurple
 	case Debug:
 		return LightBlue
 	case Verbo:
@@ -74,6 +77,8 @@ func (l Level) String() string {
 		return "WARN "
 	case Info:
 		return "INFO "
+	case Trace:
+		return "TRACE"
 	case Debug:
 		return "DEBUG"
 	case Verbo:

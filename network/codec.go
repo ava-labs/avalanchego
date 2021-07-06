@@ -21,13 +21,19 @@ type Codec struct{}
 
 // Pack attempts to pack a map of fields into a message.
 // The first byte of the message is the opcode of the message.
-func (Codec) Pack(op Op, fields map[Field]interface{}) (Msg, error) {
+// Uses [buffer] to hold the message's byte repr.
+// [buffer]'s contents may be overwritten.
+// [buffer] may be nil.
+func (Codec) Pack(buffer []byte, op Op, fields map[Field]interface{}) (Msg, error) {
 	message, ok := Messages[op]
 	if !ok {
 		return nil, errBadOp
 	}
 
-	p := wrappers.Packer{MaxSize: math.MaxInt32}
+	p := wrappers.Packer{
+		MaxSize: math.MaxInt32,
+		Bytes:   buffer[:0],
+	}
 	p.PackByte(byte(op))
 	for _, field := range message {
 		data, ok := fields[field]

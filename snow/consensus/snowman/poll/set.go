@@ -11,8 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 type poll struct {
@@ -48,7 +48,7 @@ func NewSet(
 		Namespace: namespace,
 		Name:      "poll_duration",
 		Help:      "Length of time the poll existed in milliseconds",
-		Buckets:   utils.MillisecondsBuckets,
+		Buckets:   metric.MillisecondsBuckets,
 	})
 	if err := registerer.Register(durPolls); err != nil {
 		log.Error("failed to register poll_duration statistics due to %s", err)

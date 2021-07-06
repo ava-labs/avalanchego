@@ -67,7 +67,6 @@ const (
 var (
 	errInvalidID         = errors.New("invalid ID")
 	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
-	errStartTimeTooLate  = errors.New("start time is too far in the future")
 	errStartTimeTooEarly = errors.New("start time is before the current chain time")
 	errStartAfterEndTime = errors.New("start time is after the end time")
 
@@ -75,6 +74,7 @@ var (
 	_ validators.Connector = &VM{}
 	_ common.StaticVM      = &VM{}
 	_ secp256k1fx.VM       = &VM{}
+	_ Fx                   = &secp256k1fx.Fx{}
 )
 
 // VM implements the snowman.ChainVM interface
@@ -135,7 +135,7 @@ func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
 	genesisBytes []byte,
-	upgradebytes []byte,
+	upgradeBytes []byte,
 	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
@@ -411,8 +411,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptAPIRequest)
-	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterAPIRequest)
+	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterRequest)
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}

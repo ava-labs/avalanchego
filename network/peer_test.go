@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"crypto"
 	"net"
 	"testing"
@@ -105,7 +106,10 @@ func TestPeer_Close(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
+		NewDialerConfig(0, 30*time.Second),
 		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
 	)
 	assert.NotNil(t, netwrk)
 
@@ -114,7 +118,8 @@ func TestPeer_Close(t *testing.T) {
 		1,
 	)
 	caller.outbounds[ip1.IP().String()] = listener
-	conn, _ := caller.Dial(ip1.IP())
+	conn, err := caller.Dial(context.Background(), ip1.IP())
+	assert.NoError(t, err)
 
 	basenetwork := netwrk.(*network)
 
@@ -124,7 +129,7 @@ func TestPeer_Close(t *testing.T) {
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sender = make(chan []byte, 10)
 	testMsg := newTestMsg(GetVersion, newmsgbytes)
-	peer.Send(testMsg)
+	peer.Send(testMsg, true)
 
 	// make sure the net pending and peer pending bytes updated
 	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {

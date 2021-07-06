@@ -7,10 +7,11 @@
 package rpcdbproto
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -1423,34 +1424,37 @@ func file_rpcdb_proto_rawDescGZIP() []byte {
 	return file_rpcdb_proto_rawDescData
 }
 
-var file_rpcdb_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
-var file_rpcdb_proto_goTypes = []interface{}{
-	(*HasRequest)(nil),                            // 0: rpcdbproto.HasRequest
-	(*HasResponse)(nil),                           // 1: rpcdbproto.HasResponse
-	(*GetRequest)(nil),                            // 2: rpcdbproto.GetRequest
-	(*GetResponse)(nil),                           // 3: rpcdbproto.GetResponse
-	(*PutRequest)(nil),                            // 4: rpcdbproto.PutRequest
-	(*PutResponse)(nil),                           // 5: rpcdbproto.PutResponse
-	(*DeleteRequest)(nil),                         // 6: rpcdbproto.DeleteRequest
-	(*DeleteResponse)(nil),                        // 7: rpcdbproto.DeleteResponse
-	(*StatRequest)(nil),                           // 8: rpcdbproto.StatRequest
-	(*StatResponse)(nil),                          // 9: rpcdbproto.StatResponse
-	(*CompactRequest)(nil),                        // 10: rpcdbproto.CompactRequest
-	(*CompactResponse)(nil),                       // 11: rpcdbproto.CompactResponse
-	(*CloseRequest)(nil),                          // 12: rpcdbproto.CloseRequest
-	(*CloseResponse)(nil),                         // 13: rpcdbproto.CloseResponse
-	(*WriteBatchRequest)(nil),                     // 14: rpcdbproto.WriteBatchRequest
-	(*WriteBatchResponse)(nil),                    // 15: rpcdbproto.WriteBatchResponse
-	(*NewIteratorRequest)(nil),                    // 16: rpcdbproto.NewIteratorRequest
-	(*NewIteratorWithStartAndPrefixRequest)(nil),  // 17: rpcdbproto.NewIteratorWithStartAndPrefixRequest
-	(*NewIteratorWithStartAndPrefixResponse)(nil), // 18: rpcdbproto.NewIteratorWithStartAndPrefixResponse
-	(*IteratorNextRequest)(nil),                   // 19: rpcdbproto.IteratorNextRequest
-	(*IteratorNextResponse)(nil),                  // 20: rpcdbproto.IteratorNextResponse
-	(*IteratorErrorRequest)(nil),                  // 21: rpcdbproto.IteratorErrorRequest
-	(*IteratorErrorResponse)(nil),                 // 22: rpcdbproto.IteratorErrorResponse
-	(*IteratorReleaseRequest)(nil),                // 23: rpcdbproto.IteratorReleaseRequest
-	(*IteratorReleaseResponse)(nil),               // 24: rpcdbproto.IteratorReleaseResponse
-}
+var (
+	file_rpcdb_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+	file_rpcdb_proto_goTypes  = []interface{}{
+		(*HasRequest)(nil),                            // 0: rpcdbproto.HasRequest
+		(*HasResponse)(nil),                           // 1: rpcdbproto.HasResponse
+		(*GetRequest)(nil),                            // 2: rpcdbproto.GetRequest
+		(*GetResponse)(nil),                           // 3: rpcdbproto.GetResponse
+		(*PutRequest)(nil),                            // 4: rpcdbproto.PutRequest
+		(*PutResponse)(nil),                           // 5: rpcdbproto.PutResponse
+		(*DeleteRequest)(nil),                         // 6: rpcdbproto.DeleteRequest
+		(*DeleteResponse)(nil),                        // 7: rpcdbproto.DeleteResponse
+		(*StatRequest)(nil),                           // 8: rpcdbproto.StatRequest
+		(*StatResponse)(nil),                          // 9: rpcdbproto.StatResponse
+		(*CompactRequest)(nil),                        // 10: rpcdbproto.CompactRequest
+		(*CompactResponse)(nil),                       // 11: rpcdbproto.CompactResponse
+		(*CloseRequest)(nil),                          // 12: rpcdbproto.CloseRequest
+		(*CloseResponse)(nil),                         // 13: rpcdbproto.CloseResponse
+		(*WriteBatchRequest)(nil),                     // 14: rpcdbproto.WriteBatchRequest
+		(*WriteBatchResponse)(nil),                    // 15: rpcdbproto.WriteBatchResponse
+		(*NewIteratorRequest)(nil),                    // 16: rpcdbproto.NewIteratorRequest
+		(*NewIteratorWithStartAndPrefixRequest)(nil),  // 17: rpcdbproto.NewIteratorWithStartAndPrefixRequest
+		(*NewIteratorWithStartAndPrefixResponse)(nil), // 18: rpcdbproto.NewIteratorWithStartAndPrefixResponse
+		(*IteratorNextRequest)(nil),                   // 19: rpcdbproto.IteratorNextRequest
+		(*IteratorNextResponse)(nil),                  // 20: rpcdbproto.IteratorNextResponse
+		(*IteratorErrorRequest)(nil),                  // 21: rpcdbproto.IteratorErrorRequest
+		(*IteratorErrorResponse)(nil),                 // 22: rpcdbproto.IteratorErrorResponse
+		(*IteratorReleaseRequest)(nil),                // 23: rpcdbproto.IteratorReleaseRequest
+		(*IteratorReleaseResponse)(nil),               // 24: rpcdbproto.IteratorReleaseResponse
+	}
+)
+
 var file_rpcdb_proto_depIdxs = []int32{
 	4,  // 0: rpcdbproto.WriteBatchRequest.puts:type_name -> rpcdbproto.PutRequest
 	6,  // 1: rpcdbproto.WriteBatchRequest.deletes:type_name -> rpcdbproto.DeleteRequest
