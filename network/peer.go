@@ -324,6 +324,7 @@ func (p *peer) WriteMessages() {
 		p.sendQueue = p.sendQueue[1:]
 		p.sendQueueCond.L.Unlock()
 		msgLen := uint32(len(msg))
+		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 		p.net.log.Verbo("sending new message to %s:\n%s",
 			p.nodeID,
 			formatting.DumpBytes{Bytes: msg})
@@ -353,7 +354,6 @@ func (p *peer) WriteMessages() {
 		atomic.StoreInt64(&p.net.lastMsgSentTime, now)
 
 		p.net.byteSlicePool.Put(msg)
-		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 	}
 }
 
