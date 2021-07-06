@@ -128,7 +128,7 @@ func TestPeer_Close(t *testing.T) {
 
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
-	peer.sender = make(chan []byte, 10)
+	peer.sendQueue = [][]byte{}
 	testMsg := newTestMsg(GetVersion, newmsgbytes)
 	peer.Send(testMsg, true)
 

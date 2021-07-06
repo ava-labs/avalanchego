@@ -1335,7 +1335,6 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	}
 
 	p.cert = cert
-	p.sender = make(chan []byte, n.sendQueueSize)
 	p.nodeID = nodeID
 	p.conn = conn
 

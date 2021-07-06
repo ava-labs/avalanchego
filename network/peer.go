@@ -75,12 +75,13 @@ type peer struct {
 	// if the close function has been called.
 	closed utils.AtomicBool
 
-	// Ensures that closing [p.sender] is handled safely
-	senderLock sync.Mutex
+	// queue of messages to be sent to this peer
+	sendQueue [][]byte
 
-	// queue of messages this connection is attempting to send the peer. Is
-	// closed when the connection is closed.
-	sender chan []byte
+	// Signalled when a message is added to [sendQueue],
+	// and when [p.closed] is set to true.
+	// [sendQueueCond.L] must be held when using [sendQueue].
+	sendQueueCond *sync.Cond
 
 	// ip may or may not be set when the peer is first started. is only modified
 	// on the connection's reader routine.
@@ -138,10 +139,11 @@ type peer struct {
 // newPeer returns a properly initialized *peer.
 func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 	p := &peer{
-		net:          net,
-		conn:         conn,
-		ip:           ip,
-		tickerCloser: make(chan struct{}),
+		sendQueueCond: sync.NewCond(&sync.Mutex{}),
+		net:           net,
+		conn:          conn,
+		ip:            ip,
+		tickerCloser:  make(chan struct{}),
 	}
 	p.aliasTimer = timer.NewTimer(p.releaseExpiredAliases)
 
@@ -304,7 +306,23 @@ func (p *peer) WriteMessages() {
 
 	var reader bytes.Reader
 	writer := bufio.NewWriter(p.conn)
-	for msg := range p.sender {
+	for { // When this loop exits, p.sendQueueCond.L is unlocked
+		p.sendQueueCond.L.Lock()
+		for {
+			if p.closed.GetValue() {
+				p.sendQueueCond.L.Unlock()
+				return
+			}
+			if len(p.sendQueue) > 0 {
+				// There is a message to send
+				break
+			}
+			// Wait until there is a message to send
+			p.sendQueueCond.Wait()
+		}
+		msg := p.sendQueue[0]
+		p.sendQueue = p.sendQueue[1:]
+		p.sendQueueCond.L.Unlock()
 		msgLen := uint32(len(msg))
 		p.net.log.Verbo("sending new message to %s:\n%s",
 			p.nodeID,
@@ -344,8 +362,8 @@ func (p *peer) WriteMessages() {
 // If ![canModifyMsg], [msg] will not be modified by this method.
 // [canModifyMsg] should be false if [msg] is sent in a loop, for example/.
 func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
-	p.senderLock.Lock()
-	defer p.senderLock.Unlock()
+	p.sendQueueCond.L.Lock()
+	defer p.sendQueueCond.L.Unlock()
 
 	// If the peer was closed then the sender channel was closed and we are
 	// unable to send this message without panicking. So drop the message.
@@ -357,8 +375,7 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	msgBytes := msg.Bytes()
 	msgLen := int64(len(msgBytes))
 
-	// Acquire space on the outbound message queue, or drop [msg]
-	// if we can't acquire space
+	// Acquire space on the outbound message queue, or drop [msg] if we can't
 	dropMsg := !p.net.outboundMsgThrottler.Acquire(uint64(msgLen), p.nodeID)
 	if dropMsg {
 		p.net.log.Debug("dropping %s message to %s%s at %s due to rate-limiting", msg.Op(), constants.NodeIDPrefix, p.nodeID, p.getIP())
@@ -368,25 +385,16 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	// when done sending [msg] or when we give up sending [msg]
 
 	// If the flag says to not modify [msgBytes], copy it so that the copy,
-	// not [msgBytes], will be put back into the pool after it's written.
+	// not [msgBytes], will be put back into the []byte pool after it's written.
 	toSend := msgBytes
 	if !canModifyMsg {
 		toSend = make([]byte, msgLen)
 		copy(toSend, msgBytes)
 	}
 
-	select {
-	// Every message put onto [p.sender] must eventually release bytes
-	// to the outbound message throttler, as noted above
-	case p.sender <- toSend:
-		return true
-	default:
-		// Drop [msg] because [p]'s outgoing message queue is full
-		p.net.log.Debug("dropping %s message to %s%s at %s due to a full send queue", msg.Op(), constants.NodeIDPrefix, p.nodeID, p.getIP())
-		p.net.byteSlicePool.Put(toSend)
-		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
-		return false
-	}
+	p.sendQueue = append(p.sendQueue, toSend)
+	p.sendQueueCond.Signal()
+	return true
 }
 
 // assumes the [stateLock] is not held
@@ -491,24 +499,17 @@ func (p *peer) close() {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.nodeID, err)
 	}
 
-	// Hold [p.senderLock] here to ensure that:
-	// * We're not currently putting things onto [p.sender], so we can empty it.
-	// * When we close [p.sender], then on the next iteration of WriteMessages,
-	//   [p.closed] will be true and we won't try to put anything onto [p.sender]
-	//   after it has been closed.
-	p.senderLock.Lock()
+	p.sendQueueCond.L.Lock()
 	// Release the bytes of the unsent messages to the outbound message throttler
-releaseLoop:
-	for {
-		select {
-		case msg := <-p.sender:
-			p.net.outboundMsgThrottler.Release(uint64(len(msg)), p.nodeID)
-		default:
-			break releaseLoop
-		}
+	for i := 0; i < len(p.sendQueue); i++ {
+		p.net.outboundMsgThrottler.Release(uint64(len(p.sendQueue[i])), p.nodeID)
 	}
-	close(p.sender)
-	p.senderLock.Unlock()
+	p.sendQueue = nil
+	p.sendQueueCond.L.Unlock()
+	// Per [p.sendQueueCond]'s spec, it is signalled when [p.closed] is set to true
+	// so that we exit the WriteMessages goroutine.
+	// Since [p.closed] is true, nothing else will be put on [p.sendQueue]
+	p.sendQueueCond.Signal()
 	p.net.disconnected(p)
 }
 
