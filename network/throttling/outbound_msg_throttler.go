@@ -198,7 +198,7 @@ func (m *outboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Re
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
 		Name:      "outbound_throttler_awaiting_release",
-		Help:      "Number of messages currently being read/handled",
+		Help:      "Number of messages waiting to be sent",
 	})
 	errs := wrappers.Errs{}
 	errs.Add(
