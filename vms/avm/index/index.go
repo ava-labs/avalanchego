@@ -27,6 +27,9 @@ import (
 // 1) An input UTXO to the transaction was at least partially owned by the address
 // 2) An output of the transaction is at least partially owned by the address
 type AddressTxsIndexer interface {
+	// Init initializes the indexer returning an error if state is invalid
+	Init(bool) error
+
 	// Reset clears unwritten indexer state.
 	Reset(ids.ID)
 
@@ -52,7 +55,10 @@ type AddressTxsIndexer interface {
 	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 }
 
-var idxKey = []byte("idx")
+var (
+	idxKey        = []byte("idx")
+	idxEnabledKey = []byte("addressTxsIdxEnabled")
+)
 
 // indexer implements AddressTxsIndexer
 type indexer struct {
@@ -185,6 +191,78 @@ func (i *indexer) Write(txID ids.ID) error {
 	return nil
 }
 
+// Init initialises indexing, returning error if the state is invalid
+func (i *indexer) Init(allowIncomplete bool) error {
+	return checkIndexingStatus(i.db, true, allowIncomplete)
+}
+
+// checkIndexingStatus checks the indexing status in the database, returning error if the state
+// with respect to provided parameters is invalid
+func checkIndexingStatus(db *versiondb.Database, enableIndexing, allowIncomplete bool) error {
+	// verify whether we've indexed before
+	idxEnabled, err := db.Get(idxEnabledKey)
+	if err == database.ErrNotFound {
+		// we're not allowed incomplete index and we've not indexed before
+		// so its ok to proceed
+		// save the flag for next time indicating indexing status
+		return saveIndexingStateToDB(db, enableIndexing)
+	} else if err != nil {
+		// some other error happened when reading the database
+		return err
+	}
+
+	// ok so we have a value stored in the db, lets check its integrity
+	if len(idxEnabled) != wrappers.BoolLen {
+		// its the wrong size, maybe the database got corrupted?
+		return fmt.Errorf("idxEnabled does not have expected size %d, found %d", wrappers.BoolLen, len(idxEnabled))
+	}
+
+	// idxEnabled is of expected size, lets see if its true or false
+	if idxEnabled[0] == 0 {
+		// index was previously enabled
+		if enableIndexing && !allowIncomplete {
+			// indexing was disabled before, we're asked to enable it but not allowed
+			// incomplete entries, we return error
+			return fmt.Errorf("indexing is off and incomplete indexing is not allowed, to proceed allow incomplete indexing in config or reindex from genesis")
+		} else if enableIndexing {
+			// we're asked to enable indexing and allow incomplete indexes
+			// save state to db and continue
+			return saveIndexingStateToDB(db, enableIndexing)
+		}
+	} else if idxEnabled[0] == 1 {
+		// index was previously disabled
+		if !enableIndexing && !allowIncomplete {
+			// index is previously enabled, we're asked to disable it but not allowed incomplete indexes
+			return fmt.Errorf("cannot disable indexing when incomplete indexes are not allowed, to proceed allow incomplete indexing in config or reset state from genesis")
+		} else if !enableIndexing {
+			// we're asked to disable indexing and allow incomplete indexes
+			// save state to db and continue
+			return saveIndexingStateToDB(db, enableIndexing)
+		}
+	}
+
+	// idxEnabled is true
+	// we're not allowed incomplete index AND index is enabled already
+	// so we're good to proceed
+	return nil
+}
+
+// saveIndexingStateToDB saves the provided [enableIndexing] state to [db]
+func saveIndexingStateToDB(db *versiondb.Database, enableIndexing bool) error {
+	var idxEnabledVal byte
+	if enableIndexing {
+		idxEnabledVal = 1
+	}
+
+	err := db.Put(idxEnabledKey, []byte{idxEnabledVal})
+	if err != nil {
+		return err
+	}
+
+	err = db.Commit()
+	return err
+}
+
 // Read returns IDs of transactions that changed [address]'s balance of [assetID],
 // starting at [cursor], in order of transaction acceptance. e.g. if [cursor] == 1, does
 // not return the first transaction that changed the balance. (This is for for pagination.)
@@ -240,10 +318,18 @@ func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m Metrics)
 	}
 }
 
-type noIndexer struct{}
+type noIndexer struct {
+	db *versiondb.Database
+}
 
-func NewNoIndexer() AddressTxsIndexer {
-	return &noIndexer{}
+func NewNoIndexer(db *versiondb.Database) AddressTxsIndexer {
+	return &noIndexer{
+		db: db,
+	}
+}
+
+func (i *noIndexer) Init(allowIncomplete bool) error {
+	return checkIndexingStatus(i.db, false, allowIncomplete)
 }
 
 func (i *noIndexer) AddUTXOsByID(func(utxoid *avax.UTXOID) (*avax.UTXO, error), ids.ID, []*avax.UTXOID) error {

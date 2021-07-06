@@ -424,6 +424,78 @@ func TestIndexer_Read(t *testing.T) {
 	}
 }
 
+func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	ctx := NewContext(t)
+
+	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
+
+	// start with indexing enabled
+	indexer := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, index.Metrics{})
+	err := indexer.Init(true)
+	assert.NoError(t, err)
+
+	// now disable indexing with allow-incomplete set to false
+	disabledIndexer := index.NewNoIndexer(versiondb.New(db))
+	err = disabledIndexer.Init(false)
+	assert.Error(t, err)
+
+	// now disable indexing with allow-incomplete set to true
+	err = disabledIndexer.Init(true)
+	assert.NoError(t, err)
+}
+
+func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	ctx := NewContext(t)
+
+	currentDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
+	db := versiondb.New(currentDB)
+
+	// disable indexing with allow-incomplete set to false
+	disabledIndexer := index.NewNoIndexer(db)
+	err := disabledIndexer.Init(false)
+	assert.NoError(t, err)
+
+	// now enable indexing with allow-incomplete set to false
+	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{})
+	err = indexer.Init(false)
+	assert.Error(t, err)
+
+	// retry enable indexing with allow-incomplete set to true
+	err = indexer.Init(true)
+	assert.NoError(t, err)
+
+	// disable indexing with allow-incomplete set to false
+	err = disabledIndexer.Init(false)
+	assert.Error(t, err)
+
+	// disable indexing again with allow-incomplete set to true
+	err = disabledIndexer.Init(true)
+	assert.NoError(t, err)
+}
+
+func TestIndexingAllowIncomplete(t *testing.T) {
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	ctx := NewContext(t)
+
+	prefixDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
+	db := versiondb.New(prefixDB)
+	// disabled indexer will persist idxEnabled as false
+	disabledIndexer := index.NewNoIndexer(db)
+	err := disabledIndexer.Init(false)
+	assert.NoError(t, err)
+
+	// we initialise with indexing enabled now
+	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{})
+	// we init with allow incomplete indexing as false
+	err = indexer.Init(false)
+	// we should get error because:
+	// - indexing was disabled previously
+	// - node now is asked to enable indexing with allow incomplete set to false
+	assert.Error(t, err)
+}
+
 func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, key *crypto.PrivateKeySECP256K1R) *avax.UTXO {
 	return &avax.UTXO{
 		UTXOID: utxoID,
