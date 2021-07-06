@@ -321,28 +321,28 @@ type sybilInboundMsgThrottlerMetrics struct {
 func (m *sybilInboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
 	m.acquireLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: constants.PlatformName,
-		Name:      "incoming_throttler_acquire_latency",
+		Name:      "inbound_throttler_acquire_latency",
 		Help:      "Duration an incoming message waited to be read due to throttling",
 		Buckets:   metric.NanosecondsBuckets,
 	})
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "incoming_throttler_remaining_at_large_bytes",
+		Name:      "inbound_throttler_remaining_at_large_bytes",
 		Help:      "Bytes remaining in the at large byte allocation",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "incoming_throttler_remaining_validator_bytes",
+		Name:      "inbound_throttler_remaining_validator_bytes",
 		Help:      "Bytes remaining in the validator byte allocation",
 	})
 	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "incoming_throttler_awaiting_acquire",
+		Name:      "inbound_throttler_awaiting_acquire",
 		Help:      "Number of incoming messages waiting to be read",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "incoming_throttler_awaiting_release",
+		Name:      "inbound_throttler_awaiting_release",
 		Help:      "Number of messages currently being read/handled",
 	})
 	errs := wrappers.Errs{}
