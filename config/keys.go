@@ -100,7 +100,7 @@ const (
 	ConsensusShutdownTimeoutKey               = "consensus-shutdown-timeout"
 	FdLimitKey                                = "fd-limit"
 	CorethConfigKey                           = "coreth-config"
-	IndexContainersEnabled                    = "index-containers-enabled"
+	IndexEnabledKey                           = "index-enabled"
 	IndexAllowIncompleteKey                   = "index-allow-incomplete"
 	RouterHealthMaxDropRateKey                = "router-health-max-drop-rate"
 	RouterHealthMaxOutstandingRequestsKey     = "router-health-max-outstanding-requests"

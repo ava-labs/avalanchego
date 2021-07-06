@@ -304,7 +304,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.MetricsAPIEnabled = v.GetBool(MetricsAPIEnabledKey)
 	nodeConfig.HealthAPIEnabled = v.GetBool(HealthAPIEnabledKey)
 	nodeConfig.IPCAPIEnabled = v.GetBool(IpcAPIEnabledKey)
-	nodeConfig.IndexAPIEnabled = v.GetBool(IndexContainersEnabled)
+	nodeConfig.IndexAPIEnabled = v.GetBool(IndexEnabledKey)
 
 	// Halflife of continuous averager used in health checks
 	healthCheckAveragerHalflife := v.GetDuration(HealthCheckAveragerHalflifeKey)

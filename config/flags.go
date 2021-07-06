@@ -255,7 +255,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(IpcsPathKey, "", "The directory (Unix) or named pipe name prefix (Windows) for IPC sockets")
 
 	// Indexer
-	fs.Bool(IndexContainersEnabled, false, "If true, index all accepted containers and transactions and expose them via an API")
+	fs.Bool(IndexEnabledKey, false, "If true, index all accepted containers and transactions and expose them via an API")
 	fs.Bool(IndexAllowIncompleteKey, false, "If true, allow running the node in such a way that could cause an index to miss transactions. Ignored if index is disabled.")
 
 	// Chain Config Dir
