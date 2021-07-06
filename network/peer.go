@@ -355,33 +355,36 @@ func (p *peer) Send(msg Msg, canModifyMsg bool) bool {
 	}
 
 	msgBytes := msg.Bytes()
-	msgBytesLen := int64(len(msgBytes))
+	msgLen := int64(len(msgBytes))
 
-	// See if we should drop message
-	dropMsg := !p.net.outboundMsgThrottler.Acquire(uint64(msgBytesLen), p.nodeID)
+	// Acquire space on the outbound message queue, or drop [msg]
+	// if we can't acquire space
+	dropMsg := !p.net.outboundMsgThrottler.Acquire(uint64(msgLen), p.nodeID)
 	if dropMsg {
-		p.net.log.Debug("dropping message to %s%s at %s due to rate-limiting", constants.NodeIDPrefix, p.nodeID, p.getIP())
+		p.net.log.Debug("dropping %s message to %s%s at %s due to rate-limiting", msg.Op(), constants.NodeIDPrefix, p.nodeID, p.getIP())
 		return false
 	}
-	// Must call p.net.outboundMsgThrottler.Release(uint64(msgBytesLen), p.nodeID)
+	// Invariant: must call p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 	// when done sending [msg] or when we give up sending [msg]
 
 	// If the flag says to not modify [msgBytes], copy it so that the copy,
 	// not [msgBytes], will be put back into the pool after it's written.
 	toSend := msgBytes
 	if !canModifyMsg {
-		toSend = make([]byte, msgBytesLen)
+		toSend = make([]byte, msgLen)
 		copy(toSend, msgBytes)
 	}
 
 	select {
+	// Every message put onto [p.sender] must eventually release bytes
+	// to the outbound message throttler, as noted above
 	case p.sender <- toSend:
 		return true
 	default:
-		// we never sent the message, remove from pending totals
-		p.net.log.Debug("dropping message to %s%s at %s due to a full send queue", constants.NodeIDPrefix, p.nodeID, p.getIP())
+		// Drop [msg] because [p]'s outgoing message queue is full
+		p.net.log.Debug("dropping %s message to %s%s at %s due to a full send queue", msg.Op(), constants.NodeIDPrefix, p.nodeID, p.getIP())
 		p.net.byteSlicePool.Put(toSend)
-		p.net.outboundMsgThrottler.Release(uint64(msgBytesLen), p.nodeID)
+		p.net.outboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
 		return false
 	}
 }
@@ -488,11 +491,13 @@ func (p *peer) close() {
 		p.net.log.Debug("closing peer %s resulted in an error: %s", p.nodeID, err)
 	}
 
-	// Hold [p.senderLock] here while we close [p.sender] so that on the
-	// next iteration of WriteMessages, [p.closed] will be seen to be closed
-	// and we won't try to put anything onto [p.sender]
+	// Hold [p.senderLock] here to ensure that:
+	// * We're not currently putting things onto [p.sender], so we can empty it.
+	// * When we close [p.sender], then on the next iteration of WriteMessages,
+	//   [p.closed] will be true and we won't try to put anything onto [p.sender]
+	//   after it has been closed.
 	p.senderLock.Lock()
-	// Release all of the unsent messages back to the outbound message throttler
+	// Release the bytes of the unsent messages to the outbound message throttler
 releaseLoop:
 	for {
 		select {
