@@ -153,9 +153,11 @@ func (vm *VM) Initialize(
 	avmConfig := Config{}
 	avmConfig.SetDefaults()
 	if len(configBytes) > 0 {
+		ctx.Log.Info("Initializing VM config")
 		if err := json.Unmarshal(configBytes, &avmConfig); err != nil {
 			return err
 		}
+		ctx.Log.Info("VM config initialized %+v", avmConfig)
 	}
 
 	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {

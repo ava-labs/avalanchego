@@ -140,6 +140,8 @@ func (i *indexer) Write(txID ids.ID) error {
 		for assetID := range assetIDs {
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
+			i.log.Debug("Writing address/AssetID/<index>/txID %s/%s/?/%s", address, assetID, txID)
+
 			var idx uint64
 			idxBytes, err := assetPrefixDB.Get(idxKey)
 			switch {
@@ -159,11 +161,13 @@ func (i *indexer) Write(txID ids.ID) error {
 			}
 
 			// write the [txID] at the index
-			i.log.Debug("Writing at index %d txID %s", idx, txID)
+			i.log.Debug("Writing address/AssetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
 				i.log.Fatal("Failed to save txID [%s], idx [%d] to the address [%s], assetID [%s] prefix DB %s", txID, idx, address, assetID, err)
 				return err
 			}
+
+			i.log.Debug("Written address/AssetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
 
 			// increment and store the index for next use
 			idx++
