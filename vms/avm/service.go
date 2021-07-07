@@ -134,7 +134,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 func decorateTx(unsignedTx UnsignedTx, vm *VM) (interface{}, error) {
 	b, ok := unsignedTx.(CoreTx)
 	if !ok {
-		return unsignedTx, nil // todo properly fix
+		return unsignedTx, nil
 	}
 	if err := b.InitFx(vm); err != nil {
 		return nil, err
