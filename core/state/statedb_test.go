@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
@@ -1024,7 +1023,7 @@ func TestMultiCoinSnapshot(t *testing.T) {
 
 func TestGenerateMulticoinAccounts(t *testing.T) {
 	var (
-		diskdb = memorydb.New()
+		diskdb = rawdb.NewMemoryDatabase()
 		triedb = trie.NewDatabase(diskdb)
 
 		accID   = []byte("acc-1")
@@ -1036,14 +1035,21 @@ func TestGenerateMulticoinAccounts(t *testing.T) {
 		balanceAsHash = common.HexToHash("0x000000000000000000000000000000000000000000000000000000000000000f")
 	)
 
+	database := NewDatabase(diskdb)
+	stateDB, _ := New(common.Hash{}, database, nil)
+	stateDB.SetBalanceMultiCoin(common.BytesToAddress(accID), common.BytesToHash(coinID), big.NewInt(15))
+	stateDBRoot, _ := stateDB.Commit(false)
+	fmt.Println("stateDBRoot:", stateDBRoot)
+
 	// Create a state trie with a multicoin balance
 	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
 	stTrie.Update(coinID, balanceAsHash.Bytes())
-	stTrie.Commit(nil)
+	stTrieRoot, _ := stTrie.Commit(nil)
+	fmt.Println("stTrie:", stTrieRoot)
 
 	// Create an account trie with an account containing our state trie
 	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
-	acc := &snapshot.Account{Balance: big.NewInt(1), Root: stTrie.Hash().Bytes(), CodeHash: crypto.Keccak256Hash(nil).Bytes(), IsMultiCoin: true}
+	acc := &snapshot.Account{Balance: big.NewInt(1), Root: stTrieRoot.Bytes(), CodeHash: crypto.Keccak256Hash(nil).Bytes(), IsMultiCoin: true}
 	val, _ := rlp.EncodeToBytes(acc)
 	accTrie.Update(accID, val)
 	root, _ := accTrie.Commit(nil)
