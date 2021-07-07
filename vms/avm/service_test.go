@@ -404,7 +404,7 @@ func TestServiceGetTxs(t *testing.T) {
 		t.Fatal("should not have called shutdown")
 	}
 	var err error
-	vm.addressTxsIndexer, err = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, "", prometheus.NewRegistry())
+	vm.addressTxsIndexer, err = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, "", prometheus.NewRegistry(), false)
 	assert.NoError(t, err)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

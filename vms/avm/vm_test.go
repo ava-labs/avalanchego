@@ -279,7 +279,11 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	shutdownNodeFunc := func(int) {
 		tb.Fatal("should not have called shutdown")
 	}
-	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, nil, issuer, []*common.Fx{
+	configBytes, err := BuildAvmConfigBytes(Config{IndexTransactions: true})
+	if err != nil {
+		tb.Fatal("should not have caused error in creating avm config bytes")
+	}
+	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, configBytes, issuer, []*common.Fx{
 		{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},

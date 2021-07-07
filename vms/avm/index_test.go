@@ -396,13 +396,6 @@ func TestIndexer_Read(t *testing.T) {
 	// setup vm, db etc
 	_, vm, _, _, _ := setup(t, true)
 
-	shutdownFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
-
-	var err error
-	vm.addressTxsIndexer, err = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
-	assert.NoError(t, err)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -442,18 +435,15 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 	}
 
 	// start with indexing enabled
-	indexer, err := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
-	assert.NoError(t, err)
-	err = indexer.Init(true)
+	_, err := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
 	// now disable indexing with allow-incomplete set to false
-	disabledIndexer := index.NewNoIndexer(versiondb.New(db))
-	err = disabledIndexer.Init(false)
+	_, err = index.NewNoIndexer(versiondb.New(db), false)
 	assert.Error(t, err)
 
 	// now disable indexing with allow-incomplete set to true
-	err = disabledIndexer.Init(true)
+	_, err = index.NewNoIndexer(versiondb.New(db), true)
 	assert.NoError(t, err)
 }
 
@@ -465,8 +455,7 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 	db := versiondb.New(currentDB)
 
 	// disable indexing with allow-incomplete set to false
-	disabledIndexer := index.NewNoIndexer(db)
-	err := disabledIndexer.Init(false)
+	_, err := index.NewNoIndexer(versiondb.New(db), false)
 	assert.NoError(t, err)
 
 	shutdownFunc := func(int) {
@@ -474,21 +463,19 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 	}
 
 	// now enable indexing with allow-incomplete set to false
-	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
-	assert.NoError(t, err)
-	err = indexer.Init(false)
+	_, err = index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
 	assert.Error(t, err)
 
 	// retry enable indexing with allow-incomplete set to true
-	err = indexer.Init(true)
+	_, err = index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
 	// disable indexing with allow-incomplete set to false
-	err = disabledIndexer.Init(false)
+	_, err = index.NewNoIndexer(versiondb.New(db), false)
 	assert.Error(t, err)
 
 	// disable indexing again with allow-incomplete set to true
-	err = disabledIndexer.Init(true)
+	_, err = index.NewNoIndexer(versiondb.New(db), true)
 	assert.NoError(t, err)
 }
 
@@ -499,19 +486,15 @@ func TestIndexingAllowIncomplete(t *testing.T) {
 	prefixDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
 	db := versiondb.New(prefixDB)
 	// disabled indexer will persist idxEnabled as false
-	disabledIndexer := index.NewNoIndexer(db)
-	err := disabledIndexer.Init(false)
+	_, err := index.NewNoIndexer(db, false)
 	assert.NoError(t, err)
 
 	shutdownFunc := func(int) {
 		t.Fatal("should not have called shutdown")
 	}
 
-	// we initialise with indexing enabled now
-	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
-	assert.NoError(t, err)
-	// we init with allow incomplete indexing as false
-	err = indexer.Init(false)
+	// we initialise with indexing enabled now and allow incomplete indexing as false
+	_, err = index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
 	// we should get error because:
 	// - indexing was disabled previously
 	// - node now is asked to enable indexing with allow incomplete set to false
@@ -536,7 +519,7 @@ func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
 		return nil, fmt.Errorf("not found")
 	}
 
-	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
+	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
 	assert.NoError(t, err)
 	indexer.AddUTXOsByID(getUTXOFn, ids.GenerateTestID(), []*avax.UTXOID{
 		{
@@ -683,6 +666,8 @@ func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID,
 	assert.NoError(t, err)
 
 	err = assetPrefixDB.Put([]byte("idx"), idxBytes)
+	assert.NoError(t, err)
+	err = db.Commit()
 	assert.NoError(t, err)
 	return testTxs
 }

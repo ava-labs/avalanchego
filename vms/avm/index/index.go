@@ -35,9 +35,6 @@ var (
 // 1) An input UTXO to the transaction was at least partially owned by the address
 // 2) An output of the transaction is at least partially owned by the address
 type AddressTxsIndexer interface {
-	// Init initializes the indexer returning an error if state is invalid
-	Init(bool) error
-
 	// Reset clears unwritten indexer state.
 	Reset(ids.ID)
 
@@ -185,7 +182,7 @@ func (i *indexer) Write(txID ids.ID) error {
 }
 
 // Init initialises indexing, returning error if the state is invalid
-func (i *indexer) Init(allowIncomplete bool) error {
+func (i *indexer) init(allowIncomplete bool) error {
 	return checkIndexingStatus(i.db, true, allowIncomplete)
 }
 
@@ -308,6 +305,7 @@ func NewAddressTxsIndexer(
 	shutdownFunc func(int),
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
+	allowIncompleteIndices bool,
 ) (AddressTxsIndexer, error) {
 	i := &indexer{
 		addressAssetIDTxMap: make(map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}),
@@ -315,21 +313,28 @@ func NewAddressTxsIndexer(
 		log:                 log,
 		shutdownF:           shutdownFunc,
 	}
-	return i, i.metrics.initialize(metricsNamespace, metricsRegisterer)
-}
 
-type noIndexer struct {
-	db *versiondb.Database
-}
-
-func NewNoIndexer(db *versiondb.Database) AddressTxsIndexer {
-	return &noIndexer{
-		db: db,
+	// initialize the indexer, checking current and previous indexer state with respect to the config
+	if err := i.init(allowIncompleteIndices); err != nil {
+		return nil, err
 	}
+
+	// initialize the metrics
+	if err := i.metrics.initialize(metricsNamespace, metricsRegisterer); err != nil {
+		return nil, err
+	}
+
+	return i, nil
 }
 
-func (i *noIndexer) Init(allowIncomplete bool) error {
-	return checkIndexingStatus(i.db, false, allowIncomplete)
+type noIndexer struct{}
+
+func NewNoIndexer(db *versiondb.Database, allowIncomplete bool) (AddressTxsIndexer, error) {
+	if err := checkIndexingStatus(db, false, allowIncomplete); err != nil {
+		return nil, err
+	}
+
+	return &noIndexer{}, nil
 }
 
 func (i *noIndexer) AddUTXOsByID(func(utxoID *avax.UTXOID) (*avax.UTXO, error), ids.ID, []*avax.UTXOID) {

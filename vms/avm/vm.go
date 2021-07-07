@@ -246,18 +246,17 @@ func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBy
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Info("address transaction indexing is enabled")
-		indexer, err := index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, ctx.Namespace, ctx.Metrics)
+		vm.addressTxsIndexer, err = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, ctx.Namespace, ctx.Metrics, avmConfig.AllowIncompleteTransactionIndex)
 		if err != nil {
-			return fmt.Errorf("failed to initialize indexer: %w", err)
-		}
-		vm.addressTxsIndexer = indexer
-		if err := vm.addressTxsIndexer.Init(avmConfig.AllowIncompleteTransactionIndex); err != nil {
-			return fmt.Errorf("failed to initialize indexer: %w", err)
+			return fmt.Errorf("failed to address transaction initialize indexer: %w", err)
 		}
 	} else {
 		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
 		vm.ctx.Log.Info("address transaction indexing is disabled.")
-		vm.addressTxsIndexer = index.NewNoIndexer(vm.db)
+		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.AllowIncompleteTransactionIndex)
+		if err != nil {
+			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
+		}
 	}
 
 	return vm.db.Commit()
