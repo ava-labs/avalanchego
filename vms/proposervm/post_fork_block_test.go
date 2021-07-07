@@ -20,17 +20,8 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-type TestOptionsBlock struct {
-	snowman.TestBlock
-	opts [2]snowman.Block
-}
-
-func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
-	return tob.opts, nil
-}
-
 // ProposerBlock Option interface tests section
-func TestOptions_PostForkBlkImplementsInterface(t *testing.T) {
+func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	// setup
 	proBlk := postForkBlock{
 		innerBlk: &snowman.TestBlock{},
@@ -43,8 +34,46 @@ func TestOptions_PostForkBlkImplementsInterface(t *testing.T) {
 	}
 
 	// setup
+	_, _, proVM, _ := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	innerOracleBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV: ids.Empty.Prefix(1111),
+			},
+			BytesV: []byte{1},
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV: ids.Empty.Prefix(2222),
+				},
+				BytesV: []byte{2},
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV: ids.Empty.Prefix(3333),
+				},
+				BytesV: []byte{3},
+			},
+		},
+	}
+
+	slb, err := statelessblock.Build(
+		ids.Empty, // refer unknown parent
+		time.Time{},
+		0, // pChainHeight,
+		proVM.ctx.StakingCert.Leaf,
+		innerOracleBlk.Bytes(),
+		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
+	)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
 	proBlk = postForkBlock{
-		innerBlk: &TestOptionsBlock{},
+		Block:    slb,
+		vm:       proVM,
+		innerBlk: innerOracleBlk,
+		status:   choices.Processing,
 	}
 
 	// test
@@ -55,7 +84,7 @@ func TestOptions_PostForkBlkImplementsInterface(t *testing.T) {
 }
 
 // ProposerBlock.Verify tests section
-func TestBlockVerify_ParentChecks(t *testing.T) {
+func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(100)
 	valVM.CantGetCurrentHeight = true
@@ -130,8 +159,6 @@ func TestBlockVerify_ParentChecks(t *testing.T) {
 	err = childProBlk.Verify()
 	if err == nil {
 		t.Fatal("Block with unknown parent should not verify")
-	} else if err == nil {
-		t.Fatal("Block with unknown parent should have different error")
 	}
 
 	// child block referring known parent does verify
@@ -157,7 +184,7 @@ func TestBlockVerify_ParentChecks(t *testing.T) {
 	}
 }
 
-func TestBlockVerify_TimestampChecks(t *testing.T) {
+func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(100)
 	valVM.CantGetCurrentHeight = true
@@ -237,8 +264,6 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	err = childProBlk.Verify()
 	if err == nil {
 		t.Fatal("Proposer block timestamp too old should not verify")
-	} else if err == nil {
-		t.Fatal("Old proposer block timestamp should have different error")
 	}
 
 	// block cannot arrive before its creator window starts
@@ -344,7 +369,7 @@ func TestBlockVerify_TimestampChecks(t *testing.T) {
 	}
 }
 
-func TestBlockVerify_PChainHeightChecks(t *testing.T) {
+func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(100)
 	valVM.CantGetCurrentHeight = true
@@ -482,7 +507,7 @@ func TestBlockVerify_PChainHeightChecks(t *testing.T) {
 	}
 }
 
-func TestBlockVerify_CoreBlockVerifyIsCalledOnce(t *testing.T) {
+func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Verify a block once (in this test by building it).
 	// Show that other verify call would not call coreBlk.Verify()
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
@@ -547,7 +572,7 @@ func TestBlockVerify_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 }
 
 // ProposerBlock.Accept tests section
-func TestBlockAccept_SetsLastAcceptedBlock(t *testing.T) {
+func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(2000)
@@ -611,7 +636,7 @@ func TestBlockAccept_SetsLastAcceptedBlock(t *testing.T) {
 	}
 }
 
-func TestBlockAccept_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
+func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	var pChainHeight uint64
 	valVM.CantGetCurrentHeight = true
@@ -658,5 +683,43 @@ func TestBlockAccept_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 		t.Fatal("could not retrieve last accepted block")
 	} else if acceptedID != proBlk1.ID() {
 		t.Fatal("unexpected last accepted ID")
+	}
+}
+
+// ProposerBlock.Reject tests section
+func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM.CantBuildBlock = true
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(111),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk,
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+
+	sb, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build block")
+	}
+	proBlk, ok := sb.(*postForkBlock)
+	if !ok {
+		t.Fatal("built block has not expected type")
+	}
+
+	if err := proBlk.Reject(); err != nil {
+		t.Fatal("could not reject block")
+	}
+
+	if proBlk.Status() != choices.Rejected {
+		t.Fatal("block rejection did not set state properly")
+	}
+
+	if proBlk.innerBlk.Status() == choices.Rejected {
+		t.Fatal("block rejection unduly changed inner block status")
 	}
 }

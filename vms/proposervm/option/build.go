@@ -7,19 +7,19 @@ import (
 
 func Build(
 	parentID ids.ID,
-	coreBytes []byte,
+	innerBytes []byte,
 ) (Option, error) {
-	block := option{
-		PrntID:    parentID,
-		coreBlock: coreBytes,
+	opt := option{
+		PrntID:     parentID,
+		InnerBytes: innerBytes,
 	}
 
-	bytes, err := c.Marshal(version, &block)
+	bytes, err := c.Marshal(version, &opt)
 	if err != nil {
 		return nil, err
 	}
-	block.bytes = bytes
+	opt.bytes = bytes
 
-	block.id = hashing.ComputeHash256Array(block.bytes)
-	return &block, nil
+	opt.id = hashing.ComputeHash256Array(opt.bytes)
+	return &opt, nil
 }

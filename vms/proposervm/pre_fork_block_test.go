@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
-func TestOptions_PreForkBlkImplementsInterface(t *testing.T) {
+func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 	// setup
 	proBlk := preForkBlock{
 		Block: &snowman.TestBlock{},
@@ -41,7 +41,7 @@ func TestOptions_PreForkBlkImplementsInterface(t *testing.T) {
 	}
 }
 
-func TestOptions_PreForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
+func TestOracle_PreForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime)
 
 	// create pre fork oracle block ...
@@ -136,7 +136,7 @@ func TestOptions_PreForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
 	}
 }
 
-func TestOptions_PostForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
+func TestOracle_PostForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime)
 
@@ -556,5 +556,42 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 		t.Fatal("could not retrieve last accepted block")
 	} else if acceptedID != builtBlk.ID() {
 		t.Fatal("unexpected last accepted ID")
+	}
+}
+
+// ProposerBlock.Reject tests section
+func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime) // disable ProBlks
+	coreVM.CantBuildBlock = true
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(111),
+			StatusV: choices.Processing,
+		},
+		BytesV:  []byte{1},
+		ParentV: coreGenBlk,
+		HeightV: coreGenBlk.Height() + 1,
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+
+	sb, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build block")
+	}
+	proBlk, ok := sb.(*preForkBlock)
+	if !ok {
+		t.Fatal("built block has not expected type")
+	}
+
+	if err := proBlk.Reject(); err != nil {
+		t.Fatal("could not reject block")
+	}
+
+	if proBlk.Status() != choices.Rejected {
+		t.Fatal("block rejection did not set state properly")
+	}
+
+	if proBlk.Block.Status() != choices.Rejected {
+		t.Fatal("block rejection did not set state properly")
 	}
 }

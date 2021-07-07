@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 )
 
 var _ Block = &postForkBlock{}
@@ -93,11 +94,57 @@ func (b *postForkBlock) Height() uint64 {
 }
 
 func (b *postForkBlock) Options() ([2]snowman.Block, error) {
-	if oracleBlk, ok := b.innerBlk.(snowman.OracleBlock); ok {
-		// TODO: correctly wrap the oracle blocks
-		return oracleBlk.Options()
+	innerOracleBlk, ok := b.innerBlk.(snowman.OracleBlock)
+	if !ok {
+		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
-	return [2]snowman.Block{}, snowman.ErrNotOracle
+
+	innerOpts, err := innerOracleBlk.Options()
+	if err != nil {
+		return innerOpts, nil
+	}
+
+	opt0, err := option.Build(
+		b.ID(),
+		innerOpts[0].Bytes(),
+	)
+	if err != nil {
+		return innerOpts, nil
+	}
+
+	opt1, err := option.Build(
+		b.ID(),
+		innerOpts[1].Bytes(),
+	)
+	if err != nil {
+		return innerOpts, nil
+	}
+
+	postForkOpt0 := &postForkOption{
+		Option:   opt0,
+		vm:       b.vm,
+		innerBlk: innerOpts[0],
+		status:   innerOpts[0].Status(),
+	}
+	if err := b.vm.storePostForkOption(postForkOpt0); err != nil {
+		return innerOpts, nil
+	}
+
+	postForkOpt1 := &postForkOption{
+		Option:   opt1,
+		vm:       b.vm,
+		innerBlk: innerOpts[1],
+		status:   innerOpts[1].Status(),
+	}
+	if err := b.vm.storePostForkOption(postForkOpt1); err != nil {
+		return innerOpts, nil
+	}
+
+	res := [2]snowman.Block{
+		postForkOpt0,
+		postForkOpt1,
+	}
+	return res, nil
 }
 
 func (b *postForkBlock) verifyPreForkChild(child *preForkBlock) error {

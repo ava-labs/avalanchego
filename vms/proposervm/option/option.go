@@ -15,13 +15,13 @@ type Option interface {
 }
 
 type option struct {
-	id        ids.ID
-	PrntID    ids.ID `serialize:"true"`
-	coreBlock []byte `serialize:"true"`
-	bytes     []byte
+	id         ids.ID
+	PrntID     ids.ID `serialize:"true"`
+	InnerBytes []byte `serialize:"true"`
+	bytes      []byte
 }
 
 func (b *option) ID() ids.ID        { return b.id }
 func (b *option) ParentID() ids.ID  { return b.PrntID }
-func (b *option) CoreBlock() []byte { return b.coreBlock }
+func (b *option) CoreBlock() []byte { return b.InnerBytes }
 func (b *option) Bytes() []byte     { return b.bytes }

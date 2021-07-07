@@ -89,7 +89,10 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, choices.Status, error)
 		if blkIntf == nil {
 			return nil, choices.Unknown, database.ErrNotFound
 		}
-		blk := blkIntf.(*blockWrapper)
+		blk, ok := blkIntf.(*blockWrapper)
+		if !ok {
+			return nil, choices.Unknown, database.ErrNotFound
+		}
 		return blk.block, blk.Status, nil
 	}
 
@@ -149,8 +152,11 @@ func (s *blockState) GetOption(blkID ids.ID) (option.Option, choices.Status, err
 		if optIntf == nil {
 			return nil, choices.Unknown, database.ErrNotFound
 		}
-		blk := optIntf.(*optionWrapper) // TODO: consider handling faulty type assertion (opts and blocks share cache)
-		return blk.option, blk.Status, nil
+		opt, ok := optIntf.(*optionWrapper)
+		if !ok {
+			return nil, choices.Unknown, database.ErrNotFound
+		}
+		return opt.option, opt.Status, nil
 	}
 
 	optWrapperBytes, err := s.db.Get(blkID[:])

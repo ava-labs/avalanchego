@@ -31,7 +31,7 @@ func TestChainState(t *testing.T) {
 	err = cs.SetLastAccepted(lastAccepted)
 	assert.NoError(err)
 
-	cs = NewChainState(db)
+	cs.WipeCache()
 
 	fetchedLastAccepted, err := cs.GetLastAccepted()
 	assert.NoError(err)

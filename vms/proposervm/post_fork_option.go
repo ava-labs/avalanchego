@@ -4,12 +4,15 @@
 package proposervm
 
 import (
+	"crypto"
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 )
 
@@ -96,13 +99,10 @@ func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
 
 func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	// retrieve relevant data from parent's parent, which must be a postForkBlock
-	parentParent := b.Parent()
-	oracleBlk, ok := parentParent.(*postForkBlock)
-	if !ok {
-		return fmt.Errorf("expected postFork block as OracleBlock") // TODO: add error
+	parentPChainHeight, err := b.pChainHeight()
+	if err != nil {
+		return err
 	}
-
-	parentPChainHeight := oracleBlk.PChainHeight()
 	// TODO: verify that [childPChainHeight] is <= the P-chain's current height
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
@@ -116,7 +116,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 		return errInnerParentMismatch
 	}
 
-	parentTimestamp := oracleBlk.Timestamp()
+	parentTimestamp := b.Timestamp()
 	childTimestamp := child.Timestamp()
 	if childTimestamp.Before(parentTimestamp) {
 		return errTimeNotMonotonic
@@ -128,7 +128,10 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	}
 
 	childHeight := child.Height()
-	proposerID := oracleBlk.Proposer()
+	proposerID, err := b.proposer()
+	if err != nil {
+		return err
+	}
 	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
 	if err != nil {
 		return err
@@ -166,20 +169,70 @@ func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
 
 func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	parentID := b.ID()
-	option, err := option.Build(
+	parentTimestamp := b.Timestamp()
+	newTimestamp := b.vm.Time()
+	if newTimestamp.Before(parentTimestamp) {
+		newTimestamp = parentTimestamp
+	}
+
+	childHeight := innerBlock.Height()
+	parentPChainHeight, err := b.pChainHeight()
+	if err != nil {
+		return nil, err
+	}
+	proposerID := b.vm.ctx.NodeID
+	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
+	if err != nil {
+		return nil, err
+	}
+
+	minTimestamp := parentTimestamp.Add(minDelay)
+	if newTimestamp.Before(minTimestamp) {
+		return nil, errProposerWindowNotStarted
+	}
+
+	pChainHeight, err := b.vm.ctx.ValidatorVM.GetCurrentHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	statelessBlock, err := block.Build(
 		parentID,
+		newTimestamp,
+		pChainHeight,
+		b.vm.ctx.StakingCert.Leaf,
 		innerBlock.Bytes(),
+		b.vm.ctx.StakingCert.PrivateKey.(crypto.Signer),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	blk := &postForkOption{
-		Option:   option,
+	blk := &postForkBlock{
+		Block:    statelessBlock,
 		vm:       b.vm,
 		innerBlk: innerBlock,
 		status:   choices.Processing,
 	}
+	return blk, b.vm.storePostForkBlock(blk)
+}
 
-	return blk, b.vm.storePostForkOption(b)
+func (b *postForkOption) pChainHeight() (uint64, error) {
+	parent := b.Parent()
+	pFBlk, ok := parent.(*postForkBlock)
+	if !ok {
+		return 0, fmt.Errorf("unexpected parent type") // TODO find better error
+	}
+
+	return pFBlk.PChainHeight(), nil
+}
+
+func (b *postForkOption) proposer() (ids.ShortID, error) {
+	parent := b.Parent()
+	pFBlk, ok := parent.(*postForkBlock)
+	if !ok {
+		return ids.ShortID{}, fmt.Errorf("unexpected parent type") // TODO find better error
+	}
+
+	return pFBlk.Proposer(), nil
 }
