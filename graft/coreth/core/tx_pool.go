@@ -28,6 +28,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -562,8 +563,8 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrNegativeValue
 	}
 	// Ensure the transaction doesn't exceed the current block limit gas.
-	if pool.currentMaxGas < tx.Gas() {
-		return ErrGasLimit
+	if txGas := tx.Gas(); pool.currentMaxGas < txGas {
+		return fmt.Errorf("%w: tx gas (%d) > current max gas (%d)", ErrGasLimit, txGas, pool.currentMaxGas)
 	}
 	// Make sure the transaction is signed properly.
 	from, err := types.Sender(pool.signer, tx)
@@ -572,24 +573,24 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
 	if !local && tx.GasPriceIntCmp(pool.gasPrice) < 0 {
-		return ErrUnderpriced
+		return fmt.Errorf("%w: address %v have gas price (%v) < pool gas price (%v)", ErrUnderpriced, from, tx.GasPrice(), pool.gasPrice)
 	}
 	// Ensure the transaction adheres to nonce ordering
-	if pool.currentState.GetNonce(from) > tx.Nonce() {
-		return ErrNonceTooLow
+	if currentNonce, txNonce := pool.currentState.GetNonce(from), tx.Nonce(); currentNonce > txNonce {
+		return fmt.Errorf("%w: address %v current nonce (%v) > tx nonce (%v)", ErrNonceTooLow, from, currentNonce, txNonce)
 	}
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
-	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
-		return ErrInsufficientFunds
+	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
+		return fmt.Errorf("%w: address %v have (%v) want (%v)", ErrInsufficientFunds, from.Hex(), balance, cost)
 	}
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
 	if err != nil {
 		return err
 	}
-	if tx.Gas() < intrGas {
-		return ErrIntrinsicGas
+	if txGas := tx.Gas(); txGas < intrGas {
+		return fmt.Errorf("%w: address %v tx gas (%v) < intrinsic gas (%v)", ErrIntrinsicGas, from.Hex(), tx.Gas(), intrGas)
 	}
 	return nil
 }

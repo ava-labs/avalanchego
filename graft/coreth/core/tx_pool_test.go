@@ -34,6 +34,7 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -303,8 +304,8 @@ func TestInvalidTransactions(t *testing.T) {
 
 	tx = transaction(1, 100000, key)
 	pool.gasPrice = big.NewInt(1000)
-	if err := pool.AddRemote(tx); err != ErrUnderpriced {
-		t.Error("expected", ErrUnderpriced, "got", err)
+	if err := pool.AddRemote(tx); !strings.Contains(err.Error(), ErrUnderpriced.Error()) {
+		t.Error("expected error to contain", ErrUnderpriced, "got", err)
 	}
 	if err := pool.AddLocal(tx); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -1362,14 +1363,14 @@ func TestTransactionPoolRepricing(t *testing.T) {
 		t.Fatalf("pool internal state corrupted: %v", err)
 	}
 	// Check that we can't add the old transactions back
-	if err := pool.AddRemote(pricedTransaction(1, 100000, big.NewInt(1), keys[0])); err != ErrUnderpriced {
-		t.Fatalf("adding underpriced pending transaction error mismatch: have %v, want %v", err, ErrUnderpriced)
+	if err := pool.AddRemote(pricedTransaction(1, 100000, big.NewInt(1), keys[0])); !strings.Contains(err.Error(), ErrUnderpriced.Error()) {
+		t.Fatalf("adding underpriced pending transaction error mismatch: have %v, want error to conain %v", err, ErrUnderpriced)
 	}
-	if err := pool.AddRemote(pricedTransaction(0, 100000, big.NewInt(1), keys[1])); err != ErrUnderpriced {
-		t.Fatalf("adding underpriced pending transaction error mismatch: have %v, want %v", err, ErrUnderpriced)
+	if err := pool.AddRemote(pricedTransaction(0, 100000, big.NewInt(1), keys[1])); !strings.Contains(err.Error(), ErrUnderpriced.Error()) {
+		t.Fatalf("adding underpriced pending transaction error mismatch: have %v, want error to conain %v", err, ErrUnderpriced)
 	}
-	if err := pool.AddRemote(pricedTransaction(2, 100000, big.NewInt(1), keys[2])); err != ErrUnderpriced {
-		t.Fatalf("adding underpriced queued transaction error mismatch: have %v, want %v", err, ErrUnderpriced)
+	if err := pool.AddRemote(pricedTransaction(2, 100000, big.NewInt(1), keys[2])); !strings.Contains(err.Error(), ErrUnderpriced.Error()) {
+		t.Fatalf("adding underpriced queued transaction error mismatch: have %v, want error to conain %v", err, ErrUnderpriced)
 	}
 	if err := validateEvents(events, 0); err != nil {
 		t.Fatalf("post-reprice event firing failed: %v", err)
