@@ -120,7 +120,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	if w.chainConfig.IsApricotPhase1(big.NewInt(timestamp)) {
 		gasLimit = w.config.ApricotPhase1GasLimit
 	} else {
-		gasLimit = core.CalcGasLimit(parent, w.config.GasFloor, w.config.GasCeil)
+		gasLimit = core.CalcGasLimit(parent.GasUsed(), parent.GasLimit(), w.config.GasFloor, w.config.GasCeil)
 	}
 	num := parent.Number()
 	header := &types.Header{

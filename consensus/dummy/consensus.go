@@ -40,6 +40,10 @@ func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	}
 }
 
+func NewFaker() *DummyEngine {
+	return NewDummyEngine(new(ConsensusCallbacks))
+}
+
 var (
 	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 )

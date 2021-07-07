@@ -140,6 +140,11 @@ func (b *BlockGen) Number() *big.Int {
 	return new(big.Int).Set(b.header.Number)
 }
 
+// BaseFee returns the EIP-1559 base fee of the block being generated.
+func (b *BlockGen) BaseFee() *big.Int {
+	return new(big.Int).Set(b.header.BaseFee)
+}
+
 // AddUncheckedReceipt forcefully adds a receipts to the block without a
 // backing transaction.
 //
@@ -263,14 +268,15 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		time = parent.Time() + 10 // block time is fixed at 10 seconds
 	}
 
+	timestamp := new(big.Int).SetUint64(time)
 	var gasLimit uint64
-	if config.IsApricotPhase1(new(big.Int).SetUint64(time)) {
+	if config.IsApricotPhase1(timestamp) {
 		gasLimit = params.ApricotPhase1GasLimit
 	} else {
-		gasLimit = CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit())
+		gasLimit = CalcGasLimit(parent.GasUsed(), parent.GasLimit(), parent.GasLimit(), parent.GasLimit())
 	}
 
-	return &types.Header{
+	header := &types.Header{
 		Root:       state.IntermediateRoot(chain.Config().IsEIP158(parent.Number())),
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
@@ -284,6 +290,16 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		Number:   new(big.Int).Add(parent.Number(), common.Big1),
 		Time:     time,
 	}
+	if chain.Config().IsApricotPhase4(timestamp) {
+		// TODO include base fee calculation
+		// header.BaseFee = misc.CalcBaseFee(chain.Config(), parent.Header())
+		parentGasLimit := parent.GasLimit()
+		if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(parent.Time())) {
+			parentGasLimit = parent.GasLimit() * params.ElasticityMultiplier
+		}
+		header.GasLimit = CalcGasLimit1559(parentGasLimit, parentGasLimit)
+	}
+	return header
 }
 
 type fakeChainReader struct {
