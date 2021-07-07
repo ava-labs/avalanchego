@@ -29,6 +29,21 @@ type ExportTx struct {
 	ExportedOuts []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
+func (t *ExportTx) InitFx(vm *VM) error {
+	for i, n := 0, len(t.ExportedOuts); i < n; i++ {
+		out := t.ExportedOuts[i]
+		fxIdx, err := vm.getFx(out.Out)
+		if err != nil {
+			return err
+		}
+
+		fx := vm.fxs[fxIdx]
+		out.FxID = fx.ID
+	}
+
+	return t.BaseTx.InitFx(vm)
+}
+
 // SyntacticVerify that this transaction is well-formed.
 func (t *ExportTx) SyntacticVerify(
 	ctx *snow.Context,

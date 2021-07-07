@@ -27,6 +27,21 @@ type ImportTx struct {
 	ImportedIns []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
+func (t *ImportTx) InitFx(vm *VM) error {
+	for i, n := 0, len(t.ImportedIns); i < n; i++ {
+		in := t.ImportedIns[i]
+		fxIdx, err := vm.getFx(in.In)
+		if err != nil {
+			return err
+		}
+
+		fx := vm.fxs[fxIdx]
+		in.FxID = fx.ID
+	}
+
+	return t.BaseTx.InitFx(vm)
+}
+
 // InputUTXOs track which UTXOs this transaction is consuming.
 func (t *ImportTx) InputUTXOs() []*avax.UTXOID {
 	utxos := t.BaseTx.InputUTXOs()
