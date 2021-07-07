@@ -190,7 +190,7 @@ func (i *indexer) init(allowIncomplete bool) error {
 // with respect to provided parameters is invalid
 func checkIndexingStatus(db database.KeyValueReaderWriter, enableIndexing, allowIncomplete bool) error {
 	// verify whether we've indexed before
-	idxEnabled, err := db.Get(idxEnabledKey)
+	idxEnabled, err := database.GetBool(db, idxEnabledKey)
 	if err == database.ErrNotFound {
 		// we're not allowed incomplete index and we've not indexed before
 		// so its ok to proceed
@@ -201,14 +201,7 @@ func checkIndexingStatus(db database.KeyValueReaderWriter, enableIndexing, allow
 		return err
 	}
 
-	// ok so we have a value stored in the db, lets check its integrity
-	if len(idxEnabled) != wrappers.BoolLen {
-		// its the wrong size, maybe the database got corrupted?
-		return fmt.Errorf("idxEnabled does not have expected size %d, found %d", wrappers.BoolLen, len(idxEnabled))
-	}
-
-	// idxEnabled is of expected size, lets see if its true or false
-	if idxEnabled[0] == 0 {
+	if !idxEnabled {
 		// index was previously enabled
 		if enableIndexing && !allowIncomplete {
 			// indexing was disabled before, we're asked to enable it but not allowed
@@ -219,7 +212,7 @@ func checkIndexingStatus(db database.KeyValueReaderWriter, enableIndexing, allow
 			// save state to db and continue
 			return database.PutBool(db, idxEnabledKey, enableIndexing)
 		}
-	} else if idxEnabled[0] == 1 {
+	} else {
 		// index was previously disabled
 		if !enableIndexing && !allowIncomplete {
 			// index is previously enabled, we're asked to disable it but not allowed incomplete indexes
