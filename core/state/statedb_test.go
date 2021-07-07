@@ -44,8 +44,6 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/trie"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -1021,56 +1019,57 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	assertBalances(11, 267, 512)
 }
 
-func TestGenerateMulticoinAccounts(t *testing.T) {
+func TestGenerateMultiCoinAccounts(t *testing.T) {
 	var (
-		diskdb = rawdb.NewMemoryDatabase()
-		triedb = trie.NewDatabase(diskdb)
+		diskdb   = rawdb.NewMemoryDatabase()
+		database = NewDatabase(diskdb)
 
-		accID   = []byte("acc-1")
-		accHash = crypto.Keccak256Hash(accID)
+		addr     = common.BytesToAddress([]byte("addr1"))
+		addrHash = crypto.Keccak256Hash(addr[:])
 
-		coinID    = []byte{'c', 'o', 'i', 'n', '1'}
-		conIDHash = crypto.Keccak256Hash(coinID)
-
-		balanceAsHash = common.HexToHash("0x000000000000000000000000000000000000000000000000000000000000000f")
+		assetID      = common.BytesToHash([]byte("coin1"))
+		assetBalance = big.NewInt(10)
 	)
 
-	database := NewDatabase(diskdb)
-	stateDB, _ := New(common.Hash{}, database, nil)
-	stateDB.SetBalanceMultiCoin(common.BytesToAddress(accID), common.BytesToHash(coinID), big.NewInt(15))
-	stateDBRoot, _ := stateDB.Commit(false)
-	fmt.Println("stateDBRoot:", stateDBRoot)
+	stateDB, err := New(common.Hash{}, database, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDB.SetBalanceMultiCoin(addr, assetID, assetBalance)
+	root, err := stateDB.Commit(false)
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// Create a state trie with a multicoin balance
-	stTrie, _ := trie.NewSecure(common.Hash{}, triedb)
-	stTrie.Update(coinID, balanceAsHash.Bytes())
-	stTrieRoot, _ := stTrie.Commit(nil)
-	fmt.Println("stTrie:", stTrieRoot)
-
-	// Create an account trie with an account containing our state trie
-	accTrie, _ := trie.NewSecure(common.Hash{}, triedb)
-	acc := &snapshot.Account{Balance: big.NewInt(1), Root: stTrieRoot.Bytes(), CodeHash: crypto.Keccak256Hash(nil).Bytes(), IsMultiCoin: true}
-	val, _ := rlp.EncodeToBytes(acc)
-	accTrie.Update(accID, val)
-	root, _ := accTrie.Commit(nil)
-
+	triedb := database.TrieDB()
+	if err := triedb.Commit(root, true, nil); err != nil {
+		t.Fatal(err)
+	}
 	// Build snapshot from scratch
-	snaps, err := snapshot.New(diskdb, triedb, 16, common.Hash{}, root, false, true, true)
+	snaps, err := snapshot.New(diskdb, triedb, 16, common.Hash{}, root, false, true, false)
 	if err != nil {
 		t.Error("Unexpected error while rebuilding snapshot:", err)
 	}
 
 	// Get latest snapshot and make sure it has the correct account and storage
 	snap := snaps.Snapshot(root)
-	acc, _ = snap.Account(accHash)
-	if !acc.IsMultiCoin {
-		t.Error("Expected account to be multicoin")
+	snapAccount, err := snap.Account(addrHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snapAccount.IsMultiCoin {
+		t.Fatalf("Expected SnapAccount to return IsMultiCoin: true, found: %v", snapAccount.IsMultiCoin)
 	}
 
-	// Load the coin1 balance from the account's storage and make sure it has
-	// the correct value
-	storageBytes, _ := snap.Storage(accHash, conIDHash)
-	if !bytes.Equal(storageBytes, balanceAsHash.Bytes()) {
-		t.Error("Incorrect storage bytes")
+	NormalizeCoinID(&assetID)
+	assetHash := crypto.Keccak256Hash(assetID.Bytes())
+	storageBytes, err := snap.Storage(addrHash, assetHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	actualAssetBalance := new(big.Int).SetBytes(storageBytes)
+	if actualAssetBalance.Cmp(assetBalance) != 0 {
+		t.Fatalf("Expected asset balance: %v, found %v", assetBalance, actualAssetBalance)
 	}
 }
