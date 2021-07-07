@@ -6,6 +6,7 @@ package database
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -108,6 +109,29 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return val, nil
+}
+
+func PutBool(db KeyValueWriter, key []byte, b bool) error {
+	var bytes []byte
+	if b {
+		bytes = []byte{1}
+	} else {
+		bytes = []byte{0}
+	}
+	return db.Put(key, bytes)
+}
+
+func GetBool(db KeyValueReader, key []byte) (bool, error) {
+	b, err := db.Get(key)
+	switch {
+	case err != nil:
+		return false, err
+	case len(b) != 1:
+		return false, fmt.Errorf("length should be 1 but is %d", len(b))
+	case b[0] != 0 && b[0] != 1:
+		return false, fmt.Errorf("should be 0 or 1 but is %v", b[0])
+	}
+	return b[0] == 1, nil
 }
 
 func Size(db Iteratee) (int, error) {
