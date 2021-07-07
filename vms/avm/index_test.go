@@ -11,6 +11,7 @@ package avm
 
 import (
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/avm/index"
@@ -141,10 +142,10 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs)
+		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs)
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
+		vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -253,10 +254,10 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction
-		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
+		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
+		vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -366,7 +367,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
 		// index the transaction, NOT calling Write(ids.ID) method
-		err = vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
+		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
 		txIDs = append(txIDs, uniqueParsedTX.ID())
@@ -376,7 +377,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 	// Reverse the order of writes to ensure overall order is still correct
 	for i := len(txIDs) - 1; i >= 0; i-- {
 		txID := txIDs[i]
-		err = vm.addressTxsIndexer.Write(txID)
+		vm.addressTxsIndexer.Write(txID)
 		assert.NoError(t, err)
 	}
 
@@ -395,7 +396,12 @@ func TestIndexer_Read(t *testing.T) {
 	_, vm, _, _, _ := setup(t, true)
 	m, err := index.NewMetrics(vm.ctx.Namespace, vm.ctx.Metrics)
 	assert.NoError(t, err)
-	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m)
+
+	shutdownFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+
+	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m, shutdownFunc)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -430,8 +436,12 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 
 	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
 
+	shutdownFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+
 	// start with indexing enabled
-	indexer := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, index.Metrics{})
+	indexer := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, index.Metrics{}, shutdownFunc)
 	err := indexer.Init(true)
 	assert.NoError(t, err)
 
@@ -457,8 +467,12 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 	err := disabledIndexer.Init(false)
 	assert.NoError(t, err)
 
+	shutdownFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+
 	// now enable indexing with allow-incomplete set to false
-	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{})
+	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{}, shutdownFunc)
 	err = indexer.Init(false)
 	assert.Error(t, err)
 
@@ -486,14 +500,52 @@ func TestIndexingAllowIncomplete(t *testing.T) {
 	err := disabledIndexer.Init(false)
 	assert.NoError(t, err)
 
+	shutdownFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+
 	// we initialise with indexing enabled now
-	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{})
+	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{}, shutdownFunc)
 	// we init with allow incomplete indexing as false
 	err = indexer.Init(false)
 	// we should get error because:
 	// - indexing was disabled previously
 	// - node now is asked to enable indexing with allow incomplete set to false
 	assert.Error(t, err)
+}
+
+func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	ctx := NewContext(t)
+
+	prefixDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
+	db := versiondb.New(prefixDB)
+
+	// we use a boolean here because the call to shutdown is synchronous to the execution
+	called := false
+	shutdownFunc := func(code int) {
+		assert.Equal(t, code, index.DatabaseOpErrorExitCode)
+		called = true
+	}
+
+	// function always returns error indicating that the utxo was not found
+	getUTXOFn := func(utxoid *avax.UTXOID) (*avax.UTXO, error) {
+		return nil, fmt.Errorf("not found")
+	}
+
+	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{}, shutdownFunc)
+	indexer.AddUTXOsByID(getUTXOFn, ids.GenerateTestID(), []*avax.UTXOID{
+		{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: 1,
+			Symbol:      false,
+		},
+	})
+
+	// we expect shutdown to have been called with the right exit code
+	if !called {
+		t.Fatal("expected shutdown to be called")
+	}
 }
 
 func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, key *crypto.PrivateKeySECP256K1R) *avax.UTXO {
@@ -547,18 +599,13 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 	vm := &VM{}
 	avmConfigBytes, err := BuildAvmConfigBytes(config)
 	assert.NoError(t, err)
-	if err := vm.Initialize(
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		avmConfigBytes,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	); err != nil {
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	if err := vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, avmConfigBytes, issuer, []*common.Fx{{
+		ID: ids.Empty,
+		Fx: &secp256k1fx.Fx{},
+	}}, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0

@@ -52,7 +52,7 @@ var (
 )
 
 func defaultService(t *testing.T) *Service {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 	ks, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))

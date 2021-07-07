@@ -64,7 +64,10 @@ func TestMigrateUptime(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 	_, genesisBytes := defaultGenesis()
 	vm.StakeMintingPeriod = 365 * 24 * time.Hour
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 

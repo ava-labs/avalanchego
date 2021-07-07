@@ -13,7 +13,7 @@ import (
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -31,7 +31,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 
 // Ensure semantic verification fails when proposed timestamp is after next validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 
 	// Case: Timestamp is after next validator start time
@@ -75,7 +75,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	vm.ctx.Lock.Unlock()
 
 	// Case: Timestamp is after next validator end time
-	vm, _ = defaultVM()
+	vm, _ = defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -98,7 +98,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 // Ensure semantic verification updates the current and pending staker set
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -293,7 +293,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		vm, _ := defaultVM()
+		vm, _ := defaultVM(t)
 		vm.ctx.Lock.Lock()
 		defer func() {
 			if err := vm.Shutdown(); err != nil {
@@ -366,7 +366,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 // when timestamp is advanced and there is a pending staker whose start time
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -455,7 +455,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 
 // Test method InitiallyPrefersCommit
 func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -485,7 +485,7 @@ func TestAdvanceTimeTxInitiallyPrefersCommit(t *testing.T) {
 
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

@@ -22,7 +22,7 @@ import (
 )
 
 func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -105,7 +105,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 }
 
 func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -190,7 +190,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -283,7 +283,7 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 	assert := assert.New(t)
 
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		err := vm.Shutdown()
@@ -390,7 +390,10 @@ func TestUptimeDisallowed(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -430,7 +433,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 

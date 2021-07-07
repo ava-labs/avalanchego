@@ -14,7 +14,7 @@ import (
 )
 
 func TestUnsignedCreateChainTxVerify(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -149,7 +149,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 
 // Ensure SemanticVerify fails when there are not enough control sigs
 func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -186,7 +186,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 // Ensure SemanticVerify fails when an incorrect control signature is given
 func TestCreateChainTxWrongControlSig(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -235,7 +235,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 // Ensure SemanticVerify fails when the Subnet the blockchain specifies as
 // its validator set doesn't exist
 func TestCreateChainTxNoSuchSubnet(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -271,7 +271,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 
 // Ensure valid tx passes semanticVerify
 func TestCreateChainTxValid(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

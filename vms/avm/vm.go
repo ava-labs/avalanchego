@@ -143,15 +143,7 @@ func (c Config) SetDefaults() {
 }
 
 // Initialize implements the avalanche.DAGVM interface
-func (vm *VM) Initialize(
-	ctx *snow.Context,
-	dbManager manager.Manager,
-	genesisBytes []byte,
-	upgradeBytes []byte,
-	configBytes []byte,
-	toEngine chan<- common.Message,
-	fxs []*common.Fx,
-) error {
+func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, shutdownNodeFunc func(int)) error {
 	avmConfig := Config{}
 	avmConfig.SetDefaults()
 	if len(configBytes) > 0 {
@@ -259,7 +251,7 @@ func (vm *VM) Initialize(
 			vm.ctx.Log.Fatal("Failed to initialize indexing metrics: %s", err)
 			return err
 		}
-		vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m)
+		vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m, shutdownNodeFunc)
 		err = vm.addressTxsIndexer.Init(avmConfig.AllowIncompleteTransactionIndex)
 		if err != nil {
 			vm.ctx.Log.Fatal("Failed to initialize indexer: %s", err)

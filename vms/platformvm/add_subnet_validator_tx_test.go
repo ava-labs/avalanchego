@@ -14,7 +14,7 @@ import (
 )
 
 func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -225,7 +225,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 }
 
 func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -538,7 +538,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 
 // Test that marshalling/unmarshalling works
 func TestAddSubnetValidatorMarshal(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _ := defaultVM(t)
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

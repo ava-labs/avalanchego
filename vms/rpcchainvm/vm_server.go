@@ -191,7 +191,15 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		EpochDuration:        time.Duration(req.EpochDuration),
 	}
 
-	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil); err != nil {
+	shutdownNodeFunc := func(int) {
+		// todo how to properly handle this?
+		err := vm.vm.Shutdown()
+		if err != nil {
+			vm.ctx.Log.Fatal("error shutting down chainvm %s", err)
+		}
+	}
+
+	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, shutdownNodeFunc); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
 		close(toEngine)

@@ -29,20 +29,12 @@ type blockVM struct {
 	clock timer.Clock
 }
 
-func (vm *blockVM) Initialize(
-	ctx *snow.Context,
-	db manager.Manager,
-	genesisBytes,
-	upgradeBytes,
-	configBytes []byte,
-	toEngine chan<- common.Message,
-	fxs []*common.Fx,
-) error {
+func (vm *blockVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx, shutdownNodeFunc func(int)) error {
 	if err := vm.blockMetrics.Initialize(fmt.Sprintf("metervm_%s", ctx.Namespace), ctx.Metrics); err != nil {
 		return err
 	}
 
-	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs)
+	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, shutdownNodeFunc)
 }
 
 func (vm *blockVM) BuildBlock() (snowman.Block, error) {

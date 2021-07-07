@@ -37,15 +37,7 @@ type VM interface {
 	//                 transaction would be in the genesis block.
 	// [toEngine]: The channel used to send messages to the consensus engine.
 	// [fxs]: Feature extensions that attach to this VM.
-	Initialize(
-		ctx *snow.Context,
-		dbManager manager.Manager,
-		genesisBytes []byte,
-		upgradeBytes []byte,
-		configBytes []byte,
-		toEngine chan<- Message,
-		fxs []*Fx,
-	) error
+	Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, toEngine chan<- Message, fxs []*Fx, shutdownNodeFunc func(int)) error
 
 	// Bootstrapping is called when the node is starting to bootstrap this chain.
 	Bootstrapping() error

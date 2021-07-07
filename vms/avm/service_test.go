@@ -401,7 +401,10 @@ func TestServiceGetTxs(t *testing.T) {
 	_, vm, s, _, _ := setup(t, true)
 	m, err := index.NewMetrics(vm.ctx.Namespace, vm.ctx.Metrics)
 	assert.NoError(t, err)
-	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m)
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m, shutdownNodeFunc)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)

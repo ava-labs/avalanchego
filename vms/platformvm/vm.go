@@ -131,15 +131,7 @@ type VM struct {
 
 // Initialize this blockchain.
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
-func (vm *VM) Initialize(
-	ctx *snow.Context,
-	dbManager manager.Manager,
-	genesisBytes []byte,
-	upgradeBytes []byte,
-	configBytes []byte,
-	msgs chan<- common.Message,
-	_ []*common.Fx,
-) error {
+func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgs chan<- common.Message, fxs []*common.Fx, shutdownNodeFunc func(int)) error {
 	ctx.Log.Verbo("initializing platform chain")
 
 	// Initialize metrics as soon as possible

@@ -1026,30 +1026,25 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	avaxID := genesisTx.ID()
 
 	issuer := make(chan common.Message, 1)
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
 	vm := &VM{}
-	err = vm.Initialize(
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.Empty,
-				Fx: &secp256k1fx.Fx{},
-			},
-			{
-				ID: ids.Empty.Prefix(0),
-				Fx: &FxTest{
-					InitializeF: func(vmIntf interface{}) error {
-						vm := vmIntf.(*VM)
-						return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
-					},
+	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, nil, issuer, []*common.Fx{
+		{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
+		},
+		{
+			ID: ids.Empty.Prefix(0),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(*VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 				},
 			},
 		},
-	)
+	}, shutdownNodeFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1199,19 +1194,14 @@ func TestIssueExportTx(t *testing.T) {
 	avaxID := genesisTx.ID()
 
 	ctx.Lock.Lock()
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
 	vm := &VM{}
-	if err := vm.Initialize(
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	); err != nil {
+	if err := vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, nil, issuer, []*common.Fx{{
+		ID: ids.Empty,
+		Fx: &secp256k1fx.Fx{},
+	}}, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
@@ -1335,20 +1325,14 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
 	assert.NoError(t, err)
-
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
 	vm := &VM{}
-	err = vm.Initialize(
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		avmConfigBytes,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
+	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, avmConfigBytes, issuer, []*common.Fx{{
+		ID: ids.Empty,
+		Fx: &secp256k1fx.Fx{},
+	}}, shutdownNodeFunc)
 	if err != nil {
 		t.Fatal(err)
 	}

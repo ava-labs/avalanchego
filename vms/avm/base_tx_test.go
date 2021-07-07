@@ -862,24 +862,19 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(
-		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.Empty,
-				Fx: &secp256k1fx.Fx{},
-			},
-			{
-				ID: ids.ID{1},
-				Fx: fx,
-			},
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
+		{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
 		},
-	)
+		{
+			ID: ids.ID{1},
+			Fx: fx,
+		},
+	}, shutdownNodeFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1284,25 +1279,19 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	fx.InitializeF = func(interface{}) error {
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
-
-	err := vm.Initialize(
-		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.ID{1},
-				Fx: &secp256k1fx.Fx{},
-			},
-			{
-				ID: ids.Empty,
-				Fx: fx,
-			},
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
+		{
+			ID: ids.ID{1},
+			Fx: &secp256k1fx.Fx{},
 		},
-	)
+		{
+			ID: ids.Empty,
+			Fx: fx,
+		},
+	}, shutdownNodeFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1428,25 +1417,19 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	fx.InitializeF = func(interface{}) error {
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
-
-	err := vm.Initialize(
-		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{
-			{
-				ID: ids.ID{1},
-				Fx: &secp256k1fx.Fx{},
-			},
-			{
-				ID: ids.Empty,
-				Fx: fx,
-			},
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
+		{
+			ID: ids.ID{1},
+			Fx: &secp256k1fx.Fx{},
 		},
-	)
+		{
+			ID: ids.Empty,
+			Fx: fx,
+		},
+	}, shutdownNodeFunc)
 	if err != nil {
 		t.Fatal(err)
 	}

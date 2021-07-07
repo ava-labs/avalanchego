@@ -246,20 +246,14 @@ func TestIssueImportTx(t *testing.T) {
 
 	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
 	assert.NoError(t, err)
-
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
 	vm := &VM{}
-	err = vm.Initialize(
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		avmConfigBytes,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
+	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, avmConfigBytes, issuer, []*common.Fx{{
+		ID: ids.Empty,
+		Fx: &secp256k1fx.Fx{},
+	}}, shutdownNodeFunc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,14 +285,26 @@ func TestIssueImportTx(t *testing.T) {
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
+			Outs: []*avax.TransferableOutput{{
+				Asset: txAssetID,
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1000,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			}},
 		}},
 		SourceChain: platformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
 			Asset:  txAssetID,
 			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				Amt: 1010,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{0},
+				},
 			},
 		}},
 	}}
@@ -316,7 +322,7 @@ func TestIssueImportTx(t *testing.T) {
 		UTXOID: utxoID,
 		Asset:  txAssetID,
 		Out: &secp256k1fx.TransferOutput{
-			Amt: 1000,
+			Amt: 1010,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -377,7 +383,6 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// todo fix this, its failing, why?
 	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), parsedTx.ID())
 	assertLatestIdx(t, vm.db, key.PublicKey().Address(), avaxID, 1)
 
@@ -413,19 +418,13 @@ func TestForceAcceptImportTx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-
-	err = vm.Initialize(
-		ctx,
-		baseDBManager.NewPrefixDBManager([]byte{1}),
-		genesisBytes,
-		nil,
-		nil,
-		issuer,
-		[]*common.Fx{{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		}},
-	)
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, nil, issuer, []*common.Fx{{
+		ID: ids.Empty,
+		Fx: &secp256k1fx.Fx{},
+	}}, shutdownNodeFunc)
 	if err != nil {
 		t.Fatal(err)
 	}

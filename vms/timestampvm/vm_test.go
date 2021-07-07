@@ -44,8 +44,10 @@ func TestGenesis(t *testing.T) {
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-
-	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -87,7 +89,10 @@ func TestHappyPath(t *testing.T) {
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -220,7 +225,10 @@ func TestService(t *testing.T) {
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
-	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
+	shutdownNodeFunc := func(int) {
+		t.Fatal("should not have called shutdown")
+	}
+	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
 		t.Fatal(err)
 	}
 
