@@ -53,7 +53,7 @@ type AddressTxsIndexer interface {
 	// Write persists the indexer state against the given [txID].
 	// Reset() must be called manually to reset the state for next write.
 	// Shuts down the node in case of an error
-	Write(txID ids.ID)
+	Write(txID ids.ID) error
 
 	// Read returns list of txIDs indexed against the specified [address] and [assetID]
 	// Returned slice length will be less than or equal to [pageSize].
@@ -132,7 +132,7 @@ func (i *indexer) AddUTXOs(txID ids.ID, utxos []*avax.UTXO) {
 // |  | "idx" => 2 		Running transaction index key, represents the next index
 // |  | "0"   => txID1
 // |  | "1"   => txID1
-func (i *indexer) Write(txID ids.ID) {
+func (i *indexer) Write(txID ids.ID) error {
 	// go through all addresses indexed against this [txID]
 	// and persist them, maintaining order
 	for address, assetIDs := range i.addressAssetIDTxMap[txID] {
@@ -147,7 +147,7 @@ func (i *indexer) Write(txID ids.ID) {
 				// Unexpected error
 				i.log.Fatal("error checking idx value exists when writing txID [%s], address [%s]: %s", txID, address, err)
 				go i.shutdownF(DatabaseOpErrorExitCode)
-				return
+				return err
 			case err == database.ErrNotFound:
 				// idx not found; this must be the first entry.
 				idx = 0
@@ -164,7 +164,7 @@ func (i *indexer) Write(txID ids.ID) {
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
 				i.log.Fatal("failed to write address/assetID/index/txID %s/%s/%d/%s: %s", address, assetID, idx, txID, err)
 				go i.shutdownF(DatabaseOpErrorExitCode)
-				return
+				return err
 			}
 
 			// increment and store the index for next use
@@ -174,13 +174,14 @@ func (i *indexer) Write(txID ids.ID) {
 			if err := assetPrefixDB.Put(idxKey, idxBytes); err != nil {
 				i.log.Fatal("failed to write next index for address/assetID/index/txID %s/%s/%d/%s: %s", address, assetID, idx, txID, err)
 				go i.shutdownF(DatabaseOpErrorExitCode)
-				return
+				return err
 			}
 		}
 	}
 	// delete already written [txID] from the map
 	delete(i.addressAssetIDTxMap, txID)
 	i.metrics.numTxsIndexed.Observe(1)
+	return nil
 }
 
 // Init initialises indexing, returning error if the state is invalid
@@ -338,7 +339,9 @@ func (i *noIndexer) AddTransferOutput(ids.ID, ids.ID, *secp256k1fx.TransferOutpu
 
 func (i *noIndexer) AddUTXOs(ids.ID, []*avax.UTXO) {}
 
-func (i *noIndexer) Write(ids.ID) {}
+func (i *noIndexer) Write(ids.ID) error {
+	return nil
+}
 
 func (i *noIndexer) Reset(ids.ID) {}
 

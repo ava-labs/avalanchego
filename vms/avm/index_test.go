@@ -146,7 +146,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs)
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
-		vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
+		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -258,7 +258,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
 		assert.NoError(t, err)
 		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
-		vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
+		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -378,7 +378,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 	// Reverse the order of writes to ensure overall order is still correct
 	for i := len(txIDs) - 1; i >= 0; i-- {
 		txID := txIDs[i]
-		vm.addressTxsIndexer.Write(txID)
+		err := vm.addressTxsIndexer.Write(txID)
 		assert.NoError(t, err)
 	}
 

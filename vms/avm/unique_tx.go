@@ -130,7 +130,10 @@ func (tx *UniqueTx) Accept() error {
 		}
 	}
 
-	tx.vm.addressTxsIndexer.Write(tx.ID())
+	err := tx.vm.addressTxsIndexer.Write(tx.ID())
+	if err != nil {
+		return err
+	}
 
 	// Remove spent utxos
 	for _, utxo := range tx.InputUTXOs() {
