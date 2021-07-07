@@ -194,6 +194,7 @@ func (tx *UniqueTx) Reject() error {
 
 	tx.deps = nil // Needed to prevent a memory leak
 
+	tx.vm.addressTxsIndexer.Reset(tx.ID())
 	return nil
 }
 
