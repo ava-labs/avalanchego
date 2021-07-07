@@ -18,6 +18,7 @@ package proposervm
 
 import (
 	"crypto"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -27,6 +28,7 @@ import (
 
 var _ Block = &postForkBlock{}
 
+// postForkBlock implements proposervm.Block
 type postForkBlock struct {
 	block.Block
 
@@ -155,6 +157,14 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 
 	b.vm.verifiedBlocks[child.ID()] = child
 	return nil
+}
+
+func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
+	if _, ok := b.innerBlk.(snowman.OracleBlock); !ok {
+		return fmt.Errorf("post fork option block does has non-oracle father")
+	}
+
+	return child.innerBlk.Verify()
 }
 
 func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {

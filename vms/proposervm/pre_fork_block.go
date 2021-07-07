@@ -3,19 +3,6 @@
 
 package proposervm
 
-// ProposerBlock is a decorator for a snowman.Block, created to handle block headers introduced with snowman++
-// ProposerBlock is made up of a ProposerBlockHeader, carrying all the new fields introduced with snowman++, and
-// a core block, which is a snowman.Block.
-// ProposerBlock serialization is a two step process: the header is serialized at proposervm level, while core block
-// serialization is deferred to the core VM. The structure marshallingProposerBLock encapsulates
-// the serialization logic
-// Contract:
-// * Parent ProposerBlock wraps Parent CoreBlock of CoreBlock wrapped into Child ProposerBlock.
-// * Only one call to each coreBlock's Verify() is issued from proposerVM. However Verify is memory only, so we won't persist
-// core blocks over which Verify has been called
-// * VERIFY FAILS ON GENESIS TODO: fix maybe
-// * Rejection of ProposerBlock does not constitute Rejection of wrapped CoreBlock
-
 import (
 	"crypto"
 
@@ -26,12 +13,12 @@ import (
 
 var _ Block = &preForkBlock{}
 
+// preForkBlock implements proposervm.Block
 type preForkBlock struct {
 	snowman.Block
 	vm *VM
 }
 
-// snowman.Block interface implementation
 func (b *preForkBlock) Parent() snowman.Block {
 	return &preForkBlock{
 		Block: b.Block.Parent(),
@@ -122,6 +109,10 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 
 	b.vm.verifiedBlocks[child.ID()] = child
 	return nil
+}
+
+func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
+	return errProposersActivated // TODO: find better error
 }
 
 func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {

@@ -18,6 +18,7 @@ package proposervm
 // implemented via the proposer block header
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -31,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -57,7 +59,7 @@ type VM struct {
 
 	ctx            *snow.Context
 	db             *versiondb.Database
-	verifiedBlocks map[ids.ID]*postForkBlock
+	verifiedBlocks map[ids.ID]Block
 	preferred      ids.ID
 }
 
@@ -93,7 +95,7 @@ func (vm *VM) Initialize(
 	})
 
 	vm.ctx = ctx
-	vm.verifiedBlocks = make(map[ids.ID]*postForkBlock)
+	vm.verifiedBlocks = make(map[ids.ID]Block)
 
 	return vm.ChainVM.Initialize(
 		ctx,
@@ -125,6 +127,9 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	if blk, err := vm.parsePostForkBlock(b); err == nil {
 		return blk, nil
 	}
+	if opt, err := vm.parsePostForkOption(b); err == nil {
+		return opt, nil
+	}
 	return vm.parsePreForkBlock(b)
 }
 
@@ -147,6 +152,15 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		return nil
 	}
 
+	if opt, err := vm.getPostForkOption(preferred); err == nil {
+		if err := vm.ChainVM.SetPreference(opt.innerBlk.ID()); err != nil {
+			return err
+		}
+
+		// TODO: reset the scheduler
+		return nil
+	}
+
 	return vm.ChainVM.SetPreference(preferred)
 }
 
@@ -162,6 +176,9 @@ func (vm *VM) getBlock(id ids.ID) (Block, error) {
 	if blk, err := vm.getPostForkBlock(id); err == nil {
 		return blk, nil
 	}
+	if opt, err := vm.getPostForkOption(id); err == nil {
+		return opt, nil
+	}
 	return vm.getPreForkBlock(id)
 }
 
@@ -174,9 +191,12 @@ func (vm *VM) getPreForkBlock(blkID ids.ID) (*preForkBlock, error) {
 }
 
 func (vm *VM) getPostForkBlock(blkID ids.ID) (*postForkBlock, error) {
-	blk, exists := vm.verifiedBlocks[blkID]
+	blkIntf, exists := vm.verifiedBlocks[blkID]
 	if exists {
-		return blk, nil
+		if blk, ok := blkIntf.(*postForkBlock); ok {
+			return blk, nil
+		}
+		return nil, fmt.Errorf("object matching requested ID is not postForkBlock one") // TODO: add error
 	}
 	statelessBlock, status, err := vm.State.GetBlock(blkID)
 	if err != nil {
@@ -191,6 +211,33 @@ func (vm *VM) getPostForkBlock(blkID ids.ID) (*postForkBlock, error) {
 
 	return &postForkBlock{
 		Block:    statelessBlock,
+		vm:       vm,
+		innerBlk: innerBlk,
+		status:   status,
+	}, nil
+}
+
+func (vm *VM) getPostForkOption(blkID ids.ID) (*postForkOption, error) {
+	optIntf, exists := vm.verifiedBlocks[blkID]
+	if exists {
+		if opt, ok := optIntf.(*postForkOption); ok {
+			return opt, nil
+		}
+		return nil, fmt.Errorf("object matching requested ID is not postForkOption one") // TODO: add error
+	}
+	option, status, err := vm.State.GetOption(blkID)
+	if err != nil {
+		return nil, err
+	}
+
+	innerBlkBytes := option.CoreBlock()
+	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return &postForkOption{
+		Option:   option,
 		vm:       vm,
 		innerBlk: innerBlk,
 		status:   status,
@@ -237,6 +284,43 @@ func (vm *VM) parsePostForkBlock(b []byte) (*postForkBlock, error) {
 
 func (vm *VM) storePostForkBlock(blk *postForkBlock) error {
 	if err := vm.State.PutBlock(blk.Block, blk.status); err != nil {
+		return err
+	}
+	return vm.db.Commit()
+}
+
+func (vm *VM) parsePostForkOption(b []byte) (*postForkOption, error) {
+	option, err := option.Parse(b)
+	if err != nil {
+		return nil, err
+	}
+	// if the block already exists, then make sure the status is set correctly
+	blkID := option.ID()
+	opt, err := vm.getPostForkOption(blkID)
+	if err == nil {
+		return opt, nil
+	}
+	if err != database.ErrNotFound {
+		return nil, err
+	}
+
+	innerBlkBytes := option.CoreBlock()
+	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	opt = &postForkOption{
+		Option:   option,
+		vm:       vm,
+		innerBlk: innerBlk,
+		status:   choices.Processing,
+	}
+	return opt, vm.storePostForkOption(opt)
+}
+
+func (vm *VM) storePostForkOption(blk *postForkOption) error {
+	if err := vm.State.PutOption(blk, blk.status); err != nil {
 		return err
 	}
 	return vm.db.Commit()
