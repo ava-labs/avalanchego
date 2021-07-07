@@ -525,11 +525,10 @@ func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
 	prefixDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
 	db := versiondb.New(prefixDB)
 
-	// we use a boolean here because the call to shutdown is synchronous to the execution
-	called := false
+	called := make(chan bool, 1)
 	shutdownFunc := func(code int) {
 		assert.Equal(t, code, index.DatabaseOpErrorExitCode)
-		called = true
+		called <- true
 	}
 
 	// function always returns error indicating that the utxo was not found
@@ -548,7 +547,8 @@ func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
 	})
 
 	// we expect shutdown to have been called with the right exit code
-	if !called {
+	shutdown := <-called
+	if !shutdown {
 		t.Fatal("expected shutdown to be called")
 	}
 }
