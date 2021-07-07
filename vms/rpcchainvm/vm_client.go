@@ -47,9 +47,10 @@ var (
 )
 
 const (
-	decidedCacheSize    = 500
-	missingCacheSize    = 200
-	unverifiedCacheSize = 200
+	decidedCacheSize      = 512
+	missingCacheSize      = 256
+	unverifiedCacheSize   = 256
+	bytesToBlockCacheSize = 512
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -197,13 +198,14 @@ func (vm *VMClient) Initialize(
 		ctx.Metrics,
 		fmt.Sprintf("%s_rpcchainvm", ctx.Namespace),
 		&chain.Config{
-			DecidedCacheSize:    decidedCacheSize,
-			MissingCacheSize:    missingCacheSize,
-			UnverifiedCacheSize: unverifiedCacheSize,
-			LastAcceptedBlock:   lastAcceptedBlk,
-			GetBlock:            vm.getBlock,
-			UnmarshalBlock:      vm.parseBlock,
-			BuildBlock:          vm.buildBlock,
+			DecidedCacheSize:      decidedCacheSize,
+			MissingCacheSize:      missingCacheSize,
+			UnverifiedCacheSize:   unverifiedCacheSize,
+			BytesToBlockCacheSize: bytesToBlockCacheSize,
+			LastAcceptedBlock:     lastAcceptedBlk,
+			GetBlock:              vm.getBlock,
+			UnmarshalBlock:        vm.parseBlock,
+			BuildBlock:            vm.buildBlock,
 		},
 	)
 	if err != nil {

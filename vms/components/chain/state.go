@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -44,14 +45,16 @@ type State struct {
 	unverifiedBlocks cache.Cacher
 	// missingBlocks is an LRU cache of missing blocks
 	// Every value in [missingBlocks] is an empty struct.
-	missingBlocks     cache.Cacher
+	missingBlocks cache.Cacher
+	// Hash of byte repr. of a block --> The block as a *BlockWrapper
+	bytesToBlockCache cache.Cacher
 	lastAcceptedBlock *BlockWrapper
 }
 
 // Config defines all of the parameters necessary to initialize State
 type Config struct {
 	// Cache configuration:
-	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize int
+	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize, BytesToBlockCacheSize int
 
 	LastAcceptedBlock  snowman.Block
 	GetBlock           func(ids.ID) (snowman.Block, error)
@@ -118,10 +121,11 @@ func (s *State) initialize(config *Config) {
 
 func NewState(config *Config) *State {
 	c := &State{
-		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
-		decidedBlocks:    &cache.LRU{Size: config.DecidedCacheSize},
-		missingBlocks:    &cache.LRU{Size: config.MissingCacheSize},
-		unverifiedBlocks: &cache.LRU{Size: config.UnverifiedCacheSize},
+		verifiedBlocks:    make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:     &cache.LRU{Size: config.DecidedCacheSize},
+		missingBlocks:     &cache.LRU{Size: config.MissingCacheSize},
+		unverifiedBlocks:  &cache.LRU{Size: config.UnverifiedCacheSize},
+		bytesToBlockCache: &cache.LRU{Size: config.BytesToBlockCacheSize},
 	}
 	c.initialize(config)
 	return c
@@ -156,11 +160,20 @@ func NewMeteredState(
 	if err != nil {
 		return nil, err
 	}
+	bytesToBlockCache, err := metercacher.New(
+		fmt.Sprintf("%s_bytes_to_block_cache", namespace),
+		registerer,
+		&cache.LRU{Size: config.BytesToBlockCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
 	c := &State{
-		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
-		decidedBlocks:    decidedCache,
-		missingBlocks:    missingCache,
-		unverifiedBlocks: unverifiedCache,
+		verifiedBlocks:    make(map[ids.ID]*BlockWrapper),
+		decidedBlocks:     decidedCache,
+		missingBlocks:     missingCache,
+		unverifiedBlocks:  unverifiedCache,
+		bytesToBlockCache: bytesToBlockCache,
 	}
 	c.initialize(config)
 	return c, nil
@@ -229,16 +242,26 @@ func (s *State) GetBlockInternal(blkID ids.ID) (snowman.Block, error) {
 // ParseBlock attempts to parse [b] into an internal Block and adds it to the appropriate
 // caching layer if successful.
 func (s *State) ParseBlock(b []byte) (snowman.Block, error) {
+	// See if we've cached this block by its byte repr.
+	blockBytesHash := hashing.ComputeHash256Array(b)
+	blkIntf, ok := s.bytesToBlockCache.Get(blockBytesHash)
+	if ok {
+		return blkIntf.(snowman.Block), nil
+	}
+
+	// We don't have this block cached by its byte repr.
+	// Parse the block from bytes
 	blk, err := s.unmarshalBlock(b)
 	if err != nil {
 		return nil, err
 	}
-
 	blkID := blk.ID()
+
 	// Check for an existing block, so we can return a unique block
 	// if processing or simply allow this block to be immediately
 	// garbage collected if it is already cached.
 	if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+		s.bytesToBlockCache.Put(blockBytesHash, cachedBlk)
 		return cachedBlk, nil
 	}
 
@@ -246,7 +269,12 @@ func (s *State) ParseBlock(b []byte) (snowman.Block, error) {
 
 	// Since this block is not in consensus, addBlockOutsideConsensus
 	// is called to add [blk] to the correct cache.
-	return s.addBlockOutsideConsensus(blk)
+	wrappedBlk, err := s.addBlockOutsideConsensus(blk)
+	if err != nil {
+		return nil, err
+	}
+	s.bytesToBlockCache.Put(blockBytesHash, wrappedBlk)
+	return wrappedBlk, nil
 }
 
 // BuildBlock attempts to build a new internal Block, wraps it, and adds it

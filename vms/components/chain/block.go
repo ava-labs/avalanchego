@@ -25,8 +25,7 @@ func (bw *BlockWrapper) Verify() error {
 	blkID := bw.ID()
 	bw.state.unverifiedBlocks.Evict(blkID)
 
-	err := bw.Block.Verify()
-	if err != nil {
+	if err := bw.Block.Verify(); err != nil {
 		// Note: we cannot cache blocks failing verification in case
 		// the error is temporary and the block could become valid in
 		// the future.
