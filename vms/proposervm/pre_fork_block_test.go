@@ -17,6 +17,226 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
+func TestOptions_PreForkBlkImplementsInterface(t *testing.T) {
+	// setup
+	proBlk := preForkBlock{
+		Block: &snowman.TestBlock{},
+	}
+
+	// test
+	_, err := proBlk.Options()
+	if err != snowman.ErrNotOracle {
+		t.Fatal("Proposer block should signal that it wraps a block not implementing Options interface with ErrNotOracleBlock error")
+	}
+
+	// setup
+	proBlk = preForkBlock{
+		Block: &TestOptionsBlock{},
+	}
+
+	// test
+	_, err = proBlk.Options()
+	if err != nil {
+		t.Fatal("Proposer block should forward wrapped block options if this implements Option interface")
+	}
+}
+
+func TestOptions_PreForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime)
+
+	// create pre fork oracle block ...
+	oracleCoreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(1111),
+				StatusV: choices.Processing,
+			},
+			BytesV:  []byte{1},
+			ParentV: coreGenBlk,
+		},
+	}
+	oracleCoreBlk.opts = [2]snowman.Block{
+		&snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(2222),
+				StatusV: choices.Processing,
+			},
+			BytesV:  []byte{2},
+			ParentV: oracleCoreBlk,
+		},
+		&snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(3333),
+				StatusV: choices.Processing,
+			},
+			BytesV:  []byte{3},
+			ParentV: oracleCoreBlk,
+		},
+	}
+
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case oracleCoreBlk.ID():
+			return oracleCoreBlk, nil
+		case oracleCoreBlk.opts[0].ID():
+			return oracleCoreBlk.opts[0], nil
+		case oracleCoreBlk.opts[1].ID():
+			return oracleCoreBlk.opts[1], nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
+	parentBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build pre fork oracle block")
+	}
+
+	// retrieve options ...
+	preForkOracleBlk, ok := parentBlk.(*preForkBlock)
+	if !ok {
+		t.Fatal("expected pre fork block")
+	}
+	opts, err := preForkOracleBlk.Options()
+	if err != nil {
+		t.Fatal("could not retrieve options from pre fork oracle block")
+	}
+	if err := opts[0].Verify(); err != nil {
+		t.Fatal("option should verify")
+	}
+
+	// ... show a block can be built on top of an option
+	if err := proVM.SetPreference(opts[0].ID()); err != nil {
+		t.Fatal("could not set preference")
+	}
+
+	lastCoreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(4444),
+				StatusV: choices.Processing,
+			},
+			BytesV:  []byte{4},
+			ParentV: oracleCoreBlk.opts[0],
+		},
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return lastCoreBlk, nil }
+
+	preForkChild, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build pre fork block on pre fork option block")
+	}
+	if _, ok := preForkChild.(*preForkBlock); !ok {
+		t.Fatal("expected pre fork block built on pre fork option block")
+	}
+}
+
+func TestOptions_PostForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
+	activationTime := genesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime)
+
+	// create pre fork oracle block pre activation time...
+	oracleCoreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(1111),
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk,
+			TimestampV: activationTime.Add(-1 * time.Second),
+		},
+	}
+
+	// ... whose options are post activation time
+	oracleCoreBlk.opts = [2]snowman.Block{
+		&snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(2222),
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{2},
+			ParentV:    oracleCoreBlk,
+			TimestampV: activationTime.Add(time.Second),
+		},
+		&snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(3333),
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{3},
+			ParentV:    oracleCoreBlk,
+			TimestampV: activationTime.Add(time.Second),
+		},
+	}
+
+	coreVM.CantBuildBlock = true
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.CantGetBlock = true
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case oracleCoreBlk.ID():
+			return oracleCoreBlk, nil
+		case oracleCoreBlk.opts[0].ID():
+			return oracleCoreBlk.opts[0], nil
+		case oracleCoreBlk.opts[1].ID():
+			return oracleCoreBlk.opts[1], nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+
+	parentBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build pre fork oracle block")
+	}
+
+	// retrieve options ...
+	preForkOracleBlk, ok := parentBlk.(*preForkBlock)
+	if !ok {
+		t.Fatal("expected pre fork block")
+	}
+	opts, err := preForkOracleBlk.Options()
+	if err != nil {
+		t.Fatal("could not retrieve options from pre fork oracle block")
+	}
+	if err := opts[0].Verify(); err != nil {
+		t.Fatal("option should verify")
+	}
+
+	// ... show a block can be built on top of an option
+	if err := proVM.SetPreference(opts[0].ID()); err != nil {
+		t.Fatal("could not set preference")
+	}
+
+	lastCoreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.Empty.Prefix(4444),
+				StatusV: choices.Processing,
+			},
+			BytesV:  []byte{4},
+			ParentV: oracleCoreBlk.opts[0],
+		},
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return lastCoreBlk, nil }
+
+	postForkChild, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build pre fork block on pre fork option block")
+	}
+	if _, ok := postForkChild.(*postForkBlock); !ok {
+		t.Fatal("expected pre fork block built on pre fork option block")
+	}
+}
+
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime)

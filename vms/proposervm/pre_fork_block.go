@@ -48,11 +48,26 @@ func (b *preForkBlock) Verify() error {
 }
 
 func (b *preForkBlock) Options() ([2]snowman.Block, error) {
-	if oracleBlk, ok := b.Block.(snowman.OracleBlock); ok {
-		// TODO: correctly wrap the oracle blocks
-		return oracleBlk.Options()
+	oracleBlk, ok := b.Block.(snowman.OracleBlock)
+	if !ok {
+		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
-	return [2]snowman.Block{}, snowman.ErrNotOracle
+
+	opts, err := oracleBlk.Options()
+	if err != nil {
+		return opts, nil
+	}
+	res := [2]snowman.Block{
+		&preForkBlock{
+			Block: opts[0],
+			vm:    b.vm,
+		},
+		&preForkBlock{
+			Block: opts[1],
+			vm:    b.vm,
+		},
+	}
+	return res, nil
 }
 
 func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {

@@ -22,14 +22,15 @@ import (
 
 type TestOptionsBlock struct {
 	snowman.TestBlock
+	opts [2]snowman.Block
 }
 
 func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
-	return [2]snowman.Block{}, nil
+	return tob.opts, nil
 }
 
 // ProposerBlock Option interface tests section
-func TestProposerBlockOptionsHandling(t *testing.T) {
+func TestOptions_PostForkBlkImplementsInterface(t *testing.T) {
 	// setup
 	proBlk := postForkBlock{
 		innerBlk: &snowman.TestBlock{},
