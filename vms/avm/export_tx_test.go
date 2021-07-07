@@ -1030,21 +1030,30 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatal("should not have called shutdown")
 	}
 	vm := &VM{}
-	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, nil, issuer, []*common.Fx{
-		{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
-		},
-		{
-			ID: ids.Empty.Prefix(0),
-			Fx: &FxTest{
-				InitializeF: func(vmIntf interface{}) error {
-					vm := vmIntf.(*VM)
-					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+	err = vm.Initialize(
+		ctx,
+		baseDBManager.NewPrefixDBManager([]byte{1}),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty,
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &FxTest{
+					InitializeF: func(vmIntf interface{}) error {
+						vm := vmIntf.(*VM)
+						return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+					},
 				},
 			},
 		},
-	}, shutdownNodeFunc)
+		shutdownNodeFunc,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1198,10 +1207,18 @@ func TestIssueExportTx(t *testing.T) {
 		t.Fatal("should not have called shutdown")
 	}
 	vm := &VM{}
-	if err := vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, nil, issuer, []*common.Fx{{
-		ID: ids.Empty,
-		Fx: &secp256k1fx.Fx{},
-	}}, shutdownNodeFunc); err != nil {
+	if err := vm.Initialize(
+		ctx,
+		baseDBManager.NewPrefixDBManager([]byte{1}),
+		genesisBytes,
+		nil,
+		nil,
+		issuer, []*common.Fx{{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
+		}},
+		shutdownNodeFunc,
+	); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0
@@ -1329,10 +1346,19 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal("should not have called shutdown")
 	}
 	vm := &VM{}
-	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, avmConfigBytes, issuer, []*common.Fx{{
-		ID: ids.Empty,
-		Fx: &secp256k1fx.Fx{},
-	}}, shutdownNodeFunc)
+	err = vm.Initialize(
+		ctx,
+		baseDBManager.NewPrefixDBManager([]byte{1}),
+		genesisBytes,
+		nil,
+		avmConfigBytes,
+		issuer,
+		[]*common.Fx{{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
+		}},
+		shutdownNodeFunc,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1435,13 +1461,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 }
 
+// Returns the byte representation of the given AVM config
 func BuildAvmConfigBytes(config Config) ([]byte, error) {
-	avmConfigBytes, err := json.Marshal(config)
-	if err != nil {
-		return nil, err
-	}
-
-	return avmConfigBytes, nil
+	return json.Marshal(config)
 }
 
 func TestExportTxNotState(t *testing.T) {

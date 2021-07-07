@@ -633,14 +633,23 @@ func TestFxInitializationFailure(t *testing.T) {
 		t.Fatal("should not have called shutdown")
 	}
 	genesisBytes := BuildGenesisTest(t)
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, make(chan common.Message, 1), []*common.Fx{{ // fxs
-		ID: ids.Empty,
-		Fx: &FxTest{
-			InitializeF: func(interface{}) error {
-				return errUnknownFx
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		make(chan common.Message, 1),
+		[]*common.Fx{{ // fxs
+			ID: ids.Empty,
+			Fx: &FxTest{
+				InitializeF: func(interface{}) error {
+					return errUnknownFx
+				},
 			},
-		},
-	}}, shutdownNodeFunc)
+		}},
+		shutdownNodeFunc,
+	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid fx initialization")
 	}

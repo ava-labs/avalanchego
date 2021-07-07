@@ -87,12 +87,11 @@ func (t *ExportTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiab
 		}
 	}
 
-	err := t.BaseTx.SemanticVerify(vm, tx, creds)
-	if err != nil {
+	if err := t.BaseTx.SemanticVerify(vm, tx, creds); err != nil {
 		return err
 	}
 
-	// index input UTXOs only since outputs will belong to different chain
+	// index input UTXOs only since outputs belong to different chain
 	vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, t.ID(), t.InputUTXOs())
 
 	return nil

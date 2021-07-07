@@ -250,10 +250,19 @@ func TestIssueImportTx(t *testing.T) {
 		t.Fatal("should not have called shutdown")
 	}
 	vm := &VM{}
-	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, avmConfigBytes, issuer, []*common.Fx{{
-		ID: ids.Empty,
-		Fx: &secp256k1fx.Fx{},
-	}}, shutdownNodeFunc)
+	err = vm.Initialize(
+		ctx,
+		baseDBManager.NewPrefixDBManager([]byte{1}),
+		genesisBytes,
+		nil,
+		avmConfigBytes,
+		issuer,
+		[]*common.Fx{{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
+		}},
+		shutdownNodeFunc,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,10 +346,6 @@ func TestIssueImportTx(t *testing.T) {
 
 	inputID := utxo.InputID()
 
-	if err := vm.state.PutUTXO(inputID, utxo); err != nil {
-		t.Fatal("Error saving utxo", err)
-	}
-
 	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
@@ -421,10 +426,19 @@ func TestForceAcceptImportTx(t *testing.T) {
 	shutdownNodeFunc := func(int) {
 		t.Fatal("should not have called shutdown")
 	}
-	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, nil, issuer, []*common.Fx{{
-		ID: ids.Empty,
-		Fx: &secp256k1fx.Fx{},
-	}}, shutdownNodeFunc)
+	err = vm.Initialize(
+		ctx,
+		baseDBManager.NewPrefixDBManager([]byte{1}),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
+		}},
+		shutdownNodeFunc,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,18 +467,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 		},
 	}
 
-	utxo := &avax.UTXO{
-		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: 1000,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{key.PublicKey().Address()},
-			},
-		},
-	}
-
 	tx := &Tx{UnsignedTx: &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -483,10 +485,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 
 	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
-	}
-
-	if err := vm.state.PutUTXO(utxoID.InputID(), utxo); err != nil {
-		t.Fatal("Error saving utxo", err)
 	}
 
 	parsedTx, err := vm.ParseTx(tx.Bytes())

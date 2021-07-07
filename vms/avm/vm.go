@@ -245,21 +245,18 @@ func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBy
 
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
-		vm.ctx.Log.Info("Address transaction indexing is enabled.")
-		m, err := index.NewMetrics(ctx.Namespace, ctx.Metrics)
+		vm.ctx.Log.Info("address transaction indexing is enabled")
+		indexer, err := index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, ctx.Namespace, ctx.Metrics)
 		if err != nil {
-			vm.ctx.Log.Fatal("Failed to initialize indexing metrics: %s", err)
-			return err
+			return fmt.Errorf("failed to initialize indexer: %w", err)
 		}
-		vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m, shutdownNodeFunc)
-		err = vm.addressTxsIndexer.Init(avmConfig.AllowIncompleteTransactionIndex)
-		if err != nil {
-			vm.ctx.Log.Fatal("Failed to initialize indexer: %s", err)
-			return err
+		vm.addressTxsIndexer = indexer
+		if err := vm.addressTxsIndexer.Init(avmConfig.AllowIncompleteTransactionIndex); err != nil {
+			return fmt.Errorf("failed to initialize indexer: %w", err)
 		}
 	} else {
 		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
-		vm.ctx.Log.Info("Address transaction indexing is disabled.")
+		vm.ctx.Log.Info("address transaction indexing is disabled.")
 		vm.addressTxsIndexer = index.NewNoIndexer(vm.db)
 	}
 

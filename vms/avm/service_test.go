@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/avm/index"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -399,12 +400,12 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	_, vm, s, _, _ := setup(t, true)
-	m, err := index.NewMetrics(vm.ctx.Namespace, vm.ctx.Metrics)
-	assert.NoError(t, err)
 	shutdownNodeFunc := func(int) {
 		t.Fatal("should not have called shutdown")
 	}
-	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m, shutdownNodeFunc)
+	var err error
+	vm.addressTxsIndexer, err = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)

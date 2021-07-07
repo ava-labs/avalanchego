@@ -865,16 +865,25 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	shutdownNodeFunc := func(int) {
 		t.Fatal("should not have called shutdown")
 	}
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
-		{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty,
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.ID{1},
+				Fx: fx,
+			},
 		},
-		{
-			ID: ids.ID{1},
-			Fx: fx,
-		},
-	}, shutdownNodeFunc)
+		shutdownNodeFunc,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1420,16 +1429,25 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	shutdownNodeFunc := func(int) {
 		t.Fatal("should not have called shutdown")
 	}
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
-		{
-			ID: ids.ID{1},
-			Fx: &secp256k1fx.Fx{},
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.ID{1},
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty,
+				Fx: fx,
+			},
 		},
-		{
-			ID: ids.Empty,
-			Fx: fx,
-		},
-	}, shutdownNodeFunc)
+		shutdownNodeFunc,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -19,6 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+)
+
+const DatabaseOpErrorExitCode int = 5
+
+var (
+	idxKey        = []byte("idx")
+	idxEnabledKey = []byte("addressTxsIdxEnabled")
 )
 
 // AddressTxsIndexer Maintains an index of an address --> IDs of transactions that changed that address's balance.
@@ -53,13 +61,6 @@ type AddressTxsIndexer interface {
 	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 }
 
-var (
-	idxKey        = []byte("idx")
-	idxEnabledKey = []byte("addressTxsIdxEnabled")
-)
-
-const DatabaseOpErrorExitCode int = 5
-
 // indexer implements AddressTxsIndexer
 type indexer struct {
 	// txID -> Address -> AssetID --> Present if the address's balance
@@ -67,7 +68,7 @@ type indexer struct {
 	addressAssetIDTxMap map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}
 	db                  *versiondb.Database
 	log                 logging.Logger
-	metrics             Metrics
+	metrics             metrics
 	// Called in a goroutine on shutdown
 	shutdownF func(int)
 }
@@ -94,8 +95,8 @@ func (i *indexer) AddUTXOsByID(getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, e
 	for _, utxoID := range inputUTXOIDs {
 		utxo, err := getUTXOF(utxoID)
 		if err != nil {
-			i.log.Fatal("Error finding UTXO ID %s when indexing transaction %s", utxoID, txID)
-			i.shutdownF(DatabaseOpErrorExitCode)
+			i.log.Fatal("error finding UTXO %s when indexing transaction %s", utxoID, txID)
+			go i.shutdownF(DatabaseOpErrorExitCode)
 			return // should never happen
 		}
 
@@ -114,7 +115,7 @@ func (i *indexer) AddUTXOs(txID ids.ID, utxos []*avax.UTXO) {
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
 		if !ok {
-			i.log.Verbo("Skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID())
+			i.log.Verbo("skipping output utxo %s for export indexing because it is not of secp256k1fx.TransferOutput", utxo.InputID())
 			continue
 		}
 
@@ -132,12 +133,6 @@ func (i *indexer) AddUTXOs(txID ids.ID, utxos []*avax.UTXO) {
 // |  | "0"   => txID1
 // |  | "1"   => txID1
 func (i *indexer) Write(txID ids.ID) {
-	// check if we have data to write for this [txID]
-	if _, exists := i.addressAssetIDTxMap[txID]; !exists {
-		i.log.Warn("Nothing indexed for txID %s to write", txID)
-		return
-	}
-
 	// go through all addresses indexed against this [txID]
 	// and persist them, maintaining order
 	for address, assetIDs := range i.addressAssetIDTxMap[txID] {
@@ -145,15 +140,13 @@ func (i *indexer) Write(txID ids.ID) {
 		for assetID := range assetIDs {
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
-			i.log.Debug("Writing address/AssetID/<index>/txID %s/%s/?/%s", address, assetID, txID)
-
 			var idx uint64
 			idxBytes, err := assetPrefixDB.Get(idxKey)
 			switch {
 			case err != nil && err != database.ErrNotFound:
 				// Unexpected error
-				i.log.Fatal("Error checking idx value exists when writing txID [%s], address [%s]: %s", txID, address, err)
-				i.shutdownF(DatabaseOpErrorExitCode)
+				i.log.Fatal("error checking idx value exists when writing txID [%s], address [%s]: %s", txID, address, err)
+				go i.shutdownF(DatabaseOpErrorExitCode)
 				return
 			case err == database.ErrNotFound:
 				// idx not found; this must be the first entry.
@@ -167,22 +160,20 @@ func (i *indexer) Write(txID ids.ID) {
 			}
 
 			// write the [txID] at the index
-			i.log.Debug("Writing address/AssetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
+			i.log.Debug("writing address/assetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
-				i.log.Fatal("Failed to save txID [%s], idx [%d] to the address [%s], assetID [%s] prefix DB %s", txID, idx, address, assetID, err)
-				i.shutdownF(DatabaseOpErrorExitCode)
+				i.log.Fatal("failed to write address/assetID/index/txID %s/%s/%d/%s: %s", address, assetID, idx, txID, err)
+				go i.shutdownF(DatabaseOpErrorExitCode)
 				return
 			}
-
-			i.log.Debug("Written address/AssetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
 
 			// increment and store the index for next use
 			idx++
 			binary.BigEndian.PutUint64(idxBytes, idx)
 
 			if err := assetPrefixDB.Put(idxKey, idxBytes); err != nil {
-				i.log.Fatal("Failed to update index for txID [%s] to the address [%s], assetID [%s] prefix DB: %s", txID, address, assetID, err)
-				i.shutdownF(DatabaseOpErrorExitCode)
+				i.log.Fatal("failed to write next index for address/assetID/index/txID %s/%s/%d/%s: %s", address, assetID, idx, txID, err)
+				go i.shutdownF(DatabaseOpErrorExitCode)
 				return
 			}
 		}
@@ -310,14 +301,20 @@ func (i *indexer) Reset(txID ids.ID) {
 
 // NewAddressTxsIndexer Returns a new AddressTxsIndexer.
 // The returned indexer ignores UTXOs that are not type secp256k1fx.TransferOutput.
-func NewAddressTxsIndexer(db *versiondb.Database, log logging.Logger, m Metrics, shutdownFunc func(int)) AddressTxsIndexer {
-	return &indexer{
+func NewAddressTxsIndexer(
+	db *versiondb.Database,
+	log logging.Logger,
+	shutdownFunc func(int),
+	metricsNamespace string,
+	metricsRegisterer prometheus.Registerer,
+) (AddressTxsIndexer, error) {
+	i := &indexer{
 		addressAssetIDTxMap: make(map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}),
 		db:                  db,
 		log:                 log,
-		metrics:             m,
 		shutdownF:           shutdownFunc,
 	}
+	return i, i.metrics.initialize(metricsNamespace, metricsRegisterer)
 }
 
 type noIndexer struct {

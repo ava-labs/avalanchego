@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/avm/index"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/version"
 
@@ -394,14 +395,14 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 func TestIndexer_Read(t *testing.T) {
 	// setup vm, db etc
 	_, vm, _, _, _ := setup(t, true)
-	m, err := index.NewMetrics(vm.ctx.Namespace, vm.ctx.Metrics)
-	assert.NoError(t, err)
 
 	shutdownFunc := func(int) {
 		t.Fatal("should not have called shutdown")
 	}
 
-	vm.addressTxsIndexer = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, m, shutdownFunc)
+	var err error
+	vm.addressTxsIndexer, err = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -441,8 +442,9 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 	}
 
 	// start with indexing enabled
-	indexer := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, index.Metrics{}, shutdownFunc)
-	err := indexer.Init(true)
+	indexer, err := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
+	err = indexer.Init(true)
 	assert.NoError(t, err)
 
 	// now disable indexing with allow-incomplete set to false
@@ -472,7 +474,8 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 	}
 
 	// now enable indexing with allow-incomplete set to false
-	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{}, shutdownFunc)
+	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 	err = indexer.Init(false)
 	assert.Error(t, err)
 
@@ -505,7 +508,8 @@ func TestIndexingAllowIncomplete(t *testing.T) {
 	}
 
 	// we initialise with indexing enabled now
-	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{}, shutdownFunc)
+	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 	// we init with allow incomplete indexing as false
 	err = indexer.Init(false)
 	// we should get error because:
@@ -533,7 +537,8 @@ func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
 		return nil, fmt.Errorf("not found")
 	}
 
-	indexer := index.NewAddressTxsIndexer(db, ctx.Log, index.Metrics{}, shutdownFunc)
+	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry())
+	assert.NoError(t, err)
 	indexer.AddUTXOsByID(getUTXOFn, ids.GenerateTestID(), []*avax.UTXOID{
 		{
 			TxID:        ids.GenerateTestID(),
