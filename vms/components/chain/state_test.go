@@ -657,3 +657,86 @@ func TestMeteredCache(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Test the bytesToBlockCache
+func TestStateByteToBlockCache(t *testing.T) {
+	testBlks := NewTestBlocks(3, nil)
+	genesisBlock := testBlks[0]
+	genesisBlock.SetStatus(choices.Accepted)
+	blk1 := testBlks[1]
+	blk1BytesHash := hashing.ComputeHash256Array(blk1.Bytes())
+	blk2 := testBlks[2]
+	blk2BytesHash := hashing.ComputeHash256Array(blk2.Bytes())
+
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	buildBlock := func() (snowman.Block, error) {
+		t.Fatal("shouldn't have been called")
+		return nil, errors.New("")
+	}
+
+	chainState := NewState(&Config{
+		DecidedCacheSize:      0,
+		MissingCacheSize:      0,
+		UnverifiedCacheSize:   0,
+		BytesToBlockCacheSize: 1,
+		LastAcceptedBlock:     genesisBlock,
+		GetBlock:              getBlock,
+		UnmarshalBlock:        parseBlock,
+		BuildBlock:            buildBlock,
+		GetBlockIDAtHeight:    getCanonicalBlockID,
+	})
+
+	// Shouldn't have blk1 to start with
+	_, err := chainState.GetBlock(blk1.ID())
+	assert.Error(t, err)
+	_, ok := chainState.bytesToBlockCache.Get(blk1BytesHash)
+	assert.False(t, ok)
+
+	// Parse blk1 from bytes
+	parsedBlk1, err := chainState.ParseBlock(blk1.Bytes())
+	assert.NoError(t, err)
+
+	// Make sure we're not calling unmarshalBlock
+	// (We should be able to get the block from bytesToBlockCache)
+	chainState.unmarshalBlock = func(b []byte) (snowman.Block, error) {
+		t.Fatal("shouldn't have called this method")
+		return nil, errors.New("")
+	}
+
+	// blk1 should be in cache now
+	gotBlk1, err := chainState.GetBlock(blk1.ID())
+	assert.NoError(t, err)
+	assert.EqualValues(t, parsedBlk1, gotBlk1)
+	_, ok = chainState.bytesToBlockCache.Get(blk1BytesHash)
+	assert.True(t, ok)
+
+	// Verify and accept blk1
+	err = parsedBlk1.Verify()
+	assert.NoError(t, err)
+	err = parsedBlk1.Accept()
+	assert.NoError(t, err)
+
+	// Make sure status is updated in chainState
+	gotBlk1, err = chainState.GetBlock(blk1.ID())
+	assert.NoError(t, err)
+	assert.EqualValues(t, parsedBlk1, gotBlk1)
+	assert.EqualValues(t, parsedBlk1.Status(), choices.Accepted)
+
+	// Parse another block
+	chainState.unmarshalBlock = parseBlock
+	_, err = chainState.ParseBlock(blk2.Bytes())
+	assert.NoError(t, err)
+
+	// Should have bumped blk1 from bytes to block cache
+	_, ok = chainState.bytesToBlockCache.Get(blk2BytesHash)
+	assert.True(t, ok)
+	_, ok = chainState.bytesToBlockCache.Get(blk1BytesHash)
+	assert.False(t, ok)
+
+	// Should still be able to get blk1 without using bytesToBlockCache,
+	// though, and it should still have the right state
+	gotBlk1, err = chainState.GetBlock(blk1.ID())
+	assert.NoError(t, err)
+	assert.EqualValues(t, parsedBlk1, gotBlk1)
+	assert.EqualValues(t, parsedBlk1.Status(), choices.Accepted)
+}
