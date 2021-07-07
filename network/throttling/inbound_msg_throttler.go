@@ -4,7 +4,6 @@
 package throttling
 
 import (
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -44,13 +43,6 @@ type msgMetadata struct {
 	closeOnAcquireChan chan struct{}
 }
 
-// See sybilInboundMsgThrottler
-type MsgThrottlerConfig struct {
-	VdrAllocSize        uint64
-	AtLargeAllocSize    uint64
-	NodeMaxAtLargeBytes uint64
-}
-
 // Returns a new MsgThrottler.
 // If this function returns an error, the returned MsgThrottler may still be used.
 // However, some of its metrics may not be registered.
@@ -61,16 +53,18 @@ func NewSybilInboundMsgThrottler(
 	config MsgThrottlerConfig,
 ) (InboundMsgThrottler, error) {
 	t := &sybilInboundMsgThrottler{
-		log:                    log,
-		vdrs:                   vdrs,
-		maxVdrBytes:            config.VdrAllocSize,
-		remainingVdrBytes:      config.VdrAllocSize,
-		remainingAtLargeBytes:  config.AtLargeAllocSize,
-		nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-		nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-		nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
-		waitingToAcquire:       linkedhashmap.New(),
-		nodeToWaitingMsgIDs:    make(map[ids.ShortID][]uint64),
+		commonMsgThrottler: commonMsgThrottler{
+			log:                    log,
+			vdrs:                   vdrs,
+			maxVdrBytes:            config.VdrAllocSize,
+			remainingVdrBytes:      config.VdrAllocSize,
+			remainingAtLargeBytes:  config.AtLargeAllocSize,
+			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
+			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+		},
+		waitingToAcquire:    linkedhashmap.New(),
+		nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
 	}
 	if err := t.metrics.initialize(metricsRegisterer); err != nil {
 		return nil, err
@@ -83,26 +77,9 @@ func NewSybilInboundMsgThrottler(
 // Messages are guaranteed to make progress toward
 // acquiring enough bytes to be read.
 type sybilInboundMsgThrottler struct {
-	log       logging.Logger
+	commonMsgThrottler
 	metrics   sybilInboundMsgThrottlerMetrics
-	lock      sync.RWMutex
 	nextMsgID uint64
-	// Primary network validator set
-	vdrs validators.Set
-	// Max number of unprocessed bytes from validators
-	maxVdrBytes uint64
-	// Max number of bytes that can be taken from the
-	// at-large byte allocation by a given node.
-	nodeMaxAtLargeBytes uint64
-	// Number of bytes left in the validator byte allocation.
-	// Initialized to [maxVdrBytes].
-	remainingVdrBytes uint64
-	// Number of bytes left in the at-large byte allocation
-	remainingAtLargeBytes uint64
-	// Node ID --> Bytes they've taken from the validator allocation
-	nodeToVdrBytesUsed map[ids.ShortID]uint64
-	// Node ID --> Bytes they've taken from the at-large allocation
-	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
 	// Node ID --> IDs of messages this node is waiting to acquire,
 	// order from oldest to most recent.
 	nodeToWaitingMsgIDs map[ids.ShortID][]uint64

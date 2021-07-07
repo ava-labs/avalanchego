@@ -4,8 +4,6 @@
 package throttling
 
 import (
-	"sync"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -36,25 +34,8 @@ type OutboundMsgThrottler interface {
 }
 
 type outboundMsgThrottler struct {
-	log     logging.Logger
-	lock    sync.Mutex
+	commonMsgThrottler
 	metrics outboundMsgThrottlerMetrics
-	// Primary network validator set
-	vdrs validators.Set
-	// Max number of bytes that can be taken from the
-	// at-large byte allocation by a given node.
-	nodeMaxAtLargeBytes uint64
-	// Number of bytes left in the validator byte allocation.
-	// Initialized to [maxVdrBytes].
-	remainingVdrBytes uint64
-	// Number of bytes left in the at-large byte allocation
-	remainingAtLargeBytes uint64
-	// Node ID --> Bytes they've taken from the validator allocation
-	nodeToVdrBytesUsed map[ids.ShortID]uint64
-	// Node ID --> Bytes they've taken from the at-large allocation
-	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
-	// Max number of unprocessed bytes from validators
-	maxVdrBytes uint64
 }
 
 func NewSybilOutboundMsgThrottler(
@@ -64,14 +45,16 @@ func NewSybilOutboundMsgThrottler(
 	config MsgThrottlerConfig,
 ) (OutboundMsgThrottler, error) {
 	t := &outboundMsgThrottler{
-		log:                    log,
-		vdrs:                   vdrs,
-		maxVdrBytes:            config.VdrAllocSize,
-		remainingVdrBytes:      config.VdrAllocSize,
-		remainingAtLargeBytes:  config.AtLargeAllocSize,
-		nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-		nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-		nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+		commonMsgThrottler: commonMsgThrottler{
+			log:                    log,
+			vdrs:                   vdrs,
+			maxVdrBytes:            config.VdrAllocSize,
+			remainingVdrBytes:      config.VdrAllocSize,
+			remainingAtLargeBytes:  config.AtLargeAllocSize,
+			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
+			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+		},
 	}
 	return t, t.metrics.initialize(metricsRegisterer)
 }
