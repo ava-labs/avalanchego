@@ -48,7 +48,7 @@ func TestArchiveBlockChain(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -73,7 +73,7 @@ func TestPruningBlockChain(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
@@ -104,7 +104,7 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 				SnapshotLimit:  256,
 			},
 			chainConfig,
-			dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)),
+			dummy.NewFaker(),
 			vm.Config{},
 			lastAcceptedHash,
 		)
