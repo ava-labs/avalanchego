@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -96,146 +96,6 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 }
 
 func TestAdaptiveTimeoutManager(t *testing.T) {
-	// Initialize
-	assert := assert.New(t)
-	tm := AdaptiveTimeoutManager{}
-	config := &AdaptiveTimeoutConfig{
-		InitialTimeout:     250 * time.Millisecond,
-		MinimumTimeout:     250 * time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutHalflife:    5 * time.Minute,
-		TimeoutCoefficient: 1.25,
-	}
-	err := tm.Initialize(config, "", prometheus.NewRegistry())
-	assert.NoError(err)
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go tm.Dispatch()
-	defer tm.Stop()
-
-	// Assert initial state is correct
-	tm.lock.Lock()
-	assert.Len(tm.timeoutMap, 0)
-	assert.Len(tm.timeoutQueue, 0)
-	assert.False(tm.timer.shouldExecute)
-	assert.Equal(config.InitialTimeout, tm.currentTimeout)
-	tm.lock.Unlock()
-
-	// Register a timeout
-	id0 := ids.GenerateTestID()
-	timeoutZeroCalled := utils.AtomicBool{}
-	tm.Put(
-		id0,
-		constants.PullQueryMsg,
-		func() { timeoutZeroCalled.SetValue(true) },
-	)
-
-	tm.lock.Lock()
-	// id0 should be in the timeout map
-	assert.Contains(tm.timeoutMap, id0)
-	// The timeout for id0 should be be in the timeout queue
-	assert.Len(tm.timeoutQueue, 1)
-	// The timeout should be in the future
-	assert.True(tm.timeoutQueue[0].deadline.After(tm.clock.Time()))
-	// But not too far in the future
-	assert.True(tm.timeoutQueue[0].deadline.Before(tm.clock.Time().Add(tm.maximumTimeout)))
-	// Timeout should be set to fire
-	assert.True(tm.timer.shouldExecute)
-	tm.lock.Unlock()
-
-	// Try to remove some non-existent timeout
-	tm.Remove(ids.GenerateTestID())
-
-	// State should be the same
-	tm.lock.Lock()
-	// id0 should be in the timeout map
-	assert.Contains(tm.timeoutMap, id0)
-	// The timeout for id0 should be be in the timeout queue
-	assert.Len(tm.timeoutQueue, 1)
-	// The timeout should be in the future
-	assert.True(tm.timeoutQueue[0].deadline.After(tm.clock.Time()))
-	// But not too far in the future
-	assert.True(tm.timeoutQueue[0].deadline.Before(tm.clock.Time().Add(tm.maximumTimeout)))
-	// Timeout should be set to fire
-	assert.True(tm.timer.shouldExecute)
-	tm.lock.Unlock()
-
-	// This should overwrite the first Put for id0
-	tm.Put(
-		id0,
-		constants.PullQueryMsg,
-		func() { wg.Done() },
-	)
-
-	tm.lock.Lock()
-	// id0 should be in the timeout map
-	assert.Contains(tm.timeoutMap, id0)
-	// The timeout for id0 should be be in the timeout queue
-	assert.Len(tm.timeoutQueue, 1)
-	// The timeout should be in the future
-	assert.True(tm.timeoutQueue[0].deadline.After(tm.clock.Time()))
-	// But not too far in the future
-	assert.True(!tm.timeoutQueue[0].deadline.After(tm.clock.Time().Add(tm.maximumTimeout)))
-	// Timeout should be set to fire
-	assert.True(tm.timer.shouldExecute)
-	tm.lock.Unlock()
-
-	// Wait until timeout fires
-	wg.Wait()
-	// Give [tm.timer] a moment to set [tm.timer.shouldExecute] to false
-	// If test is being flaky, try increasing this
-	time.Sleep(100 * time.Millisecond)
-
-	// Make sure first timeout we registered then overwrote never fires
-	assert.False(timeoutZeroCalled.GetValue())
-
-	tm.lock.Lock()
-	assert.Len(tm.timeoutMap, 0)
-	assert.Len(tm.timeoutQueue, 0)
-	assert.False(tm.timer.shouldExecute)
-	tm.lock.Unlock()
-
-	// Register two more timeouts
-	id1 := ids.GenerateTestID()
-	id2 := ids.GenerateTestID()
-	wg.Add(2)
-	tm.Put(
-		id1,
-		constants.PullQueryMsg,
-		func() { wg.Done() },
-	)
-	tm.Put(
-		id2,
-		constants.PullQueryMsg,
-		func() { wg.Done() },
-	)
-
-	tm.lock.Lock()
-	// id1 should be in the timeout map
-	assert.Contains(tm.timeoutMap, id1)
-	// id2 should be in the timeout map
-	assert.Contains(tm.timeoutMap, id2)
-	assert.Len(tm.timeoutMap, 2)
-	assert.Len(tm.timeoutQueue, 2)
-	assert.True(!tm.timeoutQueue[0].deadline.After(tm.timeoutQueue[1].deadline))
-	// Timeout should be set to fire
-	assert.True(tm.timer.shouldExecute)
-	tm.lock.Unlock()
-
-	// Wait until both timeouts fire
-	wg.Wait()
-	// Give [tm.timer] a moment to set [tm.timer.shouldExecute] to false
-	// If test is being flaky, try increasing this
-	time.Sleep(100 * time.Millisecond)
-
-	tm.lock.Lock()
-	assert.Len(tm.timeoutMap, 0)
-	assert.Len(tm.timeoutQueue, 0)
-	assert.False(tm.timer.shouldExecute)
-	tm.lock.Unlock()
-}
-
-func TestAdaptiveTimeoutManager2(t *testing.T) {
 	tm := AdaptiveTimeoutManager{}
 	err := tm.Initialize(
 		&AdaptiveTimeoutConfig{
