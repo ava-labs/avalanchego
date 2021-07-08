@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/timestampvm"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	smeng "github.com/ava-labs/avalanchego/snow/engine/snowman"
@@ -1322,7 +1321,7 @@ func TestCreateChain(t *testing.T) {
 	tx, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
-		timestampvm.ID,
+		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
 		nil,
 		"name",
 		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
