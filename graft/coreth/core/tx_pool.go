@@ -1157,7 +1157,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	if reset != nil {
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsApricotPhase4(new(big.Int).SetUint64(reset.newHead.Time)) {
-			// TODO set after migrating CalcBaseFee into coreth
+			// TODO(aaronbuchwald) set after migrating CalcBaseFee into coreth
 			// pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead)
 			// pool.priced.SetBaseFee(pendingBaseFee)
 		}

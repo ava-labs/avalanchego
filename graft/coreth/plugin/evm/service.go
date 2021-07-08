@@ -51,7 +51,7 @@ type NetAPI struct{ vm *VM }
 func (s *NetAPI) Listening() bool { return true } // always listening
 
 // PeerCount returns the number of connected peers
-func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) } // TODO: report number of connected peers
+func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) }
 
 // Version returns the current ethereum protocol version.
 func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
