@@ -116,7 +116,6 @@ func (i *indexer) add(txID, assetID ids.ID, addrs []ids.ShortID) {
 }
 
 // See AddressTxsIndexer
-// TODO return an error here
 func (i *indexer) Add(
 	txID ids.ID,
 	inputUTXOIDs []*avax.UTXOID,
