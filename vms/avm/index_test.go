@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/version"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -424,24 +425,21 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 	}
 
 	// start with indexing enabled
-	_, err := index.NewIndexer(versiondb.New(db), ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
+	_, err := index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
 	// now disable indexing with allow-incomplete set to false
-	_, err = index.NewNoIndexer(versiondb.New(db), false)
+	_, err = index.NewNoIndexer(db, false)
 	assert.Error(t, err)
 
 	// now disable indexing with allow-incomplete set to true
-	_, err = index.NewNoIndexer(versiondb.New(db), true)
+	_, err = index.NewNoIndexer(db, true)
 	assert.NoError(t, err)
 }
 
 func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	ctx := NewContext(t)
-
-	currentDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
-	db := versiondb.New(currentDB)
+	db := memdb.New()
 
 	// disable indexing with allow-incomplete set to false
 	_, err := index.NewNoIndexer(db, false)
@@ -451,20 +449,20 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 		t.Fatal("should not have called shutdown")
 	}
 
-	// now enable indexing with allow-incomplete set to false
+	// It's not OK to have an incomplete index when allowIncompleteIndices is false
 	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
 	assert.Error(t, err)
 
-	// retry enable indexing with allow-incomplete set to true
+	// It's OK to have an incomplete index when allowIncompleteIndices is true
 	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
-	// disable indexing with allow-incomplete set to false
-	_, err = index.NewNoIndexer(versiondb.New(db), false)
-	assert.Error(t, err)
+	// It's OK to have an incomplete index when indexing currently disabled
+	_, err = index.NewNoIndexer(db, false)
+	assert.NoError(t, err)
 
-	// disable indexing again with allow-incomplete set to true
-	_, err = index.NewNoIndexer(versiondb.New(db), true)
+	// It's OK to have an incomplete index when allowIncompleteIndices is true
+	_, err = index.NewNoIndexer(db, true)
 	assert.NoError(t, err)
 }
 

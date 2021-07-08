@@ -6,6 +6,7 @@ package index
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -24,8 +25,8 @@ import (
 const DatabaseOpErrorExitCode int = 5
 
 var (
-	idxKey        = []byte("idx")
-	idxEnabledKey = []byte("addressTxsIdxEnabled")
+	idxKey         = []byte("idx")
+	idxCompleteKey = []byte("complete")
 )
 
 // AddressTxsIndexer maintains information about which transactions changed
@@ -255,44 +256,32 @@ func (i *indexer) init(allowIncomplete bool) error {
 // checkIndexStatus checks the indexing status in the database, returning error if the state
 // with respect to provided parameters is invalid
 func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowIncomplete bool) error {
-	// verify whether we've indexed before
-	idxEnabled, err := database.GetBool(db, idxEnabledKey)
+	// verify whether the index is complete.
+	idxComplete, err := database.GetBool(db, idxCompleteKey)
 	if err == database.ErrNotFound {
-		// we're not allowed incomplete index and we've not indexed before
-		// so its ok to proceed
-		// save the flag for next time indicating indexing status
-		return database.PutBool(db, idxEnabledKey, enableIndexing)
+		// We've not run before. Mark whether indexing is enabled this run.
+		return database.PutBool(db, idxCompleteKey, enableIndexing)
 	} else if err != nil {
-		// some other error happened when reading the database
 		return err
 	}
 
-	if !idxEnabled {
-		// index was previously enabled
+	if !idxComplete { // In a previous run, we did not index so it's incomplete.
 		if enableIndexing && !allowIncomplete {
-			// indexing was disabled before, we're asked to enable it but not allowed
-			// incomplete entries, we return error
-			return fmt.Errorf("indexing is off and incomplete indexing is not allowed, to proceed allow incomplete indexing in config or reindex from genesis")
-		} else if enableIndexing {
-			// we're asked to enable indexing and allow incomplete indexes
-			// save state to db and continue
-			return database.PutBool(db, idxEnabledKey, enableIndexing)
+			// indexing was disabled before but now we want to index.
+			return errors.New("running would create incomplete index. Allow incomplete indices or re-sync from genesis with indexing enabled")
 		}
-	} else {
-		// index was previously disabled
-		if !enableIndexing && !allowIncomplete {
-			// index is previously enabled, we're asked to disable it but not allowed incomplete indexes
-			return fmt.Errorf("cannot disable indexing when incomplete indexes are not allowed, to proceed allow incomplete indexing in config or reset state from genesis")
-		} else if !enableIndexing {
-			// we're asked to disable indexing and allow incomplete indexes
-			// save state to db and continue
-			return database.PutBool(db, idxEnabledKey, enableIndexing)
-		}
+		// either indexing is disabled, or incomplete indices are ok, so we don't care that index is incomplete
+		return nil
 	}
 
-	// idxEnabled is true
-	// we're not allowed incomplete index AND index is enabled already
-	// so we're good to proceed
+	// the index is complete
+	if !enableIndexing { // indexing is disabled this run
+		if !allowIncomplete {
+			return errors.New("running would create incomplete index. Allow incomplete indices or enable indexing")
+		}
+		// running without indexing makes it incomplete
+		return database.PutBool(db, idxCompleteKey, false)
+	}
 	return nil
 }
 
