@@ -102,8 +102,10 @@ type GetAddressTxsReply struct {
 func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
 	service.vm.ctx.Log.Info("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
 	pageSize := uint64(args.PageSize)
-	if pageSize == 0 || pageSize > maxPageSize {
-		return fmt.Errorf("pageSize must be greater than zero and less than the maximum allowed size of %d", maxPageSize)
+	if pageSize > maxPageSize {
+		return fmt.Errorf("pageSize > maximum allowed (%d)", maxPageSize)
+	} else if pageSize == 0 {
+		pageSize = maxPageSize
 	}
 
 	// Parse to address
