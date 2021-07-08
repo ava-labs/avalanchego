@@ -80,7 +80,8 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
-
+	// TODO verify gas limit EIP-1559
+	// TODO verify base fee is not there pre Apricot Phase 4 and is correct post Apricot Phase 4
 	if config := chain.Config(); config.IsApricotPhase1(new(big.Int).SetUint64((header.Time))) {
 		if header.GasLimit != params.ApricotPhase1GasLimit {
 			return fmt.Errorf("expected gas limit to be %d, but found %d", params.ApricotPhase1GasLimit, header.GasLimit)
@@ -97,6 +98,19 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
 		}
 	}
+
+	// if !chain.Config().IsLondon(header.Number) {
+	// 	// Verify BaseFee not present before EIP-1559 fork.
+	// 	if header.BaseFee != nil {
+	// 		return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
+	// 	}
+	// 	if err := misc.VerifyGaslimit(parent.GasLimit, header.GasLimit); err != nil {
+	// 		return err
+	// 	}
+	// } else if err := misc.VerifyEip1559Header(chain.Config(), parent, header); err != nil {
+	// 	// Verify the header's EIP-1559 attributes.
+	// 	return err
+	// }
 
 	// Verify that the block number is parent's +1
 	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
@@ -191,3 +205,6 @@ func (self *DummyEngine) ExtraStateChange(block *types.Block, statedb *state.Sta
 	}
 	return nil
 }
+
+// TODO ensure that baseFee is correctly serialized on block headers as this is handled in other consensus engines
+// to some extent - the seal hash
