@@ -36,7 +36,7 @@ var (
 // 1) A UTXO that the transaction consumes was at least partially owned by the address.
 // 2) A UTXO that the transaction produces is at least partially owned by the address.
 type AddressTxsIndexer interface {
-	// Add must be called after [txID] passes verification.
+	// Add is called during [txID]'s SemanticVerify.
 	// [inputUTXOIDs] are the IDs of UTXOs [txID] consumes.
 	// [outputUTXOs] are the UTXOs [txID] creates.
 	// [getUTXOF] can be used to look up UTXOs by ID.
@@ -47,14 +47,14 @@ type AddressTxsIndexer interface {
 		getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
 	)
 
-	// Accept must be called when [txID] is accepted.
+	// Accept is called when [txID] is accepted.
 	// Persists data about [txID] and what balances it changed.
 	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM.
 	Accept(txID ids.ID) error
 
-	// Reject must be called when [txID] is rejected.
-	// Clears unwritten state about a rejected tx.
-	Reject(ids.ID)
+	// Clear is called when [txID] is rejected or fails verification.
+	// Clears unwritten state about the tx.
+	Clear(ids.ID)
 
 	// Read returns the IDs of transactions that changed [address]'s balance of [assetID].
 	// The returned transactions are in order of increasing acceptance time.
@@ -103,7 +103,7 @@ func NewIndexer(
 }
 
 // add marks that [txID] changes the balance of [assetID] for [addrs]
-// This data is either written in Accept() or cleared in Reject()
+// This data is either written in Accept() or cleared in Clear()
 func (i *indexer) add(txID, assetID ids.ID, addrs []ids.ShortID) {
 	for _, address := range addrs {
 		if _, exists := i.balanceChanges[txID]; !exists {
@@ -243,8 +243,8 @@ func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uin
 	return txIDs, nil
 }
 
-// Reject clears data about which balances [txID] changed.
-func (i *indexer) Reject(txID ids.ID) {
+// Clear clears data about which balances [txID] changed.
+func (i *indexer) Clear(txID ids.ID) {
 	i.balanceChanges[txID] = make(map[ids.ShortID]map[ids.ID]struct{})
 }
 
@@ -319,7 +319,7 @@ func (i *noIndexer) Accept(ids.ID) error {
 	return nil
 }
 
-func (i *noIndexer) Reject(ids.ID) {}
+func (i *noIndexer) Clear(ids.ID) {}
 
 func (i *noIndexer) Read(ids.ShortID, ids.ID, uint64, uint64) ([]ids.ID, error) {
 	return nil, nil

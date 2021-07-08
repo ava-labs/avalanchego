@@ -190,7 +190,7 @@ func (tx *UniqueTx) Reject() error {
 
 	tx.deps = nil // Needed to prevent a memory leak
 
-	tx.vm.addressTxsIndexer.Reject(tx.ID())
+	tx.vm.addressTxsIndexer.Clear(tx.ID())
 	return nil
 }
 
@@ -334,5 +334,9 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	return tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx)
+	if err := tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx); err != nil {
+		tx.vm.addressTxsIndexer.Clear(tx.ID())
+		return err
+	}
+	return nil
 }
