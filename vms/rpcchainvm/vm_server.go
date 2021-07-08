@@ -6,6 +6,7 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -390,9 +391,12 @@ func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyReque
 	if err != nil {
 		return nil, err
 	}
-	blk, err := vm.vm.GetBlock(id)
+	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
 		return nil, err
+	}
+	if blk.ID() != id {
+		return nil, fmt.Errorf("expected block ID to match request %s, but found %s", id, blk.ID())
 	}
 	return &vmproto.BlockVerifyResponse{}, blk.Verify()
 }
