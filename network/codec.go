@@ -101,7 +101,7 @@ func (c codec) Pack(
 	p.PackByte(byte(op))
 
 	// Optionally, pack whether the payload is compressed
-	if includeIsCompressedFlag {
+	if includeIsCompressedFlag && op.Compressable() {
 		p.PackBool(compress)
 	}
 
@@ -163,7 +163,7 @@ func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
 
 	// See if messages of this type may be compressed
 	compressed := false
-	if parseIsCompressedFlag {
+	if op.Compressable() && parseIsCompressedFlag {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {

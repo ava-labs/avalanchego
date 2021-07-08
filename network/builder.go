@@ -24,8 +24,8 @@ func (b Builder) GetVersion() (Msg, error) {
 		buf,
 		GetVersion,
 		nil,
-		false, // GetVersion messages can't be compressed
-		false, // GetVersion messages can't be compressed
+		GetVersion.Compressable(), // GetVersion messages can't be compressed
+		GetVersion.Compressable(), // GetVersion messages can't be compressed
 	)
 }
 
@@ -52,8 +52,8 @@ func (b Builder) Version(
 			VersionTime: myVersionTime,
 			SigBytes:    sig,
 		},
-		false, // Version Messages can't be compressed
-		false, // Version Messages can't be compressed
+		Version.Compressable(), // Version Messages can't be compressed
+		Version.Compressable(), // Version Messages can't be compressed
 	)
 }
 
@@ -73,7 +73,7 @@ func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag, com
 			SignedPeers: peers,
 		},
 		includeIsCompressedFlag, // PeerList messages may be compressed
-		compress,
+		compress && PeerList.Compressable(),
 	)
 }
 
@@ -84,8 +84,8 @@ func (b Builder) Ping() (Msg, error) {
 		buf,
 		Ping,
 		nil,
-		false, // Ping messages can't be compressed
-		false,
+		Ping.Compressable(), // Ping messages can't be compressed
+		Ping.Compressable(),
 	)
 }
 
@@ -96,8 +96,8 @@ func (b Builder) Pong() (Msg, error) {
 		buf,
 		Pong,
 		nil,
-		false, // Ping messages can't be compressed
-		false,
+		Pong.Compressable(), // Ping messages can't be compressed
+		Pong.Compressable(),
 	)
 }
 
@@ -116,8 +116,8 @@ func (b Builder) GetAcceptedFrontier(
 			RequestID: requestID,
 			Deadline:  deadline,
 		},
-		false, // GetAcceptedFrontier messages can't be compressed
-		false,
+		GetAcceptedFrontier.Compressable(), // GetAcceptedFrontier messages can't be compressed
+		GetAcceptedFrontier.Compressable(),
 	)
 }
 
@@ -141,8 +141,8 @@ func (b Builder) AcceptedFrontier(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		false, // AcceptedFrontier messages can't be compressed
-		false,
+		AcceptedFrontier.Compressable(), // AcceptedFrontier messages can't be compressed
+		AcceptedFrontier.Compressable(),
 	)
 }
 
@@ -168,8 +168,8 @@ func (b Builder) GetAccepted(
 			Deadline:     deadline,
 			ContainerIDs: containerIDBytes,
 		},
-		false, // GetAccepted messages can't be compressed
-		false,
+		GetAccepted.Compressable(), // GetAccepted messages can't be compressed
+		GetAccepted.Compressable(),
 	)
 }
 
@@ -193,8 +193,8 @@ func (b Builder) Accepted(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		false, // Accepted messages can't be compressed
-		false,
+		Accepted.Compressable(), // Accepted messages can't be compressed
+		Accepted.Compressable(),
 	)
 }
 
@@ -215,8 +215,8 @@ func (b Builder) GetAncestors(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		false, // GetAncestors messages can't be compressed
-		false,
+		GetAncestors.Compressable(), // GetAncestors messages can't be compressed
+		GetAncestors.Compressable(),
 	)
 }
 
@@ -238,7 +238,7 @@ func (b Builder) MultiPut(
 			MultiContainerBytes: containers,
 		},
 		includeIsCompressedFlag,
-		compressed,
+		compressed && MultiPut.Compressable(),
 	)
 }
 
@@ -259,8 +259,8 @@ func (b Builder) Get(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		false, // Get messages can't be compressed
-		false,
+		Get.Compressable(), // Get messages can't be compressed
+		Get.Compressable(),
 	)
 }
 
@@ -284,7 +284,7 @@ func (b Builder) Put(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		compress,
+		compress && Put.Compressable(),
 	)
 }
 
@@ -310,7 +310,7 @@ func (b Builder) PushQuery(
 			ContainerBytes: container,
 		},
 		includeIsCompressedFlag,
-		compress,
+		compress && PushQuery.Compressable(),
 	)
 }
 
@@ -331,8 +331,8 @@ func (b Builder) PullQuery(
 			Deadline:    deadline,
 			ContainerID: containerID[:],
 		},
-		false, // PullQuery messages can't be compressed
-		false,
+		PullQuery.Compressable(), // PullQuery messages can't be compressed
+		PullQuery.Compressable(),
 	)
 }
 
@@ -356,7 +356,7 @@ func (b Builder) Chits(
 			RequestID:    requestID,
 			ContainerIDs: containerIDBytes,
 		},
-		false, // Chits messages can't be compressed
-		false,
+		Chits.Compressable(), // Chits messages can't be compressed
+		Chits.Compressable(),
 	)
 }

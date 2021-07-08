@@ -217,12 +217,14 @@ func TestCodecPackParseGzip(t *testing.T) {
 		},
 	}
 
+	peerSupportsCompression := false
+	compressionEnabledOnNode := false
 	// Test without compression
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(nil, m.op, m.fields, false, false)
+		packedIntf, err := c.Pack(nil, m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode)
 		assert.NoError(t, err, "failed on operation %s", m.op)
 
-		unpackedIntf, err := c.Parse(packedIntf.Bytes(), false)
+		unpackedIntf, err := c.Parse(packedIntf.Bytes(), peerSupportsCompression)
 		assert.NoError(t, err)
 
 		packed := packedIntf.(*msg)
@@ -238,13 +240,14 @@ func TestCodecPackParseGzip(t *testing.T) {
 		assert.EqualValues(t, packed.bytes, unpacked.bytes)
 	}
 
-	// Test with compression
+	// Test with Op based compression
+	peerSupportsCompression = true
+	compressionEnabledOnNode = true
 	for _, m := range msgs {
-		compress := m.op == Put || m.op == PushQuery || m.op == PeerList || m.op == MultiPut
-		packedIntf, err := c.Pack(nil, m.op, m.fields, true, compress)
+		packedIntf, err := c.Pack(nil, m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode && m.op.Compressable())
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
-		unpackedIntf, err := c.Parse(packedIntf.Bytes(), true)
+		unpackedIntf, err := c.Parse(packedIntf.Bytes(), peerSupportsCompression)
 		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
 		packed := packedIntf.(*msg)

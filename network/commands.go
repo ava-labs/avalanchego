@@ -152,6 +152,48 @@ func (f Field) String() string {
 // Op is an opcode
 type Op byte
 
+func (op Op) Compressable() bool {
+	switch op {
+	case GetVersion:
+		return false
+	case Version:
+		return false
+	case GetPeerList:
+		return false
+	case PeerList:
+		return true
+	case Ping:
+		return false
+	case Pong:
+		return false
+	case GetAcceptedFrontier:
+		return false
+	case AcceptedFrontier:
+		return false
+	case GetAccepted:
+		return false
+	case Accepted:
+		return false
+	case Get:
+		return false
+	case GetAncestors:
+		return false
+	case Put:
+		return true
+	case MultiPut:
+		return true
+	case PushQuery:
+		return true
+	case PullQuery:
+		return false
+	case Chits:
+		return false
+	default:
+		// we don't recognise the message
+		return false
+	}
+}
+
 func (op Op) String() string {
 	switch op {
 	case GetVersion:
