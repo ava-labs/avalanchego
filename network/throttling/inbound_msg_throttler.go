@@ -4,7 +4,6 @@
 package throttling
 
 import (
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -19,12 +18,12 @@ import (
 )
 
 var (
-	_ MsgThrottler = &noMsgThrottler{}
-	_ MsgThrottler = &sybilMsgThrottler{}
+	_ InboundMsgThrottler = &noInboundMsgThrottler{}
+	_ InboundMsgThrottler = &sybilInboundMsgThrottler{}
 )
 
-// MsgThrottler rate-limits incoming messages from the network.
-type MsgThrottler interface {
+// InboundMsgThrottler rate-limits incoming messages from the network.
+type InboundMsgThrottler interface {
 	// Blocks until node [nodeID] can put a message of
 	// size [msgSize] onto the incoming message buffer.
 	Acquire(msgSize uint64, nodeID ids.ShortID)
@@ -44,33 +43,28 @@ type msgMetadata struct {
 	closeOnAcquireChan chan struct{}
 }
 
-// See sybilMsgThrottler
-type MsgThrottlerConfig struct {
-	VdrAllocSize        uint64
-	AtLargeAllocSize    uint64
-	NodeMaxAtLargeBytes uint64
-}
-
 // Returns a new MsgThrottler.
 // If this function returns an error, the returned MsgThrottler may still be used.
 // However, some of its metrics may not be registered.
-func NewSybilMsgThrottler(
+func NewSybilInboundMsgThrottler(
 	log logging.Logger,
 	metricsRegisterer prometheus.Registerer,
 	vdrs validators.Set,
 	config MsgThrottlerConfig,
-) (MsgThrottler, error) {
-	t := &sybilMsgThrottler{
-		log:                    log,
-		vdrs:                   vdrs,
-		maxVdrBytes:            config.VdrAllocSize,
-		remainingVdrBytes:      config.VdrAllocSize,
-		remainingAtLargeBytes:  config.AtLargeAllocSize,
-		nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
-		nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
-		nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
-		waitingToAcquire:       linkedhashmap.New(),
-		nodeToWaitingMsgIDs:    make(map[ids.ShortID][]uint64),
+) (InboundMsgThrottler, error) {
+	t := &sybilInboundMsgThrottler{
+		commonMsgThrottler: commonMsgThrottler{
+			log:                    log,
+			vdrs:                   vdrs,
+			maxVdrBytes:            config.VdrAllocSize,
+			remainingVdrBytes:      config.VdrAllocSize,
+			remainingAtLargeBytes:  config.AtLargeAllocSize,
+			nodeMaxAtLargeBytes:    config.NodeMaxAtLargeBytes,
+			nodeToVdrBytesUsed:     make(map[ids.ShortID]uint64),
+			nodeToAtLargeBytesUsed: make(map[ids.ShortID]uint64),
+		},
+		waitingToAcquire:    linkedhashmap.New(),
+		nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
 	}
 	if err := t.metrics.initialize(metricsRegisterer); err != nil {
 		return nil, err
@@ -82,27 +76,10 @@ func NewSybilMsgThrottler(
 // It gives more space to validators with more stake.
 // Messages are guaranteed to make progress toward
 // acquiring enough bytes to be read.
-type sybilMsgThrottler struct {
-	log       logging.Logger
-	metrics   sybilMsgThrottlerMetrics
-	lock      sync.RWMutex
+type sybilInboundMsgThrottler struct {
+	commonMsgThrottler
+	metrics   sybilInboundMsgThrottlerMetrics
 	nextMsgID uint64
-	// Primary network validator set
-	vdrs validators.Set
-	// Max number of unprocessed bytes from validators
-	maxVdrBytes uint64
-	// Max number of bytes that can be taken from the
-	// at-large byte allocation by a given node.
-	nodeMaxAtLargeBytes uint64
-	// Number of bytes left in the validator byte allocation.
-	// Initialized to [maxVdrBytes].
-	remainingVdrBytes uint64
-	// Number of bytes left in the at-large byte allocation
-	remainingAtLargeBytes uint64
-	// Node ID --> Bytes they've taken from the validator allocation
-	nodeToVdrBytesUsed map[ids.ShortID]uint64
-	// Node ID --> Bytes they've taken from the at-large allocation
-	nodeToAtLargeBytesUsed map[ids.ShortID]uint64
 	// Node ID --> IDs of messages this node is waiting to acquire,
 	// order from oldest to most recent.
 	nodeToWaitingMsgIDs map[ids.ShortID][]uint64
@@ -125,7 +102,7 @@ type sybilMsgThrottler struct {
 // Returns when we can read a message of size [msgSize] from node [nodeID].
 // Release([msgSize], [nodeID]) must be called (!) when done with the message
 // or when we give up trying to read the message, if applicable.
-func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
+func (t *sybilInboundMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 	t.metrics.awaitingAcquire.Inc()
 	startTime := time.Now()
 	defer func() {
@@ -209,7 +186,7 @@ func (t *sybilMsgThrottler) Acquire(msgSize uint64, nodeID ids.ShortID) {
 }
 
 // Must correspond to a previous call of Acquire([msgSize], [nodeID])
-func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
+func (t *sybilInboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	t.lock.Lock()
 	defer func() {
 		t.metrics.remainingAtLargeBytes.Set(float64(t.remainingAtLargeBytes))
@@ -310,7 +287,7 @@ func (t *sybilMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 	}
 }
 
-type sybilMsgThrottlerMetrics struct {
+type sybilInboundMsgThrottlerMetrics struct {
 	acquireLatency        prometheus.Histogram
 	remainingAtLargeBytes prometheus.Gauge
 	remainingVdrBytes     prometheus.Gauge
@@ -318,31 +295,31 @@ type sybilMsgThrottlerMetrics struct {
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *sybilMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
+func (m *sybilInboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
 	m.acquireLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_acquire_latency",
+		Name:      "throttler_inbound_acquire_latency",
 		Help:      "Duration an incoming message waited to be read due to throttling",
 		Buckets:   metric.NanosecondsBuckets,
 	})
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_remaining_at_large_bytes",
+		Name:      "throttler_inbound_remaining_at_large_bytes",
 		Help:      "Bytes remaining in the at large byte allocation",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_remaining_validator_bytes",
+		Name:      "throttler_inbound_remaining_validator_bytes",
 		Help:      "Bytes remaining in the validator byte allocation",
 	})
 	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_awaiting_acquire",
+		Name:      "throttler_inbound_awaiting_acquire",
 		Help:      "Number of incoming messages waiting to be read",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "throttler_awaiting_release",
+		Name:      "throttler_inbound_awaiting_release",
 		Help:      "Number of messages currently being read/handled",
 	})
 	errs := wrappers.Errs{}
@@ -356,14 +333,14 @@ func (m *sybilMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Regis
 	return errs.Err
 }
 
-func NewNoThrottler() MsgThrottler {
-	return &noMsgThrottler{}
+func NewNoInboundThrottler() InboundMsgThrottler {
+	return &noInboundMsgThrottler{}
 }
 
 // noMsgThrottler implements MsgThrottler.
 // [Acquire] always returns immediately.
-type noMsgThrottler struct{}
+type noInboundMsgThrottler struct{}
 
-func (*noMsgThrottler) Acquire(uint64, ids.ShortID) {}
+func (*noInboundMsgThrottler) Acquire(uint64, ids.ShortID) {}
 
-func (*noMsgThrottler) Release(uint64, ids.ShortID) {}
+func (*noInboundMsgThrottler) Release(uint64, ids.ShortID) {}
