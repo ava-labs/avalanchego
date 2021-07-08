@@ -246,9 +246,6 @@ func TestIssueImportTx(t *testing.T) {
 
 	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
 	assert.NoError(t, err)
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
@@ -261,7 +258,6 @@ func TestIssueImportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-		shutdownNodeFunc,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -423,9 +419,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
@@ -437,7 +430,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-		shutdownNodeFunc,
 	)
 	if err != nil {
 		t.Fatal(err)

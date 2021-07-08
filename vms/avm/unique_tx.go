@@ -122,6 +122,7 @@ func (tx *UniqueTx) Accept() error {
 	defer tx.vm.db.Abort()
 
 	if err := tx.vm.addressTxsIndexer.Accept(txID); err != nil {
+		_ = tx.vm.Shutdown()
 		return err
 	}
 

@@ -40,16 +40,19 @@ type AddressTxsIndexer interface {
 	// [inputUTXOIDs] are the IDs of UTXOs [txID] consumes.
 	// [outputUTXOs] are the UTXOs [txID] creates.
 	// [getUTXOF] can be used to look up UTXOs by ID.
+	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM,
+	// and shut down this chain.
 	Add(
 		txID ids.ID,
 		inputUTXOIDs []*avax.UTXOID,
 		outputUTXOs []*avax.UTXO,
 		getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
-	)
+	) error
 
 	// Accept is called when [txID] is accepted.
 	// Persists data about [txID] and what balances it changed.
-	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM.
+	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM,
+	// and shut down this chain.
 	Accept(txID ids.ID) error
 
 	// Clear is called when [txID] is rejected or fails verification.
@@ -71,8 +74,6 @@ type indexer struct {
 	// txID -> Address -> AssetID --> exists if the address's balance
 	// of the asset is changed by processing tx [txID]
 	balanceChanges map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}
-	// Called in a goroutine on shutdown. Stops this node.
-	shutdownF func(int)
 }
 
 // NewIndexer Returns a new AddressTxsIndexer.
@@ -80,7 +81,6 @@ type indexer struct {
 func NewIndexer(
 	db database.Database,
 	log logging.Logger,
-	shutdownF func(int),
 	metricsNamespace string,
 	metricsRegisterer prometheus.Registerer,
 	allowIncompleteIndices bool,
@@ -89,7 +89,6 @@ func NewIndexer(
 		balanceChanges: make(map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}),
 		db:             db,
 		log:            log,
-		shutdownF:      shutdownF,
 	}
 	// initialize the indexer
 	if err := i.init(allowIncompleteIndices); err != nil {
@@ -123,15 +122,12 @@ func (i *indexer) Add(
 	inputUTXOIDs []*avax.UTXOID,
 	outputUTXOs []*avax.UTXO,
 	getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
-) {
+) error {
 	utxos := outputUTXOs
 	for _, utxoID := range inputUTXOIDs {
 		utxo, err := getUTXOF(utxoID)
 		if err != nil { // should never happen
-			i.log.Fatal("error finding UTXO %s: %s", utxoID, err)
-			// Shut down the node
-			go i.shutdownF(DatabaseOpErrorExitCode)
-			return
+			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
 		}
 		utxos = append(utxos, utxo)
 	}
@@ -143,6 +139,7 @@ func (i *indexer) Add(
 		}
 		i.add(txID, utxo.AssetID(), out.Addrs)
 	}
+	return nil
 }
 
 // Accept persists which balances [txID] changed.
@@ -166,9 +163,7 @@ func (i *indexer) Accept(txID ids.ID) error {
 			switch {
 			case err != nil && err != database.ErrNotFound:
 				// Unexpected error
-				i.log.Fatal("error indexing txID %s: %s", txID, err)
-				go i.shutdownF(DatabaseOpErrorExitCode)
-				return err
+				return fmt.Errorf("error indexing txID %s: %s", txID, err)
 			case err == database.ErrNotFound:
 				// idx not found; this must be the first entry.
 				idx = 0
@@ -182,9 +177,7 @@ func (i *indexer) Accept(txID ids.ID) error {
 			// write the [txID] at the index
 			i.log.Verbo("writing address/assetID/index/txID %s/%s/%d/%s", address, assetID, idx, txID)
 			if err := assetPrefixDB.Put(idxBytes, txID[:]); err != nil {
-				i.log.Fatal("failed to write txID while indexing %s: %s", txID, err)
-				go i.shutdownF(DatabaseOpErrorExitCode)
-				return err
+				return fmt.Errorf("failed to write txID while indexing %s: %s", txID, err)
 			}
 
 			// increment and store the index for next use
@@ -192,9 +185,7 @@ func (i *indexer) Accept(txID ids.ID) error {
 			binary.BigEndian.PutUint64(idxBytes, idx)
 
 			if err := assetPrefixDB.Put(idxKey, idxBytes); err != nil {
-				i.log.Fatal("failed to write index txID while indexing %s: %s", txID, err)
-				go i.shutdownF(DatabaseOpErrorExitCode)
-				return err
+				return fmt.Errorf("failed to write index txID while indexing %s: %s", txID, err)
 			}
 		}
 	}
@@ -294,7 +285,8 @@ func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer
 	return &noIndexer{}, nil
 }
 
-func (i *noIndexer) Add(ids.ID, []*avax.UTXOID, []*avax.UTXO, func(utxoID *avax.UTXOID) (*avax.UTXO, error)) {
+func (i *noIndexer) Add(ids.ID, []*avax.UTXOID, []*avax.UTXO, func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
+	return nil
 }
 
 func (i *noIndexer) Accept(ids.ID) error {

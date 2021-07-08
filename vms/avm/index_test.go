@@ -5,7 +5,6 @@ package avm
 
 import (
 	"encoding/binary"
-	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/avm/index"
@@ -108,8 +107,9 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs, uniqueParsedTX.UTXOs(), vm.getUTXO)
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
+		err := vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs, uniqueParsedTX.UTXOs(), vm.getUTXO)
+		assert.NoError(t, err)
+		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -192,8 +192,9 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		addressTxMap[addr] = uniqueParsedTX
 
 		// index the transaction
-		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
+		err := vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
+		assert.NoError(t, err)
+		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -276,7 +277,8 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		addressTxMap[addr] = uniqueParsedTX
 
 		// index the transaction, NOT calling Accept(ids.ID) method
-		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
+		err := vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
+		assert.NoError(t, err)
 		txIDs = append(txIDs, uniqueParsedTX.ID())
 	}
 
@@ -336,12 +338,8 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 
 	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
 
-	shutdownFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
-
 	// start with indexing enabled
-	_, err := index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
+	_, err := index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
 	// now disable indexing with allow-incomplete set to false
@@ -361,16 +359,12 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 	_, err := index.NewNoIndexer(db, false)
 	assert.NoError(t, err)
 
-	shutdownFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
-
 	// It's not OK to have an incomplete index when allowIncompleteIndices is false
-	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
+	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
 	assert.Error(t, err)
 
 	// It's OK to have an incomplete index when allowIncompleteIndices is true
-	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
+	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
 	// It's OK to have an incomplete index when indexing currently disabled
@@ -392,53 +386,12 @@ func TestIndexingAllowIncomplete(t *testing.T) {
 	_, err := index.NewNoIndexer(db, false)
 	assert.NoError(t, err)
 
-	shutdownFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
-
 	// we initialise with indexing enabled now and allow incomplete indexing as false
-	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
+	_, err = index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), false)
 	// we should get error because:
 	// - indexing was disabled previously
 	// - node now is asked to enable indexing with allow incomplete set to false
 	assert.Error(t, err)
-}
-
-func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-	ctx := NewContext(t)
-
-	prefixDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
-	db := versiondb.New(prefixDB)
-
-	called := make(chan struct{}, 1)
-	shutdownFunc := func(code int) {
-		assert.Equal(t, code, index.DatabaseOpErrorExitCode)
-		called <- struct{}{}
-	}
-
-	// function always returns error indicating that the utxo was not found
-	getUTXOFn := func(utxoid *avax.UTXOID) (*avax.UTXO, error) {
-		return nil, fmt.Errorf("not found")
-	}
-
-	indexer, err := index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
-	assert.NoError(t, err)
-	indexer.Add(
-		ids.GenerateTestID(),
-		[]*avax.UTXOID{
-			{
-				TxID:        ids.GenerateTestID(),
-				OutputIndex: 1,
-				Symbol:      false,
-			},
-		},
-		nil,
-		getUTXOFn,
-	)
-
-	// we expect shutdown to have been called with the right exit code
-	<-called
 }
 
 func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax.UTXO {
@@ -492,13 +445,10 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 	vm := &VM{}
 	avmConfigBytes, err := BuildAvmConfigBytes(config)
 	assert.NoError(t, err)
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	if err := vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, avmConfigBytes, issuer, []*common.Fx{{
 		ID: ids.Empty,
 		Fx: &secp256k1fx.Fx{},
-	}}, shutdownNodeFunc); err != nil {
+	}}); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0

@@ -862,9 +862,6 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	err := vm.Initialize(
 		ctx,
 		manager.NewMemDB(version.DefaultVersion1_0_0),
@@ -882,7 +879,6 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 				Fx: fx,
 			},
 		},
-		shutdownNodeFunc,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1288,9 +1284,6 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	fx.InitializeF = func(interface{}) error {
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
 		{
 			ID: ids.ID{1},
@@ -1300,7 +1293,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: fx,
 		},
-	}, shutdownNodeFunc)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1426,9 +1419,6 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	fx.InitializeF = func(interface{}) error {
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	err := vm.Initialize(
 		ctx,
 		manager.NewMemDB(version.DefaultVersion1_0_0),
@@ -1446,7 +1436,6 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 				Fx: fx,
 			},
 		},
-		shutdownNodeFunc,
 	)
 	if err != nil {
 		t.Fatal(err)

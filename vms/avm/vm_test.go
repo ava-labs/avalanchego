@@ -276,9 +276,6 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 		txFee:         testTxFee,
 		creationTxFee: testTxFee,
 	}
-	shutdownNodeFunc := func(int) {
-		tb.Fatal("should not have called shutdown")
-	}
 	configBytes, err := BuildAvmConfigBytes(Config{IndexTransactions: true})
 	if err != nil {
 		tb.Fatal("should not have caused error in creating avm config bytes")
@@ -292,7 +289,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 			ID: nftfx.ID,
 			Fx: &nftfx.Fx{},
 		},
-	}, shutdownNodeFunc)
+	})
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -592,10 +589,7 @@ func TestInvalidGenesis(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), nil, nil, nil, make(chan common.Message, 1), nil, shutdownNodeFunc)
+	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), nil, nil, nil, make(chan common.Message, 1), nil)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid genesis")
 	}
@@ -611,13 +605,10 @@ func TestInvalidFx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, make(chan common.Message, 1), []*common.Fx{ // fxs
 		nil,
-	}, shutdownNodeFunc)
+	})
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid interface")
 	}
@@ -633,9 +624,6 @@ func TestFxInitializationFailure(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
 		ctx,
@@ -652,7 +640,6 @@ func TestFxInitializationFailure(t *testing.T) {
 				},
 			},
 		}},
-		shutdownNodeFunc,
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid fx initialization")
@@ -860,9 +847,6 @@ func TestIssueNFT(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
@@ -874,7 +858,7 @@ func TestIssueNFT(t *testing.T) {
 			ID: ids.Empty.Prefix(1),
 			Fx: &nftfx.Fx{},
 		},
-	}, shutdownNodeFunc)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1001,9 +985,6 @@ func TestIssueProperty(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
@@ -1019,7 +1000,7 @@ func TestIssueProperty(t *testing.T) {
 			ID: ids.Empty.Prefix(2),
 			Fx: &propertyfx.Fx{},
 		},
-	}, shutdownNodeFunc)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

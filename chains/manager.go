@@ -515,7 +515,6 @@ func (m *manager) createAvalancheChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		m.ShutdownNodeFunc,
 	); err != nil {
 		return nil, fmt.Errorf("error initializing VM: %w", err)
 	}
@@ -656,7 +655,6 @@ func (m *manager) createSnowmanChain(
 		chainConfig.Config,
 		msgChan,
 		fxs,
-		m.ShutdownNodeFunc,
 	); err != nil {
 		return nil, err
 	}

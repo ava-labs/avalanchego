@@ -1026,9 +1026,6 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	avaxID := genesisTx.ID()
 
 	issuer := make(chan common.Message, 1)
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
@@ -1052,7 +1049,6 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 				},
 			},
 		},
-		shutdownNodeFunc,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1203,9 +1199,6 @@ func TestIssueExportTx(t *testing.T) {
 	avaxID := genesisTx.ID()
 
 	ctx.Lock.Lock()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	vm := &VM{}
 	if err := vm.Initialize(
 		ctx,
@@ -1217,7 +1210,6 @@ func TestIssueExportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-		shutdownNodeFunc,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -1342,9 +1334,6 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	}
 	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
 	assert.NoError(t, err)
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
@@ -1357,7 +1346,6 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
-		shutdownNodeFunc,
 	)
 	if err != nil {
 		t.Fatal(err)

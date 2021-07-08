@@ -45,7 +45,6 @@ type VM interface {
 		configBytes []byte,
 		toEngine chan<- Message,
 		fxs []*Fx,
-		shutdownNodeFunc func(int),
 	) error
 
 	// Bootstrapping is called when the node is starting to bootstrap this chain.

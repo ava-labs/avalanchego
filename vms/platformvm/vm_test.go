@@ -284,7 +284,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 	return &buildGenesisArgs, genesisBytes
 }
 
-func defaultVM(t *testing.T) (*VM, database.Database) {
+func defaultVM() (*VM, database.Database) {
 	vm := &VM{Factory: Factory{
 		Chains:             chains.MockManager{},
 		Validators:         validators.NewManager(),
@@ -315,10 +315,7 @@ func defaultVM(t *testing.T) (*VM, database.Database) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		panic(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -385,12 +382,9 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -423,7 +417,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 // Ensure genesis state is parsed from bytes and stored correctly
 func TestGenesis(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -590,7 +584,7 @@ func TestGenesisGetUTXOs(t *testing.T) {
 
 // accept proposal to add validator to primary network
 func TestAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -670,7 +664,7 @@ func TestAddValidatorCommit(t *testing.T) {
 
 // verify invalid proposal to add validator to primary network
 func TestInvalidAddValidatorCommit(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -740,7 +734,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -815,7 +809,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 // Reject proposal to add validator to primary network
 func TestAddValidatorInvalidNotReissued(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -861,7 +855,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 // Accept proposal to add validator to subnet
 func TestAddSubnetValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -944,7 +938,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 
 // Reject proposal to add validator to subnet
 func TestAddSubnetValidatorReject(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1027,7 +1021,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 
 // Test case where primary network validator rewarded
 func TestRewardValidatorAccept(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1126,7 +1120,7 @@ func TestRewardValidatorAccept(t *testing.T) {
 
 // Test case where primary network validator not rewarded
 func TestRewardValidatorReject(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1214,7 +1208,7 @@ func TestRewardValidatorReject(t *testing.T) {
 
 // Test case where primary network validator is preferred to be rewarded
 func TestRewardValidatorPreferred(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1300,7 +1294,7 @@ func TestRewardValidatorPreferred(t *testing.T) {
 
 // Ensure BuildBlock errors when there is no block to build
 func TestUnneededBuildBlock(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1315,7 +1309,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 
 // test acceptance of proposal to create a new chain
 func TestCreateChain(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1371,7 +1365,7 @@ func TestCreateChain(t *testing.T) {
 // 3) Advance timestamp to validator's start time (moving the validator from pending to current)
 // 4) Advance timestamp to validator's end time (removing validator from current)
 func TestCreateSubnet(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1602,7 +1596,7 @@ func TestCreateSubnet(t *testing.T) {
 
 // test asset import
 func TestAtomicImport(t *testing.T) {
-	vm, baseDB := defaultVM(t)
+	vm, baseDB := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1695,7 +1689,7 @@ func TestAtomicImport(t *testing.T) {
 
 // test optimistic asset import
 func TestOptimisticAtomicImport(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1783,11 +1777,8 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
 	firstCtx.Lock.Lock()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, shutdownNodeFunc); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1876,7 +1867,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, shutdownNodeFunc); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1906,11 +1897,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
 	firstCtx.Lock.Lock()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, shutdownNodeFunc); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2010,7 +1998,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, shutdownNodeFunc); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 	lastAccepted, err := secondVM.LastAccepted()
@@ -2046,11 +2034,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2256,11 +2241,8 @@ func TestUnverifiedParent(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
+	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2315,7 +2297,7 @@ func TestUnverifiedParent(t *testing.T) {
 }
 
 func TestMaxStakeAmount(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -2412,11 +2394,8 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, shutdownNodeFunc); err != nil {
+	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}
 

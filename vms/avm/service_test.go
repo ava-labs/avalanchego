@@ -400,11 +400,8 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 func TestServiceGetTxs(t *testing.T) {
 	_, vm, s, _, _ := setup(t, true)
-	shutdownNodeFunc := func(int) {
-		t.Fatal("should not have called shutdown")
-	}
 	var err error
-	vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, "", prometheus.NewRegistry(), false)
+	vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", prometheus.NewRegistry(), false)
 	assert.NoError(t, err)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

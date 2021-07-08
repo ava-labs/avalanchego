@@ -11,7 +11,7 @@ import (
 )
 
 func TestSemanticVerifySpendUTXOs(t *testing.T) {
-	vm, _ := defaultVM(t)
+	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

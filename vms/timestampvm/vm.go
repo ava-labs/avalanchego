@@ -48,7 +48,7 @@ type VM struct {
 // [toEngine] is used to notify the consensus engine that new blocks are
 //   ready to be added to consensus
 // The data in the genesis block is [genesisData]
-func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisData []byte, upgradeData []byte, configData []byte, toEngine chan<- common.Message, fxs []*common.Fx, shutdownNodeFunc func(int)) error {
+func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisData []byte, upgradeData []byte, configData []byte, toEngine chan<- common.Message, fxs []*common.Fx) error {
 	if err := vm.SnowmanVM.Initialize(ctx, dbManager.Current().Database, vm.ParseBlock, toEngine); err != nil {
 		ctx.Log.Error("error initializing SnowmanVM: %v", err)
 		return err
