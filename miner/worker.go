@@ -130,6 +130,18 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		Extra:      nil,
 		Time:       uint64(timestamp),
 	}
+	// TODO(aaronbuchwald) handle gas limit and base fee creation if enabled in miner
+	// bigTimestamp := new(big.Int).SetUint64(timestamp)
+	// Set baseFee and GasLimit if we are on an EIP-1559 chain
+	// if w.chainConfig.IsApricotPhase4(bigTimestamp) {
+	// 	header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
+	// 	parentGasLimit := parent.GasLimit()
+	// 	if !w.chainConfig.IsLondon(parent.Number) {
+	// 		// Bump by 2x
+	// 		parentGasLimit = parent.GasLimit() * params.ElasticityMultiplier
+	// 	}
+	// 	header.GasLimit = core.CalcGasLimit1559(parentGasLimit, w.config.GasCeil)
+	// }
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
 	}
@@ -147,7 +159,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	}
 
 	// Fill the block with all available pending transactions.
-	pending, err := w.eth.TxPool().Pending()
+	pending, err := w.eth.TxPool().Pending(true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch pending transactions: %w", err)
 	}
@@ -162,11 +174,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		}
 	}
 	if len(localTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(env.signer, localTxs)
+		txs := types.NewTransactionsByPriceAndNonce(env.signer, localTxs, header.BaseFee)
 		w.commitTransactions(env, txs, w.coinbase)
 	}
 	if len(remoteTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(env.signer, remoteTxs)
+		txs := types.NewTransactionsByPriceAndNonce(env.signer, remoteTxs, header.BaseFee)
 		w.commitTransactions(env, txs, w.coinbase)
 	}
 
