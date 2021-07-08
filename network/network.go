@@ -276,7 +276,6 @@ func NewDefaultNetwork(
 	gossipOnAcceptSize uint,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
-
 ) Network {
 	return NewNetwork(
 		registerer,

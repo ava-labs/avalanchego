@@ -160,27 +160,27 @@ type outboundMsgThrottlerMetrics struct {
 func (m *outboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
 	m.acquireSuccesses = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
-		Name:      "outbound_throttler_acquire_successes",
+		Name:      "throttler_outbound_acquire_successes",
 		Help:      "Outbound messages not dropped due to rate-limiting",
 	})
 	m.acquireFailures = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
-		Name:      "outbound_throttler_acquire_failures",
+		Name:      "throttler_outbound_acquire_failures",
 		Help:      "Outbound messages dropped due to rate-limiting",
 	})
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "outbound_throttler_remaining_at_large_bytes",
+		Name:      "throttler_outbound_remaining_at_large_bytes",
 		Help:      "Bytes remaining in the at large byte allocation",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "outbound_throttler_remaining_validator_bytes",
+		Name:      "throttler_outbound_remaining_validator_bytes",
 		Help:      "Bytes remaining in the validator byte allocation",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
-		Name:      "outbound_throttler_awaiting_release",
+		Name:      "throttler_outbound_awaiting_release",
 		Help:      "Number of messages waiting to be sent",
 	})
 	errs := wrappers.Errs{}
