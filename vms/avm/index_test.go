@@ -23,13 +23,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -42,22 +40,10 @@ var indexEnabledAvmConfig = Config{
 
 func TestIndexTransaction_Ordered(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
-
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-
-	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx := NewContext(t)
-	ctx.SharedMemory = m.NewSharedMemory(chainID)
-	peerSharedMemory := m.NewSharedMemory(platformChainID)
-
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
@@ -67,8 +53,8 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	// get the key
 	key := keys[0]
+	addr := key.PublicKey().Address()
 
 	var uniqueTxs []*UniqueTx
 	txAssetID := avax.Asset{ID: avaxID}
@@ -81,7 +67,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		}
 
 		// build the transaction
-		tx := buildTX(utxoID, txAssetID, key.PublicKey().Address())
+		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
 		if err := signTX(vm.codec, tx, key); err != nil {
@@ -89,28 +75,12 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		}
 
 		// Provide the platform UTXO
-		utxo := buildPlatformUTXO(utxoID, txAssetID, key)
-
-		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
-		if err != nil {
-			t.Fatal(err)
-		}
+		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
 		inputID := utxo.InputID()
 		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
 			t.Fatal("Error saving utxo", err)
-		}
-
-		// put utxo in shared memory
-		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-			Key:   inputID[:],
-			Value: utxoBytes,
-			Traits: [][]byte{
-				key.PublicKey().Address().Bytes(),
-			},
-		}}); err != nil {
-			t.Fatal(err)
 		}
 
 		// issue transaction
@@ -139,7 +109,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 
 		// index the transaction
 		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs, uniqueParsedTX.UTXOs(), vm.getUTXO)
-		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -147,28 +117,17 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	assert.Len(t, uniqueTxs, 5)
 	// for each *UniqueTx check its indexed at right index
 	for i, tx := range uniqueTxs {
-		assertIndexedTX(t, vm.db, uint64(i), key.PublicKey().Address(), txAssetID.ID, tx.ID())
+		assertIndexedTX(t, vm.db, uint64(i), addr, txAssetID.ID, tx.ID())
 	}
 
-	assertLatestIdx(t, vm.db, key.PublicKey().Address(), txAssetID.ID, 5)
+	assertLatestIdx(t, vm.db, addr, txAssetID.ID, 5)
 }
 
 func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
-
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-
-	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx := NewContext(t)
-	ctx.SharedMemory = m.NewSharedMemory(chainID)
-	peerSharedMemory := m.NewSharedMemory(platformChainID)
-
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	avaxID := genesisTx.ID()
@@ -200,28 +159,12 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		}
 
 		// Provide the platform UTXO
-		utxo := buildPlatformUTXO(utxoID, txAssetID, key)
-
-		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
-		if err != nil {
-			t.Fatal(err)
-		}
+		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
 		inputID := utxo.InputID()
 		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
 			t.Fatal("Error saving utxo", err)
-		}
-
-		// put utxo in shared memory
-		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-			Key:   inputID[:],
-			Value: utxoBytes,
-			Traits: [][]byte{
-				addr.Bytes(),
-			},
-		}}); err != nil {
-			t.Fatal(err)
 		}
 
 		// issue transaction
@@ -250,7 +193,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 		// index the transaction
 		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
-		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -266,22 +209,10 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
-
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-
-	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx := NewContext(t)
-	ctx.SharedMemory = m.NewSharedMemory(chainID)
-	peerSharedMemory := m.NewSharedMemory(platformChainID)
-
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
-
 	avaxID := genesisTx.ID()
 	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
 	defer func() {
@@ -297,13 +228,14 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 
 	ctx.Lock.Lock()
 	for _, key := range keys {
+		addr := key.PublicKey().Address()
 		// create utxoID and assetIDs
 		utxoID := avax.UTXOID{
 			TxID: ids.GenerateTestID(),
 		}
 
 		// build the transaction
-		tx := buildTX(utxoID, txAssetID, key.PublicKey().Address())
+		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
 		if err := signTX(vm.codec, tx, key); err != nil {
@@ -311,28 +243,12 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		}
 
 		// Provide the platform UTXO
-		utxo := buildPlatformUTXO(utxoID, txAssetID, key)
-
-		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
-		if err != nil {
-			t.Fatal(err)
-		}
+		utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
 
 		// save utxo to state
 		inputID := utxo.InputID()
 		if err := vm.state.PutUTXO(inputID, utxo); err != nil {
 			t.Fatal("Error saving utxo", err)
-		}
-
-		// put utxo in shared memory
-		if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
-			Key:   inputID[:],
-			Value: utxoBytes,
-			Traits: [][]byte{
-				key.PublicKey().Address().Bytes(),
-			},
-		}}); err != nil {
-			t.Fatal(err)
 		}
 
 		// issue transaction
@@ -357,7 +273,7 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 
 		parsedTx := txs[0]
 		uniqueParsedTX := parsedTx.(*UniqueTx)
-		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
+		addressTxMap[addr] = uniqueParsedTX
 
 		// index the transaction, NOT calling Accept(ids.ID) method
 		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
@@ -525,7 +441,7 @@ func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
 	<-called
 }
 
-func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, key *crypto.PrivateKeySECP256K1R) *avax.UTXO {
+func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, addr ids.ShortID) *avax.UTXO {
 	return &avax.UTXO{
 		UTXOID: utxoID,
 		Asset:  txAssetID,
@@ -533,7 +449,7 @@ func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, key *crypto.Pri
 			Amt: 1000,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
-				Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				Addrs:     []ids.ShortID{addr},
 			},
 		},
 	}
