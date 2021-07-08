@@ -80,8 +80,8 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
-	// TODO verify gas limit EIP-1559
-	// TODO verify base fee is not there pre Apricot Phase 4 and is correct post Apricot Phase 4
+	// TODO(aaronbuchwald) verify gas limit EIP-1559
+	// TODO(aaronbuchwald) verify base fee is not there pre Apricot Phase 4 and is correct post Apricot Phase 4
 	if config := chain.Config(); config.IsApricotPhase1(new(big.Int).SetUint64((header.Time))) {
 		if header.GasLimit != params.ApricotPhase1GasLimit {
 			return fmt.Errorf("expected gas limit to be %d, but found %d", params.ApricotPhase1GasLimit, header.GasLimit)
@@ -206,5 +206,5 @@ func (self *DummyEngine) ExtraStateChange(block *types.Block, statedb *state.Sta
 	return nil
 }
 
-// TODO ensure that baseFee is correctly serialized on block headers as this is handled in other consensus engines
+// TODO(aaronbuchwald) ensure that baseFee is correctly serialized on block headers as this is handled in other consensus engines
 // to some extent - the seal hash
