@@ -258,7 +258,6 @@ func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBy
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
 	}
-
 	return vm.db.Commit()
 }
 

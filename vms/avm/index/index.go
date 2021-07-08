@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 
@@ -67,7 +66,7 @@ type AddressTxsIndexer interface {
 type indexer struct {
 	log     logging.Logger
 	metrics metrics
-	db      *versiondb.Database
+	db      database.Database
 	// txID -> Address -> AssetID --> exists if the address's balance
 	// of the asset is changed by processing tx [txID]
 	balanceChanges map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}
@@ -78,7 +77,7 @@ type indexer struct {
 // NewIndexer Returns a new AddressTxsIndexer.
 // The returned indexer ignores UTXOs that are not type secp256k1fx.TransferOutput.
 func NewIndexer(
-	db *versiondb.Database,
+	db database.Database,
 	log logging.Logger,
 	shutdownF func(int),
 	metricsNamespace string,
@@ -250,10 +249,7 @@ func (i *indexer) Clear(txID ids.ID) {
 
 // Init initialises indexing, returning error if the state is invalid
 func (i *indexer) init(allowIncomplete bool) error {
-	if err := checkIndexStatus(i.db, true, allowIncomplete); err != nil {
-		return err
-	}
-	return i.db.Commit()
+	return checkIndexStatus(i.db, true, allowIncomplete)
 }
 
 // checkIndexStatus checks the indexing status in the database, returning error if the state
@@ -302,11 +298,8 @@ func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowInc
 
 type noIndexer struct{}
 
-func NewNoIndexer(db *versiondb.Database, allowIncomplete bool) (AddressTxsIndexer, error) {
+func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer, error) {
 	if err := checkIndexStatus(db, false, allowIncomplete); err != nil {
-		return nil, err
-	}
-	if err := db.Commit(); err != nil {
 		return nil, err
 	}
 	return &noIndexer{}, nil
