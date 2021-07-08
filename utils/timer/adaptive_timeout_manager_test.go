@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -32,7 +31,6 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 				MaximumTimeout:     3 * time.Second,
 				TimeoutCoefficient: 2,
 				TimeoutHalflife:    5 * time.Minute,
-				Registerer:         prometheus.NewRegistry(),
 			},
 			shouldErrWith: "initial timeout < minimum timeout",
 		},
@@ -43,7 +41,6 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 				MaximumTimeout:     3 * time.Second,
 				TimeoutCoefficient: 2,
 				TimeoutHalflife:    5 * time.Minute,
-				Registerer:         prometheus.NewRegistry(),
 			},
 			shouldErrWith: "initial timeout > maximum timeout",
 		},
@@ -54,7 +51,6 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 				MaximumTimeout:     3 * time.Second,
 				TimeoutCoefficient: 0.9,
 				TimeoutHalflife:    5 * time.Minute,
-				Registerer:         prometheus.NewRegistry(),
 			},
 			shouldErrWith: "timeout coefficient < 1",
 		},
@@ -64,7 +60,6 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 				MinimumTimeout:     2 * time.Second,
 				MaximumTimeout:     3 * time.Second,
 				TimeoutCoefficient: 1,
-				Registerer:         prometheus.NewRegistry(),
 			},
 			shouldErrWith: "timeout halflife is 0",
 		},
@@ -75,7 +70,6 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 				MaximumTimeout:     3 * time.Second,
 				TimeoutCoefficient: 1,
 				TimeoutHalflife:    -1 * time.Second,
-				Registerer:         prometheus.NewRegistry(),
 			},
 			shouldErrWith: "timeout halflife is negative",
 		},
@@ -86,14 +80,13 @@ func TestAdaptiveTimeoutManagerInit(t *testing.T) {
 				MaximumTimeout:     3 * time.Second,
 				TimeoutCoefficient: 1,
 				TimeoutHalflife:    5 * time.Minute,
-				Registerer:         prometheus.NewRegistry(),
 			},
 		},
 	}
 
 	for _, test := range tests {
 		tm := AdaptiveTimeoutManager{}
-		err := tm.Initialize(&test.config)
+		err := tm.Initialize(&test.config, "", prometheus.NewRegistry())
 		if err != nil && test.shouldErrWith == "" {
 			assert.FailNow(t, "error from valid config", err)
 		} else if err == nil && test.shouldErrWith != "" {
@@ -112,10 +105,8 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 		MaximumTimeout:     10 * time.Second,
 		TimeoutHalflife:    5 * time.Minute,
 		TimeoutCoefficient: 1.25,
-		MetricsNamespace:   constants.PlatformName,
-		Registerer:         prometheus.NewRegistry(),
 	}
-	err := tm.Initialize(config)
+	err := tm.Initialize(config, "", prometheus.NewRegistry())
 	assert.NoError(err)
 	wg := sync.WaitGroup{}
 	wg.Add(1)
@@ -246,15 +237,17 @@ func TestAdaptiveTimeoutManager(t *testing.T) {
 
 func TestAdaptiveTimeoutManager2(t *testing.T) {
 	tm := AdaptiveTimeoutManager{}
-	err := tm.Initialize(&AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     time.Hour,
-		TimeoutHalflife:    5 * time.Minute,
-		TimeoutCoefficient: 1.25,
-		MetricsNamespace:   constants.PlatformName,
-		Registerer:         prometheus.NewRegistry(),
-	})
+	err := tm.Initialize(
+		&AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     time.Hour,
+			TimeoutHalflife:    5 * time.Minute,
+			TimeoutCoefficient: 1.25,
+		},
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

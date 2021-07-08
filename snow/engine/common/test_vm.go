@@ -23,6 +23,7 @@ var (
 	errHealthCheck          = errors.New("unexpectedly called HealthCheck")
 	errConnected            = errors.New("unexpectedly called Connected")
 	errDisconnected         = errors.New("unexpectedly called Disconnected")
+	errVersion              = errors.New("unexpectedly called Version")
 
 	_ VM = &TestVM{}
 )
@@ -33,7 +34,7 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealthCheck, CantConnected, CantDisconnected bool
+	CantHealthCheck, CantConnected, CantDisconnected, CantVersion bool
 
 	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
@@ -42,6 +43,7 @@ type TestVM struct {
 	ConnectedF                               func(ids.ShortID) error
 	DisconnectedF                            func(ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
+	VersionF                                 func() (string, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -151,4 +153,14 @@ func (vm *TestVM) Disconnected(id ids.ShortID) error {
 		vm.T.Fatal(errDisconnected)
 	}
 	return nil
+}
+
+func (vm *TestVM) Version() (string, error) {
+	if vm.VersionF != nil {
+		return vm.VersionF()
+	}
+	if vm.CantVersion && vm.T != nil {
+		vm.T.Fatal(errVersion)
+	}
+	return "", nil
 }

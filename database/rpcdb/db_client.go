@@ -27,6 +27,7 @@ const (
 var (
 	_ database.Database = &DatabaseClient{}
 	_ database.Batch    = &batch{}
+	_ database.Iterator = &iterator{}
 )
 
 // DatabaseClient is an implementation of database that talks over RPC.

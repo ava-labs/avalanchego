@@ -28,6 +28,7 @@ prev_plugin_dir="$prev_build_dir/plugins"
 
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
+# You should probably set it - export DOCKER_REPO='avaplatform/avalanchego'
 avalanchego_dockerhub_repo=${DOCKER_REPO:-"local"}
 
 # Current branch

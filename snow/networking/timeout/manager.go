@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Manager registers and fires timeouts for the snow API.
@@ -24,9 +25,14 @@ type Manager struct {
 }
 
 // Initialize this timeout manager.
-func (m *Manager) Initialize(timeoutConfig *timer.AdaptiveTimeoutConfig, benchlistMgr benchlist.Manager) error {
+func (m *Manager) Initialize(
+	timeoutConfig *timer.AdaptiveTimeoutConfig,
+	benchlistMgr benchlist.Manager,
+	metricsNamespace string,
+	metricsRegister prometheus.Registerer,
+) error {
 	m.benchlistMgr = benchlistMgr
-	return m.tm.Initialize(timeoutConfig)
+	return m.tm.Initialize(timeoutConfig, metricsNamespace, metricsRegister)
 }
 
 // Dispatch ...

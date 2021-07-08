@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -863,7 +864,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	issuer := make(chan common.Message, 1)
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1286,7 +1287,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
@@ -1430,7 +1431,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 
 	err := vm.Initialize(
 		ctx,
-		manager.NewDefaultMemDBManager(),
+		manager.NewMemDB(version.DefaultVersion1_0_0),
 		genesisBytes,
 		nil,
 		nil,
