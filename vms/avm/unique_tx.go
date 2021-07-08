@@ -116,7 +116,6 @@ func (tx *UniqueTx) Key() interface{} { return tx.txID }
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {
 	if s := tx.Status(); s != choices.Processing {
-		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
 	txID := tx.ID()
@@ -293,6 +292,7 @@ func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 // Verify the validity of this transaction
 func (tx *UniqueTx) Verify() error {
 	if err := tx.verifyWithoutCacheWrites(); err != nil {
+		tx.vm.addressTxsIndexer.Clear(tx.ID())
 		return err
 	}
 
@@ -334,9 +334,5 @@ func (tx *UniqueTx) SemanticVerify() error {
 		return tx.validity
 	}
 
-	if err := tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx); err != nil {
-		tx.vm.addressTxsIndexer.Clear(tx.ID())
-		return err
-	}
-	return nil
+	return tx.Tx.SemanticVerify(tx.vm, tx.UnsignedTx)
 }
