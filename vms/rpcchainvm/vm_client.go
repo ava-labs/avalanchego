@@ -47,9 +47,10 @@ var (
 )
 
 const (
-	decidedCacheSize    = 500
-	missingCacheSize    = 200
-	unverifiedCacheSize = 200
+	decidedCacheSize    = 512
+	missingCacheSize    = 256
+	unverifiedCacheSize = 256
+	bytesToIDCacheSize  = 512
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -200,6 +201,7 @@ func (vm *VMClient) Initialize(
 			DecidedCacheSize:    decidedCacheSize,
 			MissingCacheSize:    missingCacheSize,
 			UnverifiedCacheSize: unverifiedCacheSize,
+			BytesToIDCacheSize:  bytesToIDCacheSize,
 			LastAcceptedBlock:   lastAcceptedBlk,
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
