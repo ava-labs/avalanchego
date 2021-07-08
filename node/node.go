@@ -231,14 +231,24 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
-	msgThrottler, err := throttling.NewSybilMsgThrottler(
+	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		n.Log,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
-		n.Config.NetworkConfig.MsgThrottlerConfig,
+		n.Config.NetworkConfig.InboundThrottlerConfig,
 	)
 	if err != nil {
-		n.Log.Warn("initializing throttler metrics failed with: %s", err)
+		return fmt.Errorf("initializing inbound message throttler failed with: %s", err)
+	}
+
+	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
+		n.Log,
+		n.Config.NetworkConfig.MetricsRegisterer,
+		primaryNetworkValidators,
+		n.Config.NetworkConfig.OutboundThrottlerConfig,
+	)
+	if err != nil {
+		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
 	}
 
 	n.Net = network.NewDefaultNetwork(
@@ -269,9 +279,9 @@ func (n *Node) initNetworking() error {
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
-		msgThrottler,
+		inboundMsgThrottler,
+		outboundMsgThrottler,
 	)
-
 	return nil
 }
 
