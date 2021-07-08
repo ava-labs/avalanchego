@@ -1,12 +1,6 @@
 // (c) 2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// (c) 2021, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
-// (c) 2021, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
 package avm
 
 import (
@@ -143,10 +137,8 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs)
-		assert.NoError(t, err)
-		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
+		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs, uniqueParsedTX.UTXOs(), vm.getUTXO)
+		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -192,13 +184,14 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 	ctx.Lock.Lock()
 	for _, key := range keys {
+		addr := key.PublicKey().Address()
 		// create utxoID and assetIDs
 		utxoID := avax.UTXOID{
 			TxID: ids.GenerateTestID(),
 		}
 
 		// build the transaction
-		tx := buildTX(utxoID, txAssetID, key.PublicKey().Address())
+		tx := buildTX(utxoID, txAssetID, addr)
 
 		// sign the transaction
 		if err := signTX(vm.codec, tx, key); err != nil {
@@ -224,7 +217,7 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
-				key.PublicKey().Address().Bytes(),
+				addr.Bytes(),
 			},
 		}}); err != nil {
 			t.Fatal(err)
@@ -252,13 +245,11 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 
 		parsedTx := txs[0]
 		uniqueParsedTX := parsedTx.(*UniqueTx)
-		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
+		addressTxMap[addr] = uniqueParsedTX
 
 		// index the transaction
-		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
-		assert.NoError(t, err)
-		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
-		err = vm.addressTxsIndexer.Write(uniqueParsedTX.ID())
+		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
+		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
 		assert.NoError(t, err)
 	}
 
@@ -367,18 +358,16 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		uniqueParsedTX := parsedTx.(*UniqueTx)
 		addressTxMap[key.PublicKey().Address()] = uniqueParsedTX
 
-		// index the transaction, NOT calling Write(ids.ID) method
-		vm.addressTxsIndexer.AddUTXOsByID(vm.getUTXO, uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs())
-		assert.NoError(t, err)
-		vm.addressTxsIndexer.AddUTXOs(uniqueParsedTX.ID(), uniqueParsedTX.UTXOs())
+		// index the transaction, NOT calling Accept(ids.ID) method
+		vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
 		txIDs = append(txIDs, uniqueParsedTX.ID())
 	}
 
-	// Call Write(ids.ID) method to flush the transactions
+	// Call Accept(ids.ID) method to flush the transactions
 	// Reverse the order of writes to ensure overall order is still correct
 	for i := len(txIDs) - 1; i >= 0; i-- {
 		txID := txIDs[i]
-		err := vm.addressTxsIndexer.Write(txID)
+		err := vm.addressTxsIndexer.Accept(txID)
 		assert.NoError(t, err)
 	}
 
@@ -435,7 +424,7 @@ func TestIndexingNewInitWithIndexingEnabled(t *testing.T) {
 	}
 
 	// start with indexing enabled
-	_, err := index.NewAddressTxsIndexer(versiondb.New(db), ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
+	_, err := index.NewIndexer(versiondb.New(db), ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
 	// now disable indexing with allow-incomplete set to false
@@ -455,7 +444,7 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 	db := versiondb.New(currentDB)
 
 	// disable indexing with allow-incomplete set to false
-	_, err := index.NewNoIndexer(versiondb.New(db), false)
+	_, err := index.NewNoIndexer(db, false)
 	assert.NoError(t, err)
 
 	shutdownFunc := func(int) {
@@ -463,11 +452,11 @@ func TestIndexingNewInitWithIndexingDisabled(t *testing.T) {
 	}
 
 	// now enable indexing with allow-incomplete set to false
-	_, err = index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
+	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
 	assert.Error(t, err)
 
 	// retry enable indexing with allow-incomplete set to true
-	_, err = index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
+	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
 	// disable indexing with allow-incomplete set to false
@@ -494,7 +483,7 @@ func TestIndexingAllowIncomplete(t *testing.T) {
 	}
 
 	// we initialise with indexing enabled now and allow incomplete indexing as false
-	_, err = index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
+	_, err = index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
 	// we should get error because:
 	// - indexing was disabled previously
 	// - node now is asked to enable indexing with allow incomplete set to false
@@ -508,10 +497,10 @@ func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
 	prefixDB := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
 	db := versiondb.New(prefixDB)
 
-	called := make(chan bool, 1)
+	called := make(chan struct{}, 1)
 	shutdownFunc := func(code int) {
 		assert.Equal(t, code, index.DatabaseOpErrorExitCode)
-		called <- true
+		called <- struct{}{}
 	}
 
 	// function always returns error indicating that the utxo was not found
@@ -519,21 +508,23 @@ func TestCallsShutdownWhenUTXOCannotBeFound(t *testing.T) {
 		return nil, fmt.Errorf("not found")
 	}
 
-	indexer, err := index.NewAddressTxsIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
+	indexer, err := index.NewIndexer(db, ctx.Log, shutdownFunc, "", prometheus.NewRegistry(), false)
 	assert.NoError(t, err)
-	indexer.AddUTXOsByID(getUTXOFn, ids.GenerateTestID(), []*avax.UTXOID{
-		{
-			TxID:        ids.GenerateTestID(),
-			OutputIndex: 1,
-			Symbol:      false,
+	indexer.Add(
+		ids.GenerateTestID(),
+		[]*avax.UTXOID{
+			{
+				TxID:        ids.GenerateTestID(),
+				OutputIndex: 1,
+				Symbol:      false,
+			},
 		},
-	})
+		nil,
+		getUTXOFn,
+	)
 
 	// we expect shutdown to have been called with the right exit code
-	shutdown := <-called
-	if !shutdown {
-		t.Fatal("expected shutdown to be called")
-	}
+	<-called
 }
 
 func buildPlatformUTXO(utxoID avax.UTXOID, txAssetID avax.Asset, key *crypto.PrivateKeySECP256K1R) *avax.UTXO {

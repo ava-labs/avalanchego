@@ -112,13 +112,10 @@ func ParseTimestamp(b []byte) (time.Time, error) {
 }
 
 func PutBool(db KeyValueWriter, key []byte, b bool) error {
-	var bytes []byte
 	if b {
-		bytes = []byte{1}
-	} else {
-		bytes = []byte{0}
+		return db.Put(key, []byte{1})
 	}
-	return db.Put(key, bytes)
+	return db.Put(key, []byte{0})
 }
 
 func GetBool(db KeyValueReader, key []byte) (bool, error) {

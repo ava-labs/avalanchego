@@ -119,19 +119,10 @@ func (tx *UniqueTx) Accept() error {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
-
+	txID := tx.ID()
 	defer tx.vm.db.Abort()
 
-	// Add new utxos
-	for _, utxo := range tx.UTXOs() {
-		if err := tx.vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
-			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
-			return err
-		}
-	}
-
-	err := tx.vm.addressTxsIndexer.Write(tx.ID())
-	if err != nil {
+	if err := tx.vm.addressTxsIndexer.Accept(txID); err != nil {
 		return err
 	}
 
@@ -142,28 +133,30 @@ func (tx *UniqueTx) Accept() error {
 			continue
 		}
 		utxoID := utxo.InputID()
-		tx.vm.ctx.Log.Debug("Deleting UTXO %s for transaction %s", utxoID.String(), tx.ID().String())
 		if err := tx.vm.state.DeleteUTXO(utxoID); err != nil {
-			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
-			return err
+			return fmt.Errorf("couldn't delete UTXO %s: %s", utxoID, err)
+		}
+	}
+	// Add new utxos
+	for _, utxo := range tx.UTXOs() {
+		utxoID := utxo.InputID()
+		if err := tx.vm.state.PutUTXO(utxoID, utxo); err != nil {
+			return fmt.Errorf("couldn't put UTXO %s: %w", utxoID, err)
 		}
 	}
 
-	txID := tx.ID()
 	if err := tx.setStatus(choices.Accepted); err != nil {
 		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", txID, err)
-		return err
+		return fmt.Errorf("couldn't set status of tx %s: %w", txID, err)
 	}
 
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
-		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
-		return err
+		return fmt.Errorf("couldn't create commitBatch while processing tx %s: %w", txID, err)
 	}
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
-		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
-		return err
+		return fmt.Errorf("ExecuteWithSideEffects errored while processing tx %s: %w", txID, err)
 	}
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
@@ -197,7 +190,7 @@ func (tx *UniqueTx) Reject() error {
 
 	tx.deps = nil // Needed to prevent a memory leak
 
-	tx.vm.addressTxsIndexer.Reset(tx.ID())
+	tx.vm.addressTxsIndexer.Reject(tx.ID())
 	return nil
 }
 

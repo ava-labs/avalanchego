@@ -246,7 +246,7 @@ func (vm *VM) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBy
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Info("address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewAddressTxsIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, ctx.Namespace, ctx.Metrics, avmConfig.AllowIncompleteTransactionIndex)
+		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, shutdownNodeFunc, ctx.Namespace, ctx.Metrics, avmConfig.AllowIncompleteTransactionIndex)
 		if err != nil {
 			return fmt.Errorf("failed to address transaction initialize indexer: %w", err)
 		}
