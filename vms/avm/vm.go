@@ -252,8 +252,7 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to address transaction initialize indexer: %w", err)
 		}
 	} else {
-		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
-		vm.ctx.Log.Info("address transaction indexing is disabled.")
+		vm.ctx.Log.Info("address transaction indexing is disabled")
 		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
