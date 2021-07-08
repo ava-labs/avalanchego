@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -155,7 +156,7 @@ func (s *Server) registerChain(chainName string, ctx *snow.Context, engine commo
 
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := "bc/" + ctx.ChainID.String()
+	defaultEndpoint := constants.ChainAliasPrefix + ctx.ChainID.String()
 
 	// Register each endpoint
 	for extension, handler := range handlers {
