@@ -70,7 +70,7 @@ func (self *ETHChain) APIBackend() *eth.EthAPIBackend {
 }
 
 func (self *ETHChain) PendingSize() (int, error) {
-	pending, err := self.backend.TxPool().Pending()
+	pending, err := self.backend.TxPool().Pending(true)
 	count := 0
 	for _, txs := range pending {
 		count += len(txs)
