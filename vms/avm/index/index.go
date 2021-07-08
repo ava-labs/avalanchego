@@ -99,10 +99,6 @@ func NewIndexer(
 	if err := i.metrics.initialize(metricsNamespace, metricsRegisterer); err != nil {
 		return nil, err
 	}
-	// Commit anything we wrote in [init]
-	if err := i.db.Commit(); err != nil {
-		return nil, err
-	}
 	return i, nil
 }
 
@@ -254,12 +250,15 @@ func (i *indexer) Reject(txID ids.ID) {
 
 // Init initialises indexing, returning error if the state is invalid
 func (i *indexer) init(allowIncomplete bool) error {
-	return checkIndexingStatus(i.db, true, allowIncomplete)
+	if err := checkIndexStatus(i.db, true, allowIncomplete); err != nil {
+		return err
+	}
+	return i.db.Commit()
 }
 
-// checkIndexingStatus checks the indexing status in the database, returning error if the state
+// checkIndexStatus checks the indexing status in the database, returning error if the state
 // with respect to provided parameters is invalid
-func checkIndexingStatus(db database.KeyValueReaderWriter, enableIndexing, allowIncomplete bool) error {
+func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowIncomplete bool) error {
 	// verify whether we've indexed before
 	idxEnabled, err := database.GetBool(db, idxEnabledKey)
 	if err == database.ErrNotFound {
@@ -304,10 +303,12 @@ func checkIndexingStatus(db database.KeyValueReaderWriter, enableIndexing, allow
 type noIndexer struct{}
 
 func NewNoIndexer(db *versiondb.Database, allowIncomplete bool) (AddressTxsIndexer, error) {
-	if err := checkIndexingStatus(db, false, allowIncomplete); err != nil {
+	if err := checkIndexStatus(db, false, allowIncomplete); err != nil {
 		return nil, err
 	}
-
+	if err := db.Commit(); err != nil {
+		return nil, err
+	}
 	return &noIndexer{}, nil
 }
 
