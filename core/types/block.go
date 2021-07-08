@@ -123,27 +123,6 @@ func (h *Header) Size() common.StorageSize {
 	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen())/8)
 }
 
-// Orignal code: (has been moved to syntacticVerify in plugin/evm/block.go)
-// // SanityCheck checks a few basic things -- these checks are way beyond what
-// // any 'sane' production values should hold, and can mainly be used to prevent
-// // that the unbounded fields are stuffed with junk data to add processing
-// // overhead
-// func (h *Header) SanityCheck() error {
-// 	if h.Number != nil && !h.Number.IsUint64() {
-// 		return fmt.Errorf("too large block number: bitlen %d", h.Number.BitLen())
-// 	}
-// 	if h.Difficulty != nil {
-// 		if diffLen := h.Difficulty.BitLen(); diffLen > 80 {
-// 			return fmt.Errorf("too large block difficulty: bitlen %d", diffLen)
-// 		}
-// 	}
-// 	// TODO: should assert Difficulty != nil
-// 	if eLen := len(h.Extra); eLen > 100*1024 {
-// 		return fmt.Errorf("too large block extradata: size %d", eLen)
-// 	}
-// 	return nil
-// }
-
 // EmptyBody returns true if there is no additional 'body' to complete the header
 // that is: no transactions and no uncles.
 func (h *Header) EmptyBody() bool {

@@ -62,7 +62,7 @@ var (
 		MuirGlacierBlock:            big.NewInt(0),
 		ApricotPhase1BlockTimestamp: big.NewInt(1617199200), // 10am EST 3/31/2021
 		ApricotPhase2BlockTimestamp: big.NewInt(1620644400), // 10am EST 5/10/2021
-		// TODO schedule Apricot Phase 3 + Apricot Phase 4
+		// TODO(aaronbuchwald) schedule Apricot Phase 3 + Apricot Phase 4
 	}
 
 	// AvalancheFujiChainConfig is the configuration for the Fuji Test Network
@@ -82,7 +82,7 @@ var (
 		MuirGlacierBlock:            big.NewInt(0),
 		ApricotPhase1BlockTimestamp: big.NewInt(1616767200), // 10am EST 3/26/2021
 		ApricotPhase2BlockTimestamp: big.NewInt(1620223200), // 10am EST 5/5/2021
-		// TODO schedule Apricot Phase 3 + Apricot Phase 4
+		// TODO(aaronbuchwald) schedule Apricot Phase 3 + Apricot Phase 4
 	}
 
 	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
@@ -325,7 +325,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 			lastFork = cur
 		}
 	}
-	// TODO check that avalanche block timestamps are at least possible with the other rule set changes
+	// TODO(aaronbuchwald) check that avalanche block timestamps are at least possible with the other rule set changes
 	// additional change: require that block number hard forks are either 0 or nil since they should not
 	// be enabled at a specific block number.
 
@@ -376,7 +376,7 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	if isForkIncompatible(c.EWASMBlock, newcfg.EWASMBlock, head) {
 		return newCompatError("ewasm fork block", c.EWASMBlock, newcfg.EWASMBlock)
 	}
-	// TODO ensure that Avalanche Blocktimestamps are not modified
+	// TODO(aaronbuchwald) ensure that Avalanche Blocktimestamps are not modified
 	return nil
 }
 
