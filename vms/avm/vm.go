@@ -133,13 +133,8 @@ func (vm *VM) Disconnected(id ids.ShortID) error {
  */
 
 type Config struct {
-	IndexTransactions               bool `json:"index-transactions"`
-	AllowIncompleteTransactionIndex bool `json:"allow-incomplete-transaction-index"`
-}
-
-func (c Config) SetDefaults() {
-	c.IndexTransactions = false
-	c.AllowIncompleteTransactionIndex = false
+	IndexTransactions    bool `json:"index-transactions"`
+	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
 }
 
 // Initialize implements the avalanche.DAGVM interface
@@ -153,9 +148,7 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 ) error {
 	avmConfig := Config{}
-	avmConfig.SetDefaults()
 	if len(configBytes) > 0 {
-		ctx.Log.Info("Initializing VM config")
 		if err := json.Unmarshal(configBytes, &avmConfig); err != nil {
 			return err
 		}
@@ -254,14 +247,14 @@ func (vm *VM) Initialize(
 	// use no op impl when disabled in config
 	if avmConfig.IndexTransactions {
 		vm.ctx.Log.Info("address transaction indexing is enabled")
-		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, ctx.Namespace, ctx.Metrics, avmConfig.AllowIncompleteTransactionIndex)
+		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, ctx.Namespace, ctx.Metrics, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to address transaction initialize indexer: %w", err)
 		}
 	} else {
 		// edge case where it was enabled but now its not enabled, should we use allow incomplete index flag?
 		vm.ctx.Log.Info("address transaction indexing is disabled.")
-		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.AllowIncompleteTransactionIndex)
+		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
 		if err != nil {
 			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
 		}
