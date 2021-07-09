@@ -507,16 +507,8 @@ func (m *manager) createAvalancheChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(
-		ctx,
-		vmDBManager,
-		genesisData,
-		chainConfig.Upgrade,
-		chainConfig.Config,
-		msgChan,
-		fxs,
-	); err != nil {
-		return nil, fmt.Errorf("error initializing VM: %w", err)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
 	// Handles serialization/deserialization of vertices and also the
@@ -647,15 +639,7 @@ func (m *manager) createSnowmanChain(
 
 	// Initialize the VM
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(
-		ctx,
-		vmDBManager,
-		genesisData,
-		chainConfig.Upgrade,
-		chainConfig.Config,
-		msgChan,
-		fxs,
-	); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
