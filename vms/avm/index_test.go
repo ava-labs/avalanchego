@@ -123,7 +123,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 	assertLatestIdx(t, vm.db, addr, txAssetID.ID, 5)
 }
 
-func TestIndexTransaction_MultipleAddresses(t *testing.T) {
+func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -206,6 +206,64 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		assertIndexedTX(t, vm.db, uint64(0), key, txAssetID.ID, tx.ID())
 		assertLatestIdx(t, vm.db, key, txAssetID.ID, 1)
 	}
+}
+
+func TestIndexTransaction_MultipleAddresses(t *testing.T) {
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	ctx := NewContext(t)
+	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+
+	avaxID := genesisTx.ID()
+	vm := setupTestVM(t, ctx, baseDBManager, genesisBytes, issuer, indexEnabledAvmConfig)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	txAssetID := avax.Asset{ID: avaxID}
+	addrs := make([]ids.ShortID, len(keys))
+	for _, key := range keys {
+		addrs = append(addrs, key.PublicKey().Address())
+	}
+
+	ctx.Lock.Lock()
+
+	key := keys[0]
+	addr := key.PublicKey().Address()
+	// create utxoID and assetIDs
+	utxoID := avax.UTXOID{
+		TxID: ids.GenerateTestID(),
+	}
+
+	// build the transaction
+	tx := buildTX(utxoID, txAssetID, addrs...)
+
+	// sign the transaction
+	if err := signTX(vm.codec, tx, key); err != nil {
+		t.Fatal(err)
+	}
+
+	// Provide the platform UTXO
+	utxo := buildPlatformUTXO(utxoID, txAssetID, addr)
+
+	// save utxo to state
+	inputID := utxo.InputID()
+	if err := vm.state.PutUTXO(inputID, utxo); err != nil {
+		t.Fatal("Error saving utxo", err)
+	}
+
+	// index the transaction
+	err := vm.addressTxsIndexer.Add(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), vm.getUTXO)
+	assert.NoError(t, err)
+	err = vm.addressTxsIndexer.Accept(tx.ID())
+	assert.NoError(t, err)
+
+	assertIndexedTX(t, vm.db, uint64(0), addr, txAssetID.ID, tx.ID())
+	assertLatestIdx(t, vm.db, addr, txAssetID.ID, 1)
 }
 
 func TestIndexTransaction_UnorderedWrites(t *testing.T) {
@@ -440,7 +498,7 @@ func signTX(codec codec.Manager, tx *Tx, key *crypto.PrivateKeySECP256K1R) error
 	return tx.SignSECP256K1Fx(codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
 }
 
-func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ids.ShortID) *Tx {
+func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ...ids.ShortID) *Tx {
 	return &Tx{
 		UnsignedTx: &BaseTx{
 			BaseTx: avax.BaseTx{
@@ -460,7 +518,7 @@ func buildTX(utxoID avax.UTXOID, txAssetID avax.Asset, address ids.ShortID) *Tx 
 						Amt: 1000,
 						OutputOwners: secp256k1fx.OutputOwners{
 							Threshold: 1,
-							Addrs:     []ids.ShortID{address},
+							Addrs:     address,
 						},
 					},
 				}},
