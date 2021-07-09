@@ -1291,8 +1291,8 @@ func TestBonusBlocksTxs(t *testing.T) {
 //     |
 //     D
 func TestReorgProtection(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
-	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0, "{\"pruning-enabled\":false}", "")
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true, genesisJSONApricotPhase0, "{\"pruning-enabled\":false}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
