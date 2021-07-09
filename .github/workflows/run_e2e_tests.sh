@@ -45,12 +45,14 @@ echo "Using $avalanche_testing_image for e2e tests"
 
 # Defines the avalanchego tag to use
 # Either uses the same tag as the current branch or uses the default
-if docker_tag_exists $avalanchego_repo $current_branch; then
-    echo "$avalanchego_repo:$current_branch exists; using this avalanchego image to run e2e tests"
-    AVALANCHE_VERSION=$current_branch
-else
-    echo "$avalanchego_repo $current_branch does NOT exist; using the default image to run e2e tests"
-fi
+# Disable matchup in favor of explicit tag
+# TODO re-enable matchup when our workflow better supports it.
+# if docker_tag_exists $avalanchego_repo $current_branch; then
+#     echo "$avalanchego_repo:$current_branch exists; using this avalanchego image to run e2e tests"
+#     AVALANCHE_VERSION=$current_branch
+# else
+#     echo "$avalanchego_repo $current_branch does NOT exist; using the default image to run e2e tests"
+# fi
 
 # pulling the avalanche-testing image
 docker pull $avalanche_testing_image
