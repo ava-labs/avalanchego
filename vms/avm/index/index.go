@@ -162,7 +162,7 @@ func (i *indexer) Accept(txID ids.ID) error {
 			switch {
 			case err != nil && err != database.ErrNotFound:
 				// Unexpected error
-				return fmt.Errorf("error indexing txID %s: %s", txID, err)
+				return fmt.Errorf("unexpected error when indexing txID %s: %s", txID, err)
 			case err == database.ErrNotFound:
 				// idx not found; this must be the first entry.
 				idx = 0
