@@ -1042,14 +1042,13 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 	// If snapshotting is enabled, update the snapshot tree with this new version
 	if snaps != nil {
 		if s.snap == nil {
-			panic(fmt.Errorf("cannot commit with snaps without a pre-existing snap layer, parentHash: %s, blockHash: %s", parentHash, blockHash))
+			log.Error(fmt.Sprintf("cannot commit with snaps without a pre-existing snap layer, parentHash: %s, blockHash: %s", parentHash, blockHash))
 		}
 		if metrics.EnabledExpensive {
 			defer func(start time.Time) { s.SnapshotCommits += time.Since(start) }(time.Now())
 		}
 		if err := snaps.Update(blockHash, root, parentHash, s.snapDestructs, s.snapAccounts, s.snapStorage); err != nil {
 			log.Warn("Failed to update snapshot tree", "to", root, "err", err)
-			panic(fmt.Sprintf("Failed to update snapshot tree: %s", err))
 		}
 		s.snap, s.snapDestructs, s.snapAccounts, s.snapStorage = nil, nil, nil, nil
 	}

@@ -238,10 +238,8 @@ func NewBlockChain(
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
 		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, true, false)
-		// TODO switch this to log an error instead of returning an error to prevent putting a node in an irrecoverable state without
-		// a code change.
 		if err != nil {
-			return nil, fmt.Errorf("unable to initialize snapshots: %w", err)
+			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err)
 		}
 	}
 
@@ -982,7 +980,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		if bc.snaps != nil {
 			discardErr := bc.snaps.Discard(block.Hash())
 			if discardErr != nil {
-				log.Warn("failed to discard snapshot after being unable to insert block trie", "block", block.Hash(), "root", block.Root())
+				log.Debug("failed to discard snapshot after being unable to insert block trie", "block", block.Hash(), "root", block.Root())
 			}
 		}
 		return NonStatTy, err
