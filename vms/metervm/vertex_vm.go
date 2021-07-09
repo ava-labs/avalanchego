@@ -29,7 +29,15 @@ type vertexVM struct {
 	clock timer.Clock
 }
 
-func (vm *vertexVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx) error {
+func (vm *vertexVM) Initialize(
+	ctx *snow.Context,
+	db manager.Manager,
+	genesisBytes,
+	upgradeBytes,
+	configBytes []byte,
+	toEngine chan<- common.Message,
+	fxs []*common.Fx,
+) error {
 	if err := vm.vertexMetrics.Initialize(fmt.Sprintf("metervm_%s", ctx.Namespace), ctx.Metrics); err != nil {
 		return err
 	}

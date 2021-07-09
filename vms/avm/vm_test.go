@@ -280,16 +280,24 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	if err != nil {
 		tb.Fatal("should not have caused error in creating avm config bytes")
 	}
-	err = vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, configBytes, issuer, []*common.Fx{
-		{
-			ID: ids.Empty,
-			Fx: &secp256k1fx.Fx{},
+	err = vm.Initialize(
+		ctx,
+		baseDBManager.NewPrefixDBManager([]byte{1}),
+		genesisBytes,
+		nil,
+		configBytes,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty,
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: nftfx.ID,
+				Fx: &nftfx.Fx{},
+			},
 		},
-		{
-			ID: nftfx.ID,
-			Fx: &nftfx.Fx{},
-		},
-	})
+	)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -589,7 +597,16 @@ func TestInvalidGenesis(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), nil, nil, nil, make(chan common.Message, 1), nil)
+
+	err := vm.Initialize(
+		ctx, // context
+		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
+		nil,                          // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
+		nil,                          // fxs
+	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid genesis")
 	}
@@ -605,10 +622,19 @@ func TestInvalidFx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
+
 	genesisBytes := BuildGenesisTest(t)
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, make(chan common.Message, 1), []*common.Fx{ // fxs
-		nil,
-	})
+	err := vm.Initialize(
+		ctx, // context
+		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
+		genesisBytes,                 // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
+		[]*common.Fx{ // fxs
+			nil,
+		},
+	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid interface")
 	}
@@ -624,14 +650,15 @@ func TestFxInitializationFailure(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
+
 	genesisBytes := BuildGenesisTest(t)
 	err := vm.Initialize(
-		ctx,
-		manager.NewMemDB(version.DefaultVersion1_0_0),
-		genesisBytes,
-		nil,
-		nil,
-		make(chan common.Message, 1),
+		ctx, // context
+		manager.NewMemDB(version.DefaultVersion1_0_0), // dbManager
+		genesisBytes,                 // genesisState
+		nil,                          // upgradeBytes
+		nil,                          // configBytes
+		make(chan common.Message, 1), // engineMessenger
 		[]*common.Fx{{ // fxs
 			ID: ids.Empty,
 			Fx: &FxTest{
@@ -847,18 +874,27 @@ func TestIssueNFT(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
-		{
-			ID: ids.Empty.Prefix(0),
-			Fx: &secp256k1fx.Fx{},
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
 		},
-		{
-			ID: ids.Empty.Prefix(1),
-			Fx: &nftfx.Fx{},
-		},
-	})
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -985,22 +1021,31 @@ func TestIssueProperty(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
+
 	genesisBytes := BuildGenesisTest(t)
 	issuer := make(chan common.Message, 1)
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
-		{
-			ID: ids.Empty.Prefix(0),
-			Fx: &secp256k1fx.Fx{},
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(2),
+				Fx: &propertyfx.Fx{},
+			},
 		},
-		{
-			ID: ids.Empty.Prefix(1),
-			Fx: &nftfx.Fx{},
-		},
-		{
-			ID: ids.Empty.Prefix(2),
-			Fx: &propertyfx.Fx{},
-		},
-	})
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -56,7 +56,7 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantHealthCheck = cant
 }
 
-func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
+func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
 	if vm.InitializeF != nil {
 		return vm.InitializeF(ctx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs)
 	}

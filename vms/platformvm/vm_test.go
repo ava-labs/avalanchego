@@ -382,6 +382,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	}
 
 	ctx.SharedMemory = m.NewSharedMemory(ctx.ChainID)
+
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
@@ -1777,6 +1778,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
 	firstCtx.Lock.Lock()
+
 	firstMsgChan := make(chan common.Message, 1)
 	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -1897,6 +1899,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstVM.clock.Set(defaultGenesisTime)
 	firstCtx := defaultContext()
 	firstCtx.Lock.Lock()
+
 	firstMsgChan := make(chan common.Message, 1)
 	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
 		t.Fatal(err)
@@ -2034,6 +2037,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	vm.clock.Set(defaultGenesisTime)
 	ctx := defaultContext()
 	ctx.Lock.Lock()
+
 	msgChan := make(chan common.Message, 1)
 	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
@@ -2241,6 +2245,7 @@ func TestUnverifiedParent(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
+
 	msgChan := make(chan common.Message, 1)
 	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
@@ -2394,6 +2399,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
+
 	msgChan := make(chan common.Message, 1)
 	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)

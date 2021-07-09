@@ -1284,16 +1284,25 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	fx.InitializeF = func(interface{}) error {
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
-	err := vm.Initialize(ctx, manager.NewMemDB(version.DefaultVersion1_0_0), genesisBytes, nil, nil, issuer, []*common.Fx{
-		{
-			ID: ids.ID{1},
-			Fx: &secp256k1fx.Fx{},
+
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.ID{1},
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty,
+				Fx: fx,
+			},
 		},
-		{
-			ID: ids.Empty,
-			Fx: fx,
-		},
-	})
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1419,6 +1428,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	fx.InitializeF = func(interface{}) error {
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
+
 	err := vm.Initialize(
 		ctx,
 		manager.NewMemDB(version.DefaultVersion1_0_0),

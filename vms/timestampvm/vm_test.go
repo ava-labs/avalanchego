@@ -44,6 +44,7 @@ func TestGenesis(t *testing.T) {
 	vm := &VM{}
 	ctx := snow.DefaultContextTest()
 	ctx.ChainID = blockchainID
+
 	if err := vm.Initialize(ctx, dbManager, []byte{0, 0, 0, 0, 0}, nil, nil, msgChan, nil); err != nil {
 		t.Fatal(err)
 	}

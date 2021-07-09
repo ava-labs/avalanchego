@@ -85,7 +85,15 @@ func (vm *VMClient) SetProcess(proc *plugin.Client) {
 	vm.proc = proc
 }
 
-func (vm *VMClient) Initialize(ctx *snow.Context, dbManager manager.Manager, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, toEngine chan<- common.Message, fxs []*common.Fx) error {
+func (vm *VMClient) Initialize(
+	ctx *snow.Context,
+	dbManager manager.Manager,
+	genesisBytes []byte,
+	upgradeBytes []byte,
+	configBytes []byte,
+	toEngine chan<- common.Message,
+	fxs []*common.Fx,
+) error {
 	if len(fxs) != 0 {
 		return errUnsupportedFXs
 	}
