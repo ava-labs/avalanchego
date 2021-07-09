@@ -306,7 +306,6 @@ func TestMissingInputUTXOReturnsError(t *testing.T) {
 
 	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
 
-	// start with indexing enabled
 	indexer, err := index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
 	assert.NoError(t, err)
 
