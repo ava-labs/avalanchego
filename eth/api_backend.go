@@ -353,9 +353,9 @@ func (b *EthAPIBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
 }
 
 // TODO(aaronbuchwald) migrate to use SuggestedTipCap once implemented in gpo
-// func (b *EthAPIBackend) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
-// 	return b.gpo.SuggestTipCap(ctx)
-// }
+func (b *EthAPIBackend) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
+	return b.gpo.SuggestPrice(ctx)
+}
 
 func (b *EthAPIBackend) ChainDb() ethdb.Database {
 	return b.eth.ChainDb()
