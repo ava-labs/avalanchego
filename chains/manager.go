@@ -294,26 +294,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		m.subnets[chainParams.SubnetID] = sb
 	}
 
-	if chainParams.SubnetID == constants.PrimaryNetworkID &&
-		chainParams.ID == constants.PlatformChainID {
-		// extract platformVM, whether it is naked or wrapped in proposerVM
-		// TODO: change once proVM is enabled for all snowman-like VMs
-		var platVM block.ChainVM
-		if proVM, ok := chain.Engine.GetVM().(*proposervm.VM); ok {
-			platVM = proVM.ChainVM
-		} else if vm, ok := chain.Engine.GetVM().(block.ChainVM); ok {
-			platVM = vm
-		}
-
-		if valVM, ok := platVM.(validators.VM); ok {
-			m.validatorVM = valVM
-		} else {
-			m.Log.Fatal("platformVM  %s does not implement validatorsVM interface", chainParams.ID)
-			go m.ShutdownNodeFunc(1)
-			return
-		}
-	}
-
 	m.chainsLock.Lock()
 	m.chains[chainParams.ID] = chain.Handler
 	m.chainsLock.Unlock()
@@ -634,7 +614,7 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.Context,
 	genesisData []byte,
-	validators,
+	vals,
 	beacons validators.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
@@ -668,16 +648,19 @@ func (m *manager) createSnowmanChain(
 	msgChan := make(chan common.Message, defaultChannelSize)
 
 	// Initialize the ProposerVM and the vm wrapped inside it
-	// TODO: temporary skip proposerVM wrap for platformVM, till options are duly handled
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	var theVM block.ChainVM = nil
-	if ctx.ChainID != constants.PlatformChainID {
-		theVM = proposervm.New(vm, time.Unix(0, 0)) // enable proBlocks
-	} else {
-		theVM = vm
-	}
-	if err := theVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+	proVM := proposervm.New(vm, time.Unix(0, 0)) // enable proBlocks
+	if err := proVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
+	}
+
+	// first vm to be init is P-Chain once, which provides validator interface to all of other VMs
+	if m.validatorVM == nil {
+		if valVM, ok := proVM.ChainVM.(validators.VM); ok {
+			m.validatorVM = valVM
+		} else {
+			return nil, fmt.Errorf("could not record validator vm interface")
+		}
 	}
 
 	// Passes messages from the consensus engine to the network
@@ -713,7 +696,7 @@ func (m *manager) createSnowmanChain(
 		Config: smbootstrap.Config{
 			Config: common.Config{
 				Ctx:                           ctx,
-				Validators:                    validators,
+				Validators:                    vals,
 				Beacons:                       beacons,
 				SampleK:                       sampleK,
 				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
@@ -728,7 +711,7 @@ func (m *manager) createSnowmanChain(
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
-			VM:           theVM,
+			VM:           proVM,
 			Bootstrapped: m.unblockChains,
 		},
 		Params:    consensusParams,
@@ -739,7 +722,7 @@ func (m *manager) createSnowmanChain(
 
 	err = handler.Initialize(
 		engine,
-		validators,
+		vals,
 		msgChan,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,

@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -91,10 +92,18 @@ func (vm *VM) Initialize(
 	vm.Scheduler = scheduler
 
 	go ctx.Log.RecoverAndPanic(func() {
-		scheduler.Dispatch(timer.MaxTime)
+		scheduler.Dispatch(vm.activationTime)
 	})
 
 	vm.ctx = ctx
+	if vm.ctx.ValidatorVM == nil { // happens creating P-chain vm
+		valVM, ok := vm.ChainVM.(validators.VM)
+		if !ok {
+			vm.ctx.Log.Error("could not access validators.VM interface")
+			return validators.ErrNotValidatorsVM
+		}
+		vm.ctx.ValidatorVM = valVM
+	}
 	vm.verifiedBlocks = make(map[ids.ID]Block)
 
 	return vm.ChainVM.Initialize(
