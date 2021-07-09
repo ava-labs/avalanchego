@@ -164,10 +164,8 @@ type network struct {
 	b                            Builder
 	isFetchOnly                  bool
 
-	// stateLock should never be held when grabbing a peer senderLock
-	stateLock    sync.RWMutex
-	pendingBytes int64
-	closed       utils.AtomicBool
+	stateLock sync.RWMutex
+	closed    utils.AtomicBool
 
 	// May contain peers that we have not finished the handshake with.
 	peers peersData
@@ -235,12 +233,16 @@ type network struct {
 	compressionEnabled bool
 
 	// Rate-limits incoming messages
-	msgThrottler throttling.MsgThrottler
+	inboundMsgThrottler throttling.InboundMsgThrottler
+
+	// Rate-limits outgoing messages
+	outboundMsgThrottler throttling.OutboundMsgThrottler
 }
 
 type Config struct {
 	HealthConfig
-	throttling.MsgThrottlerConfig
+	InboundThrottlerConfig  throttling.MsgThrottlerConfig
+	OutboundThrottlerConfig throttling.MsgThrottlerConfig
 	timer.AdaptiveTimeoutConfig
 	DialerConfig     dialer.Config
 	MetricsNamespace string
@@ -279,7 +281,8 @@ func NewDefaultNetwork(
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
 	compressionEnabled bool,
-	msgThrottler throttling.MsgThrottler,
+	inboundMsgThrottler throttling.InboundMsgThrottler,
+	outboundMsgThrottler throttling.OutboundMsgThrottler,
 ) (Network, error) {
 	return NewNetwork(
 		registerer,
@@ -324,7 +327,8 @@ func NewDefaultNetwork(
 		tlsKey,
 		isFetchOnly,
 		compressionEnabled,
-		msgThrottler,
+		inboundMsgThrottler,
+		outboundMsgThrottler,
 	)
 }
 
@@ -372,7 +376,8 @@ func NewNetwork(
 	tlsKey crypto.Signer,
 	isFetchOnly bool,
 	compressionEnabled bool,
-	msgThrottler throttling.MsgThrottler,
+	inboundMsgThrottler throttling.InboundMsgThrottler,
+	outboundMsgThrottler throttling.OutboundMsgThrottler,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
@@ -430,7 +435,8 @@ func NewNetwork(
 			},
 		},
 		compressionEnabled: compressionEnabled,
-		msgThrottler:       msgThrottler,
+		inboundMsgThrottler:  inboundMsgThrottler,
+		outboundMsgThrottler: outboundMsgThrottler,
 	}
 	codec, err := newCodec(registerer)
 	if err != nil {
@@ -1401,7 +1407,6 @@ func (n *network) upgrade(p *peer, upgrader Upgrader) error {
 	}
 
 	p.cert = cert
-	p.sender = make(chan []byte, n.sendQueueSize)
 	p.nodeID = nodeID
 	p.conn = conn
 
@@ -1695,7 +1700,6 @@ func (n *network) HealthCheck() (interface{}, error) {
 			connectedTo++
 		}
 	}
-	pendingSendBytes := atomic.LoadInt64(&n.pendingBytes)
 	sendFailRate := n.sendFailRateCalculator.Read()
 	n.stateLock.RUnlock()
 
@@ -1720,12 +1724,6 @@ func (n *network) HealthCheck() (interface{}, error) {
 	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
 	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent.Milliseconds()))
-
-	// Make sure the send queue isn't too full
-	portionFull := float64(pendingSendBytes) / float64(n.maxNetworkPendingSendBytes) // In [0,1]
-	healthy = healthy && portionFull <= n.healthConfig.MaxPortionSendQueueBytesFull
-	details["sendQueuePortionFull"] = portionFull
-	n.metrics.sendQueuePortionFull.Set(portionFull)
 
 	// Make sure the message send failed rate isn't too high
 	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate

@@ -110,7 +110,8 @@ func TestPeer_Close(t *testing.T) {
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
-		defaultMsgThrottler,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, netwrk)
@@ -129,17 +130,9 @@ func TestPeer_Close(t *testing.T) {
 
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
-	peer.sender = make(chan []byte, 10)
+	peer.sendQueue = [][]byte{}
 	testMsg := newTestMsg(GetVersion, newmsgbytes)
 	peer.Send(testMsg, true)
-
-	// make sure the net pending and peer pending bytes updated
-	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
 
 	go func() {
 		err := netwrk.Close()
@@ -147,12 +140,4 @@ func TestPeer_Close(t *testing.T) {
 	}()
 
 	peer.Close()
-
-	// The network pending bytes should be reduced back to zero on close.
-	if basenetwork.pendingBytes != int64(0) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
 }
