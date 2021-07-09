@@ -300,6 +300,35 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 	}
 }
 
+func TestMissingInputUTXOReturnsError(t *testing.T) {
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	ctx := NewContext(t)
+
+	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
+
+	// start with indexing enabled
+	indexer, err := index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
+	assert.NoError(t, err)
+
+	txID := ids.GenerateTestID()
+	inputUTXOIDs := []*avax.UTXOID{
+		{
+			TxID:        txID,
+			OutputIndex: uint32(0),
+			Symbol:      true,
+		},
+	}
+	var outputUTXOs []*avax.UTXO
+	getUTXOFn := func(utxoID *avax.UTXOID) (*avax.UTXO, error) {
+		assert.Equal(t, utxoID, inputUTXOIDs[0])
+		return nil, errMissingUTXO
+	}
+
+	err = indexer.Add(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), errMissingUTXO.Error())
+}
+
 func TestIndexer_Read(t *testing.T) {
 	// setup vm, db etc
 	_, vm, _, _, _ := setup(t, true)
