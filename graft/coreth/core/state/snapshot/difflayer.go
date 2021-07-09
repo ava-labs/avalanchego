@@ -112,8 +112,9 @@ type diffLayer struct {
 	parent snapshot   // Parent snapshot modified by this one, never nil
 	memory uint64     // Approximate guess as to how much memory we use
 
-	blockHash, root common.Hash // Root hash to which this snapshot diff belongs to
-	stale           uint32      // Signals that the layer became stale (state progressed)
+	blockHash common.Hash // Block hash to which this snapshot diff belongs to
+	root      common.Hash // Root hash to which this snapshot diff belongs to
+	stale     uint32      // Signals that the layer became stale (state progressed)
 
 	// destructSet is a very special helper marker. If an account is marked as
 	// deleted, then it's recorded in this set. However it's allowed that an account

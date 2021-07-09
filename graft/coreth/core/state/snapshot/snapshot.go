@@ -206,8 +206,6 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 		defer snap.waitBuild()
 	}
 	// Attempt to load a previously persisted snapshot and rebuild one if failed
-	// TODO ensure that loadSnapshot generates only a diskLayer and that it
-	// includes the blockHash
 	head, err := loadSnapshot(diskdb, triedb, cache, blockHash, root, recovery)
 	if err != nil {
 		if rebuild {
@@ -330,7 +328,6 @@ func (t *Tree) Update(blockHash, blockRoot, parentBlockHash common.Hash, destruc
 			"blockHash", blockHash, "blockRoot", blockRoot, "parentHash", parentBlockHash,
 			"existingBlockRoot", snap.Root(),
 		)
-		panic("Should not attempt to re-insert existing snapshot") // TODO remove
 	}
 
 	snap = parent.Update(blockHash, blockRoot, destructs, accounts, storage)
