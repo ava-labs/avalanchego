@@ -573,16 +573,16 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	// Drop non-local transactions under our own minimal accepted gas price
 	if !local && tx.GasPriceIntCmp(pool.gasPrice) < 0 {
-		return fmt.Errorf("%w: address %v have gas price (%v) < pool gas price (%v)", ErrUnderpriced, from, tx.GasPrice(), pool.gasPrice)
+		return fmt.Errorf("%w: address %s have gas price (%d) < pool gas price (%d)", ErrUnderpriced, from.Hex(), tx.GasPrice(), pool.gasPrice)
 	}
 	// Ensure the transaction adheres to nonce ordering
 	if currentNonce, txNonce := pool.currentState.GetNonce(from), tx.Nonce(); currentNonce > txNonce {
-		return fmt.Errorf("%w: address %v current nonce (%v) > tx nonce (%v)", ErrNonceTooLow, from, currentNonce, txNonce)
+		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)", ErrNonceTooLow, from.Hex(), currentNonce, txNonce)
 	}
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
 	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
-		return fmt.Errorf("%w: address %v have (%v) want (%v)", ErrInsufficientFunds, from.Hex(), balance, cost)
+		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
 	}
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
