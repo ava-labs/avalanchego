@@ -81,6 +81,16 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	vm.ctx = ctx
+	if vm.ctx.ValidatorVM == nil { // happens creating P-chain vm
+		valVM, ok := vm.ChainVM.(validators.VM)
+		if !ok {
+			vm.ctx.Log.Error("could not access validators.VM interface")
+			return validators.ErrNotValidatorsVM
+		}
+		vm.ctx.ValidatorVM = valVM
+	}
+
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
@@ -95,15 +105,6 @@ func (vm *VM) Initialize(
 		scheduler.Dispatch(vm.activationTime)
 	})
 
-	vm.ctx = ctx
-	if vm.ctx.ValidatorVM == nil { // happens creating P-chain vm
-		valVM, ok := vm.ChainVM.(validators.VM)
-		if !ok {
-			vm.ctx.Log.Error("could not access validators.VM interface")
-			return validators.ErrNotValidatorsVM
-		}
-		vm.ctx.ValidatorVM = valVM
-	}
 	vm.verifiedBlocks = make(map[ids.ID]Block)
 
 	return vm.ChainVM.Initialize(
