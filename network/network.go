@@ -434,7 +434,7 @@ func NewNetwork(
 				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
-		compressionEnabled: compressionEnabled,
+		compressionEnabled:   compressionEnabled,
 		inboundMsgThrottler:  inboundMsgThrottler,
 		outboundMsgThrottler: outboundMsgThrottler,
 	}
