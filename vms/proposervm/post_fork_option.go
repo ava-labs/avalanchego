@@ -136,9 +136,11 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		return err
 	}
+	b.vm.ctx.Log.Debug("Snowman++ verify post-option block %s - selected delay %s", b.ID(), minDelay.String())
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	if childTimestamp.Before(minTimestamp) {
+		b.vm.ctx.Log.Debug("Snowman++ verify - dropped post-option block %s", b.ID())
 		return errProposerWindowNotStarted
 	}
 
@@ -188,6 +190,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	if newTimestamp.Before(minTimestamp) {
+		b.vm.ctx.Log.Debug("Snowman++ build post-option block %s - Build called too early, dropping block", b.ID())
 		return nil, errProposerWindowNotStarted
 	}
 
@@ -214,6 +217,9 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		innerBlk: innerBlock,
 		status:   choices.Processing,
 	}
+
+	b.vm.ctx.Log.Debug("Snowman++ build post-option block %s - selected delay %s, timestamp %v, timestamp parent block %v",
+		blk.ID(), minDelay.String(), blk.Timestamp().Unix(), b.Timestamp().Unix())
 	return blk, b.vm.storePostForkBlock(blk)
 }
 

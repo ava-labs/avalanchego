@@ -120,6 +120,7 @@ func (vm *VM) Initialize(
 
 // block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
+	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now().Unix())
 	preferredBlock, err := vm.getBlock(vm.preferred)
 	if err != nil {
 		return nil, err

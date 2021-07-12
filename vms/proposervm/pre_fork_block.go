@@ -119,10 +119,14 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.activationTime) {
 		// The chain hasn't forked yet
-		return &preForkBlock{
+		res := &preForkBlock{
 			Block: innerBlock,
 			vm:    b.vm,
-		}, nil
+		}
+		b.vm.ctx.Log.Debug("Snowman++ build pre-fork block %s - timestamp parent block %v",
+			res.ID(), b.Timestamp().Unix())
+
+		return res, nil
 	}
 
 	// The chain is currently forking
@@ -156,5 +160,8 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		innerBlk: innerBlock,
 		status:   choices.Processing,
 	}
+
+	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - timestamp %v, timestamp parent block %v",
+		blk.ID(), blk.Timestamp().Unix(), b.Timestamp().Unix())
 	return blk, b.vm.storePostForkBlock(blk)
 }

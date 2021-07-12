@@ -183,9 +183,11 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		return err
 	}
+	b.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - selected delay %s", b.ID(), minDelay.String())
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	if childTimestamp.Before(minTimestamp) {
+		b.vm.ctx.Log.Debug("Snowman++ verify - dropped post-fork block %s", b.ID())
 		return errProposerWindowNotStarted
 	}
 
@@ -232,6 +234,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	if newTimestamp.Before(minTimestamp) {
+		b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - Build called too early, dropping block", b.ID())
 		return nil, errProposerWindowNotStarted
 	}
 
@@ -258,5 +261,8 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		innerBlk: innerBlock,
 		status:   choices.Processing,
 	}
+
+	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - selected delay %v, timestamp %v, timestamp parent block %v",
+		blk.ID(), minDelay.String(), blk.Timestamp().Unix(), b.Timestamp().Unix())
 	return blk, b.vm.storePostForkBlock(blk)
 }
