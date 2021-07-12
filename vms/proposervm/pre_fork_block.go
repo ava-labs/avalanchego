@@ -27,6 +27,8 @@ func (b *preForkBlock) Parent() snowman.Block {
 }
 
 func (b *preForkBlock) Verify() error {
+	b.vm.ctx.Log.Debug("Snowman++ calling verify on %s", b.ID())
+
 	parent, err := b.vm.getBlock(b.Block.Parent().ID())
 	if err != nil {
 		return err
@@ -125,7 +127,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 			vm:    b.vm,
 		}
 		b.vm.ctx.Log.Debug("Snowman++ build pre-fork block %s - timestamp parent block %v",
-			res.ID(), b.Timestamp().Unix())
+			res.ID(), b.Timestamp().Format("15:04:05"))
 
 		return res, nil
 	}
@@ -162,7 +164,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		status:   choices.Processing,
 	}
 
-	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - timestamp %v, timestamp parent block %v",
-		blk.ID(), blk.Timestamp().Unix(), b.Timestamp().Unix())
+	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay NA, block timestamp %v.",
+		blk.ID(), parentTimestamp.Format("15:04:05"), newTimestamp.Format("15:04:05"))
 	return blk, b.vm.storePostForkBlock(blk)
 }

@@ -77,6 +77,8 @@ func (b *postForkOption) Parent() snowman.Block {
 }
 
 func (b *postForkOption) Verify() error {
+	b.vm.ctx.Log.Debug("Snowman++ calling verify on %s", b.ID())
+
 	parent, err := b.vm.getBlock(b.ParentID())
 	if err != nil {
 		return err
@@ -136,11 +138,13 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		return err
 	}
-	b.vm.ctx.Log.Debug("Snowman++ verify post-option block %s - selected delay %s", b.ID(), minDelay.String())
 
 	minTimestamp := parentTimestamp.Add(minDelay)
+	b.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
+		child.ID(), parentTimestamp.Format("15:04:05"), minDelay, childTimestamp.Format("15:04:05"))
+
 	if childTimestamp.Before(minTimestamp) {
-		b.vm.ctx.Log.Debug("Snowman++ verify - dropped post-option block %s", b.ID())
+		b.vm.ctx.Log.Debug("Snowman++ verify - dropped post-fork block due to time window %s", child.ID())
 		return errProposerWindowNotStarted
 	}
 
@@ -190,7 +194,8 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	if newTimestamp.Before(minTimestamp) {
-		b.vm.ctx.Log.Debug("Snowman++ build post-option block %s - Build called too early, dropping block", b.ID())
+		b.vm.ctx.Log.Debug("Snowman++ build post-fork option - parent timestamp %v, expected delay %v, block timestamp %v. Dropping block, build called too early.",
+			parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
 		return nil, errProposerWindowNotStarted
 	}
 
@@ -218,8 +223,9 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		status:   choices.Processing,
 	}
 
-	b.vm.ctx.Log.Debug("Snowman++ build post-option block %s - selected delay %s, timestamp %v, timestamp parent block %v",
-		blk.ID(), minDelay.String(), blk.Timestamp().Unix(), b.Timestamp().Unix())
+	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, expected delay %v, block timestamp %v.",
+		blk.ID(), parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
+
 	return blk, b.vm.storePostForkBlock(blk)
 }
 

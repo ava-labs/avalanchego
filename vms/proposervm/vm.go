@@ -119,7 +119,7 @@ func (vm *VM) Initialize(
 
 // block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
-	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now().Unix())
+	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now().Format("15:04:05"))
 	preferredBlock, err := vm.getBlock(vm.preferred)
 	if err != nil {
 		return nil, err
@@ -153,25 +153,50 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	}
 	vm.preferred = preferred
 
+	var prefBlk snowman.Block
+	var proposerID ids.ShortID
+	var pChainHeight uint64
+
 	if blk, err := vm.getPostForkBlock(preferred); err == nil {
 		if err := vm.ChainVM.SetPreference(blk.innerBlk.ID()); err != nil {
 			return err
 		}
 
-		// TODO: reset the scheduler
-		return nil
-	}
-
-	if opt, err := vm.getPostForkOption(preferred); err == nil {
+		prefBlk = blk
+		pChainHeight = blk.PChainHeight()
+		proposerID = blk.Proposer()
+	} else if opt, err := vm.getPostForkOption(preferred); err == nil {
 		if err := vm.ChainVM.SetPreference(opt.innerBlk.ID()); err != nil {
 			return err
 		}
 
-		// TODO: reset the scheduler
-		return nil
+		prefBlk = opt
+		pChainHeight, err = opt.pChainHeight()
+		if err != nil {
+			vm.ctx.Log.Error("Snowman++ set preference - could not retrieve current P-Chain height")
+		}
+		proposerID, err = opt.proposer()
+		if err != nil {
+			return err
+		}
+	} else {
+		return vm.ChainVM.SetPreference(preferred)
 	}
 
-	return vm.ChainVM.SetPreference(preferred)
+	// reset scheduler
+	minDelay, err := vm.Windower.Delay(prefBlk.Height(), pChainHeight, proposerID)
+	if err != nil {
+		return err
+	}
+
+	nextStartTime := prefBlk.Timestamp().Add(minDelay)
+	if nextStartTime.After(vm.activationTime) {
+		vm.Scheduler.SetStartTime(nextStartTime)
+		vm.ctx.Log.Debug("Snowman++ set preference - preferred block ID %s,  timestamp %v; next start time scheduled at %v",
+			prefBlk.ID(), prefBlk.Timestamp().Format("15:04:05"), nextStartTime.Format("15:04:05"))
+	}
+
+	return nil
 }
 
 func (vm *VM) LastAccepted() (ids.ID, error) {
