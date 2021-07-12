@@ -294,11 +294,13 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		// TODO(aaronbuchwald) include base fee calculation
 		// header.BaseFee = misc.CalcBaseFee(chain.Config(), parent.Header())
 		header.BaseFee = big.NewInt(0)
-		parentGasLimit := parent.GasLimit()
-		if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(parent.Time())) {
-			parentGasLimit = parent.GasLimit() * params.ElasticityMultiplier
-		}
-		header.GasLimit = CalcGasLimit1559(parentGasLimit, parentGasLimit)
+
+		// Exclude gas limit change from Apricot Phase 4
+		// parentGasLimit := parent.GasLimit()
+		// if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(parent.Time())) {
+		// 	parentGasLimit = parent.GasLimit() * params.ElasticityMultiplier
+		// }
+		// header.GasLimit = CalcGasLimit1559(parentGasLimit, parentGasLimit)
 	}
 	return header
 }
