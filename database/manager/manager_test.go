@@ -20,13 +20,13 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-func TestNewSingleDB(t *testing.T) {
+func TestNewSingleLevelDB(t *testing.T) {
 	dir := t.TempDir()
 
 	v1 := version.DefaultVersion1_0_0
 
 	dbPath := filepath.Join(dir, v1.String())
-	db, err := leveldb.New(dbPath, logging.NoLog{}, 0, 0, 0)
+	db, err := leveldb.New(dbPath, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestNewSingleDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := New(dir, logging.NoLog{}, v1, true)
+	manager, err := NewLevelDB(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestNewCreatesSingleDB(t *testing.T) {
 
 	v1 := version.DefaultVersion1_0_0
 
-	manager, err := New(dir, logging.NoLog{}, v1, true)
+	manager, err := NewLevelDB(dir, logging.NoLog{}, v1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,13 +86,13 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	v2 := version.NewDefaultVersion(1, 2, 0)
 
 	dbPath1 := filepath.Join(dir, v1.String())
-	db1, err := leveldb.New(dbPath1, logging.NoLog{}, 0, 0, 0)
+	db1, err := leveldb.New(dbPath1, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	dbPath2 := filepath.Join(dir, v2.String())
-	db2, err := leveldb.New(dbPath2, logging.NoLog{}, 0, 0, 0)
+	db2, err := leveldb.New(dbPath2, logging.NoLog{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,7 +102,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = New(dir, logging.NoLog{}, v2, true)
+	_, err = NewLevelDB(dir, logging.NoLog{}, v2, true)
 	assert.Error(t, err, "expected to error creating the manager due to an open db")
 
 	err = db1.Close()
@@ -114,7 +114,7 @@ func TestNewInvalidMemberPresent(t *testing.T) {
 	err = f.Close()
 	assert.NoError(t, err)
 
-	db, err := New(dir, logging.NoLog{}, v1, true)
+	db, err := NewLevelDB(dir, logging.NoLog{}, v1, true)
 	assert.NoError(t, err, "expected not to error with a non-directory file being present")
 
 	err = db.Close()
@@ -134,7 +134,7 @@ func TestNewSortsDatabases(t *testing.T) {
 
 	for _, version := range vers {
 		dbPath := filepath.Join(dir, version.String())
-		db, err := leveldb.New(dbPath, logging.NoLog{}, 0, 0, 0)
+		db, err := leveldb.New(dbPath, logging.NoLog{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -145,7 +145,7 @@ func TestNewSortsDatabases(t *testing.T) {
 		}
 	}
 
-	manager, err := New(dir, logging.NoLog{}, vers[0], true)
+	manager, err := NewLevelDB(dir, logging.NoLog{}, vers[0], true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,20 +391,20 @@ func TestDoesNotIncludePreviousVersions(t *testing.T) {
 	v1 := version.NewDefaultVersion(1, 1, 0)
 	v2 := version.NewDefaultVersion(1, 2, 0)
 	db1Path := filepath.Join(dir, v1.String())
-	db1, err := leveldb.New(db1Path, logging.NoLog{}, 0, 0, 0)
+	db1, err := leveldb.New(db1Path, logging.NoLog{})
 	defer db1.Close()
 	assert.NoError(t, err)
 	db2Path := filepath.Join(dir, v2.String())
-	db2, err := leveldb.New(db2Path, logging.NoLog{}, 0, 0, 0)
+	db2, err := leveldb.New(db2Path, logging.NoLog{})
 	assert.NoError(t, err)
 
 	err = db2.Close()
 	assert.NoError(t, err)
 
-	manager, err := New(dir, logging.NoLog{}, v2, false)
+	manager, err := NewLevelDB(dir, logging.NoLog{}, v2, false)
 	assert.NoError(t, err, "shouldn't error because shouldn't try to open previous database version")
 	assert.NoError(t, manager.Close())
 
-	_, err = New(dir, logging.NoLog{}, v2, true)
+	_, err = NewLevelDB(dir, logging.NoLog{}, v2, true)
 	assert.Error(t, err, "should error because trying to open open database (1.1.0)")
 }

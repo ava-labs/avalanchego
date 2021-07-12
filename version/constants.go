@@ -13,7 +13,8 @@ import (
 var (
 	String                       string // Printed when CLI arg --version is used
 	GitCommit                    string // Set in the build script (i.e. at compile time)
-	Current                      = NewDefaultApplication(constants.PlatformName, 1, 4, 9)
+	Current                      = NewDefaultVersion(1, 4, 10)
+	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 5)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 3, 0)
 	MinimumUnmaskedVersion       = NewDefaultApplication(constants.PlatformName, 1, 1, 0)
@@ -48,7 +49,7 @@ var (
 func init() {
 	format := "%s [database=%s"
 	args := []interface{}{
-		Current,
+		CurrentApp,
 		CurrentDatabase,
 	}
 	if GitCommit != "" {
@@ -82,7 +83,7 @@ func GetApricotPhase2Time(networkID uint32) time.Time {
 
 func GetCompatibility(networkID uint32) Compatibility {
 	return NewCompatibility(
-		Current,
+		CurrentApp,
 		MinimumCompatibleVersion,
 		GetApricotPhase2Time(networkID),
 		PrevMinimumCompatibleVersion,

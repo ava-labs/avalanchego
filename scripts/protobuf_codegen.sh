@@ -1,31 +1,28 @@
 #!/bin/bash
 
-TARGET="."
+TARGET=$PWD
 
 if [ -n "$1" ]; then 
   TARGET="$1"
 fi
 
-echo "Target folder is: $TARGET"
+echo "Re-genrating protobuf for target directory: $TARGET"
 
-for PBF in $(find $TARGET -type f | grep proto$)
+for PROTO_BUFFER_FILE in $(find $TARGET -type f | grep proto$)
 do
-  echo $PBF
-  PFILE=$(basename $PBF)
-  FDIR=$(dirname $PBF)
-  PDIR=$(dirname $FDIR)
-  PROTODIR=$(basename $FDIR)
-  protoc\
-    -I="$FDIR"\
-    --go_out="$FDIR"\
-    --go-grpc_out="$PDIR"\
-    --go_opt=paths=source_relative\
-    --go-grpc_opt M"$PFILE"=/"$PROTODIR"\
-    "$PBF"
+  echo "Re-generating protobuf: $PROTO_BUFFER_FILE"
+  PROTO_FILE_DIR=$(dirname $PROTO_BUFFER_FILE)
+  protoc \
+    --fatal_warnings \
+    -I="$PROTO_FILE_DIR" \
+    --go_out="$PROTO_FILE_DIR" \
+    --go-grpc_out="$PROTO_FILE_DIR" \
+    --go_opt=paths=source_relative \
+    --go-grpc_opt=paths=source_relative \
+    "$PROTO_BUFFER_FILE"
   if [[ $? -ne 0 ]];  then
-    echo "WARN: protobuf codegen did not succeed for $PBF"
+    echo "WARN: protobuf codegen did not succeed for $PROTO_BUFFER_FILE"
   else
-    echo "protobuf codegen succeed for $PBF"
+    echo "protobuf codegen succeed for $PROTO_BUFFER_FILE"
   fi
 done
-
