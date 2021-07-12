@@ -4,7 +4,12 @@
 package secp256k1fx
 
 import (
+	"encoding/json"
 	"errors"
+
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+
+	"github.com/ava-labs/avalanchego/snow"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -15,6 +20,7 @@ var (
 	errOutputUnspendable                 = errors.New("output is unspendable")
 	errOutputUnoptimized                 = errors.New("output representation should be optimized")
 	errAddrsNotSortedUnique              = errors.New("addresses not sorted and unique")
+	errMarshal                           = errors.New("cannot marshal without ctx")
 	_                       verify.State = &OutputOwners{}
 )
 
@@ -23,6 +29,33 @@ type OutputOwners struct {
 	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
+	Ctx       *snow.Context `serialize:"false"`
+}
+
+// MarshalJSON marshals OutputOwners as JSON with human readable addresses
+func (out *OutputOwners) MarshalJSON() ([]byte, error) {
+	// we need out.Ctx to do this, if its absent, throw error
+	if out.Ctx == nil {
+		return nil, errMarshal
+	}
+
+	result := make(map[string]interface{})
+	result["locktime"] = out.Locktime
+	result["threshold"] = out.Threshold
+
+	addrsLen := len(out.Addrs)
+	addresses := make([]string, addrsLen)
+	for i, n := 0, addrsLen; i < n; i++ {
+		addr := out.Addrs[i]
+		fAddr, err := avax.FormatAddress(out.Ctx, addr)
+		if err != nil {
+			return nil, err
+		}
+		addresses = append(addresses, fAddr)
+	}
+	result["addresses"] = addresses
+
+	return json.Marshal(result)
 }
 
 // Addresses returns the addresses that manage this output
