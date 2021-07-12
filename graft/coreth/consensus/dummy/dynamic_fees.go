@@ -25,8 +25,9 @@ var (
 // and calculates the expected base fee as well as the encoding of the past
 // pricing information for the child block.
 func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int) {
-	// If the current block is the first EIP-1559 block, return the InitialBaseFee.
-	if !config.IsApricotPhase4(new(big.Int).SetUint64(parent.Time)) {
+	// If the current block is the first EIP-1559 block, or it is the genesis block
+	// return the initial slice and initial base fee.
+	if !config.IsApricotPhase4(new(big.Int).SetUint64(parent.Time)) || parent.Number.Cmp(common.Big0) == 0 {
 		initialSlice := make([]byte, 80)
 		initialBaseFee := new(big.Int).SetUint64(params.InitialBaseFee)
 		return initialSlice, initialBaseFee
