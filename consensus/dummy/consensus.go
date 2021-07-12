@@ -19,7 +19,9 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
+var blockGasFee = big.NewInt(1_000_000)
+
+type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, uncles []*types.Header) error
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
@@ -157,11 +159,38 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 
 func (self *DummyEngine) Finalize(
 	chain consensus.ChainHeaderReader, header *types.Header,
-	state *state.StateDB, txs []*types.Transaction,
-	uncles []*types.Header) {
-	if self.cb.OnFinalize != nil {
-		self.cb.OnFinalize(chain, header, state, txs, uncles)
+	state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt,
+	uncles []*types.Header) error {
+
+	// If Apricot Phase 4 is live, ensure that the transactions in the block have met the block fee.
+	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
+		blockFeePremium := new(big.Int)
+		blockFeeContribution := new(big.Int)
+		totalBlockFee := new(big.Int)
+		// Calculate the total excess over the base fee that was paid towards the block fee
+		for i, receipt := range receipts {
+			blockFeePremium = blockFeePremium.Sub(txs[i].GasPrice(), header.BaseFee)
+			blockFeeContribution = blockFeeContribution.Mul(blockFeePremium, new(big.Int).SetUint64(receipt.GasUsed))
+
+			totalBlockFee = totalBlockFee.Add(totalBlockFee, blockFeeContribution)
+		}
+		// TODO factor atomic transactions into the calculation.
+		// In order to divide, we require that the baseFee must never be 0
+		if header.BaseFee.Cmp(common.Big0) <= 0 {
+			return fmt.Errorf("invalid base fee (%d) in apricot phase 4", header.BaseFee)
+		}
+		blockGas := new(big.Int).Div(totalBlockFee, new(big.Int).Set(header.BaseFee))
+		if !blockGas.IsUint64() {
+			return fmt.Errorf("calculated block gas was not uint64: %d", blockGas)
+		}
+		if blockGas.Cmp(blockGasFee) < 0 {
+			return fmt.Errorf("insufficient gas (%d) to cover the block fee (%d) at base fee (%d) (total block fee: %d)", blockGas, blockGasFee, header.BaseFee, totalBlockFee)
+		}
 	}
+	if self.cb.OnFinalize != nil {
+		return self.cb.OnFinalize(chain, header, state, txs, receipts, uncles)
+	}
+	return nil
 }
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
