@@ -476,7 +476,7 @@ func (b *BlockClient) Parent() snowman.Block {
 
 func (b *BlockClient) Verify() error {
 	_, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
-		Id: b.id[:],
+		Bytes: b.bytes,
 	})
 	return err
 }

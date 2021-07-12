@@ -386,11 +386,7 @@ func (vm *VMServer) Version(_ context.Context, req *vmproto.VersionRequest) (*vm
 }
 
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
-	id, err := ids.ToID(req.Id)
-	if err != nil {
-		return nil, err
-	}
-	blk, err := vm.vm.GetBlock(id)
+	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
 		return nil, err
 	}
