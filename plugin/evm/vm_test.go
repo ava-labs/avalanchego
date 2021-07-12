@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -121,7 +122,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 	genesisBytes := BuildGenesisTest(t, genesisJSON)
 	ctx := NewContext()
 
-	baseDBManager := manager.NewDefaultMemDBManager()
+	baseDBManager := manager.NewMemDB(version.NewDefaultVersion(1, 4, 5))
 
 	m := &atomic.Memory{}
 	m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
@@ -131,7 +132,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewDefaultMemDBManager())
+	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.NewDefaultVersion(1, 4, 5)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1291,8 +1292,8 @@ func TestBonusBlocksTxs(t *testing.T) {
 //     |
 //     D
 func TestReorgProtection(t *testing.T) {
-	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
-	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	issuer1, vm1, _, sharedMemory1 := GenesisVM(t, true, genesisJSONApricotPhase0, "{\"pruning-enabled\":false}", "")
+	issuer2, vm2, _, sharedMemory2 := GenesisVM(t, true, genesisJSONApricotPhase0, "{\"pruning-enabled\":false}", "")
 
 	defer func() {
 		if err := vm1.Shutdown(); err != nil {
