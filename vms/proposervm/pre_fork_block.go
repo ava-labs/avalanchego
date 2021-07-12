@@ -112,7 +112,8 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
-	return errProposersActivated // TODO: find better error
+	b.vm.ctx.Log.Error("post-fork option built on top of pre-fork block")
+	return errUnexpectedBlockType
 }
 
 func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {

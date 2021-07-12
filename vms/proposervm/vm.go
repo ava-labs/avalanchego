@@ -18,7 +18,6 @@ package proposervm
 // implemented via the proposer block header
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -207,7 +206,8 @@ func (vm *VM) getPostForkBlock(blkID ids.ID) (*postForkBlock, error) {
 		if blk, ok := blkIntf.(*postForkBlock); ok {
 			return blk, nil
 		}
-		return nil, fmt.Errorf("object matching requested ID is not postForkBlock one") // TODO: add error
+		vm.ctx.Log.Error("object matching requested ID is not postForkBlock one")
+		return nil, errUnexpectedBlockType
 	}
 	statelessBlock, status, err := vm.State.GetBlock(blkID)
 	if err != nil {
@@ -234,7 +234,8 @@ func (vm *VM) getPostForkOption(blkID ids.ID) (*postForkOption, error) {
 		if opt, ok := optIntf.(*postForkOption); ok {
 			return opt, nil
 		}
-		return nil, fmt.Errorf("object matching requested ID is not postForkOption one") // TODO: add error
+		vm.ctx.Log.Error("object matching requested ID is not postForkOption one")
+		return nil, errUnexpectedBlockType
 	}
 	option, status, err := vm.State.GetOption(blkID)
 	if err != nil {

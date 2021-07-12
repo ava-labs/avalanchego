@@ -227,7 +227,8 @@ func (b *postForkOption) pChainHeight() (uint64, error) {
 	parent := b.Parent()
 	pFBlk, ok := parent.(*postForkBlock)
 	if !ok {
-		return 0, fmt.Errorf("unexpected parent type") // TODO find better error
+		b.vm.ctx.Log.Error("post-fork option parent is not post-fork block")
+		return 0, errUnexpectedBlockType
 	}
 
 	return pFBlk.PChainHeight(), nil
@@ -237,7 +238,8 @@ func (b *postForkOption) proposer() (ids.ShortID, error) {
 	parent := b.Parent()
 	pFBlk, ok := parent.(*postForkBlock)
 	if !ok {
-		return ids.ShortID{}, fmt.Errorf("unexpected parent type") // TODO find better error
+		b.vm.ctx.Log.Error("post-fork option parent is not post-fork block")
+		return ids.ShortID{}, errUnexpectedBlockType
 	}
 
 	return pFBlk.Proposer(), nil

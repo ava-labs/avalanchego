@@ -17,6 +17,7 @@ const (
 
 var (
 	errUnsignedChild            = errors.New("expected child to be signed")
+	errUnexpectedBlockType      = errors.New("unexpected proposer block type type")
 	errInnerParentMismatch      = errors.New("inner parentID didn't match expected parent")
 	errTimeNotMonotonic         = errors.New("time must monotonically increase")
 	errPChainHeightNotMonotonic = errors.New("p chain height must monotonically increase")
