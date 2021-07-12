@@ -48,7 +48,8 @@ func NewFaker() *DummyEngine {
 }
 
 var (
-	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
+	allowedFutureBlockTime     = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
+	apricotPhase4ExtraDataSize = 80
 )
 
 var (
@@ -63,9 +64,14 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		return errUnclesUnsupported
 	}
 	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+	if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
+		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
+			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+		}
+	} else if len(header.Extra) != apricotPhase4ExtraDataSize {
+		return fmt.Errorf("expected extra-data field to be: %d, but found %d", apricotPhase4ExtraDataSize, len(header.Extra))
 	}
+
 	// Verify the header's timestamp
 	if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
 		return consensus.ErrFutureBlock
