@@ -169,20 +169,26 @@ func (self *DummyEngine) Finalize(
 		totalBlockFee := new(big.Int)
 		// Calculate the total excess over the base fee that was paid towards the block fee
 		for i, receipt := range receipts {
+			// Each transaction contributes the excess over the baseFee towards the totalBlockFee
+			// This should be equivalent to the sum of the "priority fees" within EIP-1559.
 			blockFeePremium = blockFeePremium.Sub(txs[i].GasPrice(), header.BaseFee)
 			blockFeeContribution = blockFeeContribution.Mul(blockFeePremium, new(big.Int).SetUint64(receipt.GasUsed))
 
 			totalBlockFee = totalBlockFee.Add(totalBlockFee, blockFeeContribution)
 		}
 		// TODO factor atomic transactions into the calculation.
-		// In order to divide, we require that the baseFee must never be 0
+		// In order to divide safely, we require that the baseFee must never be 0
 		if header.BaseFee.Cmp(common.Big0) <= 0 {
 			return fmt.Errorf("invalid base fee (%d) in apricot phase 4", header.BaseFee)
 		}
+		// Calculate how much gas the [totalBlockFee] would purchase at the price level
+		// set by this block.
 		blockGas := new(big.Int).Div(totalBlockFee, new(big.Int).Set(header.BaseFee))
 		if !blockGas.IsUint64() {
 			return fmt.Errorf("calculated block gas was not uint64: %d", blockGas)
 		}
+		// We require that [blockGas] covers at least [blockGasFee] to ensure that it
+		// costs a minimum amount to produce a valid block.
 		if blockGas.Cmp(blockGasFee) < 0 {
 			return fmt.Errorf("insufficient gas (%d) to cover the block fee (%d) at base fee (%d) (total block fee: %d)", blockGas, blockGasFee, header.BaseFee, totalBlockFee)
 		}
