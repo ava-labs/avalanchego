@@ -3,20 +3,6 @@
 
 package proposervm
 
-// VM is a decorator for a snowman.ChainVM struct, created to handle block headers introduced with snowman++
-
-// Contract
-// * CoreVM MUST build blocks on top of currently preferred block, otherwise Verify() will fail
-// * After initialization. full ProposerBlocks (proHeader + core block) are stored in proposervm.VM's db
-// on Build/ParseBlock calls, AFTER calls to core vm's Build/ParseBlock, which we ASSUME
-//  would store core block on core VM's db.
-// * ProposerVM do not track ProposerBlock state; instead state related calls (Accept/Reject/Status) are
-// forwarded to the core VM. Since block registration HAPPENS BEFORE block status settings,
-// proposerVM is guaranteed not to lose the last accepted block
-// * ProposerVM can handle both ProposerVM blocks AND generic snowman.Block not wrapped with a ProposerBlocHeader
-// This allows all snowman-like VM freedom to select a time after which introduce the congestion control mechanism
-// implemented via the proposer block header
-
 import (
 	"time"
 
