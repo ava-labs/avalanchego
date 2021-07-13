@@ -5,6 +5,7 @@ package process
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -98,7 +99,8 @@ func (a *App) Start() int {
 	var dbManager manager.Manager
 	switch a.config.DBName {
 	case rocksdb.Name:
-		dbManager, err = manager.NewRocksDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
+		path := filepath.Join(a.config.DBPath, "rocksdb")
+		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase, !a.config.FetchOnly)
 	case leveldb.Name:
 		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
 	case memdb.Name:
