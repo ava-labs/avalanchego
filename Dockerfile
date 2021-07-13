@@ -1,13 +1,33 @@
-# syntax=docker/dockerfile:experimental
+# Changes to the minimum golang version must also be replicated in
+# scripts/ansible/roles/golang_based/defaults/main.yml
+# scripts/build_avalanche.sh
+# scripts/local.Dockerfile
+# Dockerfile (here)
+# README.md
+# go.mod
+# ============= Compilation Stage ================
+FROM golang:1.15.5-alpine AS builder
+RUN apk add --no-cache bash git make gcc musl-dev linux-headers git ca-certificates g++
 
-FROM golang:1.15.5-buster
+WORKDIR /build
+# Copy and download avalanche dependencies using go mod
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
 
-RUN mkdir -p /go/src/github.com/ava-labs
+# Copy the code into the container
+COPY . .
 
-WORKDIR $GOPATH/src/github.com/ava-labs/
-COPY . avalanchego
-
-WORKDIR $GOPATH/src/github.com/ava-labs/avalanchego
+# Build avalanchego and plugins
 RUN ./scripts/build.sh
 
-RUN ln -sv $GOPATH/src/github.com/ava-labs/avalanchego/ /avalanchego
+# ============= Cleanup Stage ================
+FROM alpine:3.13 AS execution
+
+RUN apk add --no-cache libstdc++
+# Maintain compatibility with previous images
+RUN mkdir -p /avalanchego/build
+WORKDIR /avalanchego/build
+
+# Copy the executables into the container
+COPY --from=builder /build/build/ .

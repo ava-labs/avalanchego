@@ -27,6 +27,8 @@ const (
 	maxContainersLen = int(4 * network.DefaultMaxMessageSize / 5)
 )
 
+var _ Engine = &Transitive{}
+
 // Transitive implements the Engine interface by attempting to fetch all
 // transitive dependencies.
 type Transitive struct {
@@ -174,11 +176,12 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 		return nil
 	}
 
-	ancestorsBytes := make([][]byte, 1, common.MaxContainersPerMultiPut) // First elt is byte repr. of blk, then its parents, then grandparent, etc.
+	// First elt is byte repr. of [blk], then its parent, then grandparent, etc.
+	ancestorsBytes := make([][]byte, 1, t.Config.MultiputMaxContainersSent)
 	ancestorsBytes[0] = blk.Bytes()
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
-	for numFetched := 1; numFetched < common.MaxContainersPerMultiPut && time.Since(startTime) < common.MaxTimeFetchingAncestors; numFetched++ {
+	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
 		blk = blk.Parent()
 		if blk.Status() == choices.Unknown {
 			break
@@ -615,9 +618,9 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdrBag.List()...)
-
+		vdrList := vdrBag.List()
+		vdrSet := ids.NewShortSet(len(vdrList))
+		vdrSet.Add(vdrList...)
 		t.Sender.PullQuery(vdrSet, t.RequestID, blkID)
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
@@ -635,8 +638,9 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		vdrSet := ids.ShortSet{}
-		vdrSet.Add(vdrBag.List()...)
+		vdrList := vdrBag.List()
+		vdrSet := ids.NewShortSet(len(vdrList))
+		vdrSet.Add(vdrList...)
 
 		t.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
 	} else if err != nil {
@@ -768,4 +772,14 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 		return intf, consensusErr
 	}
 	return intf, fmt.Errorf("vm: %s ; consensus: %s", vmErr, consensusErr)
+}
+
+// GetBlock implements the snowman.Engine interface
+func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	return t.VM.GetBlock(blkID)
+}
+
+// GetVM implements the snowman.Engine interface
+func (t *Transitive) GetVM() common.VM {
+	return t.VM
 }

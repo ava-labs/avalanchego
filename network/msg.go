@@ -3,6 +3,8 @@
 
 package network
 
+var _ Msg = &msg{}
+
 // Msg represents a set of fields that can be serialized into a byte stream
 type Msg interface {
 	Op() Op

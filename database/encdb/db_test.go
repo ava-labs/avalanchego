@@ -22,3 +22,18 @@ func TestInterface(t *testing.T) {
 		test(t, db)
 	}
 }
+
+func BenchmarkInterface(b *testing.B) {
+	pw := "lol totally a secure password"
+	for _, size := range database.BenchmarkSizes {
+		keys, values := database.SetupBenchmark(b, size, size)
+		for _, bench := range database.Benchmarks {
+			unencryptedDB := memdb.New()
+			db, err := New([]byte(pw), unencryptedDB)
+			if err != nil {
+				b.Fatal(err)
+			}
+			bench(b, db, "encdb", keys, values)
+		}
+	}
+}

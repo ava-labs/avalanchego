@@ -10,12 +10,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -774,7 +775,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -834,7 +835,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -894,7 +895,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -978,7 +979,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -997,10 +998,10 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 	ctx := NewContext(t)
 
-	baseDB := memdb.New()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1012,7 +1013,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := userKeystore.AddUser(username, password); err != nil {
+	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
@@ -1025,8 +1026,10 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{
 			{
@@ -1097,7 +1100,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1157,7 +1160,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tx, err := vm.Parse(rawTx.Bytes())
+	tx, err := vm.ParseTx(rawTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1177,10 +1180,10 @@ func TestIssueExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDB := memdb.New()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1196,8 +1199,10 @@ func TestIssueExportTx(t *testing.T) {
 	vm := &VM{}
 	if err := vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,
@@ -1269,7 +1274,7 @@ func TestIssueExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
+	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}
@@ -1304,10 +1309,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	genesisBytes := BuildGenesisTest(t)
 
 	issuer := make(chan common.Message, 1)
-	baseDB := memdb.New()
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 
 	m := &atomic.Memory{}
-	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDB))
+	err := m.Initialize(logging.NoLog{}, prefixdb.New([]byte{0}, baseDBManager.Current().Database))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1324,8 +1329,10 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
-		prefixdb.New([]byte{1}, baseDB),
+		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
+		nil,
+		nil,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,
@@ -1400,7 +1407,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	txs := vm.Pending()
+	txs := vm.PendingTxs()
 	if len(txs) != 1 {
 		t.Fatalf("Should have returned %d tx(s)", 1)
 	}

@@ -1,0 +1,84 @@
+name: build-arm64-debian-packages
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  build-bionic-arm64-package:
+    runs-on: [self-hosted, linux, ARM64, bionic]
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+         go-version: '1.15.5' # The Go version to download (if necessary) and use.
+    - run: go version
+
+    - name: Build the avalanchego binaries 
+      run: ./scripts/build.sh 
+
+    - name: Install aws cli
+      run: |
+        sudo apt update
+        sudo apt-get -y install awscli
+
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      shell: bash
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Create debian package
+      run: ./.github/workflows/build-deb-pkg.sh
+      env:
+        TAG: ${{ steps.get_version.outputs.VERSION }}
+        BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "arm64"
+        RELEASE: "bionic"
+
+  build-focal-arm64-package:
+    runs-on: [self-hosted, linux, ARM64, focal] 
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-go@v2
+      with:
+         go-version: '1.15.5' # The Go version to download (if necessary) and use.
+    - run: go version
+
+    - name: Build the avalanchego binaries
+      run: ./scripts/build.sh
+
+    - name: Install aws cli
+      run: |
+        sudo apt update
+        sudo apt-get -y install awscli
+
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      shell: bash
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Create debian package
+      run: ./.github/workflows/build-deb-pkg.sh
+      env:
+        TAG: ${{ steps.get_version.outputs.VERSION }}
+        BUCKET: ${{ secrets.BUCKET }}
+        ARCH: "arm64"
+        RELEASE: "focal"
+

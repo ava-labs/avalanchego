@@ -4,9 +4,10 @@
 package common
 
 import (
-	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
 // VM describes the interface that all consensus VMs must implement
@@ -17,6 +18,9 @@ type VM interface {
 	// Periodically called and reported via the node's Health API.
 	health.Checkable
 
+	// Connector represents a handler that is called on connection connect/disconnect
+	validators.Connector
+
 	// Initialize this VM.
 	// [ctx]: Metadata about this VM.
 	//     [ctx.networkID]: The ID of the network this VM's chain is running on.
@@ -26,7 +30,7 @@ type VM interface {
 	//     [ctx.Lock]: A Read/Write lock shared by this VM and the consensus
 	//                 engine that manages this VM. The write lock is held
 	//                 whenever code in the consensus engine calls the VM.
-	// [db]: The database this VM will persist data to.
+	// [dbManager]: The manager of the database this VM will persist data to.
 	// [genesisBytes]: The byte-encoding of the genesis information of this
 	//                 VM. The VM uses it to initialize its state. For
 	//                 example, if this VM were an account-based payments
@@ -37,8 +41,10 @@ type VM interface {
 	// [fxs]: Feature extensions that attach to this VM.
 	Initialize(
 		ctx *snow.Context,
-		db database.Database,
+		dbManager manager.Manager,
 		genesisBytes []byte,
+		upgradeBytes []byte,
+		configBytes []byte,
 		toEngine chan<- Message,
 		fxs []*Fx,
 	) error
@@ -51,6 +57,23 @@ type VM interface {
 
 	// Shutdown is called when the node is shutting down.
 	Shutdown() error
+
+	// Version returns the version of the VM this node is running.
+	Version() (string, error)
+
+	// Creates the HTTP handlers for custom VM network calls.
+	//
+	// This exposes handlers that the outside world can use to communicate with
+	// a static reference to the VM. Each handler has the path:
+	// [Address of node]/ext/VM/[VM ID]/[extension]
+	//
+	// Returns a mapping from [extension]s to HTTP handlers.
+	//
+	// Each extension can specify how locking is managed for convenience.
+	//
+	// For example, it might make sense to have an extension for creating
+	// genesis bytes this VM can interpret.
+	CreateStaticHandlers() (map[string]*HTTPHandler, error)
 
 	// Creates the HTTP handlers for custom chain network calls.
 	//
@@ -66,22 +89,4 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers() (map[string]*HTTPHandler, error)
-}
-
-// StaticVM describes the functionality that allows a user to interact with a VM
-// statically.
-type StaticVM interface {
-	// Creates the HTTP handlers for custom VM network calls.
-	//
-	// This exposes handlers that the outside world can use to communicate with
-	// a static reference to the VM. Each handler has the path:
-	// [Address of node]/ext/VM/[VM ID]/[extension]
-	//
-	// Returns a mapping from [extension]s to HTTP handlers.
-	//
-	// Each extension can specify how locking is managed for convenience.
-	//
-	// For example, it might make sense to have an extension for creating
-	// genesis bytes this VM can interpret.
-	CreateStaticHandlers() (map[string]*HTTPHandler, error)
 }

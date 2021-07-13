@@ -8,8 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -28,7 +28,7 @@ func initHistogram(
 		Namespace: namespace,
 		Name:      name,
 		Help:      defaultRequestHelpMsg,
-		Buckets:   utils.MillisecondsBuckets,
+		Buckets:   metric.MillisecondsBuckets,
 	})
 
 	if err := registerer.Register(histogram); err != nil {
@@ -72,7 +72,6 @@ func (m *metrics) RegisterChain(ctx *snow.Context, namespace string) error {
 	}
 	m.chainToMetrics[ctx.ChainID] = cm
 	return nil
-
 }
 
 // Record that a response to a message of type [msgType] regarding chain [chainID] took [latency]

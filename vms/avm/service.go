@@ -173,12 +173,11 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		err       error
 	)
 	if sourceChain == service.vm.ctx.ChainID {
-		utxos, endAddr, endUTXOID, err = service.vm.GetUTXOs(
+		utxos, endAddr, endUTXOID, err = service.vm.getPaginatedUTXOs(
 			addrSet,
 			startAddr,
 			startUTXO,
 			int(args.Limit),
-			true,
 		)
 	} else {
 		utxos, endAddr, endUTXOID, err = service.vm.GetAtomicUTXOs(
@@ -293,7 +292,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	addrSet := ids.ShortSet{}
 	addrSet.Add(addr)
 
-	utxos, _, _, err := service.vm.GetUTXOs(addrSet, ids.ShortEmpty, ids.Empty, -1, false)
+	utxos, err := service.vm.getAllUTXOs(addrSet)
 	if err != nil {
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
@@ -357,7 +356,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 	addrSet := ids.ShortSet{}
 	addrSet.Add(address)
 
-	utxos, _, _, err := service.vm.GetUTXOs(addrSet, ids.ShortEmpty, ids.Empty, -1, false)
+	utxos, err := service.vm.getAllUTXOs(addrSet)
 	if err != nil {
 		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
@@ -476,7 +475,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		utxos,
 		kc,
 		map[ids.ID]uint64{
-			service.vm.ctx.AVAXAssetID: service.vm.creationTxFee,
+			service.vm.feeAssetID: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -484,9 +483,9 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.creationTxFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -631,7 +630,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		utxos,
 		kc,
 		map[ids.ID]uint64{
-			service.vm.ctx.AVAXAssetID: service.vm.creationTxFee,
+			service.vm.feeAssetID: service.vm.creationTxFee,
 		},
 	)
 	if err != nil {
@@ -639,9 +638,9 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.creationTxFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.creationTxFee {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.creationTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1019,11 +1018,11 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amountsWithFee[assetID] = amount
 	}
 
-	amountWithFee, err := safemath.Add64(amounts[service.vm.ctx.AVAXAssetID], service.vm.txFee)
+	amountWithFee, err := safemath.Add64(amounts[service.vm.feeAssetID], service.vm.txFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
-	amountsWithFee[service.vm.ctx.AVAXAssetID] = amountWithFee
+	amountsWithFee[service.vm.feeAssetID] = amountWithFee
 
 	amountsSpent, ins, keys, err := service.vm.Spend(
 		utxos,
@@ -1130,7 +1129,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		feeUTXOs,
 		feeKc,
 		map[ids.ID]uint64{
-			service.vm.ctx.AVAXAssetID: service.vm.txFee,
+			service.vm.feeAssetID: service.vm.txFee,
 		},
 	)
 	if err != nil {
@@ -1138,9 +1137,9 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.txFee {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1247,7 +1246,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		utxos,
 		kc,
 		map[ids.ID]uint64{
-			service.vm.ctx.AVAXAssetID: service.vm.txFee,
+			service.vm.feeAssetID: service.vm.txFee,
 		},
 	)
 	if err != nil {
@@ -1255,9 +1254,9 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.txFee {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1363,7 +1362,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		feeUTXOs,
 		feeKc,
 		map[ids.ID]uint64{
-			service.vm.ctx.AVAXAssetID: service.vm.txFee,
+			service.vm.feeAssetID: service.vm.txFee,
 		},
 	)
 	if err != nil {
@@ -1371,9 +1370,9 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.txFee {
 		outs = append(outs, &avax.TransferableOutput{
-			Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
 				Amt: amountSpent - service.vm.txFee,
 				OutputOwners: secp256k1fx.OutputOwners{
@@ -1479,13 +1478,13 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 
-	if amountSpent := amountsSpent[service.vm.ctx.AVAXAssetID]; amountSpent < service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent < service.vm.txFee {
 		var localAmountsSpent map[ids.ID]uint64
 		localAmountsSpent, ins, keys, err = service.vm.Spend(
 			utxos,
 			kc,
 			map[ids.ID]uint64{
-				service.vm.ctx.AVAXAssetID: service.vm.txFee - amountSpent,
+				service.vm.feeAssetID: service.vm.txFee - amountSpent,
 			},
 		)
 		if err != nil {
@@ -1502,7 +1501,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 
 	// Because we ensured that we had enough inputs for the fee, we can
 	// safely just remove it without concern for underflow.
-	amountsSpent[service.vm.ctx.AVAXAssetID] -= service.vm.txFee
+	amountsSpent[service.vm.feeAssetID] -= service.vm.txFee
 
 	keys = append(keys, importKeys...)
 
@@ -1623,14 +1622,14 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 	}
 
 	amounts := map[ids.ID]uint64{}
-	if assetID == service.vm.ctx.AVAXAssetID {
+	if assetID == service.vm.feeAssetID {
 		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
-		amounts[service.vm.ctx.AVAXAssetID] = amountWithFee
+		amounts[service.vm.feeAssetID] = amountWithFee
 	} else {
-		amounts[service.vm.ctx.AVAXAssetID] = service.vm.txFee
+		amounts[service.vm.feeAssetID] = service.vm.txFee
 		amounts[assetID] = uint64(args.Amount)
 	}
 

@@ -12,23 +12,26 @@ import (
 
 	"github.com/hashicorp/go-plugin"
 
+	"github.com/ava-labs/avalanchego/api/keystore/gkeystore"
+	"github.com/ava-labs/avalanchego/api/keystore/gkeystore/gkeystoreproto"
+	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory"
+	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/rpcdb"
 	"github.com/ava-labs/avalanchego/database/rpcdb/rpcdbproto"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/ghttpproto"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gkeystore"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gkeystore/gkeystoreproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsharedmemory"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/messenger"
@@ -36,17 +39,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto"
 )
 
-var (
-	_ vmproto.VMServer = &VMServer{}
-)
+var _ vmproto.VMServer = &VMServer{}
 
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
+	vmproto.UnimplementedVMServer
 	vm     block.ChainVM
 	broker *plugin.GRPCBroker
 
 	serverCloser grpcutils.ServerCloser
-	conns        []*grpc.ClientConn
+	connCloser   wrappers.Closer
 
 	ctx      *snow.Context
 	toEngine chan common.Message
@@ -87,52 +89,76 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 
-	dbConn, err := vm.broker.Dial(req.DbServer)
-	if err != nil {
-		return nil, err
+	// Dial each database in the request and construct the database manager
+	versionedDBs := make([]*manager.VersionedDatabase, len(req.DbServers))
+	versionParser := version.NewDefaultParser()
+	for i, vDBReq := range req.DbServers {
+		version, err := versionParser.Parse(vDBReq.Version)
+		if err != nil {
+			// Ignore closing errors to return the original error
+			_ = vm.connCloser.Close()
+			return nil, err
+		}
+
+		dbConn, err := vm.broker.Dial(vDBReq.DbServer)
+		if err != nil {
+			// Ignore closing errors to return the original error
+			_ = vm.connCloser.Close()
+			return nil, err
+		}
+		vm.connCloser.Add(dbConn)
+
+		versionedDBs[i] = &manager.VersionedDatabase{
+			Database: rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn)),
+			Version:  version,
+		}
 	}
-	msgConn, err := vm.broker.Dial(req.EngineServer)
+	dbManager, err := manager.NewManagerFromDBs(versionedDBs)
 	if err != nil {
-		// Ignore DB closing error to return the original error
-		_ = dbConn.Close()
-		return nil, err
-	}
-	keystoreConn, err := vm.broker.Dial(req.KeystoreServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = dbConn.Close()
-		_ = msgConn.Close()
-		return nil, err
-	}
-	sharedMemoryConn, err := vm.broker.Dial(req.SharedMemoryServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = dbConn.Close()
-		_ = msgConn.Close()
-		_ = keystoreConn.Close()
-		return nil, err
-	}
-	bcLookupConn, err := vm.broker.Dial(req.BcLookupServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = dbConn.Close()
-		_ = msgConn.Close()
-		_ = keystoreConn.Close()
-		_ = sharedMemoryConn.Close()
-		return nil, err
-	}
-	snLookupConn, err := vm.broker.Dial(req.SnLookupServer)
-	if err != nil {
-		// Ignore closing error to return the original error
-		_ = dbConn.Close()
-		_ = msgConn.Close()
-		_ = keystoreConn.Close()
-		_ = sharedMemoryConn.Close()
-		_ = bcLookupConn.Close()
+		// Ignore closing errors to return the original error
+		_ = vm.connCloser.Close()
 		return nil, err
 	}
 
-	dbClient := rpcdb.NewClient(rpcdbproto.NewDatabaseClient(dbConn))
+	msgConn, err := vm.broker.Dial(req.EngineServer)
+	if err != nil {
+		// Ignore closing errors to return the original error
+		_ = vm.connCloser.Close()
+		return nil, err
+	}
+	vm.connCloser.Add(msgConn)
+
+	keystoreConn, err := vm.broker.Dial(req.KeystoreServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = vm.connCloser.Close()
+		return nil, err
+	}
+	vm.connCloser.Add(keystoreConn)
+
+	sharedMemoryConn, err := vm.broker.Dial(req.SharedMemoryServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = vm.connCloser.Close()
+		return nil, err
+	}
+	vm.connCloser.Add(sharedMemoryConn)
+
+	bcLookupConn, err := vm.broker.Dial(req.BcLookupServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = vm.connCloser.Close()
+		return nil, err
+	}
+	vm.connCloser.Add(bcLookupConn)
+
+	snLookupConn, err := vm.broker.Dial(req.SnLookupServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = vm.connCloser.Close()
+		return nil, err
+	}
+
 	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
 	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(keystoreConn), vm.broker)
 	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(sharedMemoryConn))
@@ -165,24 +191,29 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		EpochDuration:        time.Duration(req.EpochDuration),
 	}
 
-	if err := vm.vm.Initialize(vm.ctx, dbClient, req.GenesisBytes, toEngine, nil); err != nil {
+	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil); err != nil {
 		// Ignore errors closing resources to return the original error
-		_ = dbConn.Close()
-		_ = msgConn.Close()
-		_ = keystoreConn.Close()
-		_ = sharedMemoryConn.Close()
-		_ = bcLookupConn.Close()
-		_ = snLookupConn.Close()
+		_ = vm.connCloser.Close()
 		close(toEngine)
 		return nil, err
 	}
 
-	vm.conns = append(vm.conns, dbConn)
-	vm.conns = append(vm.conns, msgConn)
 	vm.toEngine = toEngine
 	lastAccepted, err := vm.vm.LastAccepted()
+	if err != nil {
+		return nil, err
+	}
+	blk, err := vm.vm.GetBlock(lastAccepted)
+	if err != nil {
+		return nil, err
+	}
+	parentID := blk.Parent().ID()
 	return &vmproto.InitializeResponse{
-		LastAcceptedID: lastAccepted[:],
+		LastAcceptedID:       lastAccepted[:],
+		LastAcceptedParentID: parentID[:],
+		Status:               uint32(choices.Accepted),
+		Height:               blk.Height(),
+		Bytes:                blk.Bytes(),
 	}, err
 }
 
@@ -205,11 +236,36 @@ func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmprot
 	close(vm.toEngine)
 
 	vm.serverCloser.Stop()
-	for _, conn := range vm.conns {
-		errs.Add(conn.Close())
-	}
+	errs.Add(vm.connCloser.Close())
 
 	return &vmproto.ShutdownResponse{}, errs.Err
+}
+
+func (vm *VMServer) CreateStaticHandlers(context.Context, *vmproto.CreateStaticHandlersRequest) (*vmproto.CreateStaticHandlersResponse, error) {
+	handlers, err := vm.vm.CreateStaticHandlers()
+	if err != nil {
+		return nil, err
+	}
+	resp := &vmproto.CreateStaticHandlersResponse{}
+	for prefix, h := range handlers {
+		handler := h
+
+		// start the messenger server
+		serverID := vm.broker.NextId()
+		go vm.broker.AcceptAndServe(serverID, func(opts []grpc.ServerOption) *grpc.Server {
+			server := grpc.NewServer(opts...)
+			vm.serverCloser.Add(server)
+			ghttpproto.RegisterHTTPServer(server, ghttp.NewServer(handler.Handler, vm.broker))
+			return server
+		})
+
+		resp.Handlers = append(resp.Handlers, &vmproto.Handler{
+			Prefix:      prefix,
+			LockOptions: uint32(handler.LockOptions),
+			Server:      serverID,
+		})
+	}
+	return resp, nil
 }
 
 func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandlersRequest) (*vmproto.CreateHandlersResponse, error) {
@@ -322,12 +378,15 @@ func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmpr
 	}, nil
 }
 
+func (vm *VMServer) Version(_ context.Context, req *vmproto.VersionRequest) (*vmproto.VersionResponse, error) {
+	version, err := vm.vm.Version()
+	return &vmproto.VersionResponse{
+		Version: version,
+	}, err
+}
+
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
-	id, err := ids.ToID(req.Id)
-	if err != nil {
-		return nil, err
-	}
-	blk, err := vm.vm.GetBlock(id)
+	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
 		return nil, err
 	}

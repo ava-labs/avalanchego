@@ -83,7 +83,6 @@ func BenchmarkEncodings(b *testing.B) {
 				if _, err := Encode(benchmark.encoding, bytes); err != nil {
 					b.Fatal(err)
 				}
-
 			}
 		})
 	}

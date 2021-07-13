@@ -5,7 +5,5 @@ package evm
 
 import "github.com/ava-labs/avalanchego/ids"
 
-var (
-	// ID that this VM uses when labeled
-	ID = ids.ID{'e', 'v', 'm'}
-)
+// ID that this VM uses when labeled
+var ID = ids.ID{'e', 'v', 'm'}

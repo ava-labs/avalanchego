@@ -24,17 +24,22 @@ import (
 
 func TestShutdown(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Millisecond,
-		MinimumTimeout:     time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutCoefficient: 1.25,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Millisecond,
+			MinimumTimeout:     time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,13 +62,8 @@ func TestShutdown(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
@@ -73,10 +73,10 @@ func TestShutdown(t *testing.T) {
 
 	chainRouter.Shutdown()
 
-	ticker := time.NewTicker(20 * time.Millisecond)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	select {
 	case <-ticker.C:
-		t.Fatalf("Handler shutdown was not called or timed out after 20ms during chainRouter shutdown")
+		t.Fatalf("Handler shutdown was not called or timed out after 250ms during chainRouter shutdown")
 	case <-shutdownCalled:
 	}
 
@@ -89,18 +89,23 @@ func TestShutdown(t *testing.T) {
 
 func TestShutdownTimesOut(t *testing.T) {
 	vdrs := validators.NewSet()
+	err := vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	benchlist := benchlist.NewNoBenchlist()
 	tm := timeout.Manager{}
 	// Ensure that the MultiPut request does not timeout
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     time.Second,
-		MinimumTimeout:     500 * time.Millisecond,
-		MaximumTimeout:     10 * time.Second,
-		TimeoutCoefficient: 1.25,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist)
+	err = tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     time.Second,
+			MinimumTimeout:     500 * time.Millisecond,
+			MaximumTimeout:     10 * time.Second,
+			TimeoutCoefficient: 1.25,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist,
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,13 +137,8 @@ func TestShutdownTimesOut(t *testing.T) {
 		&engine,
 		vdrs,
 		nil,
-		1,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
@@ -149,7 +149,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	shutdownFinished := make(chan struct{}, 1)
 
 	go func() {
-		handler.MultiPut(ids.ShortID{}, 1, nil)
+		handler.MultiPut(ids.ShortID{}, 1, nil, func() {})
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
 		chainRouter.Shutdown()
@@ -168,15 +168,18 @@ func TestRouterTimeout(t *testing.T) {
 	// Create a timeout manager
 	maxTimeout := 25 * time.Millisecond
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     10 * time.Millisecond,
-		MinimumTimeout:     10 * time.Millisecond,
-		MaximumTimeout:     maxTimeout,
-		TimeoutCoefficient: 1,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist.NewNoBenchlist())
+	err := tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     10 * time.Millisecond,
+			MinimumTimeout:     10 * time.Millisecond,
+			MaximumTimeout:     maxTimeout,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,17 +231,15 @@ func TestRouterTimeout(t *testing.T) {
 	engine.ContextF = snow.DefaultContextTest
 
 	handler := &Handler{}
+	vdrs := validators.NewSet()
+	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	err = handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
@@ -270,15 +271,18 @@ func TestRouterTimeout(t *testing.T) {
 func TestRouterClearTimeouts(t *testing.T) {
 	// Create a timeout manager
 	tm := timeout.Manager{}
-	err := tm.Initialize(&timer.AdaptiveTimeoutConfig{
-		InitialTimeout:     3 * time.Second,
-		MinimumTimeout:     3 * time.Second,
-		MaximumTimeout:     5 * time.Minute,
-		TimeoutCoefficient: 1,
-		TimeoutHalflife:    5 * time.Minute,
-		MetricsNamespace:   "",
-		Registerer:         prometheus.NewRegistry(),
-	}, benchlist.NewNoBenchlist())
+	err := tm.Initialize(
+		&timer.AdaptiveTimeoutConfig{
+			InitialTimeout:     3 * time.Second,
+			MinimumTimeout:     3 * time.Second,
+			MaximumTimeout:     5 * time.Minute,
+			TimeoutCoefficient: 1,
+			TimeoutHalflife:    5 * time.Minute,
+		},
+		benchlist.NewNoBenchlist(),
+		"",
+		prometheus.NewRegistry(),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,18 +299,16 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	engine.ContextF = snow.DefaultContextTest
 
+	vdrs := validators.NewSet()
+	err = vdrs.AddWeight(ids.GenerateTestShortID(), 1)
+	assert.NoError(t, err)
 	handler := &Handler{}
 	err = handler.Initialize(
 		&engine,
-		validators.NewSet(),
+		vdrs,
 		nil,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultMaxNonStakerPendingMsgs,
-		DefaultStakerPortion,
-		DefaultStakerPortion,
 		"",
 		prometheus.NewRegistry(),
-		&Delay{},
 	)
 	assert.NoError(t, err)
 
@@ -330,12 +332,12 @@ func TestRouterClearTimeouts(t *testing.T) {
 
 	// Clear each timeout by simulating responses to the queries
 	// Note: Depends on the ordering of [msgs]
-	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil)
-	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil)
-	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil)
-	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil)
-	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil)
+	chainRouter.Put(vID, handler.ctx.ChainID, 0, ids.GenerateTestID(), nil, nil)
+	chainRouter.MultiPut(vID, handler.ctx.ChainID, 1, nil, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 2, nil, nil)
+	chainRouter.Chits(vID, handler.ctx.ChainID, 3, nil, nil)
+	chainRouter.Accepted(vID, handler.ctx.ChainID, 4, nil, nil)
+	chainRouter.AcceptedFrontier(vID, handler.ctx.ChainID, 5, nil, nil)
 
 	assert.Equal(t, chainRouter.timedRequests.Len(), 0)
 }

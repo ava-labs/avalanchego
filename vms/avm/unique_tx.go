@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -21,17 +22,21 @@ var (
 	errRejectedTx      = errors.New("transaction is rejected")
 )
 
+var (
+	_ snowstorm.Tx    = &UniqueTx{}
+	_ cache.Evictable = &UniqueTx{}
+)
+
 // UniqueTx provides a de-duplication service for txs. This only provides a
 // performance boost
 type UniqueTx struct {
-	*TxState
+	*TxCachedState
 
 	vm   *VM
 	txID ids.ID
 }
 
-// TxState ...
-type TxState struct {
+type TxCachedState struct {
 	*Tx
 
 	unique, verifiedTx, verifiedState bool
@@ -48,20 +53,20 @@ type TxState struct {
 func (tx *UniqueTx) refresh() {
 	tx.vm.numTxRefreshes.Inc()
 
-	if tx.TxState == nil {
-		tx.TxState = &TxState{}
+	if tx.TxCachedState == nil {
+		tx.TxCachedState = &TxCachedState{}
 	}
 	if tx.unique {
 		return
 	}
-	unique := tx.vm.state.UniqueTx(tx)
+	unique := tx.vm.state.DeduplicateTx(tx)
 	prevTx := tx.Tx
 	if unique == tx {
 		tx.vm.numTxRefreshMisses.Inc()
 
 		// If no one was in the cache, make sure that there wasn't an
 		// intermediate object whose state I must reflect
-		if status, err := tx.vm.state.Status(tx.ID()); err == nil {
+		if status, err := tx.vm.state.GetStatus(tx.ID()); err == nil {
 			tx.status = status
 		}
 		tx.unique = true
@@ -71,7 +76,7 @@ func (tx *UniqueTx) refresh() {
 		// If someone is in the cache, they must be up to date
 
 		// This ensures that every unique tx object points to the same tx state
-		tx.TxState = unique.TxState
+		tx.TxCachedState = unique.TxCachedState
 	}
 
 	if tx.Tx != nil {
@@ -79,8 +84,7 @@ func (tx *UniqueTx) refresh() {
 	}
 
 	if prevTx == nil {
-		// TODO: register hits/misses for this
-		if innerTx, err := tx.vm.state.Tx(tx.ID()); err == nil {
+		if innerTx, err := tx.vm.state.GetTx(tx.ID()); err == nil {
 			tx.Tx = innerTx
 		}
 	} else {
@@ -102,7 +106,7 @@ func (tx *UniqueTx) setStatus(status choices.Status) error {
 		return nil
 	}
 	tx.status = status
-	return tx.vm.state.SetStatus(tx.ID(), status)
+	return tx.vm.state.PutStatus(tx.ID(), status)
 }
 
 // ID returns the wrapped txID
@@ -125,7 +129,7 @@ func (tx *UniqueTx) Accept() error {
 			continue
 		}
 		utxoID := utxo.InputID()
-		if err := tx.vm.state.SpendUTXO(utxoID); err != nil {
+		if err := tx.vm.state.DeleteUTXO(utxoID); err != nil {
 			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
 			return err
 		}
@@ -133,7 +137,7 @@ func (tx *UniqueTx) Accept() error {
 
 	// Add new utxos
 	for _, utxo := range tx.UTXOs() {
-		if err := tx.vm.state.FundUTXO(utxo); err != nil {
+		if err := tx.vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
 			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
 			return err
 		}
@@ -145,6 +149,7 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	txID := tx.ID()
+
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
 		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
@@ -158,7 +163,7 @@ func (tx *UniqueTx) Accept() error {
 
 	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
-	tx.vm.pubsub.Publish("accepted", txID)
+	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
@@ -183,7 +188,6 @@ func (tx *UniqueTx) Reject() error {
 		return err
 	}
 
-	tx.vm.pubsub.Publish("rejected", txID)
 	tx.vm.walletService.decided(txID)
 
 	tx.deps = nil // Needed to prevent a memory leak
@@ -294,7 +298,6 @@ func (tx *UniqueTx) Verify() error {
 	}
 
 	tx.verifiedState = true
-	tx.vm.pubsub.Publish("verified", tx.ID())
 	return nil
 }
 
@@ -314,7 +317,7 @@ func (tx *UniqueTx) SyntacticVerify() error {
 	tx.validity = tx.Tx.SyntacticVerify(
 		tx.vm.ctx,
 		tx.vm.codec,
-		tx.vm.ctx.AVAXAssetID,
+		tx.vm.feeAssetID,
 		tx.vm.txFee,
 		tx.vm.creationTxFee,
 		len(tx.vm.fxs),

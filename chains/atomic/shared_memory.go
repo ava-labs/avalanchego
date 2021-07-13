@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -22,6 +23,8 @@ var (
 	largerIndexPrefix  = []byte{3}
 
 	errDuplicatedOperation = errors.New("duplicated operation on provided value")
+
+	_ SharedMemory = &sharedMemory{}
 )
 
 type dbElement struct {
@@ -241,7 +244,8 @@ func (s *state) SetValue(e *Element) error {
 
 	for _, trait := range e.Traits {
 		traitDB := prefixdb.New(trait, s.indexDB)
-		if err := traitDB.Put(e.Key, nil); err != nil {
+		traitList := linkeddb.NewDefault(traitDB)
+		if err := traitList.Put(e.Key, nil); err != nil {
 			return err
 		}
 	}
@@ -283,7 +287,8 @@ func (s *state) RemoveValue(key []byte) error {
 
 	for _, trait := range value.Traits {
 		traitDB := prefixdb.New(trait, s.indexDB)
-		if err := traitDB.Delete(key); err != nil {
+		traitList := linkeddb.NewDefault(traitDB)
+		if err := traitList.Delete(key); err != nil {
 			return err
 		}
 	}
@@ -334,7 +339,8 @@ func (s *state) appendTraitKeys(keys *[][]byte, tracked *ids.Set, limit *int, tr
 	lastKey := startKey
 
 	traitDB := prefixdb.New(trait, s.indexDB)
-	iter := traitDB.NewIteratorWithStart(startKey)
+	traitList := linkeddb.NewDefault(traitDB)
+	iter := traitList.NewIteratorWithStart(startKey)
 	defer iter.Release()
 	for iter.Next() && *limit > 0 {
 		key := iter.Key()

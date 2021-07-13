@@ -1,5 +1,6 @@
 syntax = "proto3";
 package gconnproto;
+option go_package = "github.com/ava-labs/avalanchego/rpcchainvm/ghttp/gconn/gconnproto";
 
 message ReadRequest {
     int32 length = 1;

@@ -1,0 +1,14 @@
+name: Build + Unit Tests
+
+on:
+  push:
+
+jobs:
+  run_build_unit_tests:
+    name: build_unit_test
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: build_test
+        shell: bash
+        run: .github/workflows/build_and_test.sh

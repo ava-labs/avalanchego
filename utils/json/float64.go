@@ -1,0 +1,29 @@
+package json
+
+import (
+	"strconv"
+)
+
+// Float64 ...
+type Float64 float64
+
+// MarshalJSON ...
+func (f Float64) MarshalJSON() ([]byte, error) {
+	return []byte("\"" + strconv.FormatFloat(float64(f), byte('f'), 4, 64) + "\""), nil
+}
+
+// UnmarshalJSON ...
+func (f *Float64) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	if str == Null {
+		return nil
+	}
+	if len(str) >= 2 {
+		if lastIndex := len(str) - 1; str[0] == '"' && str[lastIndex] == '"' {
+			str = str[1:lastIndex]
+		}
+	}
+	val, err := strconv.ParseFloat(str, 64)
+	*f = Float64(val)
+	return err
+}

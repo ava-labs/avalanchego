@@ -35,11 +35,6 @@ var (
 // StaticService defines the static API methods exposed by the platform VM
 type StaticService struct{}
 
-// CreateStaticService ...
-func CreateStaticService() *StaticService {
-	return &StaticService{}
-}
-
 // APIUTXO is a UTXO on the Platform Chain that exists at the chain's genesis.
 type APIUTXO struct {
 	Locktime json.Uint64 `json:"locktime"`
@@ -253,7 +248,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			if apiUTXO.Locktime > args.Time {
 				utxo.Out = &StakeableLockOut{
 					Locktime:        uint64(apiUTXO.Locktime),
-					TransferableOut: utxo.Out.(avax.TransferableOut),
+					TransferableOut: utxo.Out,
 				}
 			}
 			stake[i] = utxo

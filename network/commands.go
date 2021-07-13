@@ -25,10 +25,12 @@ const (
 	ContainerBytes                   // Used for gossiping
 	ContainerIDs                     // Used for querying
 	MultiContainerBytes              // Used in MultiPut
+	SigBytes                         // Used in handshake / peer gossiping
+	VersionTime                      // Used in handshake / peer gossiping
+	SignedPeers                      // Used in peer gossiping
 	AppRequestBytes                  // Used at application level
 	AppResponseBytes                 // Used at application level
 	AppGossipBytes                   // Used at application level
-
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -62,6 +64,12 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPack2DBytes
 	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
 		return wrappers.TryPackBytes
+	case SigBytes:
+		return wrappers.TryPackBytes
+	case VersionTime:
+		return wrappers.TryPackLong
+	case SignedPeers:
+		return wrappers.TryPackIPCertList
 	default:
 		return nil
 	}
@@ -98,6 +106,12 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpack2DBytes
 	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
 		return wrappers.TryUnpackBytes
+	case SigBytes:
+		return wrappers.TryUnpackBytes
+	case VersionTime:
+		return wrappers.TryUnpackLong
+	case SignedPeers:
+		return wrappers.TryUnpackIPCertList
 	default:
 		return nil
 	}
@@ -137,6 +151,12 @@ func (f Field) String() string {
 		return "AppResponseBytes"
 	case AppGossipBytes:
 		return "AppGossipBytes"
+	case SigBytes:
+		return "SigBytes"
+	case VersionTime:
+		return "VersionTime"
+	case SignedPeers:
+		return "SignedPeers"
 	default:
 		return "Unknown Field"
 	}
@@ -145,13 +165,13 @@ func (f Field) String() string {
 // Op is an opcode
 type Op byte
 
-// Public commands that may be sent between nodes
+// Public commands that may be sent between stakers
 const (
 	// Handshake:
 	GetVersion Op = iota
-	Version
+	_
 	GetPeerList
-	PeerList
+	_
 	Ping
 	Pong
 	// Bootstrapping:
@@ -167,6 +187,9 @@ const (
 	PushQuery
 	PullQuery
 	Chits
+	// Handshake / peer gossiping
+	Version
+	PeerList
 	// Application level:
 	AppRequest
 	AppResponse
@@ -225,9 +248,9 @@ var (
 	Messages = map[Op][]Field{
 		// Handshake:
 		GetVersion:  {},
-		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr},
+		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes},
 		GetPeerList: {},
-		PeerList:    {Peers},
+		PeerList:    {SignedPeers},
 		Ping:        {},
 		Pong:        {},
 		// Bootstrapping:

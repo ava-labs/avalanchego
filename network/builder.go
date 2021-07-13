@@ -9,39 +9,61 @@ import (
 )
 
 // Builder extends a Codec to build messages safely
-type Builder struct{ Codec }
+type Builder struct {
+	Codec
+	// [getByteSlice] must not be nil.
+	// [getByteSlice] may return nil.
+	// [getByteSlice] must be safe for concurrent access by multiple goroutines.
+	getByteSlice func() []byte
+}
 
 // GetVersion message
-func (m Builder) GetVersion() (Msg, error) { return m.Pack(GetVersion, nil) }
+func (m Builder) GetVersion() (Msg, error) {
+	buf := m.getByteSlice()
+	return m.Pack(buf, GetVersion, nil)
+}
 
 // Version message
-func (m Builder) Version(networkID, nodeID uint32, myTime uint64, ip utils.IPDesc, myVersion string) (Msg, error) {
-	return m.Pack(Version, map[Field]interface{}{
-		NetworkID:  networkID,
-		NodeID:     nodeID,
-		MyTime:     myTime,
-		IP:         ip,
-		VersionStr: myVersion,
+func (m Builder) Version(networkID, nodeID uint32, myTime uint64, ip utils.IPDesc, myVersion string, myVersionTime uint64, sig []byte) (Msg, error) {
+	buf := m.getByteSlice()
+	return m.Pack(buf, Version, map[Field]interface{}{
+		NetworkID:   networkID,
+		NodeID:      nodeID,
+		MyTime:      myTime,
+		IP:          ip,
+		VersionStr:  myVersion,
+		VersionTime: myVersionTime,
+		SigBytes:    sig,
 	})
 }
 
 // GetPeerList message
-func (m Builder) GetPeerList() (Msg, error) { return m.Pack(GetPeerList, nil) }
+func (m Builder) GetPeerList() (Msg, error) {
+	buf := m.getByteSlice()
+	return m.Pack(buf, GetPeerList, nil)
+}
 
-// PeerList message
-func (m Builder) PeerList(ipDescs []utils.IPDesc) (Msg, error) {
-	return m.Pack(PeerList, map[Field]interface{}{Peers: ipDescs})
+func (m Builder) PeerList(peers []utils.IPCertDesc) (Msg, error) {
+	buf := m.getByteSlice()
+	return m.Pack(buf, PeerList, map[Field]interface{}{SignedPeers: peers})
 }
 
 // Ping message
-func (m Builder) Ping() (Msg, error) { return m.Pack(Ping, nil) }
+func (m Builder) Ping() (Msg, error) {
+	buf := m.getByteSlice()
+	return m.Pack(buf, Ping, nil)
+}
 
 // Pong message
-func (m Builder) Pong() (Msg, error) { return m.Pack(Pong, nil) }
+func (m Builder) Pong() (Msg, error) {
+	buf := m.getByteSlice()
+	return m.Pack(buf, Pong, nil)
+}
 
 // GetAcceptedFrontier message
 func (m Builder) GetAcceptedFrontier(chainID ids.ID, requestID uint32, deadline uint64) (Msg, error) {
-	return m.Pack(GetAcceptedFrontier, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, GetAcceptedFrontier, map[Field]interface{}{
 		ChainID:   chainID[:],
 		RequestID: requestID,
 		Deadline:  deadline,
@@ -55,7 +77,8 @@ func (m Builder) AcceptedFrontier(chainID ids.ID, requestID uint32, containerIDs
 		copy := containerID
 		containerIDBytes[i] = copy[:]
 	}
-	return m.Pack(AcceptedFrontier, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, AcceptedFrontier, map[Field]interface{}{
 		ChainID:      chainID[:],
 		RequestID:    requestID,
 		ContainerIDs: containerIDBytes,
@@ -69,7 +92,8 @@ func (m Builder) GetAccepted(chainID ids.ID, requestID uint32, deadline uint64, 
 		copy := containerID
 		containerIDBytes[i] = copy[:]
 	}
-	return m.Pack(GetAccepted, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, GetAccepted, map[Field]interface{}{
 		ChainID:      chainID[:],
 		RequestID:    requestID,
 		Deadline:     deadline,
@@ -84,7 +108,8 @@ func (m Builder) Accepted(chainID ids.ID, requestID uint32, containerIDs []ids.I
 		copy := containerID
 		containerIDBytes[i] = copy[:]
 	}
-	return m.Pack(Accepted, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, Accepted, map[Field]interface{}{
 		ChainID:      chainID[:],
 		RequestID:    requestID,
 		ContainerIDs: containerIDBytes,
@@ -93,7 +118,8 @@ func (m Builder) Accepted(chainID ids.ID, requestID uint32, containerIDs []ids.I
 
 // GetAncestors message
 func (m Builder) GetAncestors(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
-	return m.Pack(GetAncestors, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, GetAncestors, map[Field]interface{}{
 		ChainID:     chainID[:],
 		RequestID:   requestID,
 		Deadline:    deadline,
@@ -103,7 +129,8 @@ func (m Builder) GetAncestors(chainID ids.ID, requestID uint32, deadline uint64,
 
 // MultiPut message
 func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte) (Msg, error) {
-	return m.Pack(MultiPut, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, MultiPut, map[Field]interface{}{
 		ChainID:             chainID[:],
 		RequestID:           requestID,
 		MultiContainerBytes: containers,
@@ -112,7 +139,8 @@ func (m Builder) MultiPut(chainID ids.ID, requestID uint32, containers [][]byte)
 
 // Get message
 func (m Builder) Get(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
-	return m.Pack(Get, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, Get, map[Field]interface{}{
 		ChainID:     chainID[:],
 		RequestID:   requestID,
 		Deadline:    deadline,
@@ -122,7 +150,8 @@ func (m Builder) Get(chainID ids.ID, requestID uint32, deadline uint64, containe
 
 // Put message
 func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) (Msg, error) {
-	return m.Pack(Put, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, Put, map[Field]interface{}{
 		ChainID:        chainID[:],
 		RequestID:      requestID,
 		ContainerID:    containerID[:],
@@ -132,7 +161,8 @@ func (m Builder) Put(chainID ids.ID, requestID uint32, containerID ids.ID, conta
 
 // PushQuery message
 func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID, container []byte) (Msg, error) {
-	return m.Pack(PushQuery, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, PushQuery, map[Field]interface{}{
 		ChainID:        chainID[:],
 		RequestID:      requestID,
 		Deadline:       deadline,
@@ -143,7 +173,8 @@ func (m Builder) PushQuery(chainID ids.ID, requestID uint32, deadline uint64, co
 
 // PullQuery message
 func (m Builder) PullQuery(chainID ids.ID, requestID uint32, deadline uint64, containerID ids.ID) (Msg, error) {
-	return m.Pack(PullQuery, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, PullQuery, map[Field]interface{}{
 		ChainID:     chainID[:],
 		RequestID:   requestID,
 		Deadline:    deadline,
@@ -158,7 +189,8 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID) 
 		copy := containerID
 		containerIDBytes[i] = copy[:]
 	}
-	return m.Pack(Chits, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, Chits, map[Field]interface{}{
 		ChainID:      chainID[:],
 		RequestID:    requestID,
 		ContainerIDs: containerIDBytes,
@@ -167,7 +199,8 @@ func (m Builder) Chits(chainID ids.ID, requestID uint32, containerIDs []ids.ID) 
 
 // Application level request
 func (m Builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (Msg, error) {
-	return m.Pack(AppRequest, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, AppRequest, map[Field]interface{}{
 		ChainID:         chainID[:],
 		RequestID:       requestID,
 		Deadline:        deadline,
@@ -177,7 +210,8 @@ func (m Builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, m
 
 // Application level response
 func (m Builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Msg, error) {
-	return m.Pack(AppResponse, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, AppResponse, map[Field]interface{}{
 		ChainID:          chainID[:],
 		RequestID:        requestID,
 		AppResponseBytes: msg,
@@ -186,7 +220,8 @@ func (m Builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Msg,
 
 // Application level gossiped message
 func (m Builder) AppGossip(chainID ids.ID, requestID uint32, msg []byte) (Msg, error) {
-	return m.Pack(AppGossip, map[Field]interface{}{
+	buf := m.getByteSlice()
+	return m.Pack(buf, AppGossip, map[Field]interface{}{
 		ChainID:        chainID[:],
 		RequestID:      requestID,
 		AppGossipBytes: msg,

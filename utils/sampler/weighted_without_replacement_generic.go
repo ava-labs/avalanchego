@@ -28,12 +28,14 @@ func (s *weightedWithoutReplacementGeneric) Initialize(weights []uint64) error {
 }
 
 func (s *weightedWithoutReplacementGeneric) Sample(count int) ([]int, error) {
-	weights, err := s.u.Sample(count)
-	if err != nil {
-		return nil, err
-	}
+	s.u.Reset()
+
 	indices := make([]int, count)
-	for i, weight := range weights {
+	for i := 0; i < count; i++ {
+		weight, err := s.u.Next()
+		if err != nil {
+			return nil, err
+		}
 		indices[i], err = s.w.Sample(weight)
 		if err != nil {
 			return nil, err

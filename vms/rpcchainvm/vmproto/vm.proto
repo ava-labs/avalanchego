@@ -1,5 +1,10 @@
 syntax = "proto3";
+
 package vmproto;
+
+option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/vmproto";
+
+// To compile: protoc --go_out=plugins=grpc:. vm.proto
 
 message InitializeRequest {
     uint32 networkID = 1;
@@ -9,20 +14,31 @@ message InitializeRequest {
     bytes xChainID = 5;
     bytes avaxAssetID = 6;
     bytes genesisBytes = 7;
-    
-    uint32 dbServer = 8;
-    uint32 engineServer = 9;
-    uint32 keystoreServer = 10;
-    uint32 sharedMemoryServer = 11;
-    uint32 bcLookupServer = 12;
-    uint32 snLookupServer = 13;
+    bytes upgradeBytes = 8;
+    bytes configBytes = 9;
 
-    bytes epochFirstTransition = 14;
-    uint64 EpochDuration = 15;
+    repeated VersionedDBServer dbServers = 10;
+    uint32 engineServer = 11;
+    uint32 keystoreServer = 12;
+    uint32 sharedMemoryServer = 13;
+    uint32 bcLookupServer = 14;
+    uint32 snLookupServer = 15;
+
+    bytes epochFirstTransition = 16;
+    uint64 EpochDuration = 17;
 }
 
 message InitializeResponse {
     bytes lastAcceptedID = 1;
+    bytes lastAcceptedParentID = 2;
+    uint32 status = 3;
+    uint64 height = 4;
+    bytes bytes = 5;
+}
+
+message VersionedDBServer {
+    uint32 dbServer = 1;
+    string version = 2;
 }
 
 message BootstrappingRequest {}
@@ -40,6 +56,12 @@ message ShutdownResponse {}
 message CreateHandlersRequest {}
 
 message CreateHandlersResponse {
+    repeated Handler handlers = 1;
+}
+
+message CreateStaticHandlersRequest {}
+
+message CreateStaticHandlersResponse {
     repeated Handler handlers = 1;
 }
 
@@ -88,7 +110,7 @@ message SetPreferenceRequest {
 message SetPreferenceResponse {}
 
 message BlockVerifyRequest {
-    bytes id = 1;
+    bytes bytes = 1;
 }
 
 message BlockVerifyResponse {}
@@ -105,10 +127,16 @@ message BlockRejectRequest {
 
 message BlockRejectResponse {}
 
-message HealthRequest{}
+message HealthRequest {}
 
-message HealthResponse{
+message HealthResponse {
     string details = 1;
+}
+
+message VersionRequest {}
+
+message VersionResponse {
+    string version = 1;
 }
 
 service VM {
@@ -117,11 +145,13 @@ service VM {
     rpc Bootstrapped(BootstrappedRequest) returns (BootstrappedResponse);
     rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
     rpc CreateHandlers(CreateHandlersRequest) returns (CreateHandlersResponse);
+    rpc CreateStaticHandlers(CreateStaticHandlersRequest) returns (CreateStaticHandlersResponse);
     rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
     rpc Health(HealthRequest) returns (HealthResponse);
+    rpc Version(VersionRequest) returns (VersionResponse);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);

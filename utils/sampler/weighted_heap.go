@@ -29,10 +29,11 @@ type weightedHeap struct {
 }
 
 func (s *weightedHeap) Initialize(weights []uint64) error {
-	if len(weights) > len(s.heap) {
-		s.heap = make([]weightedHeapElement, len(weights))
+	numWeights := len(weights)
+	if numWeights <= cap(s.heap) {
+		s.heap = s.heap[:numWeights]
 	} else {
-		s.heap = s.heap[:len(weights)]
+		s.heap = make([]weightedHeapElement, numWeights)
 	}
 	for i, weight := range weights {
 		s.heap[i] = weightedHeapElement{
@@ -94,12 +95,15 @@ type innerSortWeightedHeap []weightedHeapElement
 func (lst innerSortWeightedHeap) Less(i, j int) bool {
 	return lst[i].weight > lst[j].weight
 }
+
 func (lst innerSortWeightedHeap) Len() int {
 	return len(lst)
 }
+
 func (lst innerSortWeightedHeap) Swap(i, j int) {
 	lst[j], lst[i] = lst[i], lst[j]
 }
+
 func sortWeightedHeap(heap []weightedHeapElement) {
 	sort.Sort(innerSortWeightedHeap(heap))
 }

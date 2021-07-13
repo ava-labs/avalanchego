@@ -30,6 +30,7 @@ const (
 	GetAncestorsMsg
 	MultiPutMsg
 	GetAncestorsFailedMsg
+	TimeoutMsg
 	AppRequestMsg
 	AppRequestFailedMsg
 	AppResponseMsg
@@ -58,6 +59,8 @@ func (t MsgType) String() string {
 		return "Get Ancestors"
 	case GetAncestorsFailedMsg:
 		return "Get Ancestors Failed"
+	case TimeoutMsg:
+		return "Timeout"
 	case PutMsg:
 		return "Put"
 	case MultiPutMsg:

@@ -4,8 +4,10 @@
 package node
 
 import (
+	"crypto/tls"
 	"time"
 
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/nat"
@@ -16,12 +18,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 )
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	genesis.Params
+
+	// If true, bootstrap the current database version and then end the node.
+	FetchOnly bool
 
 	// Genesis information
 	GenesisBytes []byte
@@ -45,36 +50,33 @@ type Config struct {
 	// Path to database
 	DBPath string
 
-	// If false, uses an in memory database
-	DBEnabled bool
+	// Name of the database type to use
+	DBName string
 
 	// Staking configuration
 	StakingIP             utils.DynamicIPDesc
-	EnableP2PTLS          bool
 	EnableStaking         bool
-	StakingKeyFile        string
-	StakingCertFile       string
+	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 
 	// Throttling
-	MaxNonStakerPendingMsgs uint32
-	StakerMSGPortion        float64
-	StakerCPUPortion        float64
-	SendQueueSize           uint32
-	MaxPendingMsgs          uint32
+	SendQueueSize uint32
 
 	// Health
 	HealthCheckFreq time.Duration
 
 	// Network configuration
-	NetworkConfig       timer.AdaptiveTimeoutConfig
-	NetworkHealthConfig network.HealthConfig
+	NetworkConfig      network.Config
+	PeerListSize       uint32
+	PeerListGossipSize uint32
+	PeerListGossipFreq time.Duration
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
 
 	// Bootstrapping configuration
-	BootstrapPeers []*Peer
+	BootstrapIDs []ids.ShortID
+	BootstrapIPs []utils.IPDesc
 
 	// HTTP configuration
 	HTTPHost string
@@ -93,6 +95,10 @@ type Config struct {
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
+	IndexAPIEnabled    bool
+
+	// Profiling configurations
+	ProfilerConfig profiler.Config
 
 	// Logging configuration
 	LoggingConfig logging.Config
@@ -103,20 +109,23 @@ type Config struct {
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters
 
-	// Throughput configuration
-	ThroughputPort          uint16
-	ThroughputServerEnabled bool
-
 	// IPC configuration
 	IPCAPIEnabled      bool
 	IPCPath            string
 	IPCDefaultChainIDs []string
 
+	// Metrics
+	MeterVMEnabled bool
+
 	// Router that is used to handle incoming consensus messages
 	ConsensusRouter          router.Router
 	RouterHealthConfig       router.HealthConfig
-	ConsensusGossipFrequency time.Duration
 	ConsensusShutdownTimeout time.Duration
+	ConsensusGossipFrequency time.Duration
+	// Number of peers to gossip to when gossiping accepted frontier
+	ConsensusGossipAcceptedFrontierSize uint
+	// Number of peers to gossip each accepted container to
+	ConsensusGossipOnAcceptSize uint
 
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration
@@ -130,13 +139,7 @@ type Config struct {
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 
-	// Restart on disconnect settings
-	RestartOnDisconnected      bool
-	DisconnectedCheckFreq      time.Duration
-	DisconnectedRestartTimeout time.Duration
-
-	// Coreth
-	CorethConfig string
+	IndexAllowIncomplete bool
 
 	// Should Bootstrap be retried
 	RetryBootstrap bool
@@ -144,6 +147,26 @@ type Config struct {
 	// Max number of times to retry bootstrap
 	RetryBootstrapMaxAttempts int
 
+	// Timeout when connecting to bootstrapping beacons
+	BootstrapBeaconConnectionTimeout time.Duration
+
+	// Max number of containers in a multiput message sent by this node.
+	BootstrapMultiputMaxContainersSent int
+
+	// This node will only consider the first [MultiputMaxContainersReceived]
+	// containers in a multiput it receives.
+	BootstrapMultiputMaxContainersReceived int
+
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration
+
+	// ChainConfigs
+	ChainConfigs map[string]chains.ChainConfig
+
+	// Max time to spend fetching a container and its
+	// ancestors while responding to a GetAncestors message
+	BootstrapMaxTimeGetAncestors time.Duration
+
+	// VM Aliases
+	VMAliases map[ids.ID][]string
 }

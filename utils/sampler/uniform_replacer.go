@@ -5,11 +5,7 @@ package sampler
 
 import (
 	"math"
-	"math/rand"
-	"time"
 )
-
-func init() { rand.Seed(time.Now().UnixNano()) }
 
 type defaultMap map[uint64]uint64
 
@@ -32,42 +28,64 @@ func (m defaultMap) get(key uint64, defaultVal uint64) uint64 {
 //
 // Sampling is performed in O(count) time and O(count) space.
 type uniformReplacer struct {
-	length uint64
-	drawn  defaultMap
+	rng        rng
+	seededRNG  rng
+	length     uint64
+	drawn      defaultMap
+	drawsCount uint64
 }
 
 func (s *uniformReplacer) Initialize(length uint64) error {
 	if length > math.MaxInt64 {
 		return errOutOfRange
 	}
+	s.rng = globalRNG
+	s.seededRNG = newRNG()
 	s.length = length
+	s.drawn = make(defaultMap)
+	s.drawsCount = 0
 	return nil
 }
 
 func (s *uniformReplacer) Sample(count int) ([]uint64, error) {
-	if count < 0 || s.length < uint64(count) {
-		return nil, errOutOfRange
-	}
-
-	if s.drawn == nil {
-		s.drawn = make(defaultMap, count)
-	} else {
-		for k := range s.drawn {
-			delete(s.drawn, k)
-		}
-	}
+	s.Reset()
 
 	results := make([]uint64, count)
 	for i := 0; i < count; i++ {
-		// We don't use a cryptographically secure source of randomness here, as
-		// there's no need to ensure a truly random sampling.
-		draw := uint64(rand.Int63n(int64(s.length-uint64(i)))) + uint64(i) // #nosec G404
-
-		ret := s.drawn.get(draw, draw)
-		s.drawn[draw] = s.drawn.get(uint64(i), uint64(i))
-
+		ret, err := s.Next()
+		if err != nil {
+			return nil, err
+		}
 		results[i] = ret
 	}
-
 	return results, nil
+}
+
+func (s *uniformReplacer) Seed(seed int64) {
+	s.rng = s.seededRNG
+	s.rng.Seed(seed)
+}
+
+func (s *uniformReplacer) ClearSeed() {
+	s.rng = globalRNG
+}
+
+func (s *uniformReplacer) Reset() {
+	for k := range s.drawn {
+		delete(s.drawn, k)
+	}
+	s.drawsCount = 0
+}
+
+func (s *uniformReplacer) Next() (uint64, error) {
+	if s.drawsCount >= s.length {
+		return 0, errOutOfRange
+	}
+
+	draw := uint64(s.rng.Int63n(int64(s.length-s.drawsCount))) + s.drawsCount
+	ret := s.drawn.get(draw, draw)
+	s.drawn[draw] = s.drawn.get(s.drawsCount, s.drawsCount)
+	s.drawsCount++
+
+	return ret, nil
 }

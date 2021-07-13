@@ -1,6 +1,8 @@
 package network
 
 import (
+	"context"
+	"crypto"
 	"net"
 	"testing"
 	"time"
@@ -28,9 +30,11 @@ func newTestMsg(op Op, bits []byte) *TestMsg {
 func (m *TestMsg) Op() Op {
 	return m.op
 }
+
 func (*TestMsg) Get(Field) interface{} {
 	return nil
 }
+
 func (m *TestMsg) Bytes() []byte {
 	return m.bytes
 }
@@ -43,8 +47,8 @@ func TestPeer_Close(t *testing.T) {
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
 	networkID := uint32(0)
-	appVersion := version.NewDefaultVersion("app", 0, 1, 0)
-	versionParser := version.NewDefaultParser()
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
 		addr: &net.TCPAddr{
@@ -61,11 +65,21 @@ func TestPeer_Close(t *testing.T) {
 		},
 		outbounds: make(map[string]*testListener),
 	}
-	serverUpgrader := NewIPUpgrader()
-	clientUpgrader := NewIPUpgrader()
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
 
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
+
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
 
 	netwrk := NewDefaultNetwork(
 		prometheus.NewRegistry(),
@@ -73,26 +87,30 @@ func TestPeer_Close(t *testing.T) {
 		id,
 		ip,
 		networkID,
-		appVersion,
+		versionManager,
 		versionParser,
 		listener,
 		caller,
-		serverUpgrader,
-		clientUpgrader,
+		serverUpgrader0,
+		clientUpgrader0,
 		vdrs,
 		vdrs,
 		handler,
 		time.Duration(0),
 		0,
-		nil,
-		false,
-		0,
-		0,
-		time.Now(),
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		false,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
 	assert.NotNil(t, netwrk)
 
@@ -101,7 +119,8 @@ func TestPeer_Close(t *testing.T) {
 		1,
 	)
 	caller.outbounds[ip1.IP().String()] = listener
-	conn, _ := caller.Dial(ip1.IP())
+	conn, err := caller.Dial(context.Background(), ip1.IP())
+	assert.NoError(t, err)
 
 	basenetwork := netwrk.(*network)
 
@@ -109,30 +128,14 @@ func TestPeer_Close(t *testing.T) {
 
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
-	peer.sender = make(chan []byte, 10)
+	peer.sendQueue = [][]byte{}
 	testMsg := newTestMsg(GetVersion, newmsgbytes)
-	peer.Send(testMsg)
-
-	// make sure the net pending and peer pending bytes updated
-	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
+	peer.Send(testMsg, true)
 
 	go func() {
 		err := netwrk.Close()
 		assert.NoError(t, err)
 	}()
 
-	peer.close()
-
-	// The network pending bytes should be reduced back to zero on close.
-	if basenetwork.pendingBytes != int64(0) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
+	peer.Close()
 }

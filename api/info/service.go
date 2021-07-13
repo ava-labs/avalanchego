@@ -17,16 +17,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms"
 )
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
-	version       version.Version
+	version       version.Application
 	nodeID        ids.ShortID
 	networkID     uint32
 	log           logging.Logger
 	networking    network.Network
 	chainManager  chains.Manager
+	vmManager     vms.Manager
 	creationTxFee uint64
 	txFee         uint64
 }
@@ -34,10 +36,11 @@ type Info struct {
 // NewService returns a new admin API service
 func NewService(
 	log logging.Logger,
-	version version.Version,
+	version version.Application,
 	nodeID ids.ShortID,
 	networkID uint32,
 	chainManager chains.Manager,
+	vmManager vms.Manager,
 	peers network.Network,
 	creationTxFee uint64,
 	txFee uint64,
@@ -52,6 +55,7 @@ func NewService(
 		networkID:     networkID,
 		log:           log,
 		chainManager:  chainManager,
+		vmManager:     vmManager,
 		networking:    peers,
 		creationTxFee: creationTxFee,
 		txFee:         txFee,
@@ -63,14 +67,25 @@ func NewService(
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
 type GetNodeVersionReply struct {
-	Version string `json:"version"`
+	Version         string            `json:"version"`
+	DatabaseVersion string            `json:"databaseVersion"`
+	GitCommit       string            `json:"gitCommit"`
+	VMVersions      map[string]string `json:"vmVersions"`
 }
 
 // GetNodeVersion returns the version this node is running
 func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersionReply) error {
 	service.log.Info("Info: GetNodeVersion called")
 
+	vmVersions, err := service.vmManager.Versions()
+	if err != nil {
+		return err
+	}
+
 	reply.Version = service.version.String()
+	reply.DatabaseVersion = version.CurrentDatabase.String()
+	reply.GitCommit = version.GitCommit
+	reply.VMVersions = vmVersions
 	return nil
 }
 

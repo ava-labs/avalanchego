@@ -5,6 +5,7 @@ package leveldb
 
 import (
 	"bytes"
+	"sync/atomic"
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/errors"
@@ -19,21 +20,31 @@ import (
 )
 
 const (
-	// minBlockCacheSize is the minimum number of bytes to use for block caching
-	// in leveldb.
-	minBlockCacheSize = 12 * opt.MiB
+	// Name is the name of this database for database switches
+	Name = "leveldb"
 
-	// minWriteBufferSize is the minimum number of bytes to use for buffers in
+	// BlockCacheSize is the number of bytes to use for block caching in
 	// leveldb.
-	minWriteBufferSize = 12 * opt.MiB
+	BlockCacheSize = 12 * opt.MiB
 
-	// minHandleCap is the minimum number of files descriptors to cap levelDB to
-	// use
-	minHandleCap = 64
+	// WriteBufferSize is the number of bytes to use for buffers in leveldb.
+	WriteBufferSize = 12 * opt.MiB
+
+	// HandleCap is the number of files descriptors to cap levelDB to use.
+	HandleCap = 64
+
+	// BitsPerKey is the number of bits to add to the bloom filter per key.
+	BitsPerKey = 10
 
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	levelDBByteOverhead = 8
+)
+
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+	_ database.Iterator = &iter{}
 )
 
 // Database is a persistent key-value store. Apart from basic data storage
@@ -43,33 +54,21 @@ type Database struct {
 	*leveldb.DB
 	log logging.Logger
 
-	// True if there was previously an error other than "not found" or "closed"
-	// while performing a db operation. If [errored] == true, Has, Get, Put,
+	// 1 if there was previously an error other than "not found" or "closed"
+	// while performing a db operation. If [errored] == 1, Has, Get, Put,
 	// Delete and batch writes fail with ErrAvoidCorruption.
-	// The node should shut down.
-	errored bool
+	errored uint64
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, log logging.Logger, blockCacheSize, writeBufferSize, handleCap int) (*Database, error) {
-	// Enforce minimums
-	if blockCacheSize < minBlockCacheSize {
-		blockCacheSize = minBlockCacheSize
-	}
-	if writeBufferSize < minWriteBufferSize {
-		writeBufferSize = minWriteBufferSize
-	}
-	if handleCap < minHandleCap {
-		handleCap = minHandleCap
-	}
-
+func New(file string, log logging.Logger) (database.Database, error) {
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
-		OpenFilesCacheCapacity: handleCap,
-		BlockCacheCapacity:     blockCacheSize,
+		OpenFilesCacheCapacity: HandleCap,
+		BlockCacheCapacity:     BlockCacheSize,
 		// There are two buffers of size WriteBuffer used.
-		WriteBuffer: writeBufferSize / 2,
-		Filter:      filter.NewBloomFilter(10),
+		WriteBuffer: WriteBufferSize / 2,
+		Filter:      filter.NewBloomFilter(BitsPerKey),
 	})
 	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 		db, err = leveldb.RecoverFile(file, nil)
@@ -85,7 +84,7 @@ func New(file string, log logging.Logger, blockCacheSize, writeBufferSize, handl
 
 // Has returns if the key is set in the database
 func (db *Database) Has(key []byte) (bool, error) {
-	if db.errored {
+	if db.corrupted() {
 		return false, database.ErrAvoidCorruption
 	}
 	has, err := db.DB.Has(key, nil)
@@ -94,7 +93,7 @@ func (db *Database) Has(key []byte) (bool, error) {
 
 // Get returns the value the key maps to in the database
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if db.errored {
+	if db.corrupted() {
 		return nil, database.ErrAvoidCorruption
 	}
 	value, err := db.DB.Get(key, nil)
@@ -103,7 +102,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 // Put sets the value of the provided key to the provided value
 func (db *Database) Put(key []byte, value []byte) error {
-	if db.errored {
+	if db.corrupted() {
 		return database.ErrAvoidCorruption
 	}
 	return db.handleError(db.DB.Put(key, value, nil))
@@ -111,7 +110,7 @@ func (db *Database) Put(key []byte, value []byte) error {
 
 // Delete removes the key from the database
 func (db *Database) Delete(key []byte) error {
-	if db.errored {
+	if db.corrupted() {
 		return database.ErrAvoidCorruption
 	}
 	return db.handleError(db.DB.Delete(key, nil))
@@ -173,13 +172,19 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 // Close implements the Database interface
 func (db *Database) Close() error { return db.handleError(db.DB.Close()) }
 
+func (db *Database) corrupted() bool {
+	return atomic.LoadUint64(&db.errored) == 1
+}
+
 func (db *Database) handleError(err error) error {
 	err = updateError(err)
+	switch err {
+	case nil, database.ErrNotFound, database.ErrClosed:
 	// If we get an error other than "not found" or "closed", disallow future
 	// database operations to avoid possible corruption
-	if err != nil && err != database.ErrNotFound && err != database.ErrClosed {
-		db.log.Fatal("leveldb error: %w", err)
-		db.errored = true
+	default:
+		db.log.Fatal("leveldb error: %s", err)
+		atomic.StoreUint64(&db.errored, 1)
 	}
 	return err
 }
@@ -210,7 +215,7 @@ func (b *batch) Size() int { return b.size }
 
 // Write flushes any accumulated data to disk.
 func (b *batch) Write() error {
-	if b.db.errored {
+	if b.db.corrupted() {
 		return database.ErrAvoidCorruption
 	}
 	return b.db.handleError(b.db.DB.Write(&b.Batch, nil))
@@ -227,9 +232,9 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 	replay := &replayer{writer: w}
 	if err := b.Batch.Replay(replay); err != nil {
 		// Never actually returns an error, because Replay just returns nil
-		return b.db.handleError(err)
+		return err
 	}
-	return b.db.handleError(replay.err)
+	return replay.err
 }
 
 // Inner returns itself

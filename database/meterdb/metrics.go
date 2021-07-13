@@ -8,24 +8,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-func newLatencyMetric(namespace, name string) prometheus.Histogram {
-	return prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_latency", name),
-		Help:      fmt.Sprintf("Latency of a %s call in nanoseconds", name),
-		Buckets:   utils.NanosecondsBuckets,
-	})
-}
 func newSizeMetric(namespace, name string) prometheus.Histogram {
 	return prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_size", name),
 		Help:      fmt.Sprintf("Bytes passed in a %s call", name),
-		Buckets:   utils.BytesBuckets,
+		Buckets:   metric.BytesBuckets,
 	})
 }
 
@@ -69,35 +61,35 @@ func (m *metrics) Initialize(
 ) error {
 	m.readSize = newSizeMetric(namespace, "read")
 	m.writeSize = newSizeMetric(namespace, "write")
-	m.has = newLatencyMetric(namespace, "has")
+	m.has = metric.NewNanosecondsLatencyMetric(namespace, "has")
 	m.hasSize = newSizeMetric(namespace, "has")
-	m.get = newLatencyMetric(namespace, "get")
+	m.get = metric.NewNanosecondsLatencyMetric(namespace, "get")
 	m.getSize = newSizeMetric(namespace, "get")
-	m.put = newLatencyMetric(namespace, "put")
+	m.put = metric.NewNanosecondsLatencyMetric(namespace, "put")
 	m.putSize = newSizeMetric(namespace, "put")
-	m.delete = newLatencyMetric(namespace, "delete")
+	m.delete = metric.NewNanosecondsLatencyMetric(namespace, "delete")
 	m.deleteSize = newSizeMetric(namespace, "delete")
-	m.newBatch = newLatencyMetric(namespace, "new_batch")
-	m.newIterator = newLatencyMetric(namespace, "new_iterator")
-	m.stat = newLatencyMetric(namespace, "stat")
-	m.compact = newLatencyMetric(namespace, "compact")
-	m.close = newLatencyMetric(namespace, "close")
-	m.bPut = newLatencyMetric(namespace, "batch_put")
+	m.newBatch = metric.NewNanosecondsLatencyMetric(namespace, "new_batch")
+	m.newIterator = metric.NewNanosecondsLatencyMetric(namespace, "new_iterator")
+	m.stat = metric.NewNanosecondsLatencyMetric(namespace, "stat")
+	m.compact = metric.NewNanosecondsLatencyMetric(namespace, "compact")
+	m.close = metric.NewNanosecondsLatencyMetric(namespace, "close")
+	m.bPut = metric.NewNanosecondsLatencyMetric(namespace, "batch_put")
 	m.bPutSize = newSizeMetric(namespace, "batch_put")
-	m.bDelete = newLatencyMetric(namespace, "batch_delete")
+	m.bDelete = metric.NewNanosecondsLatencyMetric(namespace, "batch_delete")
 	m.bDeleteSize = newSizeMetric(namespace, "batch_delete")
-	m.bSize = newLatencyMetric(namespace, "batch_size")
-	m.bWrite = newLatencyMetric(namespace, "batch_write")
+	m.bSize = metric.NewNanosecondsLatencyMetric(namespace, "batch_size")
+	m.bWrite = metric.NewNanosecondsLatencyMetric(namespace, "batch_write")
 	m.bWriteSize = newSizeMetric(namespace, "batch_write")
-	m.bReset = newLatencyMetric(namespace, "batch_reset")
-	m.bReplay = newLatencyMetric(namespace, "batch_replay")
-	m.bInner = newLatencyMetric(namespace, "batch_inner")
-	m.iNext = newLatencyMetric(namespace, "iterator_next")
+	m.bReset = metric.NewNanosecondsLatencyMetric(namespace, "batch_reset")
+	m.bReplay = metric.NewNanosecondsLatencyMetric(namespace, "batch_replay")
+	m.bInner = metric.NewNanosecondsLatencyMetric(namespace, "batch_inner")
+	m.iNext = metric.NewNanosecondsLatencyMetric(namespace, "iterator_next")
 	m.iNextSize = newSizeMetric(namespace, "iterator_next")
-	m.iError = newLatencyMetric(namespace, "iterator_error")
-	m.iKey = newLatencyMetric(namespace, "iterator_key")
-	m.iValue = newLatencyMetric(namespace, "iterator_value")
-	m.iRelease = newLatencyMetric(namespace, "iterator_release")
+	m.iError = metric.NewNanosecondsLatencyMetric(namespace, "iterator_error")
+	m.iKey = metric.NewNanosecondsLatencyMetric(namespace, "iterator_key")
+	m.iValue = metric.NewNanosecondsLatencyMetric(namespace, "iterator_value")
+	m.iRelease = metric.NewNanosecondsLatencyMetric(namespace, "iterator_release")
 
 	errs := wrappers.Errs{}
 	errs.Add(

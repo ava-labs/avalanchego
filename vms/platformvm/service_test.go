@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"testing"
 
@@ -14,10 +15,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/keystore"
+	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -47,24 +53,24 @@ var (
 
 func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
-	vm.Ctx.Lock.Lock()
-	defer vm.Ctx.Lock.Unlock()
-	ks, err := keystore.CreateTestKeystore()
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+	ks, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ks.AddUser(testUsername, testPassword); err != nil {
+	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
-	vm.SnowmanVM.Ctx.Keystore = ks.NewBlockchainKeyStore(vm.SnowmanVM.Ctx.ChainID)
+	vm.ctx.Keystore = ks.NewBlockchainKeyStore(vm.ctx.ChainID)
 	return &Service{vm: vm}
 }
 
 // Give user [testUsername] control of [testPrivateKey] and keys[0] (which is funded)
 func defaultAddress(t *testing.T, service *Service) {
-	service.vm.Ctx.Lock.Lock()
-	defer service.vm.Ctx.Lock.Unlock()
-	userDB, err := service.vm.SnowmanVM.Ctx.Keystore.GetDatabase(testUsername, testPassword)
+	service.vm.ctx.Lock.Lock()
+	defer service.vm.ctx.Lock.Unlock()
+	userDB, err := service.vm.ctx.Keystore.GetDatabase(testUsername, testPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,12 +122,12 @@ func TestExportKey(t *testing.T) {
 
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := ExportKeyReply{}
@@ -151,12 +157,12 @@ func TestImportKey(t *testing.T) {
 	}
 
 	service := defaultService(t)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	reply := api.JSONAddress{}
@@ -172,27 +178,70 @@ func TestImportKey(t *testing.T) {
 func TestGetTxStatus(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
-	// create a tx
-	tx, err := service.vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
+	factory := crypto.FactorySECP256K1R{}
+	recipientKeyIntf, err := factory.NewPrivateKey()
 	if err != nil {
 		t.Fatal(err)
 	}
+	recipientKey := recipientKeyIntf.(*crypto.PrivateKeySECP256K1R)
+
+	m := &atomic.Memory{}
+	err = m.Initialize(logging.NoLog{}, prefixdb.New([]byte{}, service.vm.dbManager.Current().Database))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	sm := m.NewSharedMemory(service.vm.ctx.ChainID)
+	peerSharedMemory := m.NewSharedMemory(avmID)
+
+	// #nosec G404
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        ids.GenerateTestID(),
+			OutputIndex: rand.Uint32(),
+		},
+		Asset: avax.Asset{ID: avaxAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 1234567,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Addrs:     []ids.ShortID{recipientKey.PublicKey().Address()},
+				Threshold: 1,
+			},
+		},
+	}
+	utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputID := utxo.InputID()
+	if err := peerSharedMemory.Put(service.vm.ctx.ChainID, []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			recipientKey.PublicKey().Address().Bytes(),
+		},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
+	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
+
+	service.vm.AtomicUTXOManager = newAtomicUTXOManager
+	tx, err := service.vm.newImportTx(avmID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service.vm.AtomicUTXOManager = oldAtomicUTXOManager
 
 	arg := &GetTxStatusArgs{TxID: tx.ID()}
 	argIncludeReason := &GetTxStatusArgs{TxID: tx.ID(), IncludeReason: true}
@@ -223,10 +272,8 @@ func TestGetTxStatus(t *testing.T) {
 	// put the chain in existing chain list
 	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
-	} else if err := service.vm.putChains(service.vm.DB, []*Tx{tx}); err != nil {
-		t.Fatal(err)
 	} else if _, err := service.vm.BuildBlock(); err == nil {
-		t.Fatal("should have errored because chain already exists")
+		t.Fatal("should have errored because of missing funds")
 	}
 
 	resp = GetTxStatusResponse{} // reset
@@ -251,15 +298,15 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatalf("reason shouldn't be empty")
 	}
 
-	// remove the chain from existing chain list
-	if err := service.vm.putChains(service.vm.DB, []*Tx{}); err != nil {
-		t.Fatal(err)
-	} else if err := service.vm.mempool.IssueTx(tx); err != nil {
+	service.vm.AtomicUTXOManager = newAtomicUTXOManager
+	service.vm.ctx.SharedMemory = sm
+
+	if err := service.vm.mempool.IssueTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
-	} else if blk, ok := block.(*StandardBlock); !ok {
-		t.Fatalf("should be *StandardBlock but is %T", blk)
+	} else if blk, ok := block.(*AtomicBlock); !ok {
+		t.Fatalf("should be *AtomicBlock but is %T", block)
 	} else if err := blk.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := blk.Accept(); err != nil {
@@ -282,12 +329,12 @@ func TestGetTxStatus(t *testing.T) {
 func TestGetTx(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	type test struct {
@@ -314,7 +361,7 @@ func TestGetTx(t *testing.T) {
 			"proposal block",
 			func() (*Tx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
-					service.vm.minValidatorStake,
+					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
 					uint64(service.vm.clock.Time().Add(syncBound).Add(defaultMinStakingDuration).Unix()),
 					ids.GenerateTestShortID(),
@@ -330,7 +377,7 @@ func TestGetTx(t *testing.T) {
 			func() (*Tx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
-					service.vm.Ctx.XChainID,
+					service.vm.ctx.XChainID,
 					ids.GenerateTestShortID(),
 					[]*crypto.PrivateKeySECP256K1R{keys[0]},
 					keys[0].PublicKey().Address(), // change addr
@@ -362,7 +409,7 @@ func TestGetTx(t *testing.T) {
 		} else if blk, ok := block.(*ProposalBlock); ok { // For proposal blocks, commit them
 			if options, err := blk.Options(); err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)
-			} else if commit, ok := options[0].(*Commit); !ok {
+			} else if commit, ok := options[0].(*CommitBlock); !ok {
 				t.Fatalf("failed test '%s': should prefer to commit", test.description)
 			} else if err := commit.Verify(); err != nil {
 				t.Fatalf("failed test '%s': %s", test.description, err)
@@ -387,12 +434,12 @@ func TestGetTx(t *testing.T) {
 func TestGetBalance(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
@@ -425,11 +472,11 @@ func TestGetStake(t *testing.T) {
 	assert := assert.New(t)
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		err := service.vm.Shutdown()
 		assert.NoError(err)
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	// Ensure GetStake is correct for each of the genesis validators
@@ -493,8 +540,8 @@ func TestGetStake(t *testing.T) {
 	oldStake := uint64(defaultWeight)
 
 	// Add a delegator
-	stakeAmt := service.vm.minDelegatorStake + 12345
-	delegatorNodeID := ids.GenerateTestShortID()
+	stakeAmt := service.vm.MinDelegatorStake + 12345
+	delegatorNodeID := keys[0].PublicKey().Address()
 	delegatorEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err := service.vm.newAddDelegatorTx(
 		stakeAmt,
@@ -506,10 +553,12 @@ func TestGetStake(t *testing.T) {
 		keys[0].PublicKey().Address(), // change addr
 	)
 	assert.NoError(err)
-	err = service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	})
+
+	service.vm.internalState.AddCurrentStaker(tx, 0)
+	service.vm.internalState.AddTx(tx, Committed)
+	err = service.vm.internalState.Commit()
+	assert.NoError(err)
+	err = service.vm.internalState.(*internalStateImpl).loadCurrentValidators()
 	assert.NoError(err)
 
 	// Make sure the delegator addr has the right stake (old stake + stakeAmt)
@@ -534,7 +583,7 @@ func TestGetStake(t *testing.T) {
 
 	// Make sure this works for pending stakers
 	// Add a pending staker
-	stakeAmt = service.vm.minValidatorStake + 54321
+	stakeAmt = service.vm.MinValidatorStake + 54321
 	pendingStakerNodeID := ids.GenerateTestShortID()
 	pendingStakerEndTime := uint64(defaultGenesisTime.Add(defaultMinStakingDuration).Unix())
 	tx, err = service.vm.newAddValidatorTx(
@@ -548,8 +597,14 @@ func TestGetStake(t *testing.T) {
 		keys[0].PublicKey().Address(), // change addr
 	)
 	assert.NoError(err)
-	err = service.vm.enqueueStaker(service.vm.DB, constants.PrimaryNetworkID, tx)
+
+	service.vm.internalState.AddPendingStaker(tx)
+	service.vm.internalState.AddTx(tx, Committed)
+	err = service.vm.internalState.Commit()
 	assert.NoError(err)
+	err = service.vm.internalState.(*internalStateImpl).loadPendingValidators()
+	assert.NoError(err)
+
 	// Make sure the delegator has the right stake (old stake + stakeAmt)
 	err = service.GetStake(nil, &args, &response)
 	assert.NoError(err)
@@ -571,12 +626,12 @@ func TestGetStake(t *testing.T) {
 func TestGetCurrentValidators(t *testing.T) {
 	service := defaultService(t)
 	defaultAddress(t, service)
-	service.vm.Ctx.Lock.Lock()
+	service.vm.ctx.Lock.Lock()
 	defer func() {
 		if err := service.vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		service.vm.Ctx.Lock.Unlock()
+		service.vm.ctx.Lock.Unlock()
 	}()
 
 	genesis, _ := defaultGenesis()
@@ -629,7 +684,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 
 	// Add a delegator
-	stakeAmt := service.vm.minDelegatorStake + 12345
+	stakeAmt := service.vm.MinDelegatorStake + 12345
 	validatorNodeID := keys[1].PublicKey().Address()
 	delegatorStartTime := uint64(defaultValidateStartTime.Unix())
 	delegatorEndTime := uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix())
@@ -646,10 +701,15 @@ func TestGetCurrentValidators(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := service.vm.addStaker(service.vm.DB, constants.PrimaryNetworkID, &rewardTx{
-		Reward: 0,
-		Tx:     *tx,
-	}); err != nil {
+
+	service.vm.internalState.AddCurrentStaker(tx, 0)
+	service.vm.internalState.AddTx(tx, Committed)
+	err = service.vm.internalState.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = service.vm.internalState.(*internalStateImpl).loadCurrentValidators()
+	if err != nil {
 		t.Fatal(err)
 	}
 

@@ -19,24 +19,3 @@ func TestTimer(t *testing.T) {
 
 	timer.SetTimeoutIn(time.Millisecond)
 }
-
-func TestTimerCancel(t *testing.T) {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	defer wg.Wait()
-
-	failTimer := NewTimer(func() {
-		wg.Done()
-		t.Fatalf("Timer should have been canceled before being called")
-	})
-	cancelTimer := NewTimer(func() {
-		wg.Done()
-		failTimer.Cancel()
-	})
-
-	go failTimer.Dispatch()
-	go cancelTimer.Dispatch()
-
-	failTimer.SetTimeoutIn(time.Second)
-	cancelTimer.SetTimeoutIn(time.Millisecond)
-}

@@ -4,26 +4,31 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# Avalanchego root folder
+AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+# Load the versions
+source "$AVALANCHE_PATH"/scripts/versions.sh
+# Load the constants
+source "$AVALANCHE_PATH"/scripts/constants.sh
+
 # Download dependencies
 echo "Downloading dependencies..."
 go mod download
 
-# Set GOPATH
-GOPATH="$(go env GOPATH)"
+# Build avalanchego
+"$AVALANCHE_PATH"/scripts/build_avalanche.sh
 
-AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
-BUILD_DIR=$AVALANCHE_PATH/build # Where binaries go
-PLUGIN_DIR="$BUILD_DIR/plugins" # Where plugin binaries (namely coreth) go
+# Build coreth
+"$AVALANCHE_PATH"/scripts/build_coreth.sh
 
+# Build prev version
+"$AVALANCHE_PATH/scripts/build_prev.sh"
 
-"$AVALANCHE_PATH/scripts/build_avalanche.sh"
-
-"$AVALANCHE_PATH/scripts/build_coreth.sh"
-
-if [[ -f "$BUILD_DIR/avalanchego" && -f "$PLUGIN_DIR/evm" ]]; then
+# Exit build successfully if the binaries are created
+if [[ -f "$latest_avalanchego_process_path" && -f "$latest_evm_path" ]]; then
         echo "Build Successful"
         exit 0
 else
-        echo "Build failure" 
+        echo "Build failure" >&2
         exit 1
 fi

@@ -24,7 +24,7 @@ type vtxParser struct {
 }
 
 func (p *vtxParser) Parse(vtxBytes []byte) (queue.Job, error) {
-	vtx, err := p.manager.Parse(vtxBytes)
+	vtx, err := p.manager.ParseVtx(vtxBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -58,12 +58,26 @@ func (v *vertexJob) MissingDependencies() (ids.Set, error) {
 	return missing, nil
 }
 
+// Returns true if this vertex job has at least 1 missing dependency
+func (v *vertexJob) HasMissingDependencies() (bool, error) {
+	parents, err := v.vtx.Parents()
+	if err != nil {
+		return false, err
+	}
+	for _, parent := range parents {
+		if parent.Status() != choices.Accepted {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (v *vertexJob) Execute() error {
-	deps, err := v.MissingDependencies()
+	hasMissingDependencies, err := v.HasMissingDependencies()
 	if err != nil {
 		return err
 	}
-	if deps.Len() != 0 {
+	if hasMissingDependencies {
 		v.numDropped.Inc()
 		return errors.New("attempting to execute blocked vertex")
 	}
@@ -85,6 +99,7 @@ func (v *vertexJob) Execute() error {
 		return fmt.Errorf("attempting to execute vertex with status %s", status)
 	case choices.Processing:
 		v.numAccepted.Inc()
+		v.log.Trace("accepting vertex %s in bootstrapping", v.vtx.ID())
 		if err := v.vtx.Accept(); err != nil {
 			return fmt.Errorf("failed to accept vertex in bootstrapping: %w", err)
 		}

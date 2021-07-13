@@ -24,6 +24,9 @@ type Logger interface {
 	// Log an event that may be useful for a user to see to measure the progress
 	// of the protocol
 	Info(format string, args ...interface{})
+	// Log an event that may be useful for understanding the order of the
+	// execution of the protocol
+	Trace(format string, args ...interface{})
 	// Log an event that may be useful for a programmer to see when debuging the
 	// execution of the protocol
 	Debug(format string, args ...interface{})
@@ -53,11 +56,17 @@ type Logger interface {
 	// executes the desired exit function
 	RecoverAndExit(f, exit func())
 
+	// Only events above or equal to the level set will be logged
 	SetLogLevel(Level)
+	// Only logged events above or equal to the level set will be logged
 	SetDisplayLevel(Level)
+	// Add a prefix to all logged messages
 	SetPrefix(string)
+	// Enable or disable logging
 	SetLoggingEnabled(bool)
+	// Enable or disable the display of logged events
 	SetDisplayingEnabled(bool)
+	// Enable or disable the display of contextual information for logged events
 	SetContextualDisplayingEnabled(bool)
 
 	// Stop this logger and write back all meta-data.
@@ -66,10 +75,19 @@ type Logger interface {
 
 // RotatingWriter allows for rotating a stream writer
 type RotatingWriter interface {
-	Initialize(Config) error
+	// Creates the log file if it doesn't exist or resume writing to it if it does
+	Initialize(Config) (int, error)
+	// Flushes the writer
 	Flush() error
+	// Writes [b] to the log file
 	Write(b []byte) (int, error)
+	// Writes [s] to the log file
 	WriteString(s string) (int, error)
+	// Closes the log file
 	Close() error
+	// Rotates the log files. Always keeps the current log in the same file.
+	// Rotated log files are stored as by appending an integer to the log file name,
+	// from 1 to the RotationSize defined in the configuration. 1 being the most
+	// recently rotated log file.
 	Rotate() error
 }

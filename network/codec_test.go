@@ -10,17 +10,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var (
-	TestCodec Codec
-)
+var TestCodec Codec
 
 func TestCodecPackInvalidOp(t *testing.T) {
-	_, err := TestCodec.Pack(math.MaxUint8, make(map[Field]interface{}))
+	_, err := TestCodec.Pack(nil, math.MaxUint8, make(map[Field]interface{}))
 	assert.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
-	_, err := TestCodec.Pack(Get, make(map[Field]interface{}))
+	_, err := TestCodec.Pack(nil, Get, make(map[Field]interface{}))
 	assert.Error(t, err)
 }
 

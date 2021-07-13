@@ -7,8 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/snow"
 )
 
@@ -20,6 +21,9 @@ var (
 	errCreateHandlers       = errors.New("unexpectedly called CreateHandlers")
 	errCreateStaticHandlers = errors.New("unexpectedly called CreateStaticHandlers")
 	errHealthCheck          = errors.New("unexpectedly called HealthCheck")
+	errConnected            = errors.New("unexpectedly called Connected")
+	errDisconnected         = errors.New("unexpectedly called Disconnected")
+	errVersion              = errors.New("unexpectedly called Version")
 
 	_ VM = &TestVM{}
 )
@@ -30,16 +34,19 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealthCheck, CantAppRequest, CantAppResponse,
-	CantAppGossip, CantAppRequestFailed bool
+	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
+	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF                              func(*snow.Context, database.Database, []byte, chan<- Message, []*Fx) error
+	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF                    func() (map[string]*HTTPHandler, error)
+	ConnectedF                               func(ids.ShortID) error
+	DisconnectedF                            func(ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
 	AppRequestF, AppGossipF, AppResponseF    func(nodeID ids.ShortID, requestID uint32, msg []byte) error
 	AppRequestFailedF                        func(nodeID ids.ShortID, requestID uint32) error
+	VersionF                                 func() (string, error)
 }
 
 func (vm *TestVM) Default(cant bool) {
@@ -57,9 +64,9 @@ func (vm *TestVM) Default(cant bool) {
 
 }
 
-func (vm *TestVM) Initialize(ctx *snow.Context, db database.Database, initState []byte, msgChan chan<- Message, fxs []*Fx) error {
+func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
 	if vm.InitializeF != nil {
-		return vm.InitializeF(ctx, db, initState, msgChan, fxs)
+		return vm.InitializeF(ctx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs)
 	}
 	if vm.CantInitialize && vm.T != nil {
 		vm.T.Fatal(errInitialize)
@@ -186,4 +193,34 @@ func (vm *TestVM) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) er
 		vm.T.Fatalf("Unexpectedly called AppGossip")
 	}
 	return errors.New("unexpectedly called AppGossip")
+}
+
+func (vm *TestVM) Connected(id ids.ShortID) error {
+	if vm.ConnectedF != nil {
+		return vm.ConnectedF(id)
+	}
+	if vm.CantConnected && vm.T != nil {
+		vm.T.Fatal(errConnected)
+	}
+	return nil
+}
+
+func (vm *TestVM) Disconnected(id ids.ShortID) error {
+	if vm.DisconnectedF != nil {
+		return vm.DisconnectedF(id)
+	}
+	if vm.CantDisconnected && vm.T != nil {
+		vm.T.Fatal(errDisconnected)
+	}
+	return nil
+}
+
+func (vm *TestVM) Version() (string, error) {
+	if vm.VersionF != nil {
+		return vm.VersionF()
+	}
+	if vm.CantVersion && vm.T != nil {
+		vm.T.Fatal(errVersion)
+	}
+	return "", nil
 }

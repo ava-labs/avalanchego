@@ -12,34 +12,32 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var (
-	Tests = []func(c GeneralCodec, t testing.TB){
-		TestStruct,
-		TestRegisterStructTwice,
-		TestUInt32,
-		TestSlice,
-		TestMaxSizeSlice,
-		TestBool,
-		TestArray,
-		TestBigArray,
-		TestPointerToStruct,
-		TestSliceOfStruct,
-		TestInterface,
-		TestSliceOfInterface,
-		TestArrayOfInterface,
-		TestPointerToInterface,
-		TestString,
-		TestNilSlice,
-		TestSerializeUnexportedField,
-		TestSerializeOfNoSerializeField,
-		TestNilSliceSerialization,
-		TestEmptySliceSerialization,
-		TestSliceWithEmptySerialization,
-		TestRestrictedSlice,
-		TestExtraSpace,
-		TestSliceLengthOverflow,
-	}
-)
+var Tests = []func(c GeneralCodec, t testing.TB){
+	TestStruct,
+	TestRegisterStructTwice,
+	TestUInt32,
+	TestSlice,
+	TestMaxSizeSlice,
+	TestBool,
+	TestArray,
+	TestBigArray,
+	TestPointerToStruct,
+	TestSliceOfStruct,
+	TestInterface,
+	TestSliceOfInterface,
+	TestArrayOfInterface,
+	TestPointerToInterface,
+	TestString,
+	TestNilSlice,
+	TestSerializeUnexportedField,
+	TestSerializeOfNoSerializeField,
+	TestNilSliceSerialization,
+	TestEmptySliceSerialization,
+	TestSliceWithEmptySerialization,
+	TestRestrictedSlice,
+	TestExtraSpace,
+	TestSliceLengthOverflow,
+}
 
 // The below structs and interfaces exist
 // for the sake of testing
@@ -508,7 +506,7 @@ func TestArrayOfInterface(codec GeneralCodec, t testing.TB) {
 // Test marshalling a pointer to an interface
 func TestPointerToInterface(codec GeneralCodec, t testing.TB) {
 	var myinnerStruct Foo = &MyInnerStruct{Str: "Hello!"}
-	var myPtr *Foo = &myinnerStruct
+	myPtr := &myinnerStruct
 
 	if err := codec.RegisterType(&MyInnerStruct{}); err != nil {
 		t.Fatal(err)

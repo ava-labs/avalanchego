@@ -4,8 +4,6 @@
 package snowstorm
 
 import (
-	"math/rand"
-
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -135,10 +133,12 @@ func (n *Network) Round() error {
 		return nil
 	}
 
-	runningInd := rand.Intn(len(n.running)) // #nosec G404
+	s := sampler.NewUniform()
+	_ = s.Initialize(uint64(len(n.running)))
+	runningInd, _ := s.Next()
+
 	running := n.running[runningInd]
 
-	s := sampler.NewUniform()
 	_ = s.Initialize(uint64(len(n.nodes)))
 	indices, _ := s.Sample(n.params.K)
 	sampledColors := ids.Bag{}

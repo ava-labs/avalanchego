@@ -62,13 +62,17 @@ type metrics struct {
 	timeSinceLastMsgReceived prometheus.Gauge
 	sendQueuePortionFull     prometheus.Gauge
 	sendFailRate             prometheus.Gauge
+	failedToParse            prometheus.Counter
+	connected                prometheus.Counter
+	disconnected             prometheus.Counter
 
 	getVersion, version,
-	getPeerlist, peerlist,
+	getPeerlist, peerList,
 	ping, pong,
 	getAcceptedFrontier, acceptedFrontier,
 	getAccepted, accepted,
-	get, getAncestors, put, multiPut,
+	getAncestors, multiPut,
+	get, put,
 	pushQuery, pullQuery, chits,
 	appRequest, appResponse, appGossip messageMetrics
 }
@@ -100,6 +104,21 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		Name:      "send_fail_rate",
 		Help:      "Portion of messages that recently failed to be sent over the network",
 	})
+	m.failedToParse = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "msgs_failed_to_parse",
+		Help:      "Number of messages that could not be parsed or were invalidly formed",
+	})
+	m.connected = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "times_connected",
+		Help:      "Times this node successfully completed a handshake with a peer",
+	})
+	m.disconnected = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "times_disconnected",
+		Help:      "Times this node disconnected from a peer it had completed a handshake with",
+	})
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -108,21 +127,24 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.timeSinceLastMsgSent),
 		registerer.Register(m.sendQueuePortionFull),
 		registerer.Register(m.sendFailRate),
+		registerer.Register(m.failedToParse),
+		registerer.Register(m.connected),
+		registerer.Register(m.disconnected),
 
 		m.getVersion.initialize(GetVersion, registerer),
 		m.version.initialize(Version, registerer),
 		m.getPeerlist.initialize(GetPeerList, registerer),
-		m.peerlist.initialize(PeerList, registerer),
+		m.peerList.initialize(PeerList, registerer),
 		m.ping.initialize(Ping, registerer),
 		m.pong.initialize(Pong, registerer),
 		m.getAcceptedFrontier.initialize(GetAcceptedFrontier, registerer),
 		m.acceptedFrontier.initialize(AcceptedFrontier, registerer),
 		m.getAccepted.initialize(GetAccepted, registerer),
 		m.accepted.initialize(Accepted, registerer),
-		m.get.initialize(Get, registerer),
 		m.getAncestors.initialize(GetAncestors, registerer),
-		m.put.initialize(Put, registerer),
 		m.multiPut.initialize(MultiPut, registerer),
+		m.get.initialize(Get, registerer),
+		m.put.initialize(Put, registerer),
 		m.pushQuery.initialize(PushQuery, registerer),
 		m.pullQuery.initialize(PullQuery, registerer),
 		m.chits.initialize(Chits, registerer),
@@ -142,7 +164,7 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 	case GetPeerList:
 		return &m.getPeerlist
 	case PeerList:
-		return &m.peerlist
+		return &m.peerList
 	case Ping:
 		return &m.ping
 	case Pong:
@@ -155,14 +177,14 @@ func (m *metrics) message(msgType Op) *messageMetrics {
 		return &m.getAccepted
 	case Accepted:
 		return &m.accepted
-	case Get:
-		return &m.get
 	case GetAncestors:
 		return &m.getAncestors
-	case Put:
-		return &m.put
 	case MultiPut:
 		return &m.multiPut
+	case Get:
+		return &m.get
+	case Put:
+		return &m.put
 	case PushQuery:
 		return &m.pushQuery
 	case PullQuery:

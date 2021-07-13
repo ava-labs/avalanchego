@@ -11,12 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/gsubnetlookup/gsubnetlookupproto"
 )
 
-var (
-	_ gsubnetlookupproto.SubnetLookupServer = &Server{}
-)
+var _ gsubnetlookupproto.SubnetLookupServer = &Server{}
 
 // Server is a subnet lookup that is managed over RPC.
 type Server struct {
+	gsubnetlookupproto.UnimplementedSubnetLookupServer
 	aliaser snow.SubnetLookup
 }
 

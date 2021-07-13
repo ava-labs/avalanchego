@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 
@@ -13,25 +14,15 @@ import (
 )
 
 var (
-	errNoCert = errors.New("tls handshake finished with no peer certificate")
+	errNoCert          = errors.New("tls handshake finished with no peer certificate")
+	_         Upgrader = &tlsServerUpgrader{}
+	_         Upgrader = &tlsClientUpgrader{}
 )
 
 // Upgrader ...
 type Upgrader interface {
 	// Must be thread safe
-	Upgrade(net.Conn) (ids.ShortID, net.Conn, error)
-}
-
-type ipUpgrader struct{}
-
-// NewIPUpgrader ...
-func NewIPUpgrader() Upgrader { return ipUpgrader{} }
-
-func (ipUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
-	addr := conn.RemoteAddr()
-	str := addr.String()
-	id := ids.ShortID(hashing.ComputeHash160Array([]byte(str)))
-	return id, conn, nil
+	Upgrade(net.Conn) (ids.ShortID, net.Conn, *x509.Certificate, error)
 }
 
 type tlsServerUpgrader struct {
@@ -45,21 +36,8 @@ func NewTLSServerUpgrader(config *tls.Config) Upgrader {
 	}
 }
 
-func (t tlsServerUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
-	encConn := tls.Server(conn, t.config)
-	if err := encConn.Handshake(); err != nil {
-		return ids.ShortID{}, nil, err
-	}
-
-	connState := encConn.ConnectionState()
-	if len(connState.PeerCertificates) == 0 {
-		return ids.ShortID{}, nil, errNoCert
-	}
-	peerCert := connState.PeerCertificates[0]
-	id := ids.ShortID(
-		hashing.ComputeHash160Array(
-			hashing.ComputeHash256(peerCert.Raw)))
-	return id, encConn, nil
+func (t tlsServerUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, *x509.Certificate, error) {
+	return connToIDAndCert(tls.Server(conn, t.config))
 }
 
 type tlsClientUpgrader struct {
@@ -73,19 +51,25 @@ func NewTLSClientUpgrader(config *tls.Config) Upgrader {
 	}
 }
 
-func (t tlsClientUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, error) {
-	encConn := tls.Client(conn, t.config)
-	if err := encConn.Handshake(); err != nil {
-		return ids.ShortID{}, nil, err
+func (t tlsClientUpgrader) Upgrade(conn net.Conn) (ids.ShortID, net.Conn, *x509.Certificate, error) {
+	return connToIDAndCert(tls.Client(conn, t.config))
+}
+
+func connToIDAndCert(conn *tls.Conn) (ids.ShortID, net.Conn, *x509.Certificate, error) {
+	if err := conn.Handshake(); err != nil {
+		return ids.ShortID{}, nil, nil, err
 	}
 
-	connState := encConn.ConnectionState()
-	if len(connState.PeerCertificates) == 0 {
-		return ids.ShortID{}, nil, errNoCert
+	state := conn.ConnectionState()
+	if len(state.PeerCertificates) == 0 {
+		return ids.ShortID{}, nil, nil, errNoCert
 	}
-	peerCert := connState.PeerCertificates[0]
-	id := ids.ShortID(
+	peerCert := state.PeerCertificates[0]
+	return certToID(peerCert), conn, peerCert, nil
+}
+
+func certToID(cert *x509.Certificate) ids.ShortID {
+	return ids.ShortID(
 		hashing.ComputeHash160Array(
-			hashing.ComputeHash256(peerCert.Raw)))
-	return id, encConn, nil
+			hashing.ComputeHash256(cert.Raw)))
 }

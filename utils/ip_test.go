@@ -20,11 +20,13 @@ func TestIPDescEqual(t *testing.T) {
 			IPDesc{net.ParseIP("127.0.0.1"), 0},
 			IPDesc{net.ParseIP("127.0.0.1"), 0},
 			true,
-		}, {
+		},
+		{
 			IPDesc{net.ParseIP("::1"), 0},
 			IPDesc{net.ParseIP("::1"), 0},
 			true,
-		}, {
+		},
+		{
 			IPDesc{net.ParseIP("127.0.0.1"), 0},
 			IPDesc{net.ParseIP("::ffff:127.0.0.1"), 0},
 			true,
@@ -35,11 +37,13 @@ func TestIPDescEqual(t *testing.T) {
 			IPDesc{net.ParseIP("127.0.0.1"), 0},
 			IPDesc{net.ParseIP("1.2.3.4"), 0},
 			false,
-		}, {
+		},
+		{
 			IPDesc{net.ParseIP("::1"), 0},
 			IPDesc{net.ParseIP("2001::1"), 0},
 			false,
-		}, {
+		},
+		{
 			IPDesc{net.ParseIP("127.0.0.1"), 0},
 			IPDesc{net.ParseIP("127.0.0.1"), 1},
 			false,

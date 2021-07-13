@@ -123,7 +123,7 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 	}
 
 	// Parse the from addresses
-	fromAddrs := ids.ShortSet{}
+	fromAddrs := ids.NewShortSet(len(args.From))
 	for _, addrStr := range args.From {
 		addr, err := w.vm.ParseLocalAddress(addrStr)
 		if err != nil {
@@ -203,11 +203,11 @@ func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amountsWithFee[assetKey] = amount
 	}
 
-	amountWithFee, err := safemath.Add64(amounts[w.vm.ctx.AVAXAssetID], w.vm.txFee)
+	amountWithFee, err := safemath.Add64(amounts[w.vm.feeAssetID], w.vm.txFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
-	amountsWithFee[w.vm.ctx.AVAXAssetID] = amountWithFee
+	amountsWithFee[w.vm.feeAssetID] = amountWithFee
 
 	amountsSpent, ins, keys, err := w.vm.Spend(
 		utxos,

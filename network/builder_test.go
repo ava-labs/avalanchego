@@ -4,19 +4,17 @@
 package network
 
 import (
-	"net"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
-var (
-	TestBuilder Builder
-)
+var TestBuilder Builder = Builder{
+	getByteSlice: func() []byte { return nil },
+}
 
 func TestBuildGetVersion(t *testing.T) {
 	msg, err := TestBuilder.GetVersion()
@@ -30,43 +28,6 @@ func TestBuildGetVersion(t *testing.T) {
 	assert.Equal(t, GetVersion, parsedMsg.Op())
 }
 
-func TestBuildVersion(t *testing.T) {
-	networkID := uint32(1)
-	nodeID := uint32(3)
-	myTime := uint64(2)
-	ip := utils.IPDesc{
-		IP:   net.IPv6loopback,
-		Port: 12345,
-	}
-	myVersion := "xD"
-
-	msg, err := TestBuilder.Version(
-		networkID,
-		nodeID,
-		myTime,
-		ip,
-		myVersion,
-	)
-	assert.NoError(t, err)
-	assert.NotNil(t, msg)
-	assert.Equal(t, Version, msg.Op())
-	assert.Equal(t, networkID, msg.Get(NetworkID))
-	assert.Equal(t, nodeID, msg.Get(NodeID))
-	assert.Equal(t, myTime, msg.Get(MyTime))
-	assert.Equal(t, ip, msg.Get(IP))
-	assert.Equal(t, myVersion, msg.Get(VersionStr))
-
-	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
-	assert.NoError(t, err)
-	assert.NotNil(t, parsedMsg)
-	assert.Equal(t, Version, parsedMsg.Op())
-	assert.Equal(t, networkID, parsedMsg.Get(NetworkID))
-	assert.Equal(t, nodeID, parsedMsg.Get(NodeID))
-	assert.Equal(t, myTime, parsedMsg.Get(MyTime))
-	assert.Equal(t, ip, parsedMsg.Get(IP))
-	assert.Equal(t, myVersion, parsedMsg.Get(VersionStr))
-}
-
 func TestBuildGetPeerList(t *testing.T) {
 	msg, err := TestBuilder.GetPeerList()
 	assert.NoError(t, err)
@@ -77,25 +38,6 @@ func TestBuildGetPeerList(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetPeerList, parsedMsg.Op())
-}
-
-func TestBuildPeerList(t *testing.T) {
-	ips := []utils.IPDesc{
-		{IP: net.IPv6loopback, Port: 12345},
-		{IP: net.IPv6loopback, Port: 54321},
-	}
-
-	msg, err := TestBuilder.PeerList(ips)
-	assert.NoError(t, err)
-	assert.NotNil(t, msg)
-	assert.Equal(t, PeerList, msg.Op())
-	assert.Equal(t, ips, msg.Get(Peers))
-
-	parsedMsg, err := TestBuilder.Parse(msg.Bytes())
-	assert.NoError(t, err)
-	assert.NotNil(t, parsedMsg)
-	assert.Equal(t, PeerList, parsedMsg.Op())
-	assert.Equal(t, ips, parsedMsg.Get(Peers))
 }
 
 func TestBuildGetAcceptedFrontier(t *testing.T) {
