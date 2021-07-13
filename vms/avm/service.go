@@ -115,12 +115,12 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
-		b, err := decorateTx(tx.UnsignedTx, service.vm)
+		err := initTx(tx.UnsignedTx, service.vm)
 		if err != nil {
 			return err
 		}
 
-		reply.Tx = b
+		reply.Tx = tx
 	} else {
 		reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	}
@@ -131,15 +131,18 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	return nil
 }
 
-func decorateTx(unsignedTx UnsignedTx, vm *VM) (interface{}, error) {
+// initTx initializes given UnsignedTx object if it is a CoreTx
+// does nothing if given UnsignedTx object is not a CoreTx
+// returns error if call to CoreTx.Init failed
+func initTx(unsignedTx UnsignedTx, vm *VM) error {
 	b, ok := unsignedTx.(CoreTx)
 	if !ok {
-		return unsignedTx, nil
+		return nil
 	}
 	if err := b.Init(vm); err != nil {
-		return nil, err
+		return err
 	}
-	return b, nil
+	return nil
 }
 
 // GetUTXOs gets all utxos for passed in addresses
