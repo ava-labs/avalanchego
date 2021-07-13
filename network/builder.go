@@ -61,7 +61,7 @@ func (b Builder) Version(
 func (b Builder) GetPeerList() (Msg, error) {
 	buf := b.getByteSlice()
 	// GetPeerList messages can't be compressed
-	return b.Pack(buf, GetPeerList, nil, false, false)
+	return b.Pack(buf, GetPeerList, nil, GetPeerList.Compressable(), GetPeerList.Compressable())
 }
 
 func (b Builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag, compress bool) (Msg, error) {
