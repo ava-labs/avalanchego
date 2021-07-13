@@ -361,10 +361,12 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		t.Fatalf("unexpectedly could not build block due to %s", err)
 	}
 	postForkChild := &postForkBlock{
-		Block:    postForkStatelessChild,
-		vm:       proVM,
-		innerBlk: coreBlk,
-		status:   choices.Processing,
+		Block: postForkStatelessChild,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: coreBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	if !postForkChild.Timestamp().Before(activationTime) {

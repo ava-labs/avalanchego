@@ -404,10 +404,12 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk := postForkBlock{
-		Block:    slb,
-		vm:       proVM,
-		innerBlk: innerBlk,
-		status:   choices.Processing,
+		Block: slb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	// test
@@ -447,10 +449,12 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk1 := postForkBlock{
-		Block:    slb1,
-		vm:       proVM,
-		innerBlk: innerBlk,
-		status:   choices.Processing,
+		Block: slb1,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	slb2, err := statelessblock.Build(
@@ -465,10 +469,12 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk2 := postForkBlock{
-		Block:    slb2,
-		vm:       proVM,
-		innerBlk: innerBlk,
-		status:   choices.Processing,
+		Block: slb2,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	if proBlk1.ID() == proBlk2.ID() {
@@ -572,10 +578,12 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	netProBlk := postForkBlock{
-		Block:    netSlb,
-		vm:       proVM,
-		innerBlk: netcoreBlk,
-		status:   choices.Processing,
+		Block: netSlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: netcoreBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	// prove that also block from network verifies

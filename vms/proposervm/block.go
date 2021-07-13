@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
@@ -39,4 +40,10 @@ type Block interface {
 	buildChild(innerBlock snowman.Block) (Block, error)
 
 	pChainHeight() (uint64, error)
+}
+
+type postForkCommonComponents struct {
+	vm       *VM
+	innerBlk snowman.Block
+	status   choices.Status
 }

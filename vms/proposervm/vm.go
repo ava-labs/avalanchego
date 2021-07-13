@@ -228,10 +228,12 @@ func (vm *VM) getPostForkBlock(blkID ids.ID) (*postForkBlock, error) {
 	}
 
 	return &postForkBlock{
-		Block:    statelessBlock,
-		vm:       vm,
-		innerBlk: innerBlk,
-		status:   status,
+		Block: statelessBlock,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk,
+			status:   status,
+		},
 	}, nil
 }
 
@@ -256,10 +258,12 @@ func (vm *VM) getPostForkOption(blkID ids.ID) (*postForkOption, error) {
 	}
 
 	return &postForkOption{
-		Option:   option,
-		vm:       vm,
-		innerBlk: innerBlk,
-		status:   status,
+		Option: option,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk,
+			status:   status,
+		},
 	}, nil
 }
 
@@ -293,10 +297,12 @@ func (vm *VM) parsePostForkBlock(b []byte) (*postForkBlock, error) {
 	}
 
 	blk = &postForkBlock{
-		Block:    statelessBlock,
-		vm:       vm,
-		innerBlk: innerBlk,
-		status:   choices.Processing,
+		Block: statelessBlock,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk,
+			status:   choices.Processing,
+		},
 	}
 	return blk, vm.storePostForkBlock(blk)
 }
@@ -330,10 +336,12 @@ func (vm *VM) parsePostForkOption(b []byte) (*postForkOption, error) {
 	}
 
 	opt = &postForkOption{
-		Option:   option,
-		vm:       vm,
-		innerBlk: innerBlk,
-		status:   choices.Processing,
+		Option: option,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerBlk,
+			status:   choices.Processing,
+		},
 	}
 	return opt, vm.storePostForkOption(opt)
 }

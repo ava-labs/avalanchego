@@ -18,10 +18,7 @@ var _ Block = &postForkOption{}
 
 type postForkOption struct {
 	option.Option
-
-	vm       *VM
-	innerBlk snowman.Block
-	status   choices.Status
+	postForkCommonComponents
 }
 
 func (b *postForkOption) Timestamp() time.Time {
@@ -98,76 +95,12 @@ func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
 }
 
 func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
-	// retrieve relevant data from parent's parent, which must be a postForkBlock
 	parentPChainHeight, err := b.pChainHeight()
 	if err != nil {
 		return err
 	}
-
-	childPChainHeight := child.PChainHeight()
-	if childPChainHeight < parentPChainHeight {
-		return errPChainHeightNotMonotonic
-	}
-
-	currentPChainHeight, err := b.vm.PChainHeight()
-	if err != nil {
-		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
-			child.ID())
-		return err
-	}
-	if childPChainHeight > currentPChainHeight {
-		return errPChainHeightNotReached
-	}
-
-	expectedInnerParentID := b.innerBlk.ID()
-	innerParent := child.innerBlk.Parent()
-	innerParentID := innerParent.ID()
-	if innerParentID != expectedInnerParentID {
-		return errInnerParentMismatch
-	}
-
-	parentTimestamp := b.Timestamp()
-	childTimestamp := child.Timestamp()
-	if childTimestamp.Before(parentTimestamp) {
-		return errTimeNotMonotonic
-	}
-
-	maxTimestamp := b.vm.Time().Add(syncBound)
-	if childTimestamp.After(maxTimestamp) {
-		return errTimeTooAdvanced
-	}
-
-	childHeight := child.Height()
-	proposerID := child.Proposer()
-	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-	if err != nil {
-		return err
-	}
-
-	minTimestamp := parentTimestamp.Add(minDelay)
-	b.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		child.ID(), parentTimestamp.Format("15:04:05"), minDelay, childTimestamp.Format("15:04:05"))
-
-	if childTimestamp.Before(minTimestamp) {
-		b.vm.ctx.Log.Debug("Snowman++ verify - dropped post-fork block due to time window %s", child.ID())
-		return errProposerWindowNotStarted
-	}
-
-	// Verify the signature of the node
-	if err := child.Block.Verify(); err != nil {
-		return err
-	}
-
-	// only validate the inner block once
-	if !b.vm.Tree.Contains(child.innerBlk) {
-		if err := child.innerBlk.Verify(); err != nil {
-			return err
-		}
-		b.vm.Tree.Add(child.innerBlk)
-	}
-
-	b.vm.verifiedBlocks[child.ID()] = child
-	return nil
+	return postForkCommonVerify(&b.postForkCommonComponents, b.Timestamp(),
+		parentPChainHeight, child)
 }
 
 func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
@@ -218,10 +151,12 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	blk := &postForkBlock{
-		Block:    statelessBlock,
-		vm:       b.vm,
-		innerBlk: innerBlock,
-		status:   choices.Processing,
+		Block: statelessBlock,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       b.vm,
+			innerBlk: innerBlock,
+			status:   choices.Processing,
+		},
 	}
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, expected delay %v, block timestamp %v.",
