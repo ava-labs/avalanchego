@@ -135,7 +135,7 @@ type peer struct {
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
 
-	// True if we should compress messages sent to this peer
+	// True if we can compress messages sent to this peer
 	canHandleCompressed utils.AtomicBool
 }
 
