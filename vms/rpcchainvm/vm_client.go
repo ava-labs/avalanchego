@@ -268,18 +268,18 @@ func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
 }
 
 func (vm *VMClient) Bootstrapping() error {
-	_, err := vm.client.Bootstrapping(context.Background(), &vmproto.BootstrappingRequest{})
+	_, err := vm.client.Bootstrapping(context.Background(), &vmproto.EmptyMsg{})
 	return err
 }
 
 func (vm *VMClient) Bootstrapped() error {
-	_, err := vm.client.Bootstrapped(context.Background(), &vmproto.BootstrappedRequest{})
+	_, err := vm.client.Bootstrapped(context.Background(), &vmproto.EmptyMsg{})
 	return err
 }
 
 func (vm *VMClient) Shutdown() error {
 	errs := wrappers.Errs{}
-	_, err := vm.client.Shutdown(context.Background(), &vmproto.ShutdownRequest{})
+	_, err := vm.client.Shutdown(context.Background(), &vmproto.EmptyMsg{})
 	errs.Add(err)
 
 	vm.serverCloser.Stop()
@@ -292,7 +292,7 @@ func (vm *VMClient) Shutdown() error {
 }
 
 func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
-	resp, err := vm.client.CreateHandlers(context.Background(), &vmproto.CreateHandlersRequest{})
+	resp, err := vm.client.CreateHandlers(context.Background(), &vmproto.EmptyMsg{})
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func (vm *VMClient) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 }
 
 func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, error) {
-	resp, err := vm.client.CreateStaticHandlers(context.Background(), &vmproto.CreateStaticHandlersRequest{})
+	resp, err := vm.client.CreateStaticHandlers(context.Background(), &vmproto.EmptyMsg{})
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +336,7 @@ func (vm *VMClient) CreateStaticHandlers() (map[string]*common.HTTPHandler, erro
 }
 
 func (vm *VMClient) buildBlock() (snowman.Block, error) {
-	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.BuildBlockRequest{})
+	resp, err := vm.client.BuildBlock(context.Background(), &vmproto.EmptyMsg{})
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +421,7 @@ func (vm *VMClient) SetPreference(id ids.ID) error {
 func (vm *VMClient) HealthCheck() (interface{}, error) {
 	return vm.client.Health(
 		context.Background(),
-		&vmproto.HealthRequest{},
+		&vmproto.EmptyMsg{},
 	)
 }
 
@@ -475,7 +475,7 @@ func (vm *VMClient) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) erro
 func (vm *VMClient) Version() (string, error) {
 	resp, err := vm.client.Version(
 		context.Background(),
-		&vmproto.VersionRequest{},
+		&vmproto.EmptyMsg{},
 	)
 	if err != nil {
 		return "", err
