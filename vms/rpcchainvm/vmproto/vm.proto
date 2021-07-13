@@ -165,7 +165,7 @@ message AppResponseMsg {
     // Request ID of request that this is in response to
     uint32 requestID = 2;
     // The response body
-    bytes msg = 3;
+    bytes response = 3;
 }
 
 message AppResponseResponse {}

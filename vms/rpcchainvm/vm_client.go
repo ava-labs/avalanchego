@@ -426,23 +426,50 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 }
 
 func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	// TODO implement
-	return nil
+	_, err := vm.client.AppRequestFailed(
+		context.Background(),
+		&vmproto.AppRequestFailedMsg{
+			NodeID:    nodeID[:],
+			RequestID: requestID,
+		},
+	)
+	return err
 }
 
 func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	// TODO implement
-	return nil
+	_, err := vm.client.AppRequest(
+		context.Background(),
+		&vmproto.AppRequestMsg{
+			NodeID:    nodeID[:],
+			RequestID: requestID,
+			Request:   request,
+		},
+	)
+	return err
 }
 
 func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	// TODO implement
-	return nil
+	_, err := vm.client.AppResponse(
+		context.Background(),
+		&vmproto.AppResponseMsg{
+			NodeID:    nodeID[:],
+			RequestID: requestID,
+			Response:  response,
+		},
+	)
+	return err
 }
 
 func (vm *VMClient) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
-	// TODO implement
-	return nil
+	_, err := vm.client.AppGossip(
+		context.Background(),
+		&vmproto.AppGossipMsg{
+			NodeID: nodeID[:],
+			MsgID:  msgID,
+			Msg:    msg,
+		},
+	)
+	return err
 }
 
 func (vm *VMClient) Version() (string, error) {
