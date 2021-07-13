@@ -156,7 +156,7 @@ type App interface {
 	// This message is not expected in response to any event, and it does
 	// not need to be responded to.
 	// The meaning of [msg] is application (VM) defined.
-	AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error
 }
 
 // FetchHandler defines how a consensus engine reacts to retrieval messages from

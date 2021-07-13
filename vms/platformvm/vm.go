@@ -420,7 +420,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	return nil
 }
 
-func (vm *VM) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+func (vm *VM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
 	return nil
 }
 

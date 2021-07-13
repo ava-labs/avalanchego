@@ -417,9 +417,9 @@ func (e *EngineTest) AppResponse(nodeID ids.ShortID, requestID uint32, response 
 	return errors.New("unexpectedly called AppResponse")
 }
 
-func (e *EngineTest) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+func (e *EngineTest) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
 	if e.AppGossipF != nil {
-		return e.AppGossipF(nodeID, requestID, msg)
+		return e.AppGossipF(nodeID, msgID, msg)
 	}
 	if !e.CantAppGossip {
 		return nil

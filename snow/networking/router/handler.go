@@ -502,11 +502,11 @@ func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseB
 }
 
 // AppGossip passes an application-level gossip message from the given node to the consensus engine.
-func (h *Handler) AppGossip(nodeID ids.ShortID, requestID uint32, appGossipBytes []byte) {
+func (h *Handler) AppGossip(nodeID ids.ShortID, msgID uint32, appGossipBytes []byte) {
 	h.push(message{
 		messageType: constants.AppGossipMsg,
 		nodeID:      nodeID,
-		requestID:   requestID,
+		requestID:   msgID,
 		appMsgBytes: appGossipBytes,
 		received:    h.clock.Time(),
 	})

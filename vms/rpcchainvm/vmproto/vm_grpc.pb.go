@@ -30,6 +30,10 @@ type VMClient interface {
 	SetPreference(ctx context.Context, in *SetPreferenceRequest, opts ...grpc.CallOption) (*SetPreferenceResponse, error)
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
 	Version(ctx context.Context, in *VersionRequest, opts ...grpc.CallOption) (*VersionResponse, error)
+	AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*AppRequestResponse, error)
+	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*AppRequestFailedResponse, error)
+	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*AppResponseResponse, error)
+	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*AppGossipResponse, error)
 	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
 	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*BlockAcceptResponse, error)
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*BlockRejectResponse, error)
@@ -151,6 +155,42 @@ func (c *vMClient) Version(ctx context.Context, in *VersionRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *vMClient) AppRequest(ctx context.Context, in *AppRequestMsg, opts ...grpc.CallOption) (*AppRequestResponse, error) {
+	out := new(AppRequestResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/AppRequest", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*AppRequestFailedResponse, error) {
+	out := new(AppRequestFailedResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/AppRequestFailed", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*AppResponseResponse, error) {
+	out := new(AppResponseResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/AppResponse", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *vMClient) AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*AppGossipResponse, error) {
+	out := new(AppGossipResponse)
+	err := c.cc.Invoke(ctx, "/vmproto.VM/AppGossip", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error) {
 	out := new(BlockVerifyResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/BlockVerify", in, out, opts...)
@@ -194,6 +234,10 @@ type VMServer interface {
 	SetPreference(context.Context, *SetPreferenceRequest) (*SetPreferenceResponse, error)
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
 	Version(context.Context, *VersionRequest) (*VersionResponse, error)
+	AppRequest(context.Context, *AppRequestMsg) (*AppRequestResponse, error)
+	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*AppRequestFailedResponse, error)
+	AppResponse(context.Context, *AppResponseMsg) (*AppResponseResponse, error)
+	AppGossip(context.Context, *AppGossipMsg) (*AppGossipResponse, error)
 	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
 	BlockAccept(context.Context, *BlockAcceptRequest) (*BlockAcceptResponse, error)
 	BlockReject(context.Context, *BlockRejectRequest) (*BlockRejectResponse, error)
@@ -239,6 +283,18 @@ func (UnimplementedVMServer) Health(context.Context, *HealthRequest) (*HealthRes
 }
 func (UnimplementedVMServer) Version(context.Context, *VersionRequest) (*VersionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Version not implemented")
+}
+func (UnimplementedVMServer) AppRequest(context.Context, *AppRequestMsg) (*AppRequestResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AppRequest not implemented")
+}
+func (UnimplementedVMServer) AppRequestFailed(context.Context, *AppRequestFailedMsg) (*AppRequestFailedResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AppRequestFailed not implemented")
+}
+func (UnimplementedVMServer) AppResponse(context.Context, *AppResponseMsg) (*AppResponseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AppResponse not implemented")
+}
+func (UnimplementedVMServer) AppGossip(context.Context, *AppGossipMsg) (*AppGossipResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AppGossip not implemented")
 }
 func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
@@ -478,6 +534,78 @@ func _VM_Version_Handler(srv interface{}, ctx context.Context, dec func(interfac
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VM_AppRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppRequestMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).AppRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/AppRequest",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).AppRequest(ctx, req.(*AppRequestMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_AppRequestFailed_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppRequestFailedMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).AppRequestFailed(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/AppRequestFailed",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).AppRequestFailed(ctx, req.(*AppRequestFailedMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_AppResponse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppResponseMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).AppResponse(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/AppResponse",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).AppResponse(ctx, req.(*AppResponseMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _VM_AppGossip_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AppGossipMsg)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VMServer).AppGossip(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/vmproto.VM/AppGossip",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VMServer).AppGossip(ctx, req.(*AppGossipMsg))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _VM_BlockVerify_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BlockVerifyRequest)
 	if err := dec(in); err != nil {
@@ -586,6 +714,22 @@ var VM_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Version",
 			Handler:    _VM_Version_Handler,
+		},
+		{
+			MethodName: "AppRequest",
+			Handler:    _VM_AppRequest_Handler,
+		},
+		{
+			MethodName: "AppRequestFailed",
+			Handler:    _VM_AppRequestFailed_Handler,
+		},
+		{
+			MethodName: "AppResponse",
+			Handler:    _VM_AppResponse_Handler,
+		},
+		{
+			MethodName: "AppGossip",
+			Handler:    _VM_AppGossip_Handler,
 		},
 		{
 			MethodName: "BlockVerify",

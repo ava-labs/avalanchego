@@ -184,9 +184,9 @@ func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []b
 	return errors.New("unexpectedly called AppResponse")
 }
 
-func (vm *TestVM) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+func (vm *TestVM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
 	if vm.AppGossipF != nil {
-		return vm.AppGossipF(nodeID, requestID, msg)
+		return vm.AppGossipF(nodeID, msgID, msg)
 	}
 	if !vm.CantAppGossip {
 		return nil

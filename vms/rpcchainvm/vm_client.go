@@ -440,7 +440,7 @@ func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response [
 	return nil
 }
 
-func (vm *VMClient) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
+func (vm *VMClient) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
 	// TODO implement
 	return nil
 }

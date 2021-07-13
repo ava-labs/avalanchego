@@ -139,6 +139,48 @@ message VersionResponse {
     string version = 1;
 }
 
+message AppRequestMsg {
+    // The node that sent us this request
+    bytes nodeID = 1;
+    // The ID of this request
+    uint32 requestID = 2;
+    // The request body
+    bytes request = 3;
+}
+
+message AppRequestResponse {}
+
+message AppRequestFailedMsg {
+    // The node that we failed to get a response from
+    bytes nodeID = 1;
+    // The ID of the request we sent and didn't get a response to
+    uint32 requestID = 2;
+}
+
+message AppRequestFailedResponse {}
+
+message AppResponseMsg {
+    // The node that we got a response from
+    bytes nodeID = 1;
+    // Request ID of request that this is in response to
+    uint32 requestID = 2;
+    // The response body
+    bytes msg = 3;
+}
+
+message AppResponseResponse {}
+
+message AppGossipMsg {
+    // The node that sent us a gossip message
+    bytes nodeID = 1;
+    // ID of this message
+    uint32 msgID = 2;
+    // The message body
+    bytes msg = 3;
+}
+
+message AppGossipResponse {}
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
     rpc Bootstrapping(BootstrappingRequest) returns (BootstrappingResponse);
@@ -152,6 +194,10 @@ service VM {
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
     rpc Health(HealthRequest) returns (HealthResponse);
     rpc Version(VersionRequest) returns (VersionResponse);
+    rpc AppRequest(AppRequestMsg) returns (AppRequestResponse);
+    rpc AppRequestFailed(AppRequestFailedMsg) returns (AppRequestFailedResponse);
+    rpc AppResponse(AppResponseMsg) returns (AppResponseResponse);
+    rpc AppGossip(AppGossipMsg) returns (AppGossipResponse);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);
