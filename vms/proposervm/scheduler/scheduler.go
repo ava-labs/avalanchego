@@ -54,10 +54,7 @@ waitloop:
 		for {
 			select {
 			case msg := <-s.fromVM:
-				select {
-				case s.toEngine <- msg:
-				default:
-				}
+				s.toEngine <- msg
 			case newStartTime, ok := <-s.newStartTime:
 				if !ok {
 					return

@@ -170,7 +170,7 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	}
 
 	// reset scheduler
-	minDelay, err := vm.Windower.Delay(prefBlk.Height(), pChainHeight, proposerID)
+	minDelay, err := vm.Windower.Delay(prefBlk.Height()+1, pChainHeight, proposerID)
 	if err != nil {
 		return err
 	}
