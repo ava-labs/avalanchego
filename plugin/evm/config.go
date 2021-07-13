@@ -15,6 +15,7 @@ const (
 	defaultEthApiEnabled               = true
 	defaultNetApiEnabled               = true
 	defaultWeb3ApiEnabled              = true
+	defaultPruningEnabled              = true
 	defaultRpcGasCap                   = 2500000000 // 25000000 X 100
 	defaultRpcTxFeeCap                 = 100        // 100 AVAX
 	defaultApiMaxDuration              = 0          // Default to no maximum API Call duration
@@ -97,6 +98,7 @@ func (c *Config) SetDefaults() {
 	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
 	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
 	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
+	c.Pruning = defaultPruningEnabled
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
