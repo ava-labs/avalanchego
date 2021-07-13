@@ -47,8 +47,10 @@ func (out *OutputOwners) InitCtx(ctx *snow.Context) {
 // the parent objects to json. Uses the OutputOwners.ctx method to format
 // the addresses. Returns errMarshal error if OutputOwners.ctx is not set.
 func (out *OutputOwners) MarshalJSON() ([]byte, error) {
+	addrsLen := len(out.Addrs)
+
 	// we need out.ctx to do this, if its absent, throw error
-	if out.ctx == nil {
+	if addrsLen > 0 && out.ctx == nil {
 		return nil, errMarshal
 	}
 
@@ -56,7 +58,6 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 	result["locktime"] = out.Locktime
 	result["threshold"] = out.Threshold
 
-	addrsLen := len(out.Addrs)
 	addresses := make([]string, addrsLen)
 	for i, n := 0, addrsLen; i < n; i++ {
 		// for each [addr] in [Addrs] we attempt to format it given
