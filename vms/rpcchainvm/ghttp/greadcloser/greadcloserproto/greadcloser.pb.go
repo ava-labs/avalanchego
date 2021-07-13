@@ -7,10 +7,11 @@
 package greadcloserproto
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -251,13 +252,16 @@ func file_greadcloser_proto_rawDescGZIP() []byte {
 	return file_greadcloser_proto_rawDescData
 }
 
-var file_greadcloser_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_greadcloser_proto_goTypes = []interface{}{
-	(*ReadRequest)(nil),   // 0: greadcloserproto.ReadRequest
-	(*ReadResponse)(nil),  // 1: greadcloserproto.ReadResponse
-	(*CloseRequest)(nil),  // 2: greadcloserproto.CloseRequest
-	(*CloseResponse)(nil), // 3: greadcloserproto.CloseResponse
-}
+var (
+	file_greadcloser_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+	file_greadcloser_proto_goTypes  = []interface{}{
+		(*ReadRequest)(nil),   // 0: greadcloserproto.ReadRequest
+		(*ReadResponse)(nil),  // 1: greadcloserproto.ReadResponse
+		(*CloseRequest)(nil),  // 2: greadcloserproto.CloseRequest
+		(*CloseResponse)(nil), // 3: greadcloserproto.CloseResponse
+	}
+)
+
 var file_greadcloser_proto_depIdxs = []int32{
 	0, // 0: greadcloserproto.Reader.Read:input_type -> greadcloserproto.ReadRequest
 	2, // 1: greadcloserproto.Reader.Close:input_type -> greadcloserproto.CloseRequest

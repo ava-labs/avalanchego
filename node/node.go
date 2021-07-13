@@ -54,7 +54,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/timestampvm"
 	"github.com/hashicorp/go-plugin"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
@@ -231,14 +230,24 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
-	msgThrottler, err := throttling.NewSybilMsgThrottler(
+	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		n.Log,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
-		n.Config.NetworkConfig.MsgThrottlerConfig,
+		n.Config.NetworkConfig.InboundThrottlerConfig,
 	)
 	if err != nil {
-		n.Log.Warn("initializing throttler metrics failed with: %s", err)
+		return fmt.Errorf("initializing inbound message throttler failed with: %s", err)
+	}
+
+	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
+		n.Log,
+		n.Config.NetworkConfig.MetricsRegisterer,
+		primaryNetworkValidators,
+		n.Config.NetworkConfig.OutboundThrottlerConfig,
+	)
+	if err != nil {
+		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
 	}
 
 	n.Net = network.NewDefaultNetwork(
@@ -269,9 +278,9 @@ func (n *Node) initNetworking() error {
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
-		msgThrottler,
+		inboundMsgThrottler,
+		outboundMsgThrottler,
 	)
-
 	return nil
 }
 
@@ -502,6 +511,7 @@ func (n *Node) initAPIServer() error {
 			n.Config.HTTPHost,
 			n.Config.HTTPPort,
 			n.Config.APIAllowedOrigins,
+			n.ID,
 		)
 		return nil
 	}
@@ -517,6 +527,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
 		n.Config.APIAllowedOrigins,
+		n.ID,
 		a,
 	)
 
@@ -534,14 +545,11 @@ func (n *Node) initAPIServer() error {
 }
 
 // Create the vmManager and register any aliases.
-func (n *Node) initVMManager(genesisBytes []byte) error {
+func (n *Node) initVMManager() error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
 	n.Log.Info("initializing VM aliases")
-	_, _, vmAliases, err := genesis.Aliases(genesisBytes)
-	if err != nil {
-		return err
-	}
+	vmAliases := genesis.GetVMAliases()
 
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
@@ -692,7 +700,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			CreationFee: n.Config.CreationTxFee,
 			Fee:         n.Config.TxFee,
 		}),
-		n.vmManager.RegisterFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.vmManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
@@ -937,7 +944,7 @@ func (n *Node) initIPCAPI() error {
 // Give chains aliases as specified by the genesis information
 func (n *Node) initChainAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing chain aliases")
-	_, chainAliases, _, err := genesis.Aliases(genesisBytes)
+	_, chainAliases, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -955,13 +962,25 @@ func (n *Node) initChainAliases(genesisBytes []byte) error {
 // APIs aliases as specified by the genesis information
 func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing API aliases")
-	defaultAliases, _, _, err := genesis.Aliases(genesisBytes)
+	apiAliases, _, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
 
-	for url, aliases := range defaultAliases {
+	for url, aliases := range apiAliases {
 		if err := n.APIServer.AddAliases(url, aliases...); err != nil {
+			return err
+		}
+	}
+
+	for vmID, aliases := range n.Config.VMAliases {
+		urlAliases := []string{}
+		for _, alias := range aliases {
+			urlAliases = append(urlAliases, ids.VMAliasPrefix+alias)
+		}
+
+		url := ids.VMAliasPrefix + vmID.String()
+		if err := n.APIServer.AddAliases(url, urlAliases...); err != nil {
 			return err
 		}
 	}
@@ -1029,7 +1048,7 @@ func (n *Node) Initialize(
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
-	if err := n.initVMManager(n.Config.GenesisBytes); err != nil {
+	if err := n.initVMManager(); err != nil {
 		return fmt.Errorf("couldn't initialize API aliases: %w", err)
 	}
 	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager

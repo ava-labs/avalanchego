@@ -7,10 +7,11 @@
 package proto
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -217,13 +218,16 @@ func file_app_proto_rawDescGZIP() []byte {
 	return file_app_proto_rawDescData
 }
 
-var file_app_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_app_proto_goTypes = []interface{}{
-	(*StartRequest)(nil),  // 0: appproto.StartRequest
-	(*StartResponse)(nil), // 1: appproto.StartResponse
-	(*StopRequest)(nil),   // 2: appproto.StopRequest
-	(*StopResponse)(nil),  // 3: appproto.StopResponse
-}
+var (
+	file_app_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+	file_app_proto_goTypes  = []interface{}{
+		(*StartRequest)(nil),  // 0: appproto.StartRequest
+		(*StartResponse)(nil), // 1: appproto.StartResponse
+		(*StopRequest)(nil),   // 2: appproto.StopRequest
+		(*StopResponse)(nil),  // 3: appproto.StopResponse
+	}
+)
+
 var file_app_proto_depIdxs = []int32{
 	0, // 0: appproto.Node.Start:input_type -> appproto.StartRequest
 	2, // 1: appproto.Node.Stop:input_type -> appproto.StopRequest

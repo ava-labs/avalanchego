@@ -114,7 +114,7 @@ message SetPreferenceRequest {
 message SetPreferenceResponse {}
 
 message BlockVerifyRequest {
-    bytes id = 1;
+    bytes bytes = 1;
 }
 
 message BlockVerifyResponse {

@@ -144,12 +144,28 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) and protoc-gen-go installed. protoc must be on your $PATH.
+To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) (v3.17.3), protoc-gen-go (v1.26.0) and protoc-gen-go-grpc (v1.1.0) installed. protoc must be on your $PATH.
+
+To install the protoc dependencies:
+
+```sh
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+```
+
+If you have not already, you may need to add `$GOPATH/bin` to your `$PATH`:
+
+```sh
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
 
 If you extract protoc to ~/software/protobuf/, the following should work:
 
 ```sh
 export PATH=$PATH:~/software/protobuf/bin/:~/go/bin
 go get google.golang.org/protobuf/cmd/protoc-gen-go
+go get google.golang.org/protobuf/cmd/protoc-gen-go-grpc
 scripts/protobuf_codegen.sh
 ```
+
+For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).

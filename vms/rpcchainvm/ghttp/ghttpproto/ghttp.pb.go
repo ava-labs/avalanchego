@@ -7,10 +7,11 @@
 package ghttpproto
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -886,18 +887,21 @@ func file_ghttp_proto_rawDescGZIP() []byte {
 	return file_ghttp_proto_rawDescData
 }
 
-var file_ghttp_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-var file_ghttp_proto_goTypes = []interface{}{
-	(*Userinfo)(nil),        // 0: ghttpproto.Userinfo
-	(*URL)(nil),             // 1: ghttpproto.URL
-	(*Element)(nil),         // 2: ghttpproto.Element
-	(*Certificates)(nil),    // 3: ghttpproto.Certificates
-	(*ConnectionState)(nil), // 4: ghttpproto.ConnectionState
-	(*Request)(nil),         // 5: ghttpproto.Request
-	(*ResponseWriter)(nil),  // 6: ghttpproto.ResponseWriter
-	(*HTTPRequest)(nil),     // 7: ghttpproto.HTTPRequest
-	(*HTTPResponse)(nil),    // 8: ghttpproto.HTTPResponse
-}
+var (
+	file_ghttp_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+	file_ghttp_proto_goTypes  = []interface{}{
+		(*Userinfo)(nil),        // 0: ghttpproto.Userinfo
+		(*URL)(nil),             // 1: ghttpproto.URL
+		(*Element)(nil),         // 2: ghttpproto.Element
+		(*Certificates)(nil),    // 3: ghttpproto.Certificates
+		(*ConnectionState)(nil), // 4: ghttpproto.ConnectionState
+		(*Request)(nil),         // 5: ghttpproto.Request
+		(*ResponseWriter)(nil),  // 6: ghttpproto.ResponseWriter
+		(*HTTPRequest)(nil),     // 7: ghttpproto.HTTPRequest
+		(*HTTPResponse)(nil),    // 8: ghttpproto.HTTPResponse
+	}
+)
+
 var file_ghttp_proto_depIdxs = []int32{
 	0,  // 0: ghttpproto.URL.user:type_name -> ghttpproto.Userinfo
 	3,  // 1: ghttpproto.ConnectionState.peerCertificates:type_name -> ghttpproto.Certificates

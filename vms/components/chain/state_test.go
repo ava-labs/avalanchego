@@ -229,6 +229,7 @@ func TestState(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -354,6 +355,7 @@ func TestBuildBlock(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -396,6 +398,7 @@ func TestStateDecideBlock(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -460,6 +463,7 @@ func TestStateParent(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -498,6 +502,7 @@ func TestGetBlockInternal(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -544,6 +549,7 @@ func TestGetBlockError(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            wrappedGetBlock,
 		UnmarshalBlock:      parseBlock,
@@ -579,6 +585,7 @@ func TestParseBlockError(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -602,6 +609,7 @@ func TestBuildBlockError(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -629,6 +637,7 @@ func TestMeteredCache(t *testing.T) {
 		DecidedCacheSize:    2,
 		MissingCacheSize:    2,
 		UnverifiedCacheSize: 2,
+		BytesToIDCacheSize:  2,
 		LastAcceptedBlock:   genesisBlock,
 		GetBlock:            getBlock,
 		UnmarshalBlock:      parseBlock,
@@ -647,4 +656,55 @@ func TestMeteredCache(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+// Test the bytesToIDCache
+func TestStateBytesToIDCache(t *testing.T) {
+	testBlks := NewTestBlocks(3, nil)
+	genesisBlock := testBlks[0]
+	genesisBlock.SetStatus(choices.Accepted)
+	blk1 := testBlks[1]
+	blk2 := testBlks[2]
+
+	getBlock, parseBlock, getCanonicalBlockID := createInternalBlockFuncs(t, testBlks)
+	buildBlock := func() (snowman.Block, error) {
+		t.Fatal("shouldn't have been called")
+		return nil, errors.New("")
+	}
+
+	chainState := NewState(&Config{
+		DecidedCacheSize:    0,
+		MissingCacheSize:    0,
+		UnverifiedCacheSize: 0,
+		BytesToIDCacheSize:  1,
+		LastAcceptedBlock:   genesisBlock,
+		GetBlock:            getBlock,
+		UnmarshalBlock:      parseBlock,
+		BuildBlock:          buildBlock,
+		GetBlockIDAtHeight:  getCanonicalBlockID,
+	})
+
+	// Shouldn't have blk1 ID to start with
+	_, err := chainState.GetBlock(blk1.ID())
+	assert.Error(t, err)
+	_, ok := chainState.bytesToIDCache.Get(string(blk1.Bytes()))
+	assert.False(t, ok)
+
+	// Parse blk1 from bytes
+	_, err = chainState.ParseBlock(blk1.Bytes())
+	assert.NoError(t, err)
+
+	// blk1 should be in cache now
+	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
+	assert.True(t, ok)
+
+	// Parse another block
+	_, err = chainState.ParseBlock(blk2.Bytes())
+	assert.NoError(t, err)
+
+	// Should have bumped blk1 from cache
+	_, ok = chainState.bytesToIDCache.Get(string(blk2.Bytes()))
+	assert.True(t, ok)
+	_, ok = chainState.bytesToIDCache.Get(string(blk1.Bytes()))
+	assert.False(t, ok)
 }
