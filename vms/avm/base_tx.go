@@ -5,6 +5,7 @@ package avm
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -21,12 +22,21 @@ type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 }
 
+// Init sets the FxID fields in the inputs and outputs of this [BaseTx]
+// Also sets the [ctx] in the OutputOwners to the given [vm.ctx] so that the
+// addresses can be json marshalled into human readable format
 func (t *BaseTx) Init(vm *VM) error {
+	fxsLen := len(vm.fxs)
 	for i, n := 0, len(t.Ins); i < n; i++ {
 		in := t.Ins[i]
 		fxIdx, err := vm.getFx(in.In)
 		if err != nil {
 			return err
+		}
+
+		if fxIdx >= fxsLen {
+			// should never happen
+			return fmt.Errorf("invalid fxID %d, cannot be greater than len(vm.fxs)=%d", fxIdx, fxsLen)
 		}
 
 		fx := vm.fxs[fxIdx]
@@ -38,6 +48,11 @@ func (t *BaseTx) Init(vm *VM) error {
 		fxIdx, err := vm.getFx(out.Out)
 		if err != nil {
 			return err
+		}
+
+		if fxIdx >= fxsLen {
+			// should never happen
+			return fmt.Errorf("invalid fxID %d, cannot be greater than len(vm.fxs)=%d", fxIdx, fxsLen)
 		}
 
 		fx := vm.fxs[fxIdx]
