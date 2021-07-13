@@ -5,10 +5,8 @@ package proposervm
 
 import (
 	"crypto"
-	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
@@ -115,6 +113,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
 			child.ID())
+		return err
 	}
 	if childPChainHeight > currentPChainHeight {
 		return errPChainHeightNotReached
@@ -139,10 +138,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	}
 
 	childHeight := child.Height()
-	proposerID, err := b.proposer()
-	if err != nil {
-		return err
-	}
+	proposerID := child.Proposer()
 	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
 	if err != nil {
 		return err
@@ -175,11 +171,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
-	if _, ok := b.innerBlk.(snowman.OracleBlock); !ok {
-		return fmt.Errorf("post fork option block does has non-oracle father")
-	}
-
-	return child.innerBlk.Verify()
+	return errUnexpectedBlockType
 }
 
 func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
@@ -247,15 +239,4 @@ func (b *postForkOption) pChainHeight() (uint64, error) {
 	}
 
 	return pFBlk.PChainHeight(), nil
-}
-
-func (b *postForkOption) proposer() (ids.ShortID, error) {
-	parent := b.Parent()
-	pFBlk, ok := parent.(*postForkBlock)
-	if !ok {
-		b.vm.ctx.Log.Error("post-fork option parent is not post-fork block")
-		return ids.ShortID{}, errUnexpectedBlockType
-	}
-
-	return pFBlk.Proposer(), nil
 }

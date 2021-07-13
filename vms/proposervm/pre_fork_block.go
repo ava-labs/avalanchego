@@ -44,7 +44,7 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 
 	opts, err := oracleBlk.Options()
 	if err != nil {
-		return opts, nil
+		return [2]snowman.Block{}, err
 	}
 	res := [2]snowman.Block{
 		&preForkBlock{
@@ -74,6 +74,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
 			child.ID())
+		return err
 	}
 	if childPChainHeight > currentPChainHeight {
 		return errPChainHeightNotReached
@@ -120,7 +121,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
-	b.vm.ctx.Log.Error("post-fork option built on top of pre-fork block")
+	b.vm.ctx.Log.Debug("post-fork option built on top of pre-fork block")
 	return errUnexpectedBlockType
 }
 

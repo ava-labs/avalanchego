@@ -139,10 +139,10 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	}
 	vm.preferred = preferred
 
-	var prefBlk snowman.Block
-	var proposerID ids.ShortID
-	var pChainHeight uint64
-
+	var (
+		prefBlk      snowman.Block
+		pChainHeight uint64
+	)
 	if blk, err := vm.getPostForkBlock(preferred); err == nil {
 		if err := vm.ChainVM.SetPreference(blk.innerBlk.ID()); err != nil {
 			return err
@@ -150,7 +150,6 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 
 		prefBlk = blk
 		pChainHeight = blk.PChainHeight()
-		proposerID = blk.Proposer()
 	} else if opt, err := vm.getPostForkOption(preferred); err == nil {
 		if err := vm.ChainVM.SetPreference(opt.innerBlk.ID()); err != nil {
 			return err
@@ -160,9 +159,6 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		pChainHeight, err = opt.pChainHeight()
 		if err != nil {
 			vm.ctx.Log.Error("Snowman++ set preference - could not retrieve current P-Chain height")
-		}
-		proposerID, err = opt.proposer()
-		if err != nil {
 			return err
 		}
 	} else {
@@ -170,16 +166,16 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	}
 
 	// reset scheduler
-	minDelay, err := vm.Windower.Delay(prefBlk.Height()+1, pChainHeight, proposerID)
+	minDelay, err := vm.Windower.Delay(prefBlk.Height()+1, pChainHeight, vm.ctx.NodeID)
 	if err != nil {
 		return err
 	}
 
 	nextStartTime := prefBlk.Timestamp().Add(minDelay)
 	if nextStartTime.After(vm.activationTime) {
-		vm.Scheduler.SetStartTime(nextStartTime)
 		vm.ctx.Log.Debug("Snowman++ set preference - preferred block ID %s,  timestamp %v; next start time scheduled at %v",
 			prefBlk.ID(), prefBlk.Timestamp().Format("15:04:05"), nextStartTime.Format("15:04:05"))
+		vm.Scheduler.SetStartTime(nextStartTime)
 	}
 
 	return nil

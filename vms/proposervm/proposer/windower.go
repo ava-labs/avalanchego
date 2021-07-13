@@ -46,9 +46,7 @@ func New(vm validators.VM, subnetID, chainID ids.ID) Windower {
 		vm:          vm,
 		subnetID:    subnetID,
 		chainSource: w.UnpackLong(),
-		// TODO: CRITICAL - make sure any sorting done inside the heap sampler
-		//       is well specified and deterministic.
-		sampler: sampler.NewDeterministicWeightedWithoutReplacement(),
+		sampler:     sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
 }
 

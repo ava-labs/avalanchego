@@ -93,7 +93,13 @@ func (s *weightedHeap) Sample(value uint64) (int, error) {
 type innerSortWeightedHeap []weightedHeapElement
 
 func (lst innerSortWeightedHeap) Less(i, j int) bool {
-	return lst[i].weight > lst[j].weight
+	if lst[i].weight > lst[j].weight {
+		return true
+	}
+	if lst[i].weight < lst[j].weight {
+		return false
+	}
+	return lst[i].index < lst[j].index
 }
 
 func (lst innerSortWeightedHeap) Len() int {

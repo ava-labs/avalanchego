@@ -90,7 +90,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 
 	innerOpts, err := innerOracleBlk.Options()
 	if err != nil {
-		return innerOpts, nil
+		return [2]snowman.Block{}, err
 	}
 
 	opt0, err := option.Build(
@@ -98,7 +98,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		innerOpts[0].Bytes(),
 	)
 	if err != nil {
-		return innerOpts, nil
+		return [2]snowman.Block{}, err
 	}
 
 	opt1, err := option.Build(
@@ -106,7 +106,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		innerOpts[1].Bytes(),
 	)
 	if err != nil {
-		return innerOpts, nil
+		return [2]snowman.Block{}, err
 	}
 
 	postForkOpt0 := &postForkOption{
@@ -116,7 +116,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		status:   innerOpts[0].Status(),
 	}
 	if err := b.vm.storePostForkOption(postForkOpt0); err != nil {
-		return innerOpts, nil
+		return [2]snowman.Block{}, err
 	}
 
 	postForkOpt1 := &postForkOption{
@@ -126,7 +126,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		status:   innerOpts[1].Status(),
 	}
 	if err := b.vm.storePostForkOption(postForkOpt1); err != nil {
-		return innerOpts, nil
+		return [2]snowman.Block{}, err
 	}
 
 	res := [2]snowman.Block{
@@ -151,6 +151,7 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
 			child.ID())
+		return err
 	}
 	if childPChainHeight > currentPChainHeight {
 		return errPChainHeightNotReached
@@ -175,7 +176,7 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	}
 
 	childHeight := child.Height()
-	proposerID := b.Proposer()
+	proposerID := child.Proposer()
 	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
 	if err != nil {
 		return err
@@ -209,7 +210,7 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 
 func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 	if _, ok := b.innerBlk.(snowman.OracleBlock); !ok {
-		return fmt.Errorf("post fork option block does has non-oracle father")
+		return fmt.Errorf("post fork option block does not have oracle father")
 	}
 
 	return child.innerBlk.Verify()
