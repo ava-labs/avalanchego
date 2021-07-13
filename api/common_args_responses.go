@@ -69,13 +69,15 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+// GetTxReply defines an object containing a single [Tx] object along with Encoding
 type GetTxReply struct {
-	// Tx is in [string] format when [GetTxArgs.Encoding] is [Encoding.Hex] or [Encoding.CB58]
-	// Tx is a Tx object when [GetTxArgs.Encoding] is [Encoding.JSON]
+	// Tx is in [string] format when [GetTxArgs.Encoding] is [Hex] or [CB58]
+	// Tx is a Tx object when [GetTxArgs.Encoding] is [JSON]
 	Tx       interface{}         `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
+// FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
 type FormattedTx struct {
 	Tx       string              `json:"tx,omitempty"`
 	Encoding formatting.Encoding `json:"encoding"`
