@@ -61,6 +61,9 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantAppRequestFailed = cant
 	vm.CantAppResponse = cant
 	vm.CantAppGossip = cant
+	vm.CantVersion = cant
+	vm.CantConnected = cant
+	vm.CantDisconnected = cant
 }
 
 func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
