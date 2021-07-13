@@ -267,3 +267,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		blk.ID(), parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
 	return blk, b.vm.storePostForkBlock(blk)
 }
+
+func (b *postForkBlock) pChainHeight() (uint64, error) {
+	return b.PChainHeight(), nil
+}

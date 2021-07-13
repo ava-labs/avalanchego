@@ -231,12 +231,9 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 }
 
 func (b *postForkOption) pChainHeight() (uint64, error) {
-	parent := b.Parent()
-	pFBlk, ok := parent.(*postForkBlock)
-	if !ok {
-		b.vm.ctx.Log.Error("post-fork option parent is not post-fork block")
-		return 0, errUnexpectedBlockType
+	parent, err := b.vm.getBlock(b.ParentID())
+	if err != nil {
+		return 0, err
 	}
-
-	return pFBlk.PChainHeight(), nil
+	return parent.pChainHeight()
 }

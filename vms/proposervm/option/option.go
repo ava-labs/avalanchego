@@ -10,18 +10,19 @@ import (
 type Option interface {
 	ID() ids.ID
 	ParentID() ids.ID
-	CoreBlock() []byte
+	Block() []byte
 	Bytes() []byte
 }
 
 type option struct {
-	id         ids.ID
 	PrntID     ids.ID `serialize:"true"`
 	InnerBytes []byte `serialize:"true"`
-	bytes      []byte
+
+	id    ids.ID
+	bytes []byte
 }
 
-func (b *option) ID() ids.ID        { return b.id }
-func (b *option) ParentID() ids.ID  { return b.PrntID }
-func (b *option) CoreBlock() []byte { return b.InnerBytes }
-func (b *option) Bytes() []byte     { return b.bytes }
+func (b *option) ID() ids.ID       { return b.id }
+func (b *option) ParentID() ids.ID { return b.PrntID }
+func (b *option) Block() []byte    { return b.InnerBytes }
+func (b *option) Bytes() []byte    { return b.bytes }

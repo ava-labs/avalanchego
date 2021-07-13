@@ -175,3 +175,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		blk.ID(), parentTimestamp.Format("15:04:05"), newTimestamp.Format("15:04:05"))
 	return blk, b.vm.storePostForkBlock(blk)
 }
+
+func (b *preForkBlock) pChainHeight() (uint64, error) {
+	return 0, nil
+}

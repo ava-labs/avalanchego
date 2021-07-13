@@ -27,6 +27,6 @@ func TestParse(t *testing.T) {
 
 	assert.Equal(builtOption.ID(), parsedOption.ID())
 	assert.Equal(builtOption.ParentID(), parsedOption.ParentID())
-	assert.Equal(builtOption.CoreBlock(), parsedOption.CoreBlock())
+	assert.Equal(builtOption.Block(), parsedOption.Block())
 	assert.Equal(builtOption.Bytes(), parsedOption.Bytes())
 }

@@ -213,7 +213,7 @@ func (vm *VM) getPostForkBlock(blkID ids.ID) (*postForkBlock, error) {
 		if blk, ok := blkIntf.(*postForkBlock); ok {
 			return blk, nil
 		}
-		vm.ctx.Log.Error("object matching requested ID is not postForkBlock one")
+		vm.ctx.Log.Debug("object matching requested ID is not a postForkBlock")
 		return nil, errUnexpectedBlockType
 	}
 	statelessBlock, status, err := vm.State.GetBlock(blkID)
@@ -241,7 +241,7 @@ func (vm *VM) getPostForkOption(blkID ids.ID) (*postForkOption, error) {
 		if opt, ok := optIntf.(*postForkOption); ok {
 			return opt, nil
 		}
-		vm.ctx.Log.Error("object matching requested ID is not postForkOption one")
+		vm.ctx.Log.Debug("object matching requested ID is not a postForkOption")
 		return nil, errUnexpectedBlockType
 	}
 	option, status, err := vm.State.GetOption(blkID)
@@ -249,7 +249,7 @@ func (vm *VM) getPostForkOption(blkID ids.ID) (*postForkOption, error) {
 		return nil, err
 	}
 
-	innerBlkBytes := option.CoreBlock()
+	innerBlkBytes := option.Block()
 	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
 	if err != nil {
 		return nil, err
@@ -323,7 +323,7 @@ func (vm *VM) parsePostForkOption(b []byte) (*postForkOption, error) {
 		return nil, err
 	}
 
-	innerBlkBytes := option.CoreBlock()
+	innerBlkBytes := option.Block()
 	innerBlk, err := vm.ChainVM.ParseBlock(innerBlkBytes)
 	if err != nil {
 		return nil, err

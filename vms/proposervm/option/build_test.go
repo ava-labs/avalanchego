@@ -21,5 +21,5 @@ func TestBuild(t *testing.T) {
 	assert.NoError(err)
 
 	assert.Equal(parentID, builtOption.ParentID())
-	assert.Equal(innerBlockBytes, builtOption.CoreBlock())
+	assert.Equal(innerBlockBytes, builtOption.Block())
 }

@@ -37,4 +37,6 @@ type Block interface {
 	verifyPostForkOption(child *postForkOption) error
 
 	buildChild(innerBlock snowman.Block) (Block, error)
+
+	pChainHeight() (uint64, error)
 }
