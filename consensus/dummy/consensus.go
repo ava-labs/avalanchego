@@ -68,8 +68,10 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 		}
-	} else if len(header.Extra) != apricotPhase4ExtraDataSize {
-		return fmt.Errorf("expected extra-data field to be: %d, but found %d", apricotPhase4ExtraDataSize, len(header.Extra))
+	} else {
+		if len(header.Extra) != apricotPhase4ExtraDataSize {
+			return fmt.Errorf("expected extra-data field to be: %d, but found %d", apricotPhase4ExtraDataSize, len(header.Extra))
+		}
 	}
 
 	// Verify the header's timestamp
@@ -163,11 +165,7 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 	return nil
 }
 
-func (self *DummyEngine) Finalize(
-	chain consensus.ChainHeaderReader, header *types.Header,
-	state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt,
-	uncles []*types.Header) error {
-
+func (self *DummyEngine) verifyGasFees(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) error {
 	// If Apricot Phase 4 is live, ensure that the transactions in the block have met the block fee.
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		blockFeePremium := new(big.Int)
@@ -199,6 +197,18 @@ func (self *DummyEngine) Finalize(
 			return fmt.Errorf("insufficient gas (%d) to cover the block fee (%d) at base fee (%d) (total block fee: %d)", blockGas, blockGasFee, header.BaseFee, totalBlockFee)
 		}
 	}
+
+	return nil
+}
+
+func (self *DummyEngine) Finalize(
+	chain consensus.ChainHeaderReader, header *types.Header,
+	state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt,
+	uncles []*types.Header) error {
+	if err := self.verifyGasFees(chain, header, txs, receipts); err != nil {
+		return err
+	}
+
 	if self.cb.OnFinalize != nil {
 		return self.cb.OnFinalize(chain, header, state, txs, receipts, uncles)
 	}
@@ -214,6 +224,9 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		if err != nil {
 			return nil, err
 		}
+	}
+	if err := self.verifyGasFees(chain, header, txs, receipts); err != nil {
+		return nil, err
 	}
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))

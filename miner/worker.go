@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -130,18 +131,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		Extra:      nil,
 		Time:       uint64(timestamp),
 	}
-	// TODO(aaronbuchwald) handle gas limit and base fee creation if enabled in miner
-	// bigTimestamp := new(big.Int).SetUint64(timestamp)
-	// Set baseFee and GasLimit if we are on an EIP-1559 chain
-	// if w.chainConfig.IsApricotPhase4(bigTimestamp) {
-	// 	header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
-	// 	parentGasLimit := parent.GasLimit()
-	// 	if !w.chainConfig.IsLondon(parent.Number) {
-	// 		// Bump by 2x
-	// 		parentGasLimit = parent.GasLimit() * params.ElasticityMultiplier
-	// 	}
-	// 	header.GasLimit = core.CalcGasLimit1559(parentGasLimit, w.config.GasCeil)
-	// }
+	// Set BaseFee and Extra data field if we are post ApricotPhase4
+	bigTimestamp := big.NewInt(timestamp)
+	if w.chainConfig.IsApricotPhase4(bigTimestamp) {
+		header.Extra, header.BaseFee = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+	}
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
 	}
