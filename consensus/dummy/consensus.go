@@ -19,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-var blockGasFee = big.NewInt(1_000_000)
+var blockGasFee = big.NewInt(500_000)
 
 type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, uncles []*types.Header) error
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error)
