@@ -808,10 +808,7 @@ func (n *network) AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uin
 
 	msg, err := n.b.AppRequest(chainID, requestID, uint64(deadline), appRequestBytes)
 	if err != nil {
-		n.log.Error("failed to build AppRequest(%s, %d): %s",
-			chainID,
-			requestID,
-			err)
+		n.log.Error("failed to build AppRequest(%s, %d): %s", chainID, requestID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
 		n.sendFailRateCalculator.Observe(1, now)
 		return nil
@@ -822,7 +819,7 @@ func (n *network) AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uin
 		peer := peerElement.peer
 		nodeID := peerElement.id
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send AppRequest(%s, %s)", nodeID, chainID)
+			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, requestID)
 			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
 			n.appRequest.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
@@ -843,20 +840,14 @@ func (n *network) AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint
 
 	msg, err := n.b.AppResponse(chainID, requestID, appResponse)
 	if err != nil {
-		n.log.Error("failed to build AppResponse(%s, %d): %s",
-			chainID,
-			requestID,
-			err)
+		n.log.Error("failed to build AppResponse(%s, %d): %s", chainID, requestID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponse})
 		n.sendFailRateCalculator.Observe(1, now)
 	}
 
 	peer := n.getPeer(nodeID)
 	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
-		n.log.Debug("failed to send AppResponse(%s, %s, %d)",
-			nodeID,
-			chainID,
-			requestID)
+		n.log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, chainID, requestID)
 		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponse})
 		n.appResponse.numFailed.Inc()
 		n.sendFailRateCalculator.Observe(1, now)
@@ -874,10 +865,7 @@ func (n *network) AppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint
 
 	msg, err := n.b.AppGossip(chainID, requestID, appGossipBytes)
 	if err != nil {
-		n.log.Error("failed to build AppGossip(%s, %d): %s",
-			chainID,
-			requestID,
-			err)
+		n.log.Error("failed to build AppGossip(%s, %d): %s", chainID, requestID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 		n.sendFailRateCalculator.Observe(1, now)
 	}
