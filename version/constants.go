@@ -13,7 +13,7 @@ import (
 var (
 	String                       string // Printed when CLI arg --version is used
 	GitCommit                    string // Set in the build script (i.e. at compile time)
-	Current                      = NewDefaultVersion(1, 4, 9)
+	Current                      = NewDefaultVersion(1, 4, 10)
 	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 4, 5)
 	PrevMinimumCompatibleVersion = NewDefaultApplication(constants.PlatformName, 1, 3, 0)

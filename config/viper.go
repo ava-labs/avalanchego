@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -24,6 +25,9 @@ func BuildViper(fs *flag.FlagSet, args []string) (*viper.Viper, error) {
 	}
 
 	v := viper.New()
+	v.AutomaticEnv()
+	v.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
+	v.SetEnvPrefix("avago")
 	if err := v.BindPFlags(pfs); err != nil {
 		return nil, err
 	}
