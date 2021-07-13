@@ -99,7 +99,7 @@ func (a *App) Start() int {
 	var dbManager manager.Manager
 	switch a.config.DBName {
 	case rocksdb.Name:
-		path := filepath.Join(a.config.DBPath, "rocksdb")
+		path := filepath.Join(a.config.DBPath, rocksdb.Name)
 		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase, !a.config.FetchOnly)
 	case leveldb.Name:
 		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
