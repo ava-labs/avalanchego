@@ -7,7 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 
 	"github.com/ava-labs/avalanchego/snow"
 
@@ -29,13 +30,25 @@ type OutputOwners struct {
 	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
 	Addrs     []ids.ShortID `serialize:"true" json:"addresses"`
-	Ctx       *snow.Context `serialize:"false"`
+	// ctx is used in MarshalJSON to convert Addrs into human readable
+	// format with ChainID and NetworkID. Unexported because we don't use
+	// it outside this object.
+	ctx *snow.Context `serialize:"false"`
 }
 
-// MarshalJSON marshals OutputOwners as JSON with human readable addresses
+// InitCtx assigns the OutputOwners.ctx object to given [ctx] object
+// Must be called at least once for MarshalJSON to work successfully
+func (out *OutputOwners) InitCtx(ctx *snow.Context) {
+	out.ctx = ctx
+}
+
+// MarshalJSON marshals OutputOwners as JSON with human readable addresses.
+// OutputOwners.InitCtx must be called before marshalling this or one of
+// the parent objects to json. Uses the OutputOwners.ctx method to format
+// the addresses. Returns errMarshal error if OutputOwners.ctx is not set.
 func (out *OutputOwners) MarshalJSON() ([]byte, error) {
-	// we need out.Ctx to do this, if its absent, throw error
-	if out.Ctx == nil {
+	// we need out.ctx to do this, if its absent, throw error
+	if out.ctx == nil {
 		return nil, errMarshal
 	}
 
@@ -46,12 +59,16 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 	addrsLen := len(out.Addrs)
 	addresses := make([]string, addrsLen)
 	for i, n := 0, addrsLen; i < n; i++ {
+		// for each [addr] in [Addrs] we attempt to format it given
+		// the [out.ctx] object
 		addr := out.Addrs[i]
-		fAddr, err := avax.FormatAddress(out.Ctx, addr)
+		fAddr, err := FormatAddress(out.ctx, addr)
 		if err != nil {
+			// we expect these addresses to be valid, return error
+			// if they are not
 			return nil, err
 		}
-		addresses = append(addresses, fAddr)
+		addresses[i] = fAddr
 	}
 	result["addresses"] = addresses
 
@@ -112,3 +129,15 @@ func (out *OutputOwners) VerifyState() error { return out.Verify() }
 
 // Sort ...
 func (out *OutputOwners) Sort() { ids.SortShortIDs(out.Addrs) }
+
+// FormatAddress formats a given [addr] into human readable format using
+// [ChainID] and [NetworkID] from the provided [ctx].
+func FormatAddress(ctx *snow.Context, addr ids.ShortID) (string, error) {
+	chainIDAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
+	if err != nil {
+		return "", err
+	}
+
+	hrp := constants.GetHRP(ctx.NetworkID)
+	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
+}

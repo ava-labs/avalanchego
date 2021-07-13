@@ -136,7 +136,7 @@ func decorateTx(unsignedTx UnsignedTx, vm *VM) (interface{}, error) {
 	if !ok {
 		return unsignedTx, nil
 	}
-	if err := b.InitFx(vm); err != nil {
+	if err := b.Init(vm); err != nil {
 		return nil, err
 	}
 	return b, nil

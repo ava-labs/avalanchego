@@ -29,7 +29,7 @@ type ExportTx struct {
 	ExportedOuts []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-func (t *ExportTx) InitFx(vm *VM) error {
+func (t *ExportTx) Init(vm *VM) error {
 	for i, n := 0, len(t.ExportedOuts); i < n; i++ {
 		out := t.ExportedOuts[i]
 		fxIdx, err := vm.getFx(out.Out)
@@ -39,9 +39,16 @@ func (t *ExportTx) InitFx(vm *VM) error {
 
 		fx := vm.fxs[fxIdx]
 		out.FxID = fx.ID
+
+		ctxInitializable, ok := out.Out.(snow.ContextInitializable)
+		if !ok {
+			continue
+		}
+
+		ctxInitializable.InitCtx(vm.ctx)
 	}
 
-	return t.BaseTx.InitFx(vm)
+	return t.BaseTx.Init(vm)
 }
 
 // SyntacticVerify that this transaction is well-formed.

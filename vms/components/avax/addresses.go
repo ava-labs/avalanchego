@@ -87,16 +87,6 @@ func (a *addressManager) FormatLocalAddress(addr ids.ShortID) (string, error) {
 	return a.FormatAddress(a.ctx.ChainID, addr)
 }
 
-func FormatAddress(ctx *snow.Context, addr ids.ShortID) (string, error) {
-	chainIDAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		return "", err
-	}
-
-	hrp := constants.GetHRP(ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
-}
-
 func (a *addressManager) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
 	chainIDAlias, err := a.ctx.BCLookup.PrimaryAlias(chainID)
 	if err != nil {

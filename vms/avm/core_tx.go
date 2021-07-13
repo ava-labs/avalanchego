@@ -13,5 +13,5 @@ type CoreTx interface {
 	ID() ids.ID
 	Outputs() []*avax.TransferableOutput
 	Inputs() []*avax.TransferableInput
-	InitFx(vm *VM) error
+	Init(vm *VM) error
 }

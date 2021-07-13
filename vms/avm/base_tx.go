@@ -21,7 +21,7 @@ type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
 }
 
-func (t *BaseTx) InitFx(vm *VM) error {
+func (t *BaseTx) Init(vm *VM) error {
 	for i, n := 0, len(t.Ins); i < n; i++ {
 		in := t.Ins[i]
 		fxIdx, err := vm.getFx(in.In)
@@ -42,6 +42,13 @@ func (t *BaseTx) InitFx(vm *VM) error {
 
 		fx := vm.fxs[fxIdx]
 		out.FxID = fx.ID
+
+		ctxInitializable, ok := out.Out.(snow.ContextInitializable)
+		if !ok {
+			continue
+		}
+
+		ctxInitializable.InitCtx(vm.ctx)
 	}
 	return nil
 }
