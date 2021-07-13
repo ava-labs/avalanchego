@@ -5,7 +5,6 @@ package avm
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -26,36 +25,23 @@ type BaseTx struct {
 // Also sets the [ctx] in the OutputOwners to the given [vm.ctx] so that the
 // addresses can be json marshalled into human readable format
 func (t *BaseTx) Init(vm *VM) error {
-	fxsLen := len(vm.fxs)
 	for i, n := 0, len(t.Ins); i < n; i++ {
 		in := t.Ins[i]
-		fxIdx, err := vm.getFx(in.In)
+		fx, err := vm.getParsedFx(in.In)
 		if err != nil {
 			return err
 		}
 
-		if fxIdx >= fxsLen {
-			// should never happen
-			return fmt.Errorf("invalid fxID %d, cannot be greater than len(vm.fxs)=%d", fxIdx, fxsLen)
-		}
-
-		fx := vm.fxs[fxIdx]
 		in.FxID = fx.ID
 	}
 
 	for i, n := 0, len(t.Outs); i < n; i++ {
 		out := t.Outs[i]
-		fxIdx, err := vm.getFx(out.Out)
+		fx, err := vm.getParsedFx(out.Out)
 		if err != nil {
 			return err
 		}
 
-		if fxIdx >= fxsLen {
-			// should never happen
-			return fmt.Errorf("invalid fxID %d, cannot be greater than len(vm.fxs)=%d", fxIdx, fxsLen)
-		}
-
-		fx := vm.fxs[fxIdx]
 		out.FxID = fx.ID
 
 		ctxInitializable, ok := out.Out.(snow.ContextInitializable)
