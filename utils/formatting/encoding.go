@@ -32,11 +32,12 @@ var (
 	// to 256 but each base 58 digit can express up to 58
 	// The 10 is because there seems to be a floating point issue where the calculated
 	// max decode size (using this formula) is slightly smaller than the actual
-	maxCB58DecodeSize   = int(float64(maxCB58EncodeSize)*math.Log2(256)/math.Log2(58)) + 10
-	errInvalidEncoding  = errors.New("invalid encoding")
-	errMissingChecksum  = errors.New("input string is smaller than the checksum size")
-	errBadChecksum      = errors.New("invalid input checksum")
-	errMissingHexPrefix = errors.New("missing 0x prefix to hex encoding")
+	maxCB58DecodeSize              = int(float64(maxCB58EncodeSize)*math.Log2(256)/math.Log2(58)) + 10
+	errInvalidEncoding             = errors.New("invalid encoding")
+	errUnsupportedEncodingInMethod = errors.New("unsupported encoding in method")
+	errMissingChecksum             = errors.New("input string is smaller than the checksum size")
+	errBadChecksum                 = errors.New("invalid input checksum")
+	errMissingHexPrefix            = errors.New("missing 0x prefix to hex encoding")
 )
 
 // Encoding defines how bytes are converted to a string and vice versa
@@ -120,9 +121,10 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 	case CB58:
 		return base58.Encode(checked), nil
 	case JSON:
-		// b, err := json.Marshal(bytes)
-		return "json goes here", nil
-
+		// JSON Marshal does not support []byte input and we rely on the
+		// router's json marshalling to marshal our interface{} into JSON
+		// in response. Therefore it is not supported in this call.
+		return "", errUnsupportedEncodingInMethod
 	default:
 		return "", errInvalidEncoding
 	}
@@ -152,7 +154,14 @@ func Decode(encoding Encoding, str string) ([]byte, error) {
 		decodedBytes, err = hex.DecodeString(str[2:])
 	case CB58:
 		decodedBytes, err = base58.Decode(str)
+	case JSON:
+		// JSON unmarshalling requires interface and has no return values
+		// contrary to this method, therefore it is not supported in this call
+		return nil, errUnsupportedEncodingInMethod
+	default:
+		return nil, errInvalidEncoding
 	}
+
 	if err != nil {
 		return nil, err
 	}
