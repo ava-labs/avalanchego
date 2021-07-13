@@ -108,7 +108,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return err
 	}
 
-	// validate core block, only once
+	// only validate the inner block once
 	if !b.vm.Tree.Contains(child.innerBlk) {
 		if err := child.innerBlk.Verify(); err != nil {
 			return err
@@ -165,10 +165,12 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	blk := &postForkBlock{
-		Block:    statelessBlock,
-		vm:       b.vm,
-		innerBlk: innerBlock,
-		status:   choices.Processing,
+		Block: statelessBlock,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       b.vm,
+			innerBlk: innerBlock,
+			status:   choices.Processing,
+		},
 	}
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay NA, block timestamp %v.",

@@ -29,7 +29,9 @@ func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
 func TestOracle_PostForkOption_DoesNotImplementInterface(t *testing.T) {
 	// setup
 	proOpt := postForkOption{
-		innerBlk: &TestOptionsBlock{},
+		postForkCommonComponents: postForkCommonComponents{
+			innerBlk: &TestOptionsBlock{},
+		},
 	}
 
 	// test

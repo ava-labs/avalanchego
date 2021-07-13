@@ -24,7 +24,9 @@ import (
 func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	// setup
 	proBlk := postForkBlock{
-		innerBlk: &snowman.TestBlock{},
+		postForkCommonComponents: postForkCommonComponents{
+			innerBlk: &snowman.TestBlock{},
+		},
 	}
 
 	// test
@@ -70,10 +72,12 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk = postForkBlock{
-		Block:    slb,
-		vm:       proVM,
-		innerBlk: innerOracleBlk,
-		status:   choices.Processing,
+		Block: slb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerOracleBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	// test
@@ -149,10 +153,12 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	childProBlk := postForkBlock{
-		Block:    childSlb,
-		vm:       proVM,
-		innerBlk: childCoreBlk,
-		status:   choices.Processing,
+		Block: childSlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	// child block referring unknown parent does not verify
@@ -255,10 +261,12 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	childProBlk := postForkBlock{
-		Block:    childSlb,
-		vm:       proVM,
-		innerBlk: childCoreBlk,
-		status:   choices.Processing,
+		Block: childSlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	err = childProBlk.Verify()
@@ -439,10 +447,12 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	childProBlk := postForkBlock{
-		Block:    childSlb,
-		vm:       proVM,
-		innerBlk: childCoreBlk,
-		status:   choices.Processing,
+		Block: childSlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	if err := childProBlk.Verify(); err == nil {
@@ -636,10 +646,12 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		t.Fatal("could not build stateless block")
 	}
 	childProBlk := postForkBlock{
-		Block:    childSlb,
-		vm:       proVM,
-		innerBlk: childCoreBlk,
-		status:   choices.Processing,
+		Block: childSlb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: childCoreBlk,
+			status:   choices.Processing,
+		},
 	}
 
 	if err := childProBlk.Verify(); err == nil {

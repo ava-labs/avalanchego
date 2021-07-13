@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
@@ -37,4 +38,10 @@ type Block interface {
 	verifyPostForkOption(child *postForkOption) error
 
 	buildChild(innerBlock snowman.Block) (Block, error)
+}
+
+type postForkCommonComponents struct {
+	vm       *VM
+	innerBlk snowman.Block
+	status   choices.Status
 }
