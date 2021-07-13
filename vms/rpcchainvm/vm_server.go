@@ -385,6 +385,38 @@ func (vm *VMServer) Version(_ context.Context, req *vmproto.VersionRequest) (*vm
 	}, err
 }
 
+func (vm *VMServer) AppRequest(ctx context.Context, req *vmproto.AppRequestMsg) (*vmproto.AppRequestResponse, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppRequest(nodeID, req.RequestID, req.Request)
+}
+
+func (vm *VMServer) AppRequestFailed(ctx context.Context, req *vmproto.AppRequestFailedMsg) (*vmproto.AppRequestFailedResponse, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppRequestFailed(nodeID, req.RequestID)
+}
+
+func (vm *VMServer) AppResponse(ctx context.Context, req *vmproto.AppResponseMsg) (*vmproto.AppResponseResponse, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppResponse(nodeID, req.RequestID, req.Response)
+}
+
+func (vm *VMServer) AppGossip(ctx context.Context, req *vmproto.AppGossipMsg) (*vmproto.AppGossipResponse, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppGossip(nodeID, req.MsgID, req.Msg)
+}
+
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
 	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
