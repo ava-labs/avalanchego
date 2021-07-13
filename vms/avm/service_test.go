@@ -635,9 +635,12 @@ func TestServiceGetTxJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	replyTx, ok := reply.Tx.(CoreTx)
-	assert.True(t, ok)
-	assert.Equal(t, replyTx.ID(), txID)
+	uniqueTx, isUniqueTx := reply.Tx.(UniqueTx)
+	assert.True(t, isUniqueTx)
+	assert.Equal(t, uniqueTx.ID(), txID)
+
+	_, isCoreTx := uniqueTx.UnsignedTx.(CoreTx)
+	assert.True(t, isCoreTx)
 }
 
 func TestServiceGetNilTx(t *testing.T) {
