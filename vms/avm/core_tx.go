@@ -5,13 +5,10 @@ package avm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-// CoreTx represents fundamental property of a transaction to have ID, Inputs and Outputs
+// CoreTx represents fundamental property of a transaction to have ID and Init method
 type CoreTx interface {
 	ID() ids.ID
-	Outputs() []*avax.TransferableOutput
-	Inputs() []*avax.TransferableInput
 	Init(vm *VM) error
 }

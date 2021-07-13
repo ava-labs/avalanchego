@@ -40,20 +40,6 @@ func (t *BaseTx) InputUTXOs() []*UTXOID {
 	return utxos
 }
 
-func (t *BaseTx) Outputs() []*TransferableOutput {
-	txOutsLen := len(t.Outs)
-	outputs := make([]*TransferableOutput, txOutsLen)
-	copy(outputs, t.Outs)
-	return outputs
-}
-
-func (t *BaseTx) Inputs() []*TransferableInput {
-	txInsLen := len(t.Ins)
-	inputs := make([]*TransferableInput, txInsLen)
-	copy(inputs, t.Ins)
-	return inputs
-}
-
 // ConsumedAssetIDs returns the IDs of the assets this transaction consumes
 func (t *BaseTx) ConsumedAssetIDs() ids.Set {
 	assets := ids.Set{}
