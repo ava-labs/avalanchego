@@ -342,26 +342,42 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 
 // AppRequestFailed implements the Engine interface
 func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	// TODO implement
-	return nil
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM that a request it made failed
+	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
 // AppRequest implements the Engine interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	// TODO implement
-	return nil
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM of this request
+	return t.VM.AppRequest(nodeID, requestID, request)
 }
 
 // AppResponse implements the Engine interface
 func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	// TODO implement
-	return nil
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppResponse(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM of a response to its request
+	return t.VM.AppResponse(nodeID, requestID, response)
 }
 
 // AppGossip implements the Engine interface
 func (t *Transitive) AppGossip(nodeID ids.ShortID, requestID uint32, msg []byte) error {
-	// TODO implement
-	return nil
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppGossip(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM of this message which has been gossiped to it
+	return t.VM.AppGossip(nodeID, requestID, msg)
 }
 
 // Notify implements the Engine interface
