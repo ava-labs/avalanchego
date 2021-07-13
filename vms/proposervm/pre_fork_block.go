@@ -69,9 +69,15 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 }
 
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
-	// TODO: verify that [childPChainHeight] is <= the P-chain's current height
 	childPChainHeight := child.PChainHeight()
-	_ = childPChainHeight
+	currentPChainHeight, err := b.vm.PChainHeight()
+	if err != nil {
+		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
+			child.ID())
+	}
+	if childPChainHeight > currentPChainHeight {
+		return errPChainHeightNotReached
+	}
 
 	expectedInnerParentID := b.ID()
 	innerParent := child.innerBlk.Parent()

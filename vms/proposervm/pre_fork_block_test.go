@@ -41,7 +41,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 	}
 }
 
-func TestOracle_PreForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
+func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime)
 
 	// create pre fork oracle block ...
@@ -136,7 +136,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
 	}
 }
 
-func TestOracle_PostForkBlkCanBuiltOnPreForkBlk(t *testing.T) {
+func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	activationTime := genesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime)
 

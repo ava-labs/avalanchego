@@ -91,7 +91,7 @@ func (b *postForkOption) Height() uint64 {
 }
 
 func (b *postForkOption) Options() ([2]snowman.Block, error) {
-	// TODO: check that option block cannot be an oracle itself
+	// option block cannot be oracle itself
 	return [2]snowman.Block{}, snowman.ErrNotOracle
 }
 
@@ -105,10 +105,19 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		return err
 	}
-	// TODO: verify that [childPChainHeight] is <= the P-chain's current height
+
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
 		return errPChainHeightNotMonotonic
+	}
+
+	currentPChainHeight, err := b.vm.PChainHeight()
+	if err != nil {
+		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
+			child.ID())
+	}
+	if childPChainHeight > currentPChainHeight {
+		return errPChainHeightNotReached
 	}
 
 	expectedInnerParentID := b.innerBlk.ID()
