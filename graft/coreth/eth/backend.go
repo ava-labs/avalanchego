@@ -355,5 +355,4 @@ func (s *Ethereum) SetGasPrice(newGasPrice *big.Int) {
 	s.gasPrice = newGasPrice
 	s.lock.Unlock()
 	s.txPool.SetGasPrice(newGasPrice)
-	s.APIBackend.gpo.SetGasPrice(newGasPrice)
 }

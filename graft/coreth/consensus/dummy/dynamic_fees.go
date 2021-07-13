@@ -15,7 +15,6 @@ import (
 
 var (
 	TargetGas   = uint64(24_000_000)
-	BlockFee    = uint64(2_000_000)
 	MaxGasPrice = new(big.Int).SetUint64(10_000 * params.GWei)
 	MinGasPrice = new(big.Int).SetUint64(10 * params.GWei)
 	BlockGasFee = uint64(1_000_000)
@@ -48,12 +47,18 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		slot := 10 - roll
 		prevGasConsumed := binary.BigEndian.Uint64(newRollupWindow[slot*8:])
 		// Count gas consumed as the previous gas consumed + parent block gas consumed
-		// + 1M Gas to charge for the block itself.
+		// + BlockGasFee to charge for the block itself.
 		gasConsumed := prevGasConsumed + parent.GasUsed + BlockGasFee
 		binary.BigEndian.PutUint64(newRollupWindow[slot*8:], gasConsumed)
+	} else {
+		// If [roll] is greater than 10, we want to apply the state transition to the
+		// base fee to account for the period of empty blocks.
 	}
 
 	// Sum the rollup window
+	// If there are a large number of blocks in the same 10s window, this will result
+	// in making the state transition more times and thus create a larger change in the
+	// base fee.
 	totalGas := uint64(0)
 	for i := 0; i < 10; i++ {
 		totalGas += binary.BigEndian.Uint64(newRollupWindow[8*i:])
