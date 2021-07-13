@@ -18,9 +18,8 @@ var (
 type UTXO struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
-	// FxID has serialize false because we don't want this to be encoded in bytes
-	FxID string       `serialize:"false" json:"fxID"`
-	Out  verify.State `serialize:"true" json:"output"`
+
+	Out verify.State `serialize:"true" json:"output"`
 }
 
 // Verify implements the verify.Verifiable interface

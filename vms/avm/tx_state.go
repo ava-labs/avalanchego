@@ -26,8 +26,6 @@ var _ TxState = &txState{}
 type TxState interface {
 	// Tx attempts to load a transaction from storage.
 	GetTx(txID ids.ID) (*Tx, error)
-	// GetTxBytes is an alias for GetTx that returns the tx as byte slice
-	GetTxBytes(txID ids.ID) ([]byte, error)
 
 	// PutTx saves the provided transaction to storage.
 	PutTx(txID ids.ID, tx *Tx) error
@@ -68,14 +66,6 @@ func NewMeteredTxState(db database.Database, codec codec.Manager, namespace stri
 		txCache: cache,
 		txDB:    db,
 	}, err
-}
-
-func (s *txState) GetTxBytes(txID ids.ID) ([]byte, error) {
-	tx, err := s.GetTx(txID)
-	if err != nil {
-		return nil, err
-	}
-	return tx.Bytes(), err
 }
 
 func (s *txState) GetTx(txID ids.ID) (*Tx, error) {
