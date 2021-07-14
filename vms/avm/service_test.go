@@ -640,7 +640,7 @@ func TestServiceGetTx(t *testing.T) {
 	assert.Equal(t, genesisTx.Bytes(), txBytes, "Wrong tx returned from service.GetTx")
 }
 
-func TestServiceGetTxJSON(t *testing.T) {
+func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	genesisBytes, vm, s, _, issuer, _ := setupWithIssuer(t, true)
 	ctx := vm.ctx
 	defer func() {
@@ -650,7 +650,7 @@ func TestServiceGetTxJSON(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	newTx := newAvaxTxWithOutputs(t, genesisBytes, vm)
+	newTx := newAvaxBaseTxWithOutputs(t, genesisBytes, vm)
 
 	txID, err := vm.IssueTx(newTx.Bytes())
 	if err != nil {
@@ -683,13 +683,110 @@ func TestServiceGetTxJSON(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
+	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
 	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 }
 
-func newAvaxTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
+func TestServiceGetTxJSON_ExportTx(t *testing.T) {
+	genesisBytes, vm, s, _, issuer, _ := setupWithIssuer(t, true)
+	ctx := vm.ctx
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	newTx := newAvaxExportTxWithOutputs(t, genesisBytes, vm)
+
+	txID, err := vm.IssueTx(newTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if txID != newTx.ID() {
+		t.Fatalf("Issue Tx returned wrong TxID")
+	}
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+	ctx.Lock.Lock()
+
+	if txs := vm.PendingTxs(); len(txs) != 1 {
+		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+
+	reply := api.GetTxReply{}
+	err = s.GetTx(nil, &api.GetTxArgs{
+		TxID:     txID,
+		Encoding: formatting.JSON,
+	}, &reply)
+	assert.NoError(t, err)
+
+	assert.Equal(t, reply.Encoding, formatting.JSON)
+	jsonTxBytes, err := json2.Marshal(reply.Tx)
+	assert.NoError(t, err)
+	jsonString := string(jsonTxBytes)
+	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
+	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
+	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+}
+
+func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
-	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+	tx := buildBaseTx(avaxTx, vm, key)
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+	return tx
+}
+
+func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
+	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	tx := buildExportTx(avaxTx, vm, key)
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+	return tx
+}
+
+func buildExportTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
+	return &Tx{UnsignedTx: &ExportTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+			Ins: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        avaxTx.ID(),
+					OutputIndex: 2,
+				},
+				Asset: avax.Asset{ID: avaxTx.ID()},
+				In: &secp256k1fx.TransferInput{
+					Amt:   startBalance,
+					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				},
+			}},
+		}},
+		DestinationChain: platformChainID,
+		ExportedOuts: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: startBalance - vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}
+}
+
+func buildBaseTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
+	return &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
 		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
@@ -718,10 +815,6 @@ func newAvaxTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 			},
 		}},
 	}}}
-	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
-		t.Fatal(err)
-	}
-	return tx
 }
 
 func TestServiceGetNilTx(t *testing.T) {
