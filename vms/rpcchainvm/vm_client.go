@@ -47,9 +47,10 @@ var (
 )
 
 const (
-	decidedCacheSize    = 500
-	missingCacheSize    = 200
-	unverifiedCacheSize = 200
+	decidedCacheSize    = 512
+	missingCacheSize    = 256
+	unverifiedCacheSize = 256
+	bytesToIDCacheSize  = 512
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -200,6 +201,7 @@ func (vm *VMClient) Initialize(
 			DecidedCacheSize:    decidedCacheSize,
 			MissingCacheSize:    missingCacheSize,
 			UnverifiedCacheSize: unverifiedCacheSize,
+			BytesToIDCacheSize:  bytesToIDCacheSize,
 			LastAcceptedBlock:   lastAcceptedBlk,
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
@@ -423,6 +425,17 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 	)
 }
 
+func (vm *VMClient) Version() (string, error) {
+	resp, err := vm.client.Version(
+		context.Background(),
+		&vmproto.VersionRequest{},
+	)
+	if err != nil {
+		return "", err
+	}
+	return resp.Version, nil
+}
+
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
 	vm *VMClient
@@ -463,7 +476,7 @@ func (b *BlockClient) Parent() snowman.Block {
 
 func (b *BlockClient) Verify() error {
 	_, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
-		Id: b.id[:],
+		Bytes: b.bytes,
 	})
 	return err
 }

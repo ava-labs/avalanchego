@@ -83,7 +83,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		// Tell the router to expect a reply message from this validator
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
-		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration))
+		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), nil)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -123,7 +123,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 // AcceptedFrontier ...
 func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
-		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
+		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
 	} else {
 		s.sender.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
@@ -139,7 +139,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		// Tell the router to expect a reply message from this validator
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
-		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerIDs)
+		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerIDs, nil)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -177,7 +177,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 // Accepted ...
 func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
-		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
+		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
 	} else {
 		s.sender.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
@@ -282,7 +282,15 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		validatorIDs.Remove(s.ctx.NodeID)
 		// Tell the router to expect a reply message from this validator
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
-		go s.router.PushQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerID, container)
+		go s.router.PushQuery(
+			s.ctx.NodeID,
+			s.ctx.ChainID,
+			requestID,
+			time.Now().Add(timeoutDuration),
+			containerID,
+			container,
+			nil,
+		)
 	}
 
 	// Some of [validatorIDs] may be benched. That is, they've been unresponsive
@@ -332,7 +340,14 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		validatorIDs.Remove(s.ctx.NodeID)
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
-		go s.router.PullQuery(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerID)
+		go s.router.PullQuery(
+			s.ctx.NodeID,
+			s.ctx.ChainID,
+			requestID,
+			time.Now().Add(timeoutDuration),
+			containerID,
+			nil,
+		)
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -371,7 +386,7 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID
 	// If [validatorID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorID == s.ctx.NodeID {
-		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes)
+		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes, nil)
 	} else {
 		s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
 	}

@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/timestampvm"
 )
 
 // Aliases returns the default aliases based on the network ID
@@ -39,9 +38,6 @@ func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map
 		case evm.ID:
 			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
 			chainAliases[chain.ID()] = GetCChainAliases()
-		case timestampvm.ID:
-			generalAliases["bc/"+chain.ID().String()] = []string{"bc/timestamp"}
-			chainAliases[chain.ID()] = []string{"timestamp"}
 		}
 	}
 	return generalAliases, chainAliases, vmAliases, nil
@@ -60,7 +56,6 @@ func getGeneralAliases() map[string][]string {
 		"vm/" + platformvm.ID.String():             {"vm/platform"},
 		"vm/" + avm.ID.String():                    {"vm/avm"},
 		"vm/" + evm.ID.String():                    {"vm/evm"},
-		"vm/" + timestampvm.ID.String():            {"vm/timestamp"},
 		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
 	}
 }
@@ -70,7 +65,6 @@ func getChainAliases() map[ids.ID][]string {
 		platformvm.ID:  {"platform"},
 		avm.ID:         {"avm"},
 		evm.ID:         {"evm"},
-		timestampvm.ID: {"timestamp"},
 		secp256k1fx.ID: {"secp256k1fx"},
 		nftfx.ID:       {"nftfx"},
 		propertyfx.ID:  {"propertyfx"},

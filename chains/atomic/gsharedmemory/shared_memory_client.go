@@ -12,10 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic/gsharedmemory/gsharedmemoryproto"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	maxBatchSize = 64 * 1024 // 64 KiB
+	maxBatchSize = 64 * units.KiB // 64 KiB
 
 	// baseElementSize is an approximation of the protobuf encoding overhead per
 	// element
