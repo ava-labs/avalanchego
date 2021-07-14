@@ -1874,41 +1874,44 @@ func file_vm_proto_rawDescGZIP() []byte {
 	return file_vm_proto_rawDescData
 }
 
-var file_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
-var file_vm_proto_goTypes = []interface{}{
-	(*InitializeRequest)(nil),            // 0: vmproto.InitializeRequest
-	(*InitializeResponse)(nil),           // 1: vmproto.InitializeResponse
-	(*VersionedDBServer)(nil),            // 2: vmproto.VersionedDBServer
-	(*BootstrappingRequest)(nil),         // 3: vmproto.BootstrappingRequest
-	(*BootstrappingResponse)(nil),        // 4: vmproto.BootstrappingResponse
-	(*BootstrappedRequest)(nil),          // 5: vmproto.BootstrappedRequest
-	(*BootstrappedResponse)(nil),         // 6: vmproto.BootstrappedResponse
-	(*ShutdownRequest)(nil),              // 7: vmproto.ShutdownRequest
-	(*ShutdownResponse)(nil),             // 8: vmproto.ShutdownResponse
-	(*CreateHandlersRequest)(nil),        // 9: vmproto.CreateHandlersRequest
-	(*CreateHandlersResponse)(nil),       // 10: vmproto.CreateHandlersResponse
-	(*CreateStaticHandlersRequest)(nil),  // 11: vmproto.CreateStaticHandlersRequest
-	(*CreateStaticHandlersResponse)(nil), // 12: vmproto.CreateStaticHandlersResponse
-	(*Handler)(nil),                      // 13: vmproto.Handler
-	(*BuildBlockRequest)(nil),            // 14: vmproto.BuildBlockRequest
-	(*BuildBlockResponse)(nil),           // 15: vmproto.BuildBlockResponse
-	(*ParseBlockRequest)(nil),            // 16: vmproto.ParseBlockRequest
-	(*ParseBlockResponse)(nil),           // 17: vmproto.ParseBlockResponse
-	(*GetBlockRequest)(nil),              // 18: vmproto.GetBlockRequest
-	(*GetBlockResponse)(nil),             // 19: vmproto.GetBlockResponse
-	(*SetPreferenceRequest)(nil),         // 20: vmproto.SetPreferenceRequest
-	(*SetPreferenceResponse)(nil),        // 21: vmproto.SetPreferenceResponse
-	(*BlockVerifyRequest)(nil),           // 22: vmproto.BlockVerifyRequest
-	(*BlockVerifyResponse)(nil),          // 23: vmproto.BlockVerifyResponse
-	(*BlockAcceptRequest)(nil),           // 24: vmproto.BlockAcceptRequest
-	(*BlockAcceptResponse)(nil),          // 25: vmproto.BlockAcceptResponse
-	(*BlockRejectRequest)(nil),           // 26: vmproto.BlockRejectRequest
-	(*BlockRejectResponse)(nil),          // 27: vmproto.BlockRejectResponse
-	(*HealthRequest)(nil),                // 28: vmproto.HealthRequest
-	(*HealthResponse)(nil),               // 29: vmproto.HealthResponse
-	(*VersionRequest)(nil),               // 30: vmproto.VersionRequest
-	(*VersionResponse)(nil),              // 31: vmproto.VersionResponse
-}
+var (
+	file_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+	file_vm_proto_goTypes  = []interface{}{
+		(*InitializeRequest)(nil),            // 0: vmproto.InitializeRequest
+		(*InitializeResponse)(nil),           // 1: vmproto.InitializeResponse
+		(*VersionedDBServer)(nil),            // 2: vmproto.VersionedDBServer
+		(*BootstrappingRequest)(nil),         // 3: vmproto.BootstrappingRequest
+		(*BootstrappingResponse)(nil),        // 4: vmproto.BootstrappingResponse
+		(*BootstrappedRequest)(nil),          // 5: vmproto.BootstrappedRequest
+		(*BootstrappedResponse)(nil),         // 6: vmproto.BootstrappedResponse
+		(*ShutdownRequest)(nil),              // 7: vmproto.ShutdownRequest
+		(*ShutdownResponse)(nil),             // 8: vmproto.ShutdownResponse
+		(*CreateHandlersRequest)(nil),        // 9: vmproto.CreateHandlersRequest
+		(*CreateHandlersResponse)(nil),       // 10: vmproto.CreateHandlersResponse
+		(*CreateStaticHandlersRequest)(nil),  // 11: vmproto.CreateStaticHandlersRequest
+		(*CreateStaticHandlersResponse)(nil), // 12: vmproto.CreateStaticHandlersResponse
+		(*Handler)(nil),                      // 13: vmproto.Handler
+		(*BuildBlockRequest)(nil),            // 14: vmproto.BuildBlockRequest
+		(*BuildBlockResponse)(nil),           // 15: vmproto.BuildBlockResponse
+		(*ParseBlockRequest)(nil),            // 16: vmproto.ParseBlockRequest
+		(*ParseBlockResponse)(nil),           // 17: vmproto.ParseBlockResponse
+		(*GetBlockRequest)(nil),              // 18: vmproto.GetBlockRequest
+		(*GetBlockResponse)(nil),             // 19: vmproto.GetBlockResponse
+		(*SetPreferenceRequest)(nil),         // 20: vmproto.SetPreferenceRequest
+		(*SetPreferenceResponse)(nil),        // 21: vmproto.SetPreferenceResponse
+		(*BlockVerifyRequest)(nil),           // 22: vmproto.BlockVerifyRequest
+		(*BlockVerifyResponse)(nil),          // 23: vmproto.BlockVerifyResponse
+		(*BlockAcceptRequest)(nil),           // 24: vmproto.BlockAcceptRequest
+		(*BlockAcceptResponse)(nil),          // 25: vmproto.BlockAcceptResponse
+		(*BlockRejectRequest)(nil),           // 26: vmproto.BlockRejectRequest
+		(*BlockRejectResponse)(nil),          // 27: vmproto.BlockRejectResponse
+		(*HealthRequest)(nil),                // 28: vmproto.HealthRequest
+		(*HealthResponse)(nil),               // 29: vmproto.HealthResponse
+		(*VersionRequest)(nil),               // 30: vmproto.VersionRequest
+		(*VersionResponse)(nil),              // 31: vmproto.VersionResponse
+	}
+)
+
 var file_vm_proto_depIdxs = []int32{
 	2,  // 0: vmproto.InitializeRequest.dbServers:type_name -> vmproto.VersionedDBServer
 	13, // 1: vmproto.CreateHandlersResponse.handlers:type_name -> vmproto.Handler
