@@ -21,17 +21,11 @@ type Server struct {
 	sm atomic.SharedMemory
 	db database.Database
 
-	putsLock sync.Mutex
-	puts     map[int64]*putRequest
-
 	getsLock sync.Mutex
 	gets     map[int64]*getRequest
 
 	indexedLock sync.Mutex
 	indexed     map[int64]*indexedRequest
-
-	removesLock sync.Mutex
-	removes     map[int64]*removeRequest
 
 	removeAndPutMultipleLock sync.Mutex
 	removeAndPutMultiples    map[int64]map[ids.ID]*atomic.Requests
@@ -42,10 +36,8 @@ func NewServer(sm atomic.SharedMemory, db database.Database) *Server {
 	return &Server{
 		sm:                    sm,
 		db:                    db,
-		puts:                  make(map[int64]*putRequest),
 		gets:                  make(map[int64]*getRequest),
 		indexed:               make(map[int64]*indexedRequest),
-		removes:               make(map[int64]*removeRequest),
 		removeAndPutMultiples: make(map[int64]map[ids.ID]*atomic.Requests),
 	}
 }
@@ -115,62 +107,6 @@ func (s *Server) RemoveAndPutMultiple(
 	}
 
 	return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, s.sm.RemoveAndPutMultiple(formattedRequest, batches...)
-}
-
-type putRequest struct {
-	peerChainID ids.ID
-	elems       []*atomic.Element
-	batches     map[int64]database.Batch
-}
-
-func (s *Server) Put(
-	_ context.Context,
-	req *gsharedmemoryproto.PutRequest,
-) (*gsharedmemoryproto.PutResponse, error) {
-	s.putsLock.Lock()
-	defer s.putsLock.Unlock()
-
-	put, exists := s.puts[req.Id]
-	if !exists {
-		peerChainID, err := ids.ToID(req.PeerChainID)
-		if err != nil {
-			return nil, err
-		}
-
-		put = &putRequest{
-			peerChainID: peerChainID,
-			elems:       make([]*atomic.Element, 0, len(req.Elems)),
-			batches:     make(map[int64]database.Batch),
-		}
-	}
-
-	for _, elem := range req.Elems {
-		put.elems = append(put.elems, &atomic.Element{
-			Key:    elem.Key,
-			Value:  elem.Value,
-			Traits: elem.Traits,
-		})
-	}
-
-	if err := s.parseBatches(put.batches, req.Batches); err != nil {
-		delete(s.puts, req.Id)
-		return nil, err
-	}
-
-	if req.Continues {
-		s.puts[req.Id] = put
-		return &gsharedmemoryproto.PutResponse{}, nil
-	}
-
-	delete(s.puts, req.Id)
-
-	batches := make([]database.Batch, len(put.batches))
-	i := 0
-	for _, batch := range put.batches {
-		batches[i] = batch
-		i++
-	}
-	return &gsharedmemoryproto.PutResponse{}, s.sm.Put(put.peerChainID, put.elems, batches...)
 }
 
 type getRequest struct {
@@ -330,54 +266,6 @@ func (s *Server) Indexed(
 		delete(s.indexed, req.Id)
 	}
 	return resp, nil
-}
-
-type removeRequest struct {
-	peerChainID ids.ID
-	keys        [][]byte
-	batches     map[int64]database.Batch
-}
-
-func (s *Server) Remove(
-	_ context.Context,
-	req *gsharedmemoryproto.RemoveRequest,
-) (*gsharedmemoryproto.RemoveResponse, error) {
-	s.removesLock.Lock()
-	defer s.removesLock.Unlock()
-
-	remove, exists := s.removes[req.Id]
-	if !exists {
-		peerChainID, err := ids.ToID(req.PeerChainID)
-		if err != nil {
-			return nil, err
-		}
-
-		remove = &removeRequest{
-			peerChainID: peerChainID,
-			batches:     make(map[int64]database.Batch),
-		}
-	}
-
-	remove.keys = append(remove.keys, req.Keys...)
-	if err := s.parseBatches(remove.batches, req.Batches); err != nil {
-		delete(s.removes, req.Id)
-		return nil, err
-	}
-
-	if req.Continues {
-		s.removes[req.Id] = remove
-		return &gsharedmemoryproto.RemoveResponse{}, nil
-	}
-
-	delete(s.removes, req.Id)
-
-	batches := make([]database.Batch, len(remove.batches))
-	i := 0
-	for _, batch := range remove.batches {
-		batches[i] = batch
-		i++
-	}
-	return &gsharedmemoryproto.RemoveResponse{}, s.sm.Remove(remove.peerChainID, remove.keys, batches...)
 }
 
 func (s *Server) parseBatches(

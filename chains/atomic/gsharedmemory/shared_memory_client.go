@@ -36,61 +36,6 @@ func NewClient(client gsharedmemoryproto.SharedMemoryClient) *Client {
 	return &Client{client: client}
 }
 
-func (c *Client) Put(peerChainID ids.ID, elems []*atomic.Element, rawBatches ...database.Batch) error {
-	req := gsharedmemoryproto.PutRequest{
-		PeerChainID: peerChainID[:],
-		Elems:       make([]*gsharedmemoryproto.Element, 0, len(elems)),
-		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
-		Continues:   true,
-	}
-
-	currentSize := 0
-	for _, elem := range elems {
-		sizeChange := baseElementSize + len(elem.Key) + len(elem.Value)
-		for _, trait := range elem.Traits {
-			sizeChange += len(trait)
-		}
-
-		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-			if _, err := c.client.Put(context.Background(), &req); err != nil {
-				return err
-			}
-			currentSize = 0
-			req.PeerChainID = nil
-			req.Elems = req.Elems[:0]
-		}
-		currentSize += sizeChange
-
-		req.Elems = append(req.Elems, &gsharedmemoryproto.Element{
-			Key:    elem.Key,
-			Value:  elem.Value,
-			Traits: elem.Traits,
-		})
-	}
-
-	batchGroups, err := c.makeBatches(rawBatches, currentSize)
-	if err != nil {
-		return err
-	}
-
-	for i, batches := range batchGroups {
-		req.Batches = batches
-		req.Continues = i < len(batchGroups)-1
-		if _, err := c.client.Put(context.Background(), &req); err != nil {
-			return err
-		}
-		req.PeerChainID = nil
-		req.Elems = nil
-	}
-	if len(batchGroups) == 0 {
-		req.Continues = false
-		if _, err := c.client.Put(context.Background(), &req); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (c *Client) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
 	req := &gsharedmemoryproto.GetRequest{
 		PeerChainID: peerChainID[:],
@@ -202,54 +147,6 @@ func (c *Client) Indexed(
 		values = append(values, resp.Values...)
 	}
 	return values, lastTrait, lastKey, nil
-}
-
-func (c *Client) Remove(peerChainID ids.ID, keys [][]byte, rawBatches ...database.Batch) error {
-	req := gsharedmemoryproto.RemoveRequest{
-		PeerChainID: peerChainID[:],
-		Id:          stdatomic.AddInt64(&c.uniqueID, 1),
-		Continues:   true,
-	}
-
-	currentSize := 0
-	prevIndex := 0
-	for i, key := range keys {
-		sizeChange := baseElementSize + len(key)
-		if newSize := currentSize + sizeChange; newSize > maxBatchSize {
-			if _, err := c.client.Remove(context.Background(), &req); err != nil {
-				return err
-			}
-
-			currentSize = 0
-			prevIndex = i
-			req.PeerChainID = nil
-		}
-		currentSize += sizeChange
-
-		req.Keys = keys[prevIndex : i+1]
-	}
-
-	batchGroups, err := c.makeBatches(rawBatches, currentSize)
-	if err != nil {
-		return err
-	}
-
-	for i, batches := range batchGroups {
-		req.Batches = batches
-		req.Continues = i < len(batchGroups)-1
-		if _, err := c.client.Remove(context.Background(), &req); err != nil {
-			return err
-		}
-		req.PeerChainID = nil
-		req.Keys = nil
-	}
-	if len(batchGroups) == 0 {
-		req.Continues = false
-		if _, err := c.client.Remove(context.Background(), &req); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]*gsharedmemoryproto.Batch, error) {

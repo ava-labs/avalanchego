@@ -65,9 +65,6 @@ type Element struct {
 
 // SharedMemory ...
 type SharedMemory interface {
-	// Adds to the peer chain's side
-	Put(peerChainID ids.ID, elems []*Element, batches ...database.Batch) error
-
 	// Fetches from this chain's side
 	Get(peerChainID ids.ID, keys [][]byte) (values [][]byte, err error)
 	Indexed(
@@ -82,8 +79,6 @@ type SharedMemory interface {
 		lastKey []byte,
 		err error,
 	)
-	Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error
-
 	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Requests, batches ...database.Batch) error
 }
 
@@ -118,30 +113,6 @@ func fetchValueAndIndexDB(smChainID []byte, peerChainID []byte, requestType Shar
 	}
 
 	return valueDB, indexDB
-}
-
-func (sm *sharedMemory) Put(peerChainID ids.ID, elems []*Element, batches ...database.Batch) error {
-	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-	vdb, db := sm.m.GetDatabase(sharedID)
-	defer sm.m.ReleaseDatabase(sharedID)
-
-	s := state{
-		c: sm.m.codec,
-	}
-
-	s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
-
-	for _, elem := range elems {
-		if err := s.SetValue(elem); err != nil {
-			return err
-		}
-	}
-
-	myBatch, err := vdb.CommitBatch()
-	if err != nil {
-		return err
-	}
-	return WriteAll(myBatch, batches...)
 }
 
 func (sm *sharedMemory) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
@@ -212,28 +183,28 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Re
 
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
 		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-
 		db := sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
-
+		defer sm.m.ReleaseDatabase(sharedID)
 		s := state{
 			c: sm.m.codec,
 		}
 
-		for _, removeRequest := range atomicRequests.RemoveRequests {
-			s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
+		s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
 
+		for _, removeRequest := range atomicRequests.RemoveRequests {
 			if err := s.RemoveValue(removeRequest); err != nil {
 				return err
 			}
-
 		}
+
+		s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
+
 		for _, putRequest := range atomicRequests.PutRequests {
 			if err := s.SetValue(putRequest); err != nil {
 				return err
 			}
 		}
 
-		sm.m.ReleaseDatabase(sharedID)
 	}
 
 	myBatch, err := vdb.CommitBatch()
@@ -241,30 +212,6 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Re
 		return err
 	}
 
-	return WriteAll(myBatch, batches...)
-}
-
-func (sm *sharedMemory) Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error {
-	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-	vdb, db := sm.m.GetDatabase(sharedID)
-	defer sm.m.ReleaseDatabase(sharedID)
-
-	s := state{
-		c: sm.m.codec,
-	}
-
-	s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
-
-	for _, key := range keys {
-		if err := s.RemoveValue(key); err != nil {
-			return err
-		}
-	}
-
-	myBatch, err := vdb.CommitBatch()
-	if err != nil {
-		return err
-	}
 	return WriteAll(myBatch, batches...)
 }
 
