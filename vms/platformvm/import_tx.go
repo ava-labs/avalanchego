@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -161,7 +162,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 		utxoID := in.InputID()
 		utxoIDs[i] = utxoID[:]
 	}
-	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
+	return ctx.SharedMemory.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
 }
 
 // Create a new transaction

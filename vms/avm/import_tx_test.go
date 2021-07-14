@@ -318,13 +318,13 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := peerSharedMemory.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			key.PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
