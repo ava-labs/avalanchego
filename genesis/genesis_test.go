@@ -25,7 +25,7 @@ func TestAliases(t *testing.T) {
 	genesisBytes, _, err := Genesis(constants.LocalID, "")
 	assert.NoError(err)
 
-	generalAliases, _, _, err := Aliases(genesisBytes)
+	generalAliases, _, err := Aliases(genesisBytes)
 	assert.NoError(err)
 
 	if _, exists := generalAliases["vm/"+platformvm.ID.String()]; !exists {
