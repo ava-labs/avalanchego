@@ -238,13 +238,35 @@ func NewBlockChain(
 
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
-		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), bc.cacheConfig.SnapshotAsync, true, false)
+		// If we are not running snapshots in async mode, generate the original snapshot disk layer up front, so
+		// we can use it while executing blocks in bootstrapping.
+		if !bc.cacheConfig.SnapshotAsync {
+			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, true, false)
+		} else {
+			// Otherwise, if we are running snapshots in async mode, attempt to initialize snapshots without rebuilding. If the snapshot
+			// disk layer is either corrupted or doesn't exist, wait until calling Bootstrapped to rebuild.
+			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, false, false)
+		}
 		if err != nil {
-			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err)
+			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", bc.cacheConfig.SnapshotAsync)
 		}
 	}
 
 	return bc, nil
+}
+
+func (bc *BlockChain) Bootstrapped() error {
+	// If [bc.snaps] is either already initialized, not meant to be initialized, or we should
+	// have already attempted to initialize it synchronously, then return early without attempting
+	// to initialize snapshots.
+	if bc.snaps != nil || bc.cacheConfig.SnapshotLimit <= 0 || !bc.cacheConfig.SnapshotAsync {
+		return nil
+	}
+
+	head := bc.LastAcceptedBlock()
+	var err error
+	bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), true, true, false)
+	return err
 }
 
 // GetVMConfig returns the block chain VM config.
