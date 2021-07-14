@@ -17,7 +17,6 @@ import (
 
 var (
 	errUnknownBlock = errors.New("unknown block")
-	errUnknownBytes = errors.New("unknown bytes")
 
 	Genesis = ids.GenerateTestID()
 )
