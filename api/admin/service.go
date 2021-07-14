@@ -5,6 +5,7 @@ package admin
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -161,4 +162,49 @@ func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.Succes
 	reply.Success = true
 	stacktrace := []byte(logging.Stacktrace{Global: true}.String())
 	return perms.WriteFile(stacktraceFile, stacktrace, perms.ReadWrite)
+}
+
+// SetLogLevelsArgs defines the log level to be set.
+type SetLogLevelsArgs struct {
+	LogLevel     string `json:"logLevel"`
+	DisplayLevel string `json:"displayLevel"`
+}
+
+// SetLogLevelsReply success result.
+type SetLogLevelsReply struct {
+	Success bool `json:"success"`
+}
+
+// SetLogLevel sets the log level and display level.
+func (service *Admin) SetLogLevels(r *http.Request, args *SetLogLevelsArgs, reply *SetLogLevelsReply) error {
+	service.log.Info("Admin: SetLogLevels called with LogLevel: %s, DisplayLevel: %s", args.LogLevel, args.DisplayLevel)
+	logLevel, err := logging.ToLevel(args.LogLevel)
+	if err != nil {
+		return fmt.Errorf("logLevel error: %w", err)
+	}
+	displayLevel, err := logging.ToLevel(args.DisplayLevel)
+	if err != nil {
+		return fmt.Errorf("displayLevel error: %w", err)
+	}
+
+	service.log.SetLogLevel(logLevel)
+	service.log.SetDisplayLevel(displayLevel)
+
+	reply.Success = true
+	return nil
+}
+
+// GetLogLevelReply returns current log levels.
+type GetLogLevelsReply struct {
+	LogLevel     string `json:"logLevel"`
+	DisplayLevel string `json:"displayLevel"`
+}
+
+// GetLogLevel sets the log level and display level.
+func (service *Admin) GetLogLevels(r *http.Request, _ *struct{}, reply *GetLogLevelsReply) error {
+	service.log.Info("Admin: GetLogLevels called")
+
+	reply.LogLevel = service.log.GetLogLevel().String()
+	reply.DisplayLevel = service.log.GetDisplayLevel().String()
+	return nil
 }

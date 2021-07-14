@@ -83,6 +83,8 @@ func (l Level) String() string {
 		return "DEBUG"
 	case Verbo:
 		return "VERBO"
+	case Off:
+		return "OFF"
 	default:
 		return "?????"
 	}

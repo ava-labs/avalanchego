@@ -300,6 +300,16 @@ func (l *Log) SetLogLevel(lvl Level) {
 	l.config.LogLevel = lvl
 }
 
+// GetDisplayLevel implements the Logger interface
+func (l *Log) GetDisplayLevel() Level {
+	return l.config.DisplayLevel
+}
+
+// GetLogLevel ...
+func (l *Log) GetLogLevel() Level {
+	return l.config.LogLevel
+}
+
 // SetDisplayLevel implements the Logger interface
 func (l *Log) SetDisplayLevel(lvl Level) {
 	l.configLock.Lock()
