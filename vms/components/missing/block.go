@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 var errMissingBlock = errors.New("missing block")
@@ -32,7 +31,7 @@ func (*Block) Reject() error { return errMissingBlock }
 func (*Block) Status() choices.Status { return choices.Unknown }
 
 // Parent ...
-func (*Block) Parent() snowman.Block { return nil }
+func (*Block) Parent() ids.ID { return ids.Empty }
 
 // Verify ...
 func (*Block) Verify() error { return errMissingBlock }

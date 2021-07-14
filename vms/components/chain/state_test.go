@@ -27,6 +27,12 @@ func (b *TestBlock) SetStatus(status choices.Status) { b.TestBlock.TestDecidable
 func NewTestBlock(i uint64, parent *TestBlock) *TestBlock {
 	b := []byte{byte(i)}
 	id := hashing.ComputeHash256Array(b)
+	var parentID ids.ID
+	if parent == nil {
+		parentID = ids.Empty
+	} else {
+		parentID = parent.ID()
+	}
 	return &TestBlock{
 		TestBlock: &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
@@ -34,7 +40,7 @@ func NewTestBlock(i uint64, parent *TestBlock) *TestBlock {
 				StatusV: choices.Unknown,
 			},
 			HeightV: i,
-			ParentV: parent,
+			ParentV: parentID,
 			BytesV:  b,
 		},
 	}
@@ -219,7 +225,7 @@ func TestState(t *testing.T) {
 			},
 			HeightV: uint64(2),
 			BytesV:  blk3Bytes,
-			ParentV: blk1,
+			ParentV: blk1.IDV,
 		},
 	}
 	testBlks = append(testBlks, blk3)
@@ -476,19 +482,30 @@ func TestStateParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	missingBlk1 := parsedBlk2.Parent()
-	if status := missingBlk1.Status(); status != choices.Unknown {
-		t.Fatalf("Expected status of parent of blk2 to be %s, but found %s", choices.Unknown, status)
+	missingBlk1ID := parsedBlk2.Parent()
+	missingBlk1, _ := chainState.GetBlock(missingBlk1ID)
+
+	if missingBlk1 != nil {
+		t.Fatalf("Expected  parent of blk2 to be not found")
 	}
 
 	parsedBlk1, err := chainState.ParseBlock(blk1.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
-	genesisBlkParent := parsedBlk1.Parent()
+
+	genesisBlkParentID := parsedBlk1.Parent()
+	genesisBlkParent, err := chainState.GetBlock(genesisBlkParentID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	checkAcceptedBlock(t, chainState, genesisBlkParent, true)
 
-	parentBlk1 := parsedBlk2.Parent()
+	parentBlk1ID := parsedBlk2.Parent()
+	parentBlk1, err := chainState.GetBlock(parentBlk1ID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	checkProcessingBlock(t, chainState, parentBlk1)
 }
 

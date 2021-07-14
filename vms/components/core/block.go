@@ -45,12 +45,16 @@ func (b *Block) ParentID() ids.ID { return b.PrntID }
 func (b *Block) Height() uint64 { return b.Hght }
 
 // Parent returns [b]'s parent
-func (b *Block) Parent() snowman.Block {
+func (b *Block) ParentBlock() snowman.Block {
 	parent, err := b.VM.GetBlock(b.ParentID())
 	if err != nil {
 		return &missing.Block{BlkID: b.ParentID()}
 	}
 	return parent
+}
+
+func (b *Block) Parent() ids.ID {
+	return b.ParentID()
 }
 
 // Accept sets this block's status to Accepted and sets lastAccepted to this

@@ -2288,8 +2288,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parentBlk := secondAdvanceTimeBlk.Parent()
-	if parentBlkID := parentBlk.ID(); parentBlkID != firstOption.ID() {
+	if parentBlkID := secondAdvanceTimeBlk.Parent(); parentBlkID != firstOption.ID() {
 		t.Fatalf("Wrong parent block ID returned")
 	} else if err := firstOption.Verify(); err != nil {
 		t.Fatal(err)
