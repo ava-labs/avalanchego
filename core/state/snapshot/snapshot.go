@@ -640,16 +640,10 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 //
 // The method returns the root hash of the base layer that needs to be persisted
 // to disk as a trie too to allow continuing any pending generation op.
-func (t *Tree) Journal(root common.Hash) (common.Hash, error) {
+func (t *Tree) Journal() (common.Hash, error) {
 	// Run the journaling
 	t.lock.Lock()
 	defer t.lock.Unlock()
-
-	// Retrieve the head snapshot to journal from var snap snapshot
-	snap := t.getSnapshot(root)
-	if snap == nil {
-		return common.Hash{}, fmt.Errorf("snapshot [%#x] missing", root)
-	}
 
 	// Firstly write out the metadata of journal
 	journal := new(bytes.Buffer)
@@ -674,7 +668,7 @@ func (t *Tree) Journal(root common.Hash) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	// Finally write out the journal of each layer in reverse order.
-	base, err := snap.Journal(journal)
+	base, err := disklayer.Journal(journal)
 	if err != nil {
 		return common.Hash{}, err
 	}
