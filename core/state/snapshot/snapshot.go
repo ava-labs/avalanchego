@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/VictoriaMetrics/fastcache"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -353,6 +354,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	start := time.Now()
 	snap, ok := t.blockLayers[blockHash]
 	if !ok {
 		return fmt.Errorf("cannot flatten missing snapshot: %s", blockHash)
@@ -434,7 +436,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	}
 	rebloom(base.blockHash)
 
-	log.Debug("Flattened snapshot tree", "blockHash", blockHash, "root", base.root, "size", len(t.blockLayers))
+	log.Debug("Flattened snapshot tree", "blockHash", blockHash, "root", base.root, "size", len(t.blockLayers), "elapsed", common.PrettyDuration(time.Since(start)))
 	return nil
 }
 

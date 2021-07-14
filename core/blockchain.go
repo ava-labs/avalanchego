@@ -1186,7 +1186,6 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
-	proctime := time.Since(start)
 
 	// Write the block to the chain and get the status.
 	// writeBlockWithState creates a reference that will be cleaned up in Accept/Reject
@@ -1203,14 +1202,14 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 			"parentHash", block.ParentHash(),
 			"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
 			"elapsed", common.PrettyDuration(time.Since(start)),
-			"root", block.Root(), "proctime", proctime)
+			"root", block.Root())
 		// Only count canonical blocks for GC processing time
 	case SideStatTy:
 		log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(),
 			"parentHash", block.ParentHash(),
 			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root(), "proctime", proctime)
+			"root", block.Root())
 	default:
 		// This in theory is impossible, but lets be nice to our future selves and leave
 		// a log, instead of trying to track down blocks imports that don't emit logs.
@@ -1218,7 +1217,7 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 			"parentHash", block.ParentHash(),
 			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root(), "proctime", proctime)
+			"root", block.Root())
 	}
 
 	return err
