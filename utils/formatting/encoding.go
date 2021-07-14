@@ -19,7 +19,7 @@ const (
 	// maximum length byte slice can be encoded as a string
 	// using the CB58 encoding. Must be longer than the length
 	// of an ID and longer than the length of a SECP256k1 private key
-	// TODO: Reduce to a reasonable amount (e.g. 16 * 1024) after we
+	// TODO: Reduce to a reasonable amount (e.g. 16 KiB) after we
 	// give users a chance to export very large keystore users to hex
 	maxCB58EncodeSize = math.MaxInt32
 	hexPrefix         = "0x"
