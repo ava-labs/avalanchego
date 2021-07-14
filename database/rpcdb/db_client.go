@@ -253,16 +253,21 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 func (b *batch) Inner() database.Batch { return b }
 
 type iterator struct {
-	db    *DatabaseClient
-	id    uint64
-	key   []byte
-	value []byte
-	errs  wrappers.Errs
+	db *DatabaseClient
+	id uint64
+
+	data []*rpcdbproto.PutRequest
+	errs wrappers.Errs
 }
 
 // Next attempts to move the iterator to the next element and returns if this
 // succeeded
 func (it *iterator) Next() bool {
+	if len(it.data) > 1 {
+		it.data = it.data[1:]
+		return true
+	}
+
 	resp, err := it.db.client.IteratorNext(context.Background(), &rpcdbproto.IteratorNextRequest{
 		Id: it.id,
 	})
@@ -270,10 +275,8 @@ func (it *iterator) Next() bool {
 		it.errs.Add(err)
 		return false
 	}
-
-	it.key = resp.Key
-	it.value = resp.Value
-	return resp.FoundNext
+	it.data = resp.Data
+	return len(it.data) > 0
 }
 
 // Error returns any that occurred while iterating
@@ -294,10 +297,20 @@ func (it *iterator) Error() error {
 }
 
 // Key returns the key of the current element
-func (it *iterator) Key() []byte { return it.key }
+func (it *iterator) Key() []byte {
+	if len(it.data) == 0 {
+		return nil
+	}
+	return it.data[0].Key
+}
 
 // Value returns the value of the current element
-func (it *iterator) Value() []byte { return it.value }
+func (it *iterator) Value() []byte {
+	if len(it.data) == 0 {
+		return nil
+	}
+	return it.data[0].Value
+}
 
 // Release frees any resources held by the iterator
 func (it *iterator) Release() {
