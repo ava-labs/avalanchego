@@ -323,29 +323,28 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 	return batchGroups, nil
 }
 
-func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*atomic.Requests, batch ...database.Batch) error {
-	formattedRequest := make(map[string]*gsharedmemoryproto.BatchMap)
+func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Requests, batch ...database.Batch) error {
+	formattedRequest := make(map[string]*gsharedmemoryproto.AtomicRequest)
 	keys := make([][]byte, 0, len(batchChainsAndInputs))
+
 	for key, value := range batchChainsAndInputs {
-		formattedValues := make([]*gsharedmemoryproto.AtomicRequest, len(value))
 		keys = append(keys, []byte(key.String()))
-		for k, v := range value {
-			formattedElements := make([]*gsharedmemoryproto.Element, 0, len(v.Elems))
-			for _, formatElems := range v.Elems {
-				formattedElements = append(formattedElements, &gsharedmemoryproto.Element{
-					Key:    formatElems.Key,
-					Value:  formatElems.Value,
-					Traits: formatElems.Traits,
-				})
-			}
-			formattedValues[k] = &gsharedmemoryproto.AtomicRequest{
-				RequestType: gsharedmemoryproto.SharedMemoryMethod(v.RequestType),
-				UtxoIDs:     v.UtxoIDs,
-				Elems:       formattedElements,
-				PeerChainID: key[:],
-			}
-			formattedRequest[key.String()] = &gsharedmemoryproto.BatchMap{Requests: formattedValues}
+		formattedElements := make([]*gsharedmemoryproto.Element, 0, len(value.PutRequests))
+		for _, v := range value.PutRequests {
+			formattedElements = append(formattedElements, &gsharedmemoryproto.Element{
+				Key:    v.Key,
+				Value:  v.Value,
+				Traits: v.Traits,
+			})
 		}
+
+		formattedValues := &gsharedmemoryproto.AtomicRequest{
+			RemoveRequests: value.RemoveRequests,
+			PutRequests:    formattedElements,
+			PeerChainID:    key[:],
+		}
+
+		formattedRequest[key.String()] = formattedValues
 	}
 
 	req := &gsharedmemoryproto.RemoveAndPutMultipleRequest{

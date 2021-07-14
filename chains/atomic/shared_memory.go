@@ -37,9 +37,8 @@ const (
 )
 
 type Requests struct {
-	RequestType SharedMemoryMethod
-	UtxoIDs     [][]byte
-	Elems       []*Element
+	RemoveRequests [][]byte
+	PutRequests    []*Element
 }
 
 type dbElement struct {
@@ -86,7 +85,7 @@ type SharedMemory interface {
 	)
 	Remove(peerChainID ids.ID, keys [][]byte, batches ...database.Batch) error
 
-	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error
+	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Requests, batches ...database.Batch) error
 }
 
 // sharedMemory provides the API for a blockchain to interact with shared memory
@@ -209,7 +208,7 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
-func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*Requests, batches ...database.Batch) error {
+func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Requests, batches ...database.Batch) error {
 
 	if len(batchChainsAndInputs) == 0 {
 		return errEmptyBatch
@@ -219,34 +218,28 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID][]*
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
 		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 
-		db := prefixdb.New(sharedID[:], vdb)
+		db := sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
 
 		s := state{
 			c: sm.m.codec,
 		}
 
-		for _, atomicRequest := range atomicRequests {
-			switch atomicRequest.RequestType {
-			case Remove:
-				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
+		for _, removeRequest := range atomicRequests.RemoveRequests {
+			s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
 
-				for _, key := range atomicRequest.UtxoIDs {
-					if err := s.RemoveValue(key); err != nil {
-						return err
-					}
-				}
-			case Put:
-				s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
-
-				for _, elem := range atomicRequest.Elems {
-					if err := s.SetValue(elem); err != nil {
-						return err
-					}
-				}
-			default:
-				panic("Illegal type")
+			if err := s.RemoveValue(removeRequest); err != nil {
+				return err
 			}
+
 		}
+		for _, putRequest := range atomicRequests.PutRequests {
+			if err := s.SetValue(putRequest); err != nil {
+				return err
+			}
+
+		}
+
+		sm.m.ReleaseDatabase(sharedID)
 	}
 
 	myBatch, err := vdb.CommitBatch()

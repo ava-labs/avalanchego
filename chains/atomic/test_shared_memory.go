@@ -295,19 +295,17 @@ func TestPutAndRemoveBatch(t *testing.T, chainID0, chainID1 ids.ID, _, sm1 Share
 	err := batch.Put([]byte{0}, []byte{1})
 	assert.NoError(err)
 
-	batchChainsAndInputs := make(map[ids.ID][]*Requests)
+	batchChainsAndInputs := make(map[ids.ID]*Requests)
 
-	byteArr := [][]byte{{0}, {1}, {2}}
+	byteArr := [][]byte{{0}, {1}, {5}}
 
-	batchChainsAndInputs[chainID0] = []*Requests{{Remove, byteArr, []*Element{{
-		Key:   []byte{2},
-		Value: []byte{9},
-	}}}}
-
-	batchChainsAndInputs[chainID1] = []*Requests{{Put, byteArr, []*Element{{
-		Key:   []byte{0},
-		Value: []byte{1},
-	}}}}
+	batchChainsAndInputs[chainID0] = &Requests{
+		PutRequests: []*Element{{
+			Key:   []byte{2},
+			Value: []byte{9},
+		}},
+		RemoveRequests: byteArr,
+	}
 
 	err = sm1.RemoveAndPutMultiple(batchChainsAndInputs, batch)
 
@@ -401,19 +399,17 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		assert.NoError(err)
 	}
 
-	batchChainsAndInputs := make(map[ids.ID][]*Requests)
+	batchChainsAndInputs := make(map[ids.ID]*Requests)
 
-	byteArr := [][]byte{{0}, {1}, {2}}
+	byteArr := [][]byte{{30}, {40}, {50}}
 
-	batchChainsAndInputs[chainID1] = []*Requests{{Remove, byteArr, []*Element{{
-		Key:   []byte{2},
-		Value: []byte{9},
-	}}}}
-
-	batchChainsAndInputs[chainID1] = []*Requests{{Put, byteArr, []*Element{{
-		Key:   []byte{0},
-		Value: []byte{1},
-	}}}}
+	batchChainsAndInputs[chainID1] = &Requests{
+		PutRequests: []*Element{{
+			Key:   []byte{2},
+			Value: []byte{9},
+		}},
+		RemoveRequests: byteArr,
+	}
 
 	err = sm0.RemoveAndPutMultiple(
 		batchChainsAndInputs,

@@ -58,6 +58,13 @@ func (m *Memory) NewSharedMemory(id ids.ID) SharedMemory {
 	}
 }
 
+// GetPrefixDBInstanceFromVdb returns a new prefix db on an existing versiondb
+func (m *Memory) GetPrefixDBInstanceFromVdb(vdb *versiondb.Database, sharedID ids.ID) database.Database {
+	lock := m.makeLock(sharedID)
+	lock.Lock()
+	return prefixdb.New(sharedID[:], vdb)
+}
+
 // GetDatabase returns and locks the provided DB
 func (m *Memory) GetDatabase(sharedID ids.ID) (*versiondb.Database, database.Database) {
 	lock := m.makeLock(sharedID)

@@ -34,7 +34,7 @@ type Server struct {
 	removes     map[int64]*removeRequest
 
 	removeAndPutMultipleLock sync.Mutex
-	removeAndPutMultiples    map[int64]map[ids.ID][]*atomic.Requests
+	removeAndPutMultiples    map[int64]map[ids.ID]*atomic.Requests
 }
 
 // NewServer returns shared memory connected to remote shared memory
@@ -46,12 +46,12 @@ func NewServer(sm atomic.SharedMemory, db database.Database) *Server {
 		gets:                  make(map[int64]*getRequest),
 		indexed:               make(map[int64]*indexedRequest),
 		removes:               make(map[int64]*removeRequest),
-		removeAndPutMultiples: make(map[int64]map[ids.ID][]*atomic.Requests),
+		removeAndPutMultiples: make(map[int64]map[ids.ID]*atomic.Requests),
 	}
 }
 
 type removeAndPutMultipleRequest struct {
-	batchChainsAndInputs map[ids.ID][]*atomic.Requests
+	batchChainsAndInputs map[ids.ID]*atomic.Requests
 	batch                map[int64]database.Batch
 }
 
@@ -65,38 +65,29 @@ func (s *Server) RemoveAndPutMultiple(
 	//
 	formattedRequest, exists := s.removeAndPutMultiples[req.Id]
 	if !exists {
-		formattedRequest = make(map[ids.ID][]*atomic.Requests)
+		formattedRequest = make(map[ids.ID]*atomic.Requests)
 		for _, value := range req.BatchChainsAndInputs {
-			var chainID ids.ID
-
-			formattedValues := make([]*atomic.Requests, len(value.Requests))
-			for k, v := range value.Requests {
-				if chainID.String() == "" {
-					chainIdentifier, err := ids.ToID(v.PeerChainID)
-					if err != nil {
-						return nil, err
-					}
-
-					chainID = chainIdentifier
-				}
-
-				formattedElements := make([]*atomic.Element, 0, len(v.Elems))
-				for _, formatElems := range v.Elems {
-					formattedElements = append(formattedElements, &atomic.Element{
-						Key:    formatElems.Key,
-						Value:  formatElems.Value,
-						Traits: formatElems.Traits,
-					})
-				}
-
-				formattedValues[k] = &atomic.Requests{
-					RequestType: atomic.SharedMemoryMethod(v.RequestType),
-					UtxoIDs:     v.UtxoIDs,
-					Elems:       formattedElements,
-				}
+			formattedElements := make([]*atomic.Element, 0, len(value.PutRequests))
+			chainIdentifier, err := ids.ToID(value.PeerChainID)
+			if err != nil {
+				return nil, err
 			}
 
-			formattedRequest[chainID] = formattedValues
+			for _, v := range value.PutRequests {
+				formattedElements = append(formattedElements, &atomic.Element{
+					Key:    v.Key,
+					Value:  v.Value,
+					Traits: v.Traits,
+				})
+
+			}
+
+			formattedValues := &atomic.Requests{
+				RemoveRequests: value.RemoveRequests,
+				PutRequests:    formattedElements,
+			}
+
+			formattedRequest[chainIdentifier] = formattedValues
 		}
 	}
 
