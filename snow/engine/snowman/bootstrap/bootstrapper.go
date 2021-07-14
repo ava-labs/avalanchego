@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -286,13 +287,18 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
+			vm:          b.VM,
 		})
 		if err != nil {
 			return err
 		}
 
 		// Traverse to the next block regardless of if the block is pushed
-		blk = blk.Parent()
+		blkID = blk.Parent()
+		blk, err = b.VM.GetBlock(blkID)
+		if err != nil {
+			blk = &missing.Block{BlkID: blkID}
+		}
 		status = blk.Status()
 		blkID = blk.ID()
 
