@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+#
+# Use lower_case variables in the scripts and UPPER_CASE variables for override
+# Use the constants.sh for env overrides
+# Use the versions.sh to specify versions
+#
 
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd ) # Directory above this script
 
@@ -22,10 +27,11 @@ prev_avalanchego_process_path="$prev_build_dir/avalanchego-process"
 prev_plugin_dir="$prev_build_dir/plugins"
 
 # Avalabs docker hub
-dockerhub_repo="avaplatform/avalanchego"
-avalanche_image_name="avalanchego"
+# avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
+# You should probably set it - export DOCKER_REPO='avaplatform/avalanchego'
+avalanchego_dockerhub_repo=${DOCKER_REPO:-"local"}
 
 # Current branch
-current_branch=$(git rev-parse --abbrev-ref HEAD)
+current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 
 git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}

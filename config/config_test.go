@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -236,6 +237,95 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	assert.Equal(expected, chainConfigs)
 }
 
+func TestReadVMAliases(t *testing.T) {
+	tests := map[string]struct {
+		givenJSON  string
+		expected   map[ids.ID][]string
+		errMessage string
+	}{
+		"wrong vm id": {
+			givenJSON:  `{"wrongVmId": ["vm1","vm2"]}`,
+			expected:   nil,
+			errMessage: "problem unmarshaling vmAliases",
+		},
+		"vm id": {
+			givenJSON: `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"],
+										"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU": ["vm3", "vm4"] }`,
+			expected: func() map[ids.ID][]string {
+				m := map[ids.ID][]string{}
+				id1, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				id2, _ := ids.FromString("Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU")
+				m[id1] = []string{"vm1", "vm2"}
+				m[id2] = []string{"vm3", "vm4"}
+				return m
+			}(),
+			errMessage: "",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert := assert.New(t)
+			root := t.TempDir()
+			aliasPath := path.Join(root, "aliases.json")
+			configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
+			configFilePath := setupConfigJSON(t, root, configJSON)
+			setupFile(t, root, "aliases.json", test.givenJSON)
+			v := setupViper(configFilePath)
+			vmAliases, err := readVMAliases(v)
+			if len(test.errMessage) > 0 {
+				assert.Error(err)
+				assert.Contains(err.Error(), test.errMessage)
+			} else {
+				assert.NoError(err)
+				assert.Equal(test.expected, vmAliases)
+			}
+		})
+	}
+}
+
+func TestReadVMAliasesDefaultDir(t *testing.T) {
+	assert := assert.New(t)
+	root := t.TempDir()
+	// changes internal package variable, since using defaultDir (under user home) is risky.
+	defaultVMAliasFilePath = filepath.Join(root, "aliases.json")
+	configFilePath := setupConfigJSON(t, root, "{}")
+
+	v := setupViper(configFilePath)
+	assert.Equal(defaultVMAliasFilePath, v.GetString(VMAliasesFileKey))
+
+	setupFile(t, root, "aliases.json", `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"]}`)
+	vmAliases, err := readVMAliases(v)
+	assert.NoError(err)
+
+	expected := map[ids.ID][]string{}
+	id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	expected[id] = []string{"vm1", "vm2"}
+	assert.Equal(expected, vmAliases)
+}
+
+func TestReadVMAliasesDirNotExists(t *testing.T) {
+	assert := assert.New(t)
+	root := t.TempDir()
+	aliasPath := "/not/exists"
+	// set it explicitly
+	configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
+	configFilePath := setupConfigJSON(t, root, configJSON)
+	v := setupViper(configFilePath)
+	vmAliases, err := readVMAliases(v)
+	assert.Nil(vmAliases)
+	assert.Error(err)
+	assert.Contains(err.Error(), "vm alias file does not exist")
+
+	// do not set it explicitly
+	configJSON = "{}"
+	configFilePath = setupConfigJSON(t, root, configJSON)
+	v = setupViper(configFilePath)
+	vmAliases, err = readVMAliases(v)
+	assert.Nil(vmAliases)
+	assert.NoError(err)
+}
+
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := path.Join(rootPath, "config.json")
@@ -252,7 +342,7 @@ func setupFile(t *testing.T, path string, fileName string, value string) {
 
 func setupViper(configFilePath string) *viper.Viper {
 	v := viper.New()
-	fs := avalancheFlagSet()
+	fs := BuildFlagSet()
 	pflag.CommandLine = pflag.NewFlagSet(os.Args[0], pflag.PanicOnError) // flags are now reset
 	pflag.CommandLine.AddGoFlagSet(fs)
 	pflag.Parse()

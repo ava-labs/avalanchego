@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
@@ -58,9 +59,8 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM    = &VM{}
-	_ common.StaticVM = &VM{}
-	_ secp256k1fx.VM  = &VM{}
+	_ vertex.DAGVM   = &VM{}
+	_ secp256k1fx.VM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -267,6 +267,11 @@ func (vm *VM) Shutdown() error {
 	return vm.baseDB.Close()
 }
 
+// Get implements the avalanche.DAGVM interface
+func (vm *VM) Version() (string, error) {
+	return version.Current.String(), nil
+}
+
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	codec := cjson.NewCodec()
@@ -274,8 +279,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
@@ -284,8 +289,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 

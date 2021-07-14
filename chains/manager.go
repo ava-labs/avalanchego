@@ -9,9 +9,6 @@ import (
 	"sync"
 	"time"
 
-	block2 "github.com/ava-labs/avalanchego/vms/metervm/block"
-	vertex2 "github.com/ava-labs/avalanchego/vms/metervm/vertex"
-
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/api/server"
@@ -34,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 
 	dbManager "github.com/ava-labs/avalanchego/database/manager"
 
@@ -50,7 +48,10 @@ const (
 	defaultChannelSize = 1024
 )
 
-var BootstrappedKey = []byte{0x00}
+var (
+	BootstrappedKey         = []byte{0x00}
+	_               Manager = &manager{}
+)
 
 // Manager manages the chains running on this node.
 // It can:
@@ -125,10 +126,6 @@ type ChainConfig struct {
 // ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled            bool // True iff the network has staking enabled
-	MaxPendingMsgs            uint32
-	MaxNonStakerPendingMsgs   uint32
-	StakerMSGPortion          float64
-	StakerCPUPortion          float64
 	Log                       logging.Logger
 	LogFactory                logging.Factory
 	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
@@ -265,6 +262,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 			}
 		}
 		sb = newSubnet(onBootstrapped, chainParams.ID)
+		m.subnets[chainParams.SubnetID] = sb
 	} else {
 		sb.addChain(chainParams.ID)
 	}
@@ -285,10 +283,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		}
 		m.Log.Error("error creating chain %s: %s", chainParams.ID, err)
 		return
-	}
-
-	if !exists {
-		m.subnets[chainParams.SubnetID] = sb
 	}
 
 	m.chainsLock.Lock()
@@ -483,8 +477,9 @@ func (m *manager) createAvalancheChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+
 	if m.MeterVMEnabled {
-		vm = vertex2.NewMeterVM(vm)
+		vm = metervm.NewVertexVM(vm)
 	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
@@ -592,10 +587,6 @@ func (m *manager) createAvalancheChain(
 		engine,
 		validators,
 		msgChan,
-		m.MaxPendingMsgs,
-		m.MaxNonStakerPendingMsgs,
-		m.StakerMSGPortion,
-		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)
@@ -623,8 +614,9 @@ func (m *manager) createSnowmanChain(
 ) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
+
 	if m.MeterVMEnabled {
-		vm = block2.NewMeterVM(vm)
+		vm = metervm.NewBlockVM(vm)
 	}
 	meterDBManager, err := m.DBManager.NewMeterDBManager(consensusParams.Namespace+"_db", ctx.Metrics)
 	if err != nil {
@@ -712,10 +704,6 @@ func (m *manager) createSnowmanChain(
 		engine,
 		validators,
 		msgChan,
-		m.MaxPendingMsgs,
-		m.MaxNonStakerPendingMsgs,
-		m.StakerMSGPortion,
-		m.StakerCPUPortion,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,
 	)

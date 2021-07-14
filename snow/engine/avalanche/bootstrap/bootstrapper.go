@@ -33,7 +33,10 @@ const (
 	bootstrappingDelay = 10 * time.Second
 )
 
-var errUnexpectedTimeout = errors.New("unexpected timeout fired")
+var (
+	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
+	_                    common.Bootstrapable = &Bootstrapper{}
+)
 
 // Config ...
 type Config struct {
@@ -448,7 +451,7 @@ func (b *Bootstrapper) checkFinish() error {
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedVts
 
-	// Not that executedVts < c*previouslyExecuted is enforced so that the
+	// Note that executedVts < c*previouslyExecuted is enforced so that the
 	// bootstrapping process will terminate even as new vertices are being
 	// issued.
 	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.RetryBootstrap {

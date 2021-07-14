@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -72,8 +73,8 @@ var (
 
 	_ block.ChainVM        = &VM{}
 	_ validators.Connector = &VM{}
-	_ common.StaticVM      = &VM{}
 	_ secp256k1fx.VM       = &VM{}
+	_ Fx                   = &secp256k1fx.Fx{}
 )
 
 // VM implements the snowman.ChainVM interface
@@ -403,6 +404,10 @@ func (vm *VM) NotifyBlockReady() {
 	}
 }
 
+func (vm *VM) Version() (string, error) {
+	return version.Current.String(), nil
+}
+
 // CreateHandlers returns a map where:
 // * keys are API endpoint extensions
 // * values are API handlers
@@ -410,8 +415,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptAPIRequest)
-	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterAPIRequest)
+	server.RegisterInterceptFunc(vm.metrics.apiRequestMetrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.metrics.apiRequestMetrics.AfterRequest)
 	if err := server.RegisterService(&Service{vm: vm}, "platform"); err != nil {
 		return nil, err
 	}

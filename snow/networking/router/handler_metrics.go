@@ -8,8 +8,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -23,7 +23,7 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 			Namespace: namespace,
 			Name:      name,
 			Help:      defaultRequestHelpMsg,
-			Buckets:   utils.NanosecondsBuckets,
+			Buckets:   metric.NanosecondsBuckets,
 		})
 
 	if err := registerer.Register(histogram); err != nil {
@@ -33,10 +33,9 @@ func initHistogram(namespace, name string, registerer prometheus.Registerer, err
 }
 
 type handlerMetrics struct {
-	namespace        string
-	registerer       prometheus.Registerer
-	pending          prometheus.Gauge
-	dropped, expired prometheus.Counter
+	namespace  string
+	registerer prometheus.Registerer
+	expired    prometheus.Counter
 	getAcceptedFrontier, acceptedFrontier, getAcceptedFrontierFailed,
 	getAccepted, accepted, getAcceptedFailed,
 	getAncestors, multiPut, getAncestorsFailed,
@@ -56,33 +55,12 @@ func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Regi
 	m.registerer = registerer
 	errs := wrappers.Errs{}
 
-	m.pending = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: namespace,
-		Name:      "pending",
-		Help:      "Number of pending events",
-	})
-	if err := registerer.Register(m.pending); err != nil {
-		errs.Add(fmt.Errorf("failed to register pending statistics due to %w", err))
-	}
-
-	m.dropped = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: namespace,
-		Name:      "dropped",
-		Help:      "Number of dropped events",
-	})
-
-	if err := registerer.Register(m.dropped); err != nil {
-		errs.Add(fmt.Errorf("failed to register dropped statistics due to %w", err))
-	}
-
 	m.expired = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "expired",
-		Help:      "Number of expired events",
+		Help:      "Incoming messages dropped because the message deadline expired",
 	})
-	if err := registerer.Register(m.expired); err != nil {
-		errs.Add(fmt.Errorf("failed to register expired statistics due to %w", err))
-	}
+	errs.Add(registerer.Register(m.expired))
 
 	m.getAcceptedFrontier = initHistogram(namespace, "get_accepted_frontier", registerer, &errs)
 	m.acceptedFrontier = initHistogram(namespace, "accepted_frontier", registerer, &errs)
@@ -110,46 +88,18 @@ func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Regi
 		Namespace: namespace,
 		Name:      "cpu_utilization",
 		Help:      "Time this handler's engine spent processing messages for a single CPU interval in milliseconds",
-		Buckets:   utils.MillisecondsBuckets,
+		Buckets:   metric.MillisecondsBuckets,
 	})
-	if err := registerer.Register(m.cpu); err != nil {
-		errs.Add(fmt.Errorf("failed to register shutdown statistics due to %w", err))
-	}
+	errs.Add(registerer.Register(m.cpu))
 	m.shutdown = prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespace,
 		Name:      "shutdown",
 		Help:      "Time spent in the process of shutting down in nanoseconds",
-		Buckets:   utils.NanosecondsBuckets,
+		Buckets:   metric.NanosecondsBuckets,
 	})
-	if err := registerer.Register(m.shutdown); err != nil {
-		errs.Add(fmt.Errorf("failed to register shutdown statistics due to %w", err))
-	}
+	errs.Add(registerer.Register(m.shutdown))
 
 	return errs.Err
-}
-
-func (m *handlerMetrics) registerTierStatistics(tier int) (prometheus.Gauge, prometheus.Histogram, error) {
-	errs := wrappers.Errs{}
-
-	gauge := prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: m.namespace,
-		Name:      fmt.Sprintf("tier_%d", tier),
-		Help:      fmt.Sprintf("Number of pending messages on tier %d of the multi-level message queue", tier),
-	})
-	if err := m.registerer.Register(gauge); err != nil {
-		errs.Add(fmt.Errorf("failed to register tier_%d statistics due to %w", tier, err))
-	}
-
-	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: m.namespace,
-		Name:      fmt.Sprintf("tier_%d_wait_time", tier),
-		Help:      fmt.Sprintf("Amount of time a message waits on tier %d queue before being processed", tier),
-		Buckets:   utils.NanosecondsBuckets,
-	})
-	if err := m.registerer.Register(histogram); err != nil {
-		errs.Add(fmt.Errorf("failed to register tier_%d_wait_time statistics due to %w", tier, err))
-	}
-	return gauge, histogram, errs.Err
 }
 
 func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) prometheus.Histogram {

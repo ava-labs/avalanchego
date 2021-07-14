@@ -14,13 +14,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NYTimes/gziphandler"
+
 	"github.com/gorilla/handlers"
 
 	"github.com/rs/cors"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -29,7 +33,10 @@ const (
 	serverShutdownTimeout = 10 * time.Second
 )
 
-var errUnknownLockOption = errors.New("invalid lock options")
+var (
+	errUnknownLockOption            = errors.New("invalid lock options")
+	_                    RouteAdder = &Server{}
+)
 
 type RouteAdder interface {
 	AddRoute(handler *common.HTTPHandler, lock *sync.RWMutex, base, endpoint string, loggingWriter io.Writer) error
@@ -37,6 +44,8 @@ type RouteAdder interface {
 
 // Server maintains the HTTP router
 type Server struct {
+	// This node's ID
+	nodeID ids.ShortID
 	// log this server writes to
 	log logging.Logger
 	// generates new logs for chains to write to
@@ -60,6 +69,7 @@ func (s *Server) Initialize(
 	host string,
 	port uint16,
 	allowedOrigins []string,
+	nodeID ids.ShortID,
 	wrappers ...Wrapper,
 ) {
 	s.log = log
@@ -67,13 +77,21 @@ func (s *Server) Initialize(
 	s.listenHost = host
 	s.listenPort = port
 	s.router = newRouter()
+	s.nodeID = nodeID
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
-	corsWrapper := cors.New(cors.Options{
+	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
-	})
-	s.handler = corsWrapper.Handler(s.router)
+	}).Handler(s.router)
+	gzipHandler := gziphandler.GzipHandler(corsHandler)
+	s.handler = http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			// Attach this node's ID as a header
+			w.Header().Set("node-id", nodeID.PrefixedString(constants.NodeIDPrefix))
+			gzipHandler.ServeHTTP(w, r)
+		},
+	)
 
 	for _, wrapper := range wrappers {
 		s.handler = wrapper.WrapHandler(s.handler)

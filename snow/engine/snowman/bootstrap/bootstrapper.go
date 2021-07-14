@@ -24,7 +24,10 @@ import (
 // Parameters for delaying bootstrapping to avoid potential CPU burns
 const bootstrappingDelay = 10 * time.Second
 
-var errUnexpectedTimeout = errors.New("unexpected timeout fired")
+var (
+	errUnexpectedTimeout                      = errors.New("unexpected timeout fired")
+	_                    common.Bootstrapable = &Bootstrapper{}
+)
 
 // Config ...
 type Config struct {
@@ -351,7 +354,7 @@ func (b *Bootstrapper) checkFinish() error {
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedBlocks
 
-	// Note that executedVts < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
+	// Note that executedBlocks < c*previouslyExecuted ( 0 <= c < 1 ) is enforced
 	// so that the bootstrapping process will terminate even as new blocks are
 	// being issued.
 	if b.RetryBootstrap && executedBlocks > 0 && executedBlocks < previouslyExecuted/2 {

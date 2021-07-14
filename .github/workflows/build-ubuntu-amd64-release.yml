@@ -82,3 +82,37 @@ jobs:
         ARCH: "amd64"
         RELEASE: "focal"
 
+  deploy-to-integration:
+    needs: build-focal-amd64-package
+    runs-on: [self-hosted, linux, deploy]
+    steps:
+    - name: Get the version
+      id: get_version
+      run: echo ::set-output name=VERSION::${GITHUB_REF/refs\/tags\//}
+      shell: bash
+
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        path: master
+
+    - name: Checkout devops repo
+      uses: actions/checkout@v2
+      with: 
+        repository: ava-labs/devops
+        token: ${{ secrets.AVALANCHE_PAT }}
+  
+    - name: Run Ansible
+      run: | 
+        export ANSIBLE_HOST_KEY_CHECKING=False
+        if [[ ${{ secrets.DEPLOY }} == "true" ]]
+        then 
+          echo "The deployment is enabled.  Deploying $TAG to integration"
+          ansible-playbook -i scripts/ansible/testnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/testnet/update-from-s3-and-restart.yml -e release_ver=$TAG
+          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-validators.yml -u avalanche scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
+          #ansible-playbook -i scripts/ansible/mainnet/inventory/deploy-api.yml -u avalanche scripts/ansible/mainnet/update-from-s3-and-restart.yml -e release_ver=$TAG
+        else
+          echo 'The deployment is not set to "true".  Skipping deployment.'
+        fi
+      env:
+        TAG: ${{ steps.get_version.outputs.VERSION }}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -45,9 +46,9 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 	assert := assert.New(t)
 	rand.Seed(0)
 
-	totalSize := 16 * 1024 * 1024 // 16 MiB
-	elementSize := 4 * 1024       // 4 KiB
-	pairSize := 2 * elementSize   // 8 KiB
+	totalSize := 16 * units.MiB  // 16 MiB
+	elementSize := 4 * units.KiB // 4 KiB
+	pairSize := 2 * elementSize  // 8 KiB
 
 	b := make([]byte, totalSize)
 	_, err := rand.Read(b) // #nosec G404
@@ -146,8 +147,8 @@ func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 S
 func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
 	assert := assert.New(t)
 
-	totalSize := 8 * 1024 * 1024 // 8 MiB
-	elementSize := 1024          // 1 KiB
+	totalSize := 8 * units.MiB   // 8 MiB
+	elementSize := 1 * units.KiB // 1 KiB
 	pairSize := 3 * elementSize  // 3 KiB
 
 	b := make([]byte, totalSize)
@@ -291,8 +292,8 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	assert := assert.New(t)
 	rand.Seed(0)
 
-	totalSize := 8 * 1024 * 1024 // 8 MiB
-	elementSize := 4 * 1024      // 4 KiB
+	totalSize := 8 * units.MiB   // 8 MiB
+	elementSize := 4 * units.KiB // 4 KiB
 	pairSize := 2 * elementSize  // 8 KiB
 
 	bytes := make([]byte, totalSize)

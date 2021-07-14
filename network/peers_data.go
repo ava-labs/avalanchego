@@ -22,29 +22,29 @@ func (p *peersData) reset() {
 }
 
 func (p *peersData) add(peer *peer) {
-	if _, ok := p.getByID(peer.id); !ok { // new insertion
+	if _, ok := p.getByID(peer.nodeID); !ok { // new insertion
 		p.peersList = append(p.peersList, peer)
-		p.peersIdxes[peer.id] = len(p.peersList) - 1
+		p.peersIdxes[peer.nodeID] = len(p.peersList) - 1
 	} else { // update
-		p.peersList[p.peersIdxes[peer.id]] = peer
+		p.peersList[p.peersIdxes[peer.nodeID]] = peer
 	}
 }
 
 func (p *peersData) remove(peer *peer) {
-	if _, ok := p.getByID(peer.id); !ok {
+	if _, ok := p.getByID(peer.nodeID); !ok {
 		return
 	}
 
 	// Drop p by replacing it with last peer in peersList.
 	// if p is already the last peer, simply drop it.
 	// Keep peersIdxes synced. peersList order is not preserved
-	idToDrop := peer.id
+	idToDrop := peer.nodeID
 	idxToReplace := p.peersIdxes[idToDrop]
 
 	if idxToReplace != len(p.peersList)-1 {
 		lastPeer := p.peersList[len(p.peersList)-1]
 		p.peersList[idxToReplace] = lastPeer
-		p.peersIdxes[lastPeer.id] = idxToReplace
+		p.peersIdxes[lastPeer.nodeID] = idxToReplace
 	}
 	p.peersList = p.peersList[:len(p.peersList)-1]
 	delete(p.peersIdxes, idToDrop)
