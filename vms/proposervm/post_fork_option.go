@@ -95,12 +95,17 @@ func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
 }
 
 func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
+	parentTimestamp := b.Timestamp()
 	parentPChainHeight, err := b.pChainHeight()
 	if err != nil {
 		return err
 	}
-	return postForkCommonVerify(&b.postForkCommonComponents, b.Timestamp(),
-		parentPChainHeight, child)
+	return postForkCommonVerify(
+		&b.postForkCommonComponents,
+		parentTimestamp,
+		parentPChainHeight,
+		child,
+	)
 }
 
 func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {

@@ -130,11 +130,10 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		return [2]snowman.Block{}, err
 	}
 
-	res := [2]snowman.Block{
+	return [2]snowman.Block{
 		postForkOpt0,
 		postForkOpt1,
-	}
-	return res, nil
+	}, nil
 }
 
 func (b *postForkBlock) verifyPreForkChild(child *preForkBlock) error {
@@ -142,9 +141,23 @@ func (b *postForkBlock) verifyPreForkChild(child *preForkBlock) error {
 }
 
 func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
+	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
-	return postForkCommonVerify(&b.postForkCommonComponents, b.Timestamp(),
-		parentPChainHeight, child)
+	return postForkCommonVerify(
+		&b.postForkCommonComponents,
+		parentTimestamp,
+		parentPChainHeight,
+		child,
+	)
+}
+
+func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
+	if _, ok := b.innerBlk.(snowman.OracleBlock); !ok {
+		b.vm.ctx.Log.Debug("post fork option block does not have oracle father")
+		return errUnexpectedBlockType
+	}
+
+	return child.innerBlk.Verify()
 }
 
 func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
@@ -201,15 +214,6 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	return blk, b.vm.storePostForkBlock(blk)
 }
 
-func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
-	if _, ok := b.innerBlk.(snowman.OracleBlock); !ok {
-		b.vm.ctx.Log.Debug("post fork option block does not have oracle father")
-		return errUnexpectedBlockType
-	}
-
-	return child.innerBlk.Verify()
-}
-
 func (b *postForkBlock) pChainHeight() (uint64, error) {
 	return b.PChainHeight(), nil
 }
@@ -220,10 +224,11 @@ func postForkCommonVerify(parent *postForkCommonComponents, parentTimestamp time
 		return errPChainHeightNotMonotonic
 	}
 
+	childID := child.ID()
 	currentPChainHeight, err := parent.vm.PChainHeight()
 	if err != nil {
 		parent.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
-			child.ID())
+			childID)
 		return err
 	}
 	if childPChainHeight > currentPChainHeight {
@@ -256,10 +261,10 @@ func postForkCommonVerify(parent *postForkCommonComponents, parentTimestamp time
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	parent.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		child.ID(), parentTimestamp.Format("15:04:05"), minDelay, childTimestamp.Format("15:04:05"))
+		childID, parentTimestamp.Format("15:04:05"), minDelay, childTimestamp.Format("15:04:05"))
 
 	if childTimestamp.Before(minTimestamp) {
-		parent.vm.ctx.Log.Debug("Snowman++ verify - dropped post-fork block due to time window %s", child.ID())
+		parent.vm.ctx.Log.Debug("Snowman++ verify - dropped post-fork block due to time window %s", childID)
 		return errProposerWindowNotStarted
 	}
 
@@ -276,6 +281,6 @@ func postForkCommonVerify(parent *postForkCommonComponents, parentTimestamp time
 		parent.vm.Tree.Add(child.innerBlk)
 	}
 
-	parent.vm.verifiedBlocks[child.ID()] = child
+	parent.vm.verifiedBlocks[childID] = child
 	return nil
 }

@@ -25,9 +25,8 @@ var (
 	errPChainHeightNotReached   = errors.New("block p chain height larger than current p chain height")
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
-
-	errProposersNotActivated = errors.New("proposers haven't been activated yet")
-	errProposersActivated    = errors.New("proposers have been activated")
+	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
+	errProposersActivated       = errors.New("proposers have been activated")
 )
 
 type Block interface {

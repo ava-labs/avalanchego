@@ -69,11 +69,12 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 }
 
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
+	childID := child.ID()
 	childPChainHeight := child.PChainHeight()
 	currentPChainHeight, err := b.vm.PChainHeight()
 	if err != nil {
 		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
-			child.ID())
+			childID)
 		return err
 	}
 	if childPChainHeight > currentPChainHeight {
@@ -116,7 +117,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		b.vm.Tree.Add(child.innerBlk)
 	}
 
-	b.vm.verifiedBlocks[child.ID()] = child
+	b.vm.verifiedBlocks[childID] = child
 	return nil
 }
 
