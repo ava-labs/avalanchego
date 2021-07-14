@@ -5,11 +5,14 @@ package avm
 
 import (
 	"bytes"
+	json2 "encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -54,6 +57,29 @@ func setup(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atomic.Memor
 	}
 	s := &Service{vm: vm}
 	return genesisBytes, vm, s, m, genesisTx
+}
+
+// Returns:
+// 1) genesis bytes of vm
+// 2) the VM
+// 3) The service that wraps the VM
+// 4) Issuer channel
+// 5) atomic memory to use in tests
+func setupWithIssuer(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atomic.Memory, chan common.Message, *Tx) {
+	var genesisBytes []byte
+	var vm *VM
+	var m *atomic.Memory
+	var issuer chan common.Message
+	var genesisTx *Tx
+	if isAVAXAsset {
+		genesisBytes, issuer, vm, m = GenesisVM(t)
+		genesisTx = GetAVAXTxFromGenesisTest(genesisBytes, t)
+	} else {
+		genesisBytes, issuer, vm, m = setupTxFeeAssets(t)
+		genesisTx = GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
+	}
+	s := &Service{vm: vm}
+	return genesisBytes, vm, s, m, issuer, genesisTx
 }
 
 // Returns:
@@ -615,32 +641,87 @@ func TestServiceGetTx(t *testing.T) {
 }
 
 func TestServiceGetTxJSON(t *testing.T) {
-	_, vm, s, _, genesisTx := setup(t, true)
+	genesisBytes, vm, s, _, issuer, _ := setupWithIssuer(t, true)
+	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
-		vm.ctx.Lock.Unlock()
+		ctx.Lock.Unlock()
 	}()
 
-	txID := genesisTx.ID()
+	newTx := newAvaxTxWithOutputs(t, genesisBytes, vm)
 
-	reply := api.GetTxReply{}
-	err := s.GetTx(nil, &api.GetTxArgs{
-		Encoding: formatting.JSON,
-		TxID:     txID,
-	}, &reply)
-	assert.NoError(t, err)
+	txID, err := vm.IssueTx(newTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
+	if txID != newTx.ID() {
+		t.Fatalf("Issue Tx returned wrong TxID")
+	}
+	ctx.Lock.Unlock()
 
-	uniqueTx, isUniqueTx := reply.Tx.(UniqueTx)
-	assert.True(t, isUniqueTx)
-	assert.Equal(t, uniqueTx.ID(), txID)
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+	ctx.Lock.Lock()
 
-	_, isCoreTx := uniqueTx.UnsignedTx.(CoreTx)
-	assert.True(t, isCoreTx)
+	if txs := vm.PendingTxs(); len(txs) != 1 {
+		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+
+	reply := api.GetTxReply{}
+	err = s.GetTx(nil, &api.GetTxArgs{
+		TxID:     txID,
+		Encoding: formatting.JSON,
+	}, &reply)
+	assert.NoError(t, err)
+
+	assert.Equal(t, reply.Encoding, formatting.JSON)
+	jsonTxBytes, err := json2.Marshal(reply.Tx)
+	assert.NoError(t, err)
+	jsonString := string(jsonTxBytes)
+	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
+	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+}
+
+func newAvaxTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
+	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        avaxTx.ID(),
+				OutputIndex: 2,
+			},
+			Asset: avax.Asset{ID: avaxTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: startBalance,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: startBalance - vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
+	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+	return firstTx
 }
 
 func TestServiceGetNilTx(t *testing.T) {
