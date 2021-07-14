@@ -93,7 +93,8 @@ type Config struct {
 	// for nodes to connect to.
 	DiscoveryURLs []string
 
-	Pruning bool // Whether to disable pruning and flush everything to disk
+	Pruning       bool // Whether to disable pruning and flush everything to disk
+	SnapshotAsync bool // Whether to generate the initial snapshot in async mode
 
 	// Whitelist of required block number -> hash values to accept
 	Whitelist map[uint64]common.Hash `toml:"-"`
