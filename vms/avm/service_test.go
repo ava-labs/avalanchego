@@ -689,7 +689,7 @@ func TestServiceGetTxJSON(t *testing.T) {
 func newAvaxTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
-	firstTx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
 		BlockchainID: chainID,
 		Ins: []*avax.TransferableInput{{
@@ -718,10 +718,10 @@ func newAvaxTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 			},
 		}},
 	}}}
-	if err := firstTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
-	return firstTx
+	return tx
 }
 
 func TestServiceGetNilTx(t *testing.T) {
