@@ -269,12 +269,17 @@ func (vm *VM) Initialize(
 	toEngine chan<- commonEng.Message,
 	fxs []*commonEng.Fx,
 ) error {
-	log.Info("Initializing Coreth VM", "Version", Version)
 	vm.config.SetDefaults()
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
 			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
 		}
+	}
+	if b, err := json.Marshal(vm.config); err == nil {
+		log.Info("Initializing Coreth VM", "Version", Version, "Config", string(b))
+	} else {
+		// Log a warning message since we have already successfully unmarshalled into the struct
+		log.Warn("Problem initializing Coreth VM", "Version", Version, "Config", string(b), "err", err)
 	}
 
 	if len(fxs) > 0 {
