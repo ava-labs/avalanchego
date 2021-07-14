@@ -136,7 +136,7 @@ type App interface {
 	// is application (VM) defined.
 	AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error
 
-	// Notify this engine that an  AppRequest message it sent to
+	// Notify this engine that an AppRequest message it sent to
 	// [nodeID] with request ID [requestID] failed.
 	// This may be because the request timed out or because the message
 	// couldn't be sent to [nodeID].

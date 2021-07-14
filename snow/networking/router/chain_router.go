@@ -141,13 +141,13 @@ func (cr *ChainRouter) removeRequest(id ids.ID) {
 // and passing it to the appropriate chain or by a call to GetFailed, GetAncestorsFailed, etc.
 // This method registers a timeout that calls such methods if we don't get a reply in time.
 func (cr *ChainRouter) RegisterRequest(
-	validatorID ids.ShortID,
+	nodeID ids.ShortID,
 	chainID ids.ID,
 	requestID uint32,
 	msgType constants.MsgType,
 ) {
 	cr.lock.Lock()
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID)
 	if cr.timedRequests.Len() == 0 {
 		cr.lastTimeNoOutstanding = cr.clock.Time()
 	}
@@ -163,21 +163,23 @@ func (cr *ChainRouter) RegisterRequest(
 	var timeoutHandler func() // Called upon timeout
 	switch msgType {
 	case constants.PullQueryMsg, constants.PushQueryMsg:
-		timeoutHandler = func() { cr.QueryFailed(validatorID, chainID, requestID) }
+		timeoutHandler = func() { cr.QueryFailed(nodeID, chainID, requestID) }
 	case constants.GetMsg:
-		timeoutHandler = func() { cr.GetFailed(validatorID, chainID, requestID) }
+		timeoutHandler = func() { cr.GetFailed(nodeID, chainID, requestID) }
 	case constants.GetAncestorsMsg:
-		timeoutHandler = func() { cr.GetAncestorsFailed(validatorID, chainID, requestID) }
+		timeoutHandler = func() { cr.GetAncestorsFailed(nodeID, chainID, requestID) }
 	case constants.GetAcceptedMsg:
-		timeoutHandler = func() { cr.GetAcceptedFailed(validatorID, chainID, requestID) }
+		timeoutHandler = func() { cr.GetAcceptedFailed(nodeID, chainID, requestID) }
 	case constants.GetAcceptedFrontierMsg:
-		timeoutHandler = func() { cr.GetAcceptedFrontierFailed(validatorID, chainID, requestID) }
+		timeoutHandler = func() { cr.GetAcceptedFrontierFailed(nodeID, chainID, requestID) }
+	case constants.AppRequestMsg:
+		timeoutHandler = func() { cr.AppRequestFailed(nodeID, chainID, requestID) }
 	default:
 		// This should never happen
-		cr.log.Error("expected message type to be one of GetMsg, PullQueryMsg, PushQueryMsg, GetAcceptedFrontierMsg, GetAcceptedMsg but got %s", msgType)
+		cr.log.Error("expected message type to be one of GetMsg, PullQueryMsg, PushQueryMsg, GetAcceptedFrontierMsg, GetAcceptedMsg, AppRequestMsg, but got %s", msgType)
 		return
 	}
-	cr.timeoutManager.RegisterRequest(validatorID, chainID, msgType, uniqueRequestID, timeoutHandler)
+	cr.timeoutManager.RegisterRequest(nodeID, chainID, msgType, uniqueRequestID, timeoutHandler)
 }
 
 // Shutdown shuts down this router
