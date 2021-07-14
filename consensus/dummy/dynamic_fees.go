@@ -38,7 +38,14 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	shortInterval := rollupWindowData[:80]
 	// roll the window over by the difference between the timestamps to generate
 	// the new rollup window.
-	newRollupWindow := rollWindow(shortInterval, 4, int(roll))
+	newRollupWindow := rollWindow(shortInterval, 8, int(roll))
+
+	var (
+		parentGasTarget          = TargetGas / params.ElasticityMultiplier
+		parentGasTargetBig       = new(big.Int).SetUint64(parentGasTarget)
+		baseFeeChangeDenominator = new(big.Int).SetUint64(params.BaseFeeChangeDenominator)
+		baseFee                  = new(big.Int).Set(parent.BaseFee)
+	)
 
 	// Add in the gas used by the parent block in the correct place
 	// If the parent consumed gas within the rollup window, add the consumed
@@ -50,27 +57,16 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		// + BlockGasFee to charge for the block itself.
 		gasConsumed := prevGasConsumed + parent.GasUsed + BlockGasFee
 		binary.BigEndian.PutUint64(newRollupWindow[slot*8:], gasConsumed)
-	} else {
-		// If [roll] is greater than 10, we want to apply the state transition to the
-		// base fee to account for the period of empty blocks.
 	}
 
 	// Sum the rollup window
-	// If there are a large number of blocks in the same 10s window, this will result
-	// in making the state transition more times and thus create a larger change in the
-	// base fee.
+	// If there are a large number of blocks in the same 10s window, this will cause more
+	// state transitions and push the base fee up more.
 	totalGas := uint64(0)
 	for i := 0; i < 10; i++ {
 		totalGas += binary.BigEndian.Uint64(newRollupWindow[8*i:])
 	}
 
-	var (
-		parentGasTarget          = TargetGas / params.ElasticityMultiplier
-		parentGasTargetBig       = new(big.Int).SetUint64(parentGasTarget)
-		baseFeeChangeDenominator = new(big.Int).SetUint64(params.BaseFeeChangeDenominator)
-	)
-
-	baseFee := new(big.Int).Set(parent.BaseFee)
 	if totalGas == TargetGas {
 		return newRollupWindow, baseFee
 	}
@@ -95,6 +91,11 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		y := x.Div(x, parentGasTargetBig)
 		baseFeeDelta := x.Div(y, baseFeeChangeDenominator)
 
+		// If [roll] is greater than 10, we want to apply the state transition to the
+		// base fee to account for the interval during which no blocks were produced.
+		if roll > 10 {
+			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/10))
+		}
 		baseFee = math.BigMax(baseFee.Sub(baseFee, baseFeeDelta), MinGasPrice)
 	}
 
