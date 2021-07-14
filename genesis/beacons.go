@@ -60,7 +60,7 @@ func getIPs(networkID uint32) []string {
 			"54.228.143.65:9651",
 			"54.232.253.20:9651",
 			"54.94.159.80:9651",
-			// TODO: add "54.94.242.98:9651",
+			"54.94.242.98:9651",
 		}
 	default:
 		return nil
@@ -119,7 +119,7 @@ func getNodeIDs(networkID uint32) []string {
 			"NodeID-84KbQHSDnojroCVY7vQ7u9Tx7pUonPaS",
 			"NodeID-JjvzhxnLHLUQ5HjVRkvG827ivbLXPwA9u",
 			"NodeID-4CWTbdvgXHY1CLXqQNAp22nJDo5nAmts6",
-			// TODO: add new bootstrap ID for 54.94.242.98
+			"NodeID-3VWnZNViBP2b56QBY7pNJSLzN2rkTyqnK",
 		}
 	default:
 		return nil
