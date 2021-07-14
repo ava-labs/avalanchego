@@ -208,7 +208,6 @@ func (sm *sharedMemory) Indexed(
 }
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Requests, batches ...database.Batch) error {
-
 	vdb := versiondb.New(sm.m.db)
 
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
@@ -232,7 +231,6 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Re
 			if err := s.SetValue(putRequest); err != nil {
 				return err
 			}
-
 		}
 
 		sm.m.ReleaseDatabase(sharedID)

@@ -79,7 +79,6 @@ func (s *Server) RemoveAndPutMultiple(
 					Value:  v.Value,
 					Traits: v.Traits,
 				})
-
 			}
 
 			formattedValues := &atomic.Requests{
