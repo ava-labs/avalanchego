@@ -103,6 +103,7 @@ type CacheConfig struct {
 	TrieDirtyLimit int  // Memory limit (MB) at which to start flushing dirty trie nodes to disk
 	Pruning        bool // Whether to disable trie write caching and GC altogether (archive node)
 	SnapshotLimit  int  // Memory allowance (MB) to use for caching snapshot entries in memory
+	SnapshotAsync  bool // Generate snapshot tree async
 	Preimages      bool // Whether to store preimage of trie key to the disk
 }
 
@@ -237,7 +238,7 @@ func NewBlockChain(
 
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
-		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, true, false)
+		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), bc.cacheConfig.SnapshotAsync, true, false)
 		if err != nil {
 			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err)
 		}
