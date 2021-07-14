@@ -24,7 +24,6 @@ var (
 	largerIndexPrefix  = []byte{3}
 
 	errDuplicatedOperation = errors.New("duplicated operation on provided value")
-	errEmptyBatch          = errors.New("there are no transactions in this batch")
 
 	_ SharedMemory = &sharedMemory{}
 )
@@ -210,9 +209,6 @@ func (sm *sharedMemory) Indexed(
 
 func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Requests, batches ...database.Batch) error {
 
-	if len(batchChainsAndInputs) == 0 {
-		return errEmptyBatch
-	}
 	vdb := versiondb.New(sm.m.db)
 
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
