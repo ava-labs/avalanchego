@@ -170,5 +170,5 @@ For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.
 ### Running protobuf codegen from docker (2-liner)
 ```sh
 docker build -t avalanche:protobuf_codegen -f Dockerfile.protoc .
-docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf bash -c "scripts/protobuf_codegen.sh"
+docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
 ```
