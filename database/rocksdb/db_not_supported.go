@@ -1,6 +1,6 @@
 // +build !linux !amd64 !rocksdballowed
 
-// ^ Only build this file if this computer is not linux OR it's not AMD64 OR rocksdb is not allowed
+// ^ Only build this file if this computer is not Linux OR it's not AMD64 OR rocksdb is not allowed
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 package rocksdb
