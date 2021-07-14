@@ -41,8 +41,8 @@ source "$AVALANCHE_PATH"/scripts/versions.sh
 # Load the constants
 source "$AVALANCHE_PATH"/scripts/constants.sh
 
-# Build with rocksdb allowed only if the environment variable ROCKSDBENABLED is set
-if [ -z ${ROCKSDBENABLED+x} ]; then
+# Build with rocksdb allowed only if the environment variable ROCKSDBALLOWED is set
+if [ -z ${ROCKSDBALLOWED+x} ]; then
     echo "Building AvalancheGo..."
     go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit" -o "$latest_avalanchego_process_path" "$AVALANCHE_PATH/app/"*.go
 
@@ -50,8 +50,8 @@ if [ -z ${ROCKSDBENABLED+x} ]; then
     go build -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit" -o "$binary_manager_path" "$AVALANCHE_PATH/main/"*.go
 else
     echo "Building AvalancheGo with rocksdb enabled..."
-    go build -tags rocksdbenabled -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit" -o "$latest_avalanchego_process_path" "$AVALANCHE_PATH/app/"*.go
+    go build -tags rocksdballowed -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit" -o "$latest_avalanchego_process_path" "$AVALANCHE_PATH/app/"*.go
 
     echo "Building AvalancheGo binary manager with rocksdb enabled..."
-    go build -tags rocksdbenabled -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit" -o "$binary_manager_path" "$AVALANCHE_PATH/main/"*.go
+    go build -tags rocksdballowed -ldflags "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit" -o "$binary_manager_path" "$AVALANCHE_PATH/main/"*.go
 fi
