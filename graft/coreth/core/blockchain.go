@@ -729,11 +729,9 @@ func (bc *BlockChain) Stop() {
 	close(bc.quit)
 	bc.wg.Wait()
 
-	// TODO ensure that this will allow correct re-generation of the base layer
-	// snapshot without re-generating any diff layers.
 	// Ensure that the entirety of the state snapshot is journalled to disk.
 	if bc.snaps != nil {
-		if _, err := bc.snaps.Journal(bc.LastAcceptedBlock().Root()); err != nil {
+		if _, err := bc.snaps.Journal(); err != nil {
 			log.Error("Failed to journal state snapshot", "err", err)
 		}
 	}
