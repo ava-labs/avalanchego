@@ -241,10 +241,12 @@ func NewBlockChain(
 		// If we are not running snapshots in async mode, generate the original snapshot disk layer up front, so
 		// we can use it while executing blocks in bootstrapping.
 		if !bc.cacheConfig.SnapshotAsync {
+			log.Info("Initializing snapshots in synchronous mode")
 			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, true, false)
 		} else {
 			// Otherwise, if we are running snapshots in async mode, attempt to initialize snapshots without rebuilding. If the snapshot
 			// disk layer is either corrupted or doesn't exist, wait until calling Bootstrapped to rebuild.
+			log.Info("Attempting to load existing snapshot in async mode")
 			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, false, false)
 		}
 		if err != nil {
@@ -265,6 +267,7 @@ func (bc *BlockChain) Bootstrapped() error {
 
 	head := bc.LastAcceptedBlock()
 	var err error
+	log.Info("Attempting to initialize snapshots in async mode after finishing bootstrapping")
 	bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), true, true, false)
 	return err
 }
