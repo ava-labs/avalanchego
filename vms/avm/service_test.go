@@ -65,21 +65,17 @@ func setup(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atomic.Memor
 // 3) The service that wraps the VM
 // 4) Issuer channel
 // 5) atomic memory to use in tests
-func setupWithIssuer(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, *atomic.Memory, chan common.Message, *Tx) {
+func setupWithIssuer(t *testing.T, isAVAXAsset bool) ([]byte, *VM, *Service, chan common.Message) {
 	var genesisBytes []byte
 	var vm *VM
-	var m *atomic.Memory
 	var issuer chan common.Message
-	var genesisTx *Tx
 	if isAVAXAsset {
-		genesisBytes, issuer, vm, m = GenesisVM(t)
-		genesisTx = GetAVAXTxFromGenesisTest(genesisBytes, t)
+		genesisBytes, issuer, vm, _ = GenesisVM(t)
 	} else {
-		genesisBytes, issuer, vm, m = setupTxFeeAssets(t)
-		genesisTx = GetCreateTxFromGenesisTest(t, genesisBytes, feeAssetName)
+		genesisBytes, issuer, vm, _ = setupTxFeeAssets(t)
 	}
 	s := &Service{vm: vm}
-	return genesisBytes, vm, s, m, issuer, genesisTx
+	return genesisBytes, vm, s, issuer
 }
 
 // Returns:
@@ -641,7 +637,7 @@ func TestServiceGetTx(t *testing.T) {
 }
 
 func TestServiceGetTxJSON_BaseTx(t *testing.T) {
-	genesisBytes, vm, s, _, issuer, _ := setupWithIssuer(t, true)
+	genesisBytes, vm, s, issuer := setupWithIssuer(t, true)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -688,7 +684,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 }
 
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
-	genesisBytes, vm, s, _, issuer, _ := setupWithIssuer(t, true)
+	genesisBytes, vm, s, issuer := setupWithIssuer(t, true)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
