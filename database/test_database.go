@@ -26,6 +26,7 @@ var Tests = []func(t *testing.T, db Database){
 	TestBatchReplay,
 	TestBatchInner,
 	TestBatchLargeSize,
+	TestIteratorSnapshot,
 	TestIterator,
 	TestIteratorStart,
 	TestIteratorPrefix,
@@ -604,6 +605,46 @@ func TestBatchLargeSize(t *testing.T, db Database) {
 
 	if err := batch.Write(); err != nil {
 		t.Fatalf("Unexpected error on batch.Write: %s", err)
+	}
+}
+
+// TestIteratorSnapshot tests to make sure the database iterates over a snapshot
+// of the database at the time of the iterator creation.
+func TestIteratorSnapshot(t *testing.T, db Database) {
+	key1 := []byte("hello1")
+	value1 := []byte("world1")
+
+	key2 := []byte("hello2")
+	value2 := []byte("world2")
+
+	if err := db.Put(key1, value1); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	iterator := db.NewIterator()
+	if iterator == nil {
+		t.Fatalf("db.NewIterator returned nil")
+	}
+	defer iterator.Release()
+
+	if err := db.Put(key2, value2); err != nil {
+		t.Fatalf("Unexpected error on batch.Put: %s", err)
+	}
+
+	if !iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", false, true)
+	} else if key := iterator.Key(); !bytes.Equal(key, key1) {
+		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: 0x%x", key, key1)
+	} else if value := iterator.Value(); !bytes.Equal(value, value1) {
+		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: 0x%x", value, value1)
+	} else if iterator.Next() {
+		t.Fatalf("iterator.Next Returned: %v ; Expected: %v", true, false)
+	} else if key := iterator.Key(); key != nil {
+		t.Fatalf("iterator.Key Returned: 0x%x ; Expected: nil", key)
+	} else if value := iterator.Value(); value != nil {
+		t.Fatalf("iterator.Value Returned: 0x%x ; Expected: nil", value)
+	} else if err := iterator.Error(); err != nil {
+		t.Fatalf("iterator.Error Returned: %s ; Expected: nil", err)
 	}
 }
 
