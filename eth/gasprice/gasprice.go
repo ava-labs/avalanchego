@@ -166,6 +166,7 @@ func (gpo *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error) {
 	if headHash == lastHead {
 		return new(big.Int).Set(lastPrice), nil
 	}
+	// TODO is there a bug with this when issuing the first block sinc ethere's no price
 	var (
 		sent, exp int
 		number    = head.Number.Uint64()
