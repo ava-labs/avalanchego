@@ -282,6 +282,10 @@ func TestVMGenesis(t *testing.T) {
 				t.Fatalf("Failed to get genesis block due to %s", err)
 			}
 
+			if height := genesisBlk.Height(); height != 0 {
+				t.Fatalf("Expected height of geneiss block to be 0, found: %d", height)
+			}
+
 			if _, err := vm.ParseBlock(genesisBlk.Bytes()); err != nil {
 				t.Fatalf("Failed to parse genesis block due to %s", err)
 			}
