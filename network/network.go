@@ -41,21 +41,19 @@ import (
 
 // reasonable default values
 const (
-	defaultInitialReconnectDelay                     = time.Second
-	defaultMaxReconnectDelay                         = time.Hour
-	DefaultMaxMessageSize                     uint32 = 2 * units.MiB
-	defaultMaxNetworkPendingSendBytes                = 512 * units.MiB
-	defaultNetworkPendingSendBytesToRateLimit        = defaultMaxNetworkPendingSendBytes / 4
-	defaultMaxClockDifference                        = time.Minute
-	defaultPeerListStakerGossipFraction              = 2
-	defaultGetVersionTimeout                         = 10 * time.Second
-	defaultAllowPrivateIPs                           = true
-	defaultPingPongTimeout                           = 30 * time.Second
-	defaultPingFrequency                             = 3 * defaultPingPongTimeout / 4
-	defaultReadBufferSize                            = 16 * units.KiB
-	defaultReadHandshakeTimeout                      = 15 * time.Second
-	defaultConnMeterCacheSize                        = 1024
-	defaultByteSliceCap                              = 128
+	defaultInitialReconnectDelay               = time.Second
+	defaultMaxReconnectDelay                   = time.Hour
+	DefaultMaxMessageSize               uint32 = 2 * units.MiB
+	defaultMaxClockDifference                  = time.Minute
+	defaultPeerListStakerGossipFraction        = 2
+	defaultGetVersionTimeout                   = 10 * time.Second
+	defaultAllowPrivateIPs                     = true
+	defaultPingPongTimeout                     = 30 * time.Second
+	defaultPingFrequency                       = 3 * defaultPingPongTimeout / 4
+	defaultReadBufferSize                      = 16 * units.KiB
+	defaultReadHandshakeTimeout                = 15 * time.Second
+	defaultConnMeterCacheSize                  = 1024
+	defaultByteSliceCap                        = 128
 )
 
 var (
@@ -121,29 +119,27 @@ type network struct {
 	// Must only be accessed atomically
 	lastMsgSentTime int64
 	// Keeps track of the percentage of sends that fail
-	sendFailRateCalculator             math.Averager
-	log                                logging.Logger
-	id                                 ids.ShortID
-	ip                                 utils.DynamicIPDesc
-	networkID                          uint32
-	versionCompatibility               version.Compatibility
-	parser                             version.ApplicationParser
-	listener                           net.Listener
-	dialer                             dialer.Dialer
-	serverUpgrader                     Upgrader
-	clientUpgrader                     Upgrader
-	vdrs                               validators.Set // set of current validators in the Avalanche network
-	beacons                            validators.Set // set of beacons in the Avalanche network
-	router                             router.Router  // router must be thread safe
-	nodeID                             uint32
-	clock                              timer.Clock
-	initialReconnectDelay              time.Duration
-	maxReconnectDelay                  time.Duration
-	maxMessageSize                     int64
-	sendQueueSize                      uint32
-	maxNetworkPendingSendBytes         int64
-	networkPendingSendBytesToRateLimit int64
-	maxClockDifference                 time.Duration
+	sendFailRateCalculator math.Averager
+	log                    logging.Logger
+	id                     ids.ShortID
+	ip                     utils.DynamicIPDesc
+	networkID              uint32
+	versionCompatibility   version.Compatibility
+	parser                 version.ApplicationParser
+	listener               net.Listener
+	dialer                 dialer.Dialer
+	serverUpgrader         Upgrader
+	clientUpgrader         Upgrader
+	vdrs                   validators.Set // set of current validators in the Avalanche network
+	beacons                validators.Set // set of beacons in the Avalanche network
+	router                 router.Router  // router must be thread safe
+	nodeID                 uint32
+	clock                  timer.Clock
+	initialReconnectDelay  time.Duration
+	maxReconnectDelay      time.Duration
+	maxMessageSize         int64
+	sendQueueSize          uint32
+	maxClockDifference     time.Duration
 	// Size of a peer list sent to peers
 	peerListSize int
 	// Gossip a peer list to peers with this frequency
@@ -296,8 +292,6 @@ func NewDefaultNetwork(
 		defaultMaxReconnectDelay,
 		DefaultMaxMessageSize,
 		sendQueueSize,
-		defaultMaxNetworkPendingSendBytes,
-		defaultNetworkPendingSendBytesToRateLimit,
 		defaultMaxClockDifference,
 		peerListSize,
 		peerListGossipFreq,
@@ -344,8 +338,6 @@ func NewNetwork(
 	maxReconnectDelay time.Duration,
 	maxMessageSize uint32,
 	sendQueueSize uint32,
-	maxNetworkPendingSendBytes int,
-	networkPendingSendBytesToRateLimit int,
 	maxClockDifference time.Duration,
 	peerListSize int,
 	peerListGossipFreq time.Duration,
@@ -388,38 +380,36 @@ func NewNetwork(
 		// This field just makes sure we don't connect to ourselves when TLS is
 		// disabled. So, cryptographically secure random number generation isn't
 		// used here.
-		nodeID:                             rand.Uint32(),
-		initialReconnectDelay:              initialReconnectDelay,
-		maxReconnectDelay:                  maxReconnectDelay,
-		maxMessageSize:                     int64(maxMessageSize),
-		sendQueueSize:                      sendQueueSize,
-		maxNetworkPendingSendBytes:         int64(maxNetworkPendingSendBytes),
-		networkPendingSendBytesToRateLimit: int64(networkPendingSendBytesToRateLimit),
-		maxClockDifference:                 maxClockDifference,
-		peerListSize:                       peerListSize,
-		peerListGossipFreq:                 peerListGossipFreq,
-		peerListGossipSize:                 peerListGossipSize,
-		peerListStakerGossipFraction:       peerListStakerGossipFraction,
-		getVersionTimeout:                  getVersionTimeout,
-		allowPrivateIPs:                    allowPrivateIPs,
-		gossipAcceptedFrontierSize:         gossipAcceptedFrontierSize,
-		gossipOnAcceptSize:                 gossipOnAcceptSize,
-		pingPongTimeout:                    pingPongTimeout,
-		pingFrequency:                      pingFrequency,
-		disconnectedIPs:                    make(map[string]struct{}),
-		connectedIPs:                       make(map[string]struct{}),
-		peerAliasIPs:                       make(map[string]struct{}),
-		peerAliasTimeout:                   peerAliasTimeout,
-		retryDelay:                         make(map[string]time.Duration),
-		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
-		readBufferSize:                     readBufferSize,
-		readHandshakeTimeout:               readHandshakeTimeout,
-		connMeter:                          NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
-		healthConfig:                       healthConfig,
-		benchlistManager:                   benchlistManager,
-		tlsKey:                             tlsKey,
-		latestPeerIP:                       make(map[ids.ShortID]signedPeerIP),
-		isFetchOnly:                        isFetchOnly,
+		nodeID:                       rand.Uint32(),
+		initialReconnectDelay:        initialReconnectDelay,
+		maxReconnectDelay:            maxReconnectDelay,
+		maxMessageSize:               int64(maxMessageSize),
+		sendQueueSize:                sendQueueSize,
+		maxClockDifference:           maxClockDifference,
+		peerListSize:                 peerListSize,
+		peerListGossipFreq:           peerListGossipFreq,
+		peerListGossipSize:           peerListGossipSize,
+		peerListStakerGossipFraction: peerListStakerGossipFraction,
+		getVersionTimeout:            getVersionTimeout,
+		allowPrivateIPs:              allowPrivateIPs,
+		gossipAcceptedFrontierSize:   gossipAcceptedFrontierSize,
+		gossipOnAcceptSize:           gossipOnAcceptSize,
+		pingPongTimeout:              pingPongTimeout,
+		pingFrequency:                pingFrequency,
+		disconnectedIPs:              make(map[string]struct{}),
+		connectedIPs:                 make(map[string]struct{}),
+		peerAliasIPs:                 make(map[string]struct{}),
+		peerAliasTimeout:             peerAliasTimeout,
+		retryDelay:                   make(map[string]time.Duration),
+		myIPs:                        map[string]struct{}{ip.IP().String(): {}},
+		readBufferSize:               readBufferSize,
+		readHandshakeTimeout:         readHandshakeTimeout,
+		connMeter:                    NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
+		healthConfig:                 healthConfig,
+		benchlistManager:             benchlistManager,
+		tlsKey:                       tlsKey,
+		latestPeerIP:                 make(map[ids.ShortID]signedPeerIP),
+		isFetchOnly:                  isFetchOnly,
 		byteSlicePool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 0, defaultByteSliceCap)
