@@ -845,11 +845,6 @@ func (p *peer) handlePeerList(msg Msg) {
 	p.gotPeerList.SetValue(true)
 	p.tryMarkFinishedHandshake()
 
-	if p.net.isFetchOnly {
-		// If the node is in fetch only mode, drop all incoming peers
-		return
-	}
-
 	ips := msg.Get(SignedPeers).([]utils.IPCertDesc)
 	for _, ip := range ips {
 		p.trackSignedPeer(ip)

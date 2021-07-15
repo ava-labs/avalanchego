@@ -71,9 +71,6 @@ func addProcessFlags(fs *flag.FlagSet) {
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
-	// Fetch only mode
-	fs.Bool(FetchOnlyKey, false, "If true, bootstrap the current database version then stop")
-
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 

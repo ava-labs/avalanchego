@@ -113,8 +113,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// Plugin directory defaults to [buildDirectory]/avalanchego-latest/plugins
 	nodeConfig.PluginDir = filepath.Join(buildDir, avalanchegoLatest, "plugins")
 
-	nodeConfig.FetchOnly = v.GetBool(FetchOnlyKey)
-
 	// Consensus Parameters
 	nodeConfig.ConsensusParams.K = v.GetInt(SnowSampleSizeKey)
 	nodeConfig.ConsensusParams.Alpha = v.GetInt(SnowQuorumSizeKey)
@@ -225,7 +223,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, errInvalidStakerWeights
 	}
 
-	if nodeConfig.FetchOnly || v.GetBool(StakingEphemeralCertEnabledKey) {
+	if v.GetBool(StakingEphemeralCertEnabledKey) {
 		// In fetch only mode or if explicitly set, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
