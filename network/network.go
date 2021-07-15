@@ -138,7 +138,6 @@ type network struct {
 	initialReconnectDelay  time.Duration
 	maxReconnectDelay      time.Duration
 	maxMessageSize         int64
-	sendQueueSize          uint32
 	maxClockDifference     time.Duration
 	// Size of a peer list sent to peers
 	peerListSize int
@@ -259,7 +258,6 @@ func NewDefaultNetwork(
 	router router.Router,
 	connMeterResetDuration time.Duration,
 	connMeterMaxConns int,
-	sendQueueSize uint32,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -291,7 +289,6 @@ func NewDefaultNetwork(
 		defaultInitialReconnectDelay,
 		defaultMaxReconnectDelay,
 		DefaultMaxMessageSize,
-		sendQueueSize,
 		defaultMaxClockDifference,
 		peerListSize,
 		peerListGossipFreq,
@@ -337,7 +334,6 @@ func NewNetwork(
 	initialReconnectDelay,
 	maxReconnectDelay time.Duration,
 	maxMessageSize uint32,
-	sendQueueSize uint32,
 	maxClockDifference time.Duration,
 	peerListSize int,
 	peerListGossipFreq time.Duration,
@@ -384,7 +380,6 @@ func NewNetwork(
 		initialReconnectDelay:        initialReconnectDelay,
 		maxReconnectDelay:            maxReconnectDelay,
 		maxMessageSize:               int64(maxMessageSize),
-		sendQueueSize:                sendQueueSize,
 		maxClockDifference:           maxClockDifference,
 		peerListSize:                 peerListSize,
 		peerListGossipFreq:           peerListGossipFreq,
