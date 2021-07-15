@@ -22,7 +22,7 @@ go mod download
 "$AVALANCHE_PATH"/scripts/build_coreth.sh
 
 # Exit build successfully if the binaries are created
-if [[ -f "$latest_avalanchego_process_path" && -f "$latest_evm_path" ]]; then
+if [[ -f "$avalanchego_path" && -f "$evm_path" ]]; then
         echo "Build Successful"
         exit 0
 else

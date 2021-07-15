@@ -67,7 +67,7 @@ func addProcessFlags(fs *flag.FlagSet) {
 	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Plugin
-	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin")
+	fs.Bool(PluginModeKey, false, "Whether the app should run as a plugin")
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
