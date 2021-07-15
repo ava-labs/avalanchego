@@ -96,11 +96,39 @@ func (tx *UnsignedImportTx) Verify(
 	return nil
 }
 
+// Amount of [assetID] burned by this transaction
+func (tx *UnsignedImportTx) Burned(assetID ids.ID) (uint64, error) {
+	var (
+		spent uint64
+		input uint64
+		err   error
+	)
+	for _, out := range tx.Outs {
+		if out.AssetID == assetID {
+			spent, err = math.Add64(spent, out.Amount)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	for _, in := range tx.ImportedInputs {
+		if in.AssetID() == assetID {
+			input, err = math.Add64(input, in.Input().Amount())
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	return math.Sub64(input, spent)
+}
+
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
 	parent *Block,
+	baseFee *big.Int,
 	rules params.Rules,
 ) TxError {
 	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {

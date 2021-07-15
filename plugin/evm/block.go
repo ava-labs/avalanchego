@@ -266,7 +266,7 @@ func (b *Block) VerifyWithoutWrites() error {
 		log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 	} else {
 		utx := atomicTx.UnsignedAtomicTx
-		if err := utx.SemanticVerify(vm, atomicTx, ancestor, rules); err != nil {
+		if err := utx.SemanticVerify(vm, atomicTx, ancestor, b.ethBlock.BaseFee(), rules); err != nil {
 			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 		}
 	}

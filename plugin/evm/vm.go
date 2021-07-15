@@ -473,7 +473,7 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
 		}
 
-		if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+		if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, header.BaseFee, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			vm.mempool.DiscardCurrentTx()
 			state.RevertToSnapshot(snapshot)

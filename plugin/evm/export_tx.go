@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/math"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -82,11 +83,39 @@ func (tx *UnsignedExportTx) Verify(
 	return nil
 }
 
+// Amount of [assetID] burned by this transaction
+func (tx *UnsignedExportTx) Burned(assetID ids.ID) (uint64, error) {
+	var (
+		spent uint64
+		input uint64
+		err   error
+	)
+	for _, out := range tx.ExportedOutputs {
+		if out.AssetID() == assetID {
+			spent, err = math.Add64(spent, out.Output().Amount())
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	for _, in := range tx.Ins {
+		if in.AssetID == assetID {
+			input, err = math.Add64(input, in.Amount)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	return math.Sub64(input, spent)
+}
+
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
 	stx *Tx,
 	_ *Block,
+	baseFee *big.Int,
 	rules params.Rules,
 ) TxError {
 	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {
