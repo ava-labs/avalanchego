@@ -34,17 +34,19 @@ type ConsensusCallbacks struct {
 }
 
 type DummyEngine struct {
-	cb *ConsensusCallbacks
+	cb          *ConsensusCallbacks
+	skipBaseFee bool
 }
 
-func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
+func NewDummyEngine(cb *ConsensusCallbacks, skipBaseFee bool) *DummyEngine {
 	return &DummyEngine{
-		cb: cb,
+		cb:          cb,
+		skipBaseFee: skipBaseFee,
 	}
 }
 
 func NewFaker() *DummyEngine {
-	return NewDummyEngine(new(ConsensusCallbacks))
+	return NewDummyEngine(new(ConsensusCallbacks), true)
 }
 
 var (
@@ -167,6 +169,11 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 }
 
 func (self *DummyEngine) verifyGasFees(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) error {
+	// If the engine is not charging the base fee, skip the verification.
+	// Note: this is a hack to support tests migrated from geth without substantial modification.
+	if self.skipBaseFee {
+		return nil
+	}
 	// If Apricot Phase 4 is live, ensure that the transactions in the block have met the block fee.
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		blockFeePremium := new(big.Int)
