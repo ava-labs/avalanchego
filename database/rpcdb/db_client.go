@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	maxBatchSize = 128 * units.KiB // 64 KiB
+	maxBatchSize = 128 * units.KiB
 
 	// baseElementSize is an approximation of the protobuf encoding overhead per
 	// element
