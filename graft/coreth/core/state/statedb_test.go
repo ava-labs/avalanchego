@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -485,7 +486,7 @@ func TestTouchDelete(t *testing.T) {
 	s := newStateTest()
 	s.state.GetOrNewStateObject(common.Address{})
 	root, _ := s.state.Commit(false)
-	s.state, _ = New(root, s.state.db, s.state.snaps)
+	s.state, _ = NewWithSnapshot(root, s.state.db, s.state.snap)
 
 	snapshot := s.state.Snapshot()
 	s.state.AddBalance(common.Address{}, new(big.Int))
@@ -687,7 +688,7 @@ func TestDeleteCreateRevert(t *testing.T) {
 	state.SetBalance(addr, big.NewInt(1))
 
 	root, _ := state.Commit(false)
-	state, _ = New(root, state.db, state.snaps)
+	state, _ = NewWithSnapshot(root, state.db, state.snap)
 
 	// Simulate self-destructing in one transaction, then create-reverting in another
 	state.Suicide(addr)
@@ -699,7 +700,7 @@ func TestDeleteCreateRevert(t *testing.T) {
 
 	// Commit the entire state and make sure we don't crash and have the correct state
 	root, _ = state.Commit(true)
-	state, _ = New(root, state.db, state.snaps)
+	state, _ = NewWithSnapshot(root, state.db, state.snap)
 
 	if state.getStateObject(addr) != nil {
 		t.Fatalf("self-destructed contract came alive")
@@ -934,7 +935,7 @@ func TestMultiCoinOperations(t *testing.T) {
 
 	s.state.GetOrNewStateObject(addr)
 	root, _ := s.state.Commit(false)
-	s.state, _ = New(root, s.state.db, s.state.snaps)
+	s.state, _ = NewWithSnapshot(root, s.state.db, s.state.snap)
 
 	s.state.AddBalance(addr, new(big.Int))
 
@@ -959,7 +960,8 @@ func TestMultiCoinSnapshot(t *testing.T) {
 
 	// Create empty snapshot.Tree and StateDB
 	root := common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
-	snapTree := snapshot.NewTestTree(db, root)
+	// Use the root as both the stateRoot and blockHash for this test.
+	snapTree := snapshot.NewTestTree(db, root, root)
 
 	addr := common.Address{1}
 	assetID1 := common.Hash{1}
@@ -1015,4 +1017,59 @@ func TestMultiCoinSnapshot(t *testing.T) {
 	stateDB.AddBalanceMultiCoin(addr, assetID1, big.NewInt(1))
 	_, _ = stateDB.Commit(false)
 	assertBalances(11, 267, 512)
+}
+
+func TestGenerateMultiCoinAccounts(t *testing.T) {
+	var (
+		diskdb   = rawdb.NewMemoryDatabase()
+		database = NewDatabase(diskdb)
+
+		addr     = common.BytesToAddress([]byte("addr1"))
+		addrHash = crypto.Keccak256Hash(addr[:])
+
+		assetID      = common.BytesToHash([]byte("coin1"))
+		assetBalance = big.NewInt(10)
+	)
+
+	stateDB, err := New(common.Hash{}, database, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDB.SetBalanceMultiCoin(addr, assetID, assetBalance)
+	root, err := stateDB.Commit(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	triedb := database.TrieDB()
+	if err := triedb.Commit(root, true, nil); err != nil {
+		t.Fatal(err)
+	}
+	// Build snapshot from scratch
+	snaps, err := snapshot.New(diskdb, triedb, 16, common.Hash{}, root, false, true, false, false)
+	if err != nil {
+		t.Error("Unexpected error while rebuilding snapshot:", err)
+	}
+
+	// Get latest snapshot and make sure it has the correct account and storage
+	snap := snaps.Snapshot(root)
+	snapAccount, err := snap.Account(addrHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !snapAccount.IsMultiCoin {
+		t.Fatalf("Expected SnapAccount to return IsMultiCoin: true, found: %v", snapAccount.IsMultiCoin)
+	}
+
+	NormalizeCoinID(&assetID)
+	assetHash := crypto.Keccak256Hash(assetID.Bytes())
+	storageBytes, err := snap.Storage(addrHash, assetHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	actualAssetBalance := new(big.Int).SetBytes(storageBytes)
+	if actualAssetBalance.Cmp(assetBalance) != 0 {
+		t.Fatalf("Expected asset balance: %v, found %v", assetBalance, actualAssetBalance)
+	}
 }

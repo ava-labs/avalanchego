@@ -352,6 +352,8 @@ func (vm *VM) Initialize(
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	ethConfig.Pruning = vm.config.Pruning
+	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
+
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
 	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
@@ -547,6 +549,10 @@ func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 // bootstrapping
 func (vm *VM) Bootstrapped() error {
 	vm.ctx.Bootstrapped()
+
+	if err := vm.chain.BlockChain().Bootstrapped(); err != nil {
+		return err
+	}
 	return vm.fx.Bootstrapped()
 }
 

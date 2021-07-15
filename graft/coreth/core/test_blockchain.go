@@ -31,7 +31,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
@@ -67,16 +66,16 @@ var tests = []ChainTest{
 		TestSetPreferenceRewind,
 	},
 	{
-		"TestBuildOnVariousStages",
+		"BuildOnVariousStages",
 		TestBuildOnVariousStages,
 	},
 	{
-		"TestEmptyBlocks",
+		"EmptyBlocks",
 		TestEmptyBlocks,
 	},
 	{
-		"TestReorgReInsert",
-		TestReorgReInsert,
+		"AcceptBlockIdenticalStateRoot",
+		TestAcceptBlockIdenticalStateRoot,
 	},
 }
 
@@ -204,20 +203,20 @@ func TestInsertChainAcceptSingleBlock(t *testing.T, create func(db ethdb.Databas
 	genesis := gspec.MustCommit(genDB)
 	_ = gspec.MustCommit(chainDB)
 
-	// This call generates a chain of 3 blocks.
-	signer := types.HomesteadSigner{}
-	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
-	// to the BlockChain's database while generating blocks.
-	chain, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, 3, func(i int, gen *BlockGen) {
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-
 	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer blockchain.Stop()
+
+	// This call generates a chain of 3 blocks.
+	signer := types.HomesteadSigner{}
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
 
 	// Insert three blocks into the chain and accept only the first block.
 	if _, err := blockchain.InsertChain(chain); err != nil {
@@ -277,31 +276,31 @@ func TestInsertLongForkedChain(t *testing.T, create func(db ethdb.Database, chai
 	genesis := gspec.MustCommit(genDB)
 	_ = gspec.MustCommit(chainDB)
 
-	numBlocks := 129
-	signer := types.HomesteadSigner{}
-	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
-	// to the BlockChain's database while generating blocks.
-	chain1, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, numBlocks, func(i int, gen *BlockGen) {
-		// Generate a transaction to create a unique block
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-	// Generate the forked chain to be longer than the original chain to check for a regression where
-	// a longer chain can trigger a reorg.
-	chain2, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, numBlocks+1, func(i int, gen *BlockGen) {
-		// Generate a transaction with a different amount to ensure [chain2] is different than [chain1].
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(5000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-
 	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer blockchain.Stop()
 
+	numBlocks := 129
+	signer := types.HomesteadSigner{}
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain1, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, numBlocks, func(i int, gen *BlockGen) {
+		// Generate a transaction to create a unique block
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
+	// Generate the forked chain to be longer than the original chain to check for a regression where
+	// a longer chain can trigger a reorg.
+	chain2, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, numBlocks+1, func(i int, gen *BlockGen) {
+		// Generate a transaction with a different amount to ensure [chain2] is different than [chain1].
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(5000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
+
 	if blockchain.snaps != nil {
-		if want, got := 1, len(blockchain.snaps.Layers()); got != want {
+		if want, got := 1, blockchain.snaps.NumBlockLayers(); got != want {
 			t.Fatalf("incorrect snapshot layer count; got %d, want %d", got, want)
 		}
 	}
@@ -312,7 +311,7 @@ func TestInsertLongForkedChain(t *testing.T, create func(db ethdb.Database, chai
 	}
 
 	if blockchain.snaps != nil {
-		if want, got := 1+len(chain1), len(blockchain.snaps.Layers()); got != want {
+		if want, got := 1+len(chain1), blockchain.snaps.NumBlockLayers(); got != want {
 			t.Fatalf("incorrect snapshot layer count; got %d, want %d", got, want)
 		}
 	}
@@ -322,7 +321,7 @@ func TestInsertLongForkedChain(t *testing.T, create func(db ethdb.Database, chai
 	}
 
 	if blockchain.snaps != nil {
-		if want, got := 1+len(chain1)+len(chain2), len(blockchain.snaps.Layers()); got != want {
+		if want, got := 1+len(chain1)+len(chain2), blockchain.snaps.NumBlockLayers(); got != want {
 			t.Fatalf("incorrect snapshot layer count; got %d, want %d", got, want)
 		}
 	}
@@ -346,7 +345,7 @@ func TestInsertLongForkedChain(t *testing.T, create func(db ethdb.Database, chai
 
 	if blockchain.snaps != nil {
 		// Snap layer count should be 1 fewer
-		if want, got := len(chain1)+len(chain2), len(blockchain.snaps.Layers()); got != want {
+		if want, got := len(chain1)+len(chain2), blockchain.snaps.NumBlockLayers(); got != want {
 			t.Fatalf("incorrect snapshot layer count; got %d, want %d", got, want)
 		}
 	}
@@ -358,14 +357,14 @@ func TestInsertLongForkedChain(t *testing.T, create func(db ethdb.Database, chai
 
 		if blockchain.snaps != nil {
 			// Snap layer count should decrease by 1 per Reject
-			if want, got := len(chain1)+len(chain2)-i-1, len(blockchain.snaps.Layers()); got != want {
+			if want, got := len(chain1)+len(chain2)-i-1, blockchain.snaps.NumBlockLayers(); got != want {
 				t.Fatalf("incorrect snapshot layer count; got %d, want %d", got, want)
 			}
 		}
 	}
 
 	if blockchain.snaps != nil {
-		if want, got := len(chain1), len(blockchain.snaps.Layers()); got != want {
+		if want, got := len(chain1), blockchain.snaps.NumBlockLayers(); got != want {
 			t.Fatalf("incorrect snapshot layer count; got %d, want %d", got, want)
 		}
 	}
@@ -377,7 +376,7 @@ func TestInsertLongForkedChain(t *testing.T, create func(db ethdb.Database, chai
 
 		if blockchain.snaps != nil {
 			// Snap layer count should decrease by 1 per Accept
-			if want, got := len(chain1)-i, len(blockchain.snaps.Layers()); got != want {
+			if want, got := len(chain1)-i, blockchain.snaps.NumBlockLayers(); got != want {
 				t.Fatalf("incorrect snapshot layer count; got %d, want %d", got, want)
 			}
 		}
@@ -439,26 +438,26 @@ func TestAcceptNonCanonicalBlock(t *testing.T, create func(db ethdb.Database, ch
 	genesis := gspec.MustCommit(genDB)
 	_ = gspec.MustCommit(chainDB)
 
-	numBlocks := 3
-	signer := types.HomesteadSigner{}
-	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
-	// to the BlockChain's database while generating blocks.
-	chain1, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, numBlocks, func(i int, gen *BlockGen) {
-		// Generate a transaction to create a unique block
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-	chain2, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, numBlocks, func(i int, gen *BlockGen) {
-		// Generate a transaction with a different amount to create a chain of blocks different from [chain1]
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(5000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-
 	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer blockchain.Stop()
+
+	numBlocks := 3
+	signer := types.HomesteadSigner{}
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain1, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, numBlocks, func(i int, gen *BlockGen) {
+		// Generate a transaction to create a unique block
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
+	chain2, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, numBlocks, func(i int, gen *BlockGen) {
+		// Generate a transaction with a different amount to create a chain of blocks different from [chain1]
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(5000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
 
 	// Insert three blocks into the chain and accept only the first.
 	if _, err := blockchain.InsertChain(chain1); err != nil {
@@ -545,21 +544,21 @@ func TestSetPreferenceRewind(t *testing.T, create func(db ethdb.Database, chainC
 	genesis := gspec.MustCommit(genDB)
 	_ = gspec.MustCommit(chainDB)
 
-	numBlocks := 3
-	signer := types.HomesteadSigner{}
-	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
-	// to the BlockChain's database while generating blocks.
-	chain, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, numBlocks, func(i int, gen *BlockGen) {
-		// Generate a transaction to create a unique block
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-
 	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer blockchain.Stop()
+
+	numBlocks := 3
+	signer := types.HomesteadSigner{}
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, numBlocks, func(i int, gen *BlockGen) {
+		// Generate a transaction to create a unique block
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
 
 	// Insert three blocks into the chain and accept only the first.
 	if _, err := blockchain.InsertChain(chain); err != nil {
@@ -682,11 +681,17 @@ func TestBuildOnVariousStages(t *testing.T, create func(db ethdb.Database, chain
 	genesis := gspec.MustCommit(genDB)
 	_ = gspec.MustCommit(chainDB)
 
+	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockchain.Stop()
+
 	// This call generates a chain of 3 blocks.
 	signer := types.HomesteadSigner{}
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
-	chain1, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, 20, func(i int, gen *BlockGen) {
+	chain1, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 20, func(i int, gen *BlockGen) {
 		// Send all funds back and forth between the two accounts
 		if i%2 == 0 {
 			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, genesisBalance, params.TxGas, nil, nil), signer, key1)
@@ -697,7 +702,7 @@ func TestBuildOnVariousStages(t *testing.T, create func(db ethdb.Database, chain
 		}
 	})
 	// Build second chain forked off of the 10th block in [chain1]
-	chain2, _ := GenerateChain(gspec.Config, chain1[9], dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, 10, func(i int, gen *BlockGen) {
+	chain2, _ := GenerateChain(gspec.Config, chain1[9], blockchain.engine, genDB, 10, func(i int, gen *BlockGen) {
 		// Send all funds back and forth between the two accounts
 		if i%2 == 0 {
 			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr2, genesisBalance, params.TxGas, nil, nil), signer, key3)
@@ -710,7 +715,7 @@ func TestBuildOnVariousStages(t *testing.T, create func(db ethdb.Database, chain
 	// Build third chain forked off of the 5th block in [chain1].
 	// The parent of this chain will be accepted before this fork
 	// is inserted.
-	chain3, _ := GenerateChain(gspec.Config, chain1[4], dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, 10, func(i int, gen *BlockGen) {
+	chain3, _ := GenerateChain(gspec.Config, chain1[4], blockchain.engine, genDB, 10, func(i int, gen *BlockGen) {
 		// Send all funds back and forth between accounts 2 and 3.
 		if i%2 == 0 {
 			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr3, genesisBalance, params.TxGas, nil, nil), signer, key2)
@@ -720,12 +725,6 @@ func TestBuildOnVariousStages(t *testing.T, create func(db ethdb.Database, chain
 			gen.AddTx(tx)
 		}
 	})
-
-	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer blockchain.Stop()
 
 	// Insert first 10 blocks from [chain1]
 	if _, err := blockchain.InsertChain(chain1); err != nil {
@@ -830,17 +829,15 @@ func TestEmptyBlocks(t *testing.T, create func(db ethdb.Database, chainConfig *p
 	genesis := gspec.MustCommit(genDB)
 	_ = gspec.MustCommit(chainDB)
 
-	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
-	// to the BlockChain's database while generating blocks.
-	chain, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, 1, func(i int, gen *BlockGen) {
-		// gen.SetExtra([]byte{byte(i)})
-	})
-
 	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer blockchain.Stop()
+
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {})
 
 	// Insert three blocks into the chain and accept only the first block.
 	if _, err := blockchain.InsertChain(chain); err != nil {
@@ -881,19 +878,19 @@ func TestReorgReInsert(t *testing.T, create func(db ethdb.Database, chainConfig 
 	genesis := gspec.MustCommit(genDB)
 	_ = gspec.MustCommit(chainDB)
 
-	signer := types.HomesteadSigner{}
-	numBlocks := 3
-	chain, _ := GenerateChain(gspec.Config, genesis, dummy.NewDummyEngine(new(dummy.ConsensusCallbacks)), genDB, numBlocks, func(i int, gen *BlockGen) {
-		// Generate a transaction to create a unique block
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-		gen.AddTx(tx)
-	})
-
 	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer blockchain.Stop()
+
+	signer := types.HomesteadSigner{}
+	numBlocks := 3
+	chain, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, numBlocks, func(i int, gen *BlockGen) {
+		// Generate a transaction to create a unique block
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		gen.AddTx(tx)
+	})
 
 	// Insert and accept first block
 	if err := blockchain.InsertBlock(chain[0]); err != nil {
@@ -943,6 +940,142 @@ func TestReorgReInsert(t *testing.T, create func(db ethdb.Database, chainConfig 
 		balance2 := sdb.GetBalance(addr2)
 		if balance2.Cmp(transferredFunds) != 0 {
 			return fmt.Errorf("expected balance2: %d, found %d", transferredFunds, balance2)
+		}
+		return nil
+	}
+
+	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+}
+
+// Insert two different chains that result in the identical state root.
+// Once we accept one of the chains, we insert and accept A3 on top of the shared
+// state root
+//   G   (genesis)
+//  / \
+// A1  B1
+// |   |
+// A2  B2 (A2 and B2 represent two different paths to the identical state trie)
+// |
+// A3
+func TestAcceptBlockIdenticalStateRoot(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		// We use two separate databases since GenerateChain commits the state roots to its underlying
+		// database.
+		genDB   = rawdb.NewMemoryDatabase()
+		chainDB = rawdb.NewMemoryDatabase()
+	)
+
+	// Ensure that key1 has some funds in the genesis block.
+	genesisBalance := big.NewInt(1000000000)
+	gspec := &Genesis{
+		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+	}
+	genesis := gspec.MustCommit(genDB)
+	_ = gspec.MustCommit(chainDB)
+
+	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockchain.Stop()
+
+	signer := types.HomesteadSigner{}
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain1, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
+		if i < 2 {
+			// Send half the funds from addr1 to addr2 in one transaction per each of the two blocks in [chain1]
+			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(500000000), params.TxGas, nil, nil), signer, key1)
+			gen.AddTx(tx)
+		}
+		// Allow the third block to be empty.
+	})
+	chain2, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 2, func(i int, gen *BlockGen) {
+		// Send 1/4 of the funds from addr1 to addr2 in tx1 and 3/4 of the funds in tx2. This will produce the identical state
+		// root in the second block of [chain2] as is present in the second block of [chain1].
+		if i == 0 {
+			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(250000000), params.TxGas, nil, nil), signer, key1)
+			gen.AddTx(tx)
+		} else {
+			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(750000000), params.TxGas, nil, nil), signer, key1)
+			gen.AddTx(tx)
+		}
+	})
+
+	// Assert that the block root of the second block in both chains is identical
+	if chain1[1].Root() != chain2[1].Root() {
+		t.Fatalf("Expected the latter block in both chain1 and chain2 to have identical state root, but found %s and %s", chain1[1].Root(), chain2[1].Root())
+	}
+
+	// Insert first two blocks of [chain1] and both blocks in [chain2]
+	// This leaves us one additional block to insert on top of [chain1]
+	// after testing that the state roots are handled correctly.
+	if _, err := blockchain.InsertChain(chain1[:2]); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := blockchain.InsertChain(chain2); err != nil {
+		t.Fatal(err)
+	}
+
+	currentBlock := blockchain.CurrentBlock()
+	expectedCurrentBlock := chain1[1]
+	if currentBlock.Hash() != expectedCurrentBlock.Hash() {
+		t.Fatalf("Expected current block to be %s:%d, but found %s%d", expectedCurrentBlock.Hash().Hex(), expectedCurrentBlock.NumberU64(), currentBlock.Hash().Hex(), currentBlock.NumberU64())
+	}
+
+	// Accept the first block in [chain1] and reject all of [chain2]
+	if err := blockchain.Accept(chain1[0]); err != nil {
+		t.Fatal(err)
+	}
+	for _, block := range chain2 {
+		if err := blockchain.Reject(block); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Accept the last two blocks in [chain1]. This is a regression test to ensure
+	// that we do not discard a snapshot difflayer that is still in use by a
+	// processing block, when a different block with the same root is rejected.
+	if err := blockchain.Accept(chain1[1]); err != nil {
+		t.Fatal(err)
+	}
+
+	lastAcceptedBlock := blockchain.LastAcceptedBlock()
+	expectedLastAcceptedBlock := chain1[1]
+	if lastAcceptedBlock.Hash() != expectedLastAcceptedBlock.Hash() {
+		t.Fatalf("Expected last accepted block to be %s:%d, but found %s%d", expectedLastAcceptedBlock.Hash().Hex(), expectedLastAcceptedBlock.NumberU64(), lastAcceptedBlock.Hash().Hex(), lastAcceptedBlock.NumberU64())
+	}
+
+	if err := blockchain.InsertBlock(chain1[2]); err != nil {
+		t.Fatal(err)
+	}
+	if err := blockchain.Accept(chain1[2]); err != nil {
+		t.Fatal(err)
+	}
+
+	// check the state of the last accepted block
+	checkState := func(sdb *state.StateDB) error {
+		nonce1 := sdb.GetNonce(addr1)
+		if nonce1 != 2 {
+			return fmt.Errorf("expected addr1 nonce: 2, found nonce: %d", nonce1)
+		}
+		balance1 := sdb.GetBalance(addr1)
+		expectedBalance := common.Big0
+		if balance1.Cmp(expectedBalance) != 0 {
+			return fmt.Errorf("expected balance1: %d, found balance: %d", expectedBalance, balance1)
+		}
+		nonce2 := sdb.GetNonce(addr2)
+		if nonce2 != 0 {
+			return fmt.Errorf("expected addr2 nonce: 0, found nonce %d", nonce2)
+		}
+		balance2 := sdb.GetBalance(addr2)
+		if balance2.Cmp(genesisBalance) != 0 {
+			return fmt.Errorf("expected balance2: %d, found %d", genesisBalance, balance2)
 		}
 		return nil
 	}
