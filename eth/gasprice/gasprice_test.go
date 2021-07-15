@@ -65,7 +65,7 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 	return b.chain.Config()
 }
 
-func newTestBackend(t *testing.T, apricotPhase4BlockTimestamp *big.Int) *testBackend {
+func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int) *testBackend {
 	var (
 		key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr   = crypto.PubkeyToAddress(key.PublicKey)
@@ -75,11 +75,11 @@ func newTestBackend(t *testing.T, apricotPhase4BlockTimestamp *big.Int) *testBac
 		}
 		signer = types.LatestSigner(gspec.Config)
 	)
-	if apricotPhase4BlockTimestamp != nil {
-		gspec.Config.ApricotPhase4BlockTimestamp = apricotPhase4BlockTimestamp
+	if apricotPhase3BlockTimestamp != nil {
+		gspec.Config.ApricotPhase3BlockTimestamp = apricotPhase3BlockTimestamp
 		signer = types.LatestSigner(gspec.Config)
 	} else {
-		gspec.Config.ApricotPhase4BlockTimestamp = nil
+		gspec.Config.ApricotPhase3BlockTimestamp = nil
 	}
 	engine := dummy.NewFaker()
 	db := rawdb.NewMemoryDatabase()
@@ -90,7 +90,7 @@ func newTestBackend(t *testing.T, apricotPhase4BlockTimestamp *big.Int) *testBac
 		b.SetCoinbase(common.Address{1})
 
 		var tx *types.Transaction
-		if apricotPhase4BlockTimestamp != nil && b.Number().Cmp(apricotPhase4BlockTimestamp) >= 0 {
+		if apricotPhase3BlockTimestamp != nil && b.Number().Cmp(apricotPhase3BlockTimestamp) >= 0 {
 			txdata := &types.DynamicFeeTx{
 				ChainID:   gspec.Config.ChainID,
 				Nonce:     b.TxNonce(addr),
@@ -145,7 +145,7 @@ func TestSuggestTipCap(t *testing.T) {
 	}
 	// TODO(aaronbuchwald) review modified test cases
 	var cases = []struct {
-		fork   *big.Int // ApricotPhase4BlockTimestamp
+		fork   *big.Int // ApricotPhase3BlockTimestamp
 		expect *big.Int // Expected gasprice suggestion
 	}{
 		{nil, big.NewInt(params.GWei * int64(225))},

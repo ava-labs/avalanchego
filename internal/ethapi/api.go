@@ -1597,7 +1597,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, ha
 		"type":              hexutil.Uint(tx.Type()),
 	}
 	// Assign the effective gas price paid
-	if !s.b.ChainConfig().IsApricotPhase4(timestamp) {
+	if !s.b.ChainConfig().IsApricotPhase3(timestamp) {
 		fields["effectiveGasPrice"] = hexutil.Uint64(tx.GasPrice().Uint64())
 	} else {
 		header, err := s.b.HeaderByHash(ctx, blockHash)

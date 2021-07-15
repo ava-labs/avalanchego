@@ -116,8 +116,8 @@ func TestDynamicFees(t *testing.T) {
 		{
 			extraData: nil,
 			baseFee:   nil,
-			minFee:    big.NewInt(10 * params.GWei),
-			maxFee:    big.NewInt(50 * params.GWei),
+			minFee:    big.NewInt(params.MinBaseFee),
+			maxFee:    big.NewInt(params.MaxBaseFee),
 			blocks: []blockDefinition{
 				{
 					timestamp: 1,
@@ -131,85 +131,45 @@ func TestDynamicFees(t *testing.T) {
 					timestamp: 1,
 					gasUsed:   21000,
 				},
+			},
+		},
+		{
+			extraData: nil,
+			baseFee:   nil,
+			minFee:    big.NewInt(params.MinBaseFee),
+			maxFee:    big.NewInt(params.MaxBaseFee),
+			blocks: []blockDefinition{
 				{
 					timestamp: 1,
-					gasUsed:   21000,
+					gasUsed:   1_000_000,
 				},
 				{
-					timestamp: 1,
-					gasUsed:   21000,
+					timestamp: 3,
+					gasUsed:   1_000_000,
 				},
 				{
-					timestamp: 1,
-					gasUsed:   21000,
+					timestamp: 5,
+					gasUsed:   2_000_000,
 				},
 				{
-					timestamp: 1,
-					gasUsed:   21000,
+					timestamp: 5,
+					gasUsed:   6_000_000,
 				},
 				{
-					timestamp: 1,
-					gasUsed:   21000,
+					timestamp: 7,
+					gasUsed:   6_000_000,
 				},
 				{
-					timestamp: 1,
-					gasUsed:   21000,
+					timestamp: 1000,
+					gasUsed:   6_000_000,
 				},
 				{
-					timestamp: 1,
-					gasUsed:   21000,
+					timestamp: 1001,
+					gasUsed:   6_000_000,
 				},
 				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
+					timestamp: 1002,
+					gasUsed:   6_000_000,
 				},
 			},
 		},
@@ -245,9 +205,5 @@ func TestDynamicFees(t *testing.T) {
 				Extra:   nextExtraData,
 			}
 		}
-	}
-
-	if true {
-		t.Fatal("fuck")
 	}
 }

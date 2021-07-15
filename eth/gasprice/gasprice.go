@@ -135,7 +135,7 @@ func (gpo *Oracle) suggestTipCap(ctx context.Context) (*big.Int, error) {
 	bigTimestamp := big.NewInt(gpo.clock.Time().Unix())
 
 	switch {
-	case gpo.backend.ChainConfig().IsApricotPhase4(bigTimestamp):
+	case gpo.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
 		return gpo.suggestDynamicTipCap(ctx)
 	case gpo.backend.ChainConfig().IsApricotPhase1(bigTimestamp):
 		return params.ApricotPhase1MinGasPrice, nil

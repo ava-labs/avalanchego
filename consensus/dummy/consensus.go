@@ -34,14 +34,14 @@ type ConsensusCallbacks struct {
 }
 
 type DummyEngine struct {
-	cb          *ConsensusCallbacks
-	skipBaseFee bool
+	cb           *ConsensusCallbacks
+	skipBlockFee bool
 }
 
-func NewDummyEngine(cb *ConsensusCallbacks, skipBaseFee bool) *DummyEngine {
+func NewDummyEngine(cb *ConsensusCallbacks, skipBlockFee bool) *DummyEngine {
 	return &DummyEngine{
-		cb:          cb,
-		skipBaseFee: skipBaseFee,
+		cb:           cb,
+		skipBlockFee: skipBlockFee,
 	}
 }
 
@@ -51,7 +51,7 @@ func NewFaker() *DummyEngine {
 
 var (
 	allowedFutureBlockTime     = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
-	apricotPhase4ExtraDataSize = 80
+	apricotPhase3ExtraDataSize = 80
 )
 
 var (
@@ -66,18 +66,18 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		return errUnclesUnsupported
 	}
 	// Ensure that the header's extra-data section is of a reasonable size
-	if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
+	if !chain.Config().IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
 		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 		}
 		// Verify BaseFee is not present before EIP-1559
-		// Note: this has been moved up from below in order to only switch on IsApricotPhase4 once.
+		// Note: this has been moved up from below in order to only switch on IsApricotPhase3 once.
 		if header.BaseFee != nil {
 			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
 		}
 	} else {
-		if len(header.Extra) != apricotPhase4ExtraDataSize {
-			return fmt.Errorf("expected extra-data field to be: %d, but found %d", apricotPhase4ExtraDataSize, len(header.Extra))
+		if len(header.Extra) != apricotPhase3ExtraDataSize {
+			return fmt.Errorf("expected extra-data field to be: %d, but found %d", apricotPhase3ExtraDataSize, len(header.Extra))
 		}
 		// Verify baseFee and rollupWindow encoding as part of header verification
 		expectedRollupWindowBytes, expectedBaseFee, err := CalcBaseFee(chain.Config(), parent, header.Time)
@@ -168,17 +168,22 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 	return nil
 }
 
-func (self *DummyEngine) verifyGasFees(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) error {
+func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) error {
 	// If the engine is not charging the base fee, skip the verification.
 	// Note: this is a hack to support tests migrated from geth without substantial modification.
-	if self.skipBaseFee {
+	if self.skipBlockFee {
 		return nil
 	}
-	// If Apricot Phase 4 is live, ensure that the transactions in the block have met the block fee.
-	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-		blockFeePremium := new(big.Int)
-		blockFeeContribution := new(big.Int)
-		totalBlockFee := new(big.Int)
+	bigTimestamp := new(big.Int).SetUint64(header.Time)
+
+	var (
+		blockFeePremium      = new(big.Int)
+		blockFeeContribution = new(big.Int)
+		totalBlockFee        = new(big.Int)
+	)
+	// Require that block after ApricotPhase4 pay a minimum block fee derived from the premium
+	// paid above the block's base fee.
+	if chain.Config().IsApricotPhase4(bigTimestamp) {
 		// Calculate the total excess over the base fee that was paid towards the block fee
 		for i, receipt := range receipts {
 			// Each transaction contributes the excess over the baseFee towards the totalBlockFee
@@ -213,7 +218,7 @@ func (self *DummyEngine) Finalize(
 	chain consensus.ChainHeaderReader, header *types.Header,
 	state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt,
 	uncles []*types.Header) error {
-	if err := self.verifyGasFees(chain, header, txs, receipts); err != nil {
+	if err := self.verifyBlockFee(chain, header, txs, receipts); err != nil {
 		return err
 	}
 
@@ -233,7 +238,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 			return nil, err
 		}
 	}
-	if err := self.verifyGasFees(chain, header, txs, receipts); err != nil {
+	if err := self.verifyBlockFee(chain, header, txs, receipts); err != nil {
 		return nil, err
 	}
 	// commit the final state root
