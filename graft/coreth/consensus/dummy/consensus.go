@@ -68,9 +68,25 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
 			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
 		}
+		// Verify BaseFee is not present before EIP-1559
+		// Note: this has been moved up from below in order to only switch on IsApricotPhase4 once.
+		if header.BaseFee != nil {
+			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
+		}
 	} else {
 		if len(header.Extra) != apricotPhase4ExtraDataSize {
 			return fmt.Errorf("expected extra-data field to be: %d, but found %d", apricotPhase4ExtraDataSize, len(header.Extra))
+		}
+		// Verify baseFee and rollupWindow encoding as part of header verification
+		expectedRollupWindowBytes, expectedBaseFee, err := CalcBaseFee(chain.Config(), parent, header.Time)
+		if err != nil {
+			return fmt.Errorf("failed to calculate base fee: %w", err)
+		}
+		if !bytes.Equal(expectedRollupWindowBytes, header.Extra) {
+			return fmt.Errorf("expected rollup window bytes: %x, found %x", expectedRollupWindowBytes, header.Extra)
+		}
+		if header.BaseFee.Cmp(expectedBaseFee) != 0 {
+			return fmt.Errorf("expected base fee (%d), found (%d)", expectedBaseFee, header.BaseFee)
 		}
 	}
 
@@ -105,21 +121,6 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 
 		if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
 			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
-		}
-	}
-	// Verify baseFee and rollupWindow encoding as part of header verification
-	if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-		// Verify BaseFee is not present before EIP-1559
-		if header.BaseFee != nil {
-			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
-		}
-	} else if false {
-		expectedRollupWindowBytes, expectedBaseFee := CalcBaseFee(chain.Config(), parent, header.Time)
-		if !bytes.Equal(expectedRollupWindowBytes, header.Extra) {
-			return fmt.Errorf("expected rollup window bytes: %x, found %x", expectedRollupWindowBytes, header.Extra)
-		}
-		if header.BaseFee.Cmp(expectedBaseFee) != 0 {
-			return fmt.Errorf("expected base fee (%d), found (%d)", expectedBaseFee, header.BaseFee)
 		}
 	}
 

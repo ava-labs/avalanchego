@@ -5,8 +5,57 @@ package dummy
 
 import (
 	"encoding/binary"
+	"math/big"
+	"os"
 	"testing"
+
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ethereum/go-ethereum/log"
 )
+
+func enableLogging() {
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
+}
+
+func init() {
+	enableLogging()
+}
+
+func testRollup(t *testing.T, longs []uint64, roll int) {
+	slice := make([]byte, len(longs)*8)
+	numLongs := len(longs)
+	for i := 0; i < numLongs; i++ {
+		binary.BigEndian.PutUint64(slice[8*i:], longs[i])
+	}
+
+	newSlice, err := rollWindow(slice, 8, roll)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// numCopies is the number of longs that should have been copied over from the previous
+	// slice as opposed to being left empty.
+	numCopies := numLongs - roll
+	for i := 0; i < numLongs; i++ {
+		// Extract the long value that is encoded at position [i] in [newSlice]
+		num := binary.BigEndian.Uint64(newSlice[8*i:])
+		// If the current index is past the point where we should have copied the value
+		// over from the previous slice, assert that the value encoded in [newSlice]
+		// is 0
+		if i >= numCopies {
+			if num != 0 {
+				t.Errorf("Expected num encoded in newSlice at position %d to be 0, but found %d", i, num)
+			}
+		} else {
+			// Otherwise, check that the value was copied over correctly
+			prevIndex := i + roll
+			prevNum := longs[prevIndex]
+			if prevNum != num {
+				t.Errorf("Expected num encoded in new slice at position %d to be %d, but found %d", i, prevNum, num)
+			}
+		}
+	}
+}
 
 func TestRollupWindow(t *testing.T) {
 	type test struct {
@@ -50,34 +99,155 @@ func TestRollupWindow(t *testing.T) {
 	}
 }
 
-func testRollup(t *testing.T, longs []uint64, roll int) {
-	slice := make([]byte, len(longs)*8)
-	numLongs := len(longs)
-	for i := 0; i < numLongs; i++ {
-		binary.BigEndian.PutUint64(slice[8*i:], longs[i])
+func TestDynamicFees(t *testing.T) {
+	type blockDefinition struct {
+		timestamp uint64
+		gasUsed   uint64
 	}
 
-	newSlice := rollWindow(slice, 8, roll)
-	// numCopies is the number of longs that should have been copied over from the previous
-	// slice as opposed to being left empty.
-	numCopies := numLongs - roll
-	for i := 0; i < numLongs; i++ {
-		// Extract the long value that is encoded at position [i] in [newSlice]
-		num := binary.BigEndian.Uint64(newSlice[8*i:])
-		// If the current index is past the point where we should have copied the value
-		// over from the previous slice, assert that the value encoded in [newSlice]
-		// is 0
-		if i >= numCopies {
-			if num != 0 {
-				t.Errorf("Expected num encoded in newSlice at position %d to be 0, but found %d", i, num)
+	type test struct {
+		extraData      []byte
+		baseFee        *big.Int
+		blocks         []blockDefinition
+		minFee, maxFee *big.Int
+	}
+
+	var tests []test = []test{
+		{
+			extraData: nil,
+			baseFee:   nil,
+			minFee:    big.NewInt(10 * params.GWei),
+			maxFee:    big.NewInt(50 * params.GWei),
+			blocks: []blockDefinition{
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   21000,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		initialBlock := test.blocks[0]
+		header := &types.Header{
+			Time:    initialBlock.timestamp,
+			GasUsed: initialBlock.gasUsed,
+			Number:  big.NewInt(0),
+			BaseFee: test.baseFee,
+			Extra:   test.extraData,
+		}
+
+		for index, block := range test.blocks[1:] {
+			nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestChainConfig, header, block.timestamp)
+			if err != nil {
+				t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
 			}
-		} else {
-			// Otherwise, check that the value was copied over correctly
-			prevIndex := i + roll
-			prevNum := longs[prevIndex]
-			if prevNum != num {
-				t.Errorf("Expected num encoded in new slice at position %d to be %d, but found %d", i, prevNum, num)
+			if nextBaseFee.Cmp(test.maxFee) > 0 {
+				t.Fatalf("Expected fee to stay less than %d, but found %d", test.maxFee, nextBaseFee)
+			}
+			if nextBaseFee.Cmp(test.minFee) < 0 {
+				t.Fatalf("Expected fee to stay greater than %d, but found %d", test.minFee, nextBaseFee)
+			}
+			log.Info("Update", "baseFee", nextBaseFee)
+			header = &types.Header{
+				Time:    block.timestamp,
+				GasUsed: block.gasUsed,
+				Number:  big.NewInt(int64(index) + 1),
+				BaseFee: nextBaseFee,
+				Extra:   nextExtraData,
 			}
 		}
+	}
+
+	if true {
+		t.Fatal("fuck")
 	}
 }

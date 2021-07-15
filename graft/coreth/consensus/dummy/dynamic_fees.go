@@ -5,31 +5,36 @@ package dummy
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
 	TargetGas   = uint64(24_000_000)
 	MaxGasPrice = new(big.Int).SetUint64(10_000 * params.GWei)
 	MinGasPrice = new(big.Int).SetUint64(10 * params.GWei)
-	BlockGasFee = uint64(1_000_000)
+	BlockGasFee = uint64(500_000)
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
 // and calculates the expected base fee as well as the encoding of the past
 // pricing information for the child block.
-func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int) {
+func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
 	if !config.IsApricotPhase4(new(big.Int).SetUint64(parent.Time)) || parent.Number.Cmp(common.Big0) == 0 {
 		initialSlice := make([]byte, 80)
 		initialBaseFee := new(big.Int).SetUint64(params.InitialBaseFee)
-		return initialSlice, initialBaseFee
+		return initialSlice, initialBaseFee, nil
+	}
+	if len(parent.Extra) != 80 {
+		return nil, nil, fmt.Errorf("expected length of parent extra data to be 80, but found %d", len(parent.Extra))
 	}
 
 	roll := timestamp - parent.Time
@@ -38,7 +43,13 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	shortInterval := rollupWindowData[:80]
 	// roll the window over by the difference between the timestamps to generate
 	// the new rollup window.
-	newRollupWindow := rollWindow(shortInterval, 8, int(roll))
+	newRollupWindow, err := rollWindow(shortInterval, 8, int(roll))
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(newRollupWindow) != 80 {
+		return nil, nil, fmt.Errorf("expected length of new rollup window to be 80, but found %d", len(parent.Extra))
+	}
 
 	var (
 		parentGasTarget          = TargetGas / params.ElasticityMultiplier
@@ -51,12 +62,16 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// If the parent consumed gas within the rollup window, add the consumed
 	// gas in.
 	if roll < 10 {
-		slot := 10 - roll
+		slot := 9 - roll
+		if slot < 0 || slot >= 10 {
+			return nil, nil, fmt.Errorf("created invalid slot %d", slot)
+		}
 		prevGasConsumed := binary.BigEndian.Uint64(newRollupWindow[slot*8:])
 		// Count gas consumed as the previous gas consumed + parent block gas consumed
 		// + BlockGasFee to charge for the block itself.
 		gasConsumed := prevGasConsumed + parent.GasUsed + BlockGasFee
 		binary.BigEndian.PutUint64(newRollupWindow[slot*8:], gasConsumed)
+		log.Info("stats", "gasConsumed", gasConsumed, "prevGasConsumed", prevGasConsumed, "parentGasUsed", parent.GasUsed, "BlockGasFee", BlockGasFee)
 	}
 
 	// Sum the rollup window
@@ -68,7 +83,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	}
 
 	if totalGas == TargetGas {
-		return newRollupWindow, baseFee
+		return newRollupWindow, baseFee, nil
 	}
 
 	if totalGas > parentGasTarget {
@@ -91,15 +106,15 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		y := x.Div(x, parentGasTargetBig)
 		baseFeeDelta := x.Div(y, baseFeeChangeDenominator)
 
-		// If [roll] is greater than 10, we want to apply the state transition to the
-		// base fee to account for the interval during which no blocks were produced.
+		// If [roll] is greater than 10, apply the state transition to the base fee to account
+		// for the interval during which no blocks were produced.
 		if roll > 10 {
 			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/10))
 		}
 		baseFee = math.BigMax(baseFee.Sub(baseFee, baseFeeDelta), MinGasPrice)
 	}
 
-	return newRollupWindow, baseFee
+	return newRollupWindow, baseFee, nil
 }
 
 // rollWindow rolls the longs within [consumptionWindow] over by [roll] places.
@@ -118,9 +133,9 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 // Roll >= 4
 // [0, 0, 0, 0]
 // Assumes that [roll] is greater than or equal to 0
-func rollWindow(consumptionWindow []byte, size, roll int) []byte {
+func rollWindow(consumptionWindow []byte, size, roll int) ([]byte, error) {
 	if len(consumptionWindow)%size != 0 {
-		panic("Expected consumption window to be a multiple of 8")
+		return nil, fmt.Errorf("expected consumption window length (%d) to be a multiple of size (%d)", len(consumptionWindow), size)
 	}
 
 	// Note: make allocates a zeroed array, so we are guaranteed
@@ -128,8 +143,8 @@ func rollWindow(consumptionWindow []byte, size, roll int) []byte {
 	res := make([]byte, len(consumptionWindow))
 	bound := roll * size
 	if bound > len(consumptionWindow) {
-		return res
+		return res, nil
 	}
 	copy(res[:], consumptionWindow[roll*size:])
-	return res
+	return res, nil
 }

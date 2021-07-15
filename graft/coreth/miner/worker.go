@@ -134,7 +134,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	// Set BaseFee and Extra data field if we are post ApricotPhase4
 	bigTimestamp := big.NewInt(timestamp)
 	if w.chainConfig.IsApricotPhase4(bigTimestamp) {
-		header.Extra, header.BaseFee = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+		var err error
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+		}
 	}
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")

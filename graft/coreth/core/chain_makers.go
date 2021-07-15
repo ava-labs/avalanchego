@@ -295,8 +295,11 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		Time:     time,
 	}
 	if chain.Config().IsApricotPhase4(timestamp) {
-		// XXX(aaronbuchwald)
-		header.Extra, header.BaseFee = dummy.CalcBaseFee(chain.Config(), parent.Header(), time)
+		var err error
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(chain.Config(), parent.Header(), time)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return header
 }
