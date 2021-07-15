@@ -64,7 +64,6 @@ type Logger interface {
 	GetLogLevel() Level
 	// Gets current DisplayLevel
 	GetDisplayLevel() Level
-
 	// Add a prefix to all logged messages
 	SetPrefix(string)
 	// Enable or disable logging
