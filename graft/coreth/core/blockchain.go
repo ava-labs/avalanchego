@@ -238,13 +238,38 @@ func NewBlockChain(
 
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
-		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), bc.cacheConfig.SnapshotAsync, true, false)
+		// If we are not running snapshots in async mode or we are starting from genesis, generate the original snapshot disk layer up front, so
+		// we can use it while executing blocks in bootstrapping.
+		if !bc.cacheConfig.SnapshotAsync || head.NumberU64() == 0 {
+			log.Info("Initializing snapshots in synchronous mode")
+			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, true, false, true)
+		} else {
+			// Otherwise, if we are running snapshots in async mode, attempt to initialize snapshots without rebuilding. If the snapshot
+			// disk layer is corrupted, incomplete, or doesn't exist, wait until calling Bootstrapped to rebuild.
+			log.Info("Attempting to load existing snapshot in async mode")
+			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, false, false, false)
+		}
 		if err != nil {
-			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err)
+			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", bc.cacheConfig.SnapshotAsync)
 		}
 	}
 
 	return bc, nil
+}
+
+func (bc *BlockChain) Bootstrapped() error {
+	// If [bc.snaps] is either already initialized, not meant to be initialized, or we should
+	// have already attempted to initialize it synchronously, then return early without attempting
+	// to initialize snapshots.
+	if bc.snaps != nil || bc.cacheConfig.SnapshotLimit <= 0 || !bc.cacheConfig.SnapshotAsync {
+		return nil
+	}
+
+	head := bc.LastAcceptedBlock()
+	var err error
+	log.Info("Attempting to initialize snapshots in async mode after finishing bootstrapping")
+	bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), true, true, false, true)
+	return err
 }
 
 // GetVMConfig returns the block chain VM config.
@@ -1161,7 +1186,6 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 		bc.reportBlock(block, receipts, err)
 		return err
 	}
-	proctime := time.Since(start)
 
 	// Write the block to the chain and get the status.
 	// writeBlockWithState creates a reference that will be cleaned up in Accept/Reject
@@ -1178,14 +1202,14 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 			"parentHash", block.ParentHash(),
 			"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
 			"elapsed", common.PrettyDuration(time.Since(start)),
-			"root", block.Root(), "proctime", proctime)
+			"root", block.Root())
 		// Only count canonical blocks for GC processing time
 	case SideStatTy:
 		log.Debug("Inserted forked block", "number", block.Number(), "hash", block.Hash(),
 			"parentHash", block.ParentHash(),
 			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root(), "proctime", proctime)
+			"root", block.Root())
 	default:
 		// This in theory is impossible, but lets be nice to our future selves and leave
 		// a log, instead of trying to track down blocks imports that don't emit logs.
@@ -1193,7 +1217,7 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 			"parentHash", block.ParentHash(),
 			"diff", block.Difficulty(), "elapsed", common.PrettyDuration(time.Since(start)),
 			"txs", len(block.Transactions()), "gas", block.GasUsed(), "uncles", len(block.Uncles()),
-			"root", block.Root(), "proctime", proctime)
+			"root", block.Root())
 	}
 
 	return err
