@@ -64,6 +64,8 @@ func (tx *UnsignedImportTx) Verify(
 		return errWrongNetworkID
 	case ctx.ChainID != tx.BlockchainID:
 		return errWrongBlockchainID
+	case rules.IsApricotPhase3 && len(tx.Outs) == 0:
+		return errNoEVMOutputs
 	}
 
 	for _, out := range tx.Outs {
