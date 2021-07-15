@@ -55,7 +55,7 @@ func init() {
 	cpy := *params.TestChainConfig
 	eip1559Config = &cpy
 	eip1559Config.ApricotPhase2BlockTimestamp = common.Big0
-	eip1559Config.ApricotPhase4BlockTimestamp = common.Big0
+	eip1559Config.ApricotPhase3BlockTimestamp = common.Big0
 }
 
 type testBlockChain struct {

@@ -131,9 +131,9 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		Extra:      nil,
 		Time:       uint64(timestamp),
 	}
-	// Set BaseFee and Extra data field if we are post ApricotPhase4
+	// Set BaseFee and Extra data field if we are post ApricotPhase3
 	bigTimestamp := big.NewInt(timestamp)
-	if w.chainConfig.IsApricotPhase4(bigTimestamp) {
+	if w.chainConfig.IsApricotPhase3(bigTimestamp) {
 		var err error
 		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
 		if err != nil {

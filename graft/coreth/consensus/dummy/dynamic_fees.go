@@ -16,10 +16,11 @@ import (
 )
 
 var (
-	TargetGas   = uint64(24_000_000)
-	MaxGasPrice = new(big.Int).SetUint64(10_000 * params.GWei)
-	MinGasPrice = new(big.Int).SetUint64(10 * params.GWei)
-	BlockGasFee = uint64(500_000)
+	InitialBaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
+	MaxGasPrice    = new(big.Int).SetUint64(params.MaxBaseFee)
+	MinGasPrice    = new(big.Int).SetUint64(params.MinBaseFee)
+	TargetGas      = uint64(24_000_000)
+	BlockGasFee    = uint64(500_000)
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
@@ -28,7 +29,7 @@ var (
 func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
-	if !config.IsApricotPhase4(new(big.Int).SetUint64(parent.Time)) || parent.Number.Cmp(common.Big0) == 0 {
+	if !config.IsApricotPhase3(new(big.Int).SetUint64(parent.Time)) || parent.Number.Cmp(common.Big0) == 0 {
 		initialSlice := make([]byte, 80)
 		initialBaseFee := new(big.Int).SetUint64(params.InitialBaseFee)
 		return initialSlice, initialBaseFee, nil
@@ -63,14 +64,12 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// gas in.
 	if roll < 10 {
 		slot := 9 - roll
-		if slot < 0 || slot >= 10 {
-			return nil, nil, fmt.Errorf("created invalid slot %d", slot)
-		}
-		prevGasConsumed := binary.BigEndian.Uint64(newRollupWindow[slot*8:])
+		start := slot * 8
+		prevGasConsumed := binary.BigEndian.Uint64(newRollupWindow[start:])
 		// Count gas consumed as the previous gas consumed + parent block gas consumed
 		// + BlockGasFee to charge for the block itself.
 		gasConsumed := prevGasConsumed + parent.GasUsed + BlockGasFee
-		binary.BigEndian.PutUint64(newRollupWindow[slot*8:], gasConsumed)
+		binary.BigEndian.PutUint64(newRollupWindow[start:], gasConsumed)
 		log.Info("stats", "gasConsumed", gasConsumed, "prevGasConsumed", prevGasConsumed, "parentGasUsed", parent.GasUsed, "BlockGasFee", BlockGasFee)
 	}
 
@@ -108,6 +107,8 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 
 		// If [roll] is greater than 10, apply the state transition to the base fee to account
 		// for the interval during which no blocks were produced.
+		// We use roll/10, so that the transition is applied for every 10s that elapsed between
+		// the parent and this block.
 		if roll > 10 {
 			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/10))
 		}

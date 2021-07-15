@@ -35,6 +35,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -1157,10 +1158,11 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	// because of another transaction (e.g. higher gas price).
 	if reset != nil {
 		pool.demoteUnexecutables()
-		if reset.newHead != nil && pool.chainconfig.IsApricotPhase4(new(big.Int).SetUint64(reset.newHead.Time)) {
-			// TODO(aaronbuchwald) set after migrating CalcBaseFee into coreth
-			// pendingBaseFee := misc.CalcBaseFee(pool.chainconfig, reset.newHead)
-			// pool.priced.SetBaseFee(pendingBaseFee)
+		if reset.newHead != nil && pool.chainconfig.IsApricotPhase3(new(big.Int).SetUint64(reset.newHead.Time)) {
+			_, baseFeeEstimate, err := dummy.CalcBaseFee(pool.chainconfig, reset.newHead, uint64(time.Now().Unix()))
+			if err == nil {
+				pool.priced.SetBaseFee(baseFeeEstimate)
+			}
 		}
 	}
 	// Ensure pool.queue and pool.pending sizes stay within the configured limits.
@@ -1285,7 +1287,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 
 	timestamp := new(big.Int).SetUint64(newHead.Time)
 	pool.eip2718 = pool.chainconfig.IsApricotPhase2(timestamp)
-	pool.eip1559 = pool.chainconfig.IsApricotPhase4(timestamp)
+	pool.eip1559 = pool.chainconfig.IsApricotPhase3(timestamp)
 }
 
 // promoteExecutables moves transactions that have become processable from the

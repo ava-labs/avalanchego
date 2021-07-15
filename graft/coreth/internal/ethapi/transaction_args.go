@@ -90,7 +90,7 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 	}
 	// After london, default to 1559 unless gasPrice is set
 	head := b.CurrentHeader()
-	if b.ChainConfig().IsApricotPhase4(new(big.Int).SetUint64(head.Time)) && args.GasPrice == nil {
+	if b.ChainConfig().IsApricotPhase3(new(big.Int).SetUint64(head.Time)) && args.GasPrice == nil {
 		if args.MaxPriorityFeePerGas == nil {
 			tip, err := b.SuggestGasTipCap(ctx)
 			if err != nil {
@@ -117,7 +117,7 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 			if err != nil {
 				return err
 			}
-			if b.ChainConfig().IsApricotPhase4(new(big.Int).SetUint64(head.Time)) {
+			if b.ChainConfig().IsApricotPhase3(new(big.Int).SetUint64(head.Time)) {
 				price.Add(price, head.BaseFee)
 			}
 			args.GasPrice = (*hexutil.Big)(price)
