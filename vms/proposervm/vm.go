@@ -196,14 +196,6 @@ func (vm *VM) getBlock(id ids.ID) (Block, error) {
 	return vm.getPreForkBlock(id)
 }
 
-func (vm *VM) getPreForkBlock(blkID ids.ID) (*preForkBlock, error) {
-	blk, err := vm.ChainVM.GetBlock(blkID)
-	return &preForkBlock{
-		Block: blk,
-		vm:    vm,
-	}, err
-}
-
 func (vm *VM) getPostForkBlock(blkID ids.ID) (*postForkBlock, error) {
 	blkIntf, exists := vm.verifiedBlocks[blkID]
 	if exists {
@@ -264,8 +256,8 @@ func (vm *VM) getPostForkOption(blkID ids.ID) (*postForkOption, error) {
 	}, nil
 }
 
-func (vm *VM) parsePreForkBlock(b []byte) (*preForkBlock, error) {
-	blk, err := vm.ChainVM.ParseBlock(b)
+func (vm *VM) getPreForkBlock(blkID ids.ID) (*preForkBlock, error) {
+	blk, err := vm.ChainVM.GetBlock(blkID)
 	return &preForkBlock{
 		Block: blk,
 		vm:    vm,
@@ -277,6 +269,7 @@ func (vm *VM) parsePostForkBlock(b []byte) (*postForkBlock, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	// if the block already exists, then make sure the status is set correctly
 	blkID := statelessBlock.ID()
 	blk, err := vm.getPostForkBlock(blkID)
@@ -304,18 +297,12 @@ func (vm *VM) parsePostForkBlock(b []byte) (*postForkBlock, error) {
 	return blk, vm.storePostForkBlock(blk)
 }
 
-func (vm *VM) storePostForkBlock(blk *postForkBlock) error {
-	if err := vm.State.PutBlock(blk.Block, blk.status); err != nil {
-		return err
-	}
-	return vm.db.Commit()
-}
-
 func (vm *VM) parsePostForkOption(b []byte) (*postForkOption, error) {
 	option, err := option.Parse(b)
 	if err != nil {
 		return nil, err
 	}
+
 	// if the block already exists, then make sure the status is set correctly
 	blkID := option.ID()
 	opt, err := vm.getPostForkOption(blkID)
@@ -341,6 +328,21 @@ func (vm *VM) parsePostForkOption(b []byte) (*postForkOption, error) {
 		},
 	}
 	return opt, vm.storePostForkOption(opt)
+}
+
+func (vm *VM) parsePreForkBlock(b []byte) (*preForkBlock, error) {
+	blk, err := vm.ChainVM.ParseBlock(b)
+	return &preForkBlock{
+		Block: blk,
+		vm:    vm,
+	}, err
+}
+
+func (vm *VM) storePostForkBlock(blk *postForkBlock) error {
+	if err := vm.State.PutBlock(blk.Block, blk.status); err != nil {
+		return err
+	}
+	return vm.db.Commit()
 }
 
 func (vm *VM) storePostForkOption(blk *postForkOption) error {
