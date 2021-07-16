@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os/exec"
+	"syscall"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/hashicorp/go-hclog"
@@ -28,7 +29,9 @@ func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 
 	// #nosec G204
 	cmd := exec.Command(f.Path)
-
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Pdeathsig: syscall.SIGTERM,
+	}
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,

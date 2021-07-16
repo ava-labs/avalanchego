@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
@@ -135,6 +136,10 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 // Assumes [nm.lock] is held
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
 	nm.log.Debug("creating new node from binary at '%s'", path)
+	cmd := exec.Command(path, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Pdeathsig: syscall.SIGTERM,
+	}
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig:  appplugin.Handshake,
 		Plugins:          appplugin.PluginMap,
