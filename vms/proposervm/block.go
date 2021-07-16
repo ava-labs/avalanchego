@@ -47,6 +47,10 @@ type postForkCommonComponents struct {
 	status   choices.Status
 }
 
+func (p *postForkCommonComponents) Height() uint64 {
+	return p.innerBlk.Height()
+}
+
 func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {

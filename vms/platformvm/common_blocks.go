@@ -169,6 +169,9 @@ func (b *CommonBlock) Height() uint64 { return b.Hght }
 
 // Timestamp returns this block's time.
 func (b *CommonBlock) Timestamp() time.Time {
+	// If this is the last accepted block and the block was loaded from disk
+	// since it was accepted, then the timestamp wouldn't be set correctly. So,
+	// we explicitly return the chain time.
 	if b.id == b.vm.lastAcceptedID {
 		return b.vm.internalState.GetTimestamp()
 	}

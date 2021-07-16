@@ -93,6 +93,9 @@ func (s *weightedHeap) Sample(value uint64) (int, error) {
 type innerSortWeightedHeap []weightedHeapElement
 
 func (lst innerSortWeightedHeap) Less(i, j int) bool {
+	// By accounting for the initial index of the weights, this results in a
+	// stable sort. We do this rather than using `sort.Stable` because of the
+	// reported change in performance of the sort used.
 	if lst[i].weight > lst[j].weight {
 		return true
 	}

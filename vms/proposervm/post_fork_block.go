@@ -74,10 +74,6 @@ func (b *postForkBlock) Verify() error {
 	return parent.verifyPostForkChild(b)
 }
 
-func (b *postForkBlock) Height() uint64 {
-	return b.innerBlk.Height()
-}
-
 func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 	innerOracleBlk, ok := b.innerBlk.(snowman.OracleBlock)
 	if !ok {

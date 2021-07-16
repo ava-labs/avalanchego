@@ -81,10 +81,6 @@ func (b *postForkOption) Verify() error {
 	return parent.verifyPostForkOption(b)
 }
 
-func (b *postForkOption) Height() uint64 {
-	return b.innerBlk.Height()
-}
-
 func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
 	return errUnsignedChild
 }
