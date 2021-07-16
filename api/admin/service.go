@@ -174,7 +174,7 @@ type SetLoggerLevelArgs struct {
 
 // SetLoggerLevel sets the log level and display level for logger name.
 func (service *Admin) SetLoggerLevel(r *http.Request, args *SetLoggerLevelArgs, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: SetLogLevels called with LoggerName: %q LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
+	service.log.Info("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
 	if len(args.LogLevel) == 0 && len(args.DisplayLevel) == 0 {
 		return errors.New("need to specify either displayLevel or logLevel")
 	}
@@ -228,7 +228,7 @@ type GetLoggerLevelReply struct {
 
 // GetLogLevel get the log level and display level of loggers.
 func (service *Admin) GetLoggerLevel(r *http.Request, args *GetLoggerLevelArgs, reply *GetLoggerLevelReply) error {
-	service.log.Info("Admin: GetLoggerLevels called with %q", args.LoggerName)
+	service.log.Info("Admin: GetLoggerLevels called with LoggerName: %q", args.LoggerName)
 	reply.LoggerLevels = make(map[string]LoggerLevels)
 	var loggerNames []string
 	// Empty name means all loggers
