@@ -21,6 +21,8 @@ func Build(
 	blockBytes []byte,
 	key crypto.Signer,
 ) (Block, error) {
+	timestamp = timestamp.Truncate(time.Second)
+
 	block := statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
