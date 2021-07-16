@@ -87,7 +87,7 @@ func (vm *VM) Initialize(
 	vm.Scheduler = scheduler
 
 	go ctx.Log.RecoverAndPanic(func() {
-		scheduler.Dispatch(vm.activationTime)
+		scheduler.Dispatch(time.Now())
 	})
 
 	vm.verifiedBlocks = make(map[ids.ID]Block)
@@ -172,12 +172,9 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	}
 
 	nextStartTime := prefBlk.Timestamp().Add(minDelay)
-	if nextStartTime.After(vm.activationTime) {
-		vm.ctx.Log.Debug("Snowman++ set preference - preferred block ID %s,  timestamp %v; next start time scheduled at %v",
-			prefBlk.ID(), prefBlk.Timestamp().Format("15:04:05"), nextStartTime.Format("15:04:05"))
-		vm.Scheduler.SetStartTime(nextStartTime)
-	}
-
+	vm.ctx.Log.Debug("Snowman++ set preference - preferred block ID %s,  timestamp %v; next start time scheduled at %v",
+		prefBlk.ID(), prefBlk.Timestamp().Format("15:04:05"), nextStartTime.Format("15:04:05"))
+	vm.Scheduler.SetStartTime(nextStartTime)
 	return nil
 }
 
