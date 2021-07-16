@@ -53,14 +53,13 @@ func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
 	vdr3 := ids.ShortID{3}
 
 	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
-	vdrBag := ids.ShortBag{}
-	vdrBag.Add(vdrs...)
 
 	// create two polls for the two vtxs
+	vdrBag := ids.ShortBag{}
+	vdrBag.Add(vdrs...)
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
 
-	// re init for second poll - why? 🤔
 	vdrBag = ids.ShortBag{}
 	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
@@ -80,15 +79,19 @@ func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
 	_, finished = s.Vote(2, vdr3, vtx2)
 	assert.False(t, finished)
 
-	result, finished := s.Vote(2, vdr1, vtx2) // poll 2 finished
-	assert.True(t, finished)
-	assert.Equal(t, result.List()[0], vtx2)
+	_, finished = s.Vote(2, vdr1, vtx2) // poll 2 finished
+	assert.False(t, finished)           // expect 2 to not have finished because 1 is still pending
 
 	_, finished = s.Vote(1, vdr2, vtx1)
 	assert.False(t, finished)
-	result, finished = s.Vote(1, vdr3, vtx1) // poll 1 finished
+
+	result, finished := s.Vote(1, vdr3, vtx1) // poll 1 finished
 	assert.True(t, finished)
 	assert.Equal(t, result.List()[0], vtx1)
+
+	result, finished = s.Vote(2, vdr1, vtx2) // poll 2 now finished since 1 has finished
+	assert.True(t, finished)
+	assert.Equal(t, result.List()[0], vtx2)
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
