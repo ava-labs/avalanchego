@@ -21,7 +21,7 @@ var (
 )
 
 // InboundConnThrottler decides whether to allow an incoming connection from IP [ipStr].
-// If Allow returns false, the connection to this IP should be closed.
+// If Allow(IP) returns false, the connection to that IP should be closed.
 type InboundConnThrottler interface {
 	// Dispatch starts this InboundConnThrottler.
 	// Must be called before [Allow].
