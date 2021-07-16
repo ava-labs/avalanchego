@@ -3,10 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
-	"syscall"
 
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 	"github.com/ava-labs/avalanchego/config"
@@ -15,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
@@ -136,14 +135,10 @@ func newNodeManager(path string, log logging.Logger) *nodeManager {
 // Assumes [nm.lock] is held
 func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (*nodeProcess, error) {
 	nm.log.Debug("creating new node from binary at '%s'", path)
-	cmd := exec.Command(path, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Pdeathsig: syscall.SIGTERM,
-	}
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig:  appplugin.Handshake,
 		Plugins:          appplugin.PluginMap,
-		Cmd:              cmd,
+		Cmd:              subprocess.New(path, args...),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}
