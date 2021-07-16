@@ -42,21 +42,20 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
 
-	opts, err := oracleBlk.Options()
+	options, err := oracleBlk.Options()
 	if err != nil {
 		return [2]snowman.Block{}, err
 	}
-	res := [2]snowman.Block{
+	return [2]snowman.Block{
 		&preForkBlock{
-			Block: opts[0],
+			Block: options[0],
 			vm:    b.vm,
 		},
 		&preForkBlock{
-			Block: opts[1],
+			Block: options[1],
 			vm:    b.vm,
 		},
-	}
-	return res, nil
+	}, nil
 }
 
 func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {

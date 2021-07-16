@@ -25,22 +25,6 @@ func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
 	return tob.opts, nil
 }
 
-// ProposerBlock Option interface tests section
-func TestOracle_PostForkOption_DoesNotImplementInterface(t *testing.T) {
-	// setup
-	proOpt := postForkOption{
-		postForkCommonComponents: postForkCommonComponents{
-			innerBlk: &TestOptionsBlock{},
-		},
-	}
-
-	// test
-	_, err := proOpt.Options()
-	if err != snowman.ErrNotOracle {
-		t.Fatal("PostForkOptions are not oracle blocks themselves")
-	}
-}
-
 // ProposerBlock.Verify tests section
 func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})

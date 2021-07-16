@@ -84,55 +84,37 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		return [2]snowman.Block{}, snowman.ErrNotOracle
 	}
 
-	innerOpts, err := innerOracleBlk.Options()
+	innerOptions, err := innerOracleBlk.Options()
 	if err != nil {
 		return [2]snowman.Block{}, err
 	}
 
-	opt0, err := option.Build(
-		b.ID(),
-		innerOpts[0].Bytes(),
-	)
-	if err != nil {
-		return [2]snowman.Block{}, err
-	}
+	parentID := b.ID()
+	outerOptions := [2]snowman.Block{}
+	for i, innerOption := range innerOptions {
+		statelessOuterOption, err := option.Build(
+			parentID,
+			innerOption.Bytes(),
+		)
+		if err != nil {
+			return [2]snowman.Block{}, err
+		}
 
-	opt1, err := option.Build(
-		b.ID(),
-		innerOpts[1].Bytes(),
-	)
-	if err != nil {
-		return [2]snowman.Block{}, err
-	}
+		outerOption := &postForkOption{
+			Option: statelessOuterOption,
+			postForkCommonComponents: postForkCommonComponents{
+				vm:       b.vm,
+				innerBlk: innerOption,
+				status:   innerOption.Status(),
+			},
+		}
+		if err := b.vm.storePostForkOption(outerOption); err != nil {
+			return [2]snowman.Block{}, err
+		}
 
-	postForkOpt0 := &postForkOption{
-		Option: opt0,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       b.vm,
-			innerBlk: innerOpts[0],
-			status:   innerOpts[0].Status(),
-		},
+		outerOptions[i] = outerOption
 	}
-	if err := b.vm.storePostForkOption(postForkOpt0); err != nil {
-		return [2]snowman.Block{}, err
-	}
-
-	postForkOpt1 := &postForkOption{
-		Option: opt1,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       b.vm,
-			innerBlk: innerOpts[1],
-			status:   innerOpts[1].Status(),
-		},
-	}
-	if err := b.vm.storePostForkOption(postForkOpt1); err != nil {
-		return [2]snowman.Block{}, err
-	}
-
-	return [2]snowman.Block{
-		postForkOpt0,
-		postForkOpt1,
-	}, nil
+	return outerOptions, nil
 }
 
 func (b *postForkBlock) verifyPreForkChild(child *preForkBlock) error {

@@ -85,11 +85,6 @@ func (b *postForkOption) Height() uint64 {
 	return b.innerBlk.Height()
 }
 
-func (b *postForkOption) Options() ([2]snowman.Block, error) {
-	// option block cannot be oracle itself
-	return [2]snowman.Block{}, snowman.ErrNotOracle
-}
-
 func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
 	return errUnsignedChild
 }
