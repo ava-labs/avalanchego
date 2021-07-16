@@ -6,6 +6,8 @@ package poll
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -36,6 +38,50 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 	if s == nil {
 		t.Fatalf("shouldn't have failed due to a metrics initialization err")
 	}
+}
+
+func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
+	factory := NewNoEarlyTermFactory()
+	log := logging.NoLog{}
+	namespace := ""
+	registerer := prometheus.NewRegistry()
+	s := NewSet(factory, log, namespace, registerer)
+
+	// create validators
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2}
+	vdr3 := ids.ShortID{3}
+
+	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+	vdrBag := ids.ShortBag{}
+	vdrBag.Add(vdrs...)
+
+	// create two polls for the two vtxs
+	added := s.Add(1, vdrBag)
+	assert.True(t, added)
+	added = s.Add(2, vdrBag)
+	assert.True(t, added)
+	assert.Equal(t, s.Len(), 2)
+
+	vtx1 := ids.ID{1}
+	vtx2 := ids.ID{2}
+
+	// vote out of order
+	_, finished := s.Vote(1, vdr1, vtx1)
+	assert.False(t, finished)
+	_, finished = s.Vote(1, vdr2, vtx1)
+	assert.False(t, finished)
+	result, finished := s.Vote(1, vdr3, vtx1)
+	assert.True(t, finished)
+	assert.Equal(t, result.List()[0], vtx1)
+
+	_, finished = s.Vote(2, vdr1, vtx2)
+	assert.False(t, finished)
+	_, finished = s.Vote(2, vdr2, vtx2)
+	assert.False(t, finished)
+	result, finished = s.Vote(2, vdr3, vtx2)
+	assert.True(t, finished)
+	assert.Equal(t, result.List()[0], vtx2)
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
