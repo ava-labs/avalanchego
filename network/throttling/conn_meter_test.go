@@ -16,18 +16,18 @@ const (
 	host3 = "127.0.0.3"
 )
 
-func TestNoIncomingConnThrottler(t *testing.T) {
-	meter := NewIncomingConnThrottler(0)
-	// meter should allow all
+func TestNoInboundConnThrottler(t *testing.T) {
+	throttler := NewInboundConnThrottler(0)
+	// throttler should allow all
 	for i := 0; i < 10; i++ {
-		allow := meter.Allow(host1)
+		allow := throttler.Allow(host1)
 		assert.True(t, allow)
 	}
 }
 
-func TestIncomingConnThrottler(t *testing.T) {
+func TestInboundConnThrottler(t *testing.T) {
 	cooldown := 100 * time.Millisecond
-	throttlerIntf := NewIncomingConnThrottler(cooldown)
+	throttlerIntf := NewInboundConnThrottler(cooldown)
 	go throttlerIntf.Dispatch()
 
 	// Allow should always return true
@@ -59,7 +59,7 @@ func TestIncomingConnThrottler(t *testing.T) {
 	assert.False(t, throttlerIntf.Allow(host3))
 
 	// Make sure [throttler.done] isn't closed
-	throttler := throttlerIntf.(*incomingConnThrottler)
+	throttler := throttlerIntf.(*inboundConnThrottler)
 	select {
 	case <-throttler.done:
 		t.Fatal("shouldn't be done")

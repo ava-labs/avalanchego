@@ -11,24 +11,24 @@ import (
 )
 
 // Maximum number of recent incoming connections allowed.
-// "recent" is defined by the [allowCooldown] used by the incomingConnThrottler.
+// "recent" is defined by the [allowCooldown] used by the inboundConnThrottler.
 // In practice, we should never have this many recent incoming connections.
-const maxRecentIncomingConnections = 1024
+const maxRecentInboundConnections = 1024
 
 var (
-	_ IncomingConnThrottler = &incomingConnThrottler{}
-	_ IncomingConnThrottler = &noIncomingConnThrottler{}
+	_ InboundConnThrottler = &inboundConnThrottler{}
+	_ InboundConnThrottler = &noInboundConnThrottler{}
 )
 
-// IncomingConnThrottler decides whether to allow an incoming connection from IP [ipStr].
+// InboundConnThrottler decides whether to allow an incoming connection from IP [ipStr].
 // If Allow returns false, the connection to this IP should be closed.
-type IncomingConnThrottler interface {
-	// Dispatch starts this IncomingConnThrottler.
+type InboundConnThrottler interface {
+	// Dispatch starts this InboundConnThrottler.
 	// Must be called before [Allow].
 	// Blocks until [Stop] is called (i.e. should be called in a goroutine.)
 	Dispatch()
-	// Stop this IncomingConnThrottler and causes [Dispatch] to return if it has been called.
-	// This IncomingConnThrottler must not be used after [Stop] is called.
+	// Stop this InboundConnThrottler and causes [Dispatch] to return if it has been called.
+	// This InboundConnThrottler must not be used after [Stop] is called.
 	Stop()
 	// Returns whether we should allow an incoming connection from [ipStr].
 	// Must only be called after [Dispatch] has been called.
@@ -36,34 +36,34 @@ type IncomingConnThrottler interface {
 	Allow(ipStr string) bool
 }
 
-// Returns an IncomingConnThrottler that allows an incoming connection from a given IP
+// Returns an InboundConnThrottler that allows an incoming connection from a given IP
 // every [allowCooldown]. If [allowCooldown] == 0, allows all incoming connections.
-func NewIncomingConnThrottler(allowCooldown time.Duration) IncomingConnThrottler {
+func NewInboundConnThrottler(allowCooldown time.Duration) InboundConnThrottler {
 	if allowCooldown == 0 {
-		return &noIncomingConnThrottler{}
+		return &noInboundConnThrottler{}
 	}
-	return &incomingConnThrottler{
+	return &inboundConnThrottler{
 		done:              make(chan struct{}, 1),
 		allowCooldown:     allowCooldown,
 		recentIPs:         make(map[string]struct{}),
-		recentIPsAndTimes: make(chan ipAndTime, maxRecentIncomingConnections),
+		recentIPsAndTimes: make(chan ipAndTime, maxRecentInboundConnections),
 	}
 }
 
-// noIncomingConnThrottler allows all incoming connections
-type noIncomingConnThrottler struct{}
+// noInboundConnThrottler allows all incoming connections
+type noInboundConnThrottler struct{}
 
-func (*noIncomingConnThrottler) Dispatch()         {}
-func (*noIncomingConnThrottler) Stop()             {}
-func (*noIncomingConnThrottler) Allow(string) bool { return true }
+func (*noInboundConnThrottler) Dispatch()         {}
+func (*noInboundConnThrottler) Stop()             {}
+func (*noInboundConnThrottler) Allow(string) bool { return true }
 
 type ipAndTime struct {
 	ip                string
 	cooldownElapsedAt time.Time
 }
 
-// incomingConnThrottler implements IncomingConnThrottler
-type incomingConnThrottler struct {
+// inboundConnThrottler implements InboundConnThrottler
+type inboundConnThrottler struct {
 	lock sync.Mutex
 	// Useful for faking time in tests
 	clock timer.Clock
@@ -84,7 +84,7 @@ type incomingConnThrottler struct {
 }
 
 // Returns whether we should allow an incoming connection from [ipStr].
-func (n *incomingConnThrottler) Allow(ipStr string) bool {
+func (n *inboundConnThrottler) Allow(ipStr string) bool {
 	n.lock.Lock()
 	defer n.lock.Unlock()
 
@@ -108,7 +108,7 @@ func (n *incomingConnThrottler) Allow(ipStr string) bool {
 	}
 }
 
-func (n *incomingConnThrottler) Dispatch() {
+func (n *inboundConnThrottler) Dispatch() {
 	for {
 		select {
 		case <-n.done:
@@ -124,6 +124,6 @@ func (n *incomingConnThrottler) Dispatch() {
 	}
 }
 
-func (n *incomingConnThrottler) Stop() {
+func (n *inboundConnThrottler) Stop() {
 	close(n.done)
 }

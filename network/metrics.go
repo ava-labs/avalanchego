@@ -65,8 +65,8 @@ type metrics struct {
 	failedToParse            prometheus.Counter
 	connected                prometheus.Counter
 	disconnected             prometheus.Counter
-	incomingConnRateLimited  prometheus.Counter
-	incomingConnAllowed      prometheus.Counter
+	inboundConnRateLimited   prometheus.Counter
+	inboundConnAllowed       prometheus.Counter
 
 	getVersion, version,
 	getPeerlist, peerList,
@@ -120,15 +120,15 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		Name:      "times_disconnected",
 		Help:      "Times this node disconnected from a peer it had completed a handshake with",
 	})
-	m.incomingConnAllowed = prometheus.NewCounter(prometheus.CounterOpts{
+	m.inboundConnAllowed = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
-		Name:      "incoming_conn_allowed",
-		Help:      "Times this node allowed (attempted to upgrade) an incoming connection",
+		Name:      "inbound_conn_allowed",
+		Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
 	})
-	m.incomingConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
+	m.inboundConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
-		Name:      "incoming_conn_rate_limited",
-		Help:      "Times this node rejected an incoming connection due to rate-limiting.",
+		Name:      "inbound_conn_rate_limited",
+		Help:      "Times this node rejected an inbound connection due to rate-limiting.",
 	})
 
 	errs := wrappers.Errs{}
@@ -141,8 +141,8 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.failedToParse),
 		registerer.Register(m.connected),
 		registerer.Register(m.disconnected),
-		registerer.Register(m.incomingConnAllowed),
-		registerer.Register(m.incomingConnRateLimited),
+		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.inboundConnRateLimited),
 
 		m.getVersion.initialize(GetVersion, registerer),
 		m.version.initialize(Version, registerer),

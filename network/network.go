@@ -158,7 +158,7 @@ type network struct {
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	incomingConnThrottler        throttling.IncomingConnThrottler
+	inboundConnThrottler         throttling.InboundConnThrottler
 	b                            Builder
 	isFetchOnly                  bool
 
@@ -409,7 +409,7 @@ func NewNetwork(
 		myIPs:                              map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:                     readBufferSize,
 		readHandshakeTimeout:               readHandshakeTimeout,
-		incomingConnThrottler:              throttling.NewIncomingConnThrottler(inboundConnCooldown),
+		inboundConnThrottler:               throttling.NewInboundConnThrottler(inboundConnCooldown),
 		healthConfig:                       healthConfig,
 		benchlistManager:                   benchlistManager,
 		tlsKey:                             tlsKey,
@@ -835,12 +835,12 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
 		return false
 	}
-	if !n.incomingConnThrottler.Allow(ipStr) {
+	if !n.inboundConnThrottler.Allow(ipStr) {
 		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
-		n.metrics.incomingConnRateLimited.Inc()
+		n.metrics.inboundConnRateLimited.Inc()
 		return false
 	}
-	n.metrics.incomingConnAllowed.Inc()
+	n.metrics.inboundConnAllowed.Inc()
 
 	// Note that we attempt to upgrade remote addresses in
 	// [n.disconnectedIPs] because that could allow us to initialize
@@ -853,8 +853,8 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 // Assumes [n.stateLock] is not held.
 func (n *network) Dispatch() error {
 	go n.gossipPeerList() // Periodically gossip peers
-	go n.incomingConnThrottler.Dispatch()
-	defer n.incomingConnThrottler.Stop()
+	go n.inboundConnThrottler.Dispatch()
+	defer n.inboundConnThrottler.Stop()
 	go func() {
 		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
