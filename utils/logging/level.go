@@ -86,6 +86,6 @@ func (l Level) String() string {
 	case Off:
 		return "OFF"
 	default:
-		return "?????"
+		return "UNKNOWN"
 	}
 }

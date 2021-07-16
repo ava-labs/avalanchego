@@ -5,7 +5,6 @@ package admin
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/gorilla/rpc/v2"
@@ -171,11 +170,6 @@ type SetLoggerLevelArgs struct {
 	LogLevel     string `json:"logLevel"`
 	DisplayLevel string `json:"displayLevel"`
 	LoggerName   string `json:"loggerName"`
-}
-
-// SetLoggerLevelReply success result.
-type SetLoggerLevelReply struct {
-	Success bool `json:"success"`
 }
 
 // SetLoggerLevel sets the log level and display level for logger name.
