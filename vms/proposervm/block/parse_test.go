@@ -15,12 +15,12 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	assert := assert.New(t)
+
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
-
-	assert := assert.New(t)
 
 	tlsCert, err := staking.NewTLSCert()
 	assert.NoError(err)
@@ -36,14 +36,5 @@ func TestParse(t *testing.T) {
 	parsedBlock, err := Parse(builtBlockBytes)
 	assert.NoError(err)
 
-	assert.Equal(builtBlock.ID(), parsedBlock.ID())
-	assert.Equal(builtBlock.ParentID(), parsedBlock.ParentID())
-	assert.Equal(builtBlock.PChainHeight(), parsedBlock.PChainHeight())
-	assert.Equal(builtBlock.Timestamp(), parsedBlock.Timestamp())
-	assert.Equal(builtBlock.Block(), parsedBlock.Block())
-	assert.Equal(builtBlock.Proposer(), parsedBlock.Proposer())
-	assert.Equal(builtBlockBytes, parsedBlock.Bytes())
-
-	err = parsedBlock.Verify()
-	assert.NoError(err)
+	equal(assert, builtBlock, parsedBlock)
 }

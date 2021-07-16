@@ -43,9 +43,9 @@ func TestBuild(t *testing.T) {
 func TestBuildCorrectTimestamp(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
+	skewedTimestamp := timestamp.Add(time.Millisecond)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
-	skewedTimestamp := timestamp.Add(time.Millisecond)
 
 	assert := assert.New(t)
 
@@ -58,11 +58,31 @@ func TestBuildCorrectTimestamp(t *testing.T) {
 	builtBlock, err := Build(parentID, skewedTimestamp, pChainHeight, cert, innerBlockBytes, key)
 	assert.NoError(err)
 
-	assert.Equal(parentID, builtBlock.ParentID())
-	assert.Equal(pChainHeight, builtBlock.PChainHeight())
 	assert.Equal(timestamp, builtBlock.Timestamp())
-	assert.Equal(innerBlockBytes, builtBlock.Block())
+}
 
-	err = builtBlock.Verify()
+func TestBuildMatchesParseTimestamp(t *testing.T) {
+	assert := assert.New(t)
+
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	skewedTimestamp := timestamp.Add(time.Millisecond)
+	pChainHeight := uint64(2)
+	innerBlockBytes := []byte{3}
+
+	tlsCert, err := staking.NewTLSCert()
 	assert.NoError(err)
+
+	cert := tlsCert.Leaf
+	key := tlsCert.PrivateKey.(crypto.Signer)
+
+	builtBlock, err := Build(parentID, skewedTimestamp, pChainHeight, cert, innerBlockBytes, key)
+	assert.NoError(err)
+
+	builtBlockBytes := builtBlock.Bytes()
+
+	parsedBlock, err := Parse(builtBlockBytes)
+	assert.NoError(err)
+
+	equal(assert, builtBlock, parsedBlock)
 }
