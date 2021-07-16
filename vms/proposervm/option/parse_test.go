@@ -12,10 +12,10 @@ import (
 )
 
 func TestParse(t *testing.T) {
+	assert := assert.New(t)
+
 	parentID := ids.ID{1}
 	innerBlockBytes := []byte{3}
-
-	assert := assert.New(t)
 
 	builtOption, err := Build(parentID, innerBlockBytes)
 	assert.NoError(err)
@@ -25,8 +25,5 @@ func TestParse(t *testing.T) {
 	parsedOption, err := Parse(builtOptionBytes)
 	assert.NoError(err)
 
-	assert.Equal(builtOption.ID(), parsedOption.ID())
-	assert.Equal(builtOption.ParentID(), parsedOption.ParentID())
-	assert.Equal(builtOption.Block(), parsedOption.Block())
-	assert.Equal(builtOption.Bytes(), parsedOption.Bytes())
+	equal(assert, builtOption, parsedOption)
 }

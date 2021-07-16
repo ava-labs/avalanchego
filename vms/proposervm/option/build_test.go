@@ -12,10 +12,10 @@ import (
 )
 
 func TestBuild(t *testing.T) {
+	assert := assert.New(t)
+
 	parentID := ids.ID{1}
 	innerBlockBytes := []byte{3}
-
-	assert := assert.New(t)
 
 	builtOption, err := Build(parentID, innerBlockBytes)
 	assert.NoError(err)
