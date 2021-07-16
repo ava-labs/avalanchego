@@ -59,29 +59,36 @@ func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
 	// create two polls for the two vtxs
 	added := s.Add(1, vdrBag)
 	assert.True(t, added)
+
+	// re init for second poll - why? 🤔
+	vdrBag = ids.ShortBag{}
+	vdrBag.Add(vdrs...)
 	added = s.Add(2, vdrBag)
 	assert.True(t, added)
 	assert.Equal(t, s.Len(), 2)
 
+	// vote vtx1 for poll 1
+	// vote vtx2 for poll 2
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 
 	// vote out of order
 	_, finished := s.Vote(1, vdr1, vtx1)
 	assert.False(t, finished)
-	_, finished = s.Vote(1, vdr2, vtx1)
-	assert.False(t, finished)
-	result, finished := s.Vote(1, vdr3, vtx1)
-	assert.True(t, finished)
-	assert.Equal(t, result.List()[0], vtx1)
-
-	_, finished = s.Vote(2, vdr1, vtx2)
-	assert.False(t, finished)
 	_, finished = s.Vote(2, vdr2, vtx2)
 	assert.False(t, finished)
-	result, finished = s.Vote(2, vdr3, vtx2)
+	_, finished = s.Vote(2, vdr3, vtx2)
+	assert.False(t, finished)
+
+	result, finished := s.Vote(2, vdr1, vtx2) // poll 2 finished
 	assert.True(t, finished)
 	assert.Equal(t, result.List()[0], vtx2)
+
+	_, finished = s.Vote(1, vdr2, vtx1)
+	assert.False(t, finished)
+	result, finished = s.Vote(1, vdr3, vtx1) // poll 1 finished
+	assert.True(t, finished)
+	assert.Equal(t, result.List()[0], vtx1)
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
