@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/hashicorp/go-plugin"
+
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
 	"github.com/ava-labs/avalanchego/api/health"
@@ -54,7 +56,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/hashicorp/go-plugin"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
@@ -267,7 +268,6 @@ func (n *Node) initNetworking() error {
 		consensusRouter,
 		n.Config.ConnMeterResetDuration,
 		n.Config.ConnMeterMaxConns,
-		n.Config.SendQueueSize,
 		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,

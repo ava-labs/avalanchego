@@ -59,9 +59,6 @@ type Config struct {
 	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 
-	// Throttling
-	SendQueueSize uint32
-
 	// Health
 	HealthCheckFreq time.Duration
 
