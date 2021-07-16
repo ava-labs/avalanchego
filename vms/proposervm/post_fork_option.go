@@ -119,11 +119,14 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		newTimestamp = parentTimestamp
 	}
 
+	// The following [minTimestamp] check should be able to be removed, but this
+	// is left here as a sanity check
 	childHeight := innerBlock.Height()
 	parentPChainHeight, err := b.pChainHeight()
 	if err != nil {
 		return nil, err
 	}
+
 	proposerID := b.vm.ctx.NodeID
 	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
 	if err != nil {

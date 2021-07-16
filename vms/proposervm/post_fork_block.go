@@ -43,7 +43,7 @@ func (b *postForkBlock) Accept() error {
 
 func (b *postForkBlock) Reject() error {
 	// we do not reject the inner block here because that block may be contained
-	// in the proposer block that causing this block to be rejected.
+	// in the proposer block that is causing this block to be rejected.
 	b.status = choices.Rejected
 	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
@@ -166,6 +166,8 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		newTimestamp = parentTimestamp
 	}
 
+	// The following [minTimestamp] check should be able to be removed, but this
+	// is left here as a sanity check
 	childHeight := innerBlock.Height()
 	parentPChainHeight := b.PChainHeight()
 	proposerID := b.vm.ctx.NodeID
