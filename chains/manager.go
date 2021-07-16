@@ -290,10 +290,6 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 		return
 	}
 
-	if !exists {
-		m.subnets[chainParams.SubnetID] = sb
-	}
-
 	m.chainsLock.Lock()
 	m.chains[chainParams.ID] = chain.Handler
 	m.chainsLock.Unlock()
