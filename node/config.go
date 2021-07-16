@@ -132,10 +132,6 @@ type Config struct {
 
 	DynamicPublicIPResolver dynamicip.Resolver
 
-	// Throttling incoming connections
-	ConnMeterResetDuration time.Duration
-	ConnMeterMaxConns      int
-
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
 

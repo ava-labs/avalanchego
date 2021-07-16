@@ -97,7 +97,6 @@ func TestPeer_Close(t *testing.T) {
 		vdrs,
 		handler,
 		time.Duration(0),
-		0,
 		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),

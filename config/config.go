@@ -212,8 +212,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.StakingIP = utils.NewDynamicIPDesc(ip, stakingPort)
 
 	nodeConfig.DynamicUpdateDuration = v.GetDuration(DynamicUpdateDurationKey)
-	nodeConfig.ConnMeterResetDuration = v.GetDuration(ConnMeterResetDurationKey)
-	nodeConfig.ConnMeterMaxConns = v.GetInt(ConnMeterMaxConnsKey)
 
 	// Staking:
 	nodeConfig.EnableStaking = v.GetBool(StakingEnabledKey)
@@ -342,6 +340,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Throttling
 	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
+	nodeConfig.NetworkConfig.InboundConnThrottlerCooldown = v.GetDuration(InboundConnThrottlerCooldownKey)
 	nodeConfig.NetworkConfig.InboundThrottlerConfig = throttling.MsgThrottlerConfig{
 		AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
 		VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
