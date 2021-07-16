@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,9 +17,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
+type PollHolder interface {
+	GetPoll() Poll
+	StartTime() time.Time
+}
+
 type poll struct {
 	Poll
 	start time.Time
+}
+
+func (p poll) GetPoll() Poll {
+	return p
+}
+
+func (p poll) StartTime() time.Time {
+	return p.start
 }
 
 type set struct {
@@ -26,7 +41,7 @@ type set struct {
 	durPolls prometheus.Histogram
 	factory  Factory
 	// maps requestID -> poll
-	polls map[uint32]poll
+	polls linkedhashmap.LinkedHashmap
 }
 
 // NewSet returns a new empty set of polls
@@ -60,7 +75,7 @@ func NewSet(
 		numPolls: numPolls,
 		durPolls: durPolls,
 		factory:  factory,
-		polls:    make(map[uint32]poll),
+		polls:    linkedhashmap.New(),
 	}
 }
 
@@ -68,7 +83,7 @@ func NewSet(
 // Returns true if the poll was registered correctly and the network sample
 //         should be made.
 func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
-	if _, exists := s.polls[requestID]; exists {
+	if _, exists := s.polls.Get(requestID); exists {
 		s.log.Debug("dropping poll due to duplicated requestID: %d", requestID)
 		return false
 	}
@@ -77,10 +92,10 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 		requestID,
 		&vdrs)
 
-	s.polls[requestID] = poll{
+	s.polls.Put(requestID, poll{
 		Poll:  s.factory.New(vdrs), // create the new poll
 		start: time.Now(),
-	}
+	})
 	s.numPolls.Inc() // increase the metrics
 	return true
 }
@@ -88,13 +103,16 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
 func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, bool) {
-	poll, exists := s.polls[requestID]
+	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
 			vdr,
 			requestID)
 		return []ids.Bag{}, false
 	}
+
+	pollHolder := pollHolderIntf.(PollHolder)
+	poll := pollHolder.GetPoll()
 
 	s.log.Verbo("processing vote from %s in the poll with requestID: %d with the vote %s",
 		vdr,
@@ -108,8 +126,8 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
-	delete(s.polls, requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
+	s.polls.Delete(requestID) // remove the poll from the current set
+	s.durPolls.Observe(float64(time.Since(pollHolder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 
 	result := poll.Result()
@@ -119,7 +137,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
 func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
-	poll, exists := s.polls[requestID]
+	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
 			vdr,
@@ -131,6 +149,9 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
 		vdr,
 		requestID)
 
+	pollHolder := pollHolderIntf.(PollHolder)
+	poll := pollHolder.GetPoll()
+
 	poll.Drop(vdr)
 	if !poll.Finished() {
 		return []ids.Bag{}, false
@@ -138,19 +159,22 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
 
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
-	delete(s.polls, requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
+	s.polls.Delete(requestID) // remove the poll from the current set
+	s.durPolls.Observe(float64(time.Since(pollHolder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 	return []ids.Bag{poll.Result()}, true
 }
 
 // Len returns the number of outstanding polls
-func (s *set) Len() int { return len(s.polls) }
+func (s *set) Len() int { return s.polls.Len() }
 
 func (s *set) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("current polls: (Size = %d)", len(s.polls)))
-	for requestID, poll := range s.polls {
+	sb.WriteString(fmt.Sprintf("current polls: (Size = %d)", s.polls.Len()))
+	iter := s.polls.NewIterator()
+	for iter.Next() {
+		requestID := iter.Key()
+		poll := iter.Value().(Poll)
 		sb.WriteString(fmt.Sprintf("\n    %d: %s", requestID, poll.PrefixedString("    ")))
 	}
 	return sb.String()
