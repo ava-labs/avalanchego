@@ -1,64 +1,63 @@
-# Snowman++: a congestion control mechanism for snowman-like VMs
+# Snowman++: a congestion control mechanism for snowman VMs
 
-Snowman++ is an optional congestion control mechanism available for snowman-like VMs. Snowman++ can be activated on any snowman-like VM and any subnet with no modifications to the VM internals; technically it is sufficient to wrap the target VM into an ad-hoc, wrapper VM called ```proposerVM``` and to specify an activation time for the congestion-control mechanism.  
-In this document we describe the high level features of Snowman++ and the implementation details of the ```proposerVM```.
+Snowman++ is a congestion control mechanism available for snowman VMs. Snowman++ can be activated on any snowman VM with no modifications to the VM internals. It is sufficient to wrap the target VM with a wrapper VM called `proposerVM` and to specify an activation time for the congestion-control mechanism. In this document we describe the high level features of Snowman++ and the implementation details of the `proposerVM`.
 
 ## Congestion control mechanism description
 
-Snowman++ introduces a ***soft leader mechanism*** which attempts to select a single leader with the power to issue a block, but opens up block production to any subnet validator if sufficient time has passed without blocks being generated.  
-At high level, Snowman++ works as follows: for each block a small list of subnet validators is randomly sampled, which will act as "proposers" for the next block. Each proposer is assigned a submission window: a proposer cannot submit its block before its submission window starts (the block will be deemed invalid), but it can submit its block after its submission window expires, competing with next proposers. If no block is produced by the proposers in their submission windows, any subnet validator will be free to propose a block, as it happens for ordinary snowman-like VMs.  
+Snowman++ introduces a **_soft proposer mechanism_** which attempts to select a single proposer with the power to issue a block, but opens up block production to every validator if sufficient time has passed without blocks being generated.
+
+At a high level, Snowman++ works as follows: for each block a small list of validators is randomly sampled, which will act as "proposers" for the next block. Each proposer is assigned a submission window: a proposer cannot submit its block before its submission window starts (the block would be deemed invalid), but it can submit its block after its submission window expires, competing with next proposers. If no block is produced by the proposers in their submission windows, any validator will be free to propose a block, as happens for ordinary snowman VMs.
+
 In the following we detail the block extensions, the proposers selection and the validations introduced for Snowman++.
 
 ### Snowman++ block extension
 
-Snowman++ does not modify the blocks produced by the VM it is applied to. However it extends these blocks with a header carrying the information needed to control block congestion.  
-A non-Option block header contains the following fields:
+Snowman++ does not modify the blocks produced by the VM it is applied to. It extends these blocks with a header carrying the information needed to control block congestion.
 
-- ```ParentID```, the ID of parent's enriched block (Note: this is different from the inner block ID).
-- ```Timestamp```, the local time at block production, corrected with parent's timestamp to guarantee monotonicity.
-- ```PChainHeight``` at the time the block is produced.
-- ```Certificate``` of block produced, to verify block signature.
-- ```Signature``` of block producer.
+A standard block header contains the following fields:
+
+- `ParentID`, the ID of parent's enriched block (Note: this is different from the inner block ID).
+- `Timestamp`, the local time at block production, corrected with parent's timestamp to guarantee monotonicity.
+- `PChainHeight` at the time the block is produced.
+- `Certificate` of block producer, to verify block signature.
+- `Signature` of block producer.
 
 An Option block header contains the field:
 
-- ```ParentID```, the ID of the Oracle block to which the Option block is associated
+- `ParentID`, the ID of the Oracle block to which the Option block is associated
 
-Option blocks inherit all remaining parameters (```Timestamp```, ```PChainHeight```, ```Certificate``` and ```Signature```) from the Oracle block they are associated to, thus allowing us to optimize header size.
+Option blocks are not signed, as they are deterministically generated from their Oracle block.
 
 ### Snowman++ proposers selection mechanism
 
-For a given subnet, Snowman++ randomly selects a list of block proposers. Block proposers must be subnet validators. Snowman++ extracts the full list of a given subnet validators from P-Chain validators list, since Avalanche requires that each subnet validator is also a P-Chain validator.
+For a given subnet, Snowman++ randomly selects a list of block proposers. Block proposers are selected from the subnet validators. Snowman++ extracts the list of a given subnet's validators from the P-Chain. Let a block have a P-Chain height `P` recorded in its header. The proposers list for next block is generated independently but reproducibly by each node as follows:
 
-Let a block have a P-Chain height ```P``` recorded in its header. The proposers list for next block is generated independently but reproducibly by each node as follows:
+- Subnet validators active at block `P` are retrieved from P-chain.
+- Validators are canonically sorted by ID.
+- A seed `S` is generated by xoring `P` and the chainID. The chainID inclusion makes sure that different seeds sequences are generated for different chains.
+- Validator are pseudo-randomly sampled without replacement by weight, seeded by `S`.
+- `maxWindows` number of subnet validators are retrieved in order from the sampled set. `maxWindows` is currently set to `5`.
+- The `maxWindows` validators are the next block's proposer list.
 
-- Subnet validators active at ```P``` are retrieved from P-chain.
-- Subnet validators are canonically sorted by ID.
-- A seed ```S``` is generated by xoring ```P``` and chainID. The chainID inclusion makes sure that different seeds sequences are generated for different chains.
-- Subnet validator are pseudo randomly sampled without replacement by weight, seeded by ```S```. Weight ties are broken by ID.
-- ```maxWindows``` number of subnet validators are retrieved in order from the sampled set. ```maxWindows``` is currently set to 5.
-- The ```maxWindows``` validators are the next block proposers list.
-
-Each proposer gets assigned a submission window of length ```WindowDuration```. currently set at 3 seconds.  
-A proposer in position ```i``` in the proposers list has its submission windows starting ```i × WindowDuration``` after its parent's timestamp.  
-Any other validator can issue a block ```maxWindows × WindowDuration``` after its parent's timestamp.
+Each proposer gets assigned a submission window of length `WindowDuration`. currently set at `3 seconds`.
+A proposer in position `i` in the proposers list has its submission windows starting `i × WindowDuration` after the parent block's timestamp. Every validator can issue a block `maxWindows × WindowDuration` after the parent block's timestamp.
 
 ### Snowman++ validations
 
 The following validation rules are enforced:
 
-- A block must have a valid signature, i.e. a signature must be generated by proposer Certificate included in block header.
-- A block must have a PChainHeight is smaller or equal to current P-Chain height is invalid.
-- A block must have a PChainHeight is larger or equal to its parent's P-Chain height (P-Chain heights are monotonic).
-- A block must have a timestamp ```t``` larger or equal to its parent's timestamp (timestamps are monotone)
-- A block received by a node at time ```t_local``` must have a timestamp```t``` such that ```t < t_local + syncBond``` (blocks too much in the future are invalid). ```syncBound``` is currently set to 10 seconds.
-- A block issued by a proposer ```p``` which has a position ```i``` in the current' P-chain height must have its timestamp at least ``` i × WindowDuration ``` seconds after its parent block 's timestamp. A block issued by a non-proposer must have its timestamp at least ```maxWindows × WindowDuration``` seconds after its parent block's timestamp.
+- A block must have a valid `Signature`, i.e. the signature must be verified to have been by the proposer `Certificate` included in block header.
+- A block must have a `PChainHeight` that is less or equal to current P-Chain height.
+- A block must have a `PChainHeight` is larger or equal to its parent's `PChainHeight` (`PChainHeight` is monotonic).
+- A block must have a `Timestamp` larger or equal to its parent's `Timestamp` (`Timestamp` is monotonic)
+- A block received by a node at time `t_local` must have a `Timestamp` such that `Timestamp < t_local + syncBond` (a block too far in the future is invalid). `syncBound` is currently set to `10 seconds`.
+- A block issued by a proposer `p` which has a position `i` in the current proposer list must have its timestamp at least `i × WindowDuration` seconds after its parent block 's timestamp. A block issued by a non-proposer must have its timestamp at least `maxWindows × WindowDuration` seconds after its parent block's timestamp.
 
 A block violating any of these rules will be marked as invalid. Note, however, that Snowman++ block invalidity does not imply its inner block invalidity. In fact the same inner block can be wrapped by different Snowman++ blocks. An inner block is mark is invalid iff a Snowman++ block wrapping one of its sibling is mark as valid.
 
 ## ProposerVM Implementation Details
 
-Snowman++ is a congestion control mechanism that can be activated for a snowman-like VM by wrapping the existing VM with a `proposerVM` one upon creation. An activation time needs to be specified, following which the congestion control mechanism will be enforced.
+Snowman++ is a congestion control mechanism that can be activated for a snowman VM by wrapping the existing VM with a `proposerVM` one upon creation. An activation time needs to be specified, following which the congestion control mechanism will be enforced.
 
 ### Block Structure
 
