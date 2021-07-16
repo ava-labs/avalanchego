@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
-type PollHolder interface {
+type pollHolder interface {
 	GetPoll() Poll
 	StartTime() time.Time
 }
@@ -111,7 +111,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 		return []ids.Bag{}, false
 	}
 
-	pollHolder := pollHolderIntf.(PollHolder)
+	pollHolder := pollHolderIntf.(pollHolder)
 	poll := pollHolder.GetPoll()
 
 	s.log.Verbo("processing vote from %s in the poll with requestID: %d with the vote %s",
@@ -149,7 +149,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
 		vdr,
 		requestID)
 
-	pollHolder := pollHolderIntf.(PollHolder)
+	pollHolder := pollHolderIntf.(pollHolder)
 	poll := pollHolder.GetPoll()
 
 	poll.Drop(vdr)
