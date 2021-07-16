@@ -143,7 +143,7 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig:  appplugin.Handshake,
 		Plugins:          appplugin.PluginMap,
-		Cmd:              exec.Command(path, args...),
+		Cmd:              cmd,
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}
