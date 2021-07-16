@@ -100,8 +100,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 	if err != nil {
 		return err
 	}
-	return postForkCommonVerify(
-		&b.postForkCommonComponents,
+	return b.postForkCommonComponents.Verify(
 		parentTimestamp,
 		parentPChainHeight,
 		child,
