@@ -71,8 +71,11 @@ func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
 	vtx1 := ids.ID{1}
 	vtx2 := ids.ID{2}
 
+	var result []ids.Bag
+	var finished bool
+
 	// vote out of order
-	_, finished := s.Vote(1, vdr1, vtx1)
+	_, finished = s.Vote(1, vdr1, vtx1)
 	assert.False(t, finished)
 	_, finished = s.Vote(2, vdr2, vtx2)
 	assert.False(t, finished)
@@ -85,13 +88,11 @@ func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
 	_, finished = s.Vote(1, vdr2, vtx1)
 	assert.False(t, finished)
 
-	result, finished := s.Vote(1, vdr3, vtx1) // poll 1 finished
+	result, finished = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
 	assert.True(t, finished)
-	assert.Equal(t, result.List()[0], vtx1)
-
-	result, finished = s.Vote(2, vdr1, vtx2) // poll 2 now finished since 1 has finished
-	assert.True(t, finished)
-	assert.Equal(t, result.List()[0], vtx2)
+	assert.Equal(t, len(result), 2)
+	assert.Equal(t, result[0].List()[0], vtx1)
+	assert.Equal(t, result[1].List()[0], vtx2)
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
@@ -130,11 +131,11 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 		t.Fatalf("Should have dropped a duplicated poll")
 	} else if result, finished := s.Vote(0, vdr2, vtxID); !finished {
 		t.Fatalf("Should have finished the")
-	} else if list := result.List(); len(list) != 1 {
+	} else if list := result[0].List(); len(list) != 1 {
 		t.Fatalf("Wrong number of vertices returned")
 	} else if retVtxID := list[0]; retVtxID != vtxID {
 		t.Fatalf("Wrong vertex returned")
-	} else if result.Count(vtxID) != 2 {
+	} else if result[0].Count(vtxID) != 2 {
 		t.Fatalf("Wrong number of votes returned")
 	}
 }
@@ -173,7 +174,7 @@ func TestCreateAndFinishFailedPoll(t *testing.T) {
 		t.Fatalf("Should have dropped a duplicated poll")
 	} else if result, finished := s.Drop(0, vdr2); !finished {
 		t.Fatalf("Should have finished the")
-	} else if list := result.List(); len(list) != 0 {
+	} else if list := result[0].List(); len(list) != 0 {
 		t.Fatalf("Wrong number of vertices returned")
 	}
 }

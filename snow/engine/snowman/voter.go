@@ -32,7 +32,7 @@ func (v *voter) Update() {
 		return
 	}
 
-	results := ids.Bag{}
+	var results []ids.Bag
 	finished := false
 	if v.response == ids.Empty {
 		results, finished = v.t.polls.Drop(v.requestID, v.vdr)
@@ -46,11 +46,18 @@ func (v *voter) Update() {
 
 	// To prevent any potential deadlocks with un-disclosed dependencies, votes
 	// must be bubbled to the nearest valid block
-	results = v.bubbleVotes(results)
+	for i, result := range results {
+		results[i] = v.bubbleVotes(result)
+	}
 
 	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
-	if err := v.t.Consensus.RecordPoll(results); err != nil {
-		v.t.errs.Add(err)
+	for _, result := range results {
+		if err := v.t.Consensus.RecordPoll(result); err != nil {
+			v.t.errs.Add(err)
+		}
+	}
+
+	if v.t.errs.Errored() {
 		return
 	}
 

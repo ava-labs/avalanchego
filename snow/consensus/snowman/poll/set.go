@@ -25,7 +25,8 @@ type set struct {
 	numPolls prometheus.Gauge
 	durPolls prometheus.Histogram
 	factory  Factory
-	polls    map[uint32]poll
+	// maps requestID -> poll
+	polls map[uint32]poll
 }
 
 // NewSet returns a new empty set of polls
@@ -86,17 +87,13 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Vote(
-	requestID uint32,
-	vdr ids.ShortID,
-	vote ids.ID,
-) (ids.Bag, bool) {
+func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, bool) {
 	poll, exists := s.polls[requestID]
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
 			vdr,
 			requestID)
-		return ids.Bag{}, false
+		return []ids.Bag{}, false
 	}
 
 	s.log.Verbo("processing vote from %s in the poll with requestID: %d with the vote %s",
@@ -106,7 +103,7 @@ func (s *set) Vote(
 
 	poll.Vote(vdr, vote)
 	if !poll.Finished() {
-		return ids.Bag{}, false
+		return []ids.Bag{}, false
 	}
 
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
@@ -114,18 +111,20 @@ func (s *set) Vote(
 	delete(s.polls, requestID) // remove the poll from the current set
 	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
-	return poll.Result(), true
+
+	result := poll.Result()
+	return []ids.Bag{result}, true
 }
 
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Drop(requestID uint32, vdr ids.ShortID) (ids.Bag, bool) {
+func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
 	poll, exists := s.polls[requestID]
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
 			vdr,
 			requestID)
-		return ids.Bag{}, false
+		return []ids.Bag{}, false
 	}
 
 	s.log.Verbo("processing dropped vote from %s in the poll with requestID: %d",
@@ -134,7 +133,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) (ids.Bag, bool) {
 
 	poll.Drop(vdr)
 	if !poll.Finished() {
-		return ids.Bag{}, false
+		return []ids.Bag{}, false
 	}
 
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
@@ -142,7 +141,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) (ids.Bag, bool) {
 	delete(s.polls, requestID) // remove the poll from the current set
 	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
-	return poll.Result(), true
+	return []ids.Bag{poll.Result()}, true
 }
 
 // Len returns the number of outstanding polls
