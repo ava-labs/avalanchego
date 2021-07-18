@@ -63,7 +63,6 @@ const (
 	NetworkPeerListGossipSizeKey              = "network-peer-list-gossip-size"
 	NetworkPeerListGossipFreqKey              = "network-peer-list-gossip-frequency"
 	NetworkCompressionEnabledKey              = "network-compression-enabled"
-	SendQueueSizeKey                          = "send-queue-size"
 	BenchlistFailThresholdKey                 = "benchlist-fail-threshold"
 	BenchlistPeerSummaryEnabledKey            = "benchlist-peer-summary-enabled"
 	BenchlistDurationKey                      = "benchlist-duration"
