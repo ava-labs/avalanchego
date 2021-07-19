@@ -166,9 +166,8 @@ func (lh *linkedHashmap) NewReverseIterator() Iter {
 func (lh *linkedHashmap) NewReverseIteratorStartingFrom(key interface{}) (Iter, bool) {
 	if elem, exists := lh.getElement(key); exists {
 		return &iterator{lh: lh, reverse: true, next: elem}, true
-	} else {
-		return nil, false
 	}
+	return nil, false
 }
 
 type iterator struct {
