@@ -10,7 +10,7 @@ import (
 
 const (
 	// MaxPayloadSize is the maximum size that can be placed into a payload
-	MaxPayloadSize = units.MiB
+	MaxPayloadSize = units.KiB
 )
 
 var (
