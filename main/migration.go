@@ -98,8 +98,7 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	)
 	switch m.rootConfig.DBName {
 	case rocksdb.Name:
-		path := filepath.Join(m.rootConfig.DBPath, rocksdb.Name)
-		dbManager, err = manager.NewRocksDB(path, logging.NoLog{}, version.CurrentDatabase, true)
+		dbManager, err = manager.NewRocksDB(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
 	case leveldb.Name:
 		dbManager, err = manager.NewLevelDB(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
 	case memdb.Name:

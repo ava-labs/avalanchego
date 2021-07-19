@@ -545,11 +545,14 @@ func (n *Node) initAPIServer() error {
 }
 
 // Create the vmManager and register any aliases.
-func (n *Node) initVMManager() error {
+func (n *Node) initVMManager(genesisBytes []byte) error {
 	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
 
 	n.Log.Info("initializing VM aliases")
-	vmAliases := genesis.GetVMAliases()
+	_, _, vmAliases, err := genesis.Aliases(genesisBytes)
+	if err != nil {
+		return err
+	}
 
 	for vmID, aliases := range vmAliases {
 		for _, alias := range aliases {
@@ -943,7 +946,7 @@ func (n *Node) initIPCAPI() error {
 // Give chains aliases as specified by the genesis information
 func (n *Node) initChainAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing chain aliases")
-	_, chainAliases, err := genesis.Aliases(genesisBytes)
+	_, chainAliases, _, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -961,25 +964,13 @@ func (n *Node) initChainAliases(genesisBytes []byte) error {
 // APIs aliases as specified by the genesis information
 func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	n.Log.Info("initializing API aliases")
-	apiAliases, _, err := genesis.Aliases(genesisBytes)
+	defaultAliases, _, _, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
 
-	for url, aliases := range apiAliases {
+	for url, aliases := range defaultAliases {
 		if err := n.APIServer.AddAliases(url, aliases...); err != nil {
-			return err
-		}
-	}
-
-	for vmID, aliases := range n.Config.VMAliases {
-		urlAliases := []string{}
-		for _, alias := range aliases {
-			urlAliases = append(urlAliases, ids.VMAliasPrefix+alias)
-		}
-
-		url := ids.VMAliasPrefix + vmID.String()
-		if err := n.APIServer.AddAliases(url, urlAliases...); err != nil {
 			return err
 		}
 	}
@@ -1047,7 +1038,7 @@ func (n *Node) Initialize(
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
-	if err := n.initVMManager(); err != nil {
+	if err := n.initVMManager(n.Config.GenesisBytes); err != nil {
 		return fmt.Errorf("couldn't initialize API aliases: %w", err)
 	}
 	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager

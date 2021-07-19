@@ -15,31 +15,32 @@ import (
 )
 
 // Aliases returns the default aliases based on the network ID
-func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, error) {
-	apiAliases := getAPIAliases()
+func Aliases(genesisBytes []byte) (map[string][]string, map[ids.ID][]string, map[ids.ID][]string, error) {
+	generalAliases := getGeneralAliases()
 	chainAliases := map[ids.ID][]string{
 		constants.PlatformChainID: {"P", "platform"},
 	}
+	vmAliases := getChainAliases()
 	genesis := &platformvm.Genesis{} // TODO let's not re-create genesis to do aliasing
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := genesis.Initialize(); err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	for _, chain := range genesis.Chains {
 		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
 		switch uChain.VMID {
 		case avm.ID:
-			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"X", "avm", constants.ChainAliasPrefix + "X", constants.ChainAliasPrefix + "/avm"}
+			generalAliases["bc/"+chain.ID().String()] = []string{"X", "avm", "bc/X", "bc/avm"}
 			chainAliases[chain.ID()] = GetXChainAliases()
 		case evm.ID:
-			apiAliases[constants.ChainAliasPrefix+chain.ID().String()] = []string{"C", "evm", constants.ChainAliasPrefix + "C", constants.ChainAliasPrefix + "evm"}
+			generalAliases["bc/"+chain.ID().String()] = []string{"C", "evm", "bc/C", "bc/evm"}
 			chainAliases[chain.ID()] = GetCChainAliases()
 		}
 	}
-	return apiAliases, chainAliases, nil
+	return generalAliases, chainAliases, vmAliases, nil
 }
 
 func GetCChainAliases() []string {
@@ -50,16 +51,16 @@ func GetXChainAliases() []string {
 	return []string{"X", "avm"}
 }
 
-func getAPIAliases() map[string][]string {
+func getGeneralAliases() map[string][]string {
 	return map[string][]string{
-		constants.VMAliasPrefix + platformvm.ID.String():                {constants.VMAliasPrefix + "platform"},
-		constants.VMAliasPrefix + avm.ID.String():                       {constants.VMAliasPrefix + "avm"},
-		constants.VMAliasPrefix + evm.ID.String():                       {constants.VMAliasPrefix + "evm"},
-		constants.ChainAliasPrefix + constants.PlatformChainID.String(): {"P", "platform", constants.ChainAliasPrefix + "P", constants.ChainAliasPrefix + "platform"},
+		"vm/" + platformvm.ID.String():             {"vm/platform"},
+		"vm/" + avm.ID.String():                    {"vm/avm"},
+		"vm/" + evm.ID.String():                    {"vm/evm"},
+		"bc/" + constants.PlatformChainID.String(): {"P", "platform", "bc/P", "bc/platform"},
 	}
 }
 
-func GetVMAliases() map[ids.ID][]string {
+func getChainAliases() map[ids.ID][]string {
 	return map[ids.ID][]string{
 		platformvm.ID:  {"platform"},
 		avm.ID:         {"avm"},

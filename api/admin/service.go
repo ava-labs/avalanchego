@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
@@ -128,7 +127,7 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 	}
 
 	reply.Success = true
-	return service.httpServer.AddAliasesWithReadLock(constants.ChainAliasPrefix+chainID.String(), constants.ChainAliasPrefix+args.Alias)
+	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
 }
 
 // GetChainAliasesArgs are the arguments for calling GetChainAliases

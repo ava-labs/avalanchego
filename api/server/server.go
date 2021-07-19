@@ -168,7 +168,7 @@ func (s *Server) registerChain(chainName string, ctx *snow.Context, engine commo
 
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := constants.ChainAliasPrefix + ctx.ChainID.String()
+	defaultEndpoint := "bc/" + ctx.ChainID.String()
 
 	// Register each endpoint
 	for extension, handler := range handlers {
