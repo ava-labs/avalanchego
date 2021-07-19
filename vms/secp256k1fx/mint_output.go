@@ -7,12 +7,10 @@ import "github.com/ava-labs/avalanchego/vms/components/verify"
 
 var _ verify.State = &MintOutput{}
 
-// MintOutput ...
 type MintOutput struct {
 	OutputOwners `serialize:"true"`
 }
 
-// Verify ...
 func (out *MintOutput) Verify() error {
 	switch {
 	case out == nil:
@@ -22,5 +20,4 @@ func (out *MintOutput) Verify() error {
 	}
 }
 
-// VerifyState ...
 func (out *MintOutput) VerifyState() error { return out.Verify() }

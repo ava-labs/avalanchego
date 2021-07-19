@@ -145,7 +145,6 @@ func (tm *AdaptiveTimeoutManager) TimeoutDuration() time.Duration {
 	return tm.currentTimeout
 }
 
-// Dispatch ...
 func (tm *AdaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
 
 // Stop executing timeouts

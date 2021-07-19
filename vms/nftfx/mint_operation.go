@@ -9,7 +9,6 @@ import (
 
 var errNilMintOperation = errors.New("nil mint operation")
 
-// MintOperation ...
 type MintOperation struct {
 	MintInput secp256k1fx.Input           `serialize:"true" json:"mintInput"`
 	GroupID   uint32                      `serialize:"true" json:"groupID"`
@@ -17,7 +16,6 @@ type MintOperation struct {
 	Outputs   []*secp256k1fx.OutputOwners `serialize:"true" json:"outputs"`
 }
 
-// Outs ...
 func (op *MintOperation) Outs() []verify.State {
 	outs := []verify.State{}
 	for _, out := range op.Outputs {
@@ -30,7 +28,6 @@ func (op *MintOperation) Outs() []verify.State {
 	return outs
 }
 
-// Verify ...
 func (op *MintOperation) Verify() error {
 	switch {
 	case op == nil:

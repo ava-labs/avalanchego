@@ -7,11 +7,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// EnableCrypto ...
 // TODO: Remove this from this package, this should be in a config file
 var EnableCrypto = true
 
-// Factory ...
 type Factory interface {
 	NewPrivateKey() (PrivateKey, error)
 
@@ -19,7 +17,6 @@ type Factory interface {
 	ToPrivateKey([]byte) (PrivateKey, error)
 }
 
-// RecoverableFactory ...
 type RecoverableFactory interface {
 	Factory
 
@@ -27,7 +24,6 @@ type RecoverableFactory interface {
 	RecoverHashPublicKey(hash, signature []byte) (PublicKey, error)
 }
 
-// PublicKey ...
 type PublicKey interface {
 	Verify(message, signature []byte) bool
 	VerifyHash(hash, signature []byte) bool
@@ -36,7 +32,6 @@ type PublicKey interface {
 	Bytes() []byte
 }
 
-// PrivateKey ...
 type PrivateKey interface {
 	PublicKey() PublicKey
 

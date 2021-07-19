@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// DumpBytes ...
 type DumpBytes struct{ Bytes []byte }
 
 func (db DumpBytes) String() string { return strings.TrimSpace(hex.Dump(db.Bytes)) }

@@ -19,7 +19,6 @@ var (
 	errOutputsNotSorted = errors.New("outputs not sorted")
 )
 
-// InitialState ...
 type InitialState struct {
 	FxID uint32         `serialize:"true" json:"fxID"`
 	Outs []verify.State `serialize:"true" json:"outputs"`
@@ -49,7 +48,6 @@ func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	return nil
 }
 
-// Sort ...
 func (is *InitialState) Sort(c codec.Manager) { sortState(is.Outs, c) }
 
 type innerSortState struct {

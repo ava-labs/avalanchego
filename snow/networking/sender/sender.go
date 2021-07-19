@@ -73,7 +73,6 @@ func (s *Sender) Initialize(
 // Context of this sender
 func (s *Sender) Context() *snow.Context { return s.ctx }
 
-// GetAcceptedFrontier ...
 func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -120,7 +119,6 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	}
 }
 
-// AcceptedFrontier ...
 func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
 		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
@@ -129,7 +127,6 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 	}
 }
 
-// GetAccepted ...
 func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
@@ -174,7 +171,6 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	}
 }
 
-// Accepted ...
 func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
 		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)

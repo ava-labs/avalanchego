@@ -806,7 +806,6 @@ func (vm *VM) LoadUser(
 	return utxos, kc, db.Close()
 }
 
-// Spend ...
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -873,7 +872,6 @@ func (vm *VM) Spend(
 	return amountsSpent, ins, keys, nil
 }
 
-// SpendNFT ...
 func (vm *VM) SpendNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -948,7 +946,6 @@ func (vm *VM) SpendNFT(
 	return ops, keys, nil
 }
 
-// SpendAll ...
 func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -998,7 +995,6 @@ func (vm *VM) SpendAll(
 	return amountsSpent, ins, keys, nil
 }
 
-// Mint ...
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1072,7 +1068,6 @@ func (vm *VM) Mint(
 	return ops, keys, nil
 }
 
-// MintNFT ...
 func (vm *VM) MintNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
