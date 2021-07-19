@@ -45,6 +45,11 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
+const (
+	// TODO: rename
+	overloadThreshold = 500 * time.Millisecond
+)
+
 var (
 	snapshotCleanAccountHitMeter   = metrics.NewRegisteredMeter("state/snapshot/clean/account/hit", nil)
 	snapshotCleanAccountMissMeter  = metrics.NewRegisteredMeter("state/snapshot/clean/account/miss", nil)
@@ -197,7 +202,7 @@ type Tree struct {
 // If [resumeGeneration] is true, it will allow the Snapshot tree to resume asynchronously
 // generating a snapshot. Otherwise, loadSnapshot will return an error if it loads an
 // incomplete snapshot.
-func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, async bool, rebuild bool, recovery bool, resumeGenerationn bool) (*Tree, error) {
+func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, async bool, rebuild bool, recovery bool, resumeGeneration bool) (*Tree, error) {
 	// Create a new, empty snapshot tree
 	snap := &Tree{
 		diskdb:      diskdb,
@@ -210,7 +215,7 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 		defer snap.waitBuild()
 	}
 	// Attempt to load a previously persisted snapshot and rebuild one if failed
-	head, err := loadSnapshot(diskdb, triedb, cache, blockHash, root, recovery, resumeGenerationn)
+	head, err := loadSnapshot(diskdb, triedb, cache, blockHash, root, recovery, resumeGeneration)
 	if err != nil {
 		if rebuild {
 			log.Warn("Failed to load snapshot, regenerating", "err", err)
@@ -495,6 +500,35 @@ func (t *Tree) discard(blockHash common.Hash, force bool) error {
 	return nil
 }
 
+// AbortGeneration stops an ongoing snapshot generation process if it hasn't
+// been stopped already.
+//
+// It is optional to manually abort snapshot generation. If generation is not
+// aborted prior to invoking diffToDisk, it will be invoked anyways.
+func (t *Tree) AbortGeneration() {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	dl := t.disklayer()
+	if dl == nil {
+		return
+	}
+
+	dl.lock.Lock()
+	defer dl.lock.Unlock()
+
+	abortGeneration(dl)
+}
+
+func abortGeneration(base *diskLayer) {
+	// If the disk layer is running a snapshot generator, abort it
+	if base.genAbort != nil && !base.aborted {
+		abort := make(chan *generatorStats)
+		base.genAbort <- abort
+		base.genStats = <-abort
+	}
+}
+
 // diffToDisk merges a bottom-most diff into the persistent disk layer underneath
 // it. The method will panic if called onto a non-bottom-most diff layer.
 //
@@ -504,14 +538,11 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 	var (
 		base  = bottom.parent.(*diskLayer)
 		batch = base.diskdb.NewBatch()
-		stats *generatorStats
 	)
-	// If the disk layer is running a snapshot generator, abort it
-	if base.genAbort != nil {
-		abort := make(chan *generatorStats)
-		base.genAbort <- abort
-		stats = <-abort
-	}
+
+	// Attempt to abort generation (if not already aborted)
+	abortGeneration(base)
+
 	// Put the deletion in the batch writer, flush all updates in the final step.
 	rawdb.DeleteSnapshotBlockHash(batch)
 	rawdb.DeleteSnapshotRoot(batch)
@@ -609,7 +640,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 	rawdb.WriteSnapshotRoot(batch, bottom.root)
 
 	// Write out the generator progress marker and report
-	journalProgress(batch, base.genMarker, stats)
+	journalProgress(batch, base.genMarker, base.genStats)
 
 	// Flush all the updates in the single db operation. Ensure the
 	// disk layer transition is atomic.
@@ -625,6 +656,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 		triedb:     base.triedb,
 		genMarker:  base.genMarker,
 		genPending: base.genPending,
+		created:    time.Now(),
 	}
 	// If snapshot generation hasn't finished yet, port over all the starts and
 	// continue where the previous round left off.
@@ -634,7 +666,16 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 	if base.genMarker != nil && base.genAbort != nil {
 		res.genMarker = base.genMarker
 		res.genAbort = make(chan chan *generatorStats)
-		go res.generate(stats)
+
+		// If the last diskLayer is not very old, we avoid generating
+		// with the expectation that the next generation will get canceled
+		// immediately.
+		if time.Now().Sub(base.created) < overloadThreshold {
+			res.aborted = true
+			res.genStats = base.genStats
+		} else {
+			go res.generate(base.genStats)
+		}
 	}
 	return res, nil
 }

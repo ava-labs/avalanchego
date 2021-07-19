@@ -860,6 +860,12 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 
 	bc.lastAccepted = block
 
+	// Abort snapshot generation before pruning anything from trie database
+	// (could occur in AcceptTrie)
+	if bc.snaps != nil {
+		bc.snaps.AbortGeneration()
+	}
+
 	// Accept Trie
 	if err := bc.stateManager.AcceptTrie(block); err != nil {
 		return fmt.Errorf("unable to accept trie: %w", err)
