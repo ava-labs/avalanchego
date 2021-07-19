@@ -82,11 +82,6 @@ func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	_, finished = s.Vote(2, vdr3, vtx2)
 	assert.False(t, finished)
 
-	// todo handle this condition now
-	//   there's a linked hashmap, we need to decide on keys and values
-	//   such that the we're able to establish the link between the requestIDs 1 and 2
-	//   indicating that 2 comes after 1 and thus upon successfully completing 2 we can complete 1 (or finish!)
-
 	_, finished = s.Vote(2, vdr1, vtx2) // poll 2 finished
 	assert.False(t, finished)           // expect 2 to not have finished because 1 is still pending
 
@@ -141,11 +136,6 @@ func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
 	assert.False(t, finished)
 	_, finished = s.Vote(2, vdr3, vtx2)
 	assert.False(t, finished)
-
-	// todo handle this condition now
-	//   there's a linked hashmap, we need to decide on keys and values
-	//   such that the we're able to establish the link between the requestIDs 1 and 2
-	//   indicating that 2 comes after 1 and thus upon successfully completing 2 we can complete 1 (or finish!)
 
 	_, finished = s.Vote(1, vdr2, vtx1)
 	assert.False(t, finished)
