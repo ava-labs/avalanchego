@@ -111,27 +111,77 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 		return []ids.Bag{}, false
 	}
 
-	pollHolder := pollHolderIntf.(pollHolder)
-	poll := pollHolder.GetPoll()
+	holder := pollHolderIntf.(pollHolder)
+	p := holder.GetPoll()
 
 	s.log.Verbo("processing vote from %s in the poll with requestID: %d with the vote %s",
 		vdr,
 		requestID,
 		vote)
 
-	poll.Vote(vdr, vote)
-	if !poll.Finished() {
+	p.Vote(vdr, vote)
+	if !p.Finished() {
 		return []ids.Bag{}, false
 	}
 
-	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
-
-	s.polls.Delete(requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Since(pollHolder.StartTime()).Milliseconds()))
+	s.log.Verbo("poll with requestID %d finished as %s", requestID, p)
+	s.durPolls.Observe(float64(time.Since(holder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 
-	result := poll.Result()
-	return []ids.Bag{result}, true
+	var results []ids.Bag
+	// check if previous poll(s) have finished
+	if oldestRequestID, _, exists := s.polls.Oldest(); exists && oldestRequestID == requestID {
+		// this is the oldest poll that has just finished
+		// iterate from oldest to newest
+		iter := s.polls.NewIterator()
+		var keysToDelete []interface{}
+		for iter.Next() {
+			holder := iter.Value().(pollHolder)
+			p = holder.GetPoll()
+			if !p.Finished() {
+				// since we're iterating from oldest to newest, if the next poll has not finished,
+				// we can break and return what we have so far
+				break
+			}
+
+			results = append(results, p.Result())
+			keysToDelete = append(keysToDelete, iter.Key())
+		}
+
+		// delete the keys to be deleted
+		for _, keyToDelete := range keysToDelete {
+			s.polls.Delete(keyToDelete)
+		}
+	} else if exists && oldestRequestID != requestID {
+		// this is not the oldest poll but there might be older polls that have finished
+
+		// iterate from newest to oldest
+		// newest may not be this poll so we skip until we find this poll
+		// workaround until there's a way to get the iterator to start from an offset
+		iter, _ := s.polls.NewReverseIteratorStartingFrom(requestID)
+		var keysToDelete []interface{}
+		for iter.Next() {
+			holder := iter.Value().(pollHolder)
+			p = holder.GetPoll()
+			if !p.Finished() {
+				// we found an unfinished poll in the history, return false
+				// because we need all polls from current (newer) to oldest to have finished
+				// to return true
+				return []ids.Bag{}, false
+			}
+
+			results = append(results, p.Result())
+			keysToDelete = append(keysToDelete, iter.Key())
+		}
+
+		// delete the keys to be deleted
+		for _, keyToDelete := range keysToDelete {
+			s.polls.Delete(keyToDelete)
+		}
+	}
+
+	// only gets here if the poll has finished
+	return results, len(results) > 0
 }
 
 // Drop registers the connections response to a query for [id]. If there was no

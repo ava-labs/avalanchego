@@ -40,7 +40,7 @@ func TestNewSetErrorOnMetrics(t *testing.T) {
 	}
 }
 
-func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
+func TestCreateAndFinishPollOutOfOrder_NewerFinishesFirst(t *testing.T) {
 	factory := NewNoEarlyTermFactory()
 	log := logging.NoLog{}
 	namespace := ""
@@ -82,6 +82,11 @@ func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
 	_, finished = s.Vote(2, vdr3, vtx2)
 	assert.False(t, finished)
 
+	// todo handle this condition now
+	//   there's a linked hashmap, we need to decide on keys and values
+	//   such that the we're able to establish the link between the requestIDs 1 and 2
+	//   indicating that 2 comes after 1 and thus upon successfully completing 2 we can complete 1 (or finish!)
+
 	_, finished = s.Vote(2, vdr1, vtx2) // poll 2 finished
 	assert.False(t, finished)           // expect 2 to not have finished because 1 is still pending
 
@@ -90,9 +95,141 @@ func TestCreateAndFinishPollOutOfOrder(t *testing.T) {
 
 	result, finished = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 should be finished as well
 	assert.True(t, finished)
-	assert.Equal(t, len(result), 2)
-	assert.Equal(t, result[0].List()[0], vtx1)
-	assert.Equal(t, result[1].List()[0], vtx2)
+	assert.Equal(t, 2, len(result))
+	assert.Equal(t, vtx1, result[0].List()[0])
+	assert.Equal(t, vtx2, result[1].List()[0])
+}
+
+func TestCreateAndFinishPollOutOfOrder_OlderFinishesFirst(t *testing.T) {
+	factory := NewNoEarlyTermFactory()
+	log := logging.NoLog{}
+	namespace := ""
+	registerer := prometheus.NewRegistry()
+	s := NewSet(factory, log, namespace, registerer)
+
+	// create validators
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2}
+	vdr3 := ids.ShortID{3}
+
+	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+
+	// create two polls for the two vtxs
+	vdrBag := ids.ShortBag{}
+	vdrBag.Add(vdrs...)
+	added := s.Add(1, vdrBag)
+	assert.True(t, added)
+
+	vdrBag = ids.ShortBag{}
+	vdrBag.Add(vdrs...)
+	added = s.Add(2, vdrBag)
+	assert.True(t, added)
+	assert.Equal(t, s.Len(), 2)
+
+	// vote vtx1 for poll 1
+	// vote vtx2 for poll 2
+	vtx1 := ids.ID{1}
+	vtx2 := ids.ID{2}
+
+	var result []ids.Bag
+	var finished bool
+
+	// vote out of order
+	_, finished = s.Vote(1, vdr1, vtx1)
+	assert.False(t, finished)
+	_, finished = s.Vote(2, vdr2, vtx2)
+	assert.False(t, finished)
+	_, finished = s.Vote(2, vdr3, vtx2)
+	assert.False(t, finished)
+
+	// todo handle this condition now
+	//   there's a linked hashmap, we need to decide on keys and values
+	//   such that the we're able to establish the link between the requestIDs 1 and 2
+	//   indicating that 2 comes after 1 and thus upon successfully completing 2 we can complete 1 (or finish!)
+
+	_, finished = s.Vote(1, vdr2, vtx1)
+	assert.False(t, finished)
+
+	result, finished = s.Vote(1, vdr3, vtx1) // poll 1 finished, poll 2 still remaining
+	assert.True(t, finished)                 // because 1 is the oldest
+	assert.Len(t, result, 1)
+	assert.Equal(t, vtx1, result[0].List()[0])
+
+	result, finished = s.Vote(2, vdr1, vtx2) // poll 2 finished
+	assert.True(t, finished)                 // because 2 is the oldest now
+	assert.Equal(t, len(result), 1)
+	assert.Equal(t, vtx2, result[0].List()[0])
+}
+
+func TestCreateAndFinishPollOutOfOrder_UnfinishedPollsGaps(t *testing.T) {
+	factory := NewNoEarlyTermFactory()
+	log := logging.NoLog{}
+	namespace := ""
+	registerer := prometheus.NewRegistry()
+	s := NewSet(factory, log, namespace, registerer)
+
+	// create validators
+	vdr1 := ids.ShortID{1}
+	vdr2 := ids.ShortID{2}
+	vdr3 := ids.ShortID{3}
+
+	vdrs := []ids.ShortID{vdr1, vdr2, vdr3}
+
+	// create three polls for the two vtxs
+	vdrBag := ids.ShortBag{}
+	vdrBag.Add(vdrs...)
+	added := s.Add(1, vdrBag)
+	assert.True(t, added)
+
+	vdrBag = ids.ShortBag{}
+	vdrBag.Add(vdrs...)
+	added = s.Add(2, vdrBag)
+	assert.True(t, added)
+
+	vdrBag = ids.ShortBag{}
+	vdrBag.Add(vdrs...)
+	added = s.Add(3, vdrBag)
+	assert.True(t, added)
+	assert.Equal(t, s.Len(), 3)
+
+	// vote vtx1 for poll 1
+	// vote vtx2 for poll 2
+	// vote vtx3 for poll 3
+	vtx1 := ids.ID{1}
+	vtx2 := ids.ID{2}
+	vtx3 := ids.ID{3}
+
+	var result []ids.Bag
+	var finished bool
+
+	// vote out of order
+	// 2 finishes first to create a gap of finished poll between two unfinished polls 1 and 3
+	_, finished = s.Vote(2, vdr3, vtx2)
+	assert.False(t, finished)
+	_, finished = s.Vote(2, vdr2, vtx2)
+	assert.False(t, finished)
+	_, finished = s.Vote(2, vdr1, vtx2)
+	assert.False(t, finished)
+
+	// 3 finishes now, 2 has already finished but 1 is not finished so we expect to receive no results still
+	_, finished = s.Vote(3, vdr2, vtx3)
+	assert.False(t, finished)
+	_, finished = s.Vote(3, vdr3, vtx3)
+	assert.False(t, finished)
+	_, finished = s.Vote(3, vdr1, vtx3)
+	assert.False(t, finished)
+
+	// 1 finishes now, 2 and 3 have already finished so we expect 3 items in results
+	_, finished = s.Vote(1, vdr1, vtx1)
+	assert.False(t, finished)
+	_, finished = s.Vote(1, vdr2, vtx1)
+	assert.False(t, finished)
+	result, finished = s.Vote(1, vdr3, vtx1)
+	assert.True(t, finished)
+	assert.Len(t, result, 3)
+	assert.Equal(t, vtx1, result[0].List()[0])
+	assert.Equal(t, vtx2, result[1].List()[0])
+	assert.Equal(t, vtx3, result[2].List()[0])
 }
 
 func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
