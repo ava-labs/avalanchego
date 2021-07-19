@@ -292,6 +292,7 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 			currentSize += sizeChange
 			currentBatch.Deletes = append(currentBatch.Deletes, d)
 		}
+
 		if len(currentBatch.Deletes)+len(currentBatch.Puts) > 0 {
 			currentBatchGroup = append(currentBatchGroup, currentBatch)
 		}

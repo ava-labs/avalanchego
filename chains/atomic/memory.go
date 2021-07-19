@@ -62,7 +62,7 @@ func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) database.Database {
 	lock := m.makeLock(sharedID)
 	lock.Lock()
-	return prefixdb.New(sharedID[:], db)
+	return prefixdb.NewNested(sharedID[:], db)
 }
 
 // ReleaseSharedDatabase unlocks the provided DB
