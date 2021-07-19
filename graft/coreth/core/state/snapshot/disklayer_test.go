@@ -141,6 +141,8 @@ func TestDiskMerge(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed to update snapshot tree: %v", err)
 	}
+	// Bypass validation of junk data
+	snaps.validated = true
 	if err := snaps.Flatten(diffBlockHash); err != nil {
 		t.Fatalf("failed to flatten snapshot tree: %v", err)
 	}
