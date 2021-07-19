@@ -47,12 +47,12 @@ import (
 
 const (
 	// skipGenThreshold is the minimum time that must have elapsed since the
-	// creation of a replaced disk layer to start snapshot generation on a new
+	// creation of the previous disk layer to start snapshot generation on a new
 	// disk layer.
 	//
-	// If we are replacing disk layers at a frequency less than this threshold,
-	// it is usually not worth it to start generation as it will be aborted
-	// before meaningful work can be done.
+	// If disk layers are being discarded at a frequency greater than this threshold,
+	// starting snapshot generation is not worth it (will be aborted before meaningful
+	// work can be done).
 	skipGenThreshold = 500 * time.Millisecond
 )
 
@@ -506,11 +506,14 @@ func (t *Tree) discard(blockHash common.Hash, force bool) error {
 	return nil
 }
 
-// AbortGeneration stops an ongoing snapshot generation process if it hasn't
-// been stopped already.
+// AbortGeneration aborts an ongoing snapshot generation process (if it hasn't
+// stopped already).
 //
-// It is optional to manually abort snapshot generation. If generation is not
-// aborted prior to invoking diffToDisk, it will be invoked anyways.
+// It is not required to manually abort snapshot generation. If generation has not
+// been manually aborted prior to invoking [diffToDisk], it will be aborted anyways.
+//
+// It is safe to call this method multiple times and when there is no snapshot
+// generation currently underway.
 func (t *Tree) AbortGeneration() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -682,12 +685,12 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 		res.genMarker = base.genMarker
 		res.genAbort = make(chan chan *generatorStats)
 
-		// If the last diskLayer is not very old, we avoid generating
-		// with the expectation that the next generation will get canceled
-		// immediately.
+		// If the diskLayer we are about to discard is not very old, we skip
+		// generation on the next layer (assuming generation will just get canceled
+		// before doing meaningful work anyways).
 		diskLayerAge := time.Since(base.created)
 		if diskLayerAge < skipGenThreshold {
-			log.Debug("Skipping snapshot generation", "disk layer age", diskLayerAge)
+			log.Debug("Skipping snapshot generation", "previous disk layer age", diskLayerAge)
 			res.genStats = base.genStats
 		} else {
 			go res.generate(base.genStats)

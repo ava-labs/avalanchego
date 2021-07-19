@@ -53,7 +53,7 @@ type diskLayer struct {
 	genPending chan struct{}             // Notification channel when generation is done (test synchronicity)
 	genAbort   chan chan *generatorStats // Notification channel to abort generating the snapshot in this layer
 
-	genStats *generatorStats // Stats for snapshot generation (generation has been aborted if non-nil)
+	genStats *generatorStats // Stats for snapshot generation (generation aborted/finished if non-nil)
 	created  time.Time       // Time at which disk layer was created
 
 	lock sync.RWMutex
