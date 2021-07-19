@@ -221,29 +221,9 @@ func (s *Server) RemoveAndPutMultiple(
 		}
 	}
 
-	for _, value := range req.BatchChainsAndInputs {
-		peerChainID, err := ids.ToID(value.PeerChainID)
-		if err != nil {
-			delete(s.removeAndPutMultiples, req.Id)
-			return nil, err
-		}
-
-		requests, ok := removeAndPut.requests[peerChainID]
-		if !ok {
-			requests = &atomic.Requests{
-				PutRequests: make([]*atomic.Element, 0, len(value.PutRequests)),
-			}
-			removeAndPut.requests[peerChainID] = requests
-		}
-
-		requests.RemoveRequests = append(requests.RemoveRequests, value.RemoveRequests...)
-		for _, v := range value.PutRequests {
-			requests.PutRequests = append(requests.PutRequests, &atomic.Element{
-				Key:    v.Key,
-				Value:  v.Value,
-				Traits: v.Traits,
-			})
-		}
+	if err := s.parseRequests(removeAndPut.requests, req.BatchChainsAndInputs); err != nil {
+		delete(s.removeAndPutMultiples, req.Id)
+		return nil, err
 	}
 
 	if err := s.parseBatches(removeAndPut.batches, req.Batches); err != nil {
@@ -266,6 +246,36 @@ func (s *Server) RemoveAndPutMultiple(
 	}
 
 	return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, s.sm.RemoveAndPutMultiple(removeAndPut.requests, batches...)
+}
+
+func (s *Server) parseRequests(
+	requests map[ids.ID]*atomic.Requests,
+	rawRequests []*gsharedmemoryproto.AtomicRequest,
+) error {
+	for _, value := range rawRequests {
+		peerChainID, err := ids.ToID(value.PeerChainID)
+		if err != nil {
+			return err
+		}
+
+		req, ok := requests[peerChainID]
+		if !ok {
+			req = &atomic.Requests{
+				PutRequests: make([]*atomic.Element, 0, len(value.PutRequests)),
+			}
+			requests[peerChainID] = req
+		}
+
+		req.RemoveRequests = append(req.RemoveRequests, value.RemoveRequests...)
+		for _, v := range value.PutRequests {
+			req.PutRequests = append(req.PutRequests, &atomic.Element{
+				Key:    v.Key,
+				Value:  v.Value,
+				Traits: v.Traits,
+			})
+		}
+	}
+	return nil
 }
 
 func (s *Server) parseBatches(
