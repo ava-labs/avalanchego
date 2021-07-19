@@ -27,18 +27,18 @@ type Server struct {
 	indexedLock sync.Mutex
 	indexed     map[int64]*indexedRequest
 
-	removeAndPutMultipleLock sync.Mutex
-	removeAndPutMultiples    map[int64]*removeAndPutMultipleRequest
+	applyLock sync.Mutex
+	apply     map[int64]*applyRequest
 }
 
 // NewServer returns shared memory connected to remote shared memory
 func NewServer(sm atomic.SharedMemory, db database.Database) *Server {
 	return &Server{
-		sm:                    sm,
-		db:                    db,
-		gets:                  make(map[int64]*getRequest),
-		indexed:               make(map[int64]*indexedRequest),
-		removeAndPutMultiples: make(map[int64]*removeAndPutMultipleRequest),
+		sm:      sm,
+		db:      db,
+		gets:    make(map[int64]*getRequest),
+		indexed: make(map[int64]*indexedRequest),
+		apply:   make(map[int64]*applyRequest),
 	}
 }
 
@@ -201,42 +201,42 @@ func (s *Server) Indexed(
 	return resp, nil
 }
 
-type removeAndPutMultipleRequest struct {
+type applyRequest struct {
 	requests map[ids.ID]*atomic.Requests
 	batches  map[int64]database.Batch
 }
 
-func (s *Server) RemoveAndPutMultiple(
+func (s *Server) Apply(
 	_ context.Context,
-	req *gsharedmemoryproto.RemoveAndPutMultipleRequest,
-) (*gsharedmemoryproto.RemoveAndPutMultipleResponse, error) {
-	s.removeAndPutMultipleLock.Lock()
-	defer s.removeAndPutMultipleLock.Unlock()
+	req *gsharedmemoryproto.ApplyRequest,
+) (*gsharedmemoryproto.ApplyResponse, error) {
+	s.applyLock.Lock()
+	defer s.applyLock.Unlock()
 
-	removeAndPut, exists := s.removeAndPutMultiples[req.Id]
+	removeAndPut, exists := s.apply[req.Id]
 	if !exists {
-		removeAndPut = &removeAndPutMultipleRequest{
+		removeAndPut = &applyRequest{
 			requests: make(map[ids.ID]*atomic.Requests),
 			batches:  make(map[int64]database.Batch),
 		}
 	}
 
-	if err := s.parseRequests(removeAndPut.requests, req.BatchChainsAndInputs); err != nil {
-		delete(s.removeAndPutMultiples, req.Id)
+	if err := s.parseRequests(removeAndPut.requests, req.Requests); err != nil {
+		delete(s.apply, req.Id)
 		return nil, err
 	}
 
 	if err := s.parseBatches(removeAndPut.batches, req.Batches); err != nil {
-		delete(s.removeAndPutMultiples, req.Id)
+		delete(s.apply, req.Id)
 		return nil, err
 	}
 
 	if req.Continues {
-		s.removeAndPutMultiples[req.Id] = removeAndPut
-		return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, nil
+		s.apply[req.Id] = removeAndPut
+		return &gsharedmemoryproto.ApplyResponse{}, nil
 	}
 
-	delete(s.removeAndPutMultiples, req.Id)
+	delete(s.apply, req.Id)
 
 	batches := make([]database.Batch, len(removeAndPut.batches))
 	i := 0
@@ -245,7 +245,7 @@ func (s *Server) RemoveAndPutMultiple(
 		i++
 	}
 
-	return &gsharedmemoryproto.RemoveAndPutMultipleResponse{}, s.sm.RemoveAndPutMultiple(removeAndPut.requests, batches...)
+	return &gsharedmemoryproto.ApplyResponse{}, s.sm.Apply(removeAndPut.requests, batches...)
 }
 
 func (s *Server) parseRequests(

@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SharedMemoryClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Indexed(ctx context.Context, in *IndexedRequest, opts ...grpc.CallOption) (*IndexedResponse, error)
-	RemoveAndPutMultiple(ctx context.Context, in *RemoveAndPutMultipleRequest, opts ...grpc.CallOption) (*RemoveAndPutMultipleResponse, error)
+	Apply(ctx context.Context, in *ApplyRequest, opts ...grpc.CallOption) (*ApplyResponse, error)
 }
 
 type sharedMemoryClient struct {
@@ -49,9 +49,9 @@ func (c *sharedMemoryClient) Indexed(ctx context.Context, in *IndexedRequest, op
 	return out, nil
 }
 
-func (c *sharedMemoryClient) RemoveAndPutMultiple(ctx context.Context, in *RemoveAndPutMultipleRequest, opts ...grpc.CallOption) (*RemoveAndPutMultipleResponse, error) {
-	out := new(RemoveAndPutMultipleResponse)
-	err := c.cc.Invoke(ctx, "/gsharedmemoryproto.SharedMemory/RemoveAndPutMultiple", in, out, opts...)
+func (c *sharedMemoryClient) Apply(ctx context.Context, in *ApplyRequest, opts ...grpc.CallOption) (*ApplyResponse, error) {
+	out := new(ApplyResponse)
+	err := c.cc.Invoke(ctx, "/gsharedmemoryproto.SharedMemory/Apply", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,7 @@ func (c *sharedMemoryClient) RemoveAndPutMultiple(ctx context.Context, in *Remov
 type SharedMemoryServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Indexed(context.Context, *IndexedRequest) (*IndexedResponse, error)
-	RemoveAndPutMultiple(context.Context, *RemoveAndPutMultipleRequest) (*RemoveAndPutMultipleResponse, error)
+	Apply(context.Context, *ApplyRequest) (*ApplyResponse, error)
 	mustEmbedUnimplementedSharedMemoryServer()
 }
 
@@ -78,8 +78,8 @@ func (UnimplementedSharedMemoryServer) Get(context.Context, *GetRequest) (*GetRe
 func (UnimplementedSharedMemoryServer) Indexed(context.Context, *IndexedRequest) (*IndexedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Indexed not implemented")
 }
-func (UnimplementedSharedMemoryServer) RemoveAndPutMultiple(context.Context, *RemoveAndPutMultipleRequest) (*RemoveAndPutMultipleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveAndPutMultiple not implemented")
+func (UnimplementedSharedMemoryServer) Apply(context.Context, *ApplyRequest) (*ApplyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Apply not implemented")
 }
 func (UnimplementedSharedMemoryServer) mustEmbedUnimplementedSharedMemoryServer() {}
 
@@ -130,20 +130,20 @@ func _SharedMemory_Indexed_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _SharedMemory_RemoveAndPutMultiple_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveAndPutMultipleRequest)
+func _SharedMemory_Apply_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ApplyRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SharedMemoryServer).RemoveAndPutMultiple(ctx, in)
+		return srv.(SharedMemoryServer).Apply(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/gsharedmemoryproto.SharedMemory/RemoveAndPutMultiple",
+		FullMethod: "/gsharedmemoryproto.SharedMemory/Apply",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SharedMemoryServer).RemoveAndPutMultiple(ctx, req.(*RemoveAndPutMultipleRequest))
+		return srv.(SharedMemoryServer).Apply(ctx, req.(*ApplyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -164,8 +164,8 @@ var SharedMemory_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _SharedMemory_Indexed_Handler,
 		},
 		{
-			MethodName: "RemoveAndPutMultiple",
-			Handler:    _SharedMemory_RemoveAndPutMultiple_Handler,
+			MethodName: "Apply",
+			Handler:    _SharedMemory_Apply_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

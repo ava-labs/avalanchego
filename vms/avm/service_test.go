@@ -707,7 +707,7 @@ func TestServiceGetUTXOs(t *testing.T) {
 		}
 	}
 
-	if err := sm.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: elems}}); err != nil {
+	if err := sm.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: elems}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1577,7 +1577,7 @@ func TestImport(t *testing.T) {
 
 			peerSharedMemory := m.NewSharedMemory(platformChainID)
 			utxoID := utxo.InputID()
-			if err := peerSharedMemory.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+			if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 				Key:   utxoID[:],
 				Value: utxoBytes,
 				Traits: [][]byte{

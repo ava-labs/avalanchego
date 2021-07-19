@@ -41,7 +41,7 @@ type SharedMemory interface {
 		lastKey []byte,
 		err error,
 	)
-	RemoveAndPutMultiple(requests map[ids.ID]*Requests, batches ...database.Batch) error
+	Apply(requests map[ids.ID]*Requests, batches ...database.Batch) error
 }
 
 // sharedMemory provides the API for a blockchain to interact with shared memory
@@ -104,7 +104,7 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
-func (sm *sharedMemory) RemoveAndPutMultiple(requests map[ids.ID]*Requests, batches ...database.Batch) error {
+func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database.Batch) error {
 	// Sorting here introduces an ordering over the locks to prevent any
 	// deadlocks
 	sharedIDs := make([]ids.ID, 0, len(requests))

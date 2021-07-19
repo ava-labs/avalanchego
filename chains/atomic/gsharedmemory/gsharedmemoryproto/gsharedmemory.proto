@@ -58,17 +58,17 @@ message IndexedResponse {
     bool continues = 4;
 }
 
-message RemoveAndPutMultipleRequest {
-    repeated AtomicRequest batchChainsAndInputs = 1;
+message ApplyRequest {
+    repeated AtomicRequest requests = 1;
     repeated Batch batches = 2;
     int64 id = 3;
     bool continues = 4;
 }
 
-message RemoveAndPutMultipleResponse {}
+message ApplyResponse {}
 
 service SharedMemory {
     rpc Get(GetRequest) returns (GetResponse);
     rpc Indexed(IndexedRequest) returns (IndexedResponse);
-    rpc RemoveAndPutMultiple(RemoveAndPutMultipleRequest) returns (RemoveAndPutMultipleResponse);
+    rpc Apply(ApplyRequest) returns (ApplyResponse);
 }
