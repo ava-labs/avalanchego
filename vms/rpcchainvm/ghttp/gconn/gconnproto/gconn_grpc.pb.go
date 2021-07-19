@@ -4,7 +4,6 @@ package gconnproto
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -103,28 +102,24 @@ type ConnServer interface {
 }
 
 // UnimplementedConnServer must be embedded to have forward compatible implementations.
-type UnimplementedConnServer struct{}
+type UnimplementedConnServer struct {
+}
 
 func (UnimplementedConnServer) Read(context.Context, *ReadRequest) (*ReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
 }
-
 func (UnimplementedConnServer) Write(context.Context, *WriteRequest) (*WriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Write not implemented")
 }
-
 func (UnimplementedConnServer) Close(context.Context, *CloseRequest) (*CloseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Close not implemented")
 }
-
 func (UnimplementedConnServer) SetDeadline(context.Context, *SetDeadlineRequest) (*SetDeadlineResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetDeadline not implemented")
 }
-
 func (UnimplementedConnServer) SetReadDeadline(context.Context, *SetReadDeadlineRequest) (*SetReadDeadlineResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetReadDeadline not implemented")
 }
-
 func (UnimplementedConnServer) SetWriteDeadline(context.Context, *SetWriteDeadlineRequest) (*SetWriteDeadlineResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetWriteDeadline not implemented")
 }

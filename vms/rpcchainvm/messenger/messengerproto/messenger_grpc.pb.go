@@ -4,7 +4,6 @@ package messengerproto
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -48,7 +47,8 @@ type MessengerServer interface {
 }
 
 // UnimplementedMessengerServer must be embedded to have forward compatible implementations.
-type UnimplementedMessengerServer struct{}
+type UnimplementedMessengerServer struct {
+}
 
 func (UnimplementedMessengerServer) Notify(context.Context, *NotifyRequest) (*NotifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Notify not implemented")

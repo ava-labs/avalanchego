@@ -4,7 +4,6 @@ package ghttpproto
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -48,7 +47,8 @@ type HTTPServer interface {
 }
 
 // UnimplementedHTTPServer must be embedded to have forward compatible implementations.
-type UnimplementedHTTPServer struct{}
+type UnimplementedHTTPServer struct {
+}
 
 func (UnimplementedHTTPServer) Handle(context.Context, *HTTPRequest) (*HTTPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Handle not implemented")

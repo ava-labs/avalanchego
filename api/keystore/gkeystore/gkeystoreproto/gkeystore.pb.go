@@ -7,11 +7,10 @@
 package gkeystoreproto
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -162,14 +161,11 @@ func file_gkeystore_proto_rawDescGZIP() []byte {
 	return file_gkeystore_proto_rawDescData
 }
 
-var (
-	file_gkeystore_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-	file_gkeystore_proto_goTypes  = []interface{}{
-		(*GetDatabaseRequest)(nil),  // 0: gkeystoreproto.GetDatabaseRequest
-		(*GetDatabaseResponse)(nil), // 1: gkeystoreproto.GetDatabaseResponse
-	}
-)
-
+var file_gkeystore_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_gkeystore_proto_goTypes = []interface{}{
+	(*GetDatabaseRequest)(nil),  // 0: gkeystoreproto.GetDatabaseRequest
+	(*GetDatabaseResponse)(nil), // 1: gkeystoreproto.GetDatabaseResponse
+}
 var file_gkeystore_proto_depIdxs = []int32{
 	0, // 0: gkeystoreproto.Keystore.GetDatabase:input_type -> gkeystoreproto.GetDatabaseRequest
 	1, // 1: gkeystoreproto.Keystore.GetDatabase:output_type -> gkeystoreproto.GetDatabaseResponse
