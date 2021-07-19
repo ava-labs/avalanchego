@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -19,19 +20,19 @@ import (
 )
 
 type TestMsg struct {
-	op    Op
+	op    message.Op
 	bytes []byte
 }
 
-func newTestMsg(op Op, bits []byte) *TestMsg {
+func newTestMsg(op message.Op, bits []byte) *TestMsg {
 	return &TestMsg{op: op, bytes: bits}
 }
 
-func (m *TestMsg) Op() Op {
+func (m *TestMsg) Op() message.Op {
 	return m.op
 }
 
-func (*TestMsg) Get(Field) interface{} {
+func (*TestMsg) Get(message.Field) interface{} {
 	return nil
 }
 
@@ -81,7 +82,7 @@ func TestPeer_Close(t *testing.T) {
 		appVersion,
 	)
 
-	netwrk := NewDefaultNetwork(
+	netwrk, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id,
@@ -98,7 +99,6 @@ func TestPeer_Close(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -109,9 +109,11 @@ func TestPeer_Close(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
 		defaultInboundMsgThrottler,
 		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, netwrk)
 
 	ip1 := utils.NewDynamicIPDesc(
@@ -129,7 +131,7 @@ func TestPeer_Close(t *testing.T) {
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
 	peer.sendQueue = [][]byte{}
-	testMsg := newTestMsg(GetVersion, newmsgbytes)
+	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
 	peer.Send(testMsg, true)
 
 	go func() {

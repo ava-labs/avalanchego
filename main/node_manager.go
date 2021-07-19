@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
@@ -138,7 +138,7 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 	clientConfig := &plugin.ClientConfig{
 		HandshakeConfig:  appplugin.Handshake,
 		Plugins:          appplugin.PluginMap,
-		Cmd:              exec.Command(path, args...),
+		Cmd:              subprocess.New(path, args...),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           hclog.New(&hclog.LoggerOptions{Level: hclog.Error}),
 	}

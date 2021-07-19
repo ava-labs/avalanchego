@@ -2404,6 +2404,7 @@ func TestEngineBootstrappingIntoConsensus(t *testing.T) {
 
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
+	vm.CantConnected = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 
@@ -2809,6 +2810,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 
 	vm.CantBootstrapping = false
 	vm.CantBootstrapped = false
+	vm.CantConnected = false
 
 	utxos := []ids.ID{ids.GenerateTestID(), ids.GenerateTestID()}
 

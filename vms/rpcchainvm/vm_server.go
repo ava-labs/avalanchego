@@ -268,7 +268,7 @@ func (vm *VMServer) CreateStaticHandlers(context.Context, *vmproto.EmptyMsg) (*v
 	return resp, nil
 }
 
-func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.EmptyMsg) (*vmproto.CreateHandlersResponse, error) {
+func (vm *VMServer) CreateHandlers(context.Context, *vmproto.EmptyMsg) (*vmproto.CreateHandlersResponse, error) {
 	handlers, err := vm.vm.CreateHandlers()
 	if err != nil {
 		return nil, err
@@ -295,7 +295,7 @@ func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.EmptyMsg) (*v
 	return resp, nil
 }
 
-func (vm *VMServer) BuildBlock(_ context.Context, _ *vmproto.EmptyMsg) (*vmproto.BuildBlockResponse, error) {
+func (vm *VMServer) BuildBlock(context.Context, *vmproto.EmptyMsg) (*vmproto.BuildBlockResponse, error) {
 	blk, err := vm.vm.BuildBlock()
 	if err != nil {
 		return nil, err
@@ -351,7 +351,7 @@ func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceR
 	return &vmproto.EmptyMsg{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(_ context.Context, req *vmproto.EmptyMsg) (*vmproto.HealthResponse, error) {
+func (vm *VMServer) Health(context.Context, *vmproto.EmptyMsg) (*vmproto.HealthResponse, error) {
 	details, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmproto.HealthResponse{}, err
@@ -378,7 +378,7 @@ func (vm *VMServer) Health(_ context.Context, req *vmproto.EmptyMsg) (*vmproto.H
 	}, nil
 }
 
-func (vm *VMServer) Version(_ context.Context, req *vmproto.EmptyMsg) (*vmproto.VersionResponse, error) {
+func (vm *VMServer) Version(context.Context, *vmproto.EmptyMsg) (*vmproto.VersionResponse, error) {
 	version, err := vm.vm.Version()
 	return &vmproto.VersionResponse{
 		Version: version,

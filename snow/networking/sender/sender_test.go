@@ -83,8 +83,8 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 
 	failedVDRs := ids.ShortSet{}
-	engine.QueryFailedF = func(validatorID ids.ShortID, _ uint32) error {
-		failedVDRs.Add(validatorID)
+	engine.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
+		failedVDRs.Add(nodeID)
 		wg.Done()
 		return nil
 	}
@@ -160,7 +160,7 @@ func TestReliableMessages(t *testing.T) {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 
-	engine.QueryFailedF = func(validatorID ids.ShortID, reqID uint32) error {
+	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -245,7 +245,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 
-	engine.QueryFailedF = func(validatorID ids.ShortID, reqID uint32) error {
+	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}

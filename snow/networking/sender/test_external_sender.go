@@ -23,21 +23,21 @@ type ExternalSenderTest struct {
 	CantGossip,
 	CantAppRequest, CantAppResponse, CantAppGossip bool
 
-	GetAcceptedFrontierF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID
-	AcceptedFrontierF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
+	GetAcceptedFrontierF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID
+	AcceptedFrontierF    func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	GetAcceptedF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID
-	AcceptedF    func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
+	GetAcceptedF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID
+	AcceptedF    func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	GetAncestorsF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
-	MultiPutF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
+	GetAncestorsF func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
+	MultiPutF     func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
 
-	GetF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
-	PutF func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	GetF func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
+	PutF func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 
-	PushQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID
-	PullQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
-	ChitsF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
+	PushQueryF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID
+	PullQueryF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
+	ChitsF     func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
 	AppRequestF  func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
 	AppResponseF func(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytyes []byte)
@@ -72,10 +72,10 @@ func (s *ExternalSenderTest) Default(cant bool) {
 // GetAcceptedFrontier calls GetAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
+func (s *ExternalSenderTest) GetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
 	switch {
 	case s.GetAcceptedFrontierF != nil:
-		return s.GetAcceptedFrontierF(validatorIDs, chainID, requestID, deadline)
+		return s.GetAcceptedFrontierF(nodeIDs, chainID, requestID, deadline)
 	case s.CantGetAcceptedFrontier && s.T != nil:
 		s.T.Fatalf("Unexpectedly called GetAcceptedFrontier")
 	case s.CantGetAcceptedFrontier && s.B != nil:
@@ -87,10 +87,10 @@ func (s *ExternalSenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, chai
 // AcceptedFrontier calls AcceptedFrontierF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (s *ExternalSenderTest) AcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	switch {
 	case s.AcceptedFrontierF != nil:
-		s.AcceptedFrontierF(validatorID, chainID, requestID, containerIDs)
+		s.AcceptedFrontierF(nodeID, chainID, requestID, containerIDs)
 	case s.CantAcceptedFrontier && s.T != nil:
 		s.T.Fatalf("Unexpectedly called AcceptedFrontier")
 	case s.CantAcceptedFrontier && s.B != nil:
@@ -101,10 +101,10 @@ func (s *ExternalSenderTest) AcceptedFrontier(validatorID ids.ShortID, chainID i
 // GetAccepted calls GetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+func (s *ExternalSenderTest) GetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
 	switch {
 	case s.GetAcceptedF != nil:
-		return s.GetAcceptedF(validatorIDs, chainID, requestID, deadline, containerIDs)
+		return s.GetAcceptedF(nodeIDs, chainID, requestID, deadline, containerIDs)
 	case s.CantGetAccepted && s.T != nil:
 		s.T.Fatalf("Unexpectedly called GetAccepted")
 	case s.CantGetAccepted && s.B != nil:
@@ -116,10 +116,10 @@ func (s *ExternalSenderTest) GetAccepted(validatorIDs ids.ShortSet, chainID ids.
 // Accepted calls AcceptedF if it was initialized. If it wasn't initialized and
 // this function shouldn't be called and testing was initialized, then testing
 // will fail.
-func (s *ExternalSenderTest) Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (s *ExternalSenderTest) Accepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	switch {
 	case s.AcceptedF != nil:
-		s.AcceptedF(validatorID, chainID, requestID, containerIDs)
+		s.AcceptedF(nodeID, chainID, requestID, containerIDs)
 	case s.CantAccepted && s.T != nil:
 		s.T.Fatalf("Unexpectedly called Accepted")
 	case s.CantAccepted && s.B != nil:
