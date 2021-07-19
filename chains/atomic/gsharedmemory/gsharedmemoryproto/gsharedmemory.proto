@@ -18,8 +18,8 @@ message Batch {
 }
 
 message AtomicRequest {
-    repeated bytes removeRequests = 1;
-    repeated Element putRequests = 2;
+	repeated bytes removeRequests = 1;
+	repeated Element putRequests = 2;
     bytes peerChainID = 3;
 }
 
