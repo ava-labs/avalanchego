@@ -140,8 +140,9 @@ func (b *Block) Accept() error {
 
 	batch, err := vm.db.CommitBatch()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
+
 	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
 

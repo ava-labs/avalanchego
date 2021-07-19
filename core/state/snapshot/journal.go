@@ -287,7 +287,7 @@ func loadDiffLayer(parent snapshot, r *rlp.Stream) (snapshot, error) {
 // the progress into the database.
 func (dl *diskLayer) Journal(buffer *bytes.Buffer) (common.Hash, error) {
 	// If the snapshot is currently being generated, abort it
-	if abortGeneration(dl) && dl.genStats != nil {
+	if dl.abortGeneration() && dl.genStats != nil {
 		dl.genStats.Log("Journalling in-progress snapshot", dl.root, dl.genMarker)
 	}
 
