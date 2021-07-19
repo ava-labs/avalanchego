@@ -53,8 +53,8 @@ type sharedMemory struct {
 
 func (sm *sharedMemory) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-	_, db := sm.m.GetDatabase(sharedID)
-	defer sm.m.ReleaseDatabase(sharedID)
+	db := sm.m.GetSharedDatabase(sm.m.db, sharedID)
+	defer sm.m.ReleaseSharedDatabase(sharedID)
 
 	s := state{
 		c:       sm.m.codec,
@@ -80,8 +80,8 @@ func (sm *sharedMemory) Indexed(
 	limit int,
 ) ([][]byte, []byte, []byte, error) {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-	_, db := sm.m.GetDatabase(sharedID)
-	defer sm.m.ReleaseDatabase(sharedID)
+	db := sm.m.GetSharedDatabase(sm.m.db, sharedID)
+	defer sm.m.ReleaseSharedDatabase(sharedID)
 
 	s := state{
 		c: sm.m.codec,
@@ -124,8 +124,8 @@ func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database
 	for _, sharedID := range sharedIDs {
 		req := sharedOperations[sharedID]
 
-		db := sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
-		defer sm.m.ReleaseDatabase(sharedID)
+		db := sm.m.GetSharedDatabase(vdb, sharedID)
+		defer sm.m.ReleaseSharedDatabase(sharedID)
 
 		s := state{
 			c: sm.m.codec,
