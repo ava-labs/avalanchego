@@ -35,10 +35,6 @@ func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 		Value: []byte{1},
 	}}}})
 
-	// err := sm0.Put(chainID1, []*Element{{
-	// 	Key:   []byte{0},
-	// 	Value: []byte{1},
-	// }})
 	assert.NoError(err)
 
 	values, err := sm1.Get(chainID0, [][]byte{{0}})

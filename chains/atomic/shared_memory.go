@@ -184,7 +184,7 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Re
 	for peerChainID, atomicRequests := range batchChainsAndInputs {
 		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
 		db := sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
-		defer sm.m.ReleaseDatabase(sharedID)
+
 		s := state{
 			c: sm.m.codec,
 		}
@@ -193,6 +193,7 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Re
 
 		for _, removeRequest := range atomicRequests.RemoveRequests {
 			if err := s.RemoveValue(removeRequest); err != nil {
+				sm.m.ReleaseDatabase(sharedID)
 				return err
 			}
 		}
@@ -201,9 +202,12 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Re
 
 		for _, putRequest := range atomicRequests.PutRequests {
 			if err := s.SetValue(putRequest); err != nil {
+				sm.m.ReleaseDatabase(sharedID)
 				return err
 			}
 		}
+
+		sm.m.ReleaseDatabase(sharedID)
 
 	}
 
