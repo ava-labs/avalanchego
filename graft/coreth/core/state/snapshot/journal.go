@@ -142,7 +142,7 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 }
 
 // loadSnapshot loads a pre-existing state snapshot backed by a key-value store.
-func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, recovery bool, resumeGenerationn bool) (snapshot, error) {
+func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, recovery bool) (snapshot, error) {
 	// Retrieve the block number and hash of the snapshot, failing if no snapshot
 	// is present in the database (or crashed mid-update).
 	baseBlockHash := rawdb.ReadSnapshotBlockHash(diskdb)
@@ -159,6 +159,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 		cache:     fastcache.New(cache * 1024 * 1024),
 		root:      baseRoot,
 		blockHash: baseBlockHash,
+		created:   time.Now(),
 	}
 	snapshot, generator, err := loadAndParseJournal(diskdb, base)
 	if err != nil {
@@ -201,10 +202,6 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 	}
 	// Everything loaded correctly, resume any suspended operations
 	if !generator.Done {
-		// If resume generation is false, return an error instead of returning an incomplete snapshot.
-		if !resumeGenerationn {
-			return nil, fmt.Errorf("loaded incomplete snapshot layer for block: %s", blockHash)
-		}
 		// Whether or not wiping was in progress, load any generator progress too
 		base.genMarker = generator.Marker
 		if base.genMarker == nil {
