@@ -70,6 +70,29 @@ func (l Level) Color() Color {
 func (l Level) String() string {
 	switch l {
 	case Fatal:
+		return "fatal"
+	case Error:
+		return "error"
+	case Warn:
+		return "warn"
+	case Info:
+		return "info"
+	case Trace:
+		return "trace"
+	case Debug:
+		return "debug"
+	case Verbo:
+		return "verbo"
+	case Off:
+		return "off"
+	default:
+		return "unknown"
+	}
+}
+
+func (l Level) AlignedString() string {
+	switch l {
+	case Fatal:
 		return "FATAL"
 	case Error:
 		return "ERROR"
@@ -83,9 +106,7 @@ func (l Level) String() string {
 		return "DEBUG"
 	case Verbo:
 		return "VERBO"
-	case Off:
-		return "OFF"
 	default:
-		return "UNKNOWN"
+		return "?????"
 	}
 }
