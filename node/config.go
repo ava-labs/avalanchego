@@ -59,9 +59,6 @@ type Config struct {
 	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 
-	// Throttling
-	SendQueueSize uint32
-
 	// Health
 	HealthCheckFreq time.Duration
 
@@ -70,6 +67,7 @@ type Config struct {
 	PeerListSize       uint32
 	PeerListGossipSize uint32
 	PeerListGossipFreq time.Duration
+	CompressionEnabled bool
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
