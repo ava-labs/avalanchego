@@ -195,20 +195,19 @@ func (service *Admin) SetLoggerLevel(r *http.Request, args *SetLoggerLevelArgs, 
 		loggerNames = service.logFactory.GetNames()
 	}
 
-	changeLogLevel := len(args.LogLevel) == 0
-	var (
-		changeLogLevelTo logging.Level
-		err              error
-	)
+	changeLogLevel := len(args.LogLevel) > 0
+	var changeLogLevelTo logging.Level
 	if changeLogLevel {
+		var err error
 		changeLogLevelTo, err = logging.ToLevel(args.LogLevel)
 		if err != nil {
 			return err
 		}
 	}
-	changeDisplayLevel := len(args.LogLevel) == 0
+	changeDisplayLevel := len(args.LogLevel) > 0
 	var changeDisplayLevelTo logging.Level
 	if changeDisplayLevel {
+		var err error
 		changeDisplayLevelTo, err = logging.ToLevel(args.LogLevel)
 		if err != nil {
 			return err
