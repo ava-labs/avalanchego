@@ -31,8 +31,8 @@ type Factory interface {
 	// GetDisplayLevels returns all log display levels in factory as name, level pairs
 	GetDisplayLevel(name string) (Level, error)
 
-	// GetDisplayLevels returns all log display levels in factory as name, level pairs
-	GetNames() []string
+	// GetLoggerNames returns the names of all logs created by this factory
+	GetLoggerNames() []string
 
 	// Close stops and clears all of a Factory's instantiated loggers
 	Close()
@@ -152,8 +152,8 @@ func (f *factory) GetDisplayLevel(name string) (Level, error) {
 	return logger.GetDisplayLevel(), nil
 }
 
-// GetDisplayLevels implements the Factory interface
-func (f *factory) GetNames() []string {
+// GetLoggerNames implements the Factory interface
+func (f *factory) GetLoggerNames() []string {
 	f.lock.RLock()
 	defer f.lock.RUnlock()
 

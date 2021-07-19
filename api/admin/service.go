@@ -184,7 +184,7 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 	if len(args.LoggerName) > 0 {
 		loggerNames = []string{args.LoggerName}
 	} else {
-		loggerNames = service.logFactory.GetNames()
+		loggerNames = service.logFactory.GetLoggerNames()
 	}
 
 	for _, name := range loggerNames {
@@ -223,7 +223,7 @@ func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, 
 	if len(args.LoggerName) > 0 {
 		loggerNames = []string{args.LoggerName}
 	} else {
-		loggerNames = service.logFactory.GetNames()
+		loggerNames = service.logFactory.GetLoggerNames()
 	}
 
 	for _, name := range loggerNames {
