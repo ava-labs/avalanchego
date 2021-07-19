@@ -7,11 +7,10 @@
 package gconnproto
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -656,24 +655,21 @@ func file_gconn_proto_rawDescGZIP() []byte {
 	return file_gconn_proto_rawDescData
 }
 
-var (
-	file_gconn_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
-	file_gconn_proto_goTypes  = []interface{}{
-		(*ReadRequest)(nil),              // 0: gconnproto.ReadRequest
-		(*ReadResponse)(nil),             // 1: gconnproto.ReadResponse
-		(*WriteRequest)(nil),             // 2: gconnproto.WriteRequest
-		(*WriteResponse)(nil),            // 3: gconnproto.WriteResponse
-		(*CloseRequest)(nil),             // 4: gconnproto.CloseRequest
-		(*CloseResponse)(nil),            // 5: gconnproto.CloseResponse
-		(*SetDeadlineRequest)(nil),       // 6: gconnproto.SetDeadlineRequest
-		(*SetDeadlineResponse)(nil),      // 7: gconnproto.SetDeadlineResponse
-		(*SetReadDeadlineRequest)(nil),   // 8: gconnproto.SetReadDeadlineRequest
-		(*SetReadDeadlineResponse)(nil),  // 9: gconnproto.SetReadDeadlineResponse
-		(*SetWriteDeadlineRequest)(nil),  // 10: gconnproto.SetWriteDeadlineRequest
-		(*SetWriteDeadlineResponse)(nil), // 11: gconnproto.SetWriteDeadlineResponse
-	}
-)
-
+var file_gconn_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_gconn_proto_goTypes = []interface{}{
+	(*ReadRequest)(nil),              // 0: gconnproto.ReadRequest
+	(*ReadResponse)(nil),             // 1: gconnproto.ReadResponse
+	(*WriteRequest)(nil),             // 2: gconnproto.WriteRequest
+	(*WriteResponse)(nil),            // 3: gconnproto.WriteResponse
+	(*CloseRequest)(nil),             // 4: gconnproto.CloseRequest
+	(*CloseResponse)(nil),            // 5: gconnproto.CloseResponse
+	(*SetDeadlineRequest)(nil),       // 6: gconnproto.SetDeadlineRequest
+	(*SetDeadlineResponse)(nil),      // 7: gconnproto.SetDeadlineResponse
+	(*SetReadDeadlineRequest)(nil),   // 8: gconnproto.SetReadDeadlineRequest
+	(*SetReadDeadlineResponse)(nil),  // 9: gconnproto.SetReadDeadlineResponse
+	(*SetWriteDeadlineRequest)(nil),  // 10: gconnproto.SetWriteDeadlineRequest
+	(*SetWriteDeadlineResponse)(nil), // 11: gconnproto.SetWriteDeadlineResponse
+}
 var file_gconn_proto_depIdxs = []int32{
 	0,  // 0: gconnproto.Conn.Read:input_type -> gconnproto.ReadRequest
 	2,  // 1: gconnproto.Conn.Write:input_type -> gconnproto.WriteRequest

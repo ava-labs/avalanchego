@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -28,7 +29,8 @@ import (
 )
 
 var (
-	dbPrefix = []byte("proposervm")
+	dbPrefix           = []byte("proposervm")
+	ErrNotValidatorsVM = errors.New("VM could not access validators.VM interface")
 
 	_ block.ChainVM = &VM{}
 )
@@ -71,7 +73,7 @@ func (vm *VM) Initialize(
 		valVM, ok := vm.ChainVM.(validators.VM)
 		if !ok {
 			vm.ctx.Log.Error("could not access validators.VM interface")
-			return validators.ErrNotValidatorsVM
+			return ErrNotValidatorsVM
 		}
 		vm.ctx.ValidatorVM = valVM
 	}

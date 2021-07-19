@@ -7,11 +7,10 @@
 package greaderproto
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -168,14 +167,11 @@ func file_greader_proto_rawDescGZIP() []byte {
 	return file_greader_proto_rawDescData
 }
 
-var (
-	file_greader_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-	file_greader_proto_goTypes  = []interface{}{
-		(*ReadRequest)(nil),  // 0: greaderproto.ReadRequest
-		(*ReadResponse)(nil), // 1: greaderproto.ReadResponse
-	}
-)
-
+var file_greader_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_greader_proto_goTypes = []interface{}{
+	(*ReadRequest)(nil),  // 0: greaderproto.ReadRequest
+	(*ReadResponse)(nil), // 1: greaderproto.ReadResponse
+}
 var file_greader_proto_depIdxs = []int32{
 	0, // 0: greaderproto.Reader.Read:input_type -> greaderproto.ReadRequest
 	1, // 1: greaderproto.Reader.Read:output_type -> greaderproto.ReadResponse

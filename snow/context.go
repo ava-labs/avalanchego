@@ -4,7 +4,8 @@
 package snow
 
 import (
-	"crypto/tls"
+	"crypto"
+	"crypto/x509"
 	"sync"
 	"time"
 
@@ -74,8 +75,9 @@ type Context struct {
 	bootstrapped uint32
 
 	// snoman++ attributes
-	StakingCert tls.Certificate // block signer
-	ValidatorVM validators.VM   // interface for P-Chain validators
+	ValidatorVM       validators.VM     // interface for P-Chain validators
+	StakingLeafSigner crypto.Signer     // block signer
+	StakingCertLeaf   *x509.Certificate // block certificate
 }
 
 // IsBootstrapped returns true iff this chain is done bootstrapping

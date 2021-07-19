@@ -4,8 +4,6 @@
 package proposervm
 
 import (
-	"crypto"
-
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -156,9 +154,9 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		parentID,
 		newTimestamp,
 		pChainHeight,
-		b.vm.ctx.StakingCert.Leaf,
+		b.vm.ctx.StakingCertLeaf,
 		innerBlock.Bytes(),
-		b.vm.ctx.StakingCert.PrivateKey.(crypto.Signer),
+		b.vm.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		return nil, err

@@ -2398,31 +2398,3 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.Encoding = args.Encoding
 	return nil
 }
-
-type GetValidatorsAtArgs struct {
-	Height   json.Uint64 `json:"height"`
-	SubnetID ids.ID      `json:"subnetID"`
-}
-
-type GetValidatorsAtReply struct {
-	Validators map[string]uint64 `json:"validators"`
-}
-
-func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
-	service.vm.ctx.Log.Info(
-		"Platform: GetValidatorsAt called with Height %d and SubnetID %s",
-		args.Height,
-		args.SubnetID,
-	)
-
-	validators, err := service.vm.GetValidatorSet(uint64(args.Height), args.SubnetID)
-	if err != nil {
-		return fmt.Errorf("couldn't get validator set: %w", err)
-	}
-
-	reply.Validators = make(map[string]uint64, len(validators))
-	for nodeID, weight := range validators {
-		reply.Validators[nodeID.PrefixedString(constants.NodeIDPrefix)] = weight
-	}
-	return nil
-}

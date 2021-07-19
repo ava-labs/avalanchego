@@ -7,11 +7,10 @@
 package gsubnetlookupproto
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -152,14 +151,11 @@ func file_gsubnetlookup_proto_rawDescGZIP() []byte {
 	return file_gsubnetlookup_proto_rawDescData
 }
 
-var (
-	file_gsubnetlookup_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-	file_gsubnetlookup_proto_goTypes  = []interface{}{
-		(*SubnetIDRequest)(nil),  // 0: gsubnetlookupproto.SubnetIDRequest
-		(*SubnetIDResponse)(nil), // 1: gsubnetlookupproto.SubnetIDResponse
-	}
-)
-
+var file_gsubnetlookup_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_gsubnetlookup_proto_goTypes = []interface{}{
+	(*SubnetIDRequest)(nil),  // 0: gsubnetlookupproto.SubnetIDRequest
+	(*SubnetIDResponse)(nil), // 1: gsubnetlookupproto.SubnetIDResponse
+}
 var file_gsubnetlookup_proto_depIdxs = []int32{
 	0, // 0: gsubnetlookupproto.SubnetLookup.SubnetID:input_type -> gsubnetlookupproto.SubnetIDRequest
 	1, // 1: gsubnetlookupproto.SubnetLookup.SubnetID:output_type -> gsubnetlookupproto.SubnetIDResponse

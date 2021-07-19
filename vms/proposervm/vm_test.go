@@ -92,10 +92,11 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	}
 
 	ctx := &snow.Context{
-		NodeID:      hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
-		Log:         logging.NoLog{},
-		StakingCert: *pTestCert,
-		ValidatorVM: valVM,
+		NodeID:            hashing.ComputeHash160Array(hashing.ComputeHash256(pTestCert.Leaf.Raw)),
+		Log:               logging.NoLog{},
+		StakingCertLeaf:   pTestCert.Leaf,
+		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
+		ValidatorVM:       valVM,
 	}
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
@@ -396,9 +397,9 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.ctx.StakingCert.Leaf,
+		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
-		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -441,9 +442,9 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		100, // pChainHeight,
-		proVM.ctx.StakingCert.Leaf,
+		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
-		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -461,9 +462,9 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		proVM.preferred,
 		innerBlk.Timestamp(),
 		200, // pChainHeight,
-		proVM.ctx.StakingCert.Leaf,
+		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
-		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -570,9 +571,9 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.ctx.StakingCert.Leaf,
+		proVM.ctx.StakingCertLeaf,
 		netcoreBlk.Bytes(),
-		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")

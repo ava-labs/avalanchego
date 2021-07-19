@@ -2,7 +2,6 @@ package proposervm
 
 import (
 	"bytes"
-	"crypto"
 	"fmt"
 	"testing"
 	"time"
@@ -353,9 +352,9 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
-		proVM.ctx.StakingCert.Leaf,
+		proVM.ctx.StakingCertLeaf,
 		coreBlk.Bytes(),
-		proVM.ctx.StakingCert.PrivateKey.(crypto.Signer),
+		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatalf("unexpectedly could not build block due to %s", err)

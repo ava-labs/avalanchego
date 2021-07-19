@@ -4,6 +4,7 @@
 package chains
 
 import (
+	"crypto"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -350,8 +351,9 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		Metrics:              m.ConsensusParams.Metrics,
 		EpochFirstTransition: m.EpochFirstTransition,
 		EpochDuration:        m.EpochDuration,
-		StakingCert:          m.StakingCert,
 		ValidatorVM:          m.validatorVM,
+		StakingCertLeaf:      m.StakingCert.Leaf,
+		StakingLeafSigner:    m.StakingCert.PrivateKey.(crypto.Signer),
 	}
 
 	// Get a factory for the vm we want to use on our chain
