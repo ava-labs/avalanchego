@@ -157,13 +157,13 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batch ...database.B
 	}
 
 	for key, value := range requests {
-		newPutElements := make([][]*gsharedmemoryproto.Element, 0)
-		newRemoveElements := make([][][]byte, 0)
+		var (
+			newPutElements [][]*gsharedmemoryproto.Element
 
-		currentPutSize, currentRemoveSize := 0, 0
-		prevPutIndex, prevRemoveIndex := 0, 0
-		holderPutIndex, holderRemoveIndex := 0, 0
-
+			currentPutSize int
+			prevPutIndex   int
+			holderPutIndex int
+		)
 		for k, v := range value.PutRequests {
 			sizePutChange := baseElementSize + len(v.Key) + len(v.Value)
 			for _, trait := range v.Traits {
@@ -200,6 +200,13 @@ func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batch ...database.B
 			newPutElements = append(newPutElements, formattedElements)
 		}
 
+		var (
+			newRemoveElements [][][]byte
+
+			currentRemoveSize int
+			prevRemoveIndex   int
+			holderRemoveIndex int
+		)
 		for i, key := range value.RemoveRequests {
 			sizeRemoveChange := baseElementSize + len(key)
 			if newSize := sizeRemoveChange + currentRemoveSize; newSize > maxBatchSize {
