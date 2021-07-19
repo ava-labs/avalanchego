@@ -144,7 +144,7 @@ type GetChainAliasesReply struct {
 }
 
 // GetChainAliases returns the aliases of the chain
-func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
+func (service *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
 	service.log.Info("Admin: GetChainAliases called with Chain: %s", args.Chain)
 
 	id, err := ids.FromString(args.Chain)
@@ -165,27 +165,19 @@ func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.Succes
 	return perms.WriteFile(stacktraceFile, stacktrace, perms.ReadWrite)
 }
 
-// SetLoggerLevelArgs defines the logger name and log&display levels to be set.
+// See SetLoggerLevel
 type SetLoggerLevelArgs struct {
-	LogLevel     string `json:"logLevel"`
-	DisplayLevel string `json:"displayLevel"`
-	LoggerName   string `json:"loggerName"`
+	LoggerName   string        `json:"loggerName"`
+	LogLevel     logging.Level `json:"logLevel"`
+	DisplayLevel logging.Level `json:"displayLevel"`
 }
 
-// SetLoggerLevel sets the log level and/or display level for loggers.
+// SetLoggerLevel sets the log level and display level for loggers.
 // If len([args.LoggerName]) == 0, sets the log/display level of all loggers.
-// Otherwise, sets the log/display level of the loggers named in that argument.
-// Sets the log level of these loggers to [args.LogLevel].
-// If len([args.LogLevel]) == 0, doesn't set the log level of these loggers.
-// If len([args.LogLevel]) > 0, must be a valid string representation of a log level.
-// Sets the display level of these loggers to [args.LogLevel].
-// If len([args.DisplayLevel]) == 0, doesn't set the display level of these loggers.
-// If len([args.DisplayLevel]) > 0, must be a valid string representation of a log level.
-func (service *Admin) SetLoggerLevel(r *http.Request, args *SetLoggerLevelArgs, reply *api.SuccessResponse) error {
+// Sets the log level to [args.LogLevel] and the display level to [args.DisplayLevel].
+// Both [args.LogLevel] and [args.DisplayLevel] must be provided.
+func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
-	if len(args.LogLevel) == 0 && len(args.DisplayLevel) == 0 {
-		return errors.New("need to specify either displayLevel or logLevel")
-	}
 
 	var loggerNames []string
 	// Empty name means all loggers
@@ -195,44 +187,21 @@ func (service *Admin) SetLoggerLevel(r *http.Request, args *SetLoggerLevelArgs, 
 		loggerNames = service.logFactory.GetNames()
 	}
 
-	changeLogLevel := len(args.LogLevel) > 0
-	var changeLogLevelTo logging.Level
-	if changeLogLevel {
-		var err error
-		changeLogLevelTo, err = logging.ToLevel(args.LogLevel)
-		if err != nil {
-			return err
-		}
-	}
-	changeDisplayLevel := len(args.LogLevel) > 0
-	var changeDisplayLevelTo logging.Level
-	if changeDisplayLevel {
-		var err error
-		changeDisplayLevelTo, err = logging.ToLevel(args.LogLevel)
-		if err != nil {
-			return err
-		}
-	}
-
 	for _, name := range loggerNames {
-		if changeLogLevel {
-			if err := service.logFactory.SetLogLevel(name, changeLogLevelTo); err != nil {
-				return err
-			}
+		if err := service.logFactory.SetLogLevel(name, args.LogLevel); err != nil {
+			return err
 		}
-		if changeDisplayLevel {
-			if err := service.logFactory.SetDisplayLevel(name, changeDisplayLevelTo); err != nil {
-				return err
-			}
+		if err := service.logFactory.SetDisplayLevel(name, args.DisplayLevel); err != nil {
+			return err
 		}
 	}
 	reply.Success = true
 	return nil
 }
 
-type LoggerLevels struct {
-	LogLevel     string `json:"logLevel"`
-	DisplayLevel string `json:"displayLevel"`
+type LogAndDisplayLevels struct {
+	LogLevel     logging.Level `json:"logLevel"`
+	DisplayLevel logging.Level `json:"displayLevel"`
 }
 
 // GetLoggerLevelArgs defines logger name arg.
@@ -242,13 +211,13 @@ type GetLoggerLevelArgs struct {
 
 // GetLogLevelReply returns current log levels in a name=>level map.
 type GetLoggerLevelReply struct {
-	LoggerLevels map[string]LoggerLevels `json:"loggerLevels"`
+	LoggerLevels map[string]LogAndDisplayLevels `json:"loggerLevels"`
 }
 
 // GetLogLevel get the log level and display level of loggers.
-func (service *Admin) GetLoggerLevel(r *http.Request, args *GetLoggerLevelArgs, reply *GetLoggerLevelReply) error {
+func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *GetLoggerLevelReply) error {
 	service.log.Info("Admin: GetLoggerLevels called with LoggerName: %q", args.LoggerName)
-	reply.LoggerLevels = make(map[string]LoggerLevels)
+	reply.LoggerLevels = make(map[string]LogAndDisplayLevels)
 	var loggerNames []string
 	// Empty name means all loggers
 	if len(args.LoggerName) > 0 {
@@ -266,9 +235,9 @@ func (service *Admin) GetLoggerLevel(r *http.Request, args *GetLoggerLevelArgs, 
 		if err != nil {
 			return err
 		}
-		reply.LoggerLevels[name] = LoggerLevels{
-			LogLevel:     logLevel.String(),
-			DisplayLevel: displayLevel.String(),
+		reply.LoggerLevels[name] = LogAndDisplayLevels{
+			LogLevel:     logLevel,
+			DisplayLevel: displayLevel,
 		}
 	}
 	return nil

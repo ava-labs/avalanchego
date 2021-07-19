@@ -4,9 +4,12 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
+
+var errMissingQuotes = errors.New("first and last characters should be quotes")
 
 type Level int
 
@@ -21,26 +24,38 @@ const (
 	Verbo
 )
 
+const (
+	fatalStr   = "FATAL"
+	errorStr   = "ERROR"
+	warnStr    = "WARN"
+	infoStr    = "INFO"
+	traceStr   = "TRACE"
+	debugStr   = "DEBUG"
+	verboStr   = "VERBO"
+	offStr     = "OFF"
+	unknownStr = "UNKNO"
+)
+
 func ToLevel(l string) (Level, error) {
 	switch strings.ToUpper(l) {
-	case "OFF":
+	case offStr:
 		return Off, nil
-	case "FATAL":
+	case fatalStr:
 		return Fatal, nil
-	case "ERROR":
+	case errorStr:
 		return Error, nil
-	case "WARN":
+	case warnStr:
 		return Warn, nil
-	case "INFO":
+	case infoStr:
 		return Info, nil
-	case "TRACE":
+	case traceStr:
 		return Trace, nil
-	case "DEBUG":
+	case debugStr:
 		return Debug, nil
-	case "VERBO":
+	case verboStr:
 		return Verbo, nil
 	default:
-		return Info, fmt.Errorf("unknown log level: %s", l)
+		return Off, fmt.Errorf("unknown log level: %q", l)
 	}
 }
 
@@ -70,43 +85,86 @@ func (l Level) Color() Color {
 func (l Level) String() string {
 	switch l {
 	case Fatal:
-		return "fatal"
+		return fatalStr
 	case Error:
-		return "error"
+		return errorStr
 	case Warn:
-		return "warn"
+		return warnStr
 	case Info:
-		return "info"
+		return infoStr
 	case Trace:
-		return "trace"
+		return traceStr
 	case Debug:
-		return "debug"
+		return debugStr
 	case Verbo:
-		return "verbo"
+		return verboStr
 	case Off:
-		return "off"
+		return offStr
 	default:
-		return "unknown"
+		// This should never happen
+		return unknownStr
 	}
 }
 
+// String representation of this level as it will appear
+// in log files and in logs displayed to screen.
+// The returned value has length 5.
 func (l Level) AlignedString() string {
+	s := unknownStr
+	// Should always match a case below
+	// Note that Off is not included because by definition
+	// we don't log/display when the [l] is Off.
 	switch l {
 	case Fatal:
-		return "FATAL"
+		s = fatalStr
 	case Error:
-		return "ERROR"
+		s = errorStr
 	case Warn:
-		return "WARN "
+		s = warnStr
 	case Info:
-		return "INFO "
+		s = infoStr
 	case Trace:
-		return "TRACE"
+		s = traceStr
 	case Debug:
-		return "DEBUG"
+		s = debugStr
 	case Verbo:
-		return "VERBO"
+		s = verboStr
+	}
+	return to5Chars(s)
+}
+
+func (l Level) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%s\"", l)), nil
+}
+
+func (l *Level) UnmarshalJSON(b []byte) error {
+	str := string(b)
+	if len(str) < 2 {
+		return errMissingQuotes
+	}
+
+	lastIndex := len(str) - 1
+	if str[0] != '"' || str[lastIndex] != '"' {
+		return errMissingQuotes
+	}
+
+	str = strings.ToUpper(str[1:lastIndex])
+	var err error
+	*l, err = ToLevel(str)
+	return err
+}
+
+// If len([s]) < 5, returns [s] padded with spaces at the end
+// If len([s]) == 5, returns [s]
+// If len([s]), returns the first 5 characters of [s]
+func to5Chars(s string) string {
+	l := len(s)
+	switch {
+	case l < 5:
+		return fmt.Sprintf("%-5s", s)
+	case l == 5:
+		return s
 	default:
-		return "?????"
+		return s[:5]
 	}
 }
