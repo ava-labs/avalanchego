@@ -180,25 +180,6 @@ func TestIterator(t *testing.T) {
 		assert.False(iter.Next())
 	}
 
-	// Case: Multiple elements Reverse Starting From
-	{
-		lh := New()
-		lh.Put(id1, 1)
-		lh.Put(id2, 2)
-		lh.Put(id3, 3)
-		iter, ok := lh.NewReverseIteratorStartingFrom(id2)
-		assert.True(ok)
-		// Should give back all 3 elements
-		assert.True(iter.Next())
-		assert.EqualValues(id2, iter.Key())
-		assert.EqualValues(2, iter.Value())
-		assert.True(iter.Next())
-		assert.EqualValues(id1, iter.Key())
-		assert.EqualValues(1, iter.Value())
-		// Should be exhausted
-		assert.False(iter.Next())
-	}
-
 	// Case: Delete element that has been iterated over
 	{
 		lh := New()

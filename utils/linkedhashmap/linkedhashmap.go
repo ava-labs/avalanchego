@@ -30,8 +30,6 @@ type LinkedHashmap interface {
 	NewIterator() Iter
 	// NewReverseIterator iterates newest to oldest
 	NewReverseIterator() Iter
-	// NewReverseIteratorStartingFrom iterates from value associated with specified [key] (inclusive) to oldest
-	NewReverseIteratorStartingFrom(key interface{}) (Iter, bool)
 }
 
 // Iterates over the keys and values in a LinkedHashmap
@@ -127,11 +125,6 @@ func (lh *linkedHashmap) get(key interface{}) (interface{}, bool) {
 	return nil, false
 }
 
-func (lh *linkedHashmap) getElement(key interface{}) (*list.Element, bool) {
-	elem, exists := lh.entryMap[key]
-	return elem, exists
-}
-
 func (lh *linkedHashmap) delete(key interface{}) {
 	if e, ok := lh.entryMap[key]; ok {
 		lh.entryList.Remove(e)
@@ -163,13 +156,6 @@ func (lh *linkedHashmap) NewReverseIterator() Iter {
 	return &iterator{lh: lh, reverse: true}
 }
 
-func (lh *linkedHashmap) NewReverseIteratorStartingFrom(key interface{}) (Iter, bool) {
-	if elem, exists := lh.getElement(key); exists {
-		return &iterator{lh: lh, reverse: true, next: elem}, true
-	}
-	return nil, false
-}
-
 type iterator struct {
 	lh                              *linkedHashmap
 	key                             interface{}
@@ -194,18 +180,13 @@ func (it *iterator) Next() bool {
 	if !it.initialized {
 		it.initialized = true
 
-		startingEntry := it.next
-
-		// try to assign a starting entry
-		if startingEntry == nil {
-			if it.reverse {
-				startingEntry = it.lh.entryList.Back()
-			} else {
-				startingEntry = it.lh.entryList.Front()
-			}
+		var startingEntry *list.Element
+		if it.reverse {
+			startingEntry = it.lh.entryList.Back()
+		} else {
+			startingEntry = it.lh.entryList.Front()
 		}
 
-		// if its still nil, this iterator cannot iterate
 		if startingEntry == nil {
 			it.exhausted = true
 			it.key = ids.Empty
