@@ -215,31 +215,46 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 		blockLayers: make(map[common.Hash]snapshot),
 		stateLayers: make(map[common.Hash]map[common.Hash]snapshot),
 	}
-	if !async {
-		defer snap.waitBuild()
-	}
+
 	// Attempt to load a previously persisted snapshot and rebuild one if failed
-	head, err := loadSnapshot(diskdb, triedb, cache, blockHash, root, recovery)
+	head, generated, err := loadSnapshot(diskdb, triedb, cache, blockHash, root, recovery)
 	if err != nil {
 		if rebuild {
 			log.Warn("Failed to load snapshot, regenerating", "err", err)
 			snap.Rebuild(blockHash, root)
+			if !async {
+				if err := snap.waitBuild(); err != nil {
+					return nil, fmt.Errorf("sync snapshot generation failed: %w", err)
+				}
+			}
 			return snap, nil
 		}
 		return nil, err // Bail out the error, don't rebuild automatically.
 	}
+
 	// Existing snapshot loaded, seed all the layers
 	// It is unnecessary to grab the lock here, since it was created within this function
 	// call, but we grab it nevertheless to follow the spec for insertSnap.
 	snap.lock.Lock()
 	defer snap.lock.Unlock()
-	// We assume a snapshot read from disk on startup was previously validated. This prevents
-	// us from a doing a costly re-verification procedure when it is not needed.
-	snap.validated = true
 	for head != nil {
 		snap.insertSnap(head)
 		head = head.Parent()
 	}
+
+	// We assume a snapshot read from disk on startup was previously validated. This prevents
+	// us from a doing a costly re-verification procedure when it is not needed.
+	if generated {
+		snap.validated = true
+		return snap, nil
+	}
+
+	if !async {
+		if err := snap.waitBuild(); err != nil {
+			return nil, fmt.Errorf("sync snapshot generation failed: %w", err)
+		}
+	}
+
 	return snap, nil
 }
 
@@ -256,8 +271,10 @@ func (t *Tree) insertSnap(snap snapshot) {
 }
 
 // waitBuild blocks until the snapshot finishes rebuilding. This method is meant
-// to be used by tests to ensure we're testing what we believe we are.
-func (t *Tree) waitBuild() {
+// to be used by tests to ensure we're testing what we believe we are. It is
+// assumed that the caller either holds the [snapTree] lock or calls this
+// function during initialization.
+func (t *Tree) waitBuild() error {
 	// Find the rebuild termination channel
 	var done chan struct{}
 
@@ -267,11 +284,13 @@ func (t *Tree) waitBuild() {
 		done = diskLayer.genPending
 	}
 	t.lock.RUnlock()
+	if done == nil {
+		return nil
+	}
 
 	// Wait until the snapshot is generated
-	if done != nil {
-		<-done
-	}
+	<-done
+	return t.validateIntegrity(diskLayer, true)
 }
 
 // Snapshot retrieves a snapshot belonging to the given state root, or nil if no
@@ -350,6 +369,24 @@ func (t *Tree) Update(blockHash, blockRoot, parentBlockHash common.Hash, destruc
 
 	snap = parent.Update(blockHash, blockRoot, destructs, accounts, storage)
 	t.insertSnap(snap)
+	return nil
+}
+
+// validateIntegrity performs an integrity check on the current snapshot. It is
+// assumed that the caller holds the [snapTree] lock.
+func (t *Tree) validateIntegrity(base *diskLayer, snapshotGenerated bool) error {
+	if t.validated || !snapshotGenerated {
+		return nil
+	}
+
+	start := time.Now()
+	log.Info("Validating snapshot integrity", "root", base.root)
+	if err := t.Verify(base.root, true); err != nil {
+		return fmt.Errorf("unable to verify snapshot integrity: %w", err)
+	}
+
+	log.Info("Validated snapshot integrity", "root", base.root, "elapsed", time.Since(start))
+	t.validated = true
 	return nil
 }
 
@@ -453,20 +490,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	}
 	rebloom(base.blockHash)
 	log.Debug("Flattened snapshot tree", "blockHash", blockHash, "root", base.root, "size", len(t.blockLayers), "elapsed", common.PrettyDuration(time.Since(start)))
-
-	// Validate integrity of generated snapshot (if haven't already)
-	if t.validated || !snapshotGenerated {
-		return nil
-	}
-	start = time.Now()
-	log.Info("Validating snapshot integrity", "root", base.root)
-	if err := t.Verify(base.root, true); err != nil {
-		return fmt.Errorf("unable to verify snapshot integrity: %w", err)
-	}
-	log.Info("Validated snapshot integrity", "root", base.root, "elapsed", time.Since(start))
-	t.validated = true
-
-	return nil
+	return t.validateIntegrity(base, snapshotGenerated)
 }
 
 // Length returns the number of snapshot layers that is currently being maintained.
