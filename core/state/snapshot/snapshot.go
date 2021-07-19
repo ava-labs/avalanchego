@@ -520,19 +520,28 @@ func (t *Tree) AbortGeneration() {
 		return
 	}
 
-	dl.lock.Lock()
-	defer dl.lock.Unlock()
-
 	abortGeneration(dl)
 }
 
 func abortGeneration(base *diskLayer) {
 	// If the disk layer is running a snapshot generator, abort it
-	if base.genAbort != nil && base.genStats == nil {
-		abort := make(chan *generatorStats)
-		base.genAbort <- abort
-		base.genStats = <-abort
+	base.lock.RLock()
+	shouldAbort := base.genAbort != nil && base.genStats == nil
+	base.lock.RUnlock()
+
+	if !shouldAbort {
+		return
 	}
+
+	// Wait for stats to be returned by generator goroutine (indicates that
+	// generation has stopped)
+	abort := make(chan *generatorStats)
+	base.genAbort <- abort
+	stats := <-abort
+
+	base.lock.Lock()
+	base.genStats = stats
+	base.lock.Unlock()
 }
 
 // diffToDisk merges a bottom-most diff into the persistent disk layer underneath

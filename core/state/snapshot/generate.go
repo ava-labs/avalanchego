@@ -754,6 +754,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 
 	dl.lock.Lock()
 	dl.genMarker = nil
+	dl.genStats = stats
 	close(dl.genPending)
 	dl.lock.Unlock()
 
