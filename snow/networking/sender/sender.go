@@ -396,7 +396,7 @@ func (s *Sender) AppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBy
 		nodeIDs.Remove(s.ctx.NodeID)
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.AppRequestMsg)
-		go s.router.AppRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), appRequestBytes)
+		go s.router.AppRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), appRequestBytes, nil)
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -432,7 +432,7 @@ func (s *Sender) AppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBy
 // Sends a response to an application-level request from the given node
 func (s *Sender) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
 	if nodeID == s.ctx.NodeID {
-		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes)
+		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
 	} else {
 		s.sender.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes)
 	}
@@ -444,7 +444,7 @@ func (s *Sender) AppGossip(nodeIDs ids.ShortSet, requestID uint32, appResponseBy
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
-		go s.router.AppGossip(s.ctx.NodeID, s.ctx.ChainID, requestID, appResponseBytes)
+		go s.router.AppGossip(s.ctx.NodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
 	}
 	s.sender.AppGossip(nodeIDs, s.ctx.ChainID, requestID, appResponseBytes)
 }

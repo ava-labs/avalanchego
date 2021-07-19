@@ -137,18 +137,21 @@ type ExternalRouter interface {
 		requestID uint32,
 		deadline time.Time,
 		appRequestBytes []byte,
+		onFinishedHandling func(),
 	)
 	AppResponse(
 		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		appResponseBytes []byte,
+		onFinishedHandling func(),
 	)
 	AppGossip(
 		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		appGossipBytes []byte,
+		onFinishedHandling func(),
 	)
 }
 

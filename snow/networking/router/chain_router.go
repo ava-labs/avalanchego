@@ -772,7 +772,14 @@ func (cr *ChainRouter) Chits(
 
 // AppRequest routes an incoming application-level request from the given node
 // to the consensus engine working on the given chain
-func (cr *ChainRouter) AppRequest(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Time, appRequestBytes []byte) {
+func (cr *ChainRouter) AppRequest(
+	nodeID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	deadline time.Time,
+	appRequestBytes []byte,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -780,16 +787,23 @@ func (cr *ChainRouter) AppRequest(nodeID ids.ShortID, chainID ids.ID, requestID 
 	if !exists {
 		cr.log.Debug("AppRequest(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
+		onFinishedHandling()
 		return
 	}
 
 	// Pass the message to the chain
-	chain.AppRequest(nodeID, requestID, deadline, appRequestBytes)
+	chain.AppRequest(nodeID, requestID, deadline, appRequestBytes, onFinishedHandling)
 }
 
 // AppResponse routes an incoming application-level response from the given node
 // to the consensus engine working on the given chain
-func (cr *ChainRouter) AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte) {
+func (cr *ChainRouter) AppResponse(
+	nodeID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	appResponseBytes []byte,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -798,6 +812,7 @@ func (cr *ChainRouter) AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID
 	if !exists {
 		cr.log.Debug("AppResponse(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appResponseBytes})
+		onFinishedHandling()
 		return
 	}
 
@@ -807,11 +822,13 @@ func (cr *ChainRouter) AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
 	if !exists {
 		// We didn't request this message. Ignore.
+		onFinishedHandling()
 		return
 	}
 	request := requestIntf.(requestEntry)
 	if request.msgType != constants.AppRequestMsg {
 		// We got back a reply of wrong type. Ignore.
+		onFinishedHandling()
 		return
 	}
 	cr.timedRequests.Delete(uniqueRequestID)
@@ -823,12 +840,18 @@ func (cr *ChainRouter) AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID
 	cr.timeoutManager.RegisterResponse(nodeID, chainID, uniqueRequestID, request.msgType, latency)
 
 	// Pass the response to the chain
-	chain.AppResponse(nodeID, requestID, appResponseBytes)
+	chain.AppResponse(nodeID, requestID, appResponseBytes, onFinishedHandling)
 }
 
 // AppGossip routes an incoming application-level gossip message from the given node
 // to the consensus engine working on the given chain
-func (cr *ChainRouter) AppGossip(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appGossipBytes []byte) {
+func (cr *ChainRouter) AppGossip(
+	nodeID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	appGossipBytes []byte,
+	onFinishedHandling func(),
+) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
@@ -836,11 +859,12 @@ func (cr *ChainRouter) AppGossip(nodeID ids.ShortID, chainID ids.ID, requestID u
 	if !exists {
 		cr.log.Debug("AppGossip(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		onFinishedHandling()
 		return
 	}
 
 	// Pass the message to the chain
-	chain.AppGossip(nodeID, requestID, appGossipBytes)
+	chain.AppGossip(nodeID, requestID, appGossipBytes, onFinishedHandling)
 }
 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]

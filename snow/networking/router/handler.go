@@ -479,36 +479,39 @@ func (h *Handler) QueryFailed(nodeID ids.ShortID, requestID uint32) {
 }
 
 // AppRequest passes an application-level request from the given node to the consensus engine.
-func (h *Handler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, appRequestBytes []byte) {
+func (h *Handler) AppRequest(nodeID ids.ShortID, requestID uint32, deadline time.Time, appRequestBytes []byte, onFinishedHandling func()) {
 	h.push(message{
-		messageType: constants.AppRequestMsg,
-		nodeID:      nodeID,
-		deadline:    deadline,
-		requestID:   requestID,
-		appMsgBytes: appRequestBytes,
-		received:    h.clock.Time(),
+		messageType:    constants.AppRequestMsg,
+		nodeID:         nodeID,
+		deadline:       deadline,
+		requestID:      requestID,
+		appMsgBytes:    appRequestBytes,
+		received:       h.clock.Time(),
+		onDoneHandling: onFinishedHandling,
 	})
 }
 
 // AppRequest passes an application-level response from the given node to the consensus engine.
-func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
+func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte, onFinishedHandling func()) {
 	h.push(message{
-		messageType: constants.AppResponseMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
-		appMsgBytes: appResponseBytes,
-		received:    h.clock.Time(),
+		messageType:    constants.AppResponseMsg,
+		nodeID:         nodeID,
+		requestID:      requestID,
+		appMsgBytes:    appResponseBytes,
+		received:       h.clock.Time(),
+		onDoneHandling: onFinishedHandling,
 	})
 }
 
 // AppGossip passes an application-level gossip message from the given node to the consensus engine.
-func (h *Handler) AppGossip(nodeID ids.ShortID, msgID uint32, appGossipBytes []byte) {
+func (h *Handler) AppGossip(nodeID ids.ShortID, msgID uint32, appGossipBytes []byte, onFinishedHandling func()) {
 	h.push(message{
-		messageType: constants.AppGossipMsg,
-		nodeID:      nodeID,
-		requestID:   msgID,
-		appMsgBytes: appGossipBytes,
-		received:    h.clock.Time(),
+		messageType:    constants.AppGossipMsg,
+		nodeID:         nodeID,
+		requestID:      msgID,
+		appMsgBytes:    appGossipBytes,
+		received:       h.clock.Time(),
+		onDoneHandling: onFinishedHandling,
 	})
 }
 
