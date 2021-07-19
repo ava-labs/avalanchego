@@ -522,7 +522,7 @@ func (t *Tree) AbortGeneration() {
 
 func abortGeneration(base *diskLayer) {
 	// If the disk layer is running a snapshot generator, abort it
-	if base.genAbort != nil && !base.aborted {
+	if base.genAbort != nil && base.genStats == nil {
 		abort := make(chan *generatorStats)
 		base.genAbort <- abort
 		base.genStats = <-abort
@@ -671,7 +671,6 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 		// with the expectation that the next generation will get canceled
 		// immediately.
 		if time.Now().Sub(base.created) < overloadThreshold {
-			res.aborted = true
 			res.genStats = base.genStats
 		} else {
 			go res.generate(base.genStats)
