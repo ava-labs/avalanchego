@@ -904,6 +904,7 @@ func NewTestTree(diskdb ethdb.KeyValueStore, blockHash, root common.Hash) *Tree 
 		root:      root,
 		blockHash: blockHash,
 		cache:     fastcache.New(128 * 256),
+		created:   time.Now(),
 	}
 	return &Tree{
 		blockLayers: map[common.Hash]snapshot{
