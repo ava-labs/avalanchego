@@ -545,6 +545,14 @@ func (t *Tree) AbortGeneration() {
 // for it to shutdown before returning (if it is running). This call should not
 // be made concurrently.
 func (dl *diskLayer) abortGeneration() bool {
+	// Store ideal time for abort to get better estimate of load
+	//
+	// Note that we set this time regardless if abortion was skipped otherwise we
+	// will never restart generation (age will always be negative).
+	if dl.abortStarted.IsZero() {
+		dl.abortStarted = time.Now()
+	}
+
 	// If the disk layer is running a snapshot generator, abort it
 	if dl.genAbort != nil && dl.genStats == nil {
 		abort := make(chan struct{})
@@ -697,16 +705,15 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 		// If the diskLayer we are about to discard is not very old, we skip
 		// generation on the next layer (assuming generation will just get canceled
 		// before doing meaningful work anyways).
-		diskLayerAge := time.Since(base.created)
+		diskLayerAge := base.abortStarted.Sub(base.created)
 		if diskLayerAge < skipGenThreshold {
 			log.Debug("Skipping snapshot generation", "previous disk layer age", diskLayerAge)
 			res.genStats = base.genStats
 		} else {
 			go res.generate(base.genStats)
 		}
-		return res, false, nil
 	}
-	return res, true, nil
+	return res, base.genMarker == nil, nil
 }
 
 // Journal commits an entire diff hierarchy to disk into a single journal entry.
