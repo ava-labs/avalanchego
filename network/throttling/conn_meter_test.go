@@ -51,7 +51,7 @@ func TestNoInboundConnThrottler(t *testing.T) {
 }
 
 func TestInboundConnThrottler(t *testing.T) {
-	cooldown := 100 * time.Millisecond
+	cooldown := 250 * time.Millisecond
 	throttlerIntf := NewInboundConnThrottler(
 		logging.NoLog{},
 		InboundConnThrottlerConfig{
@@ -86,7 +86,7 @@ func TestInboundConnThrottler(t *testing.T) {
 
 	// Wait a little longer to make sure the throttler has time to
 	// clear the IPs after Dispatch wakes up
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(25 * time.Millisecond)
 
 	// Allow should return true now that [cooldown] has passed
 	assert.True(t, throttlerIntf.Allow(host1))
