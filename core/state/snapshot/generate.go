@@ -176,6 +176,7 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache i
 		genMarker:  genMarker,
 		genPending: make(chan struct{}),
 		genAbort:   make(chan chan struct{}),
+		created:    time.Now(),
 	}
 	go base.generate(stats)
 	log.Debug("Start snapshot generation", "root", root)
