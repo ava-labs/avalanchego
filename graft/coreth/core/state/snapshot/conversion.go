@@ -75,7 +75,7 @@ func GenerateStorageTrieRoot(account common.Hash, it StorageIterator) (common.Ha
 // (account trie + all storage tries).
 func GenerateTrie(snaptree *Tree, root common.Hash, src ethdb.Database, dst ethdb.KeyValueWriter) error {
 	// Traverse all state by snapshot, re-generate the whole state trie
-	acctIt, err := snaptree.AccountIterator(root, common.Hash{})
+	acctIt, err := snaptree.AccountIterator(root, common.Hash{}, false)
 	if err != nil {
 		return err // The required snapshot might not exist.
 	}
@@ -91,7 +91,7 @@ func GenerateTrie(snaptree *Tree, root common.Hash, src ethdb.Database, dst ethd
 			rawdb.WriteCode(dst, codeHash, code)
 		}
 		// Then migrate all storage trie nodes into the tmp db.
-		storageIt, err := snaptree.StorageIterator(root, accountHash, common.Hash{})
+		storageIt, err := snaptree.StorageIterator(root, accountHash, common.Hash{}, false)
 		if err != nil {
 			return common.Hash{}, err
 		}
