@@ -526,25 +526,23 @@ func (t *Tree) AbortGeneration() {
 	abortGeneration(dl)
 }
 
-func abortGeneration(base *diskLayer) {
+func abortGeneration(base *diskLayer) bool {
 	// If the disk layer is running a snapshot generator, abort it
 	base.lock.RLock()
 	shouldAbort := base.genAbort != nil && base.genStats == nil
 	base.lock.RUnlock()
 
 	if !shouldAbort {
-		return
+		return false
 	}
 
 	// Wait for stats to be returned by generator goroutine (indicates that
 	// generation has stopped)
-	abort := make(chan *generatorStats)
+	abort := make(chan struct{})
 	base.genAbort <- abort
-	stats := <-abort
+	<-abort
 
-	base.lock.Lock()
-	base.genStats = stats
-	base.lock.Unlock()
+	return true
 }
 
 // diffToDisk merges a bottom-most diff into the persistent disk layer underneath
@@ -683,7 +681,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 	// to allow the tests to play with the marker without triggering this path.
 	if base.genMarker != nil && base.genAbort != nil {
 		res.genMarker = base.genMarker
-		res.genAbort = make(chan chan *generatorStats)
+		res.genAbort = make(chan chan struct{})
 
 		// If the diskLayer we are about to discard is not very old, we skip
 		// generation on the next layer (assuming generation will just get canceled
@@ -760,7 +758,7 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 		case *diskLayer:
 			// If the base layer is generating, abort it and save
 			if layer.genAbort != nil {
-				abort := make(chan *generatorStats)
+				abort := make(chan struct{})
 				layer.genAbort <- abort
 
 				<-abort
