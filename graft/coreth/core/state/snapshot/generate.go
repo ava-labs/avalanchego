@@ -724,9 +724,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			if abort == nil { // aborted by internal error, wait the signal
 				abort = <-dl.genAbort
 			}
-			dl.lock.Lock()
 			dl.genStats = stats
-			dl.lock.Unlock()
 			close(abort)
 			return
 		}
@@ -747,9 +745,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		log.Error("Failed to flush batch", "err", err)
 
 		abort = <-dl.genAbort
-		dl.lock.Lock()
 		dl.genStats = stats
-		dl.lock.Unlock()
 		close(abort)
 		return
 	}
