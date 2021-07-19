@@ -141,8 +141,7 @@ func TestDiskMerge(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("failed to update snapshot tree: %v", err)
 	}
-	// Bypass validation of junk data
-	snaps.validated = true
+	snaps.validated = true // Bypass validation of junk data
 	if err := snaps.Flatten(diffBlockHash); err != nil {
 		t.Fatalf("failed to flatten snapshot tree: %v", err)
 	}
@@ -491,7 +490,8 @@ func TestDiskGeneratorPersistence(t *testing.T) {
 		t.Fatalf("failed to update snapshot tree: %v", err)
 	}
 	dl = snaps.disklayer()
-	dl.genMarker = nil // Construction finished
+	dl.genMarker = nil     // Construction finished
+	snaps.validated = true // Bypass validation of junk data
 	if err := snaps.Flatten(diffTwoBlockHash); err != nil {
 		t.Fatalf("failed to flatten snapshot tree: %v", err)
 	}
