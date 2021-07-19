@@ -46,8 +46,14 @@ import (
 )
 
 const (
-	// TODO: rename
-	overloadThreshold = 500 * time.Millisecond
+	// skipGenThreshold is the minimum time that must have elapsed since the
+	// creation of a replaced disk layer to start snapshot generation on a new
+	// disk layer.
+	//
+	// If we are replacing disk layers at a frequency less than this threshold,
+	// it is usually not worth it to start generation as it will be aborted
+	// before meaningful work can be done.
+	skipGenThreshold = 500 * time.Millisecond
 )
 
 var (
@@ -670,7 +676,9 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 		// If the last diskLayer is not very old, we avoid generating
 		// with the expectation that the next generation will get canceled
 		// immediately.
-		if time.Since(base.created) < overloadThreshold {
+		diskLayerAge := time.Since(base.created)
+		if diskLayerAge < skipGenThreshold {
+			log.Debug("Skipping snapshot generation", "disk layer age", diskLayerAge)
 			res.genStats = base.genStats
 		} else {
 			go res.generate(base.genStats)
