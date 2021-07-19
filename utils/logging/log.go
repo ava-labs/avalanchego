@@ -37,7 +37,7 @@ type Log struct {
 }
 
 // New returns a new logger set up according to [config]
-func New(config Config) (*Log, error) {
+func newLog(config Config) (*Log, error) {
 	if err := os.MkdirAll(config.Directory, perms.ReadWriteExecute); err != nil {
 		return nil, err
 	}
@@ -302,11 +302,17 @@ func (l *Log) SetLogLevel(lvl Level) {
 
 // GetLogLevel ...
 func (l *Log) GetLogLevel() Level {
+	l.configLock.Lock()
+	defer l.configLock.Unlock()
+
 	return l.config.LogLevel
 }
 
 // GetDisplayLevel implements the Logger interface
 func (l *Log) GetDisplayLevel() Level {
+	l.configLock.Lock()
+	defer l.configLock.Unlock()
+
 	return l.config.DisplayLevel
 }
 

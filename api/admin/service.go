@@ -172,7 +172,15 @@ type SetLoggerLevelArgs struct {
 	LoggerName   string `json:"loggerName"`
 }
 
-// SetLoggerLevel sets the log level and display level for logger name.
+// SetLoggerLevel sets the log level and/or display level for loggers.
+// If len([args.LoggerName]) == 0, sets the log/display level of all loggers.
+// Otherwise, sets the log/display level of the loggers named in that argument.
+// Sets the log level of these loggers to [args.LogLevel].
+// If len([args.LogLevel]) == 0, doesn't set the log level of these loggers.
+// If len([args.LogLevel]) > 0, must be a valid string representation of a log level.
+// Sets the display level of these loggers to [args.LogLevel].
+// If len([args.DisplayLevel]) == 0, doesn't set the display level of these loggers.
+// If len([args.DisplayLevel]) > 0, must be a valid string representation of a log level.
 func (service *Admin) SetLoggerLevel(r *http.Request, args *SetLoggerLevelArgs, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
 	if len(args.LogLevel) == 0 && len(args.DisplayLevel) == 0 {
@@ -187,22 +195,34 @@ func (service *Admin) SetLoggerLevel(r *http.Request, args *SetLoggerLevelArgs, 
 		loggerNames = service.logFactory.GetNames()
 	}
 
+	changeLogLevel := len(args.LogLevel) == 0
+	var (
+		changeLogLevelTo logging.Level
+		err              error
+	)
+	if changeLogLevel {
+		changeLogLevelTo, err = logging.ToLevel(args.LogLevel)
+		if err != nil {
+			return err
+		}
+	}
+	changeDisplayLevel := len(args.LogLevel) == 0
+	var changeDisplayLevelTo logging.Level
+	if changeDisplayLevel {
+		changeDisplayLevelTo, err = logging.ToLevel(args.LogLevel)
+		if err != nil {
+			return err
+		}
+	}
+
 	for _, name := range loggerNames {
-		if len(args.LogLevel) > 0 {
-			logLevel, err := logging.ToLevel(args.LogLevel)
-			if err != nil {
-				return err
-			}
-			if err := service.logFactory.SetLogLevel(name, logLevel); err != nil {
+		if changeLogLevel {
+			if err := service.logFactory.SetLogLevel(name, changeLogLevelTo); err != nil {
 				return err
 			}
 		}
-		if len(args.DisplayLevel) > 0 {
-			displayLevel, err := logging.ToLevel(args.DisplayLevel)
-			if err != nil {
-				return err
-			}
-			if err := service.logFactory.SetDisplayLevel(name, displayLevel); err != nil {
+		if changeDisplayLevel {
+			if err := service.logFactory.SetDisplayLevel(name, changeDisplayLevelTo); err != nil {
 				return err
 			}
 		}
