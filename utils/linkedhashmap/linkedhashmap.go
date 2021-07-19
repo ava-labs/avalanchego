@@ -26,10 +26,7 @@ type LinkedHashmap interface {
 
 	Oldest() (key interface{}, val interface{}, exists bool)
 	Newest() (key interface{}, val interface{}, exists bool)
-	// NewIterator iterates oldest to newest
 	NewIterator() Iter
-	// NewReverseIterator iterates newest to oldest
-	NewReverseIterator() Iter
 }
 
 // Iterates over the keys and values in a LinkedHashmap
@@ -152,16 +149,12 @@ func (lh *linkedHashmap) NewIterator() Iter {
 	return &iterator{lh: lh}
 }
 
-func (lh *linkedHashmap) NewReverseIterator() Iter {
-	return &iterator{lh: lh, reverse: true}
-}
-
 type iterator struct {
-	lh                              *linkedHashmap
-	key                             interface{}
-	value                           interface{}
-	next                            *list.Element
-	initialized, exhausted, reverse bool
+	lh                     *linkedHashmap
+	key                    interface{}
+	value                  interface{}
+	next                   *list.Element
+	initialized, exhausted bool
 }
 
 func (it *iterator) Next() bool {
@@ -179,23 +172,15 @@ func (it *iterator) Next() bool {
 	// If the iterator was not yet initialized, do it now.
 	if !it.initialized {
 		it.initialized = true
-
-		var startingEntry *list.Element
-		if it.reverse {
-			startingEntry = it.lh.entryList.Back()
-		} else {
-			startingEntry = it.lh.entryList.Front()
-		}
-
-		if startingEntry == nil {
+		oldest := it.lh.entryList.Front()
+		if oldest == nil {
 			it.exhausted = true
 			it.key = ids.Empty
 			it.value = nil
 			it.next = nil
 			return false
 		}
-
-		it.next = startingEntry
+		it.next = oldest
 	}
 
 	// It's important to ensure that [it.next] is not nil
@@ -203,11 +188,7 @@ func (it *iterator) Next() bool {
 	// over from [it.lh]
 	it.key = it.next.Value.(keyValue).key
 	it.value = it.next.Value.(keyValue).value
-	if it.reverse {
-		it.next = it.next.Prev() // Next time, return previous element
-	} else {
-		it.next = it.next.Next() // Next time, return next element
-	}
+	it.next = it.next.Next() // Next time, return next element
 	it.exhausted = it.next == nil
 	return true
 }
