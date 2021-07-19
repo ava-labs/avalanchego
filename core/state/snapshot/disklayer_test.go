@@ -555,7 +555,7 @@ func TestDiskSeek(t *testing.T) {
 		{0x00, 0x00},
 	}
 	for i, tc := range cases {
-		it, err := snaps.AccountIterator(baseRoot, common.Hash{tc.pos})
+		it, err := snaps.AccountIterator(baseRoot, common.Hash{tc.pos}, false)
 		if err != nil {
 			t.Fatalf("case %d, error: %v", i, err)
 		}

@@ -192,8 +192,9 @@ type Tree struct {
 	// stateRoot -> blockHash -> snapshot
 	// Update creates a new block layer with a parent taken from the blockHash -> snapshot map
 	// we can support grabbing a read only Snapshot by getting any one from the state root based map
-	stateLayers map[common.Hash]map[common.Hash]snapshot
-	lock        sync.RWMutex
+	stateLayers       map[common.Hash]map[common.Hash]snapshot
+	snapshotValidated bool // Indicates if snapshot has been validated (true if previously generated)
+	lock              sync.RWMutex
 }
 
 // New attempts to load an already existing snapshot from a persistent key-value
@@ -232,6 +233,9 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 	// call, but we grab it nevertheless to follow the spec for insertSnap.
 	snap.lock.Lock()
 	defer snap.lock.Unlock()
+	// We assume a snapshot read from disk on startup was previously validated. This prevents
+	// us from a doing a costly re-verification procedure when it is not needed.
+	snap.snapshotValidated = true
 	for head != nil {
 		snap.insertSnap(head)
 		head = head.Parent()
@@ -273,15 +277,17 @@ func (t *Tree) waitBuild() {
 // Snapshot retrieves a snapshot belonging to the given state root, or nil if no
 // snapshot is maintained for that state root.
 func (t *Tree) Snapshot(stateRoot common.Hash) Snapshot {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	return t.getSnapshot(stateRoot)
+	return t.getSnapshot(stateRoot, false)
 }
 
-// getSnapshot retrieves a Snapshot by its state root. Assumes the read lock
-// is held.
-func (t *Tree) getSnapshot(stateRoot common.Hash) snapshot {
+// getSnapshot retrieves a Snapshot by its state root. If the caller already holds the
+// snapTree lock when callthing this function, [holdsTreeLock] should be set to true.
+func (t *Tree) getSnapshot(stateRoot common.Hash, holdsTreeLock bool) snapshot {
+	if !holdsTreeLock {
+		t.lock.RLock()
+		defer t.lock.RUnlock()
+	}
+
 	layers := t.stateLayers[stateRoot]
 	for _, layer := range layers {
 		return layer
@@ -386,7 +392,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	}
 
 	diff.lock.RLock()
-	base, err := diffToDisk(diff)
+	base, snapshotGenerated, err := diffToDisk(diff)
 	diff.lock.RUnlock()
 	if err != nil {
 		return err
@@ -446,8 +452,20 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 		}
 	}
 	rebloom(base.blockHash)
-
 	log.Debug("Flattened snapshot tree", "blockHash", blockHash, "root", base.root, "size", len(t.blockLayers), "elapsed", common.PrettyDuration(time.Since(start)))
+
+	// Validate integrity of generated snapshot (if haven't already)
+	if t.snapshotValidated || !snapshotGenerated {
+		return nil
+	}
+	start = time.Now()
+	log.Info("Validating snapshot integrity", "root", base.root)
+	if err := t.Verify(base.root, true); err != nil {
+		return fmt.Errorf("unable to verify snapshot integrity: %w", err)
+	}
+	log.Info("Validated snapshot integrity", "root", base.root, "elapsed", time.Since(start))
+	t.snapshotValidated = true
+
 	return nil
 }
 
@@ -543,7 +561,7 @@ func (dl *diskLayer) abortGeneration() bool {
 //
 // The disk layer persistence should be operated in an atomic way. All updates should
 // be discarded if the whole transition if not finished.
-func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
+func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 	var (
 		base  = bottom.parent.(*diskLayer)
 		batch = base.diskdb.NewBatch()
@@ -559,7 +577,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 	// Mark the original base as stale as we're going to create a new wrapper
 	base.lock.Lock()
 	if base.stale {
-		return nil, ErrStaleParentLayer // we've committed into the same base from two children, boo
+		return nil, false, ErrStaleParentLayer // we've committed into the same base from two children, boo
 	}
 	base.stale = true
 	base.lock.Unlock()
@@ -686,8 +704,9 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 		} else {
 			go res.generate(base.genStats)
 		}
+		return res, false, nil
 	}
-	return res, nil
+	return res, true, nil
 }
 
 // Journal commits an entire diff hierarchy to disk into a single journal entry.
@@ -787,41 +806,47 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 
 // AccountIterator creates a new account iterator for the specified root hash and
 // seeks to a starting account hash.
-func (t *Tree) AccountIterator(root common.Hash, seek common.Hash) (AccountIterator, error) {
-	ok, err := t.generating()
-	if err != nil {
-		return nil, err
+func (t *Tree) AccountIterator(root common.Hash, seek common.Hash, force bool) (AccountIterator, error) {
+	if !force {
+		ok, err := t.generating()
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return nil, ErrNotConstructed
+		}
 	}
-	if ok {
-		return nil, ErrNotConstructed
-	}
-	return newFastAccountIterator(t, root, seek)
+	return newFastAccountIterator(t, root, seek, force)
 }
 
 // StorageIterator creates a new storage iterator for the specified root hash and
 // account. The iterator will be move to the specific start position.
-func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek common.Hash) (StorageIterator, error) {
-	ok, err := t.generating()
-	if err != nil {
-		return nil, err
+func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek common.Hash, force bool) (StorageIterator, error) {
+	if !force {
+		ok, err := t.generating()
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return nil, ErrNotConstructed
+		}
 	}
-	if ok {
-		return nil, ErrNotConstructed
-	}
-	return newFastStorageIterator(t, root, account, seek)
+	return newFastStorageIterator(t, root, account, seek, force)
 }
 
 // Verify iterates the whole state(all the accounts as well as the corresponding storages)
 // with the specific root and compares the re-computed hash with the original one.
-func (t *Tree) Verify(root common.Hash) error {
-	acctIt, err := t.AccountIterator(root, common.Hash{})
+// When [force] is true, it is assumed that the caller has confirmed that the
+// snapshot is generated and that they hold the snapTree lock.
+func (t *Tree) Verify(root common.Hash, force bool) error {
+	acctIt, err := t.AccountIterator(root, common.Hash{}, force)
 	if err != nil {
 		return err
 	}
 	defer acctIt.Release()
 
 	got, err := generateTrieRoot(nil, acctIt, common.Hash{}, stackTrieGenerate, func(db ethdb.KeyValueWriter, accountHash, codeHash common.Hash, stat *generateStats) (common.Hash, error) {
-		storageIt, err := t.StorageIterator(root, accountHash, common.Hash{})
+		storageIt, err := t.StorageIterator(root, accountHash, common.Hash{}, force)
 		if err != nil {
 			return common.Hash{}, err
 		}
