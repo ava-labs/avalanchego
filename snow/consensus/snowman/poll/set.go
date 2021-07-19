@@ -152,32 +152,6 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 		for _, keyToDelete := range keysToDelete {
 			s.polls.Delete(keyToDelete)
 		}
-	} else if exists && oldestRequestID != requestID {
-		// this is not the oldest poll but there might be older polls that have finished
-
-		// iterate from newest to oldest
-		// newest may not be this poll so we skip until we find this poll
-		// workaround until there's a way to get the iterator to start from an offset
-		iter, _ := s.polls.NewReverseIteratorStartingFrom(requestID)
-		var keysToDelete []interface{}
-		for iter.Next() {
-			holder := iter.Value().(pollHolder)
-			p = holder.GetPoll()
-			if !p.Finished() {
-				// we found an unfinished poll in the history, return false
-				// because we need all polls from current (newer) to oldest to have finished
-				// to return true
-				return []ids.Bag{}, false
-			}
-
-			results = append(results, p.Result())
-			keysToDelete = append(keysToDelete, iter.Key())
-		}
-
-		// delete the keys to be deleted
-		for _, keyToDelete := range keysToDelete {
-			s.polls.Delete(keyToDelete)
-		}
 	}
 
 	// only gets here if the poll has finished
