@@ -208,7 +208,6 @@ func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Re
 		}
 
 		sm.m.ReleaseDatabase(sharedID)
-
 	}
 
 	myBatch, err := vdb.CommitBatch()

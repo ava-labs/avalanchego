@@ -207,7 +207,6 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 			currentSize += sizeChange
 			currentBatch.Deletes = append(currentBatch.Deletes, d)
 		}
-
 		if len(currentBatch.Deletes)+len(currentBatch.Puts) > 0 {
 			currentBatchGroup = append(currentBatchGroup, currentBatch)
 		}
@@ -229,7 +228,6 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 	}
 
 	for key, value := range batchChainsAndInputs {
-
 		newPutElements := make([][]*gsharedmemoryproto.Element, 0)
 		newRemoveElements := make([][][]byte, 0)
 
@@ -259,7 +257,6 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 				holderPutIndex = k
 			}
 			currentPutSize += sizePutChange
-
 		}
 
 		if len(value.PutRequests) > 0 && currentPutSize <= maxBatchSize {
@@ -285,9 +282,7 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 			}
 
 			currentRemoveSize += sizeRemoveChange
-
 		}
-
 		if len(value.RemoveRequests) > 0 && currentRemoveSize <= maxBatchSize {
 			newRemoveElements = append(newRemoveElements, value.RemoveRequests[prevRemoveIndex:holderRemoveIndex+1])
 		}
@@ -301,8 +296,8 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 		}
 
 		for i := 0; i < maxLoop; i++ {
-			if i < len(newRemoveElements) && i < len(newPutElements) {
-
+			switch {
+			case i < len(newRemoveElements) && i < len(newPutElements):
 				formattedRequest := make(map[string]*gsharedmemoryproto.AtomicRequest)
 
 				formattedValues := &gsharedmemoryproto.AtomicRequest{
@@ -323,7 +318,7 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 					return err
 				}
 
-			} else if i < len(newRemoveElements) {
+			case i < len(newRemoveElements):
 				formattedRequest := make(map[string]*gsharedmemoryproto.AtomicRequest)
 
 				formattedValues := &gsharedmemoryproto.AtomicRequest{
@@ -342,8 +337,7 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 				if _, err := c.client.RemoveAndPutMultiple(context.Background(), request); err != nil {
 					return err
 				}
-
-			} else if i < len(newPutElements) {
+			case i < len(newPutElements):
 				formattedRequest := make(map[string]*gsharedmemoryproto.AtomicRequest)
 
 				formattedValues := &gsharedmemoryproto.AtomicRequest{
@@ -362,14 +356,10 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 				if _, err := c.client.RemoveAndPutMultiple(context.Background(), request); err != nil {
 					return err
 				}
-
 			}
 		}
-
 	}
-
 	currentSize := 0
-
 	batchGroups, err := c.makeBatches(batch, currentSize)
 	if err != nil {
 		return err

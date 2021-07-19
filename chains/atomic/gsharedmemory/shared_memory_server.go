@@ -88,7 +88,6 @@ func (s *Server) RemoveAndPutMultiple(
 		} else {
 			removeAndPut.batchChainsAndInputs[chainIdentifier] = formattedValues
 		}
-
 	}
 
 	if err := s.parseBatches(removeAndPut.batch, req.Batches); err != nil {
