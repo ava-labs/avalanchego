@@ -150,6 +150,123 @@ func (c *Client) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
+func (c *Client) Apply(requests map[ids.ID]*atomic.Requests, batch ...database.Batch) error {
+	req := &gsharedmemoryproto.ApplyRequest{
+		Continues: true,
+		Id:        stdatomic.AddInt64(&c.uniqueID, 1),
+	}
+
+	for key, value := range requests {
+		newPutElements := make([][]*gsharedmemoryproto.Element, 0)
+		newRemoveElements := make([][][]byte, 0)
+
+		currentPutSize, currentRemoveSize := 0, 0
+		prevPutIndex, prevRemoveIndex := 0, 0
+		holderPutIndex, holderRemoveIndex := 0, 0
+
+		for k, v := range value.PutRequests {
+			sizePutChange := baseElementSize + len(v.Key) + len(v.Value)
+			for _, trait := range v.Traits {
+				sizePutChange += len(trait)
+			}
+
+			if newSize := sizePutChange + currentPutSize; newSize > maxBatchSize {
+				currentPutSize = 0
+				formattedElements := make([]*gsharedmemoryproto.Element, 0, len(value.PutRequests[prevPutIndex:k+1]))
+				for _, v := range value.PutRequests[prevPutIndex : k+1] {
+					formattedElements = append(formattedElements, &gsharedmemoryproto.Element{
+						Key:    v.Key,
+						Value:  v.Value,
+						Traits: v.Traits,
+					})
+				}
+				newPutElements = append(newPutElements, formattedElements)
+				prevPutIndex = k + 1
+			} else {
+				holderPutIndex = k
+			}
+			currentPutSize += sizePutChange
+		}
+
+		if len(value.PutRequests) > 0 && currentPutSize <= maxBatchSize {
+			formattedElements := make([]*gsharedmemoryproto.Element, 0, len(value.PutRequests[prevPutIndex:holderPutIndex+1]))
+			for _, v := range value.PutRequests[prevPutIndex : holderPutIndex+1] {
+				formattedElements = append(formattedElements, &gsharedmemoryproto.Element{
+					Key:    v.Key,
+					Value:  v.Value,
+					Traits: v.Traits,
+				})
+			}
+			newPutElements = append(newPutElements, formattedElements)
+		}
+
+		for i, key := range value.RemoveRequests {
+			sizeRemoveChange := baseElementSize + len(key)
+			if newSize := sizeRemoveChange + currentRemoveSize; newSize > maxBatchSize {
+				currentRemoveSize = 0
+				newRemoveElements = append(newRemoveElements, value.RemoveRequests[prevRemoveIndex:i+1])
+				prevRemoveIndex = i + 1
+			} else {
+				holderRemoveIndex = i
+			}
+
+			currentRemoveSize += sizeRemoveChange
+		}
+		if len(value.RemoveRequests) > 0 && currentRemoveSize <= maxBatchSize {
+			newRemoveElements = append(newRemoveElements, value.RemoveRequests[prevRemoveIndex:holderRemoveIndex+1])
+		}
+
+		for i := 0; i < len(newRemoveElements) || i < len(newPutElements); i++ {
+			request := &gsharedmemoryproto.ApplyRequest{
+				Continues: true,
+				Id:        req.Id,
+			}
+			switch {
+			case i < len(newRemoveElements) && i < len(newPutElements):
+				request.Requests = []*gsharedmemoryproto.AtomicRequest{{
+					RemoveRequests: newRemoveElements[i],
+					PutRequests:    newPutElements[i],
+					PeerChainID:    key[:],
+				}}
+			case i < len(newRemoveElements):
+				request.Requests = []*gsharedmemoryproto.AtomicRequest{{
+					RemoveRequests: newRemoveElements[i],
+					PeerChainID:    key[:],
+				}}
+			case i < len(newPutElements):
+				request.Requests = []*gsharedmemoryproto.AtomicRequest{{
+					PutRequests: newPutElements[i],
+					PeerChainID: key[:],
+				}}
+			}
+			if _, err := c.client.Apply(context.Background(), request); err != nil {
+				return err
+			}
+		}
+	}
+	currentSize := 0
+	batchGroups, err := c.makeBatches(batch, currentSize)
+	if err != nil {
+		return err
+	}
+
+	for i, batches := range batchGroups {
+		req.Batches = batches
+		req.Continues = i < len(batchGroups)-1
+		if _, err := c.client.Apply(context.Background(), req); err != nil {
+			return err
+		}
+	}
+
+	if len(batchGroups) == 0 {
+		req.Continues = false
+		if _, err := c.client.Apply(context.Background(), req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]*gsharedmemoryproto.Batch, error) {
 	batchGroups := [][]*gsharedmemoryproto.Batch(nil)
 	currentBatchGroup := []*gsharedmemoryproto.Batch(nil)
@@ -218,128 +335,4 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 		batchGroups = append(batchGroups, currentBatchGroup)
 	}
 	return batchGroups, nil
-}
-
-func (c *Client) Apply(batchChainsAndInputs map[ids.ID]*atomic.Requests, batch ...database.Batch) error {
-	req := &gsharedmemoryproto.ApplyRequest{
-		Continues: true,
-		Id:        stdatomic.AddInt64(&c.uniqueID, 1),
-	}
-
-	for key, value := range batchChainsAndInputs {
-		newPutElements := make([][]*gsharedmemoryproto.Element, 0)
-		newRemoveElements := make([][][]byte, 0)
-
-		currentPutSize, currentRemoveSize := 0, 0
-		prevPutIndex, prevRemoveIndex := 0, 0
-		holderPutIndex, holderRemoveIndex := 0, 0
-
-		for k, v := range value.PutRequests {
-			sizePutChange := baseElementSize + len(v.Key) + len(v.Value)
-			for _, trait := range v.Traits {
-				sizePutChange += len(trait)
-			}
-
-			if newSize := sizePutChange + currentPutSize; newSize > maxBatchSize {
-				currentPutSize = 0
-				formattedElements := make([]*gsharedmemoryproto.Element, 0, len(value.PutRequests[prevPutIndex:k+1]))
-				for _, v := range value.PutRequests[prevPutIndex : k+1] {
-					formattedElements = append(formattedElements, &gsharedmemoryproto.Element{
-						Key:    v.Key,
-						Value:  v.Value,
-						Traits: v.Traits,
-					})
-				}
-				newPutElements = append(newPutElements, formattedElements)
-				prevPutIndex = k + 1
-			} else {
-				holderPutIndex = k
-			}
-			currentPutSize += sizePutChange
-		}
-
-		if len(value.PutRequests) > 0 && currentPutSize <= maxBatchSize {
-			formattedElements := make([]*gsharedmemoryproto.Element, 0, len(value.PutRequests[prevPutIndex:holderPutIndex+1]))
-			for _, v := range value.PutRequests[prevPutIndex : holderPutIndex+1] {
-				formattedElements = append(formattedElements, &gsharedmemoryproto.Element{
-					Key:    v.Key,
-					Value:  v.Value,
-					Traits: v.Traits,
-				})
-			}
-			newPutElements = append(newPutElements, formattedElements)
-		}
-
-		for i, key := range value.RemoveRequests {
-			sizeRemoveChange := baseElementSize + len(key)
-			if newSize := sizeRemoveChange + currentRemoveSize; newSize > maxBatchSize {
-				currentRemoveSize = 0
-				newRemoveElements = append(newRemoveElements, value.RemoveRequests[prevRemoveIndex:i+1])
-				prevRemoveIndex = i + 1
-			} else {
-				holderRemoveIndex = i
-			}
-
-			currentRemoveSize += sizeRemoveChange
-		}
-		if len(value.RemoveRequests) > 0 && currentRemoveSize <= maxBatchSize {
-			newRemoveElements = append(newRemoveElements, value.RemoveRequests[prevRemoveIndex:holderRemoveIndex+1])
-		}
-
-		maxLoop := 0
-		if len(newPutElements) < len(newRemoveElements) {
-			maxLoop = len(newRemoveElements)
-		} else {
-			maxLoop = len(newPutElements)
-		}
-
-		for i := 0; i < maxLoop; i++ {
-			request := &gsharedmemoryproto.ApplyRequest{
-				Continues: true,
-				Id:        req.Id,
-			}
-			switch {
-			case i < len(newRemoveElements) && i < len(newPutElements):
-				request.Requests = []*gsharedmemoryproto.AtomicRequest{{
-					RemoveRequests: newRemoveElements[i],
-					PutRequests:    newPutElements[i],
-					PeerChainID:    key[:],
-				}}
-			case i < len(newRemoveElements):
-				request.Requests = []*gsharedmemoryproto.AtomicRequest{{
-					RemoveRequests: newRemoveElements[i],
-					PeerChainID:    key[:],
-				}}
-			case i < len(newPutElements):
-				request.Requests = []*gsharedmemoryproto.AtomicRequest{{
-					PutRequests: newPutElements[i],
-					PeerChainID: key[:],
-				}}
-			}
-			if _, err := c.client.Apply(context.Background(), request); err != nil {
-				return err
-			}
-		}
-	}
-	currentSize := 0
-	batchGroups, err := c.makeBatches(batch, currentSize)
-	if err != nil {
-		return err
-	}
-
-	for i, batches := range batchGroups {
-		req.Batches = batches
-		req.Continues = i < len(batchGroups)-1
-		if _, err := c.client.Apply(context.Background(), req); err != nil {
-			return err
-		}
-	}
-
-	if len(batchGroups) == 0 {
-		req.Continues = false
-		if _, err := c.client.Apply(context.Background(), req); err != nil {
-			return err
-		}
-	}
-	return nil
 }
