@@ -396,6 +396,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
 
+	nodeConfig.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
+
 	// Metrics Namespace
 	nodeConfig.NetworkConfig.MetricsNamespace = constants.PlatformName
 
