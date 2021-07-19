@@ -60,7 +60,6 @@ func (s *Server) RemoveAndPutMultiple(
 			batchChainsAndInputs: make(map[ids.ID]*atomic.Requests),
 			batch:                make(map[int64]database.Batch),
 		}
-
 	}
 
 	for _, value := range req.BatchChainsAndInputs {
@@ -88,7 +87,6 @@ func (s *Server) RemoveAndPutMultiple(
 			val.RemoveRequests = append(val.RemoveRequests, formattedValues.RemoveRequests...)
 		} else {
 			removeAndPut.batchChainsAndInputs[chainIdentifier] = formattedValues
-
 		}
 
 	}

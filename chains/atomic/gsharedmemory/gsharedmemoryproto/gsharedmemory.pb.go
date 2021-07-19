@@ -7,10 +7,11 @@
 package gsharedmemoryproto
 
 import (
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
+
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -1110,25 +1111,28 @@ func file_gsharedmemory_proto_rawDescGZIP() []byte {
 	return file_gsharedmemory_proto_rawDescData
 }
 
-var file_gsharedmemory_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
-var file_gsharedmemory_proto_goTypes = []interface{}{
-	(*BatchPut)(nil),                     // 0: gsharedmemoryproto.BatchPut
-	(*BatchDelete)(nil),                  // 1: gsharedmemoryproto.BatchDelete
-	(*Batch)(nil),                        // 2: gsharedmemoryproto.Batch
-	(*AtomicRequest)(nil),                // 3: gsharedmemoryproto.AtomicRequest
-	(*Element)(nil),                      // 4: gsharedmemoryproto.Element
-	(*PutRequest)(nil),                   // 5: gsharedmemoryproto.PutRequest
-	(*RemoveAndPutMultipleRequest)(nil),  // 6: gsharedmemoryproto.RemoveAndPutMultipleRequest
-	(*RemoveAndPutMultipleResponse)(nil), // 7: gsharedmemoryproto.RemoveAndPutMultipleResponse
-	(*PutResponse)(nil),                  // 8: gsharedmemoryproto.PutResponse
-	(*GetRequest)(nil),                   // 9: gsharedmemoryproto.GetRequest
-	(*GetResponse)(nil),                  // 10: gsharedmemoryproto.GetResponse
-	(*IndexedRequest)(nil),               // 11: gsharedmemoryproto.IndexedRequest
-	(*IndexedResponse)(nil),              // 12: gsharedmemoryproto.IndexedResponse
-	(*RemoveRequest)(nil),                // 13: gsharedmemoryproto.RemoveRequest
-	(*RemoveResponse)(nil),               // 14: gsharedmemoryproto.RemoveResponse
-	nil,                                  // 15: gsharedmemoryproto.RemoveAndPutMultipleRequest.BatchChainsAndInputsEntry
-}
+var (
+	file_gsharedmemory_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+	file_gsharedmemory_proto_goTypes  = []interface{}{
+		(*BatchPut)(nil),                     // 0: gsharedmemoryproto.BatchPut
+		(*BatchDelete)(nil),                  // 1: gsharedmemoryproto.BatchDelete
+		(*Batch)(nil),                        // 2: gsharedmemoryproto.Batch
+		(*AtomicRequest)(nil),                // 3: gsharedmemoryproto.AtomicRequest
+		(*Element)(nil),                      // 4: gsharedmemoryproto.Element
+		(*PutRequest)(nil),                   // 5: gsharedmemoryproto.PutRequest
+		(*RemoveAndPutMultipleRequest)(nil),  // 6: gsharedmemoryproto.RemoveAndPutMultipleRequest
+		(*RemoveAndPutMultipleResponse)(nil), // 7: gsharedmemoryproto.RemoveAndPutMultipleResponse
+		(*PutResponse)(nil),                  // 8: gsharedmemoryproto.PutResponse
+		(*GetRequest)(nil),                   // 9: gsharedmemoryproto.GetRequest
+		(*GetResponse)(nil),                  // 10: gsharedmemoryproto.GetResponse
+		(*IndexedRequest)(nil),               // 11: gsharedmemoryproto.IndexedRequest
+		(*IndexedResponse)(nil),              // 12: gsharedmemoryproto.IndexedResponse
+		(*RemoveRequest)(nil),                // 13: gsharedmemoryproto.RemoveRequest
+		(*RemoveResponse)(nil),               // 14: gsharedmemoryproto.RemoveResponse
+		nil,                                  // 15: gsharedmemoryproto.RemoveAndPutMultipleRequest.BatchChainsAndInputsEntry
+	}
+)
+
 var file_gsharedmemory_proto_depIdxs = []int32{
 	0,  // 0: gsharedmemoryproto.Batch.puts:type_name -> gsharedmemoryproto.BatchPut
 	1,  // 1: gsharedmemoryproto.Batch.deletes:type_name -> gsharedmemoryproto.BatchDelete

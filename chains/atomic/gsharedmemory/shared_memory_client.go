@@ -222,7 +222,6 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 }
 
 func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Requests, batch ...database.Batch) error {
-
 	req := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
 		BatchChainsAndInputs: make(map[string]*gsharedmemoryproto.AtomicRequest),
 		Continues:            true,
