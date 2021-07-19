@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -143,7 +144,7 @@ func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
 	}
 
 	// all static endpoints go to the vm endpoint, defaulting to the vm id
-	defaultEndpoint := "vm/" + vmID.String()
+	defaultEndpoint := constants.VMAliasPrefix + vmID.String()
 	// use a single lock for this entire vm
 	lock := new(sync.RWMutex)
 	// register the static endpoints
