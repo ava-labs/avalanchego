@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -190,7 +191,7 @@ type VM struct {
 	chain       *coreth.ETHChain
 	chainConfig *params.ChainConfig
 	// [db] is the VM's current database managed by ChainState
-	db database.Database
+	db *versiondb.Database
 	// [chaindb] is the database supplied to the Ethereum backend
 	chaindb Database
 	// [acceptedBlockDB] is the database to store the last accepted
@@ -287,8 +288,9 @@ func (vm *VM) Initialize(
 
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
-	vm.db = dbManager.Current().Database
-	vm.chaindb = Database{prefixdb.New(ethDBPrefix, vm.db)}
+	baseDB := dbManager.Current().Database
+	vm.chaindb = Database{prefixdb.New(ethDBPrefix, baseDB)}
+	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
 	g := new(core.Genesis)
@@ -533,11 +535,11 @@ func (vm *VM) pruneChain() error {
 	}
 	heightBytes := make([]byte, 8)
 	binary.PutUvarint(heightBytes, lastAcceptedHeight)
-	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err == nil {
-		return nil
-	} else {
-		return fmt.Errorf("failed to write pruned rejected blocks to db: %w", err)
+	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err != nil {
+		return err
 	}
+
+	return vm.db.Commit()
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing

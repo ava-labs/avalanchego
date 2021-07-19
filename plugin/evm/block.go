@@ -122,7 +122,7 @@ func (b *Block) Accept() error {
 		return err
 	}
 	if tx == nil {
-		return nil
+		return vm.db.Commit()
 	}
 
 	// Remove the accepted transaction from the mempool
@@ -135,10 +135,14 @@ func (b *Block) Accept() error {
 
 	if bonusBlocks.Contains(b.id) {
 		log.Info("skipping atomic tx acceptance on bonus block", "block", b.id)
-		return nil
+		return vm.db.Commit()
 	}
 
-	return tx.UnsignedAtomicTx.Accept(vm.ctx, vm.db.NewBatch())
+	batch, err := vm.db.CommitBatch()
+	if err != nil {
+		return err
+	}
+	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
 
 // Reject implements the snowman.Block interface
