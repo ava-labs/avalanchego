@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+//nolint
 // TODO: Remove this from this package, this should be in a config file
 var EnableCrypto = true
 
