@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package message
 
 import (
 	"crypto/x509"
@@ -18,29 +18,29 @@ import (
 )
 
 func TestCodecPackInvalidOp(t *testing.T) {
-	codec, err := newCodec(prometheus.NewRegistry())
+	codec, err := NewCodec(prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	_, err = codec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), false, false)
+	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 
-	_, err = codec.Pack(nil, math.MaxUint8, make(map[Field]interface{}), true, true)
+	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), true, true)
 	assert.Error(t, err)
 }
 
 func TestCodecPackMissingField(t *testing.T) {
-	codec, err := newCodec(prometheus.NewRegistry())
+	codec, err := NewCodec(prometheus.NewRegistry())
 	assert.NoError(t, err)
 
-	_, err = codec.Pack(nil, Get, make(map[Field]interface{}), false, false)
+	_, err = codec.Pack(Get, make(map[Field]interface{}), false, false)
 	assert.Error(t, err)
 
-	_, err = codec.Pack(nil, Get, make(map[Field]interface{}), true, true)
+	_, err = codec.Pack(Get, make(map[Field]interface{}), true, true)
 	assert.Error(t, err)
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
-	codec, err := newCodec(prometheus.NewRegistry())
+	codec, err := NewCodec(prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	_, err = codec.Parse([]byte{math.MaxUint8}, true)
@@ -51,7 +51,7 @@ func TestCodecParseInvalidOp(t *testing.T) {
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
-	codec, err := newCodec(prometheus.NewRegistry())
+	codec, err := NewCodec(prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	_, err = codec.Parse([]byte{byte(GetVersion), 0x00}, false)
@@ -63,10 +63,8 @@ func TestCodecParseExtraSpace(t *testing.T) {
 
 // If [compress] == true and [includeIsCompressedFlag] == false, error
 func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
-	compressor, err := compression.NewGzipCompressor()
-	assert.NoError(t, err)
 	c := codec{
-		compressor: compressor,
+		compressor: compression.NewGzipCompressor(),
 	}
 	id := ids.GenerateTestID()
 	fields := map[Field]interface{}{
@@ -75,19 +73,19 @@ func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
 		ContainerIDs: [][]byte{id[:]},
 	}
 	// [compress] == true and [includeIsCompressedFlag] == false
-	_, err = c.Pack(nil, Chits, fields, false, true)
+	_, err := c.Pack(Chits, fields, false, true)
 	assert.EqualValues(t, errCompressNeedsFlag, err)
 }
 
 // Test packing and then parsing messages
 // when using a gzip compressor
 func TestCodecPackParseGzip(t *testing.T) {
-	c, err := newCodec(prometheus.DefaultRegisterer)
+	c, err := NewCodec(prometheus.DefaultRegisterer)
 	assert.NoError(t, err)
 	id := ids.GenerateTestID()
 	cert := &x509.Certificate{}
 
-	msgs := []msg{
+	msgs := []message{
 		{
 			op:     GetVersion,
 			fields: map[Field]interface{}{},
@@ -221,14 +219,14 @@ func TestCodecPackParseGzip(t *testing.T) {
 	compressionEnabledOnNode := false
 	// Test without compression
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(nil, m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode)
+		packedIntf, err := c.Pack(m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode)
 		assert.NoError(t, err, "failed on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), peerSupportsCompression)
 		assert.NoError(t, err)
 
-		packed := packedIntf.(*msg)
-		unpacked := unpackedIntf.(*msg)
+		packed := packedIntf.(*message)
+		unpacked := unpackedIntf.(*message)
 
 		assert.EqualValues(t, len(packed.fields), len(packed.fields))
 		for field := range packed.fields {
@@ -244,14 +242,14 @@ func TestCodecPackParseGzip(t *testing.T) {
 	peerSupportsCompression = true
 	compressionEnabledOnNode = true
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(nil, m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode && m.op.Compressable())
+		packedIntf, err := c.Pack(m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode && m.op.Compressable())
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
 		unpackedIntf, err := c.Parse(packedIntf.Bytes(), peerSupportsCompression)
 		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
-		packed := packedIntf.(*msg)
-		unpacked := unpackedIntf.(*msg)
+		packed := packedIntf.(*message)
+		unpacked := unpackedIntf.(*message)
 
 		assert.EqualValues(t, len(packed.fields), len(unpacked.fields))
 		for field := range packed.fields {

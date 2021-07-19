@@ -21,8 +21,7 @@ func TestGzipCompressDecompress(t *testing.T) {
 		data2[i] = byte(rand.Intn(256)) // #nosec G404
 	}
 
-	compressor, err := NewGzipCompressor()
-	assert.NoError(t, err)
+	compressor := NewGzipCompressor()
 
 	dataCompressed, err := compressor.Compress(data)
 	assert.NoError(t, err)

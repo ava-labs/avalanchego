@@ -1,7 +1,7 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package network
+package message
 
 import (
 	"errors"
@@ -19,31 +19,50 @@ var (
 	errMissingField      = errors.New("message missing field")
 	errBadOp             = errors.New("input field has invalid operation")
 	errCompressNeedsFlag = errors.New("compressed message requires isCompressed flag")
+
+	_ Codec = &codec{}
 )
+
+type Codec interface {
+	Pack(
+		op Op,
+		fieldValues map[Field]interface{},
+		includeIsCompressedFlag bool,
+		compress bool,
+	) (Message, error)
+
+	Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error)
+}
 
 // codec defines the serialization and deserialization of network messages.
 // It's safe for multiple goroutines to call Pack and Parse concurrently.
 type codec struct {
-	// [bytesSavedMetrics] must not be nil.
-	// Should only be written to on codec creation.
+	// [getBytes] may return nil.
+	// [getBytes] must be safe for concurrent access by multiple goroutines.
+	getBytes func() []byte
+
 	bytesSavedMetrics     map[Op]prometheus.Histogram
 	compressTimeMetrics   map[Op]prometheus.Histogram
 	decompressTimeMetrics map[Op]prometheus.Histogram
-	// [compressor] must not be nil
-	compressor compression.Compressor
+	compressor            compression.Compressor
 }
 
-func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
-	compressor, err := compression.NewGzipCompressor()
-	if err != nil {
-		return codec{}, fmt.Errorf("couldn't create compressor: %s", err)
-	}
-	c := codec{
+func NewCodec(metrics prometheus.Registerer) (Codec, error) {
+	return NewCodecWithAllocator(
+		metrics,
+		func() []byte { return nil },
+	)
+}
+
+func NewCodecWithAllocator(metrics prometheus.Registerer, getBytes func() []byte) (Codec, error) {
+	c := &codec{
+		getBytes:              getBytes,
 		bytesSavedMetrics:     make(map[Op]prometheus.Histogram, len(ops)),
 		compressTimeMetrics:   make(map[Op]prometheus.Histogram, len(ops)),
 		decompressTimeMetrics: make(map[Op]prometheus.Histogram, len(ops)),
-		compressor:            compressor,
+		compressor:            compression.NewGzipCompressor(),
 	}
+
 	errs := wrappers.Errs{}
 	for _, op := range ops {
 		c.bytesSavedMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
@@ -61,9 +80,9 @@ func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 			Name:      fmt.Sprintf("%s_decompress_time", op),
 			Help:      fmt.Sprintf("Time (in ns) to decompress %s messages", op),
 		})
-		errs.Add(metricsRegisterer.Register(c.bytesSavedMetrics[op]))
-		errs.Add(metricsRegisterer.Register(c.compressTimeMetrics[op]))
-		errs.Add(metricsRegisterer.Register(c.decompressTimeMetrics[op]))
+		errs.Add(metrics.Register(c.bytesSavedMetrics[op]))
+		errs.Add(metrics.Register(c.compressTimeMetrics[op]))
+		errs.Add(metrics.Register(c.decompressTimeMetrics[op]))
 	}
 	return c, errs.Err
 }
@@ -78,21 +97,21 @@ func newCodec(metricsRegisterer prometheus.Registerer) (codec, error) {
 // If [compress] and [includeIsCompressedFlag], compress the payload.
 // If [compress] == true, [includeIsCompressedFlag] must be true
 // TODO remove [includeIsCompressedFlag] after network upgrade.
-func (c codec) Pack(
-	buffer []byte,
+func (c *codec) Pack(
 	op Op,
 	fieldValues map[Field]interface{},
 	includeIsCompressedFlag bool,
 	compress bool,
-) (Msg, error) {
+) (Message, error) {
 	if compress && !includeIsCompressedFlag {
 		return nil, errCompressNeedsFlag
 	}
-	msgFields, ok := Messages[op]
+	msgFields, ok := messages[op]
 	if !ok {
 		return nil, errBadOp
 	}
 
+	buffer := c.getBytes()
 	p := wrappers.Packer{
 		MaxSize: math.MaxInt32,
 		Bytes:   buffer[:0],
@@ -116,7 +135,7 @@ func (c codec) Pack(
 	if p.Err != nil {
 		return nil, p.Err
 	}
-	msg := &msg{
+	msg := &message{
 		op:     op,
 		fields: fieldValues,
 		bytes:  p.Bytes,
@@ -150,20 +169,20 @@ func (c codec) Pack(
 // whether the message payload is compressed. Should only be true
 // if we expect this peer to send us compressed messages.
 // TODO remove [parseIsCompressedFlag] after network upgrade
-func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
+func (c *codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)
 	op := Op(p.UnpackByte())
 
-	msgFields, ok := Messages[op]
+	msgFields, ok := messages[op]
 	if !ok { // Unknown message type
 		return nil, errBadOp
 	}
 
 	// See if messages of this type may be compressed
 	compressed := false
-	if op.Compressable() && parseIsCompressedFlag {
+	if parseIsCompressedFlag && op.Compressable() {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {
@@ -200,7 +219,7 @@ func (c codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Msg, error) {
 		return nil, fmt.Errorf("expected length %d but got %d", len(p.Bytes), p.Offset)
 	}
 
-	return &msg{
+	return &message{
 		op:     op,
 		fields: fieldValues,
 		bytes:  p.Bytes,

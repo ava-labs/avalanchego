@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
@@ -157,7 +158,8 @@ type network struct {
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
 	connMeter                    ConnMeter
-	b                            Builder
+	c                            message.Codec
+	b                            message.Builder
 	isFetchOnly                  bool
 
 	stateLock sync.RWMutex
@@ -424,16 +426,17 @@ func NewNetwork(
 		inboundMsgThrottler:  inboundMsgThrottler,
 		outboundMsgThrottler: outboundMsgThrottler,
 	}
-	codec, err := newCodec(registerer)
+	codec, err := message.NewCodecWithAllocator(
+		registerer,
+		func() []byte {
+			return netw.byteSlicePool.Get().([]byte)
+		},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing codec failed with: %s", err)
 	}
-	netw.b = Builder{
-		codec: codec,
-		getByteSlice: func() []byte {
-			return netw.byteSlicePool.Get().([]byte)
-		},
-	}
+	netw.c = codec
+	netw.b = message.NewBuilder(codec)
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
 	if err := netw.initialize(registerer); err != nil {
@@ -738,7 +741,7 @@ func (n *network) PushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint
 		peer := peerElement.peer
 		vID := peerElement.id
 		canHandleCompressed := peer != nil && peer.canHandleCompressed.GetValue()
-		var msg Msg
+		var msg message.Message
 		if canHandleCompressed {
 			msg = msgWithIsCompressedFlag
 		} else {
@@ -1085,7 +1088,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 	for _, index := range indices {
 		peer := allPeers[int(index)]
 		canHandleCompressed := peer.canHandleCompressed.GetValue()
-		var msg Msg
+		var msg message.Message
 		if canHandleCompressed {
 			msg = msgWithIsCompressedFlag
 		} else {

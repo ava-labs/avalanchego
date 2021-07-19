@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -16,7 +17,7 @@ type messageMetrics struct {
 	receivedBytes, sentBytes, numSent, numFailed, numReceived prometheus.Counter
 }
 
-func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registerer) error {
+func (mm *messageMetrics) initialize(msgType message.Op, registerer prometheus.Registerer) error {
 	mm.numSent = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
 		Name:      fmt.Sprintf("%s_sent", msgType),
@@ -128,62 +129,62 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.connected),
 		registerer.Register(m.disconnected),
 
-		m.getVersion.initialize(GetVersion, registerer),
-		m.version.initialize(Version, registerer),
-		m.getPeerlist.initialize(GetPeerList, registerer),
-		m.peerList.initialize(PeerList, registerer),
-		m.ping.initialize(Ping, registerer),
-		m.pong.initialize(Pong, registerer),
-		m.getAcceptedFrontier.initialize(GetAcceptedFrontier, registerer),
-		m.acceptedFrontier.initialize(AcceptedFrontier, registerer),
-		m.getAccepted.initialize(GetAccepted, registerer),
-		m.accepted.initialize(Accepted, registerer),
-		m.getAncestors.initialize(GetAncestors, registerer),
-		m.multiPut.initialize(MultiPut, registerer),
-		m.get.initialize(Get, registerer),
-		m.put.initialize(Put, registerer),
-		m.pushQuery.initialize(PushQuery, registerer),
-		m.pullQuery.initialize(PullQuery, registerer),
-		m.chits.initialize(Chits, registerer),
+		m.getVersion.initialize(message.GetVersion, registerer),
+		m.version.initialize(message.Version, registerer),
+		m.getPeerlist.initialize(message.GetPeerList, registerer),
+		m.peerList.initialize(message.PeerList, registerer),
+		m.ping.initialize(message.Ping, registerer),
+		m.pong.initialize(message.Pong, registerer),
+		m.getAcceptedFrontier.initialize(message.GetAcceptedFrontier, registerer),
+		m.acceptedFrontier.initialize(message.AcceptedFrontier, registerer),
+		m.getAccepted.initialize(message.GetAccepted, registerer),
+		m.accepted.initialize(message.Accepted, registerer),
+		m.getAncestors.initialize(message.GetAncestors, registerer),
+		m.multiPut.initialize(message.MultiPut, registerer),
+		m.get.initialize(message.Get, registerer),
+		m.put.initialize(message.Put, registerer),
+		m.pushQuery.initialize(message.PushQuery, registerer),
+		m.pullQuery.initialize(message.PullQuery, registerer),
+		m.chits.initialize(message.Chits, registerer),
 	)
 	return errs.Err
 }
 
-func (m *metrics) message(msgType Op) *messageMetrics {
+func (m *metrics) message(msgType message.Op) *messageMetrics {
 	switch msgType {
-	case GetVersion:
+	case message.GetVersion:
 		return &m.getVersion
-	case Version:
+	case message.Version:
 		return &m.version
-	case GetPeerList:
+	case message.GetPeerList:
 		return &m.getPeerlist
-	case PeerList:
+	case message.PeerList:
 		return &m.peerList
-	case Ping:
+	case message.Ping:
 		return &m.ping
-	case Pong:
+	case message.Pong:
 		return &m.pong
-	case GetAcceptedFrontier:
+	case message.GetAcceptedFrontier:
 		return &m.getAcceptedFrontier
-	case AcceptedFrontier:
+	case message.AcceptedFrontier:
 		return &m.acceptedFrontier
-	case GetAccepted:
+	case message.GetAccepted:
 		return &m.getAccepted
-	case Accepted:
+	case message.Accepted:
 		return &m.accepted
-	case GetAncestors:
+	case message.GetAncestors:
 		return &m.getAncestors
-	case MultiPut:
+	case message.MultiPut:
 		return &m.multiPut
-	case Get:
+	case message.Get:
 		return &m.get
-	case Put:
+	case message.Put:
 		return &m.put
-	case PushQuery:
+	case message.PushQuery:
 		return &m.pushQuery
-	case PullQuery:
+	case message.PullQuery:
 		return &m.pullQuery
-	case Chits:
+	case message.Chits:
 		return &m.chits
 	default:
 		return nil

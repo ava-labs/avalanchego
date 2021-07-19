@@ -68,13 +68,13 @@ func (g *gzipCompressor) resetReader(msg []byte) error {
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
-func NewGzipCompressor() (Compressor, error) {
+func NewGzipCompressor() Compressor {
 	var buf bytes.Buffer
-	c := &gzipCompressor{
-		bytesReader: &bytes.Reader{},
+	return &gzipCompressor{
 		writeBuffer: &buf,
+		gzipWriter:  gzip.NewWriter(&buf),
+
+		bytesReader: &bytes.Reader{},
+		gzipReader:  &gzip.Reader{},
 	}
-	c.gzipWriter = gzip.NewWriter(c.writeBuffer)
-	c.gzipReader = &gzip.Reader{}
-	return c, nil
 }
