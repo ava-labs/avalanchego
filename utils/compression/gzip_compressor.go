@@ -8,6 +8,8 @@ import (
 	"compress/gzip"
 	"io/ioutil"
 	"sync"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 // gzipCompressor implements Compressor
@@ -26,16 +28,17 @@ func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	g.resetWriter()
+	g.writeBuffer.Reset()
+	g.gzipWriter.Reset(g.writeBuffer)
 	if _, err := g.gzipWriter.Write(msg); err != nil {
 		return nil, err
 	}
 	if err := g.gzipWriter.Close(); err != nil {
 		return nil, err
 	}
+
 	compressed := g.writeBuffer.Bytes()
-	compressedCopy := make([]byte, len(compressed))
-	copy(compressedCopy, compressed)
+	compressedCopy := utils.CopyBytes(compressed)
 	return compressedCopy, nil
 }
 
@@ -44,27 +47,15 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
-	if err := g.resetReader(msg); err != nil {
+	g.bytesReader.Reset(msg)
+	if err := g.gzipReader.Reset(g.bytesReader); err != nil {
 		return nil, err
 	}
 	decompressed, err := ioutil.ReadAll(g.gzipReader)
 	if err != nil {
 		return nil, err
 	}
-	if err = g.gzipReader.Close(); err != nil {
-		return nil, err
-	}
-	return decompressed, nil
-}
-
-func (g *gzipCompressor) resetWriter() {
-	g.writeBuffer.Reset()
-	g.gzipWriter.Reset(g.writeBuffer)
-}
-
-func (g *gzipCompressor) resetReader(msg []byte) error {
-	g.bytesReader.Reset(msg)
-	return g.gzipReader.Reset(g.bytesReader)
+	return decompressed, g.gzipReader.Close()
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
