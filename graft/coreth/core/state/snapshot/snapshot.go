@@ -670,7 +670,7 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, error) {
 		// If the last diskLayer is not very old, we avoid generating
 		// with the expectation that the next generation will get canceled
 		// immediately.
-		if time.Now().Sub(base.created) < overloadThreshold {
+		if time.Since(base.created) < overloadThreshold {
 			res.genStats = base.genStats
 		} else {
 			go res.generate(base.genStats)
