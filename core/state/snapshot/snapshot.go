@@ -192,9 +192,9 @@ type Tree struct {
 	// stateRoot -> blockHash -> snapshot
 	// Update creates a new block layer with a parent taken from the blockHash -> snapshot map
 	// we can support grabbing a read only Snapshot by getting any one from the state root based map
-	stateLayers       map[common.Hash]map[common.Hash]snapshot
-	snapshotValidated bool // Indicates if snapshot has been validated (true if previously generated)
-	lock              sync.RWMutex
+	stateLayers map[common.Hash]map[common.Hash]snapshot
+	validated   bool // Indicates if snapshot has been validated (true if previously generated)
+	lock        sync.RWMutex
 }
 
 // New attempts to load an already existing snapshot from a persistent key-value
@@ -235,7 +235,7 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 	defer snap.lock.Unlock()
 	// We assume a snapshot read from disk on startup was previously validated. This prevents
 	// us from a doing a costly re-verification procedure when it is not needed.
-	snap.snapshotValidated = true
+	snap.validated = true
 	for head != nil {
 		snap.insertSnap(head)
 		head = head.Parent()
@@ -455,7 +455,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	log.Debug("Flattened snapshot tree", "blockHash", blockHash, "root", base.root, "size", len(t.blockLayers), "elapsed", common.PrettyDuration(time.Since(start)))
 
 	// Validate integrity of generated snapshot (if haven't already)
-	if t.snapshotValidated || !snapshotGenerated {
+	if t.validated || !snapshotGenerated {
 		return nil
 	}
 	start = time.Now()
@@ -464,7 +464,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 		return fmt.Errorf("unable to verify snapshot integrity: %w", err)
 	}
 	log.Info("Validated snapshot integrity", "root", base.root, "elapsed", time.Since(start))
-	t.snapshotValidated = true
+	t.validated = true
 
 	return nil
 }

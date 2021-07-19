@@ -247,7 +247,7 @@ func NewBlockChain(
 			// Otherwise, if we are running snapshots in async mode, attempt to initialize snapshots without rebuilding. If the snapshot
 			// disk layer is corrupted, incomplete, or doesn't exist, wait until calling Bootstrapped to rebuild.
 			log.Info("Attempting to load existing snapshot in async mode")
-			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, false, false)
+			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), true, true, false)
 		}
 		if err != nil {
 			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", bc.cacheConfig.SnapshotAsync)

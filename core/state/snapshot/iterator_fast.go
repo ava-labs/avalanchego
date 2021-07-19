@@ -89,8 +89,8 @@ type fastIterator struct {
 // element per diff layer. The returned combo iterator can be used to walk over
 // the entire snapshot diff stack simultaneously.
 func newFastIterator(tree *Tree, root common.Hash, account common.Hash, seek common.Hash, accountIterator bool, holdsTreeLock bool) (*fastIterator, error) {
-	snap := tree.getSnapshot(root, holdsTreeLock)
-	if snap == nil {
+	current := tree.getSnapshot(root, holdsTreeLock)
+	if current == nil {
 		return nil, fmt.Errorf("unknown snapshot: %x", root)
 	}
 	fi := &fastIterator{
@@ -98,7 +98,6 @@ func newFastIterator(tree *Tree, root common.Hash, account common.Hash, seek com
 		root:    root,
 		account: accountIterator,
 	}
-	current := snap.(snapshot)
 	for depth := 0; current != nil; depth++ {
 		if accountIterator {
 			fi.iterators = append(fi.iterators, &weightedIterator{
