@@ -34,12 +34,12 @@ type InboundConnThrottler interface {
 }
 
 type InboundConnThrottlerConfig struct {
-	// Allow(ipStr) returns true if it has been at least [allowCooldown]
+	// Allow(ipStr) returns true if it has been at least [AllowCooldown]
 	// since the last time Allow(ipStr) returned true or if
 	// Allow(ipStr) has never been called.
 	// If <= 0, inbound connections not rate-limited.
 	AllowCooldown time.Duration
-	// Maximum number of inbound connections allowed within [allowCooldown].
+	// Maximum number of inbound connections allowed within [AllowCooldown].
 	// (As implemented in inboundConnThrottler, may actually allow
 	// [MaxRecentConns+1] due to a race condition but that's fine.)
 	// If <= 0, inbound connections not rate-limited.
@@ -47,7 +47,7 @@ type InboundConnThrottlerConfig struct {
 }
 
 // Returns an InboundConnThrottler that allows an inbound connection from a given IP
-// every [allowCooldown].
+// every [AllowCooldown].
 func NewInboundConnThrottler(log logging.Logger, config InboundConnThrottlerConfig) InboundConnThrottler {
 	if config.AllowCooldown <= 0 || config.MaxRecentConns <= 0 {
 		return &noInboundConnThrottler{}
@@ -83,12 +83,12 @@ type inboundConnThrottler struct {
 	// When [done] is closed, Dispatch returns.
 	done chan struct{}
 	// IP --> Present if Allow(ipStr) returned true
-	// within the last [allowCooldown].
+	// within the last [AllowCooldown].
 	recentIPs map[string]struct{}
 	// Sorted in order of increasing time
 	// of last call to Allow that returned true.
 	// For each IP in this channel, Allow(ipStr)
-	// returned true within the last [allowCooldown].
+	// returned true within the last [AllowCooldown].
 	recentIPsAndTimes chan ipAndTime
 }
 

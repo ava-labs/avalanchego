@@ -122,12 +122,12 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	})
 	m.inboundConnAllowed = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
-		Name:      "inbound_conn_allowed",
+		Name:      "inbound_conn_throttler_allowed",
 		Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
 	})
 	m.inboundConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: constants.PlatformName,
-		Name:      "inbound_conn_rate_limited",
+		Name:      "inbound_conn_throttler_rate_limited",
 		Help:      "Times this node rejected an inbound connection due to rate-limiting.",
 	})
 
