@@ -550,10 +550,6 @@ func (vm *VM) Bootstrapping() error { return vm.fx.Bootstrapping() }
 // bootstrapping
 func (vm *VM) Bootstrapped() error {
 	vm.ctx.Bootstrapped()
-
-	if err := vm.chain.BlockChain().Bootstrapped(); err != nil {
-		return err
-	}
 	return vm.fx.Bootstrapped()
 }
 
