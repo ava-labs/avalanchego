@@ -339,7 +339,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
 
 	// Throttling
-	nodeConfig.NetworkConfig.InboundConnThrottlerCooldown = v.GetDuration(InboundConnThrottlerCooldownKey)
+	nodeConfig.NetworkConfig.InboundConnThrottlerConfig = throttling.InboundConnThrottlerConfig{
+		AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
+		MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
+	}
 	nodeConfig.NetworkConfig.InboundThrottlerConfig = throttling.MsgThrottlerConfig{
 		AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
 		VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),

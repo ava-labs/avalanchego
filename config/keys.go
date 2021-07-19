@@ -27,6 +27,7 @@ const (
 	DynamicUpdateDurationKey                  = "dynamic-update-duration"
 	DynamicPublicIPResolverKey                = "dynamic-public-ip"
 	InboundConnThrottlerCooldownKey           = "inbound-conn-throttler-cooldown"
+	InboundConnThrottlerMaxRecentConnsKey     = "inbound-conn-throttler-max-recent-conns"
 	OutboundConnectionThrottlingRps           = "outbound-connection-throttling-rps"
 	OutboundConnectionTimeout                 = "outbound-connection-timeout"
 	HTTPHostKey                               = "http-host"

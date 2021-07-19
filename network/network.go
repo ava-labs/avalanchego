@@ -229,9 +229,9 @@ type network struct {
 
 type Config struct {
 	HealthConfig
-	InboundConnThrottlerCooldown time.Duration
-	InboundThrottlerConfig       throttling.MsgThrottlerConfig
-	OutboundThrottlerConfig      throttling.MsgThrottlerConfig
+	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig
+	InboundThrottlerConfig     throttling.MsgThrottlerConfig
+	OutboundThrottlerConfig    throttling.MsgThrottlerConfig
 	timer.AdaptiveTimeoutConfig
 	DialerConfig     dialer.Config
 	MetricsNamespace string
@@ -256,7 +256,7 @@ func NewDefaultNetwork(
 	vdrs validators.Set,
 	beacons validators.Set,
 	router router.Router,
-	inboundConnCooldown time.Duration,
+	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -301,7 +301,7 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
-		inboundConnCooldown,
+		inboundConnThrottlerConfig,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -344,7 +344,7 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
-	inboundConnCooldown time.Duration,
+	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -394,7 +394,7 @@ func NewNetwork(
 		myIPs:                        map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:               readBufferSize,
 		readHandshakeTimeout:         readHandshakeTimeout,
-		inboundConnThrottler:         throttling.NewInboundConnThrottler(inboundConnCooldown),
+		inboundConnThrottler:         throttling.NewInboundConnThrottler(log, inboundConnThrottlerConfig),
 		healthConfig:                 healthConfig,
 		benchlistManager:             benchlistManager,
 		tlsKey:                       tlsKey,

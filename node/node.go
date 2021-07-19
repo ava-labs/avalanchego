@@ -266,7 +266,7 @@ func (n *Node) initNetworking() error {
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
-		n.Config.NetworkConfig.InboundConnThrottlerCooldown,
+		n.Config.NetworkConfig.InboundConnThrottlerConfig,
 		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
