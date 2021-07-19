@@ -155,6 +155,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 	}
 
 	// only gets here if the poll has finished
+	// results will have values if this and other newer polls have finished
 	return results, len(results) > 0
 }
 
