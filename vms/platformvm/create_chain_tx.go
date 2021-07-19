@@ -29,8 +29,8 @@ var (
 )
 
 const (
-	maxNameLen    = 1 << 7
-	maxGenesisLen = 1 << 20
+	maxNameLen    = 128
+	maxGenesisLen = 1024 * 1024
 )
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx

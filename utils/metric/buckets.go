@@ -5,6 +5,8 @@ package metric
 
 import (
 	"time"
+
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 var (
@@ -46,14 +48,14 @@ var (
 	// Useful bytes buckets
 
 	BytesBuckets = []float64{
-		1 << 8,
-		1 << 10, // 1 KiB
-		1 << 12,
-		1 << 14,
-		1 << 16,
-		1 << 18,
-		1 << 20, // 1 MiB
-		1 << 22,
+		256,
+		units.KiB,
+		4 * units.KiB,
+		16 * units.KiB,
+		64 * units.KiB,
+		256 * units.KiB,
+		units.MiB,
+		4 * units.MiB,
 		// anything larger than 4 MiB will be bucketed together
 	}
 )

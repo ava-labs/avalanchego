@@ -3,13 +3,14 @@ package nftfx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const (
 	// MaxPayloadSize is the maximum size that can be placed into a payload
-	MaxPayloadSize = 1 << 10
+	MaxPayloadSize = units.MiB
 )
 
 var (

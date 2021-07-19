@@ -20,7 +20,7 @@ import (
 
 const (
 	// DefaultMaxMessageSize is the number of bytes to cap messages at by default
-	DefaultMaxMessageSize = 1 << 21
+	DefaultMaxMessageSize = 2 * 1024 * 1024
 )
 
 // ErrMessageTooLarge is returned when reading a message that is larger than
