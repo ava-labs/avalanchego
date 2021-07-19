@@ -59,7 +59,7 @@ message IndexedResponse {
 }
 
 message RemoveAndPutMultipleRequest {
-    map<string, AtomicRequest> batchChainsAndInputs = 1;
+    repeated AtomicRequest batchChainsAndInputs = 1;
     repeated Batch batches = 2;
     int64 id = 3;
     bool continues = 4;

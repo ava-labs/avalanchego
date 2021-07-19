@@ -222,9 +222,8 @@ func (c *Client) makeBatches(rawBatches []database.Batch, currentSize int) ([][]
 
 func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Requests, batch ...database.Batch) error {
 	req := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
-		BatchChainsAndInputs: make(map[string]*gsharedmemoryproto.AtomicRequest),
-		Continues:            true,
-		Id:                   stdatomic.AddInt64(&c.uniqueID, 1),
+		Continues: true,
+		Id:        stdatomic.AddInt64(&c.uniqueID, 1),
 	}
 
 	for key, value := range batchChainsAndInputs {
@@ -288,7 +287,6 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 		}
 
 		maxLoop := 0
-
 		if len(newPutElements) < len(newRemoveElements) {
 			maxLoop = len(newRemoveElements)
 		} else {
@@ -296,66 +294,30 @@ func (c *Client) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*atomic.Re
 		}
 
 		for i := 0; i < maxLoop; i++ {
+			request := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
+				Continues: true,
+				Id:        req.Id,
+			}
 			switch {
 			case i < len(newRemoveElements) && i < len(newPutElements):
-				formattedRequest := make(map[string]*gsharedmemoryproto.AtomicRequest)
-
-				formattedValues := &gsharedmemoryproto.AtomicRequest{
+				request.BatchChainsAndInputs = []*gsharedmemoryproto.AtomicRequest{{
 					RemoveRequests: newRemoveElements[i],
 					PutRequests:    newPutElements[i],
 					PeerChainID:    key[:],
-				}
-
-				formattedRequest[key.String()] = formattedValues
-
-				request := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
-					BatchChainsAndInputs: formattedRequest,
-					Continues:            true,
-					Id:                   req.Id,
-				}
-
-				if _, err := c.client.RemoveAndPutMultiple(context.Background(), request); err != nil {
-					return err
-				}
-
+				}}
 			case i < len(newRemoveElements):
-				formattedRequest := make(map[string]*gsharedmemoryproto.AtomicRequest)
-
-				formattedValues := &gsharedmemoryproto.AtomicRequest{
+				request.BatchChainsAndInputs = []*gsharedmemoryproto.AtomicRequest{{
 					RemoveRequests: newRemoveElements[i],
 					PeerChainID:    key[:],
-				}
-
-				request := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
-					BatchChainsAndInputs: formattedRequest,
-					Continues:            true,
-					Id:                   req.Id,
-				}
-
-				formattedRequest[key.String()] = formattedValues
-
-				if _, err := c.client.RemoveAndPutMultiple(context.Background(), request); err != nil {
-					return err
-				}
+				}}
 			case i < len(newPutElements):
-				formattedRequest := make(map[string]*gsharedmemoryproto.AtomicRequest)
-
-				formattedValues := &gsharedmemoryproto.AtomicRequest{
+				request.BatchChainsAndInputs = []*gsharedmemoryproto.AtomicRequest{{
 					PutRequests: newPutElements[i],
 					PeerChainID: key[:],
-				}
-
-				formattedRequest[key.String()] = formattedValues
-
-				request := &gsharedmemoryproto.RemoveAndPutMultipleRequest{
-					BatchChainsAndInputs: formattedRequest,
-					Continues:            true,
-					Id:                   req.Id,
-				}
-
-				if _, err := c.client.RemoveAndPutMultiple(context.Background(), request); err != nil {
-					return err
-				}
+				}}
+			}
+			if _, err := c.client.RemoveAndPutMultiple(context.Background(), request); err != nil {
+				return err
 			}
 		}
 	}
