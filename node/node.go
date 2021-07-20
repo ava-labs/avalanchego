@@ -976,10 +976,10 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	for vmID, aliases := range n.Config.VMAliases {
 		urlAliases := []string{}
 		for _, alias := range aliases {
-			urlAliases = append(urlAliases, ids.VMAliasPrefix+alias)
+			urlAliases = append(urlAliases, constants.VMAliasPrefix+alias)
 		}
 
-		url := ids.VMAliasPrefix + vmID.String()
+		url := constants.VMAliasPrefix + vmID.String()
 		if err := n.APIServer.AddAliases(url, urlAliases...); err != nil {
 			return err
 		}
