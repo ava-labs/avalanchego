@@ -128,11 +128,11 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag {
 	s.durPolls.Observe(float64(time.Since(holder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 
-	return s.processFinishedPolls(requestID)
+	return s.processFinishedPolls()
 }
 
 // processFinishedPolls checks for other finished polls and returns them all if finished
-func (s *set) processFinishedPolls(requestID uint32) []ids.Bag {
+func (s *set) processFinishedPolls() []ids.Bag {
 	var results []ids.Bag
 
 	// iterate from oldest to newest
@@ -182,7 +182,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) []ids.Bag {
 
 	s.durPolls.Observe(float64(time.Since(pollHolder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
-	return s.processFinishedPolls(requestID)
+	return s.processFinishedPolls()
 }
 
 // Len returns the number of outstanding polls
