@@ -102,13 +102,13 @@ func (s *set) Add(requestID uint32, vdrs ids.ShortBag) bool {
 
 // Vote registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, bool) {
+func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag {
 	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
 			vdr,
 			requestID)
-		return []ids.Bag{}, false
+		return nil
 	}
 
 	holder := pollHolderIntf.(pollHolder)
@@ -121,7 +121,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 
 	p.Vote(vdr, vote)
 	if !p.Finished() {
-		return []ids.Bag{}, false
+		return nil
 	}
 
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, p)
@@ -131,7 +131,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 	var results []ids.Bag
 	// If this is not the oldest poll, return as is.
 	if oldestRequestID, _, _ := s.polls.Oldest(); oldestRequestID != requestID {
-		return nil, false
+		return nil
 	}
 
 	// this is the oldest poll that has just finished
@@ -152,18 +152,18 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 
 	// only gets here if the poll has finished
 	// results will have values if this and other newer polls have finished
-	return results, len(results) > 0
+	return results
 }
 
 // Drop registers the connections response to a query for [id]. If there was no
 // query, or the response has already be registered, nothing is performed.
-func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
+func (s *set) Drop(requestID uint32, vdr ids.ShortID) []ids.Bag {
 	pollHolderIntf, exists := s.polls.Get(requestID)
 	if !exists {
 		s.log.Verbo("dropping vote from %s to an unknown poll with requestID: %d",
 			vdr,
 			requestID)
-		return []ids.Bag{}, false
+		return nil
 	}
 
 	s.log.Verbo("processing dropped vote from %s in the poll with requestID: %d",
@@ -175,7 +175,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
 
 	poll.Drop(vdr)
 	if !poll.Finished() {
-		return []ids.Bag{}, false
+		return nil
 	}
 
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
@@ -183,7 +183,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool) {
 	s.polls.Delete(requestID) // remove the poll from the current set
 	s.durPolls.Observe(float64(time.Since(pollHolder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
-	return []ids.Bag{poll.Result()}, true
+	return []ids.Bag{poll.Result()}
 }
 
 // Len returns the number of outstanding polls

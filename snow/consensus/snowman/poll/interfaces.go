@@ -14,8 +14,8 @@ type Set interface {
 	fmt.Stringer
 
 	Add(requestID uint32, vdrs ids.ShortBag) bool
-	Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, bool)
-	Drop(requestID uint32, vdr ids.ShortID) ([]ids.Bag, bool)
+	Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag
+	Drop(requestID uint32, vdr ids.ShortID) []ids.Bag
 	Len() int
 }
 
