@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -42,9 +43,9 @@ type codec struct {
 	// [getBytes] must be safe for concurrent access by multiple goroutines.
 	getBytes func() []byte
 
-	bytesSavedMetrics     map[Op]prometheus.Histogram
-	compressTimeMetrics   map[Op]prometheus.Histogram
-	decompressTimeMetrics map[Op]prometheus.Histogram
+	bytesSavedMetrics     map[Op]metric.Averager
+	compressTimeMetrics   map[Op]metric.Averager
+	decompressTimeMetrics map[Op]metric.Averager
 	compressor            compression.Compressor
 }
 
@@ -58,32 +59,44 @@ func NewCodec(metrics prometheus.Registerer) (Codec, error) {
 func NewCodecWithAllocator(metrics prometheus.Registerer, getBytes func() []byte) (Codec, error) {
 	c := &codec{
 		getBytes:              getBytes,
-		bytesSavedMetrics:     make(map[Op]prometheus.Histogram, len(ops)),
-		compressTimeMetrics:   make(map[Op]prometheus.Histogram, len(ops)),
-		decompressTimeMetrics: make(map[Op]prometheus.Histogram, len(ops)),
+		bytesSavedMetrics:     make(map[Op]metric.Averager, len(ops)),
+		compressTimeMetrics:   make(map[Op]metric.Averager, len(ops)),
+		decompressTimeMetrics: make(map[Op]metric.Averager, len(ops)),
 		compressor:            compression.NewGzipCompressor(),
 	}
 
-	errs := wrappers.Errs{}
+	var (
+		errs wrappers.Errs
+		err  error
+	)
 	for _, op := range ops {
-		c.bytesSavedMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
-			Namespace: constants.PlatformName,
-			Name:      fmt.Sprintf("%s_bytes_saved", op),
-			Help:      fmt.Sprintf("Number of bytes saved (not sent) due to compression of %s messages", op),
-		})
-		c.compressTimeMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
-			Namespace: constants.PlatformName,
-			Name:      fmt.Sprintf("%s_compress_time", op),
-			Help:      fmt.Sprintf("Time (in ns) to compress %s messages", op),
-		})
-		c.decompressTimeMetrics[op] = prometheus.NewHistogram(prometheus.HistogramOpts{
-			Namespace: constants.PlatformName,
-			Name:      fmt.Sprintf("%s_decompress_time", op),
-			Help:      fmt.Sprintf("Time (in ns) to decompress %s messages", op),
-		})
-		errs.Add(metrics.Register(c.bytesSavedMetrics[op]))
-		errs.Add(metrics.Register(c.compressTimeMetrics[op]))
-		errs.Add(metrics.Register(c.decompressTimeMetrics[op]))
+		if !op.Compressable() {
+			continue
+		}
+
+		c.bytesSavedMetrics[op], err = metric.NewAverager(
+			constants.PlatformName,
+			fmt.Sprintf("%s_bytes_saved", op),
+			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", op),
+			metrics,
+		)
+		errs.Add(err)
+
+		c.compressTimeMetrics[op], err = metric.NewAverager(
+			constants.PlatformName,
+			fmt.Sprintf("%s_compress_time", op),
+			fmt.Sprintf("time (in ns) to compress %s messages", op),
+			metrics,
+		)
+		errs.Add(err)
+
+		c.decompressTimeMetrics[op], err = metric.NewAverager(
+			constants.PlatformName,
+			fmt.Sprintf("%s_decompress_time", op),
+			fmt.Sprintf("time (in ns) to decompress %s messages", op),
+			metrics,
+		)
+		errs.Add(err)
 	}
 	return c, errs.Err
 }
