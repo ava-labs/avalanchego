@@ -1,15 +1,14 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 )
 
-var errMissingQuotes = errors.New("first and last characters should be quotes")
+const alignedStringLen = 5
 
 type Level int
 
@@ -36,6 +35,7 @@ const (
 	unknownStr = "UNKNO"
 )
 
+// Inverse of Level.String()
 func ToLevel(l string) (Level, error) {
 	switch strings.ToUpper(l) {
 	case offStr:
@@ -108,63 +108,21 @@ func (l Level) String() string {
 
 // String representation of this level as it will appear
 // in log files and in logs displayed to screen.
-// The returned value has length 5.
+// The returned value has length [alignedStringLen].
 func (l Level) AlignedString() string {
-	s := unknownStr
-	// Should always match a case below
-	// Note that Off is not included because by definition
-	// we don't log/display when the [l] is Off.
-	switch l {
-	case Fatal:
-		s = fatalStr
-	case Error:
-		s = errorStr
-	case Warn:
-		s = warnStr
-	case Info:
-		s = infoStr
-	case Trace:
-		s = traceStr
-	case Debug:
-		s = debugStr
-	case Verbo:
-		s = verboStr
+	s := l.String()
+	sLen := len(s)
+	switch {
+	case sLen < alignedStringLen:
+		// Pad with spaces on the right
+		return fmt.Sprintf("%s%s", s, strings.Repeat(" ", alignedStringLen-sLen))
+	case sLen == alignedStringLen:
+		return s
+	default:
+		return s[:alignedStringLen]
 	}
-	return to5Chars(s)
 }
 
 func (l Level) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("\"%s\"", l)), nil
-}
-
-func (l *Level) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if len(str) < 2 {
-		return errMissingQuotes
-	}
-
-	lastIndex := len(str) - 1
-	if str[0] != '"' || str[lastIndex] != '"' {
-		return errMissingQuotes
-	}
-
-	str = strings.ToUpper(str[1:lastIndex])
-	var err error
-	*l, err = ToLevel(str)
-	return err
-}
-
-// If len([s]) < 5, returns [s] padded with spaces at the end
-// If len([s]) == 5, returns [s]
-// If len([s]), returns the first 5 characters of [s]
-func to5Chars(s string) string {
-	l := len(s)
-	switch {
-	case l < 5:
-		return fmt.Sprintf("%-5s", s)
-	case l == 5:
-		return s
-	default:
-		return s[:5]
-	}
 }
