@@ -137,7 +137,6 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 	// this is the oldest poll that has just finished
 	// iterate from oldest to newest
 	iter := s.polls.NewIterator()
-	var keysToDelete []interface{}
 	for iter.Next() {
 		holder := iter.Value().(pollHolder)
 		p = holder.GetPoll()
@@ -148,12 +147,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) ([]ids.Bag, b
 		}
 
 		results = append(results, p.Result())
-		keysToDelete = append(keysToDelete, iter.Key())
-	}
-
-	// delete the keys to be deleted
-	for _, keyToDelete := range keysToDelete {
-		s.polls.Delete(keyToDelete)
+		s.polls.Delete(iter.Key())
 	}
 
 	// only gets here if the poll has finished
