@@ -198,7 +198,10 @@ if ! mkdir -p "${KURTOSIS_DIRPATH}"; then
     exit 1
 fi
 
+# Flags to ensure the CPU usage is the same in CI
 docker run \
+    --cpus="1.5" \
+    --memory="5gb" \
     `# The Kurtosis initializer runs inside a Docker container, but needs to access to the Docker engine; this is how to do it` \
     `# For more info, see the bottom of: http://jpetazzo.github.io/2015/09/03/do-not-use-docker-in-docker-for-ci/` \
     --mount "type=bind,source=/var/run/docker.sock,target=/var/run/docker.sock" \
