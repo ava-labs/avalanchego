@@ -23,7 +23,7 @@ type poll struct {
 type set struct {
 	log      logging.Logger
 	numPolls prometheus.Gauge
-	durPolls prometheus.Histogram
+	durPolls metric.Averager
 	factory  Factory
 	polls    map[uint32]poll
 }
@@ -33,24 +33,24 @@ func NewSet(
 	factory Factory,
 	log logging.Logger,
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) Set {
 	numPolls := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "polls",
 		Help:      "Number of pending network polls",
 	})
-	if err := registerer.Register(numPolls); err != nil {
+	if err := reg.Register(numPolls); err != nil {
 		log.Error("failed to register polls statistics due to %s", err)
 	}
 
-	durPolls := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "poll_duration",
-		Help:      "Length of time the poll existed in milliseconds",
-		Buckets:   metric.MillisecondsBuckets,
-	})
-	if err := registerer.Register(durPolls); err != nil {
+	durPolls, err := metric.NewAverager(
+		namespace,
+		"poll_duration",
+		"time (in ns) of a poll existing",
+		reg,
+	)
+	if err != nil {
 		log.Error("failed to register poll_duration statistics due to %s", err)
 	}
 

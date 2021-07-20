@@ -65,38 +65,33 @@ func NewCodecWithAllocator(metrics prometheus.Registerer, getBytes func() []byte
 		compressor:            compression.NewGzipCompressor(),
 	}
 
-	var (
-		errs wrappers.Errs
-		err  error
-	)
+	errs := wrappers.Errs{}
 	for _, op := range ops {
 		if !op.Compressable() {
 			continue
 		}
 
-		c.bytesSavedMetrics[op], err = metric.NewAverager(
+		c.bytesSavedMetrics[op] = metric.NewAveragerWithErrs(
 			constants.PlatformName,
 			fmt.Sprintf("%s_bytes_saved", op),
 			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", op),
 			metrics,
+			&errs,
 		)
-		errs.Add(err)
-
-		c.compressTimeMetrics[op], err = metric.NewAverager(
+		c.compressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			constants.PlatformName,
 			fmt.Sprintf("%s_compress_time", op),
 			fmt.Sprintf("time (in ns) to compress %s messages", op),
 			metrics,
+			&errs,
 		)
-		errs.Add(err)
-
-		c.decompressTimeMetrics[op], err = metric.NewAverager(
+		c.decompressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			constants.PlatformName,
 			fmt.Sprintf("%s_decompress_time", op),
 			fmt.Sprintf("time (in ns) to decompress %s messages", op),
 			metrics,
+			&errs,
 		)
-		errs.Add(err)
 	}
 	return c, errs.Err
 }

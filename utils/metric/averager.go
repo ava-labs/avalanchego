@@ -21,6 +21,12 @@ type averager struct {
 }
 
 func NewAverager(namespace, name, desc string, reg prometheus.Registerer) (Averager, error) {
+	errs := wrappers.Errs{}
+	a := NewAveragerWithErrs(namespace, name, desc, reg, &errs)
+	return a, errs.Err
+}
+
+func NewAveragerWithErrs(namespace, name, desc string, reg prometheus.Registerer, errs *wrappers.Errs) Averager {
 	a := averager{
 		count: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
@@ -34,12 +40,11 @@ func NewAverager(namespace, name, desc string, reg prometheus.Registerer) (Avera
 		}),
 	}
 
-	errs := wrappers.Errs{}
 	errs.Add(
 		reg.Register(a.count),
 		reg.Register(a.sum),
 	)
-	return &a, errs.Err
+	return &a
 }
 
 func (a *averager) Observe(v float64) {

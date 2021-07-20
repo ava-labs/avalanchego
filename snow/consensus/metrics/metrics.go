@@ -32,18 +32,17 @@ type Metrics struct {
 	// numProcessing keeps track of the number of items processing
 	numProcessing prometheus.Gauge
 
-	// latAccepted tracks the number of milliseconds that an item was processing
+	// latAccepted tracks the number of nanoseconds that an item was processing
 	// before being accepted
-	latAccepted prometheus.Histogram
+	latAccepted metric.Averager
 
-	// rejected tracks the number of milliseconds that an item was processing
+	// rejected tracks the number of nanoseconds that an item was processing
 	// before being rejected
-	latRejected             prometheus.Histogram
-	longestRunningContainer prometheus.Histogram
+	latRejected metric.Averager
 }
 
 // Initialize the metrics with the provided names.
-func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Logger, namespace string, registerer prometheus.Registerer) error {
+func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Logger, namespace string, reg prometheus.Registerer) error {
 	m.processingEntries = linkedhashmap.New()
 	m.log = log
 
@@ -52,31 +51,23 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		Name:      fmt.Sprintf("%s_processing", metricName),
 		Help:      fmt.Sprintf("Number of currently processing %s", metricName),
 	})
-	m.latAccepted = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_accepted", metricName),
-		Help:      fmt.Sprintf("Latency of accepting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   metric.MillisecondsBuckets,
-	})
-	m.latRejected = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_rejected", metricName),
-		Help:      fmt.Sprintf("Latency of rejecting from the time the %s was issued in milliseconds", descriptionName),
-		Buckets:   metric.MillisecondsBuckets,
-	})
-	m.longestRunningContainer = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      fmt.Sprintf("%s_longest_running", metricName),
-		Help:      fmt.Sprintf("Latency of processing the issued %s in milliseconds", descriptionName),
-		Buckets:   metric.MillisecondsBuckets,
-	})
 
 	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(m.numProcessing),
-		registerer.Register(m.latAccepted),
-		registerer.Register(m.latRejected),
+	m.latAccepted = metric.NewAveragerWithErrs(
+		namespace,
+		fmt.Sprintf("%s_accepted", metricName),
+		fmt.Sprintf("time (in ns) of accepting from the time the %s was issued", descriptionName),
+		reg,
+		&errs,
 	)
+	m.latRejected = metric.NewAveragerWithErrs(
+		namespace,
+		fmt.Sprintf("%s_rejected", metricName),
+		fmt.Sprintf("time (in ns) of rejecting from the time the %s was issued", descriptionName),
+		reg,
+		&errs,
+	)
+	errs.Add(reg.Register(m.numProcessing))
 	return errs.Err
 }
 
@@ -97,7 +88,7 @@ func (m *Metrics) Accepted(id ids.ID) {
 
 	endTime := m.Clock.Time()
 	duration := endTime.Sub(startTime.(time.Time))
-	m.latAccepted.Observe(float64(duration.Milliseconds()))
+	m.latAccepted.Observe(float64(duration))
 	m.numProcessing.Dec()
 }
 
@@ -112,7 +103,7 @@ func (m *Metrics) Rejected(id ids.ID) {
 
 	endTime := m.Clock.Time()
 	duration := endTime.Sub(startTime.(time.Time))
-	m.latRejected.Observe(float64(duration.Milliseconds()))
+	m.latRejected.Observe(float64(duration))
 	m.numProcessing.Dec()
 }
 
@@ -125,7 +116,6 @@ func (m *Metrics) MeasureAndGetOldestDuration() time.Duration {
 	}
 
 	duration := now.Sub(oldestTime)
-	m.longestRunningContainer.Observe(float64(duration.Milliseconds()))
 	return duration
 }
 
