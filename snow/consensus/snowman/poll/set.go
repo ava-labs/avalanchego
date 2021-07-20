@@ -112,7 +112,7 @@ func (s *set) Vote(
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
 	delete(s.polls, requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
+	s.durPolls.Observe(float64(time.Since(poll.start)))
 	s.numPolls.Dec() // decrease the metrics
 	return poll.Result(), true
 }
@@ -140,7 +140,7 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) (ids.Bag, bool) {
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
 	delete(s.polls, requestID) // remove the poll from the current set
-	s.durPolls.Observe(float64(time.Since(poll.start).Milliseconds()))
+	s.durPolls.Observe(float64(time.Since(poll.start)))
 	s.numPolls.Dec() // decrease the metrics
 	return poll.Result(), true
 }
