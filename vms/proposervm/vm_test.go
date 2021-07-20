@@ -117,6 +117,37 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 }
 
 // VM.BuildBlock tests section
+
+func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
+	// given the same core block, BuildBlock returns the same proposer block
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
+	proVM.Set(skewedTimestamp)
+
+	coreVM.CantBuildBlock = true
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.Empty.Prefix(111),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk,
+		HeightV:    coreGenBlk.Height() + 1,
+		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
+	}
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+
+	// test
+	builtBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("proposerVM could not build block")
+	}
+
+	if builtBlk.Timestamp().Truncate(time.Second) != builtBlk.Timestamp() {
+		t.Fatal("Timestamp should be rounded to second")
+	}
+}
+
 func TestBuildBlockIsIdempotent(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks

@@ -4,6 +4,8 @@
 package proposervm
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -140,7 +142,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	// The chain is currently forking
 
 	parentID := b.ID()
-	newTimestamp := b.vm.Time()
+	newTimestamp := b.vm.Time().Truncate(time.Second)
 	if newTimestamp.Before(parentTimestamp) {
 		newTimestamp = parentTimestamp
 	}

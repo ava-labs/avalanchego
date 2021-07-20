@@ -51,10 +51,14 @@ waitloop:
 			continue waitloop
 		}
 
+		msgSent := false // send only one signal to engine per time window
 		for {
 			select {
 			case msg := <-s.fromVM:
-				s.toEngine <- msg
+				if !msgSent {
+					s.toEngine <- msg
+					msgSent = true
+				}
 			case newStartTime, ok := <-s.newStartTime:
 				if !ok {
 					return

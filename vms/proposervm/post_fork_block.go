@@ -4,6 +4,8 @@
 package proposervm
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
@@ -144,7 +146,7 @@ func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	parentID := b.ID()
 	parentTimestamp := b.Timestamp()
-	newTimestamp := b.vm.Time()
+	newTimestamp := b.vm.Time().Truncate(time.Second)
 	if newTimestamp.Before(parentTimestamp) {
 		newTimestamp = parentTimestamp
 	}

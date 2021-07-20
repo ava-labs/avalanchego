@@ -104,7 +104,7 @@ func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
 func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	parentID := b.ID()
 	parentTimestamp := b.Timestamp()
-	newTimestamp := b.vm.Time()
+	newTimestamp := b.vm.Time().Truncate(time.Second)
 	if newTimestamp.Before(parentTimestamp) {
 		newTimestamp = parentTimestamp
 	}
