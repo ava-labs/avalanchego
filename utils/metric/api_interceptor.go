@@ -34,7 +34,14 @@ func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APII
 		prometheus.HistogramOpts{
 			Namespace: namespace,
 			Name:      "request_duration_ms",
-			Buckets:   MillisecondsHTTPBuckets,
+			Buckets: []float64{
+				100,  // 100 ms - instant
+				250,  // 250 ms - good
+				500,  // 500 ms - not great
+				1000, // 1 second - worrisome
+				5000, // 5 seconds - bad
+				// anything larger than 5 seconds will be bucketed together
+			},
 		},
 		[]string{"method"},
 	)
