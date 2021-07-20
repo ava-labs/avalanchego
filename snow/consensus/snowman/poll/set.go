@@ -134,12 +134,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag {
 // processFinishedPolls checks for other finished polls and returns them all if finished
 func (s *set) processFinishedPolls(requestID uint32) []ids.Bag {
 	var results []ids.Bag
-	// If this is not the oldest poll, return as is.
-	if oldestRequestID, _, _ := s.polls.Oldest(); oldestRequestID != requestID {
-		return nil
-	}
 
-	// this is the oldest poll that has just finished
 	// iterate from oldest to newest
 	iter := s.polls.NewIterator()
 	for iter.Next() {
