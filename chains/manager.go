@@ -647,18 +647,21 @@ func (m *manager) createSnowmanChain(
 
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)
+
 	proVM := proposervm.New(vm, time.Unix(0, 0)) // enable proBlocks
-	if err := proVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
-		return nil, err
-	}
 
 	// first vm to be init is P-Chain once, which provides validator interface to all of other VMs
 	if m.validatorVM == nil {
 		if valVM, ok := proVM.ChainVM.(validators.VM); ok {
 			m.validatorVM = valVM
+			ctx.ValidatorVM = valVM
 		} else {
 			return nil, fmt.Errorf("could not record validator vm interface")
 		}
+	}
+
+	if err := proVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+		return nil, err
 	}
 
 	// Passes messages from the consensus engine to the network

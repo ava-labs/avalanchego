@@ -130,7 +130,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		return nil, errProposerWindowNotStarted
 	}
 
-	pChainHeight, err := b.vm.ctx.ValidatorVM.GetCurrentHeight()
+	pChainHeight, err := b.vm.PChainHeight()
 	if err != nil {
 		return nil, err
 	}

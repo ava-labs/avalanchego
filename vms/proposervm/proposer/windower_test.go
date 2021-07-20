@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 func TestWindowerNoValidators(t *testing.T) {
@@ -23,8 +24,11 @@ func TestWindowerNoValidators(t *testing.T) {
 	vm := &testVM{getValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		return nil, nil
 	}}
+	ctx := &snow.Context{
+		ValidatorVM: vm,
+	}
 
-	w := New(vm, subnetID, chainID)
+	w := New(ctx, subnetID, chainID)
 
 	delay, err := w.Delay(1, 0, nodeID)
 	assert.NoError(err)
@@ -43,8 +47,11 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 			validatorID: 10,
 		}, nil
 	}}
+	ctx := &snow.Context{
+		ValidatorVM: vm,
+	}
 
-	w := New(vm, subnetID, chainID)
+	w := New(ctx, subnetID, chainID)
 
 	validatorDelay, err := w.Delay(1, 0, validatorID)
 	assert.NoError(err)
@@ -73,8 +80,11 @@ func TestWindowerChangeByHeight(t *testing.T) {
 		}
 		return validators, nil
 	}}
+	ctx := &snow.Context{
+		ValidatorVM: vm,
+	}
 
-	w := New(vm, subnetID, chainID)
+	w := New(ctx, subnetID, chainID)
 
 	expectedDelays1 := []time.Duration{
 		6 * time.Second,
@@ -128,9 +138,12 @@ func TestWindowerChangeByChain(t *testing.T) {
 		}
 		return validators, nil
 	}}
+	ctx := &snow.Context{
+		ValidatorVM: vm,
+	}
 
-	w0 := New(vm, subnetID, chainID0)
-	w1 := New(vm, subnetID, chainID1)
+	w0 := New(ctx, subnetID, chainID0)
+	w1 := New(ctx, subnetID, chainID1)
 
 	expectedDelays0 := []time.Duration{
 		6 * time.Second,
