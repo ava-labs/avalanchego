@@ -12,6 +12,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/manager"
+	"github.com/ava-labs/avalanchego/version"
+
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -730,6 +737,95 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 }
 
+func TestServiceGetTxJSON_OperationTx(t *testing.T) {
+	vm := &VM{}
+	ctx := NewContext(t)
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	_, err = vm.IssueTx(createAssetTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mintNFTTx := newAvaxOperationTxWithOutputs(t, createAssetTx, genesisBytes, vm)
+	txID, err := vm.IssueTx(mintNFTTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if txID != mintNFTTx.ID() {
+		t.Fatalf("Issue Tx returned wrong TxID")
+	}
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+	ctx.Lock.Lock()
+
+	if txs := vm.PendingTxs(); len(txs) != 2 {
+		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+
+	reply := api.GetTxReply{}
+	s := &Service{vm: vm}
+	err = s.GetTx(nil, &api.GetTxArgs{
+		TxID:     txID,
+		Encoding: formatting.JSON,
+	}, &reply)
+	assert.NoError(t, err)
+
+	assert.Equal(t, reply.Encoding, formatting.JSON)
+	jsonTxBytes, err := json2.Marshal(reply.Tx)
+	assert.NoError(t, err)
+	jsonString := string(jsonTxBytes)
+
+	assert.Contains(t, jsonString, "\"operation\":{\"mintInput\":{\"signatureIndices\":[0]},\"groupID\":1,\"payload\":\"aGVsbG8=\",\"outputs\":[{\"addresses\":[],\"locktime\":0,\"threshold\":0}]},\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"}]}")
+}
+
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
@@ -748,6 +844,58 @@ func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 		t.Fatal(err)
 	}
 	return tx
+}
+
+func newAvaxCreateAssetTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
+	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	tx := buildCreateAssetTx(key)
+	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
+		t.Fatal(err)
+	}
+	return tx
+}
+
+func newAvaxOperationTxWithOutputs(t *testing.T, createAssetTx *Tx, genesisBytes []byte, vm *VM) *Tx {
+	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
+	key := keys[0]
+	tx := buildOperationTx(createAssetTx)
+	if err := tx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
+		t.Fatal(err)
+	}
+	return tx
+}
+
+func buildBaseTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
+	return &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		Ins: []*avax.TransferableInput{{
+			UTXOID: avax.UTXOID{
+				TxID:        avaxTx.ID(),
+				OutputIndex: 2,
+			},
+			Asset: avax.Asset{ID: avaxTx.ID()},
+			In: &secp256k1fx.TransferInput{
+				Amt: startBalance,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{
+						0,
+					},
+				},
+			},
+		}},
+		Outs: []*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: avaxTx.ID()},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: startBalance - vm.txFee,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		}},
+	}}}
 }
 
 func buildExportTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
@@ -781,36 +929,59 @@ func buildExportTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
 	}}
 }
 
-func buildBaseTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
-	return &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		Ins: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        avaxTx.ID(),
-				OutputIndex: 2,
-			},
-			Asset: avax.Asset{ID: avaxTx.ID()},
-			In: &secp256k1fx.TransferInput{
-				Amt: startBalance,
-				Input: secp256k1fx.Input{
-					SigIndices: []uint32{
-						0,
+func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
+	return &Tx{UnsignedTx: &CreateAssetTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		Name:         "Team Rocket",
+		Symbol:       "TR",
+		Denomination: 0,
+		States: []*InitialState{{
+			FxID: 1,
+			Outs: []verify.State{
+				&nftfx.MintOutput{
+					GroupID: 1,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
+					},
+				},
+				&nftfx.MintOutput{
+					GroupID: 2,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{key.PublicKey().Address()},
 					},
 				},
 			},
 		}},
-		Outs: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: avaxTx.ID()},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+	}}
+}
+
+func buildOperationTx(createAssetTx *Tx) *Tx {
+	return &Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		Ops: []*Operation{{
+			Asset: avax.Asset{ID: createAssetTx.ID()},
+			UTXOIDs: []*avax.UTXOID{{
+				TxID:        createAssetTx.ID(),
+				OutputIndex: 0,
+			}},
+			Op: &nftfx.MintOperation{
+				MintInput: secp256k1fx.Input{
+					SigIndices: []uint32{0},
 				},
+				GroupID: 1,
+				Payload: []byte{'h', 'e', 'l', 'l', 'o'},
+				Outputs: []*secp256k1fx.OutputOwners{{}},
 			},
 		}},
-	}}}
+	}}
 }
 
 func TestServiceGetNilTx(t *testing.T) {

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/ids"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -27,6 +29,7 @@ type Operation struct {
 
 	UTXOIDs []*avax.UTXOID `serialize:"true" json:"inputIDs"`
 	Op      FxOperation    `serialize:"true" json:"operation"`
+	FxID    ids.ID         `serialize:"false" json:"fxID"`
 }
 
 // Verify implements the verify.Verifiable interface

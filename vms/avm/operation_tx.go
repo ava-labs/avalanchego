@@ -25,6 +25,19 @@ type OperationTx struct {
 	Ops    []*Operation `serialize:"true" json:"operations"`
 }
 
+func (t *OperationTx) Init(vm *VM) error {
+	for i, n := 0, len(t.Ops); i < n; i++ {
+		op := t.Ops[i]
+		fx, err := vm.getParsedFx(op.Op)
+		if err != nil {
+			return err
+		}
+		op.FxID = fx.ID
+	}
+
+	return t.BaseTx.Init(vm)
+}
+
 // Operations track which ops this transaction is performing. The returned array
 // should not be modified.
 func (t *OperationTx) Operations() []*Operation { return t.Ops }
