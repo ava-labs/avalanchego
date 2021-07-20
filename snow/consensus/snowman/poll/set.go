@@ -128,6 +128,11 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag {
 	s.durPolls.Observe(float64(time.Since(holder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
 
+	return s.processFinishedPolls(requestID)
+}
+
+// processFinishedPolls checks for other finished polls and returns them all if finished
+func (s *set) processFinishedPolls(requestID uint32) []ids.Bag {
 	var results []ids.Bag
 	// If this is not the oldest poll, return as is.
 	if oldestRequestID, _, _ := s.polls.Oldest(); oldestRequestID != requestID {
@@ -139,7 +144,7 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag {
 	iter := s.polls.NewIterator()
 	for iter.Next() {
 		holder := iter.Value().(pollHolder)
-		p = holder.GetPoll()
+		p := holder.GetPoll()
 		if !p.Finished() {
 			// since we're iterating from oldest to newest, if the next poll has not finished,
 			// we can break and return what we have so far
@@ -180,10 +185,9 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) []ids.Bag {
 
 	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
 
-	s.polls.Delete(requestID) // remove the poll from the current set
 	s.durPolls.Observe(float64(time.Since(pollHolder.StartTime()).Milliseconds()))
 	s.numPolls.Dec() // decrease the metrics
-	return []ids.Bag{poll.Result()}
+	return s.processFinishedPolls(requestID)
 }
 
 // Len returns the number of outstanding polls
