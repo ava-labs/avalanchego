@@ -33,13 +33,13 @@ func NewAPIInterceptor(namespace string, registerer prometheus.Registerer) (APII
 	requestDuration := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Namespace: namespace,
-			Name:      "request_duration_ms",
+			Name:      "request_duration",
 			Buckets: []float64{
-				100,  // 100 ms - instant
-				250,  // 250 ms - good
-				500,  // 500 ms - not great
-				1000, // 1 second - worrisome
-				5000, // 5 seconds - bad
+				float64(100 * time.Millisecond), // instant
+				float64(250 * time.Millisecond), // good
+				float64(500 * time.Millisecond), // not great
+				float64(time.Second),            // worrisome
+				float64(5 * time.Second),        // bad
 				// anything larger than 5 seconds will be bucketed together
 			},
 		},
@@ -81,7 +81,7 @@ func (apr *apiInterceptor) AfterRequest(i *rpc.RequestInfo) {
 	durationMetric := apr.requestDuration.With(prometheus.Labels{
 		"method": i.Method,
 	})
-	durationMetric.Observe(float64(duration.Milliseconds()))
+	durationMetric.Observe(float64(duration))
 
 	if i.Error != nil {
 		errMetric := apr.requestErrors.With(prometheus.Labels{
