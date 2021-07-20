@@ -238,19 +238,14 @@ func NewBlockChain(
 
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
-		// If we are not running snapshots in async mode or we are starting from genesis, generate the original snapshot disk layer up front, so
-		// we can use it while executing blocks in bootstrapping.
-		if !bc.cacheConfig.SnapshotAsync || head.NumberU64() == 0 {
-			log.Info("Initializing snapshots in synchronous mode")
-			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, true, false)
-		} else {
-			// Otherwise, if we are running snapshots in async mode, attempt to initialize snapshots without rebuilding. If the snapshot
-			// disk layer is corrupted, incomplete, or doesn't exist, wait until calling Bootstrapped to rebuild.
-			log.Info("Attempting to load existing snapshot in async mode")
-			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), true, true, false)
-		}
+		// If we are starting from genesis, generate the original snapshot disk layer
+		// up front, so we can use it while executing blocks in bootstrapping. This
+		// also avoids a costly async generation process when reaching tip.
+		async := bc.cacheConfig.SnapshotAsync && head.NumberU64() > 0
+		log.Info("Initializing snapshots", "async", async)
+		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), async, true, false)
 		if err != nil {
-			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", bc.cacheConfig.SnapshotAsync)
+			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", async)
 		}
 	}
 
