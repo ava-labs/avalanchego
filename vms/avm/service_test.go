@@ -823,7 +823,7 @@ func TestServiceGetTxJSON_OperationTx(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 
-	assert.Contains(t, jsonString, "\"operation\":{\"mintInput\":{\"signatureIndices\":[0]},\"groupID\":1,\"payload\":\"aGVsbG8=\",\"outputs\":[{\"addresses\":[],\"locktime\":0,\"threshold\":0}]},\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"}]}")
+	assert.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",")
 }
 
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
