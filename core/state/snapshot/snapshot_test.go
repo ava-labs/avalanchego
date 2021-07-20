@@ -114,7 +114,7 @@ func TestDiskLayerExternalInvalidationFullFlatten(t *testing.T) {
 		t.Errorf("pre-flatten block layer count mismatch: have %d, want %d", n, 2)
 	}
 	// Commit the diff layer onto the disk and ensure it's persisted
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatalf("failed to merge diff layer onto disk: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestDiskLayerExternalInvalidationPartialFlatten(t *testing.T) {
 	defer func(memcap uint64) { aggregatorMemoryLimit = memcap }(aggregatorMemoryLimit)
 	aggregatorMemoryLimit = 0
 
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatalf("Failed to flatten diff layer onto disk: %v", err)
 	}
@@ -207,7 +207,7 @@ func TestDiffLayerExternalInvalidationPartialFlatten(t *testing.T) {
 	}
 	ref := snaps.Snapshot(common.HexToHash("0xff02"))
 
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestPostFlattenBasicDataAccess(t *testing.T) {
 	}
 
 	// Now, merge the a-chain layer by layer
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0xa1")); err != nil {
 		t.Error(err)
 	}
@@ -444,7 +444,7 @@ func TestTreeFlattenDoesNotDropPendingLayers(t *testing.T) {
 		t.Errorf("pre-flatten block layer count mismatch: have %d, want %d", n, 19)
 	}
 
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	if err := snaps.Flatten(common.Hash{0xee, 0xee, byte(2)}); err != nil {
 		t.Fatalf("failed to flatten diff layer from chain A: %v", err)
 	}
@@ -505,7 +505,7 @@ func TestStaleOriginLayer(t *testing.T) {
 		t.Errorf("failed to create diff layer A: %v", err)
 	}
 	// Flatten account 0xa1 to disk
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	if err := snaps.Flatten(diffBlockHashA); err != nil {
 		t.Errorf("failed to flatten diff block A: %v", err)
 	}
@@ -628,7 +628,7 @@ func TestRebloomOnFlatten(t *testing.T) {
 	// Flatten diffLayer A, making it a disk layer and trigger a rebloom on B, C
 	// and D. If we didn't rebloom, or didn't rebloom recursively, then blooms C
 	// and D would still think addrA was in the diff layers
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	if err := snaps.Flatten(diffBlockHashA); err != nil {
 		t.Errorf("failed to flattten diff block A: %v", err)
 	}
