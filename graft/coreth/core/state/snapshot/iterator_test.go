@@ -247,7 +247,7 @@ func TestAccountIteratorTraversal(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
-	snaps.validated = true    // Bypass validation of junk data
+	snaps.verified = true     // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatal(err)
 	}
@@ -289,7 +289,7 @@ func TestStorageIteratorTraversal(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
-	snaps.validated = true    // Bypass validation of junk data
+	snaps.verified = true     // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +371,7 @@ func TestAccountIteratorTraversalValues(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
-	snaps.validated = true    // Bypass validation of junk data
+	snaps.verified = true     // Bypass validation of junk data
 	for i := 2; i < 7; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x0%d", i))); err != nil {
 			t.Fatal(err)
@@ -466,7 +466,7 @@ func TestStorageIteratorTraversalValues(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
-	snaps.validated = true    // Bypass validation of junk data
+	snaps.verified = true     // Bypass validation of junk data
 	for i := 2; i < 7; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x0%d", i))); err != nil {
 			t.Fatal(err)
@@ -521,7 +521,7 @@ func TestAccountIteratorLargeTraversal(t *testing.T) {
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
 
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	for i := 2; i < 127; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x%02x", i))); err != nil {
 			t.Fatal(err)
@@ -555,7 +555,7 @@ func TestAccountIteratorFlattening(t *testing.T) {
 	it, _ := snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{}, false)
 	defer it.Release()
 
-	snaps.validated = true // Bypass validation of junk data
+	snaps.verified = true // Bypass validation of junk data
 	for i := 2; i < 4; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x%02x", i))); err != nil {
 			t.Errorf("failed to flatten: %v", err)

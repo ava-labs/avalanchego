@@ -193,7 +193,7 @@ type Tree struct {
 	// Update creates a new block layer with a parent taken from the blockHash -> snapshot map
 	// we can support grabbing a read only Snapshot by getting any one from the state root based map
 	stateLayers map[common.Hash]map[common.Hash]snapshot
-	validated   bool // Indicates if snapshot has been validated (true if previously generated)
+	verified    bool // Indicates if snapshot integrity has been verified
 	lock        sync.RWMutex
 }
 
@@ -242,10 +242,10 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 		head = head.Parent()
 	}
 
-	// We assume a snapshot read from disk on startup was previously validated. This prevents
+	// We assume a snapshot read from disk on startup was previously verified. This prevents
 	// us from a doing a costly re-verification procedure when it is not needed.
 	if generated {
-		snap.validated = true
+		snap.verified = true
 		return snap, nil
 	}
 
@@ -290,7 +290,7 @@ func (t *Tree) waitBuild() error {
 
 	// Wait until the snapshot is generated
 	<-done
-	return t.validateIntegrity(diskLayer, true)
+	return t.verifyIntegrity(diskLayer, true)
 }
 
 // Snapshot retrieves a snapshot belonging to the given state root, or nil if no
@@ -372,21 +372,21 @@ func (t *Tree) Update(blockHash, blockRoot, parentBlockHash common.Hash, destruc
 	return nil
 }
 
-// validateIntegrity performs an integrity check on the current snapshot. It is
+// verifyIntegrity performs an integrity check on the current snapshot. It is
 // assumed that the caller holds the [snapTree] lock.
-func (t *Tree) validateIntegrity(base *diskLayer, snapshotGenerated bool) error {
-	if t.validated || !snapshotGenerated {
+func (t *Tree) verifyIntegrity(base *diskLayer, snapshotGenerated bool) error {
+	if t.verified || !snapshotGenerated {
 		return nil
 	}
 
 	start := time.Now()
-	log.Info("Validating snapshot integrity", "root", base.root)
-	if err := t.Verify(base.root, true); err != nil {
+	log.Info("Verifying snapshot integrity", "root", base.root)
+	if err := t.verify(base.root, true); err != nil {
 		return fmt.Errorf("unable to verify snapshot integrity: %w", err)
 	}
 
-	log.Info("Validated snapshot integrity", "root", base.root, "elapsed", time.Since(start))
-	t.validated = true
+	log.Info("Verified snapshot integrity", "root", base.root, "elapsed", time.Since(start))
+	t.verified = true
 	return nil
 }
 
@@ -490,7 +490,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	}
 	rebloom(base.blockHash)
 	log.Debug("Flattened snapshot tree", "blockHash", blockHash, "root", base.root, "size", len(t.blockLayers), "elapsed", common.PrettyDuration(time.Since(start)))
-	return t.validateIntegrity(base, snapshotGenerated)
+	return t.verifyIntegrity(base, snapshotGenerated)
 }
 
 // Length returns the number of snapshot layers that is currently being maintained.
@@ -869,7 +869,11 @@ func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek commo
 // with the specific root and compares the re-computed hash with the original one.
 // When [force] is true, it is assumed that the caller has confirmed that the
 // snapshot is generated and that they hold the snapTree lock.
-func (t *Tree) Verify(root common.Hash, force bool) error {
+func (t *Tree) Verify(root common.Hash) error {
+	return t.verify(root, false)
+}
+
+func (t *Tree) verify(root common.Hash, force bool) error {
 	acctIt, err := t.AccountIterator(root, common.Hash{}, force)
 	if err != nil {
 		return err
