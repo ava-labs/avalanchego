@@ -55,6 +55,27 @@ type Tx struct {
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
 }
 
+// Init initializes FxID where required
+// Used for JSON marshaling of data
+func (t *Tx) Init(vm *VM) error {
+	for i, n := 0, len(t.Creds); i < n; i++ {
+		cred := t.Creds[i]
+		fxCred, ok := cred.(secp256k1fx.FxCredential)
+		if !ok {
+			// [secp256k1fx.Credential] is embedded by nftx and propertyfx at the moment
+			// so this [if] block will never get called because it will cast to [FxCredential]
+			continue
+		}
+
+		fx, err := vm.getParsedFx(cred)
+		if err != nil {
+			return err
+		}
+		fxCred.InitFx(fx.ID)
+	}
+	return nil
+}
+
 // Credentials describes the authorization that allows the Inputs to consume the
 // specified UTXOs. The returned array should not be modified.
 func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
@@ -18,9 +19,18 @@ const (
 	defaultEncoding = formatting.Hex
 )
 
+type FxCredential interface {
+	InitFx(fxID ids.ID)
+}
+
 // Credential ...
 type Credential struct {
+	FxID ids.ID                          `serialize:"true" json:"fxID"`
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
+}
+
+func (cr *Credential) InitFx(fxID ids.ID) {
+	cr.FxID = fxID
 }
 
 // MarshalJSON marshals [cr] to JSON
