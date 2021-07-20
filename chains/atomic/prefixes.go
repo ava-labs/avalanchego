@@ -5,7 +5,6 @@ package atomic
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -42,21 +41,17 @@ type prefixes struct {
 
 func (p *prefixes) getValueDB(myChainID, peerChainID ids.ID, db database.Database) database.Database {
 	if bytes.Compare(myChainID[:], peerChainID[:]) == -1 {
-		fmt.Println("smaller value")
 		return prefixdb.New(p.smallerValuePrefix, db)
 	}
-	fmt.Println("larger value")
 	return prefixdb.New(p.largerValuePrefix, db)
 }
 
 func (p *prefixes) getValueAndIndexDB(myChainID, peerChainID ids.ID, db database.Database) (database.Database, database.Database) {
 	var valueDB, indexDB database.Database
 	if bytes.Compare(myChainID[:], peerChainID[:]) == -1 {
-		fmt.Println("smaller state")
 		valueDB = prefixdb.New(p.smallerValuePrefix, db)
 		indexDB = prefixdb.New(p.smallerIndexPrefix, db)
 	} else {
-		fmt.Println("larger state")
 		valueDB = prefixdb.New(p.largerValuePrefix, db)
 		indexDB = prefixdb.New(p.largerIndexPrefix, db)
 	}

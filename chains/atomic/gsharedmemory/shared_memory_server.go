@@ -213,39 +213,39 @@ func (s *Server) Apply(
 	s.applyLock.Lock()
 	defer s.applyLock.Unlock()
 
-	removeAndPut, exists := s.apply[req.Id]
+	apply, exists := s.apply[req.Id]
 	if !exists {
-		removeAndPut = &applyRequest{
+		apply = &applyRequest{
 			requests: make(map[ids.ID]*atomic.Requests),
 			batches:  make(map[int64]database.Batch),
 		}
 	}
 
-	if err := s.parseRequests(removeAndPut.requests, req.Requests); err != nil {
+	if err := s.parseRequests(apply.requests, req.Requests); err != nil {
 		delete(s.apply, req.Id)
 		return nil, err
 	}
 
-	if err := s.parseBatches(removeAndPut.batches, req.Batches); err != nil {
+	if err := s.parseBatches(apply.batches, req.Batches); err != nil {
 		delete(s.apply, req.Id)
 		return nil, err
 	}
 
 	if req.Continues {
-		s.apply[req.Id] = removeAndPut
+		s.apply[req.Id] = apply
 		return &gsharedmemoryproto.ApplyResponse{}, nil
 	}
 
 	delete(s.apply, req.Id)
 
-	batches := make([]database.Batch, len(removeAndPut.batches))
+	batches := make([]database.Batch, len(apply.batches))
 	i := 0
-	for _, batch := range removeAndPut.batches {
+	for _, batch := range apply.batches {
 		batches[i] = batch
 		i++
 	}
 
-	return &gsharedmemoryproto.ApplyResponse{}, s.sm.Apply(removeAndPut.requests, batches...)
+	return &gsharedmemoryproto.ApplyResponse{}, s.sm.Apply(apply.requests, batches...)
 }
 
 func (s *Server) parseRequests(
