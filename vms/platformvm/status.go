@@ -14,19 +14,16 @@ type Status uint32
 
 // List of possible status values
 // [Unknown] Zero value, means the status is not known
-// [Preferred] means the operation is known and preferred, but hasn't been decided yet
-// [Created] means the operation occurred, but isn't managed locally
-// [Validating] means the operation was accepted and is managed locally
+// [Committed] Reached finality
+// [Aborted] Block proposal was aborted
+// [Processing] Not found in the db but is in the preferred blocks db
+// [Dropped] The transaction was dropped most likely because it was invalid
 const (
-	Unknown Status = iota
-	Preferred
-	Created
-	Validating
-	Committed
-	Aborted
-	Processing
-	Syncing
-	Dropped
+	Unknown    Status = 0
+	Committed  Status = 4
+	Aborted    Status = 5
+	Processing Status = 6
+	Dropped    Status = 8
 )
 
 // MarshalJSON ...
@@ -46,20 +43,12 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	switch str {
 	case "\"Unknown\"":
 		*s = Unknown
-	case "\"Preferred\"":
-		*s = Preferred
-	case "\"Created\"":
-		*s = Created
-	case "\"Validating\"":
-		*s = Validating
 	case "\"Committed\"":
 		*s = Committed
 	case "\"Aborted\"":
 		*s = Aborted
 	case "\"Processing\"":
 		*s = Processing
-	case "\"Syncing\"":
-		*s = Syncing
 	case "\"Dropped\"":
 		*s = Dropped
 	default:
@@ -71,7 +60,7 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 // Valid returns nil if the status is a valid status.
 func (s Status) Valid() error {
 	switch s {
-	case Unknown, Preferred, Created, Validating, Committed, Aborted, Processing, Syncing, Dropped:
+	case Unknown, Committed, Aborted, Processing, Dropped:
 		return nil
 	default:
 		return errUnknownStatus
@@ -82,20 +71,12 @@ func (s Status) String() string {
 	switch s {
 	case Unknown:
 		return "Unknown"
-	case Preferred:
-		return "Preferred"
-	case Created:
-		return "Created"
-	case Validating:
-		return "Validating"
 	case Committed:
 		return "Committed"
 	case Aborted:
 		return "Aborted"
 	case Processing:
 		return "Processing"
-	case Syncing:
-		return "Syncing"
 	case Dropped:
 		return "Dropped"
 	default:

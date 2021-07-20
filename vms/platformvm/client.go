@@ -351,7 +351,7 @@ func (c *Client) CreateBlockchain(
 }
 
 // GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-func (c *Client) GetBlockchainStatus(blockchainID string) (Status, error) {
+func (c *Client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest("getBlockchainStatus", &GetBlockchainStatusArgs{
 		BlockchainID: blockchainID,
