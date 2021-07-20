@@ -142,5 +142,5 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 		inputID := in.UTXOID.InputID()
 		utxoIDs[i] = inputID[:]
 	}
-	return vm.ctx.SharedMemory.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{t.SourceChain: {RemoveRequests: utxoIDs}}, batch)
+	return vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{t.SourceChain: {RemoveRequests: utxoIDs}}, batch)
 }

@@ -7,11 +7,10 @@
 package gwriterproto
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -168,14 +167,11 @@ func file_gwriter_proto_rawDescGZIP() []byte {
 	return file_gwriter_proto_rawDescData
 }
 
-var (
-	file_gwriter_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-	file_gwriter_proto_goTypes  = []interface{}{
-		(*WriteRequest)(nil),  // 0: gwriterproto.WriteRequest
-		(*WriteResponse)(nil), // 1: gwriterproto.WriteResponse
-	}
-)
-
+var file_gwriter_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_gwriter_proto_goTypes = []interface{}{
+	(*WriteRequest)(nil),  // 0: gwriterproto.WriteRequest
+	(*WriteResponse)(nil), // 1: gwriterproto.WriteResponse
+}
 var file_gwriter_proto_depIdxs = []int32{
 	0, // 0: gwriterproto.Writer.Write:input_type -> gwriterproto.WriteRequest
 	1, // 1: gwriterproto.Writer.Write:output_type -> gwriterproto.WriteResponse

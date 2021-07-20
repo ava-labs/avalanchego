@@ -162,7 +162,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 		utxoID := in.InputID()
 		utxoIDs[i] = utxoID[:]
 	}
-	return ctx.SharedMemory.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
 }
 
 // Create a new transaction

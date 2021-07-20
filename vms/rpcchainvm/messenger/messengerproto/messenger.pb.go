@@ -7,11 +7,10 @@
 package messengerproto
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -140,14 +139,11 @@ func file_messenger_proto_rawDescGZIP() []byte {
 	return file_messenger_proto_rawDescData
 }
 
-var (
-	file_messenger_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
-	file_messenger_proto_goTypes  = []interface{}{
-		(*NotifyRequest)(nil),  // 0: messengerproto.NotifyRequest
-		(*NotifyResponse)(nil), // 1: messengerproto.NotifyResponse
-	}
-)
-
+var file_messenger_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_messenger_proto_goTypes = []interface{}{
+	(*NotifyRequest)(nil),  // 0: messengerproto.NotifyRequest
+	(*NotifyResponse)(nil), // 1: messengerproto.NotifyResponse
+}
 var file_messenger_proto_depIdxs = []int32{
 	0, // 0: messengerproto.Messenger.Notify:input_type -> messengerproto.NotifyRequest
 	1, // 1: messengerproto.Messenger.Notify:output_type -> messengerproto.NotifyResponse

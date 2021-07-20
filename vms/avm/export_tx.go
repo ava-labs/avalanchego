@@ -122,5 +122,5 @@ func (t *ExportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 		elems[i] = elem
 	}
 
-	return vm.ctx.SharedMemory.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{t.DestinationChain: {PutRequests: elems}}, batch)
+	return vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{t.DestinationChain: {PutRequests: elems}}, batch)
 }

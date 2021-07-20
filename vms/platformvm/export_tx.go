@@ -154,7 +154,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 		elems[i] = elem
 	}
 
-	return ctx.SharedMemory.RemoveAndPutMultiple(map[ids.ID]*atomic.Requests{tx.DestinationChain: {PutRequests: elems}}, batch)
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.DestinationChain: {PutRequests: elems}}, batch)
 }
 
 // Create a new transaction

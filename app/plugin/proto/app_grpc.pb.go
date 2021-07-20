@@ -4,7 +4,6 @@ package proto
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -59,12 +58,12 @@ type NodeServer interface {
 }
 
 // UnimplementedNodeServer must be embedded to have forward compatible implementations.
-type UnimplementedNodeServer struct{}
+type UnimplementedNodeServer struct {
+}
 
 func (UnimplementedNodeServer) Start(context.Context, *StartRequest) (*StartResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
-
 func (UnimplementedNodeServer) Stop(context.Context, *StopRequest) (*StopResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Stop not implemented")
 }

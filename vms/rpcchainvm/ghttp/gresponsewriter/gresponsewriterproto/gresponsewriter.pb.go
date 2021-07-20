@@ -7,11 +7,10 @@
 package gresponsewriterproto
 
 import (
-	reflect "reflect"
-	sync "sync"
-
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	reflect "reflect"
+	sync "sync"
 )
 
 const (
@@ -569,21 +568,18 @@ func file_gresponsewriter_proto_rawDescGZIP() []byte {
 	return file_gresponsewriter_proto_rawDescData
 }
 
-var (
-	file_gresponsewriter_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
-	file_gresponsewriter_proto_goTypes  = []interface{}{
-		(*Header)(nil),              // 0: gresponsewriterproto.Header
-		(*WriteRequest)(nil),        // 1: gresponsewriterproto.WriteRequest
-		(*WriteResponse)(nil),       // 2: gresponsewriterproto.WriteResponse
-		(*WriteHeaderRequest)(nil),  // 3: gresponsewriterproto.WriteHeaderRequest
-		(*WriteHeaderResponse)(nil), // 4: gresponsewriterproto.WriteHeaderResponse
-		(*FlushRequest)(nil),        // 5: gresponsewriterproto.FlushRequest
-		(*FlushResponse)(nil),       // 6: gresponsewriterproto.FlushResponse
-		(*HijackRequest)(nil),       // 7: gresponsewriterproto.HijackRequest
-		(*HijackResponse)(nil),      // 8: gresponsewriterproto.HijackResponse
-	}
-)
-
+var file_gresponsewriter_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_gresponsewriter_proto_goTypes = []interface{}{
+	(*Header)(nil),              // 0: gresponsewriterproto.Header
+	(*WriteRequest)(nil),        // 1: gresponsewriterproto.WriteRequest
+	(*WriteResponse)(nil),       // 2: gresponsewriterproto.WriteResponse
+	(*WriteHeaderRequest)(nil),  // 3: gresponsewriterproto.WriteHeaderRequest
+	(*WriteHeaderResponse)(nil), // 4: gresponsewriterproto.WriteHeaderResponse
+	(*FlushRequest)(nil),        // 5: gresponsewriterproto.FlushRequest
+	(*FlushResponse)(nil),       // 6: gresponsewriterproto.FlushResponse
+	(*HijackRequest)(nil),       // 7: gresponsewriterproto.HijackRequest
+	(*HijackResponse)(nil),      // 8: gresponsewriterproto.HijackResponse
+}
 var file_gresponsewriter_proto_depIdxs = []int32{
 	0, // 0: gresponsewriterproto.WriteRequest.headers:type_name -> gresponsewriterproto.Header
 	0, // 1: gresponsewriterproto.WriteHeaderRequest.headers:type_name -> gresponsewriterproto.Header

@@ -4,56 +4,18 @@
 package atomic
 
 import (
-	"bytes"
-	"errors"
-
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/linkeddb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-var (
-	smallerValuePrefix = []byte{0}
-	smallerIndexPrefix = []byte{1}
-	largerValuePrefix  = []byte{2}
-	largerIndexPrefix  = []byte{3}
-
-	errDuplicatedOperation = errors.New("duplicated operation on provided value")
-
-	_ SharedMemory = &sharedMemory{}
-)
-
-type SharedMemoryMethod int
-
-const (
-	Put SharedMemoryMethod = iota
-	Remove
-)
+var _ SharedMemory = &sharedMemory{}
 
 type Requests struct {
 	RemoveRequests [][]byte
 	PutRequests    []*Element
-}
 
-type dbElement struct {
-	// Present indicates the value was removed before existing.
-	// If set to false, when this element is added to the shared memory, it will
-	// be immediately removed.
-	// If set to true, then this element will be removed normally when remove is
-	// called.
-	Present bool `serialize:"true"`
-
-	// Value is the body of this element.
-	Value []byte `serialize:"true"`
-
-	// Traits are a collection of features that can be used to lookup this
-	// element.
-	Traits [][]byte `serialize:"true"`
+	peerChainID ids.ID
 }
 
 // Element ...
@@ -79,7 +41,7 @@ type SharedMemory interface {
 		lastKey []byte,
 		err error,
 	)
-	RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Requests, batches ...database.Batch) error
+	Apply(requests map[ids.ID]*Requests, batches ...database.Batch) error
 }
 
 // sharedMemory provides the API for a blockchain to interact with shared memory
@@ -89,44 +51,14 @@ type sharedMemory struct {
 	thisChainID ids.ID
 }
 
-func fetchValueAndIndexDB(smChainID []byte, peerChainID []byte, requestType SharedMemoryMethod, db database.Database) (database.Database, database.Database) {
-	var valueDB, indexDB database.Database
-	switch requestType {
-	case Remove:
-		if bytes.Compare(smChainID, peerChainID) == -1 {
-			valueDB = prefixdb.New(smallerValuePrefix, db)
-			indexDB = prefixdb.New(smallerIndexPrefix, db)
-		} else {
-			valueDB = prefixdb.New(largerValuePrefix, db)
-			indexDB = prefixdb.New(largerIndexPrefix, db)
-		}
-	case Put:
-		if bytes.Compare(smChainID, peerChainID) == -1 {
-			valueDB = prefixdb.New(largerValuePrefix, db)
-			indexDB = prefixdb.New(largerIndexPrefix, db)
-		} else {
-			valueDB = prefixdb.New(smallerValuePrefix, db)
-			indexDB = prefixdb.New(smallerIndexPrefix, db)
-		}
-	default:
-		panic("Illegal type")
-	}
-
-	return valueDB, indexDB
-}
-
 func (sm *sharedMemory) Get(peerChainID ids.ID, keys [][]byte) ([][]byte, error) {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-	_, db := sm.m.GetDatabase(sharedID)
-	defer sm.m.ReleaseDatabase(sharedID)
+	db := sm.m.GetSharedDatabase(sm.m.db, sharedID)
+	defer sm.m.ReleaseSharedDatabase(sharedID)
 
 	s := state{
-		c: sm.m.codec,
-	}
-	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
-		s.valueDB = prefixdb.New(smallerValuePrefix, db)
-	} else {
-		s.valueDB = prefixdb.New(largerValuePrefix, db)
+		c:       sm.m.codec,
+		valueDB: inbound.getValueDB(sm.thisChainID, peerChainID, db),
 	}
 
 	values := make([][]byte, len(keys))
@@ -148,19 +80,13 @@ func (sm *sharedMemory) Indexed(
 	limit int,
 ) ([][]byte, []byte, []byte, error) {
 	sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-	_, db := sm.m.GetDatabase(sharedID)
-	defer sm.m.ReleaseDatabase(sharedID)
+	db := sm.m.GetSharedDatabase(sm.m.db, sharedID)
+	defer sm.m.ReleaseSharedDatabase(sharedID)
 
 	s := state{
 		c: sm.m.codec,
 	}
-	if bytes.Compare(sm.thisChainID[:], peerChainID[:]) == -1 {
-		s.valueDB = prefixdb.New(smallerValuePrefix, db)
-		s.indexDB = prefixdb.New(smallerIndexPrefix, db)
-	} else {
-		s.valueDB = prefixdb.New(largerValuePrefix, db)
-		s.indexDB = prefixdb.New(largerIndexPrefix, db)
-	}
+	s.valueDB, s.indexDB = inbound.getValueAndIndexDB(sm.thisChainID, peerChainID, db)
 
 	keys, lastTrait, lastKey, err := s.getKeys(traits, startTrait, startKey, limit)
 	if err != nil {
@@ -178,200 +104,52 @@ func (sm *sharedMemory) Indexed(
 	return values, lastTrait, lastKey, nil
 }
 
-func (sm *sharedMemory) RemoveAndPutMultiple(batchChainsAndInputs map[ids.ID]*Requests, batches ...database.Batch) error {
+func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database.Batch) error {
+	// Sorting here introduces an ordering over the locks to prevent any
+	// deadlocks
+	sharedIDs := make([]ids.ID, 0, len(requests))
+	sharedOperations := make(map[ids.ID]*Requests, len(requests))
+	for peerChainID, request := range requests {
+		sharedID := sm.m.sharedID(sm.thisChainID, peerChainID)
+		sharedIDs = append(sharedIDs, sharedID)
+
+		request.peerChainID = peerChainID
+		sharedOperations[sharedID] = request
+	}
+	ids.SortIDs(sharedIDs)
+
+	// Make sure all operations are committed atomically
 	vdb := versiondb.New(sm.m.db)
 
-	for peerChainID, atomicRequests := range batchChainsAndInputs {
-		sharedID := sm.m.sharedID(peerChainID, sm.thisChainID)
-		db := sm.m.GetPrefixDBInstanceFromVdb(vdb, sharedID)
+	for _, sharedID := range sharedIDs {
+		req := sharedOperations[sharedID]
+
+		db := sm.m.GetSharedDatabase(vdb, sharedID)
+		defer sm.m.ReleaseSharedDatabase(sharedID)
 
 		s := state{
 			c: sm.m.codec,
 		}
 
-		s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Remove, db)
-
-		for _, removeRequest := range atomicRequests.RemoveRequests {
+		s.valueDB, s.indexDB = inbound.getValueAndIndexDB(sm.thisChainID, req.peerChainID, db)
+		for _, removeRequest := range req.RemoveRequests {
 			if err := s.RemoveValue(removeRequest); err != nil {
-				sm.m.ReleaseDatabase(sharedID)
 				return err
 			}
 		}
 
-		s.valueDB, s.indexDB = fetchValueAndIndexDB(sm.thisChainID[:], peerChainID[:], Put, db)
-
-		for _, putRequest := range atomicRequests.PutRequests {
+		s.valueDB, s.indexDB = outbound.getValueAndIndexDB(sm.thisChainID, req.peerChainID, db)
+		for _, putRequest := range req.PutRequests {
 			if err := s.SetValue(putRequest); err != nil {
-				sm.m.ReleaseDatabase(sharedID)
 				return err
 			}
 		}
-
-		sm.m.ReleaseDatabase(sharedID)
 	}
 
-	myBatch, err := vdb.CommitBatch()
+	batch, err := vdb.CommitBatch()
 	if err != nil {
 		return err
 	}
 
-	return WriteAll(myBatch, batches...)
-}
-
-type state struct {
-	c       codec.Manager
-	valueDB database.Database
-	indexDB database.Database
-}
-
-func (s *state) Value(key []byte) (*Element, error) {
-	value, err := s.loadValue(key)
-	if err != nil {
-		return nil, err
-	}
-
-	if !value.Present {
-		return nil, database.ErrNotFound
-	}
-
-	return &Element{
-		Key:    key,
-		Value:  value.Value,
-		Traits: value.Traits,
-	}, nil
-}
-
-func (s *state) SetValue(e *Element) error {
-	value, err := s.loadValue(e.Key)
-	if err == nil {
-		// The key was already registered with the state.
-
-		if !value.Present {
-			// This was previously optimistically deleted from the database, so
-			// it should be immediately removed.
-			return s.valueDB.Delete(e.Key)
-		}
-
-		// This key was written twice, which is invalid
-		return errDuplicatedOperation
-	}
-	if err != database.ErrNotFound {
-		// An unexpected error occurred, so we should propagate that error
-		return err
-	}
-
-	for _, trait := range e.Traits {
-		traitDB := prefixdb.New(trait, s.indexDB)
-		traitList := linkeddb.NewDefault(traitDB)
-		if err := traitList.Put(e.Key, nil); err != nil {
-			return err
-		}
-	}
-
-	dbElem := dbElement{
-		Present: true,
-		Value:   e.Value,
-		Traits:  e.Traits,
-	}
-
-	valueBytes, err := s.c.Marshal(codecVersion, &dbElem)
-	if err != nil {
-		return err
-	}
-	return s.valueDB.Put(e.Key, valueBytes)
-}
-
-func (s *state) RemoveValue(key []byte) error {
-	value, err := s.loadValue(key)
-	if err != nil {
-		if err != database.ErrNotFound {
-			// An unexpected error occurred, so we should propagate that error
-			return err
-		}
-
-		// The value doesn't exist, so we should optimistically deleted it
-		dbElem := dbElement{Present: false}
-		valueBytes, err := s.c.Marshal(codecVersion, &dbElem)
-		if err != nil {
-			return err
-		}
-		return s.valueDB.Put(key, valueBytes)
-	}
-
-	// Don't allow the removal of something that was already removed.
-	if !value.Present {
-		return errDuplicatedOperation
-	}
-
-	for _, trait := range value.Traits {
-		traitDB := prefixdb.New(trait, s.indexDB)
-		traitList := linkeddb.NewDefault(traitDB)
-		if err := traitList.Delete(key); err != nil {
-			return err
-		}
-	}
-	return s.valueDB.Delete(key)
-}
-
-func (s *state) loadValue(key []byte) (*dbElement, error) {
-	valueBytes, err := s.valueDB.Get(key)
-	if err != nil {
-		return nil, err
-	}
-
-	// The key was in the database
-	value := &dbElement{}
-	_, err = s.c.Unmarshal(valueBytes, value)
-	return value, err
-}
-
-func (s *state) getKeys(traits [][]byte, startTrait, startKey []byte, limit int) ([][]byte, []byte, []byte, error) {
-	tracked := ids.Set{}
-	keys := [][]byte(nil)
-	lastTrait := startTrait
-	lastKey := startKey
-	utils.Sort2DBytes(traits)
-	for _, trait := range traits {
-		switch bytes.Compare(trait, startTrait) {
-		case -1:
-			continue
-		case 1:
-			startKey = nil
-		}
-
-		lastTrait = trait
-		var err error
-		lastKey, err = s.appendTraitKeys(&keys, &tracked, &limit, trait, startKey)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-
-		if limit == 0 {
-			break
-		}
-	}
-	return keys, lastTrait, lastKey, nil
-}
-
-func (s *state) appendTraitKeys(keys *[][]byte, tracked *ids.Set, limit *int, trait, startKey []byte) ([]byte, error) {
-	lastKey := startKey
-
-	traitDB := prefixdb.New(trait, s.indexDB)
-	traitList := linkeddb.NewDefault(traitDB)
-	iter := traitList.NewIteratorWithStart(startKey)
-	defer iter.Release()
-	for iter.Next() && *limit > 0 {
-		key := iter.Key()
-		lastKey = key
-
-		id := hashing.ComputeHash256Array(key)
-		if tracked.Contains(id) {
-			continue
-		}
-
-		tracked.Add(id)
-		*keys = append(*keys, key)
-		*limit--
-	}
-	return lastKey, iter.Error()
+	return WriteAll(batch, batches...)
 }
