@@ -124,14 +124,10 @@ func (s *set) Vote(requestID uint32, vdr ids.ShortID, vote ids.ID) []ids.Bag {
 		return nil
 	}
 
-	s.log.Verbo("poll with requestID %d finished as %s", requestID, p)
-	s.durPolls.Observe(float64(time.Since(holder.StartTime()).Milliseconds()))
-	s.numPolls.Dec() // decrease the metrics
-
 	return s.processFinishedPolls()
 }
 
-// processFinishedPolls checks for other finished polls and returns them all if finished
+// processFinishedPolls checks for other dependent finished polls and returns them all if finished
 func (s *set) processFinishedPolls() []ids.Bag {
 	var results []ids.Bag
 
@@ -145,6 +141,10 @@ func (s *set) processFinishedPolls() []ids.Bag {
 			// we can break and return what we have so far
 			break
 		}
+
+		s.log.Verbo("poll with requestID %d finished as %s", iter.Key(), holder.GetPoll())
+		s.durPolls.Observe(float64(time.Since(holder.StartTime()).Milliseconds()))
+		s.numPolls.Dec() // decrease the metrics
 
 		results = append(results, p.Result())
 		s.polls.Delete(iter.Key())
@@ -178,10 +178,6 @@ func (s *set) Drop(requestID uint32, vdr ids.ShortID) []ids.Bag {
 		return nil
 	}
 
-	s.log.Verbo("poll with requestID %d finished as %s", requestID, poll)
-
-	s.durPolls.Observe(float64(time.Since(pollHolder.StartTime()).Milliseconds()))
-	s.numPolls.Dec() // decrease the metrics
 	return s.processFinishedPolls()
 }
 
