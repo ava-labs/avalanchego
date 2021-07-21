@@ -109,7 +109,7 @@ func (m *Metrics) Rejected(id ids.ID) {
 
 func (m *Metrics) MeasureAndGetOldestDuration() time.Duration {
 	now := m.Clock.Time()
-	oldestTimeIntf, exists := m.processingEntries.Oldest()
+	_, oldestTimeIntf, exists := m.processingEntries.Oldest()
 	oldestTime := now
 	if exists {
 		oldestTime = oldestTimeIntf.(time.Time)

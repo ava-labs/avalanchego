@@ -907,7 +907,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	// check for long running requests
 	now := cr.clock.Time()
 	processingRequest := now
-	if longestRunning, exists := cr.timedRequests.Oldest(); exists {
+	if _, longestRunning, exists := cr.timedRequests.Oldest(); exists {
 		processingRequest = longestRunning.(requestEntry).time
 	}
 	timeReqRunning := now.Sub(processingRequest)
