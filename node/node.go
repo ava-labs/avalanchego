@@ -251,7 +251,8 @@ func (n *Node) initNetworking() error {
 		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
 	}
 
-	n.Net = network.NewDefaultNetwork(
+	n.Net, err = network.NewDefaultNetwork(
+		fmt.Sprintf("%s_network", constants.PlatformName),
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
@@ -277,10 +278,11 @@ func (n *Node) initNetworking() error {
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		n.Config.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
 	)
-	return nil
+	return err
 }
 
 type insecureValidatorManager struct {

@@ -24,8 +24,8 @@ type Hashmap interface {
 type LinkedHashmap interface {
 	Hashmap
 
-	Oldest() (val interface{}, exists bool)
-	Newest() (val interface{}, exists bool)
+	Oldest() (key interface{}, val interface{}, exists bool)
+	Newest() (key interface{}, val interface{}, exists bool)
 	NewIterator() Iter
 }
 
@@ -86,14 +86,14 @@ func (lh *linkedHashmap) Len() int {
 	return lh.len()
 }
 
-func (lh *linkedHashmap) Oldest() (interface{}, bool) {
+func (lh *linkedHashmap) Oldest() (interface{}, interface{}, bool) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
 	return lh.oldest()
 }
 
-func (lh *linkedHashmap) Newest() (interface{}, bool) {
+func (lh *linkedHashmap) Newest() (interface{}, interface{}, bool) {
 	lh.lock.Lock()
 	defer lh.lock.Unlock()
 
@@ -131,18 +131,18 @@ func (lh *linkedHashmap) delete(key interface{}) {
 
 func (lh *linkedHashmap) len() int { return len(lh.entryMap) }
 
-func (lh *linkedHashmap) oldest() (interface{}, bool) {
+func (lh *linkedHashmap) oldest() (interface{}, interface{}, bool) {
 	if val := lh.entryList.Front(); val != nil {
-		return val.Value.(keyValue).value, true
+		return val.Value.(keyValue).key, val.Value.(keyValue).value, true
 	}
-	return nil, false
+	return nil, nil, false
 }
 
-func (lh *linkedHashmap) newest() (interface{}, bool) {
+func (lh *linkedHashmap) newest() (interface{}, interface{}, bool) {
 	if val := lh.entryList.Back(); val != nil {
-		return val.Value.(keyValue).value, true
+		return val.Value.(keyValue).key, val.Value.(keyValue).value, true
 	}
-	return nil, false
+	return nil, nil, false
 }
 
 func (lh *linkedHashmap) NewIterator() Iter {
