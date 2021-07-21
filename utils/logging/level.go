@@ -122,7 +122,3 @@ func (l Level) AlignedString() string {
 		return s[:alignedStringLen]
 	}
 }
-
-func (l Level) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("\"%s\"", l)), nil
-}

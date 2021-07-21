@@ -191,6 +191,7 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 	changeLogLevel := len(args.LogLevel) > 0
 	var changeLogLevelTo logging.Level
 	if changeLogLevel {
+		// Parse new log level from string
 		var err error
 		changeLogLevelTo, err = logging.ToLevel(args.LogLevel)
 		if err != nil {
@@ -200,6 +201,7 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 	changeDisplayLevel := len(args.DisplayLevel) > 0
 	var changeDisplayLevelTo logging.Level
 	if changeDisplayLevel {
+		// Parse new display level from string
 		var err error
 		changeDisplayLevelTo, err = logging.ToLevel(args.DisplayLevel)
 		if err != nil {
@@ -208,10 +210,10 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 	}
 
 	var loggerNames []string
-	// Empty name means all loggers
 	if len(args.LoggerName) > 0 {
 		loggerNames = []string{args.LoggerName}
 	} else {
+		// Empty name means all loggers
 		loggerNames = service.logFactory.GetLoggerNames()
 	}
 
@@ -232,21 +234,21 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 }
 
 type LogAndDisplayLevels struct {
-	LogLevel     logging.Level `json:"logLevel"`
-	DisplayLevel logging.Level `json:"displayLevel"`
+	LogLevel     string `json:"logLevel"`
+	DisplayLevel string `json:"displayLevel"`
 }
 
-// GetLoggerLevelArgs defines logger name arg.
+// See GetLoggerLevel
 type GetLoggerLevelArgs struct {
 	LoggerName string `json:"loggerName"`
 }
 
-// GetLogLevelReply returns current log levels in a name=>level map.
+// See GetLoggerLevel
 type GetLoggerLevelReply struct {
 	LoggerLevels map[string]LogAndDisplayLevels `json:"loggerLevels"`
 }
 
-// GetLogLevel get the log level and display level of loggers.
+// GetLogLevel returns the log level and display level of all loggers.
 func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *GetLoggerLevelReply) error {
 	service.log.Info("Admin: GetLoggerLevels called with LoggerName: %q", args.LoggerName)
 	reply.LoggerLevels = make(map[string]LogAndDisplayLevels)
@@ -268,8 +270,8 @@ func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, 
 			return err
 		}
 		reply.LoggerLevels[name] = LogAndDisplayLevels{
-			LogLevel:     logLevel,
-			DisplayLevel: displayLevel,
+			LogLevel:     logLevel.String(),
+			DisplayLevel: displayLevel.String(),
 		}
 	}
 	return nil
