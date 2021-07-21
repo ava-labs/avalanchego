@@ -3,6 +3,8 @@ package nftfx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/snow"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -17,11 +19,17 @@ type MintOperation struct {
 	Outputs   []*secp256k1fx.OutputOwners `serialize:"true" json:"outputs"`
 }
 
-func (op *MintOperation) GetSecpOutputs() []*secp256k1fx.OutputOwners {
-	return op.Outputs
+func (op *MintOperation) InitCtx(ctx *snow.Context) {
+	if ctx == nil {
+		return
+	}
+
+	for _, out := range op.Outputs {
+		out.InitCtx(ctx)
+	}
 }
 
-// Outs ...
+// Outs Returns []TransferOutput as []verify.State
 func (op *MintOperation) Outs() []verify.State {
 	outs := []verify.State{}
 	for _, out := range op.Outputs {

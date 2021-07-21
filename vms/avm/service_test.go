@@ -823,6 +823,9 @@ func TestServiceGetTxJSON_OperationTx(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 
+	// contains the address in the right format
+	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	// contains the fxID
 	assert.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",")
 }
 

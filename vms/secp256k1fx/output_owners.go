@@ -25,10 +25,6 @@ var (
 	_                       verify.State = &OutputOwners{}
 )
 
-type HasSecpOutputs interface {
-	GetSecpOutputs() []*OutputOwners
-}
-
 // OutputOwners ...
 type OutputOwners struct {
 	Locktime  uint64        `serialize:"true" json:"locktime"`

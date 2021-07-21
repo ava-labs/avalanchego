@@ -6,6 +6,8 @@ package secp256k1fx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/snow"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -16,6 +18,15 @@ type MintOperation struct {
 	MintInput      Input          `serialize:"true" json:"mintInput"`
 	MintOutput     MintOutput     `serialize:"true" json:"mintOutput"`
 	TransferOutput TransferOutput `serialize:"true" json:"transferOutput"`
+}
+
+func (op *MintOperation) InitCtx(ctx *snow.Context) {
+	if ctx == nil {
+		return
+	}
+
+	op.MintOutput.OutputOwners.InitCtx(ctx)
+	op.TransferOutput.OutputOwners.InitCtx(ctx)
 }
 
 // Outs ...
