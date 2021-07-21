@@ -13,7 +13,6 @@ do
   echo "Re-generating protobuf: $PROTO_BUFFER_FILE"
   PROTO_FILE_DIR=$(dirname $PROTO_BUFFER_FILE)
   protoc \
-    --fatal_warnings \
     -I="$PROTO_FILE_DIR" \
     --go_out="$PROTO_FILE_DIR" \
     --go-grpc_out="$PROTO_FILE_DIR" \
