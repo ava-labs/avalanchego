@@ -35,7 +35,7 @@ func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*rout
 		prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "longest_running_request",
-			Help:      "Time the longest request took in milliseconds",
+			Help:      "Time (in ns) the longest request took",
 		},
 	)
 

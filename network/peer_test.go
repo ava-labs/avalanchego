@@ -83,6 +83,7 @@ func TestPeer_Close(t *testing.T) {
 	)
 
 	netwrk, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id,
