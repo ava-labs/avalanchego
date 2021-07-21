@@ -57,8 +57,11 @@ func (b *blockJob) MissingDependencies() (ids.Set, error) {
 }
 
 func (b *blockJob) HasMissingDependencies() (bool, error) {
-	missing, err := b.MissingDependencies()
-	return missing.Len() > 0, err
+	parentID := b.blk.Parent()
+	if parent, err := b.vm.GetBlock(parentID); err != nil || parent.Status() != choices.Accepted {
+		return true, nil
+	}
+	return false, nil
 }
 
 func (b *blockJob) Execute() error {

@@ -184,8 +184,8 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 
 	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
 		blkID := blk.Parent()
-		blk, err := t.GetBlock(blkID)
-		if err != nil {
+		var err error
+		if blk, err = t.GetBlock(blkID); err != nil {
 			break
 		}
 		blkBytes := blk.Bytes()
@@ -480,7 +480,8 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 		}
 
 		blkID = blk.Parent()
-		blk, err := t.GetBlock(blkID)
+		var err error
+		blk, err = t.GetBlock(blkID)
 
 		// If we don't have this ancestor, request it from [vdr]
 		if err != nil || !blk.Status().Fetched() {
@@ -516,11 +517,10 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 			return false, err
 		}
 		blkID = blk.Parent()
-		blk, err := t.GetBlock(blkID)
-		if err != nil { // Can't find the next ancestor
+		var err error
+		if blk, err = t.GetBlock(blkID); err != nil {
 			blk = &missing.Block{BlkID: blkID}
 		}
-		blkID = blk.ID()
 	}
 
 	// The block was issued into consensus. This is the happy path.

@@ -23,16 +23,10 @@ type TestBlock struct {
 func (b *TestBlock) SetStatus(status choices.Status) { b.TestBlock.TestDecidable.StatusV = status }
 
 // NewTestBlock returns a new test block with height, bytes, and ID derived from [i]
-// and using [parent] as the parent block
-func NewTestBlock(i uint64, parent *TestBlock) *TestBlock {
+// and using [parentID] as the parent block ID
+func NewTestBlock(i uint64, parentID ids.ID) *TestBlock {
 	b := []byte{byte(i)}
 	id := hashing.ComputeHash256Array(b)
-	var parentID ids.ID
-	if parent == nil {
-		parentID = ids.Empty
-	} else {
-		parentID = parent.ID()
-	}
 	return &TestBlock{
 		TestBlock: &snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
@@ -46,17 +40,14 @@ func NewTestBlock(i uint64, parent *TestBlock) *TestBlock {
 	}
 }
 
-// NewTestBlocks generates [numBlocks] consecutive blocks starting
-// at height [parent.Height() + 1].
-func NewTestBlocks(numBlocks uint64, parent *TestBlock) []*TestBlock {
+// NewTestBlocks generates [numBlocks] consecutive blocks
+func NewTestBlocks(numBlocks uint64) []*TestBlock {
 	blks := make([]*TestBlock, 0, numBlocks)
-	var startHeight uint64
-	if parent != nil {
-		startHeight = parent.HeightV + 1
-	}
-	for i := startHeight; i < numBlocks; i++ {
-		blks = append(blks, NewTestBlock(i, parent))
-		parent = blks[len(blks)-1]
+	parentID := ids.Empty
+	for i := uint64(0); i < numBlocks; i++ {
+		blks = append(blks, NewTestBlock(i, parentID))
+		parent := blks[len(blks)-1]
+		parentID = parent.ID()
 	}
 
 	return blks
@@ -208,7 +199,7 @@ func checkRejectedBlock(t *testing.T, s *State, blk snowman.Block, cached bool) 
 }
 
 func TestState(t *testing.T) {
-	testBlks := NewTestBlocks(3, nil)
+	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -345,7 +336,7 @@ func TestState(t *testing.T) {
 }
 
 func TestBuildBlock(t *testing.T) {
-	testBlks := NewTestBlocks(2, nil)
+	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -390,7 +381,7 @@ func TestBuildBlock(t *testing.T) {
 }
 
 func TestStateDecideBlock(t *testing.T) {
-	testBlks := NewTestBlocks(4, nil)
+	testBlks := NewTestBlocks(4)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	badAcceptBlk := testBlks[1]
@@ -458,7 +449,7 @@ func TestStateDecideBlock(t *testing.T) {
 }
 
 func TestStateParent(t *testing.T) {
-	testBlks := NewTestBlocks(3, nil)
+	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -510,7 +501,7 @@ func TestStateParent(t *testing.T) {
 }
 
 func TestGetBlockInternal(t *testing.T) {
-	testBlks := NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
@@ -549,7 +540,7 @@ func TestGetBlockInternal(t *testing.T) {
 }
 
 func TestGetBlockError(t *testing.T) {
-	testBlks := NewTestBlocks(2, nil)
+	testBlks := NewTestBlocks(2)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]
@@ -593,7 +584,7 @@ func TestGetBlockError(t *testing.T) {
 }
 
 func TestParseBlockError(t *testing.T) {
-	testBlks := NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
@@ -617,7 +608,7 @@ func TestParseBlockError(t *testing.T) {
 }
 
 func TestBuildBlockError(t *testing.T) {
-	testBlks := NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
@@ -645,7 +636,7 @@ func TestMeteredCache(t *testing.T) {
 	namespace1 := "Joe"
 	namespace2 := "Namath"
 
-	testBlks := NewTestBlocks(1, nil)
+	testBlks := NewTestBlocks(1)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 
@@ -677,7 +668,7 @@ func TestMeteredCache(t *testing.T) {
 
 // Test the bytesToIDCache
 func TestStateBytesToIDCache(t *testing.T) {
-	testBlks := NewTestBlocks(3, nil)
+	testBlks := NewTestBlocks(3)
 	genesisBlock := testBlks[0]
 	genesisBlock.SetStatus(choices.Accepted)
 	blk1 := testBlks[1]

@@ -4,9 +4,7 @@
 package chain
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 // BlockWrapper wraps a snowman Block while adding a smart caching layer to improve
@@ -54,21 +52,4 @@ func (bw *BlockWrapper) Reject() error {
 	delete(bw.state.verifiedBlocks, blkID)
 	bw.state.decidedBlocks.Put(blkID, bw)
 	return bw.Block.Reject()
-}
-
-// ParentBlock returns the parent of [bw]
-// Ensures that a BlockWrapper is returned instead of the internal
-// block type by using cache to retrieve the parent block by ID.
-func (bw *BlockWrapper) ParentBlock() snowman.Block {
-	parentID := bw.Block.Parent()
-	blk, err := bw.state.GetBlock(parentID)
-	if err == nil {
-		return blk
-	}
-	return &missing.Block{BlkID: parentID}
-}
-
-// Parent returns the parent ID of [bw]
-func (bw *BlockWrapper) Parent() ids.ID {
-	return bw.Block.Parent()
 }
