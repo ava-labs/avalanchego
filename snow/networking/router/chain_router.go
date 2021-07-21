@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -69,8 +68,6 @@ type ChainRouter struct {
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
 	timedRequests linkedhashmap.LinkedHashmap
-	// Measures average rate at which messages are dropped
-	dropRateCalculator math.Averager
 	// Last time at which there were no outstanding requests
 	lastTimeNoOutstanding time.Time
 	// Used in [createRequestID].
@@ -110,8 +107,6 @@ func (cr *ChainRouter) Initialize(
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
 	cr.peers.Add(nodeID)
-	// Set up meter to count dropped messages
-	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
 	cr.healthConfig = healthConfig
 	cr.requestIDBytes = make([]byte, 2*hashing.HashLen+wrappers.IntLen) // Validator ID, Chain ID, Request ID
 
@@ -893,16 +888,11 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	dropRate := cr.dropRateCalculator.Read()
-	healthy := dropRate <= cr.healthConfig.MaxDropRate
-	details := map[string]interface{}{
-		"msgDropRate": dropRate,
-	}
-	cr.metrics.msgDropRate.Set(dropRate)
-
 	numOutstandingReqs := cr.timedRequests.Len()
-	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
-	details["outstandingRequests"] = numOutstandingReqs
+	healthy := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	details := map[string]interface{}{
+		"outstandingRequests": numOutstandingReqs,
+	}
 
 	// check for long running requests
 	now := cr.clock.Time()

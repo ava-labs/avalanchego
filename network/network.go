@@ -242,8 +242,7 @@ type Config struct {
 	InboundThrottlerConfig     throttling.MsgThrottlerConfig
 	OutboundThrottlerConfig    throttling.MsgThrottlerConfig
 	timer.AdaptiveTimeoutConfig
-	DialerConfig     dialer.Config
-	MetricsNamespace string
+	DialerConfig dialer.Config
 	// [Registerer] is set in node's initMetricsAPI method
 	MetricsRegisterer prometheus.Registerer
 }
