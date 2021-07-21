@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -34,29 +35,39 @@ type Windower interface {
 // windower interfaces with P-Chain and it is responsible for calculating the
 // delay for the block submission window of a given validator
 type windower struct {
-	vm          validators.VM
+	ctx         *snow.Context
 	subnetID    ids.ID
+	chainID     ids.ID
 	chainSource uint64
 	sampler     sampler.WeightedWithoutReplacement
 }
 
-func New(vm validators.VM, subnetID, chainID ids.ID) Windower {
+func New(ctx *snow.Context, subnetID, chainID ids.ID) Windower {
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
-		vm:          vm,
+		ctx:         ctx,
 		subnetID:    subnetID,
+		chainID:     chainID,
 		chainSource: w.UnpackLong(),
 		sampler:     sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
 }
 
 func (w *windower) PChainHeight() (uint64, error) {
-	return w.vm.GetCurrentHeight()
+	if w.subnetID != constants.PrimaryNetworkID || w.chainID != constants.PlatformChainID {
+		w.ctx.Lock.Lock()
+		defer w.ctx.Lock.Unlock()
+	}
+	return w.ctx.ValidatorVM.GetCurrentHeight()
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
 	// get the validator set by the p-chain height
-	validatorsMap, err := w.vm.GetValidatorSet(pChainHeight, w.subnetID)
+	if w.subnetID != constants.PrimaryNetworkID || w.chainID != constants.PlatformChainID {
+		w.ctx.Lock.Lock()
+		defer w.ctx.Lock.Unlock()
+	}
+	validatorsMap, err := w.ctx.ValidatorVM.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {
 		return 0, err
 	}

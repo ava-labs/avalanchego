@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -17,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -29,8 +27,7 @@ import (
 )
 
 var (
-	dbPrefix           = []byte("proposervm")
-	ErrNotValidatorsVM = errors.New("VM could not access validators.VM interface")
+	dbPrefix = []byte("proposervm")
 
 	_ block.ChainVM = &VM{}
 )
@@ -72,20 +69,11 @@ func (vm *VM) Initialize(
 	fxs []*common.Fx,
 ) error {
 	vm.ctx = ctx
-	if vm.ctx.ValidatorVM == nil { // happens creating P-chain vm
-		valVM, ok := vm.ChainVM.(validators.VM)
-		if !ok {
-			vm.ctx.Log.Error("could not access validators.VM interface")
-			return ErrNotValidatorsVM
-		}
-		vm.ctx.ValidatorVM = valVM
-	}
-
 	rawDB := dbManager.Current().Database
 	prefixDB := prefixdb.New(dbPrefix, rawDB)
 	vm.db = versiondb.New(prefixDB)
 	vm.State = state.New(vm.db)
-	vm.Windower = proposer.New(ctx.ValidatorVM, ctx.SubnetID, ctx.ChainID)
+	vm.Windower = proposer.New(ctx, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 
 	scheduler, vmToEngine := scheduler.New(toEngine)

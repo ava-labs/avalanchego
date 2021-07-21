@@ -141,7 +141,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	// The child's P-Chain height is the P-Chain's height when it
 	// was proposed (i.e. now)
-	pChainHeight, err := b.vm.ctx.ValidatorVM.GetCurrentHeight()
+	pChainHeight, err := b.vm.PChainHeight()
 	if err != nil {
 		return nil, err
 	}

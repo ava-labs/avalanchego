@@ -160,7 +160,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		newTimestamp = parentTimestamp
 	}
 
-	pChainHeight, err := b.vm.ctx.ValidatorVM.GetCurrentHeight()
+	pChainHeight, err := b.vm.PChainHeight()
 	if err != nil {
 		return nil, err
 	}
