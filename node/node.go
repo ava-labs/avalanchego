@@ -598,12 +598,14 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
+	requestsNamespace := fmt.Sprintf("%s_requests", constants.PlatformName)
+
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
 	if err := timeoutManager.Initialize(
 		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
 		n.benchlistManager,
-		n.Config.NetworkConfig.MetricsNamespace,
+		requestsNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 	); err != nil {
 		return err
@@ -620,7 +622,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		criticalChains,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
-		n.Config.NetworkConfig.MetricsNamespace,
+		requestsNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 	)
 	if err != nil {
@@ -884,7 +886,12 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	healthService, err := health.NewService(n.Config.HealthCheckFreq, n.Log, n.Config.NetworkConfig.MetricsNamespace, n.Config.ConsensusParams.Metrics)
+	healthService, err := health.NewService(
+		n.Config.HealthCheckFreq,
+		n.Log,
+		fmt.Sprintf("%s_health", constants.PlatformName),
+		n.Config.ConsensusParams.Metrics,
+	)
 	if err != nil {
 		return err
 	}

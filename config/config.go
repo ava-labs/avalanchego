@@ -400,9 +400,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	nodeConfig.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
 
-	// Metrics Namespace
-	nodeConfig.NetworkConfig.MetricsNamespace = constants.PlatformName
-
 	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
 	// [PeerListGossipFreq]
 	nodeConfig.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
