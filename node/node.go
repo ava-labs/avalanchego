@@ -252,6 +252,7 @@ func (n *Node) initNetworking() error {
 	}
 
 	n.Net, err = network.NewDefaultNetwork(
+		fmt.Sprintf("%s_network", constants.PlatformName),
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,

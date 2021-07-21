@@ -313,6 +313,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 	)
 
 	net, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id,
@@ -449,6 +450,7 @@ func TestEstablishConnection(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -483,6 +485,7 @@ func TestEstablishConnection(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -630,6 +633,7 @@ func TestDoubleTrack(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -664,6 +668,7 @@ func TestDoubleTrack(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -812,6 +817,7 @@ func TestDoubleClose(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -846,6 +852,7 @@ func TestDoubleClose(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -999,6 +1006,7 @@ func TestTrackConnected(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1033,6 +1041,7 @@ func TestTrackConnected(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1160,6 +1169,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1194,6 +1204,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1452,6 +1463,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1486,6 +1498,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1520,6 +1533,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assert.NotNil(t, net1)
 
 	net2, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1554,6 +1568,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assert.NotNil(t, net2)
 
 	net3, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -1909,6 +1924,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1943,6 +1959,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1977,6 +1994,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.NotNil(t, net1)
 
 	net2, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -2011,6 +2029,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.NotNil(t, net2)
 
 	net3, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -2282,6 +2301,7 @@ func TestPeerSignature(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -2316,6 +2336,7 @@ func TestPeerSignature(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -2350,6 +2371,7 @@ func TestPeerSignature(t *testing.T) {
 	assert.NotNil(t, net1)
 
 	net2, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -2728,6 +2750,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -2762,6 +2785,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
