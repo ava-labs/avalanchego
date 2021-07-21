@@ -6,6 +6,8 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,6 +35,24 @@ func (t *OperationTx) Init(vm *VM) error {
 			return err
 		}
 		op.FxID = fx.ID
+
+		hasSecpOutputs, ok := op.Op.(secp256k1fx.HasSecpOutputs)
+		if ok {
+			outputs := hasSecpOutputs.GetSecpOutputs()
+			for _, out := range outputs {
+				out.InitCtx(vm.ctx)
+			}
+		}
+
+		outputs := op.Op.Outs()
+		for _, output := range outputs {
+			ctxInitializable, ok := output.(snow.ContextInitializable)
+			if !ok {
+				continue
+			}
+
+			ctxInitializable.InitCtx(vm.ctx)
+		}
 	}
 
 	return t.BaseTx.Init(vm)

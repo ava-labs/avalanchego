@@ -17,6 +17,10 @@ type MintOperation struct {
 	Outputs   []*secp256k1fx.OutputOwners `serialize:"true" json:"outputs"`
 }
 
+func (op *MintOperation) GetSecpOutputs() []*secp256k1fx.OutputOwners {
+	return op.Outputs
+}
+
 // Outs ...
 func (op *MintOperation) Outs() []verify.State {
 	outs := []verify.State{}

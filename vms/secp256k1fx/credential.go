@@ -25,7 +25,7 @@ type FxCredential interface {
 
 // Credential ...
 type Credential struct {
-	FxID ids.ID                          `serialize:"true" json:"fxID"`
+	FxID ids.ID                          `serialize:"false" json:"fxID"`
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
 }
 

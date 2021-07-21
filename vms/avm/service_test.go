@@ -859,7 +859,7 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) 
 func newAvaxOperationTxWithOutputs(t *testing.T, createAssetTx *Tx, genesisBytes []byte, vm *VM) *Tx {
 	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
-	tx := buildOperationTx(createAssetTx)
+	tx := buildOperationTx(createAssetTx, key)
 	if err := tx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
@@ -960,7 +960,10 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 	}}
 }
 
-func buildOperationTx(createAssetTx *Tx) *Tx {
+// todo alternate operation tx with nftfx.MintOperation and secp.MintOperation
+//   another test with multiple output owners
+
+func buildOperationTx(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Tx {
 	return &Tx{UnsignedTx: &OperationTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -978,7 +981,10 @@ func buildOperationTx(createAssetTx *Tx) *Tx {
 				},
 				GroupID: 1,
 				Payload: []byte{'h', 'e', 'l', 'l', 'o'},
-				Outputs: []*secp256k1fx.OutputOwners{{}},
+				Outputs: []*secp256k1fx.OutputOwners{{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				}},
 			},
 		}},
 	}}
