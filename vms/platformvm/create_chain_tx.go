@@ -30,7 +30,7 @@ var (
 
 const (
 	maxNameLen    = 128
-	maxGenesisLen = 1024 * 1024
+	maxGenesisLen = units.MiB
 )
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx
