@@ -84,25 +84,6 @@ func TestInboundConnThrottler(t *testing.T) {
 	// Wait for the cooldown to elapse
 	time.Sleep(cooldown)
 
-	// Wait a little longer to make sure the throttler has time to
-	// clear the IPs after Dispatch wakes up
-	time.Sleep(25 * time.Millisecond)
-
-	// Allow should return true now that [cooldown] has passed
-	assert.True(t, throttlerIntf.Allow(host1))
-	assert.True(t, throttlerIntf.Allow(host2))
-	assert.True(t, throttlerIntf.Allow(host3))
-
-	// Shouldn't allow this IP because the number of connections
-	// within the last [cooldown] is at [MaxRecentConns]
-	_ = throttlerIntf.Allow(host4)
-	assert.False(t, throttlerIntf.Allow(host5))
-
-	// Shouldn't allow these IPs again until [cooldown] has passed
-	assert.False(t, throttlerIntf.Allow(host1))
-	assert.False(t, throttlerIntf.Allow(host2))
-	assert.False(t, throttlerIntf.Allow(host3))
-
 	// Make sure [throttler.done] isn't closed
 	throttler := throttlerIntf.(*inboundConnThrottler)
 	select {

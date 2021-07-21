@@ -55,7 +55,7 @@ func NewInboundConnThrottler(log logging.Logger, config InboundConnThrottlerConf
 	return &inboundConnThrottler{
 		InboundConnThrottlerConfig: config,
 		log:                        log,
-		done:                       make(chan struct{}, 1),
+		done:                       make(chan struct{}),
 		recentIPs:                  make(map[string]struct{}),
 		recentIPsAndTimes:          make(chan ipAndTime, config.MaxRecentConns),
 	}
