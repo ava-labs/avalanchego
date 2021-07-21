@@ -76,6 +76,10 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (id *ID) UnmarshalText(text []byte) error {
+	return id.UnmarshalJSON(text)
+}
+
 // Prefix this id to create a more selective id. This can be used to store
 // multiple values under the same key. For example:
 // prefix1(id) -> confidence

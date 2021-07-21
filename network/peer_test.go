@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils"
@@ -19,19 +20,19 @@ import (
 )
 
 type TestMsg struct {
-	op    Op
+	op    message.Op
 	bytes []byte
 }
 
-func newTestMsg(op Op, bits []byte) *TestMsg {
+func newTestMsg(op message.Op, bits []byte) *TestMsg {
 	return &TestMsg{op: op, bytes: bits}
 }
 
-func (m *TestMsg) Op() Op {
+func (m *TestMsg) Op() message.Op {
 	return m.op
 }
 
-func (*TestMsg) Get(Field) interface{} {
+func (*TestMsg) Get(message.Field) interface{} {
 	return nil
 }
 
@@ -81,7 +82,7 @@ func TestPeer_Close(t *testing.T) {
 		appVersion,
 	)
 
-	netwrk := NewDefaultNetwork(
+	netwrk, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id,
@@ -98,7 +99,6 @@ func TestPeer_Close(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -106,11 +106,14 @@ func TestPeer_Close(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		NewDialerConfig(0, 30*time.Second),
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, netwrk)
 
 	ip1 := utils.NewDynamicIPDesc(
@@ -127,17 +130,9 @@ func TestPeer_Close(t *testing.T) {
 
 	// fake a peer, and write a message
 	peer := newPeer(basenetwork, conn, ip1.IP())
-	peer.sender = make(chan []byte, 10)
-	testMsg := newTestMsg(GetVersion, newmsgbytes)
+	peer.sendQueue = [][]byte{}
+	testMsg := newTestMsg(message.GetVersion, newmsgbytes)
 	peer.Send(testMsg, true)
-
-	// make sure the net pending and peer pending bytes updated
-	if basenetwork.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
 
 	go func() {
 		err := netwrk.Close()
@@ -145,12 +140,4 @@ func TestPeer_Close(t *testing.T) {
 	}()
 
 	peer.Close()
-
-	// The network pending bytes should be reduced back to zero on close.
-	if basenetwork.pendingBytes != int64(0) {
-		t.Fatalf("pending bytes invalid")
-	}
-	if peer.pendingBytes != int64(len(newmsgbytes)) {
-		t.Fatalf("pending bytes invalid")
-	}
 }

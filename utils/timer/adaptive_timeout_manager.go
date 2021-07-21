@@ -67,9 +67,7 @@ type AdaptiveTimeoutConfig struct {
 	TimeoutCoefficient float64
 	// Larger halflife --> less volatile timeout
 	// [timeoutHalfLife] must be positive
-	TimeoutHalflife  time.Duration
-	MetricsNamespace string
-	Registerer       prometheus.Registerer
+	TimeoutHalflife time.Duration
 }
 
 // AdaptiveTimeoutManager is a manager for timeouts.
@@ -93,19 +91,23 @@ type AdaptiveTimeoutManager struct {
 }
 
 // Initialize this timeout manager with the provided config
-func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) error {
+func (tm *AdaptiveTimeoutManager) Initialize(
+	config *AdaptiveTimeoutConfig,
+	metricsNamespace string,
+	metricsRegister prometheus.Registerer,
+) error {
 	tm.networkTimeoutMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: config.MetricsNamespace,
+		Namespace: metricsNamespace,
 		Name:      "network_timeout",
 		Help:      "Duration of current network timeout in nanoseconds",
 	})
 	tm.avgLatency = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: config.MetricsNamespace,
+		Namespace: metricsNamespace,
 		Name:      "avg_network_latency",
 		Help:      "Average network latency in nanoseconds",
 	})
 	tm.numTimeouts = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: config.MetricsNamespace,
+		Namespace: metricsNamespace,
 		Name:      "request_timeouts",
 		Help:      "Number of timed out requests",
 	})
@@ -130,9 +132,9 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	tm.timer = NewTimer(tm.Timeout)
 
 	errs := &wrappers.Errs{}
-	errs.Add(config.Registerer.Register(tm.networkTimeoutMetric))
-	errs.Add(config.Registerer.Register(tm.avgLatency))
-	errs.Add(config.Registerer.Register(tm.numTimeouts))
+	errs.Add(metricsRegister.Register(tm.networkTimeoutMetric))
+	errs.Add(metricsRegister.Register(tm.avgLatency))
+	errs.Add(metricsRegister.Register(tm.numTimeouts))
 	return errs.Err
 }
 

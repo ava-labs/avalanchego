@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -32,7 +33,6 @@ import (
 )
 
 const (
-	defaultSendQueueSize              = 1 << 10
 	defaultAliasTimeout               = 2 * time.Second
 	defaultGossipPeerListFreq         = time.Minute
 	defaultPeerListSize               = 50
@@ -263,7 +263,10 @@ func initCerts(t *testing.T) {
 	tlsConfig2 = TLSConfig(*cert2)
 }
 
-var defaultTestDialerConfig = NewDialerConfig(0, 30*time.Second)
+var (
+	defaultInboundMsgThrottler  = throttling.NewNoInboundThrottler()
+	defaultOutboundMsgThrottler = throttling.NewNoOutboundThrottler()
+)
 
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)
@@ -309,7 +312,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		appVersion,
 	)
 
-	net := NewDefaultNetwork(
+	net, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id,
@@ -326,7 +329,6 @@ func TestNewDefaultNetwork(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -334,11 +336,14 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net)
 
 	go func() {
@@ -346,7 +351,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		assert.NoError(t, err)
 	}()
 
-	err := net.Dispatch()
+	err = net.Dispatch()
 	assert.Error(t, err)
 }
 
@@ -443,7 +448,7 @@ func TestEstablishConnection(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -460,7 +465,6 @@ func TestEstablishConnection(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -468,14 +472,17 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -492,7 +499,6 @@ func TestEstablishConnection(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -500,11 +506,14 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
 	go func() {
@@ -521,7 +530,7 @@ func TestEstablishConnection(t *testing.T) {
 	wg0.Wait()
 	wg1.Wait()
 
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -620,7 +629,7 @@ func TestDoubleTrack(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -637,7 +646,6 @@ func TestDoubleTrack(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -645,14 +653,17 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -669,7 +680,6 @@ func TestDoubleTrack(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -677,11 +687,14 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
 	net0.Track(ip1.IP(), id1)
@@ -699,7 +712,7 @@ func TestDoubleTrack(t *testing.T) {
 	wg0.Wait()
 	wg1.Wait()
 
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -798,7 +811,7 @@ func TestDoubleClose(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -815,7 +828,6 @@ func TestDoubleClose(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -823,14 +835,17 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -847,7 +862,6 @@ func TestDoubleClose(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -855,11 +869,14 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
 	net0.Track(ip1.IP(), id1)
@@ -876,7 +893,7 @@ func TestDoubleClose(t *testing.T) {
 	wg0.Wait()
 	wg1.Wait()
 
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -981,7 +998,7 @@ func TestTrackConnected(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -998,7 +1015,6 @@ func TestTrackConnected(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1006,14 +1022,17 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1030,7 +1049,6 @@ func TestTrackConnected(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1038,11 +1056,14 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
 	net0.Track(ip1.IP(), id1)
@@ -1061,7 +1082,7 @@ func TestTrackConnected(t *testing.T) {
 
 	net0.Track(ip1.IP(), id1)
 
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -1138,7 +1159,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1155,7 +1176,6 @@ func TestTrackConnectedRace(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1163,14 +1183,17 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1187,7 +1210,6 @@ func TestTrackConnectedRace(t *testing.T) {
 		handler,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1195,11 +1217,14 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
 	net0.Track(ip1.IP(), id1)
@@ -1213,7 +1238,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		assert.Error(t, err)
 	}()
 
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -1426,7 +1451,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1443,7 +1468,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1451,14 +1475,17 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1475,7 +1502,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1483,14 +1509,17 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
-	net2 := NewDefaultNetwork(
+	net2, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1507,7 +1536,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler2,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1515,14 +1543,17 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net2)
 
-	net3 := NewDefaultNetwork(
+	net3, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -1539,7 +1570,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		handler3,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1547,11 +1577,14 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net3)
 
 	go func() {
@@ -1628,7 +1661,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 
 	// Cleanup
 	cleanup = true
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -1875,7 +1908,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1892,7 +1925,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1900,14 +1932,17 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1924,7 +1959,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1932,14 +1966,17 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
-	net2 := NewDefaultNetwork(
+	net2, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1956,7 +1993,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler2,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1964,14 +2000,17 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net2)
 
-	net3 := NewDefaultNetwork(
+	net3, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -1988,7 +2027,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		handler3,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1996,11 +2034,14 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net3)
 
 	go func() {
@@ -2240,7 +2281,7 @@ func TestPeerSignature(t *testing.T) {
 		appVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -2257,7 +2298,6 @@ func TestPeerSignature(t *testing.T) {
 		handler0,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2265,14 +2305,17 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -2289,7 +2332,6 @@ func TestPeerSignature(t *testing.T) {
 		handler1,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2297,14 +2339,17 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
-	net2 := NewDefaultNetwork(
+	net2, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -2321,7 +2366,6 @@ func TestPeerSignature(t *testing.T) {
 		handler2,
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2329,11 +2373,14 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net2)
 
 	go func() {
@@ -2389,7 +2436,7 @@ func TestPeerSignature(t *testing.T) {
 	_, ok = handled[id2.String()+":"+id1.String()]
 	assert.True(t, ok)
 
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 
 	err = net1.Close()
@@ -2680,7 +2727,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		net1MinCompatibleVersion,
 	)
 
-	net0 := NewDefaultNetwork(
+	net0, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -2697,7 +2744,6 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		&testHandler{},
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2705,14 +2751,17 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1 := NewDefaultNetwork(
+	net1, err := NewDefaultNetwork(
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -2729,7 +2778,6 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		&testHandler{},
 		time.Duration(0),
 		0,
-		defaultSendQueueSize,
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2737,11 +2785,14 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		defaultTestDialerConfig,
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler,
 	)
+	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
 	go func() {
@@ -2765,7 +2816,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	}
 
 	// Cleanup
-	err := net0.Close()
+	err = net0.Close()
 	assert.NoError(t, err)
 	err = net1.Close()
 	assert.NoError(t, err)

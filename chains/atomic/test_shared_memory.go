@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,10 +30,11 @@ var SharedMemoryTests = []func(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1
 func TestSharedMemoryPutAndGet(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
 	assert := assert.New(t)
 
-	err := sm0.Put(chainID1, []*Element{{
+	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
-	}})
+	}}}})
+
 	assert.NoError(err)
 
 	values, err := sm1.Get(chainID0, [][]byte{{0}})
@@ -46,9 +48,9 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 	assert := assert.New(t)
 	rand.Seed(0)
 
-	totalSize := 16 * 1024 * 1024 // 16 MiB
-	elementSize := 4 * 1024       // 4 KiB
-	pairSize := 2 * elementSize   // 8 KiB
+	totalSize := 16 * units.MiB  // 16 MiB
+	elementSize := 4 * units.KiB // 4 KiB
+	pairSize := 2 * elementSize  // 8 KiB
 
 	b := make([]byte, totalSize)
 	_, err := rand.Read(b) // #nosec G404
@@ -70,10 +72,11 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 		keys = append(keys, key)
 	}
 
-	err = sm0.Put(
-		chainID1,
-		elems,
-	)
+	err = sm0.Apply(map[ids.ID]*Requests{
+		chainID1: {
+			PutRequests: elems,
+		},
+	})
 	assert.NoError(err)
 
 	values, err := sm1.Get(
@@ -85,34 +88,36 @@ func TestSharedMemoryLargePutGetAndRemove(t *testing.T, chainID0, chainID1 ids.I
 		assert.Equal(elems[i].Value, value)
 	}
 
-	err = sm1.Remove(
-		chainID0,
-		keys,
-	)
+	err = sm1.Apply(map[ids.ID]*Requests{
+		chainID0: {
+			RemoveRequests: keys,
+		},
+	})
+
 	assert.NoError(err)
 }
 
 func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
 	assert := assert.New(t)
 
-	err := sm0.Put(chainID1, []*Element{{
+	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
 		Traits: [][]byte{
 			{2},
 			{3},
 		},
-	}})
+	}}}})
 	assert.NoError(err)
 
-	err = sm0.Put(chainID1, []*Element{{
+	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{4},
 		Value: []byte{5},
 		Traits: [][]byte{
 			{2},
 			{3},
 		},
-	}})
+	}}}})
 	assert.NoError(err)
 
 	values, _, _, err := sm0.Indexed(chainID1, [][]byte{{2}}, nil, nil, 1)
@@ -147,8 +152,8 @@ func TestSharedMemoryIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 S
 func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, sm1 SharedMemory, _ database.Database) {
 	assert := assert.New(t)
 
-	totalSize := 8 * 1024 * 1024 // 8 MiB
-	elementSize := 1024          // 1 KiB
+	totalSize := 8 * units.MiB   // 8 MiB
+	elementSize := 1 * units.KiB // 1 KiB
 	pairSize := 3 * elementSize  // 3 KiB
 
 	b := make([]byte, totalSize)
@@ -177,7 +182,7 @@ func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, 
 		})
 	}
 
-	err = sm0.Put(chainID1, elems)
+	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: elems}})
 	assert.NoError(err)
 
 	values, _, _, err := sm1.Indexed(chainID0, allTraits, nil, nil, len(elems)+1)
@@ -187,8 +192,7 @@ func TestSharedMemoryLargeIndexed(t *testing.T, chainID0, chainID1 ids.ID, sm0, 
 
 func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database) {
 	assert := assert.New(t)
-
-	err := sm0.Put(chainID1, []*Element{
+	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{
 		{
 			Key:   []byte{0},
 			Value: []byte{1},
@@ -197,29 +201,26 @@ func TestSharedMemoryCantDuplicatePut(t *testing.T, _, chainID1 ids.ID, sm0, _ S
 			Key:   []byte{0},
 			Value: []byte{2},
 		},
-	})
+	}}})
 	assert.Error(err, "shouldn't be able to write duplicated keys")
-
-	err = sm0.Put(chainID1, []*Element{{
+	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
-	}})
+	}}}})
 	assert.NoError(err)
-
-	err = sm0.Put(chainID1, []*Element{{
+	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 		Key:   []byte{0},
 		Value: []byte{1},
-	}})
+	}}}})
 	assert.Error(err, "shouldn't be able to write duplicated keys")
 }
 
 func TestSharedMemoryCantDuplicateRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ SharedMemory, _ database.Database) {
 	assert := assert.New(t)
-
-	err := sm0.Remove(chainID1, [][]byte{{0}})
+	err := sm0.Apply(map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}})
 	assert.NoError(err)
 
-	err = sm0.Remove(chainID1, [][]byte{{0}})
+	err = sm0.Apply(map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}})
 	assert.Error(err, "shouldn't be able to remove duplicated keys")
 }
 
@@ -237,12 +238,11 @@ func TestSharedMemoryCommitOnPut(t *testing.T, _, chainID1 ids.ID, sm0, _ Shared
 	err = batch.Delete([]byte{1})
 	assert.NoError(err)
 
-	err = sm0.Put(
-		chainID1,
-		[]*Element{{
+	err = sm0.Apply(
+		map[ids.ID]*Requests{chainID1: {PutRequests: []*Element{{
 			Key:   []byte{0},
 			Value: []byte{1},
-		}},
+		}}}},
 		batch,
 	)
 	assert.NoError(err)
@@ -270,9 +270,8 @@ func TestSharedMemoryCommitOnRemove(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	err = batch.Delete([]byte{1})
 	assert.NoError(err)
 
-	err = sm0.Remove(
-		chainID1,
-		[][]byte{{0}},
+	err = sm0.Apply(
+		map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}},
 		batch,
 	)
 	assert.NoError(err)
@@ -295,21 +294,19 @@ func TestPutAndRemoveBatch(t *testing.T, chainID0, chainID1 ids.ID, _, sm1 Share
 	err := batch.Put([]byte{0}, []byte{1})
 	assert.NoError(err)
 
-	batchChainsAndInputs := make(map[ids.ID][]*Requests)
+	batchChainsAndInputs := make(map[ids.ID]*Requests)
 
-	byteArr := [][]byte{{0}, {1}, {2}}
+	byteArr := [][]byte{{0}, {1}, {5}}
 
-	batchChainsAndInputs[chainID0] = []*Requests{{Remove, byteArr, []*Element{{
-		Key:   []byte{2},
-		Value: []byte{9},
-	}}}}
+	batchChainsAndInputs[chainID0] = &Requests{
+		PutRequests: []*Element{{
+			Key:   []byte{2},
+			Value: []byte{9},
+		}},
+		RemoveRequests: byteArr,
+	}
 
-	batchChainsAndInputs[chainID1] = []*Requests{{Put, byteArr, []*Element{{
-		Key:   []byte{0},
-		Value: []byte{1},
-	}}}}
-
-	err = sm1.RemoveAndPutMultiple(batchChainsAndInputs, batch)
+	err = sm1.Apply(batchChainsAndInputs, batch)
 
 	assert.NoError(err)
 
@@ -324,8 +321,8 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	assert := assert.New(t)
 	rand.Seed(0)
 
-	totalSize := 8 * 1024 * 1024 // 8 MiB
-	elementSize := 4 * 1024      // 4 KiB
+	totalSize := 8 * units.MiB   // 8 MiB
+	elementSize := 4 * units.KiB // 4 KiB
 	pairSize := 2 * elementSize  // 8 KiB
 
 	bytes := make([]byte, totalSize)
@@ -356,9 +353,8 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 	err = batch.Delete([]byte{1})
 	assert.NoError(err)
 
-	err = sm0.Remove(
-		chainID1,
-		[][]byte{{0}},
+	err = sm0.Apply(
+		map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{0}}}},
 		batch,
 	)
 	assert.NoError(err)
@@ -382,9 +378,8 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		assert.NoError(err)
 	}
 
-	err = sm0.Remove(
-		chainID1,
-		[][]byte{{1}},
+	err = sm0.Apply(
+		map[ids.ID]*Requests{chainID1: {RemoveRequests: [][]byte{{1}}}},
 		batch,
 	)
 
@@ -401,21 +396,19 @@ func TestSharedMemoryLargeBatchSize(t *testing.T, _, chainID1 ids.ID, sm0, _ Sha
 		assert.NoError(err)
 	}
 
-	batchChainsAndInputs := make(map[ids.ID][]*Requests)
+	batchChainsAndInputs := make(map[ids.ID]*Requests)
 
-	byteArr := [][]byte{{0}, {1}, {2}}
+	byteArr := [][]byte{{30}, {40}, {50}}
 
-	batchChainsAndInputs[chainID1] = []*Requests{{Remove, byteArr, []*Element{{
-		Key:   []byte{2},
-		Value: []byte{9},
-	}}}}
+	batchChainsAndInputs[chainID1] = &Requests{
+		PutRequests: []*Element{{
+			Key:   []byte{2},
+			Value: []byte{9},
+		}},
+		RemoveRequests: byteArr,
+	}
 
-	batchChainsAndInputs[chainID1] = []*Requests{{Put, byteArr, []*Element{{
-		Key:   []byte{0},
-		Value: []byte{1},
-	}}}}
-
-	err = sm0.RemoveAndPutMultiple(
+	err = sm0.Apply(
 		batchChainsAndInputs,
 		batch,
 	)

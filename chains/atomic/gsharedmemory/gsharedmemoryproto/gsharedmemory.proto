@@ -18,15 +18,9 @@ message Batch {
 }
 
 message AtomicRequest {
-    SharedMemoryMethod requestType = 1;
-	repeated bytes utxoIDs = 2;
-	repeated Element elems = 3;
-    bytes peerChainID = 4;
-}
-
-enum SharedMemoryMethod {
-    Put = 0;
-    Remove = 1;
+    repeated bytes removeRequests = 1;
+    repeated Element putRequests = 2;
+    bytes peerChainID = 3;
 }
 
 message Element {
@@ -34,30 +28,6 @@ message Element {
     bytes Value = 2;
     repeated bytes Traits = 3;
 }
-
-message PutRequest {
-    bytes peerChainID = 1;
-    repeated Element elems = 2;
-    repeated Batch batches = 3;
-    int64 id = 4;
-    bool continues = 5;
-}
-
-message BatchMap {
-    repeated AtomicRequest requests = 1;
-}
-
-message RemoveAndPutMultipleRequest {
-    map<string, BatchMap> batchChainsAndInputs = 1;
-    repeated Batch batches = 2;
-    int64 id = 3;
-    bool continues = 4;
-}
-
-
-message RemoveAndPutMultipleResponse {}
-
-message PutResponse {}
 
 message GetRequest {
     bytes peerChainID = 1;
@@ -88,20 +58,17 @@ message IndexedResponse {
     bool continues = 4;
 }
 
-message RemoveRequest {
-    bytes peerChainID = 1;
-    repeated bytes keys = 2;
-    repeated Batch batches = 3;
-    int64 id = 4;
-    bool continues = 5;
+message ApplyRequest {
+    repeated AtomicRequest requests = 1;
+    repeated Batch batches = 2;
+    int64 id = 3;
+    bool continues = 4;
 }
 
-message RemoveResponse {}
+message ApplyResponse {}
 
 service SharedMemory {
-    rpc Put(PutRequest) returns (PutResponse);
     rpc Get(GetRequest) returns (GetResponse);
     rpc Indexed(IndexedRequest) returns (IndexedResponse);
-    rpc Remove(RemoveRequest) returns (RemoveResponse);
-    rpc RemoveAndPutMultiple(RemoveAndPutMultipleRequest) returns (RemoveAndPutMultipleResponse);
+    rpc Apply(ApplyRequest) returns (ApplyResponse);
 }

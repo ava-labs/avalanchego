@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -37,6 +38,9 @@ type Manager interface {
 	// of the VM with the given ID
 	RegisterFactory(ids.ID, Factory) error
 
+	// Versions returns the versions of all the VMs that have been registered
+	Versions() (map[string]string, error)
+
 	// Given an alias, return the ID of the VM associated with that alias
 	Lookup(string) (ids.ID, error)
 
@@ -53,9 +57,13 @@ type manager struct {
 	// alias of the VM. That is, [VM].String() is an alias for the VM, too.
 	ids.Aliaser
 
-	// Key: The key underlying a VM's ID
+	// Key: A VM's ID
 	// Value: A factory that creates new instances of that VM
-	vmFactories map[ids.ID]Factory
+	factories map[ids.ID]Factory
+
+	// Key: A VM's ID
+	// Value: version the VM returned
+	versions map[ids.ID]string
 
 	// The node's API server.
 	// [manager] adds routes to this server to expose new API endpoints/services
@@ -67,9 +75,10 @@ type manager struct {
 // NewManager returns an instance of a VM manager
 func NewManager(apiServer *server.Server, log logging.Logger) Manager {
 	m := &manager{
-		vmFactories: make(map[ids.ID]Factory),
-		apiServer:   apiServer,
-		log:         log,
+		factories: make(map[ids.ID]Factory),
+		versions:  make(map[ids.ID]string),
+		apiServer: apiServer,
+		log:       log,
 	}
 	m.Initialize()
 	return m
@@ -78,77 +87,91 @@ func NewManager(apiServer *server.Server, log logging.Logger) Manager {
 // Return a factory that can create new instances of the vm whose
 // ID is [vmID]
 func (m *manager) GetFactory(vmID ids.ID) (Factory, error) {
-	if factory, ok := m.vmFactories[vmID]; ok {
+	if factory, ok := m.factories[vmID]; ok {
 		return factory, nil
 	}
-	return nil, fmt.Errorf("no vm with ID '%v' has been registered", vmID)
+	return nil, fmt.Errorf("%q was not registered as a vm", vmID)
 }
 
 // Map [vmID] to [factory]. [factory] creates new instances of the vm whose
 // ID is [vmID]
 func (m *manager) RegisterFactory(vmID ids.ID, factory Factory) error {
-	if _, exists := m.vmFactories[vmID]; exists {
-		return fmt.Errorf("a vm with ID '%v' has already been registered", vmID)
+	if _, exists := m.factories[vmID]; exists {
+		return fmt.Errorf("%q was already registered as a vm", vmID)
 	}
 	if err := m.Alias(vmID, vmID.String()); err != nil {
 		return err
 	}
 
-	m.vmFactories[vmID] = factory
+	m.factories[vmID] = factory
 
-	// add the static API endpoints
-	return m.addStaticAPIEndpoints(vmID)
-}
+	// VMs can expose a static API (one that does not depend on the state of a
+	// particular chain.) This adds to the node's API server the static API of
+	// the VM with ID [vmID]. This allows clients to call the VM's static API
+	// methods.
 
-// VMs can expose a static API (one that does not depend on the state of a particular chain.)
-// This method adds to the node's API server the static API of the VM with ID [vmID].
-// This allows clients to call the VM's static API methods.
-func (m *manager) addStaticAPIEndpoints(vmID ids.ID) error {
-	vmFactory, err := m.GetFactory(vmID)
-	m.log.AssertNoError(err)
-	m.log.Debug("adding static API for VM with ID %s", vmID)
-	vm, err := vmFactory.New(nil)
+	m.log.Debug("adding static API for vm %q", vmID)
+
+	vm, err := factory.New(nil)
 	if err != nil {
 		return err
 	}
 
-	staticVM, ok := vm.(common.StaticVM)
+	commonVM, ok := vm.(common.VM)
 	if !ok {
-		staticVM, ok := vm.(common.VM)
-		if ok {
-			if err := staticVM.Shutdown(); err != nil {
-				m.log.Error("shutting down static API endpoints errored with: %s", err)
-				return err
-			}
-		}
 		return nil
 	}
 
-	handlers, err := staticVM.CreateStaticHandlers()
+	version, err := commonVM.Version()
 	if err != nil {
-		m.log.Error("starting static API endpoints for %s errored with: %s", vmID, err)
+		m.log.Error("fetching version for %q errored with: %s", vmID, err)
 
-		staticVM, ok := vm.(common.VM)
-		if ok {
-			if err := staticVM.Shutdown(); err != nil {
-				m.log.Error("shutting down static API endpoints errored with: %s", err)
-				return err
-			}
+		if err := commonVM.Shutdown(); err != nil {
+			return fmt.Errorf("shutting down VM errored with: %s", err)
+		}
+		return nil
+	}
+	m.versions[vmID] = version
+
+	handlers, err := commonVM.CreateStaticHandlers()
+	if err != nil {
+		m.log.Error("creating static API endpoints for %q errored with: %s", vmID, err)
+
+		if err := commonVM.Shutdown(); err != nil {
+			return fmt.Errorf("shutting down VM errored with: %s", err)
 		}
 		return nil
 	}
 
 	// all static endpoints go to the vm endpoint, defaulting to the vm id
-	defaultEndpoint := "vm/" + vmID.String()
+	defaultEndpoint := constants.VMAliasPrefix + vmID.String()
 	// use a single lock for this entire vm
 	lock := new(sync.RWMutex)
 	// register the static endpoints
 	for extension, service := range handlers {
-		m.log.Verbo("adding static API endpoint: %s", defaultEndpoint+extension)
+		m.log.Verbo("adding static API endpoint: %s%s", defaultEndpoint, extension)
 		if err := m.apiServer.AddRoute(service, lock, defaultEndpoint, extension, m.log); err != nil {
-			m.log.Warn("failed to add static API endpoint %s: %v", fmt.Sprintf("%s%s", defaultEndpoint, extension), err)
-			return err
+			return fmt.Errorf(
+				"failed to add static API endpoint %s%s: %s",
+				defaultEndpoint,
+				extension,
+				err,
+			)
 		}
 	}
 	return nil
+}
+
+// Versions returns the primary alias of the VM mapped to the reported version
+// of the VM for all the registered VMs that reported versions.
+func (m *manager) Versions() (map[string]string, error) {
+	versions := make(map[string]string, len(m.versions))
+	for vmID, version := range m.versions {
+		alias, err := m.PrimaryAlias(vmID)
+		if err != nil {
+			return nil, err
+		}
+		versions[alias] = version
+	}
+	return versions, nil
 }

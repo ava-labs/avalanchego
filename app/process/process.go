@@ -5,10 +5,13 @@ package process
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/rocksdb"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -94,24 +97,26 @@ func (a *App) Start() int {
 
 	// start the db manager
 	var dbManager manager.Manager
-	if a.config.DBEnabled {
-		dbManager, err = manager.New(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
-		if err != nil {
-			a.log.Fatal("couldn't create db manager at %s: %s", a.config.DBPath, err)
-			return 1
-		}
-	} else {
-		dbManager, err = manager.NewManagerFromDBs(
-			[]*manager.VersionedDatabase{
-				{
-					Database: memdb.New(),
-					Version:  version.CurrentDatabase,
-				},
-			})
-		if err != nil {
-			a.log.Fatal("couldn't create db manager from memory db: %s", err)
-			return 1
-		}
+	switch a.config.DBName {
+	case rocksdb.Name:
+		path := filepath.Join(a.config.DBPath, rocksdb.Name)
+		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase, !a.config.FetchOnly)
+	case leveldb.Name:
+		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
+	case memdb.Name:
+		dbManager = manager.NewMemDB(version.CurrentDatabase)
+	default:
+		err = fmt.Errorf(
+			"db-type was %q but should have been one of {%s, %s, %s}",
+			a.config.DBName,
+			leveldb.Name,
+			rocksdb.Name,
+			memdb.Name,
+		)
+	}
+	if err != nil {
+		a.log.Fatal("couldn't create %q db manager at %s: %s", a.config.DBName, a.config.DBPath, err)
+		return 1
 	}
 
 	// ensure migrations are done
