@@ -74,7 +74,7 @@ type Context struct {
 	// Non-zero iff this chain bootstrapped. Should only be accessed atomically.
 	bootstrapped uint32
 
-	// snoman++ attributes
+	// snowman++ attributes
 	ValidatorVM       validators.VM     // interface for P-Chain validators
 	StakingLeafSigner crypto.Signer     // block signer
 	StakingCertLeaf   *x509.Certificate // block certificate

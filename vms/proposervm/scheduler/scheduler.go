@@ -21,17 +21,19 @@ type Scheduler interface {
 
 // scheduler to control the signal dispatching from a vm to consensus engine
 type scheduler struct {
-	fromVM       <-chan common.Message
-	toEngine     chan<- common.Message
-	newStartTime chan time.Time
+	activationTime time.Time
+	fromVM         <-chan common.Message
+	toEngine       chan<- common.Message
+	newStartTime   chan time.Time
 }
 
-func New(toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
+func New(toEngine chan<- common.Message, activationTime time.Time) (Scheduler, chan<- common.Message) {
 	vmToEngine := make(chan common.Message, fromVMSize)
 	return &scheduler{
-		fromVM:       vmToEngine,
-		toEngine:     toEngine,
-		newStartTime: make(chan time.Time),
+		activationTime: activationTime,
+		fromVM:         vmToEngine,
+		toEngine:       toEngine,
+		newStartTime:   make(chan time.Time),
 	}, vmToEngine
 }
 
@@ -51,13 +53,13 @@ waitloop:
 			continue waitloop
 		}
 
-		msgSent := false // send only one signal to engine per time window
+		msgSent := false // send only one signal to engine per time window, after Fork
 		for {
 			select {
 			case msg := <-s.fromVM:
 				if !msgSent {
 					s.toEngine <- msg
-					msgSent = true
+					msgSent = !time.Now().Before(s.activationTime)
 				}
 			case newStartTime, ok := <-s.newStartTime:
 				if !ok {

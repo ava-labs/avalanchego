@@ -130,6 +130,12 @@ type VM struct {
 	lastVdrUpdate time.Time
 }
 
+// implements SnowmanPlusPlusVM interface
+func (vm *VM) GetActivationTime() time.Time {
+	// ProposerVM activation time for snowman++ protocol
+	return time.Unix(0, 0)
+}
+
 // Initialize this blockchain.
 // [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
 func (vm *VM) Initialize(

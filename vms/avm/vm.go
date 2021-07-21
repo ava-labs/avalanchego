@@ -113,6 +113,12 @@ type VM struct {
 	walletService WalletService
 }
 
+// implements SnowmanPlusPlusVM interface
+func (vm *VM) GetActivationTime() time.Time {
+	// ProposerVM activation time for snowman++ protocol
+	return time.Unix(0, 0)
+}
+
 func (vm *VM) Connected(id ids.ShortID) error {
 	return nil // noop
 }

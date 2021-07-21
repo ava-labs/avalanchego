@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/snow/triggers"
-	"github.com/ava-labs/avalanchego/snow/validators"
+	vals "github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
@@ -106,7 +106,7 @@ type ChainParameters struct {
 	VMAlias     string   // The ID of the vm this chain is running
 	FxAliases   []string // The IDs of the feature extensions this chain is running
 
-	CustomBeacons validators.Set // Should only be set if the default beacons can't be used.
+	CustomBeacons vals.Set // Should only be set if the default beacons can't be used.
 }
 
 type chain struct {
@@ -114,7 +114,7 @@ type chain struct {
 	Engine  common.Engine
 	Handler *router.Handler
 	Ctx     *snow.Context
-	Beacons validators.Set
+	Beacons vals.Set
 }
 
 // ChainConfig is configuration settings for the current execution.
@@ -140,10 +140,10 @@ type ManagerConfig struct {
 	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
 	EpochFirstTransition      time.Time
 	EpochDuration             time.Duration
-	Validators                validators.Manager // Validators validating on this chain
-	NodeID                    ids.ShortID        // The ID of this node
-	NetworkID                 uint32             // ID of the network this node is connected to
-	Server                    *server.Server     // Handles HTTP API calls
+	Validators                vals.Manager   // Validators validating on this chain
+	NodeID                    ids.ShortID    // The ID of this node
+	NetworkID                 uint32         // ID of the network this node is connected to
+	Server                    *server.Server // Handles HTTP API calls
 	Keystore                  keystore.Keystore
 	AtomicMemory              *atomic.Memory
 	AVAXAssetID               ids.ID
@@ -159,7 +159,7 @@ type ManagerConfig struct {
 	// and use [FetchOnlyFrom] as beacons
 	FetchOnly bool
 	// [FetchOnlyFrom] ignored unless [FetchOnly] is true
-	FetchOnlyFrom validators.Set
+	FetchOnlyFrom vals.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
@@ -195,8 +195,8 @@ type manager struct {
 	// Value: The chain
 	chains map[ids.ID]*router.Handler
 
-	// snoman++ related interface to allow validators retrival
-	validatorVM validators.VM
+	// snowman++ related interface to allow validators retrival
+	validatorVM vals.VM
 }
 
 // New returns a new Manager
@@ -397,8 +397,8 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 	consensusParams := m.ConsensusParams
 	consensusParams.Namespace = fmt.Sprintf("%s_%s", constants.PlatformName, primaryAlias)
 
-	// The validators of this blockchain
-	var vdrs validators.Set // Validators validating this blockchain
+	// The vals of this blockchain
+	var vdrs vals.Set // Validators validating this blockchain
 	var ok bool
 	if m.StakingEnabled {
 		vdrs, ok = m.Validators.GetValidators(chainParams.SubnetID)
@@ -477,7 +477,7 @@ func (m *manager) createAvalancheChain(
 	ctx *snow.Context,
 	genesisData []byte,
 	validators,
-	beacons validators.Set,
+	beacons vals.Set,
 	vm vertex.DAGVM,
 	fxs []*common.Fx,
 	consensusParams avcon.Parameters,
@@ -612,8 +612,8 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.Context,
 	genesisData []byte,
-	vals,
-	beacons validators.Set,
+	validators,
+	beacons vals.Set,
 	vm block.ChainVM,
 	fxs []*common.Fx,
 	consensusParams snowball.Parameters,
@@ -648,11 +648,9 @@ func (m *manager) createSnowmanChain(
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)
 
-	proVM := proposervm.New(vm, time.Unix(0, 0)) // enable proBlocks
-
-	// first vm to be init is P-Chain once, which provides validator interface to all of other VMs
+	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorVM == nil {
-		if valVM, ok := proVM.ChainVM.(validators.VM); ok {
+		if valVM, ok := vm.(vals.VM); ok {
 			m.validatorVM = valVM
 			ctx.ValidatorVM = valVM
 		} else {
@@ -660,7 +658,12 @@ func (m *manager) createSnowmanChain(
 		}
 	}
 
-	if err := proVM.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+	if vmPlus, ok := vm.(block.SnowmanPlusPlusVM); ok {
+		vm = proposervm.New(vm, vmPlus.GetActivationTime()) // enable ProposerVM on this VM
+	}
+
+	if err := vm.Initialize(ctx, vmDBManager, genesisData,
+		chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
 		return nil, err
 	}
 
@@ -697,7 +700,7 @@ func (m *manager) createSnowmanChain(
 		Config: smbootstrap.Config{
 			Config: common.Config{
 				Ctx:                           ctx,
-				Validators:                    vals,
+				Validators:                    validators,
 				Beacons:                       beacons,
 				SampleK:                       sampleK,
 				StartupAlpha:                  (3*bootstrapWeight + 3) / 4,
@@ -712,7 +715,7 @@ func (m *manager) createSnowmanChain(
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
 			},
 			Blocked:      blocked,
-			VM:           proVM,
+			VM:           vm,
 			Bootstrapped: m.unblockChains,
 		},
 		Params:    consensusParams,
@@ -723,7 +726,7 @@ func (m *manager) createSnowmanChain(
 
 	err = handler.Initialize(
 		engine,
-		vals,
+		validators,
 		msgChan,
 		fmt.Sprintf("%s_handler", consensusParams.Namespace),
 		consensusParams.Metrics,

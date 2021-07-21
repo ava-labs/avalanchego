@@ -73,7 +73,7 @@ func (vm *VM) Initialize(
 	vm.Windower = proposer.New(ctx, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 
-	scheduler, vmToEngine := scheduler.New(toEngine)
+	scheduler, vmToEngine := scheduler.New(toEngine, vm.activationTime)
 	vm.Scheduler = scheduler
 
 	go ctx.Log.RecoverAndPanic(func() {
@@ -148,7 +148,6 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		prefBlk = opt
 		pChainHeight, err = opt.pChainHeight()
 		if err != nil {
-			vm.ctx.Log.Error("Snowman++ set preference - could not retrieve current P-Chain height")
 			return err
 		}
 	} else {
