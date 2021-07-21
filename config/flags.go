@@ -125,17 +125,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
-	// Incoming Connection Throttling
-	// Upgrade at most [conn-meter-max-conns] incoming connections from a given
-	// IP in the last [conn-meter-reset-duration].
-	fs.Duration(ConnMeterResetDurationKey, 0*time.Second,
-		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If either is 0, incoming connections are not rate-limited.")
-	// TODO: Use Uint rather than Int when negative arguments are invalid
-	fs.Int(ConnMeterMaxConnsKey, 5,
-		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If either is 0, incoming connections are not rate-limited.")
-	// Outgoing Connection Throttling
+	// Inbound Connection Throttling
+	fs.Duration(InboundConnThrottlerCooldownKey, 2*time.Second, "Allow an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connections.")
+	fs.Int(InboundConnThrottlerMaxRecentConnsKey, 1024, fmt.Sprintf("Allow at most this many inbound connection per [--%s]", InboundConnThrottlerCooldownKey))
+	// Outbound Connection Throttling
 	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
 	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer.")
 	// Timeouts

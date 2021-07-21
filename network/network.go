@@ -53,7 +53,6 @@ const (
 	defaultPingFrequency                       = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                      = 16 * units.KiB
 	defaultReadHandshakeTimeout                = 15 * time.Second
-	defaultConnMeterCacheSize                  = 1024
 	defaultByteSliceCap                        = 128
 )
 
@@ -157,7 +156,7 @@ type network struct {
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	connMeter                    ConnMeter
+	inboundConnThrottler         throttling.InboundConnThrottler
 	c                            message.Codec
 	b                            message.Builder
 	isFetchOnly                  bool
@@ -239,8 +238,9 @@ type network struct {
 
 type Config struct {
 	HealthConfig
-	InboundThrottlerConfig  throttling.MsgThrottlerConfig
-	OutboundThrottlerConfig throttling.MsgThrottlerConfig
+	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig
+	InboundThrottlerConfig     throttling.MsgThrottlerConfig
+	OutboundThrottlerConfig    throttling.MsgThrottlerConfig
 	timer.AdaptiveTimeoutConfig
 	DialerConfig     dialer.Config
 	MetricsNamespace string
@@ -266,8 +266,7 @@ func NewDefaultNetwork(
 	vdrs validators.Set,
 	beacons validators.Set,
 	router router.Router,
-	connMeterResetDuration time.Duration,
-	connMeterMaxConns int,
+	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -314,9 +313,7 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
-		connMeterResetDuration,
-		defaultConnMeterCacheSize,
-		connMeterMaxConns,
+		inboundConnThrottlerConfig,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -361,9 +358,7 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
-	connMeterResetDuration time.Duration,
-	connMeterCacheSize int,
-	connMeterMaxConns int,
+	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -414,7 +409,7 @@ func NewNetwork(
 		myIPs:                        map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:               readBufferSize,
 		readHandshakeTimeout:         readHandshakeTimeout,
-		connMeter:                    NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
+		inboundConnThrottler:         throttling.NewInboundConnThrottler(log, inboundConnThrottlerConfig),
 		healthConfig:                 healthConfig,
 		benchlistManager:             benchlistManager,
 		tlsKey:                       tlsKey,
@@ -873,10 +868,12 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
 		return false
 	}
-	if !n.connMeter.Allow(ipStr) {
+	if !n.inboundConnThrottler.Allow(ipStr) {
 		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
+		n.metrics.inboundConnRateLimited.Inc()
 		return false
 	}
+	n.metrics.inboundConnAllowed.Inc()
 
 	// Note that we attempt to upgrade remote addresses in
 	// [n.disconnectedIPs] because that could allow us to initialize
@@ -889,6 +886,8 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 // Assumes [n.stateLock] is not held.
 func (n *network) Dispatch() error {
 	go n.gossipPeerList() // Periodically gossip peers
+	go n.inboundConnThrottler.Dispatch()
+	defer n.inboundConnThrottler.Stop()
 	go func() {
 		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)

@@ -65,6 +65,8 @@ type metrics struct {
 	failedToParse            prometheus.Counter
 	connected                prometheus.Counter
 	disconnected             prometheus.Counter
+	inboundConnRateLimited   prometheus.Counter
+	inboundConnAllowed       prometheus.Counter
 
 	getVersion, version,
 	getPeerlist, peerList,
@@ -117,6 +119,16 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		Name:      "times_disconnected",
 		Help:      "Times this node disconnected from a peer it had completed a handshake with",
 	})
+	m.inboundConnAllowed = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "inbound_conn_throttler_allowed",
+		Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
+	})
+	m.inboundConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "inbound_conn_throttler_rate_limited",
+		Help:      "Times this node rejected an inbound connection due to rate-limiting.",
+	})
 
 	errs := wrappers.Errs{}
 	errs.Add(
@@ -128,6 +140,8 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		registerer.Register(m.failedToParse),
 		registerer.Register(m.connected),
 		registerer.Register(m.disconnected),
+		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.inboundConnRateLimited),
 
 		m.getVersion.initialize(message.GetVersion, registerer),
 		m.version.initialize(message.Version, registerer),
