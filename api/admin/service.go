@@ -188,25 +188,14 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 		return errors.New("need to specify either displayLevel or logLevel")
 	}
 
-	changeLogLevel := len(args.LogLevel) > 0
-	var changeLogLevelTo logging.Level
-	if changeLogLevel {
-		// Parse new log level from string
-		var err error
-		changeLogLevelTo, err = logging.ToLevel(args.LogLevel)
-		if err != nil {
-			return err
-		}
+	changeLogLevelTo, changeLogLevel, err := getLevelFromArg(args.LogLevel)
+	if err != nil {
+		return err
 	}
-	changeDisplayLevel := len(args.DisplayLevel) > 0
-	var changeDisplayLevelTo logging.Level
-	if changeDisplayLevel {
-		// Parse new display level from string
-		var err error
-		changeDisplayLevelTo, err = logging.ToLevel(args.DisplayLevel)
-		if err != nil {
-			return err
-		}
+
+	changeDisplayLevelTo, changeDisplayLevel, err := getLevelFromArg(args.DisplayLevel)
+	if err != nil {
+		return err
 	}
 
 	var loggerNames []string
@@ -275,4 +264,16 @@ func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, 
 		}
 	}
 	return nil
+}
+
+func getLevelFromArg(arg string) (logging.Level, bool, error) {
+	if len(arg) > 0 {
+		// Parse new level from string
+		level, err := logging.ToLevel(arg)
+		if err != nil {
+			return level, false, err
+		}
+		return level, true, nil
+	}
+	return logging.Off, false, nil
 }
