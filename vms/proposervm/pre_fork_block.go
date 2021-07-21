@@ -20,6 +20,7 @@ type preForkBlock struct {
 }
 
 func (b *preForkBlock) Parent() snowman.Block {
+	// A preForkBlock's parent is always a preForkBlock
 	return &preForkBlock{
 		Block: b.Block.Parent(),
 		vm:    b.vm,
@@ -46,6 +47,7 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 	if err != nil {
 		return [2]snowman.Block{}, err
 	}
+	// A pre-fork block's child options are always pre-fork blocks
 	return [2]snowman.Block{
 		&preForkBlock{
 			Block: options[0],
@@ -61,25 +63,28 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if !parentTimestamp.Before(b.vm.activationTime) {
+		// If this block's timestamp is at or after activation time,
+		// it's child must be a post-fork block
 		return errProposersActivated
 	}
 
 	return child.Block.Verify()
 }
 
+// This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	childID := child.ID()
 	childPChainHeight := child.PChainHeight()
 	currentPChainHeight, err := b.vm.PChainHeight()
 	if err != nil {
-		b.vm.ctx.Log.Error("Snowman++ verify post-fork block %s - could not retrieve current P-Chain height",
-			childID)
+		b.vm.ctx.Log.Error("couldn't retrieve current P-Chain height while verifying %s: %s", childID, err)
 		return err
 	}
 	if childPChainHeight > currentPChainHeight {
 		return errPChainHeightNotReached
 	}
 
+	// Make sure [b] is the parent of [child]'s inner block
 	expectedInnerParentID := b.ID()
 	innerParent := child.innerBlk.Parent()
 	innerParentID := innerParent.ID()
@@ -87,17 +92,21 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return errInnerParentMismatch
 	}
 
-	// This block is expected to be the fork block
+	// A *preForkBlock can only have a *postForkBlock child
+	// if the *preForkBlock is the last *preForkBlock before activation takes effect
+	// (its timestamp is at or after the activation time)
 	parentTimestamp := b.Timestamp()
 	if parentTimestamp.Before(b.vm.activationTime) {
 		return errProposersNotActivated
 	}
 
+	// Child's timestamp must be at or after its parent's timestamp
 	childTimestamp := child.Timestamp()
 	if childTimestamp.Before(parentTimestamp) {
 		return errTimeNotMonotonic
 	}
 
+	// Child timestamp can't be too far in the future
 	maxTimestamp := b.vm.Time().Add(syncBound)
 	if childTimestamp.After(maxTimestamp) {
 		return errTimeTooAdvanced
@@ -108,7 +117,11 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return err
 	}
 
-	// only validate the inner block once
+	// If inner block's Verify returned true, don't call it again.
+	// Note that if [child.innerBlk.Verify] returns nil,
+	// this method returns nil. This must always remain the case to
+	// maintain the inner block's invariant that if it's Verify()
+	// returns nil, it is eventually accepted/rejected.
 	if !b.vm.Tree.Contains(child.innerBlk) {
 		if err := child.innerBlk.Verify(); err != nil {
 			return err
@@ -121,7 +134,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
-	b.vm.ctx.Log.Debug("post-fork option built on top of pre-fork block")
+	b.vm.ctx.Log.Debug("post-fork option has pre-fork block as parent")
 	return errUnexpectedBlockType
 }
 

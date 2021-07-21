@@ -45,8 +45,11 @@ type VM struct {
 	scheduler.Scheduler
 	timer.Clock
 
-	ctx            *snow.Context
-	db             *versiondb.Database
+	ctx *snow.Context
+	db  *versiondb.Database
+	// Block ID --> Block
+	// Each element is a block that passed verification but
+	// hasn't yet been accepted/rejected
 	verifiedBlocks map[ids.ID]Block
 	preferred      ids.ID
 }
