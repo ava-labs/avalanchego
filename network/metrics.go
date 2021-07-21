@@ -65,6 +65,8 @@ type metrics struct {
 	failedToParse            prometheus.Counter
 	connected                prometheus.Counter
 	disconnected             prometheus.Counter
+	inboundConnRateLimited   prometheus.Counter
+	inboundConnAllowed       prometheus.Counter
 
 	getVersion, version,
 	getPeerlist, peerList,
@@ -76,46 +78,56 @@ type metrics struct {
 	pushQuery, pullQuery, chits messageMetrics
 }
 
-func (m *metrics) initialize(registerer prometheus.Registerer) error {
+func (m *metrics) initialize(namespace string, registerer prometheus.Registerer) error {
 	m.numPeers = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "peers",
 		Help:      "Number of network peers",
 	})
 	m.timeSinceLastMsgReceived = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "time_since_last_msg_received",
-		Help:      "Time since the last msg was received in milliseconds",
+		Help:      "Time (in ns) since the last msg was received",
 	})
 	m.timeSinceLastMsgSent = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "time_since_last_msg_sent",
-		Help:      "Time since the last msg was sent in milliseconds",
+		Help:      "Time (in ns) since the last msg was sent",
 	})
 	m.sendQueuePortionFull = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "send_queue_portion_full",
 		Help:      "Percentage of use in Send Queue",
 	})
 	m.sendFailRate = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "send_fail_rate",
 		Help:      "Portion of messages that recently failed to be sent over the network",
 	})
 	m.failedToParse = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "msgs_failed_to_parse",
 		Help:      "Number of messages that could not be parsed or were invalidly formed",
 	})
 	m.connected = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "times_connected",
 		Help:      "Times this node successfully completed a handshake with a peer",
 	})
 	m.disconnected = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "times_disconnected",
 		Help:      "Times this node disconnected from a peer it had completed a handshake with",
+	})
+	m.inboundConnAllowed = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "inbound_conn_throttler_allowed",
+		Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
+	})
+	m.inboundConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: constants.PlatformName,
+		Name:      "inbound_conn_throttler_rate_limited",
+		Help:      "Times this node rejected an inbound connection due to rate-limiting.",
 	})
 
 	errs := wrappers.Errs{}
@@ -128,6 +140,8 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.failedToParse),
 		registerer.Register(m.connected),
 		registerer.Register(m.disconnected),
+		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.inboundConnRateLimited),
 
 		m.getVersion.initialize(message.GetVersion, registerer),
 		m.version.initialize(message.Version, registerer),

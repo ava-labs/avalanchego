@@ -252,6 +252,7 @@ func (n *Node) initNetworking() error {
 	}
 
 	n.Net, err = network.NewDefaultNetwork(
+		fmt.Sprintf("%s_network", constants.PlatformName),
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
@@ -266,8 +267,7 @@ func (n *Node) initNetworking() error {
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
-		n.Config.ConnMeterResetDuration,
-		n.Config.ConnMeterMaxConns,
+		n.Config.NetworkConfig.InboundConnThrottlerConfig,
 		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,

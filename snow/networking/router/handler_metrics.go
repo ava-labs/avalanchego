@@ -13,23 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const (
-	defaultRequestHelpMsg = "Time spent processing this request in nanoseconds"
-)
-
-func initHistogram(namespace, name string, registerer prometheus.Registerer, errs *wrappers.Errs) prometheus.Histogram {
-	histogram := prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Namespace: namespace,
-			Name:      name,
-			Help:      defaultRequestHelpMsg,
-			Buckets:   metric.NanosecondsBuckets,
-		})
-
-	if err := registerer.Register(histogram); err != nil {
-		errs.Add(fmt.Errorf("failed to register %s statistics due to %w", name, err))
-	}
-	return histogram
+func initAverager(namespace, name string, reg prometheus.Registerer, errs *wrappers.Errs) metric.Averager {
+	return metric.NewAveragerWithErrs(
+		namespace,
+		name,
+		fmt.Sprintf("time (in ns) of processing a %s", name),
+		reg,
+		errs,
+	)
 }
 
 type handlerMetrics struct {
@@ -45,14 +36,13 @@ type handlerMetrics struct {
 	timeout,
 	notify,
 	gossip,
-	cpu,
-	shutdown prometheus.Histogram
+	shutdown metric.Averager
 }
 
 // Initialize implements the Engine interface
-func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Registerer) error {
+func (m *handlerMetrics) Initialize(namespace string, reg prometheus.Registerer) error {
 	m.namespace = namespace
-	m.registerer = registerer
+	m.registerer = reg
 	errs := wrappers.Errs{}
 
 	m.expired = prometheus.NewCounter(prometheus.CounterOpts{
@@ -60,49 +50,42 @@ func (m *handlerMetrics) Initialize(namespace string, registerer prometheus.Regi
 		Name:      "expired",
 		Help:      "Incoming messages dropped because the message deadline expired",
 	})
-	errs.Add(registerer.Register(m.expired))
+	errs.Add(reg.Register(m.expired))
 
-	m.getAcceptedFrontier = initHistogram(namespace, "get_accepted_frontier", registerer, &errs)
-	m.acceptedFrontier = initHistogram(namespace, "accepted_frontier", registerer, &errs)
-	m.getAcceptedFrontierFailed = initHistogram(namespace, "get_accepted_frontier_failed", registerer, &errs)
-	m.getAccepted = initHistogram(namespace, "get_accepted", registerer, &errs)
-	m.accepted = initHistogram(namespace, "accepted", registerer, &errs)
-	m.getAcceptedFailed = initHistogram(namespace, "get_accepted_failed", registerer, &errs)
-	m.getAncestors = initHistogram(namespace, "get_ancestors", registerer, &errs)
-	m.multiPut = initHistogram(namespace, "multi_put", registerer, &errs)
-	m.getAncestorsFailed = initHistogram(namespace, "get_ancestors_failed", registerer, &errs)
-	m.get = initHistogram(namespace, "get", registerer, &errs)
-	m.put = initHistogram(namespace, "put", registerer, &errs)
-	m.getFailed = initHistogram(namespace, "get_failed", registerer, &errs)
-	m.pushQuery = initHistogram(namespace, "push_query", registerer, &errs)
-	m.pullQuery = initHistogram(namespace, "pull_query", registerer, &errs)
-	m.chits = initHistogram(namespace, "chits", registerer, &errs)
-	m.queryFailed = initHistogram(namespace, "query_failed", registerer, &errs)
-	m.connected = initHistogram(namespace, "connected", registerer, &errs)
-	m.disconnected = initHistogram(namespace, "disconnected", registerer, &errs)
-	m.timeout = initHistogram(namespace, "timeout", registerer, &errs)
-	m.notify = initHistogram(namespace, "notify", registerer, &errs)
-	m.gossip = initHistogram(namespace, "gossip", registerer, &errs)
+	m.getAcceptedFrontier = initAverager(namespace, "get_accepted_frontier", reg, &errs)
+	m.acceptedFrontier = initAverager(namespace, "accepted_frontier", reg, &errs)
+	m.getAcceptedFrontierFailed = initAverager(namespace, "get_accepted_frontier_failed", reg, &errs)
+	m.getAccepted = initAverager(namespace, "get_accepted", reg, &errs)
+	m.accepted = initAverager(namespace, "accepted", reg, &errs)
+	m.getAcceptedFailed = initAverager(namespace, "get_accepted_failed", reg, &errs)
+	m.getAncestors = initAverager(namespace, "get_ancestors", reg, &errs)
+	m.multiPut = initAverager(namespace, "multi_put", reg, &errs)
+	m.getAncestorsFailed = initAverager(namespace, "get_ancestors_failed", reg, &errs)
+	m.get = initAverager(namespace, "get", reg, &errs)
+	m.put = initAverager(namespace, "put", reg, &errs)
+	m.getFailed = initAverager(namespace, "get_failed", reg, &errs)
+	m.pushQuery = initAverager(namespace, "push_query", reg, &errs)
+	m.pullQuery = initAverager(namespace, "pull_query", reg, &errs)
+	m.chits = initAverager(namespace, "chits", reg, &errs)
+	m.queryFailed = initAverager(namespace, "query_failed", reg, &errs)
+	m.connected = initAverager(namespace, "connected", reg, &errs)
+	m.disconnected = initAverager(namespace, "disconnected", reg, &errs)
+	m.timeout = initAverager(namespace, "timeout", reg, &errs)
+	m.notify = initAverager(namespace, "notify", reg, &errs)
+	m.gossip = initAverager(namespace, "gossip", reg, &errs)
 
-	m.cpu = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "cpu_utilization",
-		Help:      "Time this handler's engine spent processing messages for a single CPU interval in milliseconds",
-		Buckets:   metric.MillisecondsBuckets,
-	})
-	errs.Add(registerer.Register(m.cpu))
-	m.shutdown = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "shutdown",
-		Help:      "Time spent in the process of shutting down in nanoseconds",
-		Buckets:   metric.NanosecondsBuckets,
-	})
-	errs.Add(registerer.Register(m.shutdown))
+	m.shutdown = metric.NewAveragerWithErrs(
+		namespace,
+		"shutdown",
+		"time (in ns) spent in the process of shutting down",
+		reg,
+		&errs,
+	)
 
 	return errs.Err
 }
 
-func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) prometheus.Histogram {
+func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) metric.Averager {
 	switch msg {
 	case constants.GetAcceptedFrontierMsg:
 		return m.getAcceptedFrontier

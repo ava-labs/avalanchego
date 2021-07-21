@@ -53,7 +53,6 @@ const (
 	defaultPingFrequency                       = 3 * defaultPingPongTimeout / 4
 	defaultReadBufferSize                      = 16 * units.KiB
 	defaultReadHandshakeTimeout                = 15 * time.Second
-	defaultConnMeterCacheSize                  = 1024
 	defaultByteSliceCap                        = 128
 )
 
@@ -157,7 +156,7 @@ type network struct {
 	pingFrequency                time.Duration
 	readBufferSize               uint32
 	readHandshakeTimeout         time.Duration
-	connMeter                    ConnMeter
+	inboundConnThrottler         throttling.InboundConnThrottler
 	c                            message.Codec
 	b                            message.Builder
 	isFetchOnly                  bool
@@ -239,8 +238,9 @@ type network struct {
 
 type Config struct {
 	HealthConfig
-	InboundThrottlerConfig  throttling.MsgThrottlerConfig
-	OutboundThrottlerConfig throttling.MsgThrottlerConfig
+	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig
+	InboundThrottlerConfig     throttling.MsgThrottlerConfig
+	OutboundThrottlerConfig    throttling.MsgThrottlerConfig
 	timer.AdaptiveTimeoutConfig
 	DialerConfig     dialer.Config
 	MetricsNamespace string
@@ -251,6 +251,7 @@ type Config struct {
 // NewDefaultNetwork returns a new Network implementation with the provided
 // parameters and some reasonable default values.
 func NewDefaultNetwork(
+	namespace string,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
@@ -265,8 +266,7 @@ func NewDefaultNetwork(
 	vdrs validators.Set,
 	beacons validators.Set,
 	router router.Router,
-	connMeterResetDuration time.Duration,
-	connMeterMaxConns int,
+	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -282,6 +282,7 @@ func NewDefaultNetwork(
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
 ) (Network, error) {
 	return NewNetwork(
+		namespace,
 		registerer,
 		log,
 		id,
@@ -312,9 +313,7 @@ func NewDefaultNetwork(
 		defaultPingFrequency,
 		defaultReadBufferSize,
 		defaultReadHandshakeTimeout,
-		connMeterResetDuration,
-		defaultConnMeterCacheSize,
-		connMeterMaxConns,
+		inboundConnThrottlerConfig,
 		healthConfig,
 		benchlistManager,
 		peerAliasTimeout,
@@ -328,6 +327,7 @@ func NewDefaultNetwork(
 
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
+	namespace string,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
@@ -358,9 +358,7 @@ func NewNetwork(
 	pingFrequency time.Duration,
 	readBufferSize uint32,
 	readHandshakeTimeout time.Duration,
-	connMeterResetDuration time.Duration,
-	connMeterCacheSize int,
-	connMeterMaxConns int,
+	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
 	healthConfig HealthConfig,
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
@@ -411,7 +409,7 @@ func NewNetwork(
 		myIPs:                        map[string]struct{}{ip.IP().String(): {}},
 		readBufferSize:               readBufferSize,
 		readHandshakeTimeout:         readHandshakeTimeout,
-		connMeter:                    NewConnMeter(connMeterResetDuration, connMeterCacheSize, connMeterMaxConns),
+		inboundConnThrottler:         throttling.NewInboundConnThrottler(log, inboundConnThrottlerConfig),
 		healthConfig:                 healthConfig,
 		benchlistManager:             benchlistManager,
 		tlsKey:                       tlsKey,
@@ -427,6 +425,7 @@ func NewNetwork(
 		outboundMsgThrottler: outboundMsgThrottler,
 	}
 	codec, err := message.NewCodecWithAllocator(
+		fmt.Sprintf("%s_codec", namespace),
 		registerer,
 		func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
@@ -439,7 +438,7 @@ func NewNetwork(
 	netw.b = message.NewBuilder(codec)
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-	if err := netw.initialize(registerer); err != nil {
+	if err := netw.initialize(namespace, registerer); err != nil {
 		return nil, fmt.Errorf("initializing network failed with: %s", err)
 	}
 	return netw, nil
@@ -869,10 +868,12 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 		n.log.Debug("not upgrading connection to %s because it's an alias", ipStr)
 		return false
 	}
-	if !n.connMeter.Allow(ipStr) {
+	if !n.inboundConnThrottler.Allow(ipStr) {
 		n.log.Debug("not upgrading connection to %s due to rate-limiting", ipStr)
+		n.metrics.inboundConnRateLimited.Inc()
 		return false
 	}
+	n.metrics.inboundConnAllowed.Inc()
 
 	// Note that we attempt to upgrade remote addresses in
 	// [n.disconnectedIPs] because that could allow us to initialize
@@ -885,6 +886,8 @@ func (n *network) shouldUpgradeIncoming(ipStr string) bool {
 // Assumes [n.stateLock] is not held.
 func (n *network) Dispatch() error {
 	go n.gossipPeerList() // Periodically gossip peers
+	go n.inboundConnThrottler.Dispatch()
+	defer n.inboundConnThrottler.Stop()
 	go func() {
 		duration := time.Until(n.versionCompatibility.MaskTime())
 		time.Sleep(duration)
@@ -1705,14 +1708,14 @@ func (n *network) HealthCheck() (interface{}, error) {
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
 	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
-	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived.Milliseconds()))
+	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
 	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
-	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent.Milliseconds()))
+	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 
 	// Make sure the message send failed rate isn't too high
 	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate
