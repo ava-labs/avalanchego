@@ -231,8 +231,10 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
+	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
 	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		n.Log,
+		networkNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
 		n.Config.NetworkConfig.InboundThrottlerConfig,
@@ -243,6 +245,7 @@ func (n *Node) initNetworking() error {
 
 	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
 		n.Log,
+		networkNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
 		n.Config.NetworkConfig.OutboundThrottlerConfig,
@@ -252,7 +255,7 @@ func (n *Node) initNetworking() error {
 	}
 
 	n.Net, err = network.NewDefaultNetwork(
-		fmt.Sprintf("%s_network", constants.PlatformName),
+		networkNamespace,
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,

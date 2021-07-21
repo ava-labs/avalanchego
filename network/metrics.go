@@ -9,7 +9,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/network/message"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -17,29 +16,29 @@ type messageMetrics struct {
 	receivedBytes, sentBytes, numSent, numFailed, numReceived prometheus.Counter
 }
 
-func (mm *messageMetrics) initialize(msgType message.Op, registerer prometheus.Registerer) error {
+func (mm *messageMetrics) initialize(msgType message.Op, namespace string, registerer prometheus.Registerer) error {
 	mm.numSent = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_sent", msgType),
 		Help:      fmt.Sprintf("Number of %s messages sent over the network", msgType),
 	})
 	mm.numFailed = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_failed", msgType),
 		Help:      fmt.Sprintf("Number of %s messages that failed to be sent over the network", msgType),
 	})
 	mm.numReceived = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_received", msgType),
 		Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
 	})
 	mm.receivedBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_received_bytes", msgType),
 		Help:      fmt.Sprintf("Number of bytes of %s messages received from the network", msgType),
 	})
 	mm.sentBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_sent_bytes", msgType),
 		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
 	})
@@ -120,12 +119,12 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		Help:      "Times this node disconnected from a peer it had completed a handshake with",
 	})
 	m.inboundConnAllowed = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "inbound_conn_throttler_allowed",
 		Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
 	})
 	m.inboundConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "inbound_conn_throttler_rate_limited",
 		Help:      "Times this node rejected an inbound connection due to rate-limiting.",
 	})
@@ -143,23 +142,23 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		registerer.Register(m.inboundConnAllowed),
 		registerer.Register(m.inboundConnRateLimited),
 
-		m.getVersion.initialize(message.GetVersion, registerer),
-		m.version.initialize(message.Version, registerer),
-		m.getPeerlist.initialize(message.GetPeerList, registerer),
-		m.peerList.initialize(message.PeerList, registerer),
-		m.ping.initialize(message.Ping, registerer),
-		m.pong.initialize(message.Pong, registerer),
-		m.getAcceptedFrontier.initialize(message.GetAcceptedFrontier, registerer),
-		m.acceptedFrontier.initialize(message.AcceptedFrontier, registerer),
-		m.getAccepted.initialize(message.GetAccepted, registerer),
-		m.accepted.initialize(message.Accepted, registerer),
-		m.getAncestors.initialize(message.GetAncestors, registerer),
-		m.multiPut.initialize(message.MultiPut, registerer),
-		m.get.initialize(message.Get, registerer),
-		m.put.initialize(message.Put, registerer),
-		m.pushQuery.initialize(message.PushQuery, registerer),
-		m.pullQuery.initialize(message.PullQuery, registerer),
-		m.chits.initialize(message.Chits, registerer),
+		m.getVersion.initialize(message.GetVersion, namespace, registerer),
+		m.version.initialize(message.Version, namespace, registerer),
+		m.getPeerlist.initialize(message.GetPeerList, namespace, registerer),
+		m.peerList.initialize(message.PeerList, namespace, registerer),
+		m.ping.initialize(message.Ping, namespace, registerer),
+		m.pong.initialize(message.Pong, namespace, registerer),
+		m.getAcceptedFrontier.initialize(message.GetAcceptedFrontier, namespace, registerer),
+		m.acceptedFrontier.initialize(message.AcceptedFrontier, namespace, registerer),
+		m.getAccepted.initialize(message.GetAccepted, namespace, registerer),
+		m.accepted.initialize(message.Accepted, namespace, registerer),
+		m.getAncestors.initialize(message.GetAncestors, namespace, registerer),
+		m.multiPut.initialize(message.MultiPut, namespace, registerer),
+		m.get.initialize(message.Get, namespace, registerer),
+		m.put.initialize(message.Put, namespace, registerer),
+		m.pushQuery.initialize(message.PushQuery, namespace, registerer),
+		m.pullQuery.initialize(message.PullQuery, namespace, registerer),
+		m.chits.initialize(message.Chits, namespace, registerer),
 	)
 	return errs.Err
 }
