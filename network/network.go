@@ -1705,14 +1705,14 @@ func (n *network) HealthCheck() (interface{}, error) {
 	timeSinceLastMsgReceived := now.Sub(lastMsgReceivedAt)
 	healthy = healthy && timeSinceLastMsgReceived <= n.healthConfig.MaxTimeSinceMsgReceived
 	details["timeSinceLastMsgReceived"] = timeSinceLastMsgReceived.String()
-	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived.Milliseconds()))
+	n.metrics.timeSinceLastMsgReceived.Set(float64(timeSinceLastMsgReceived))
 
 	// Make sure we've sent an outgoing message within the threshold
 	lastMsgSentAt := time.Unix(atomic.LoadInt64(&n.lastMsgSentTime), 0)
 	timeSinceLastMsgSent := now.Sub(lastMsgSentAt)
 	healthy = healthy && timeSinceLastMsgSent <= n.healthConfig.MaxTimeSinceMsgSent
 	details["timeSinceLastMsgSent"] = timeSinceLastMsgSent.String()
-	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent.Milliseconds()))
+	n.metrics.timeSinceLastMsgSent.Set(float64(timeSinceLastMsgSent))
 
 	// Make sure the message send failed rate isn't too high
 	healthy = healthy && sendFailRate <= n.healthConfig.MaxSendFailRate

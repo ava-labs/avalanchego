@@ -85,12 +85,12 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 	m.timeSinceLastMsgReceived = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
 		Name:      "time_since_last_msg_received",
-		Help:      "Time since the last msg was received in milliseconds",
+		Help:      "Time (in ns) since the last msg was received",
 	})
 	m.timeSinceLastMsgSent = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
 		Name:      "time_since_last_msg_sent",
-		Help:      "Time since the last msg was sent in milliseconds",
+		Help:      "Time (in ns) since the last msg was sent",
 	})
 	m.sendQueuePortionFull = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: constants.PlatformName,
