@@ -251,6 +251,8 @@ func TestCreateAndFinishSuccessfulPoll(t *testing.T) {
 		t.Fatalf("Should have dropped a duplicated poll")
 	} else if results = s.Vote(0, vdr2, vtxID); len(results) == 0 {
 		t.Fatalf("Should have finished the")
+	} else if len(results) != 1 {
+		t.Fatalf("Wrong number of results returned")
 	} else if list := results[0].List(); len(list) != 1 {
 		t.Fatalf("Wrong number of vertices returned")
 	} else if retVtxID := list[0]; retVtxID != vtxID {
