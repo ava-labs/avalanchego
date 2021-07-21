@@ -38,7 +38,7 @@ func (p poll) StartTime() time.Time {
 type set struct {
 	log      logging.Logger
 	numPolls prometheus.Gauge
-	durPolls prometheus.Histogram
+	durPolls metric.Averager
 	factory  Factory
 	// maps requestID -> poll
 	polls linkedhashmap.LinkedHashmap
@@ -49,24 +49,24 @@ func NewSet(
 	factory Factory,
 	log logging.Logger,
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) Set {
 	numPolls := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "polls",
 		Help:      "Number of pending network polls",
 	})
-	if err := registerer.Register(numPolls); err != nil {
+	if err := reg.Register(numPolls); err != nil {
 		log.Error("failed to register polls statistics due to %s", err)
 	}
 
-	durPolls := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "poll_duration",
-		Help:      "Length of time the poll existed in milliseconds",
-		Buckets:   metric.MillisecondsBuckets,
-	})
-	if err := registerer.Register(durPolls); err != nil {
+	durPolls, err := metric.NewAverager(
+		namespace,
+		"poll_duration",
+		"time (in ns) this poll took to complete",
+		reg,
+	)
+	if err != nil {
 		log.Error("failed to register poll_duration statistics due to %s", err)
 	}
 
@@ -143,7 +143,7 @@ func (s *set) processFinishedPolls() []ids.Bag {
 		}
 
 		s.log.Verbo("poll with requestID %d finished as %s", iter.Key(), holder.GetPoll())
-		s.durPolls.Observe(float64(time.Since(holder.StartTime()).Milliseconds()))
+		s.durPolls.Observe(float64(time.Since(holder.StartTime())))
 		s.numPolls.Dec() // decrease the metrics
 
 		results = append(results, p.Result())

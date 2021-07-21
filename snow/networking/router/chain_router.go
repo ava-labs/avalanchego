@@ -913,7 +913,7 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	timeReqRunning := now.Sub(processingRequest)
 	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
 	details["longestRunningRequest"] = timeReqRunning.String()
-	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning.Milliseconds()))
+	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning))
 
 	if !healthy {
 		// The router is not healthy
