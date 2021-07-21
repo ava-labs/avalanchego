@@ -12,7 +12,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/compression"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -49,14 +48,15 @@ type codec struct {
 	compressor            compression.Compressor
 }
 
-func NewCodec(metrics prometheus.Registerer) (Codec, error) {
+func NewCodec(namespace string, metrics prometheus.Registerer) (Codec, error) {
 	return NewCodecWithAllocator(
+		namespace,
 		metrics,
 		func() []byte { return nil },
 	)
 }
 
-func NewCodecWithAllocator(metrics prometheus.Registerer, getBytes func() []byte) (Codec, error) {
+func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getBytes func() []byte) (Codec, error) {
 	c := &codec{
 		getBytes:              getBytes,
 		bytesSavedMetrics:     make(map[Op]metric.Averager, len(ops)),
@@ -72,21 +72,21 @@ func NewCodecWithAllocator(metrics prometheus.Registerer, getBytes func() []byte
 		}
 
 		c.bytesSavedMetrics[op] = metric.NewAveragerWithErrs(
-			constants.PlatformName,
+			namespace,
 			fmt.Sprintf("%s_bytes_saved", op),
 			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", op),
 			metrics,
 			&errs,
 		)
 		c.compressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			constants.PlatformName,
+			namespace,
 			fmt.Sprintf("%s_compress_time", op),
 			fmt.Sprintf("time (in ns) to compress %s messages", op),
 			metrics,
 			&errs,
 		)
 		c.decompressTimeMetrics[op] = metric.NewAveragerWithErrs(
-			constants.PlatformName,
+			namespace,
 			fmt.Sprintf("%s_decompress_time", op),
 			fmt.Sprintf("time (in ns) to decompress %s messages", op),
 			metrics,

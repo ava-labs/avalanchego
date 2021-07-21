@@ -251,6 +251,7 @@ type Config struct {
 // NewDefaultNetwork returns a new Network implementation with the provided
 // parameters and some reasonable default values.
 func NewDefaultNetwork(
+	namespace string,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
@@ -282,6 +283,7 @@ func NewDefaultNetwork(
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
 ) (Network, error) {
 	return NewNetwork(
+		namespace,
 		registerer,
 		log,
 		id,
@@ -328,6 +330,7 @@ func NewDefaultNetwork(
 
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
+	namespace string,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	id ids.ShortID,
@@ -427,6 +430,7 @@ func NewNetwork(
 		outboundMsgThrottler: outboundMsgThrottler,
 	}
 	codec, err := message.NewCodecWithAllocator(
+		fmt.Sprintf("%s_codec", namespace),
 		registerer,
 		func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
@@ -439,7 +443,7 @@ func NewNetwork(
 	netw.b = message.NewBuilder(codec)
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, healthConfig.MaxSendFailRateHalflife, netw.clock.Time()))
-	if err := netw.initialize(registerer); err != nil {
+	if err := netw.initialize(namespace, registerer); err != nil {
 		return nil, fmt.Errorf("initializing network failed with: %s", err)
 	}
 	return netw, nil

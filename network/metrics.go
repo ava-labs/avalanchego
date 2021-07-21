@@ -76,44 +76,44 @@ type metrics struct {
 	pushQuery, pullQuery, chits messageMetrics
 }
 
-func (m *metrics) initialize(registerer prometheus.Registerer) error {
+func (m *metrics) initialize(namespace string, registerer prometheus.Registerer) error {
 	m.numPeers = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "peers",
 		Help:      "Number of network peers",
 	})
 	m.timeSinceLastMsgReceived = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "time_since_last_msg_received",
 		Help:      "Time (in ns) since the last msg was received",
 	})
 	m.timeSinceLastMsgSent = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "time_since_last_msg_sent",
 		Help:      "Time (in ns) since the last msg was sent",
 	})
 	m.sendQueuePortionFull = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "send_queue_portion_full",
 		Help:      "Percentage of use in Send Queue",
 	})
 	m.sendFailRate = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "send_fail_rate",
 		Help:      "Portion of messages that recently failed to be sent over the network",
 	})
 	m.failedToParse = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "msgs_failed_to_parse",
 		Help:      "Number of messages that could not be parsed or were invalidly formed",
 	})
 	m.connected = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "times_connected",
 		Help:      "Times this node successfully completed a handshake with a peer",
 	})
 	m.disconnected = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "times_disconnected",
 		Help:      "Times this node disconnected from a peer it had completed a handshake with",
 	})

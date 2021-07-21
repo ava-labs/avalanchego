@@ -56,14 +56,14 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 	m.latAccepted = metric.NewAveragerWithErrs(
 		namespace,
 		fmt.Sprintf("%s_accepted", metricName),
-		fmt.Sprintf("time (in ns) of accepting from the time the %s was issued", descriptionName),
+		fmt.Sprintf("time (in ns) from issuance of a %s to its acceptance", descriptionName),
 		reg,
 		&errs,
 	)
 	m.latRejected = metric.NewAveragerWithErrs(
 		namespace,
 		fmt.Sprintf("%s_rejected", metricName),
-		fmt.Sprintf("time (in ns) of rejecting from the time the %s was issued", descriptionName),
+		fmt.Sprintf("time (in ns) from issuance of a %s to its rejection", descriptionName),
 		reg,
 		&errs,
 	)
