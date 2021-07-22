@@ -245,8 +245,7 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 
 	// Verify any synchronously generated or loaded snapshot from disk
 	if !async || generated {
-		shouldWait := !async && !generated
-		if err := snap.verifyIntegrity(snap.disklayer(), shouldWait); err != nil {
+		if err := snap.verifyIntegrity(snap.disklayer(), !async && !generated); err != nil {
 			return nil, err
 		}
 	}
@@ -552,10 +551,6 @@ func (t *Tree) AbortGeneration() {
 	defer t.lock.Unlock()
 
 	dl := t.disklayer()
-	if dl == nil {
-		return
-	}
-
 	dl.abortGeneration()
 }
 
