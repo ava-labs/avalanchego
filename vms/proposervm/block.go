@@ -41,16 +41,25 @@ type Block interface {
 	pChainHeight() (uint64, error)
 }
 
+// field of postForkBlock and postForkOption
 type postForkCommonComponents struct {
 	vm       *VM
 	innerBlk snowman.Block
 	status   choices.Status
 }
 
+// Return the inner block's height
 func (p *postForkCommonComponents) Height() uint64 {
 	return p.innerBlk.Height()
 }
 
+// Verify returns nil if:
+// 1) [child]'s P-Chain height >= [parentPChainHeight]
+// 2) [childPChainHeight] <= the current P-Chain height
+// 3) [p]'s inner block is the parent of [c]'s inner block
+// 4) [child]'s timestamp is within the synchrony bound, after [p]'s timestamp, and within its proposer's window
+// 5) [child] has a valid signature from its proposer
+// 6) [child]'s inner block is valid
 func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
@@ -106,7 +115,11 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return err
 	}
 
-	// only validate the inner block once
+	// If inner block's Verify returned true, don't call it again.
+	// Note that if [child.innerBlk.Verify] returns nil,
+	// this method returns nil. This must always remain the case to
+	// maintain the inner block's invariant that if it's Verify()
+	// returns nil, it is eventually accepted/rejected.
 	if !p.vm.Tree.Contains(child.innerBlk) {
 		if err := child.innerBlk.Verify(); err != nil {
 			return err

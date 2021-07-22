@@ -15,12 +15,14 @@ import (
 
 var _ Block = &postForkOption{}
 
+// The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {
 	option.Option
 	postForkCommonComponents
 }
 
 func (b *postForkOption) Timestamp() time.Time {
+	// A *postForkOption's timestamp is its parent's timestamp
 	parent := b.Parent()
 	return parent.Timestamp()
 }
@@ -32,12 +34,12 @@ func (b *postForkOption) Accept() error {
 		return err
 	}
 
+	// Persist this block and its status
 	if err := b.vm.storePostForkOption(b); err != nil {
 		return err
 	}
 
-	// mark the inner block as accepted and all the conflicting inner blocks as
-	// rejected
+	// mark the inner block as accepted and all conflicting inner blocks as rejected
 	if err := b.vm.Tree.Accept(b.innerBlk); err != nil {
 		return err
 	}
@@ -51,6 +53,7 @@ func (b *postForkOption) Reject() error {
 	// in the proposer block that causing this block to be rejected.
 	b.status = choices.Rejected
 
+	// Persist this block and its status
 	if err := b.vm.storePostForkOption(b); err != nil {
 		return err
 	}
@@ -70,6 +73,8 @@ func (b *postForkOption) Parent() snowman.Block {
 	return res
 }
 
+// If Verify returns nil, Accept or Reject is eventually called on
+// [b] a
 func (b *postForkOption) Verify() error {
 	b.vm.ctx.Log.Debug("Snowman++ calling verify on %s", b.ID())
 
@@ -81,6 +86,7 @@ func (b *postForkOption) Verify() error {
 }
 
 func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
+	// A *preForkBlock's parent must be a *preForkBlock
 	return errUnsignedChild
 }
 
@@ -98,6 +104,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
+	// A *postForkOption's parent cant be a *postForkOption
 	return errUnexpectedBlockType
 }
 
@@ -105,6 +112,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	parentID := b.ID()
 	parentTimestamp := b.Timestamp()
 	newTimestamp := b.vm.Time().Truncate(time.Second)
+	// The child's timestamp is the later of now and this block's timestamp
 	if newTimestamp.Before(parentTimestamp) {
 		newTimestamp = parentTimestamp
 	}
@@ -125,17 +133,21 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	if newTimestamp.Before(minTimestamp) {
+		// It's not our turn to propose a block yet
 		b.vm.ctx.Log.Debug("Snowman++ build post-fork option - parent timestamp %v, expected delay %v, block timestamp %v. Dropping block, build called too early.",
 			parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
 		return nil, errProposerWindowNotStarted
 	}
 
+	// The child's P-Chain height is the P-Chain's height when it
+	// was proposed (i.e. now)
 	pChainHeight, err := b.vm.PChainHeight()
 	if err != nil {
 		return nil, err
 	}
 
-	statelessBlock, err := block.Build(
+	// Build the child
+	statelessChild, err := block.Build(
 		parentID,
 		newTimestamp,
 		pChainHeight,
@@ -147,8 +159,8 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		return nil, err
 	}
 
-	blk := &postForkBlock{
-		Block: statelessBlock,
+	child := &postForkBlock{
+		Block: statelessChild,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,
@@ -157,11 +169,12 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		blk.ID(), parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
-
-	return blk, b.vm.storePostForkBlock(blk)
+		child.ID(), parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
+	// Persist the child
+	return child, b.vm.storePostForkBlock(child)
 }
 
+// This block's P-Chain height is its parent's P-Chain height
 func (b *postForkOption) pChainHeight() (uint64, error) {
 	parent, err := b.vm.getBlock(b.ParentID())
 	if err != nil {
