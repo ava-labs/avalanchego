@@ -785,13 +785,15 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	key := keys[0]
+
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	mintNFTTx := newAvaxOperationTxWithNFTxMintOp(t, createAssetTx, genesisBytes, vm)
+	mintNFTTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, true, buildNFTxMintOp(createAssetTx, key))
 	txID, err := vm.IssueTx(mintNFTTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -881,13 +883,15 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	key := keys[0]
+
 	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	mintSecpOpTx := newAvaxOperationTxWithMultipleOutputs(t, createAssetTx, genesisBytes, vm)
+	mintSecpOpTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, false, buildSecpMintOp(createAssetTx, key))
 
 	// workaround because IssueTx does not work with this one
 	s := &Service{vm: vm}
@@ -936,22 +940,19 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) 
 	return tx
 }
 
-func newAvaxOperationTxWithNFTxMintOp(t *testing.T, createAssetTx *Tx, genesisBytes []byte, vm *VM) *Tx {
+func newSignedOperationTxWithOps(t *testing.T, key *crypto.PrivateKeySECP256K1R, genesisBytes []byte, vm *VM, isSignNFTx bool, op ...*Operation) *Tx {
 	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
-	key := keys[0]
-	tx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key))
-	if err := tx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
-		t.Fatal(err)
-	}
-	return tx
-}
+	tx := buildOperationTxWithOp(op...)
 
-func newAvaxOperationTxWithMultipleOutputs(t *testing.T, createAssetTx *Tx, genesisBytes []byte, vm *VM) *Tx {
-	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
-	key := keys[0]
-	tx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key))
-	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
-		t.Fatal(err)
+	var err error
+	if isSignNFTx {
+		err = tx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
+	} else {
+		err = tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
+	}
+
+	if err != nil {
+		t.Fatal("error when signing test tx", err)
 	}
 	return tx
 }
@@ -1050,8 +1051,7 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 	}}
 }
 
-// todo alternate operation tx with nftfx.MintOperation and secp.MintOperation
-//   another test with multiple output owners
+// todo another test with multiple output owners
 
 func buildNFTxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Operation {
 	return &Operation{
