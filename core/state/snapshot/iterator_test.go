@@ -66,7 +66,7 @@ func TestAccountIteratorBasics(t *testing.T) {
 	it := diffLayer.AccountIterator(common.Hash{})
 	verifyIterator(t, 100, it, verifyNothing) // Nil is allowed for single layer iterator
 
-	diskLayer, _ := diffToDisk(diffLayer)
+	diskLayer, _, _ := diffToDisk(diffLayer)
 	it = diskLayer.AccountIterator(common.Hash{})
 	verifyIterator(t, 100, it, verifyNothing) // Nil is allowed for single layer iterator
 }
@@ -106,7 +106,7 @@ func TestStorageIteratorBasics(t *testing.T) {
 		verifyIterator(t, 100, it, verifyNothing) // Nil is allowed for single layer iterator
 	}
 
-	diskLayer, _ := diffToDisk(diffLayer)
+	diskLayer, _, _ := diffToDisk(diffLayer)
 	for account := range accounts {
 		it, _ := diskLayer.StorageIterator(account, common.Hash{})
 		verifyIterator(t, 100-nilStorage[account], it, verifyNothing) // Nil is allowed for single layer iterator
@@ -236,7 +236,7 @@ func TestAccountIteratorTraversal(t *testing.T) {
 	verifyIterator(t, 3, head.(snapshot).AccountIterator(common.Hash{}), verifyNothing)
 	verifyIterator(t, 7, head.(*diffLayer).newBinaryAccountIterator(), verifyAccount)
 
-	it, _ := snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{})
+	it, _ := snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{}, false)
 	verifyIterator(t, 7, it, verifyAccount)
 	it.Release()
 
@@ -247,12 +247,13 @@ func TestAccountIteratorTraversal(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
+	snaps.verified = true     // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatal(err)
 	}
 	verifyIterator(t, 7, head.(*diffLayer).newBinaryAccountIterator(), verifyAccount)
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{})
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{}, false)
 	verifyIterator(t, 7, it, verifyAccount)
 	it.Release()
 }
@@ -277,7 +278,7 @@ func TestStorageIteratorTraversal(t *testing.T) {
 	verifyIterator(t, 3, diffIter, verifyNothing)
 	verifyIterator(t, 6, head.(*diffLayer).newBinaryStorageIterator(common.HexToHash("0xaa")), verifyStorage)
 
-	it, _ := snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ := snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.Hash{}, false)
 	verifyIterator(t, 6, it, verifyStorage)
 	it.Release()
 
@@ -288,12 +289,13 @@ func TestStorageIteratorTraversal(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
+	snaps.verified = true     // Bypass validation of junk data
 	if err := snaps.Flatten(common.HexToHash("0x02")); err != nil {
 		t.Fatal(err)
 	}
 	verifyIterator(t, 6, head.(*diffLayer).newBinaryStorageIterator(common.HexToHash("0xaa")), verifyStorage)
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.Hash{}, false)
 	verifyIterator(t, 6, it, verifyStorage)
 	it.Release()
 }
@@ -348,7 +350,7 @@ func TestAccountIteratorTraversalValues(t *testing.T) {
 	snaps.Update(common.HexToHash("0x08"), common.HexToHash("0xff08"), common.HexToHash("0x07"), nil, g, nil)
 	snaps.Update(common.HexToHash("0x09"), common.HexToHash("0xff09"), common.HexToHash("0x08"), nil, h, nil)
 
-	it, _ := snaps.AccountIterator(common.HexToHash("0xff09"), common.Hash{})
+	it, _ := snaps.AccountIterator(common.HexToHash("0xff09"), common.Hash{}, false)
 	head := snaps.Snapshot(common.HexToHash("0xff09"))
 	for it.Next() {
 		hash := it.Hash()
@@ -369,13 +371,14 @@ func TestAccountIteratorTraversalValues(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
+	snaps.verified = true     // Bypass validation of junk data
 	for i := 2; i < 7; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x0%d", i))); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff09"), common.Hash{})
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff09"), common.Hash{}, false)
 	for it.Next() {
 		hash := it.Hash()
 		want, err := head.AccountRLP(hash)
@@ -442,7 +445,7 @@ func TestStorageIteratorTraversalValues(t *testing.T) {
 	snaps.Update(common.HexToHash("0x08"), common.HexToHash("0xff08"), common.HexToHash("0x07"), nil, randomAccountSet("0xaa"), wrapStorage(g))
 	snaps.Update(common.HexToHash("0x09"), common.HexToHash("0xff09"), common.HexToHash("0x08"), nil, randomAccountSet("0xaa"), wrapStorage(h))
 
-	it, _ := snaps.StorageIterator(common.HexToHash("0xff09"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ := snaps.StorageIterator(common.HexToHash("0xff09"), common.HexToHash("0xaa"), common.Hash{}, false)
 	head := snaps.Snapshot(common.HexToHash("0xff09"))
 	for it.Next() {
 		hash := it.Hash()
@@ -463,13 +466,14 @@ func TestStorageIteratorTraversalValues(t *testing.T) {
 		aggregatorMemoryLimit = limit
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
+	snaps.verified = true     // Bypass validation of junk data
 	for i := 2; i < 7; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x0%d", i))); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff09"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff09"), common.HexToHash("0xaa"), common.Hash{}, false)
 	for it.Next() {
 		hash := it.Hash()
 		want, err := head.Storage(common.HexToHash("0xaa"), hash)
@@ -505,7 +509,7 @@ func TestAccountIteratorLargeTraversal(t *testing.T) {
 	verifyIterator(t, 200, head.(snapshot).AccountIterator(common.Hash{}), verifyNothing)
 	verifyIterator(t, 200, head.(*diffLayer).newBinaryAccountIterator(), verifyAccount)
 
-	it, _ := snaps.AccountIterator(common.HexToHash("0xff80"), common.Hash{})
+	it, _ := snaps.AccountIterator(common.HexToHash("0xff80"), common.Hash{}, false)
 	verifyIterator(t, 200, it, verifyAccount)
 	it.Release()
 
@@ -517,6 +521,7 @@ func TestAccountIteratorLargeTraversal(t *testing.T) {
 	}()
 	aggregatorMemoryLimit = 0 // Force pushing the bottom-most layer into disk
 
+	snaps.verified = true // Bypass validation of junk data
 	for i := 2; i < 127; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x%02x", i))); err != nil {
 			t.Fatal(err)
@@ -524,7 +529,7 @@ func TestAccountIteratorLargeTraversal(t *testing.T) {
 	}
 	verifyIterator(t, 200, head.(*diffLayer).newBinaryAccountIterator(), verifyAccount)
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff80"), common.Hash{})
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff80"), common.Hash{}, false)
 	verifyIterator(t, 200, it, verifyAccount)
 	it.Release()
 }
@@ -547,9 +552,10 @@ func TestAccountIteratorFlattening(t *testing.T) {
 		randomAccountSet("0xcc", "0xf0", "0xff"), nil)
 
 	// Create an iterator and flatten the data from underneath it
-	it, _ := snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{})
+	it, _ := snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{}, false)
 	defer it.Release()
 
+	snaps.verified = true // Bypass validation of junk data
 	for i := 2; i < 4; i++ {
 		if err := snaps.Flatten(common.HexToHash(fmt.Sprintf("0x%02x", i))); err != nil {
 			t.Errorf("failed to flatten: %v", err)
@@ -575,39 +581,39 @@ func TestAccountIteratorSeek(t *testing.T) {
 	// 03: aa, bb, dd, ee, f0 (, f0), ff
 	// 04: aa, bb, cc, dd, ee, f0 (, f0), ff (, ff)
 	// Construct various iterators and ensure their traversal is correct
-	it, _ := snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xdd"))
+	it, _ := snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xdd"), false)
 	defer it.Release()
 	verifyIterator(t, 3, it, verifyAccount) // expected: ee, f0, ff
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), false)
 	defer it.Release()
 	verifyIterator(t, 4, it, verifyAccount) // expected: aa, ee, f0, ff
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xff"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xff"), false)
 	defer it.Release()
 	verifyIterator(t, 1, it, verifyAccount) // expected: ff
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xff1"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff02"), common.HexToHash("0xff1"), false)
 	defer it.Release()
 	verifyIterator(t, 0, it, verifyAccount) // expected: nothing
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xbb"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xbb"), false)
 	defer it.Release()
 	verifyIterator(t, 6, it, verifyAccount) // expected: bb, cc, dd, ee, f0, ff
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xef"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xef"), false)
 	defer it.Release()
 	verifyIterator(t, 2, it, verifyAccount) // expected: f0, ff
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xf0"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xf0"), false)
 	defer it.Release()
 	verifyIterator(t, 2, it, verifyAccount) // expected: f0, ff
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xff"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xff"), false)
 	defer it.Release()
 	verifyIterator(t, 1, it, verifyAccount) // expected: ff
 
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xff1"))
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.HexToHash("0xff1"), false)
 	defer it.Release()
 	verifyIterator(t, 0, it, verifyAccount) // expected: nothing
 }
@@ -630,35 +636,35 @@ func TestStorageIteratorSeek(t *testing.T) {
 	// 03: 01, 02, 03, 05 (, 05), 06
 	// 04: 01(, 01), 02, 03, 05(, 05, 05), 06, 08
 	// Construct various iterators and ensure their traversal is correct
-	it, _ := snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x01"))
+	it, _ := snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x01"), false)
 	defer it.Release()
 	verifyIterator(t, 3, it, verifyStorage) // expected: 01, 03, 05
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x02"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x02"), false)
 	defer it.Release()
 	verifyIterator(t, 2, it, verifyStorage) // expected: 03, 05
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x5"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x5"), false)
 	defer it.Release()
 	verifyIterator(t, 1, it, verifyStorage) // expected: 05
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x6"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff02"), common.HexToHash("0xaa"), common.HexToHash("0x6"), false)
 	defer it.Release()
 	verifyIterator(t, 0, it, verifyStorage) // expected: nothing
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x01"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x01"), false)
 	defer it.Release()
 	verifyIterator(t, 6, it, verifyStorage) // expected: 01, 02, 03, 05, 06, 08
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x05"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x05"), false)
 	defer it.Release()
 	verifyIterator(t, 3, it, verifyStorage) // expected: 05, 06, 08
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x08"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x08"), false)
 	defer it.Release()
 	verifyIterator(t, 1, it, verifyStorage) // expected: 08
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x09"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.HexToHash("0x09"), false)
 	defer it.Release()
 	verifyIterator(t, 0, it, verifyStorage) // expected: nothing
 }
@@ -684,13 +690,13 @@ func TestAccountIteratorDeletions(t *testing.T) {
 		nil, randomAccountSet("0x33", "0x44", "0x55"), nil)
 
 	// The output should be 11,33,44,55
-	it, _ := snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{})
+	it, _ := snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{}, false)
 	// Do a quick check
 	verifyIterator(t, 4, it, verifyAccount)
 	it.Release()
 
 	// And a more detailed verification that we indeed do not see '0x22'
-	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{})
+	it, _ = snaps.AccountIterator(common.HexToHash("0xff04"), common.Hash{}, false)
 	defer it.Release()
 	for it.Next() {
 		hash := it.Hash()
@@ -714,12 +720,12 @@ func TestStorageIteratorDeletions(t *testing.T) {
 		randomAccountSet("0xaa"), randomStorageSet([]string{"0xaa"}, [][]string{{"0x02", "0x04", "0x06"}}, [][]string{{"0x01", "0x03"}}))
 
 	// The output should be 02,04,05,06
-	it, _ := snaps.StorageIterator(common.HexToHash("0xff03"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ := snaps.StorageIterator(common.HexToHash("0xff03"), common.HexToHash("0xaa"), common.Hash{}, false)
 	verifyIterator(t, 4, it, verifyStorage)
 	it.Release()
 
 	// The output should be 04,05,06
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff03"), common.HexToHash("0xaa"), common.HexToHash("0x03"))
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff03"), common.HexToHash("0xaa"), common.HexToHash("0x03"), false)
 	verifyIterator(t, 3, it, verifyStorage)
 	it.Release()
 
@@ -729,7 +735,7 @@ func TestStorageIteratorDeletions(t *testing.T) {
 	}
 	snaps.Update(common.HexToHash("0x04"), common.HexToHash("0xff04"), common.HexToHash("0x03"), destructed, nil, nil)
 
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff04"), common.HexToHash("0xaa"), common.Hash{}, false)
 	verifyIterator(t, 0, it, verifyStorage)
 	it.Release()
 
@@ -738,13 +744,13 @@ func TestStorageIteratorDeletions(t *testing.T) {
 		randomAccountSet("0xaa"), randomStorageSet([]string{"0xaa"}, [][]string{{"0x07", "0x08", "0x09"}}, nil))
 
 	// The output should be 07,08,09
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff05"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff05"), common.HexToHash("0xaa"), common.Hash{}, false)
 	verifyIterator(t, 3, it, verifyStorage)
 	it.Release()
 
 	// Destruct the whole storage but re-create the account in the same layer
 	snaps.Update(common.HexToHash("0x06"), common.HexToHash("0xff06"), common.HexToHash("0x05"), destructed, randomAccountSet("0xaa"), randomStorageSet([]string{"0xaa"}, [][]string{{"0x11", "0x12"}}, nil))
-	it, _ = snaps.StorageIterator(common.HexToHash("0xff06"), common.HexToHash("0xaa"), common.Hash{})
+	it, _ = snaps.StorageIterator(common.HexToHash("0xff06"), common.HexToHash("0xaa"), common.Hash{}, false)
 	verifyIterator(t, 2, it, verifyStorage) // The output should be 11,12
 	it.Release()
 
@@ -810,7 +816,7 @@ func BenchmarkAccountIteratorTraversal(b *testing.B) {
 	})
 	b.Run("fast iterator keys", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{})
+			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{}, false)
 			defer it.Release()
 
 			got := 0
@@ -824,7 +830,7 @@ func BenchmarkAccountIteratorTraversal(b *testing.B) {
 	})
 	b.Run("fast iterator values", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{})
+			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{}, false)
 			defer it.Release()
 
 			got := 0
@@ -899,7 +905,7 @@ func BenchmarkAccountIteratorLargeBaselayer(b *testing.B) {
 	})
 	b.Run("fast iterator (keys)", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{})
+			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{}, false)
 			defer it.Release()
 
 			got := 0
@@ -913,7 +919,7 @@ func BenchmarkAccountIteratorLargeBaselayer(b *testing.B) {
 	})
 	b.Run("fast iterator (values)", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{})
+			it, _ := snaps.AccountIterator(common.HexToHash("0xff65"), common.Hash{}, false)
 			defer it.Release()
 
 			got := 0

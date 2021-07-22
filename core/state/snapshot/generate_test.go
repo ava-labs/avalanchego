@@ -86,7 +86,7 @@ func TestGeneration(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -151,7 +151,7 @@ func TestGenerateExistentState(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -324,7 +324,7 @@ func TestGenerateExistentStateWithWrongStorage(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -377,7 +377,7 @@ func TestGenerateExistentStateWithWrongAccounts(t *testing.T) {
 	checkSnapRoot(t, snap, root)
 
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -420,7 +420,7 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -476,7 +476,7 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -531,7 +531,7 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -595,7 +595,7 @@ func TestGenerateWithExtraAccounts(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 	// If we now inspect the snap db, there should exist no extraneous storage items
@@ -653,7 +653,7 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -706,7 +706,7 @@ func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -750,7 +750,7 @@ func TestGenerateWithMalformedSnapdata(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 	// If we now inspect the snap db, there should exist no extraneous storage items
@@ -782,7 +782,7 @@ func TestGenerateFromEmptySnap(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -829,7 +829,7 @@ func TestGenerateWithIncompleteStorage(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
