@@ -27,7 +27,7 @@ type Block struct {
 	Metadata
 	PrntID ids.ID `serialize:"true" json:"parentID"`  // parent's ID
 	Hght   uint64 `serialize:"true" json:"height"`    // This block's height. The genesis block is at height 0.
-	Time   int64  `serialize:"true" json:"timestamp"` // This block's time. The genesis time is at 0.
+	Time   int64  `serialize:"true" json:"timestamp"` // The time this block was proposed at. The genesis time is at 0.
 	VM     *SnowmanVM
 }
 

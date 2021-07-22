@@ -1017,6 +1017,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				return err
 			}
 
+			// Copy so value passed into [Put] doesn't get overwritten next iteration
 			nodeID := nodeID
 			if err := diffDB.Put(nodeID[:], nodeDiffBytes); err != nil {
 				return err

@@ -135,7 +135,7 @@ type CommonBlock struct {
 	self      Block // self is a reference to this block's implementing struct
 	id        ids.ID
 	bytes     []byte
-	timestamp time.Time
+	timestamp time.Time // Time this block was proposed at
 	status    choices.Status
 	vm        *VM
 

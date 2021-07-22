@@ -69,7 +69,7 @@ There are three kinds of `proposervm.Blocks`:
 - `postForkBlock` adds congestion-control related fields to an inner block, resulting in a different ID and serialization than the inner block. Note that for such blocks, serialization is a two step process: the header is serialized at the `proposerVM` level, while the inner block serialization is deferred to the inner VM.
 - `postForkOption` wraps inner blocks that are associated with an Oracle Block. This enables oracle blocks to be issued without enforcing the congestion control mechanism. Similarly to `postForkBlocks`, this changes the block's ID and serialization.
 
-The following invariant holds:
+The following invariants holds:
 
 - Given a `proposervm.Block` **C** and its parent block **P**, **P**'s inner block must be **C**'s inner block's parent.
 - Only one verification attempt will be issued to a _valid_ inner block. On the contrary multiple verification calls can be issued to invalid inner blocks.
