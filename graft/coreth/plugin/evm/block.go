@@ -143,6 +143,10 @@ func (b *Block) Accept() error {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
 
+	// Although returning an error from Accept is considered fatal, it is good
+	// practice to cleanup the batch we were modifying in the case of an error.
+	defer vm.db.Abort()
+
 	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
 
