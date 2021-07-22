@@ -224,8 +224,8 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 			log.Warn("Failed to load snapshot, regenerating", "err", err)
 			snap.Rebuild(blockHash, root)
 			if !async {
-				if err := snap.waitBuild(); err != nil {
-					return nil, fmt.Errorf("sync snapshot generation failed: %w", err)
+				if err := snap.verifyIntegrity(snap.disklayer(), true); err != nil {
+					return nil, err
 				}
 			}
 			return snap, nil
@@ -243,17 +243,11 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 		head = head.Parent()
 	}
 
-	// Verify any previously generated snapshot from disk
-	if generated {
-		if err := snap.verifyIntegrity(snap.disklayer()); err != nil {
+	// Verify any synchronously generated or loaded snapshot from disk
+	if !async || generated {
+		shouldWait := !async && !generated
+		if err := snap.verifyIntegrity(snap.disklayer(), shouldWait); err != nil {
 			return nil, err
-		}
-		return snap, nil
-	}
-
-	if !async {
-		if err := snap.waitBuild(); err != nil {
-			return nil, fmt.Errorf("sync snapshot generation failed: %w", err)
 		}
 	}
 
@@ -270,29 +264,6 @@ func (t *Tree) insertSnap(snap snapshot) {
 		t.stateLayers[snap.Root()] = blockSnaps
 	}
 	blockSnaps[snap.BlockHash()] = snap
-}
-
-// waitBuild blocks until the snapshot finishes rebuilding. This method is meant
-// to be used by tests to ensure we're testing what we believe we are. It is
-// assumed that the caller either holds the [snapTree] lock or calls this
-// function during initialization.
-func (t *Tree) waitBuild() error {
-	// Find the rebuild termination channel
-	var done chan struct{}
-
-	t.lock.RLock()
-	diskLayer := t.disklayer()
-	if diskLayer != nil {
-		done = diskLayer.genPending
-	}
-	t.lock.RUnlock()
-	if done == nil {
-		return nil
-	}
-
-	// Wait until the snapshot is generated
-	<-done
-	return t.verifyIntegrity(diskLayer)
 }
 
 // Snapshot retrieves a snapshot belonging to the given state root, or nil if no
@@ -377,11 +348,25 @@ func (t *Tree) Update(blockHash, blockRoot, parentBlockHash common.Hash, destruc
 // verifyIntegrity performs an integrity check on the current snapshot using
 // verify. Most importantly, verifyIntegrity ensures verify is called at
 // most once during the entire lifetime of [Tree], returning immediately if
-// already invoked. It is assumed that the caller holds the [snapTree] lock
+// already invoked. If [waitBuild] is true, verifyIntegrity will wait for
+// generation of the snapshot to finish before verifying.
+//
+// It is assumed that the caller holds the [snapTree] lock
 // when calling this function.
-func (t *Tree) verifyIntegrity(base *diskLayer) error {
+func (t *Tree) verifyIntegrity(base *diskLayer, waitBuild bool) error {
+	// Find the rebuild termination channel and wait until
+	// the snapshot is generated
+	if done := base.genPending; waitBuild && done != nil {
+		log.Info("Waiting for snapshot generation", "root", base.root)
+		<-done
+	}
+
 	if t.verified {
 		return nil
+	}
+
+	if base.genMarker != nil {
+		return errors.New("cannot verify integrity of an unfinished snapshot")
 	}
 
 	start := time.Now()
@@ -499,7 +484,7 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	if !snapshotGenerated {
 		return nil
 	}
-	return t.verifyIntegrity(base)
+	return t.verifyIntegrity(base, false)
 }
 
 // Length returns the number of snapshot layers that is currently being maintained.
