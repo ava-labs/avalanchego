@@ -141,7 +141,9 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 	return snapshot, generator, nil
 }
 
-// loadSnapshot loads a pre-existing state snapshot backed by a key-value store.
+// loadSnapshot loads a pre-existing state snapshot backed by a key-value
+// store. If loading the snapshot from disk is successful, this function also
+// returns a boolean indicating whether or not the snapshot is fully generated.
 func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, recovery bool) (snapshot, bool, error) {
 	// Retrieve the block number and hash of the snapshot, failing if no snapshot
 	// is present in the database (or crashed mid-update).

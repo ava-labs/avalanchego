@@ -845,7 +845,9 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 }
 
 // AccountIterator creates a new account iterator for the specified root hash and
-// seeks to a starting account hash.
+// seeks to a starting account hash. When [force] is true, a new account
+// iterator is created without acquiring the [snapTree] lock and without
+// confirming that the snapshot on the disk layer is fully generated.
 func (t *Tree) AccountIterator(root common.Hash, seek common.Hash, force bool) (AccountIterator, error) {
 	if !force {
 		ok, err := t.generating()
@@ -860,7 +862,9 @@ func (t *Tree) AccountIterator(root common.Hash, seek common.Hash, force bool) (
 }
 
 // StorageIterator creates a new storage iterator for the specified root hash and
-// account. The iterator will be move to the specific start position.
+// account. The iterator will be move to the specific start position. When [force]
+// is true, a new account iterator is created without acquiring the [snapTree]
+// lock and without confirming that the snapshot on the disk layer is fully generated.
 func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek common.Hash, force bool) (StorageIterator, error) {
 	if !force {
 		ok, err := t.generating()
