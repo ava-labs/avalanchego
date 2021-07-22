@@ -894,7 +894,6 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	mintSecpOpTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, false, buildSecpMintOp(createAssetTx, key))
 
-	// workaround because IssueTx does not work with this one
 	s := &Service{vm: vm}
 	err = s.initTx(mintSecpOpTx.UnsignedTx, vm)
 	assert.NoError(t, err)
@@ -910,6 +909,83 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	// contains the fxID
 	assert.Contains(t, jsonString, "\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"inputIDs\":[{\"txID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\"")
 	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x82a5e9d15d238e615639af2f957fe41aad268a37d7e9fbf89d75dfa0e87b21a321474a1901fde92d3e6e618cf0df998113901699a723a6e4c391fa3e490c5600010fcacb81\"]")
+}
+
+func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
+	vm := &VM{}
+	ctx := NewContext(t)
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(2),
+				Fx: &propertyfx.Fx{},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := keys[0]
+
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	_, err = vm.IssueTx(createAssetTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mintSecpOpTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, false, buildSecpMintOp(createAssetTx, key), buildSecpMintOp(createAssetTx, keys[1]))
+
+	s := &Service{vm: vm}
+	err = s.initTx(mintSecpOpTx.UnsignedTx, vm)
+	assert.NoError(t, err)
+
+	b, err := json2.Marshal(mintSecpOpTx)
+	assert.NoError(t, err)
+	jsonString := string(b)
+
+	// contains the address in the right format
+	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+
+	// contains the fxID
+	assert.Contains(t, jsonString, "\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"inputIDs\":[{\"txID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x672e614c1c2881e9aea8d785c6a34c032579e939b22231a9ee8036f4fde89122743826111a98536db554787baf91108ff2254b9cfa1fcb70c3a0ce20b986e6330145178ae6\"]")
 }
 
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
@@ -1052,8 +1128,6 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 		}},
 	}}
 }
-
-// todo another test with multiple output owners
 
 func buildNFTxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Operation {
 	return &Operation{
