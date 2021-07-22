@@ -1061,6 +1061,162 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x672e614c1c2881e9aea8d785c6a34c032579e939b22231a9ee8036f4fde89122743826111a98536db554787baf91108ff2254b9cfa1fcb70c3a0ce20b986e6330145178ae6\"]")
 }
 
+func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
+	vm := &VM{}
+	ctx := NewContext(t)
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(2),
+				Fx: &propertyfx.Fx{},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := keys[0]
+
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	_, err = vm.IssueTx(createAssetTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mintPropertyFxOpTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, false, buildPropertyFxMintOp(createAssetTx, key))
+
+	s := &Service{vm: vm}
+	err = s.initTx(mintPropertyFxOpTx.UnsignedTx, vm)
+	assert.NoError(t, err)
+
+	b, err := json2.Marshal(mintPropertyFxOpTx)
+	assert.NoError(t, err)
+	jsonString := string(b)
+	fmt.Println(jsonString)
+
+	// contains the address in the right format
+	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+
+	// contains the fxID
+	assert.Contains(t, jsonString, "\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"inputIDs\":[{\"txID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x82a5e9d15d238e615639af2f957fe41aad268a37d7e9fbf89d75dfa0e87b21a321474a1901fde92d3e6e618cf0df998113901699a723a6e4c391fa3e490c5600010fcacb81\"]")
+}
+
+func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) {
+	vm := &VM{}
+	ctx := NewContext(t)
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(2),
+				Fx: &propertyfx.Fx{},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := keys[0]
+
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	_, err = vm.IssueTx(createAssetTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mintPropertyFxOpTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, false, buildPropertyFxMintOp(createAssetTx, keys[1]), buildPropertyFxMintOp(createAssetTx, keys[2]))
+
+	s := &Service{vm: vm}
+	err = s.initTx(mintPropertyFxOpTx.UnsignedTx, vm)
+	assert.NoError(t, err)
+
+	b, err := json2.Marshal(mintPropertyFxOpTx)
+	assert.NoError(t, err)
+	jsonString := string(b)
+
+	// contains the address in the right format
+	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd\"]")
+	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing17fpqs358de5lgu7a5ftpw2t8axf0pm33983krk\"]")
+	assert.Contains(t, jsonString, "\"ownedOutput\":{\"addresses\":[\"X-testing17fpqs358de5lgu7a5ftpw2t8axf0pm33983krk\"],")
+
+	// contains the fxID
+	assert.Contains(t, jsonString, "\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"inputIDs\":[{\"txID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0xcd26e4883f42b744b461522e0e5d4232053b185230df4d79a0c14cbb35a32f0b307c2a4cc5321e728aad7deff9d44d5c9195425f65b74f905e32368f2e4efe9701c5445c05\"]")
+}
+
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	avaxTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 	key := keys[0]
@@ -1218,6 +1374,33 @@ func buildNFTxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Opera
 			Outputs: []*secp256k1fx.OutputOwners{{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{key.PublicKey().Address()},
+			}},
+		},
+	}
+}
+
+func buildPropertyFxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Operation {
+	return &Operation{
+		Asset: avax.Asset{ID: createAssetTx.ID()},
+		UTXOIDs: []*avax.UTXOID{{
+			TxID:        createAssetTx.ID(),
+			OutputIndex: 0,
+		}},
+		Op: &propertyfx.MintOperation{
+			MintInput: secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+			MintOutput: propertyfx.MintOutput{OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					key.PublicKey().Address(),
+				},
+			}},
+			OwnedOutput: propertyfx.OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					key.PublicKey().Address(),
+				},
 			}},
 		},
 	}
