@@ -2866,6 +2866,9 @@ func TestApricotPhase1Transition(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2941,6 +2944,11 @@ func TestApricotPhase1Transition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 5; i++ {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -3008,6 +3016,11 @@ func TestApricotPhase1Transition(t *testing.T) {
 		if ethBlkTxs[i].Hash() != tx.Hash() {
 			t.Fatalf("expected tx at index %d to have hash: %x but has: %x", i, txs[i].Hash(), tx.Hash())
 		}
+	}
+
+	newHead = <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blkB.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm1.chain.AddRemoteTxs(txs[5:])
