@@ -862,6 +862,8 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	// TODO: add header check
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -903,6 +905,8 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// TODO: add header check
+
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
@@ -930,6 +934,8 @@ func TestSetPreferenceRace(t *testing.T) {
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
+
+	// TODO: add header check
 
 	// Block D
 	errs = vm2.chain.AddRemoteTxs(txs[5:10])
@@ -1423,6 +1429,8 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	// TODO: Add header check
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -1463,6 +1471,8 @@ func TestReorgProtection(t *testing.T) {
 	if err := vm1.SetPreference(vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
+
+	// TODO: add header check
 
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
@@ -1636,6 +1646,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	// TODO: add header check
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -1684,6 +1696,8 @@ func TestNonCanonicalAccept(t *testing.T) {
 	if b := vm1.chain.GetBlockByNumber(blkBHeight); b.Hash() != blkBHash {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
+
+	// TODO: add header check
 
 	errs = vm2.chain.AddRemoteTxs(txs[0:5])
 	for i, err := range errs {
@@ -1842,6 +1856,8 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	// TODO: add header check
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -1891,6 +1907,8 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
+	// TODO: add header check
+
 	errs = vm2.chain.AddRemoteTxs(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
@@ -1915,6 +1933,8 @@ func TestStickyPreference(t *testing.T) {
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
+
+	// TODO: add header check
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
 	for i, err := range errs {
@@ -2141,6 +2161,8 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	// TODO: add header check
+
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -2179,6 +2201,8 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// TODO: add header check
+
 	errs = vm2.chain.AddRemoteTxs(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
@@ -2203,6 +2227,8 @@ func TestUncleBlock(t *testing.T) {
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
+
+	// TODO: add header check
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:10])
 	for i, err := range errs {
@@ -2474,6 +2500,8 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	// TODO: add header check
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -2514,6 +2542,8 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// TODO: add header check
+
 	errs = vm2.chain.AddRemoteTxs(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
@@ -2535,6 +2565,8 @@ func TestAcceptReorg(t *testing.T) {
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
 	}
+
+	// TODO: add header check
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
 	for i, err := range errs {
@@ -2782,6 +2814,8 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
 	}
+
+	// TODO: add header check
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 5; i++ {
