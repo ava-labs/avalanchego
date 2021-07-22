@@ -1023,6 +1023,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1120,6 +1123,11 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 
 	if err := vm.SetPreference(blk0.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk0.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
