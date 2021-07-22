@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 // DefaultLogDirectory is the default directory where logs are saved
@@ -30,7 +31,7 @@ func DefaultConfig() (Config, error) {
 	dir, err := homedir.Expand(DefaultLogDirectory)
 	return Config{
 		RotationInterval: 24 * time.Hour,
-		FileSize:         1 << 23, // 8 MB
+		FileSize:         8 * units.MiB,
 		RotationSize:     7,
 		FlushSize:        1,
 		DisplayLevel:     Info,

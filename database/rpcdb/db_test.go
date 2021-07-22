@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	bufSize = 1 << 20
+	bufSize = 1024 * 1024
 )
 
 func TestInterface(t *testing.T) {
