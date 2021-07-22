@@ -834,6 +834,79 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x9e7c919bf910d68090d489f6e2ee12c0ba555e7932c281e098c4af8d95e4527b3db6b8d138a9c942d77ba61cb4021fb2142ae909ddd3b1cf14e38827792343250022ebd9b0\"]")
 }
 
+func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
+	vm := &VM{}
+	ctx := NewContext(t)
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key := keys[0]
+
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	_, err = vm.IssueTx(createAssetTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mintNFTTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, true, buildNFTxMintOp(createAssetTx, keys[1]), buildNFTxMintOp(createAssetTx, keys[2]))
+
+	s := &Service{vm: vm}
+	err = s.initTx(mintNFTTx.UnsignedTx, vm)
+	assert.NoError(t, err)
+	b, err := json2.Marshal(mintNFTTx)
+	assert.NoError(t, err)
+	jsonString := string(b)
+
+	// contains the address in the right format
+	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd\"]")
+	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing17fpqs358de5lgu7a5ftpw2t8axf0pm33983krk\"]")
+
+	// contains the fxID
+	assert.Contains(t, jsonString, "\"assetID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
+	assert.Contains(t, jsonString, "\"assetID\":\"26XbEsA4gTdmwfzDFunjByPkN2nxkiwpav4NUq3uMotkDr1jkT\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0xfe44debb943b2b9b3531dbf20e9b66854b48b81d83017148ae400c6b2dce7ae343819d4e1325989f85ca5c33e422ac72c480691457b766f1f20a4c4fd4c391ae00ce0e728f\"]")
+}
+
 func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	vm := &VM{}
 	ctx := NewContext(t)
