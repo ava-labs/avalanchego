@@ -165,3 +165,8 @@ scripts/protobuf_codegen.sh
 ```
 
 For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).
+
+### Security Bugs
+**We and our community welcome responsible disclosures.**
+
+If you've discovered a security vulnerabilitiy, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).
