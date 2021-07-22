@@ -108,6 +108,10 @@ func (b *Block) ID() ids.ID { return b.id }
 func (b *Block) Accept() error {
 	vm := b.vm
 
+	// Although returning an error from Accept is considered fatal, it is good
+	// practice to cleanup the batch we were modifying in the case of an error.
+	defer vm.db.Abort()
+
 	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	if err := vm.chain.Accept(b.ethBlock); err != nil {
@@ -142,10 +146,6 @@ func (b *Block) Accept() error {
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
-
-	// Although returning an error from Accept is considered fatal, it is good
-	// practice to cleanup the batch we were modifying in the case of an error.
-	defer vm.db.Abort()
 
 	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }
