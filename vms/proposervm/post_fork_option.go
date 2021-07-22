@@ -135,7 +135,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	if newTimestamp.Before(minTimestamp) {
 		// It's not our turn to propose a block yet
 		b.vm.ctx.Log.Debug("Snowman++ build post-fork option - parent timestamp %v, expected delay %v, block timestamp %v. Dropping block, build called too early.",
-			parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
+			parentTimestamp, minDelay, newTimestamp)
 		return nil, errProposerWindowNotStarted
 	}
 
@@ -169,7 +169,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		child.ID(), parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
+		child.ID(), parentTimestamp, minDelay, newTimestamp)
 	// Persist the child
 	return child, b.vm.storePostForkBlock(child)
 }

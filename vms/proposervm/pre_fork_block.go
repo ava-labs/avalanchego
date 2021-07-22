@@ -147,7 +147,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 			vm:    b.vm,
 		}
 		b.vm.ctx.Log.Debug("Snowman++ build pre-fork block %s - timestamp parent block %v",
-			res.ID(), b.Timestamp().Format("15:04:05"))
+			res.ID(), b.Timestamp())
 
 		return res, nil
 	}
@@ -187,7 +187,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay NA, block timestamp %v.",
-		blk.ID(), parentTimestamp.Format("15:04:05"), newTimestamp.Format("15:04:05"))
+		blk.ID(), parentTimestamp, newTimestamp)
 	return blk, b.vm.storePostForkBlock(blk)
 }
 

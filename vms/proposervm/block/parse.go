@@ -5,13 +5,11 @@ package block
 
 import (
 	"crypto/x509"
-	"errors"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
-
-var errWrongVersion = errors.New("wrong version")
 
 func Parse(bytes []byte) (Block, error) {
 	block := statelessBlock{
@@ -23,7 +21,7 @@ func Parse(bytes []byte) (Block, error) {
 		return nil, err
 	}
 	if parsedVersion != version {
-		return nil, errWrongVersion
+		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
 	}
 
 	block.timestamp = time.Unix(block.StatelessBlock.Timestamp, 0)

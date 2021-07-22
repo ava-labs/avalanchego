@@ -98,7 +98,7 @@ func (vm *VM) Initialize(
 
 // block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
-	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now().Format("15:04:05"))
+	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now())
 	preferredBlock, err := vm.getBlock(vm.preferred)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 
 	nextStartTime := prefBlk.Timestamp().Add(minDelay)
 	vm.ctx.Log.Debug("Snowman++ set preference - preferred block ID %s,  timestamp %v; next start time scheduled at %v",
-		prefBlk.ID(), prefBlk.Timestamp().Format("15:04:05"), nextStartTime.Format("15:04:05"))
+		prefBlk.ID(), prefBlk.Timestamp(), nextStartTime)
 	vm.Scheduler.SetStartTime(nextStartTime)
 	return nil
 }

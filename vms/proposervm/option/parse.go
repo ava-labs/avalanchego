@@ -4,12 +4,10 @@
 package option
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
-
-var errWrongVersion = errors.New("wrong version")
 
 func Parse(bytes []byte) (Option, error) {
 	block := option{
@@ -21,7 +19,7 @@ func Parse(bytes []byte) (Option, error) {
 		return nil, err
 	}
 	if parsedVersion != version {
-		return nil, errWrongVersion
+		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
 	}
 
 	return &block, nil

@@ -103,7 +103,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 
 	minTimestamp := parentTimestamp.Add(minDelay)
 	p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		childID, parentTimestamp.Format("15:04:05"), minDelay, childTimestamp.Format("15:04:05"))
+		childID, parentTimestamp, minDelay, childTimestamp)
 
 	if childTimestamp.Before(minTimestamp) {
 		p.vm.ctx.Log.Debug("Snowman++ verify - dropped post-fork block due to time window %s", childID)

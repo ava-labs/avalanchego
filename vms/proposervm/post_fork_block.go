@@ -21,6 +21,10 @@ type postForkBlock struct {
 	postForkCommonComponents
 }
 
+// Accept:
+// 1) Sets this blocks status to Accepted.
+// 2) Persists this block in storage
+// 3) Calls Reject() on siblings of this block and their descendants.
 func (b *postForkBlock) Accept() error {
 	b.status = choices.Accepted
 	blkID := b.ID()
@@ -179,7 +183,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	if newTimestamp.Before(minTimestamp) {
 		// It's not our turn to propose a block yet
 		b.vm.ctx.Log.Debug("Snowman++ build post-fork block - parent timestamp %s, expected delay %s, block timestamp %s. Dropping block, build called too early.",
-			parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
+			parentTimestamp, minDelay, newTimestamp)
 		return nil, errProposerWindowNotStarted
 	}
 
@@ -213,7 +217,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		child.ID(), parentTimestamp.Format("15:04:05"), minDelay, newTimestamp.Format("15:04:05"))
+		child.ID(), parentTimestamp, minDelay, newTimestamp)
 	// Persist the child
 	return child, b.vm.storePostForkBlock(child)
 }
