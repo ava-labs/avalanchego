@@ -2812,6 +2812,9 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2887,7 +2890,10 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO: add header check
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 5; i++ {
