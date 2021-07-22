@@ -85,6 +85,10 @@ func (b *postForkOption) Verify() error {
 	return parent.verifyPostForkOption(b)
 }
 
+func (b *postForkOption) getInnerBlk() snowman.Block {
+	return b.innerBlk
+}
+
 func (b *postForkOption) verifyPreForkChild(child *preForkBlock) error {
 	// A *preForkBlock's parent must be a *preForkBlock
 	return errUnsignedChild

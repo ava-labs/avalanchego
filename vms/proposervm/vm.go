@@ -96,6 +96,23 @@ func (vm *VM) Initialize(
 	)
 }
 
+func (vm *VM) verifyAndRecordInnerBlk(postFork Block) error {
+	// If inner block's Verify returned true, don't call it again.
+	// Note that if [postFork.getInnerBlk().Verify] returns nil,
+	// this method returns nil. This must always remain the case to
+	// maintain the inner block's invariant that if it's Verify()
+	// returns nil, it is eventually accepted/rejected.
+	if !vm.Tree.Contains(postFork.getInnerBlk()) {
+		if err := postFork.getInnerBlk().Verify(); err != nil {
+			return err
+		}
+		vm.Tree.Add(postFork.getInnerBlk())
+	}
+
+	vm.verifiedBlocks[postFork.ID()] = postFork
+	return nil
+}
+
 // block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now())

@@ -71,6 +71,10 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	return child.Block.Verify()
 }
 
+func (b *preForkBlock) getInnerBlk() snowman.Block {
+	return b.Block
+}
+
 // This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	childID := child.ID()

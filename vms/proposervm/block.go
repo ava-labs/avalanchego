@@ -32,6 +32,8 @@ var (
 type Block interface {
 	snowman.Block
 
+	getInnerBlk() snowman.Block
+
 	verifyPreForkChild(child *preForkBlock) error
 	verifyPostForkChild(child *postForkBlock) error
 	verifyPostForkOption(child *postForkOption) error
@@ -115,18 +117,5 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return err
 	}
 
-	// If inner block's Verify returned true, don't call it again.
-	// Note that if [child.innerBlk.Verify] returns nil,
-	// this method returns nil. This must always remain the case to
-	// maintain the inner block's invariant that if it's Verify()
-	// returns nil, it is eventually accepted/rejected.
-	if !p.vm.Tree.Contains(child.innerBlk) {
-		if err := child.innerBlk.Verify(); err != nil {
-			return err
-		}
-		p.vm.Tree.Add(child.innerBlk)
-	}
-
-	p.vm.verifiedBlocks[childID] = child
-	return nil
+	return p.vm.verifyAndRecordInnerBlk(child)
 }
