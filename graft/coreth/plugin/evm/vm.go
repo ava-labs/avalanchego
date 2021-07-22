@@ -354,6 +354,7 @@ func (vm *VM) Initialize(
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
+	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId

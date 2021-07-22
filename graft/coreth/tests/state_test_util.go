@@ -161,7 +161,7 @@ func MakePreState(db ethdb.Database, accounts core.GenesisAlloc, snapshotter boo
 
 	var snaps *snapshot.Tree
 	if snapshotter {
-		snaps, _ = snapshot.New(db, sdb.TrieDB(), 1, common.Hash{}, root, false, true, false)
+		snaps, _ = snapshot.New(db, sdb.TrieDB(), 1, common.Hash{}, root, false, true, false, false)
 	}
 	statedb, _ = state.New(root, sdb, snaps)
 	return snaps, statedb
