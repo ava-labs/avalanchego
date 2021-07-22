@@ -104,6 +104,7 @@ type CacheConfig struct {
 	Pruning        bool // Whether to disable trie write caching and GC altogether (archive node)
 	SnapshotLimit  int  // Memory allowance (MB) to use for caching snapshot entries in memory
 	SnapshotAsync  bool // Generate snapshot tree async
+	SnapshotVerify bool // Verify generated snapshots
 	Preimages      bool // Whether to store preimage of trie key to the disk
 }
 
@@ -238,38 +239,18 @@ func NewBlockChain(
 
 	// Load any existing snapshot, regenerating it if loading failed
 	if bc.cacheConfig.SnapshotLimit > 0 {
-		// If we are not running snapshots in async mode or we are starting from genesis, generate the original snapshot disk layer up front, so
-		// we can use it while executing blocks in bootstrapping.
-		if !bc.cacheConfig.SnapshotAsync || head.NumberU64() == 0 {
-			log.Info("Initializing snapshots in synchronous mode")
-			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, true, false, true)
-		} else {
-			// Otherwise, if we are running snapshots in async mode, attempt to initialize snapshots without rebuilding. If the snapshot
-			// disk layer is corrupted, incomplete, or doesn't exist, wait until calling Bootstrapped to rebuild.
-			log.Info("Attempting to load existing snapshot in async mode")
-			bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), false, false, false, false)
-		}
+		// If we are starting from genesis, generate the original snapshot disk layer
+		// up front, so we can use it while executing blocks in bootstrapping. This
+		// also avoids a costly async generation process when reaching tip.
+		async := bc.cacheConfig.SnapshotAsync && head.NumberU64() > 0
+		log.Info("Initializing snapshots", "async", async)
+		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), async, true, false, bc.cacheConfig.SnapshotVerify)
 		if err != nil {
-			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", bc.cacheConfig.SnapshotAsync)
+			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", async)
 		}
 	}
 
 	return bc, nil
-}
-
-func (bc *BlockChain) Bootstrapped() error {
-	// If [bc.snaps] is either already initialized, not meant to be initialized, or we should
-	// have already attempted to initialize it synchronously, then return early without attempting
-	// to initialize snapshots.
-	if bc.snaps != nil || bc.cacheConfig.SnapshotLimit <= 0 || !bc.cacheConfig.SnapshotAsync {
-		return nil
-	}
-
-	head := bc.LastAcceptedBlock()
-	var err error
-	log.Info("Attempting to initialize snapshots in async mode after finishing bootstrapping")
-	bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), true, true, false, true)
-	return err
 }
 
 // GetVMConfig returns the block chain VM config.
@@ -859,6 +840,12 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 	}
 
 	bc.lastAccepted = block
+
+	// Abort snapshot generation before pruning anything from trie database
+	// (could occur in AcceptTrie)
+	if bc.snaps != nil {
+		bc.snaps.AbortGeneration()
+	}
 
 	// Accept Trie
 	if err := bc.stateManager.AcceptTrie(block); err != nil {

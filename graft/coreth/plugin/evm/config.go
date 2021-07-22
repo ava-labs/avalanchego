@@ -53,8 +53,9 @@ type Config struct {
 	Web3APIEnabled     bool `json:"web3-api-enabled"`
 
 	// Eth Settings
-	Pruning       bool `json:"pruning-enabled"`
-	SnapshotAsync bool `json:"snapshot-async"`
+	Pruning        bool `json:"pruning-enabled"`
+	SnapshotAsync  bool `json:"snapshot-async"`
+	SnapshotVerify bool `json:"snapshot-verification-enabled"`
 
 	LocalTxsEnabled         bool     `json:"local-txs-enabled"`
 	APIMaxDuration          Duration `json:"api-max-duration"`

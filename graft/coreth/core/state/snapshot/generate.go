@@ -175,7 +175,8 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache i
 		cache:      fastcache.New(cache * 1024 * 1024),
 		genMarker:  genMarker,
 		genPending: make(chan struct{}),
-		genAbort:   make(chan chan *generatorStats),
+		genAbort:   make(chan chan struct{}),
+		created:    time.Now(),
 	}
 	go base.generate(stats)
 	log.Debug("Start snapshot generation", "root", root)
@@ -562,7 +563,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		batch     = dl.diskdb.NewBatch()
 		logged    = time.Now()
 		accOrigin = common.CopyBytes(accMarker)
-		abort     chan *generatorStats
+		abort     chan struct{}
 	)
 	stats.Log("Resuming state snapshot generation", dl.root, dl.genMarker)
 
@@ -724,7 +725,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			if abort == nil { // aborted by internal error, wait the signal
 				abort = <-dl.genAbort
 			}
-			abort <- stats
+			dl.genStats = stats
+			close(abort)
 			return
 		}
 		// Abort the procedure if the entire snapshot is generated
@@ -744,7 +746,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		log.Error("Failed to flush batch", "err", err)
 
 		abort = <-dl.genAbort
-		abort <- stats
+		dl.genStats = stats
+		close(abort)
 		return
 	}
 	batch.Reset()
@@ -754,12 +757,13 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 
 	dl.lock.Lock()
 	dl.genMarker = nil
+	dl.genStats = stats
 	close(dl.genPending)
 	dl.lock.Unlock()
 
 	// Someone will be looking for us, wait it out
 	abort = <-dl.genAbort
-	abort <- nil
+	close(abort)
 }
 
 // increaseKey increase the input key by one bit. Return nil if the entire
