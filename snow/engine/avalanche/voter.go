@@ -34,20 +34,24 @@ func (v *voter) Update() {
 		return
 	}
 
-	results, finished := v.t.polls.Vote(v.requestID, v.vdr, v.response)
-	if !finished {
+	results := v.t.polls.Vote(v.requestID, v.vdr, v.response)
+	if len(results) == 0 {
 		return
 	}
-	results, err := v.bubbleVotes(results)
-	if err != nil {
-		v.t.errs.Add(err)
-		return
+	for _, result := range results {
+		_, err := v.bubbleVotes(result)
+		if err != nil {
+			v.t.errs.Add(err)
+			return
+		}
 	}
 
 	v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &results)
-	if err := v.t.Consensus.RecordPoll(results); err != nil {
-		v.t.errs.Add(err)
-		return
+	for _, result := range results {
+		if err := v.t.Consensus.RecordPoll(result); err != nil {
+			v.t.errs.Add(err)
+			return
+		}
 	}
 
 	orphans := v.t.Consensus.Orphans()

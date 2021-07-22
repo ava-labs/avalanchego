@@ -6,16 +6,18 @@ package avalanche
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
 	numVtxRequests, numPendingVts, numMissingTxs prometheus.Gauge
-	getAncestorsVtxs                             prometheus.Histogram
+	getAncestorsVtxs                             metric.Averager
 }
 
 // Initialize implements the Engine interface
-func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer) error {
+func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
+	errs := wrappers.Errs{}
 	m.numVtxRequests = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "vtx_requests",
@@ -31,29 +33,19 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		Name:      "missing_txs",
 		Help:      "Number of missing transactions",
 	})
-	m.getAncestorsVtxs = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      "get_ancestors_vtxs",
-		Help:      "The number of vertices fetched in a call to GetAncestors",
-		Buckets: []float64{
-			0,
-			1,
-			5,
-			10,
-			100,
-			500,
-			1000,
-			1500,
-			2000,
-		},
-	})
 
-	errs := wrappers.Errs{}
+	m.getAncestorsVtxs = metric.NewAveragerWithErrs(
+		namespace,
+		"get_ancestors_vtxs",
+		"vertices fetched in a call to GetAncestors",
+		reg,
+		&errs,
+	)
+
 	errs.Add(
-		registerer.Register(m.numVtxRequests),
-		registerer.Register(m.numPendingVts),
-		registerer.Register(m.numMissingTxs),
-		registerer.Register(m.getAncestorsVtxs),
+		reg.Register(m.numVtxRequests),
+		reg.Register(m.numPendingVts),
+		reg.Register(m.numMissingTxs),
 	)
 	return errs.Err
 }
