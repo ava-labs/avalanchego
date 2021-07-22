@@ -137,7 +137,7 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 	if err != nil {
 		return nil, journalGenerator{}, err
 	}
-	log.Debug("Loaded snapshot journal", "diskroot", base.root, "diffhead", snapshot.Root())
+	log.Debug("Loaded snapshot journal", "diskroot", base.root, "diffhead", snapshot.Root(), "done", generator.Done)
 	return snapshot, generator, nil
 }
 

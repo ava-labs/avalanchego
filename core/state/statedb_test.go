@@ -1046,7 +1046,7 @@ func TestGenerateMultiCoinAccounts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Build snapshot from scratch
-	snaps, err := snapshot.New(diskdb, triedb, 16, common.Hash{}, root, false, true, false)
+	snaps, err := snapshot.New(diskdb, triedb, 16, common.Hash{}, root, false, true, false, false)
 	if err != nil {
 		t.Error("Unexpected error while rebuilding snapshot:", err)
 	}
