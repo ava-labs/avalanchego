@@ -1786,6 +1786,11 @@ func TestStickyPreference(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1889,7 +1894,14 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
-	// TODO: add header check
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
 
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
@@ -1940,8 +1952,6 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	// TODO: add header check
-
 	errs = vm2.chain.AddRemoteTxs(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
@@ -1967,7 +1977,10 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// TODO: add header check
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
 	for i, err := range errs {
