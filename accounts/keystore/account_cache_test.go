@@ -85,7 +85,7 @@ func TestWatchNewFile(t *testing.T) {
 
 	// ks should see the accounts.
 	var list []accounts.Account
-	for i := 0; i < 10; i++ {
+	for {
 		list = ks.Accounts()
 		if reflect.DeepEqual(list, wantAccounts) {
 			// ks should have also received change notifications
@@ -98,7 +98,6 @@ func TestWatchNewFile(t *testing.T) {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	t.Errorf("got %s, want %s", spew.Sdump(list), spew.Sdump(wantAccounts))
 }
 
 func TestWatchNoDir(t *testing.T) {
