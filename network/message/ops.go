@@ -84,7 +84,7 @@ var (
 func (op Op) Compressable() bool {
 	switch op {
 	case PeerList, Put, MultiPut, PushQuery:
-		return true
+		return false
 	default:
 		return false
 	}
