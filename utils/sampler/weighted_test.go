@@ -31,7 +31,7 @@ var (
 		{
 			name: "lookup",
 			sampler: &weightedUniform{
-				maxWeight: 1 << 10,
+				maxWeight: 1024,
 			},
 		},
 		{
@@ -41,7 +41,7 @@ var (
 					&weightedArray{},
 					&weightedHeap{},
 					&weightedUniform{
-						maxWeight: 1 << 10,
+						maxWeight: 1024,
 					},
 				},
 				benchmarkIterations: 30,
