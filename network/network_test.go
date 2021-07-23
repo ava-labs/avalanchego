@@ -313,6 +313,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 	)
 
 	net, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id,
@@ -327,8 +328,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -449,6 +449,7 @@ func TestEstablishConnection(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -463,8 +464,7 @@ func TestEstablishConnection(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -483,6 +483,7 @@ func TestEstablishConnection(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -497,8 +498,7 @@ func TestEstablishConnection(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -630,6 +630,7 @@ func TestDoubleTrack(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -644,8 +645,7 @@ func TestDoubleTrack(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -664,6 +664,7 @@ func TestDoubleTrack(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -678,8 +679,7 @@ func TestDoubleTrack(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -812,6 +812,7 @@ func TestDoubleClose(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -826,8 +827,7 @@ func TestDoubleClose(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -846,6 +846,7 @@ func TestDoubleClose(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -860,8 +861,7 @@ func TestDoubleClose(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -999,6 +999,7 @@ func TestTrackConnected(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1013,8 +1014,7 @@ func TestTrackConnected(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1033,6 +1033,7 @@ func TestTrackConnected(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1047,8 +1048,7 @@ func TestTrackConnected(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1160,6 +1160,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1174,8 +1175,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1194,6 +1194,7 @@ func TestTrackConnectedRace(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1208,8 +1209,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1452,6 +1452,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1466,8 +1467,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1486,6 +1486,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1500,8 +1501,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1520,6 +1520,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assert.NotNil(t, net1)
 
 	net2, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1534,8 +1535,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler2,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1554,6 +1554,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	assert.NotNil(t, net2)
 
 	net3, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -1568,8 +1569,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler3,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1909,6 +1909,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -1923,8 +1924,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1943,6 +1943,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1957,8 +1958,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -1977,6 +1977,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.NotNil(t, net1)
 
 	net2, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -1991,8 +1992,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler2,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2011,6 +2011,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	assert.NotNil(t, net2)
 
 	net3, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -2025,8 +2026,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler3,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2282,6 +2282,7 @@ func TestPeerSignature(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -2296,8 +2297,7 @@ func TestPeerSignature(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler0,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2316,6 +2316,7 @@ func TestPeerSignature(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -2330,8 +2331,7 @@ func TestPeerSignature(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler1,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2350,6 +2350,7 @@ func TestPeerSignature(t *testing.T) {
 	assert.NotNil(t, net1)
 
 	net2, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id2,
@@ -2364,8 +2365,7 @@ func TestPeerSignature(t *testing.T) {
 		vdrs,
 		vdrs,
 		handler2,
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2728,6 +2728,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	)
 
 	net0, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id0,
@@ -2742,8 +2743,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		vdrs,
 		vdrs,
 		&testHandler{},
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
@@ -2762,6 +2762,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	assert.NotNil(t, net0)
 
 	net1, err := NewDefaultNetwork(
+		"",
 		prometheus.NewRegistry(),
 		log,
 		id1,
@@ -2776,8 +2777,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		vdrs,
 		vdrs,
 		&testHandler{},
-		time.Duration(0),
-		0,
+		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
 		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,

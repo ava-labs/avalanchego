@@ -1228,7 +1228,7 @@ func MetricsAcceptedErrorTest(t *testing.T, factory Factory) {
 	numAccepted := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "blks_accepted",
+			Name:      "blks_accepted_count",
 		})
 
 	if err := params.Metrics.Register(numAccepted); err != nil {
@@ -1259,7 +1259,7 @@ func MetricsRejectedErrorTest(t *testing.T, factory Factory) {
 	numRejected := prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: params.Namespace,
-			Name:      "blks_rejected",
+			Name:      "blks_rejected_count",
 		})
 
 	if err := params.Metrics.Register(numRejected); err != nil {

@@ -40,7 +40,9 @@ func (p *noEarlyTermPoll) Vote(vdr ids.ShortID, vote ids.ID) {
 func (p *noEarlyTermPoll) Drop(vdr ids.ShortID) { p.polled.Remove(vdr) }
 
 // Finished returns true when all validators have voted
-func (p *noEarlyTermPoll) Finished() bool { return p.polled.Len() == 0 }
+func (p *noEarlyTermPoll) Finished() bool {
+	return p.polled.Len() == 0
+}
 
 // Result returns the result of this poll
 func (p *noEarlyTermPoll) Result() ids.Bag { return p.votes }
