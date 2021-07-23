@@ -156,8 +156,13 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 
 // assume the [stateLock] is held
 func (p *peer) Start() {
-	go p.ReadMessages()
-	go p.WriteMessages()
+	go func() {
+		// Make sure that the version is the first message sent
+		p.sendVersion()
+
+		go p.ReadMessages()
+		go p.WriteMessages()
+	}()
 }
 
 func (p *peer) StartTicker() {
@@ -305,8 +310,6 @@ func (p *peer) ReadMessages() {
 // attempt to write messages to the peer
 func (p *peer) WriteMessages() {
 	defer p.Close()
-
-	p.sendVersion()
 
 	var reader bytes.Reader
 	writer := bufio.NewWriter(p.conn)
