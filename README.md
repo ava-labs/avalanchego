@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="resources/AvalancheLogoRed.png?raw=true">
+  <img src="resources/Avalanche_Horizontal_Red.png?raw=true">
 </div>
 
 ---
