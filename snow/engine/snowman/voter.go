@@ -5,7 +5,7 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
+	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -77,17 +77,21 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 		if err != nil {
 			continue
 		}
-
-		for blk.Status().Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
+		status := blk.Status()
+		blkID := blk.ID()
+		for status.Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
 			blkID := blk.Parent()
 			blk, err = v.t.GetBlock(blkID)
 			if err != nil {
-				blk = &missing.Block{BlkID: blkID}
+				status = choices.Unknown
+				break
 			}
+			status = blk.Status()
 		}
-
-		if !blk.Status().Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
-			bubbledVotes.AddCount(blk.ID(), count)
+		if status == choices.Unknown && v.t.Consensus.Processing(blkID) {
+			bubbledVotes.AddCount(blkID, count)
+		} else if !status.Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
+			bubbledVotes.AddCount(blkID, count)
 		}
 	}
 	return bubbledVotes

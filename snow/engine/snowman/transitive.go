@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 const (
@@ -512,20 +511,29 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	for blk.Status().Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+	status := blk.Status()
+	for status.Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
 		blkID = blk.Parent()
 		var err error
 		if blk, err = t.GetBlock(blkID); err != nil {
-			blk = &missing.Block{BlkID: blkID}
+			status = choices.Unknown
+			break
 		}
+		status = blk.Status()
 	}
 
-	// The block was issued into consensus. This is the happy path.
-	if t.Consensus.DecidedOrProcessing(blk) {
-		return true, nil
+	if status == choices.Unknown {
+		if t.Consensus.Processing(blkID) {
+			return true, nil
+		}
+	} else {
+		// The block was issued into consensus. This is the happy path.
+		if t.Consensus.DecidedOrProcessing(blk) {
+			return true, nil
+		}
 	}
 
 	// There's an outstanding request for this block.

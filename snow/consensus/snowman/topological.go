@@ -163,28 +163,28 @@ func (ts *Topological) AcceptedOrProcessing(blk Block) bool {
 	if blk.Status() == choices.Accepted {
 		return true
 	}
-	// If the block is in the map of current blocks, then the block is currently
-	// processing.
-	_, ok := ts.blocks[blk.ID()]
-	return ok
+	return ts.Processing(blk.ID())
 }
 
 // DecidedOrProcessing implements the Snowman interface
 func (ts *Topological) DecidedOrProcessing(blk Block) bool {
-	switch blk.Status() {
 	// If the block is decided, then it must have been previously issued.
-	case choices.Accepted, choices.Rejected:
+	if blk.Status().Decided() {
 		return true
+	}
 	// If the block is marked as fetched, we can check if it has been
 	// transitively rejected.
-	case choices.Processing:
-		if blk.Height() <= ts.height {
-			return true
-		}
+	if blk.Status() == choices.Processing && blk.Height() <= ts.height {
+		return true
 	}
+	return ts.Processing(blk.ID())
+}
+
+// Processing implements the Snowman interface
+func (ts *Topological) Processing(blkID ids.ID) bool {
 	// If the block is in the map of current blocks, then the block is currently
 	// processing.
-	_, ok := ts.blocks[blk.ID()]
+	_, ok := ts.blocks[blkID]
 	return ok
 }
 

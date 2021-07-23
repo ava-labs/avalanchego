@@ -38,6 +38,9 @@ type Consensus interface {
 	// currently processing.
 	DecidedOrProcessing(Block) bool
 
+	// Processing returns true if the block ID is currently processing.
+	Processing(ids.ID) bool
+
 	// IsPreferred returns true if the block is currently on the preferred
 	// chain.
 	IsPreferred(Block) bool

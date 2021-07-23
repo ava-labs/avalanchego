@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 // Parameters for delaying bootstrapping to avoid potential CPU burns
@@ -275,6 +274,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
 		b.tipHeight = blkHeight
 	}
+
 	for status == choices.Processing {
 		if b.Halted() {
 			return nil
@@ -297,10 +297,10 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 		blkID = blk.Parent()
 		blk, err = b.VM.GetBlock(blkID)
 		if err != nil {
-			blk = &missing.Block{BlkID: blkID}
+			status = choices.Unknown
+		} else {
+			status = blk.Status()
 		}
-		status = blk.Status()
-		blkID = blk.ID()
 
 		if !pushed {
 			// If this block is already on the queue, then we can stop
