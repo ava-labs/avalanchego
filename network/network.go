@@ -62,7 +62,7 @@ var (
 	errPeerIsMyself          = errors.New("peer is myself")
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
 
-	minVersionCanHandleCompressed = version.NewDefaultVersion(1, 4, 11)
+	minVersionCanHandleCompressed = version.NewDefaultVersion(1, 4, 10)
 )
 
 var _ Network = &network{}
