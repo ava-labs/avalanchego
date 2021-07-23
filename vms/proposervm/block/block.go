@@ -43,13 +43,17 @@ type statelessBlock struct {
 	bytes     []byte
 }
 
-func (b *statelessBlock) ID() ids.ID            { return b.id }
-func (b *statelessBlock) ParentID() ids.ID      { return b.StatelessBlock.ParentID }
-func (b *statelessBlock) PChainHeight() uint64  { return b.StatelessBlock.PChainHeight }
-func (b *statelessBlock) Timestamp() time.Time  { return b.timestamp }
+func (b *statelessBlock) ID() ids.ID           { return b.id }
+func (b *statelessBlock) ParentID() ids.ID     { return b.StatelessBlock.ParentID }
+func (b *statelessBlock) PChainHeight() uint64 { return b.StatelessBlock.PChainHeight }
+func (b *statelessBlock) Timestamp() time.Time { return b.timestamp }
+
+// Block returns the byte representation of inner block, while ...
 func (b *statelessBlock) Block() []byte         { return b.StatelessBlock.Block }
 func (b *statelessBlock) Proposer() ids.ShortID { return b.proposer }
-func (b *statelessBlock) Bytes() []byte         { return b.bytes }
+
+// ... Bytes returns the byte representation of the whole wrapped block
+func (b *statelessBlock) Bytes() []byte { return b.bytes }
 
 func (b *statelessBlock) Verify() error {
 	unsignedBytes, err := c.Marshal(version, &b.StatelessBlock)

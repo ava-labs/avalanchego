@@ -157,6 +157,8 @@ func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 	innerParent := child.innerBlk.Parent()
 	innerParentID := innerParent.ID()
 	if innerParentID != expectedInnerParentID {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork option; expected inner parent %s but got %s",
+			expectedInnerParentID, innerParentID)
 		return errInnerParentMismatch
 	}
 
@@ -186,7 +188,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	minTimestamp := parentTimestamp.Add(minDelay)
 	if newTimestamp.Before(minTimestamp) {
 		// It's not our turn to propose a block yet
-		b.vm.ctx.Log.Debug("Snowman++ build post-fork block - parent timestamp %s, expected delay %s, block timestamp %s. Dropping block, build called too early.",
+		b.vm.ctx.Log.Warn("Snowman++ build post-fork block - dropped block; parent timestamp %s, expected delay %s, block timestamp %s.",
 			parentTimestamp, minDelay, newTimestamp)
 		return nil, errProposerWindowNotStarted
 	}

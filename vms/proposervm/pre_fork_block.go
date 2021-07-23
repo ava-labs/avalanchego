@@ -85,6 +85,8 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return err
 	}
 	if childPChainHeight > currentPChainHeight {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
+			currentPChainHeight, childPChainHeight)
 		return errPChainHeightNotReached
 	}
 
@@ -93,6 +95,8 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	innerParent := child.innerBlk.Parent()
 	innerParentID := innerParent.ID()
 	if innerParentID != expectedInnerParentID {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected inner parent %s but got %s",
+			expectedInnerParentID, innerParentID)
 		return errInnerParentMismatch
 	}
 
@@ -107,12 +111,16 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	// Child's timestamp must be at or after its parent's timestamp
 	childTimestamp := child.Timestamp()
 	if childTimestamp.Before(parentTimestamp) {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected child's timestamp (%s) to be at or after parent's timestamp (%s)",
+			childTimestamp, parentTimestamp)
 		return errTimeNotMonotonic
 	}
 
 	// Child timestamp can't be too far in the future
 	maxTimestamp := b.vm.Time().Add(syncBound)
 	if childTimestamp.After(maxTimestamp) {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; block's timestamp (%s) is after the synchrony bound (%s)",
+			childTimestamp, maxTimestamp)
 		return errTimeTooAdvanced
 	}
 
