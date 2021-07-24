@@ -6,6 +6,8 @@ package avm
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -133,6 +135,37 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP
 		cred := &secp256k1fx.Credential{
 			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
 		}
+		for i, key := range keys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			copy(cred.Sigs[i][:], sig)
+		}
+		t.Creds = append(t.Creds, cred)
+	}
+
+	signedBytes, err := c.Marshal(codecVersion, t)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	t.Initialize(unsignedBytes, signedBytes)
+	return nil
+}
+
+// SignPropertyFx ...
+// todo cleanup sign methods
+func (t *Tx) SignPropertyFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	hash := hashing.ComputeHash256(unsignedBytes)
+	for _, keys := range signers {
+		cred := &propertyfx.Credential{Credential: secp256k1fx.Credential{
+			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
+		}}
 		for i, key := range keys {
 			sig, err := key.SignHash(hash)
 			if err != nil {
