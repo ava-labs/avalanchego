@@ -34,7 +34,8 @@ type TestVM struct {
 
 	CantInitialize, CantBootstrapping, CantBootstrapped,
 	CantShutdown, CantCreateHandlers, CantCreateStaticHandlers,
-	CantHealthCheck, CantConnected, CantDisconnected, CantVersion bool
+	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
+	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
 	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
@@ -43,6 +44,8 @@ type TestVM struct {
 	ConnectedF                               func(ids.ShortID) error
 	DisconnectedF                            func(ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
+	AppRequestF, AppGossipF, AppResponseF    func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppRequestFailedF                        func(nodeID ids.ShortID, requestID uint32) error
 	VersionF                                 func() (string, error)
 }
 
@@ -54,6 +57,13 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantCreateHandlers = cant
 	vm.CantCreateStaticHandlers = cant
 	vm.CantHealthCheck = cant
+	vm.CantAppRequest = cant
+	vm.CantAppRequestFailed = cant
+	vm.CantAppResponse = cant
+	vm.CantAppGossip = cant
+	vm.CantVersion = cant
+	vm.CantConnected = cant
+	vm.CantDisconnected = cant
 }
 
 func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
@@ -133,6 +143,58 @@ func (vm *TestVM) HealthCheck() (interface{}, error) {
 		vm.T.Fatal(errHealthCheck)
 	}
 	return nil, errHealthCheck
+}
+
+func (vm *TestVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if vm.AppRequestFailedF != nil {
+		return vm.AppRequestFailedF(nodeID, requestID)
+	}
+	if !vm.CantAppRequestFailed {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppRequestFailed")
+	}
+	return errors.New("unexpectedly called AppRequestFailed")
+}
+
+func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	if vm.AppRequestF != nil {
+		return vm.AppRequestF(nodeID, requestID, request)
+	}
+	if !vm.CantAppRequest {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppRequest")
+	}
+	return errors.New("unexpectedly called AppRequest")
+}
+
+func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	if vm.AppResponseF != nil {
+		return vm.AppResponseF(nodeID, requestID, response)
+	}
+	if !vm.CantAppResponse {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppResponse")
+	}
+	return errors.New("unexpectedly called AppResponse")
+}
+
+func (vm *TestVM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+	if vm.AppGossipF != nil {
+		return vm.AppGossipF(nodeID, msgID, msg)
+	}
+	if !vm.CantAppGossip {
+		return nil
+	}
+	if vm.T != nil {
+		vm.T.Fatalf("Unexpectedly called AppGossip")
+	}
+	return errors.New("unexpectedly called AppGossip")
 }
 
 func (vm *TestVM) Connected(id ids.ShortID) error {

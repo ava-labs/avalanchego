@@ -74,7 +74,8 @@ type metrics struct {
 	getAccepted, accepted,
 	getAncestors, multiPut,
 	get, put,
-	pushQuery, pullQuery, chits messageMetrics
+	pushQuery, pullQuery, chits,
+	appRequest, appResponse, appGossip messageMetrics
 }
 
 func (m *metrics) initialize(namespace string, registerer prometheus.Registerer) error {
@@ -159,6 +160,9 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 		m.pushQuery.initialize(message.PushQuery, namespace, registerer),
 		m.pullQuery.initialize(message.PullQuery, namespace, registerer),
 		m.chits.initialize(message.Chits, namespace, registerer),
+		m.appRequest.initialize(message.AppRequest, namespace, registerer),
+		m.appResponse.initialize(message.AppResponse, namespace, registerer),
+		m.appGossip.initialize(message.AppGossip, namespace, registerer),
 	)
 	return errs.Err
 }
@@ -199,6 +203,12 @@ func (m *metrics) message(msgType message.Op) *messageMetrics {
 		return &m.pullQuery
 	case message.Chits:
 		return &m.chits
+	case message.AppRequest:
+		return &m.appRequest
+	case message.AppResponse:
+		return &m.appResponse
+	case message.AppGossip:
+		return &m.appGossip
 	default:
 		return nil
 	}

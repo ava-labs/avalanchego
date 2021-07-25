@@ -1174,3 +1174,23 @@ func (vm *VM) lookupAssetID(asset string) (ids.ID, error) {
 	}
 	return ids.ID{}, fmt.Errorf("asset '%s' not found", asset)
 }
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+	return nil
+}

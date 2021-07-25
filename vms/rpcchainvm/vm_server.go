@@ -219,18 +219,18 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}, err
 }
 
-func (vm *VMServer) Bootstrapping(context.Context, *vmproto.BootstrappingRequest) (*vmproto.BootstrappingResponse, error) {
-	return &vmproto.BootstrappingResponse{}, vm.vm.Bootstrapping()
+func (vm *VMServer) Bootstrapping(context.Context, *vmproto.EmptyMsg) (*vmproto.EmptyMsg, error) {
+	return &vmproto.EmptyMsg{}, vm.vm.Bootstrapping()
 }
 
-func (vm *VMServer) Bootstrapped(context.Context, *vmproto.BootstrappedRequest) (*vmproto.BootstrappedResponse, error) {
+func (vm *VMServer) Bootstrapped(context.Context, *vmproto.EmptyMsg) (*vmproto.EmptyMsg, error) {
 	vm.ctx.Bootstrapped()
-	return &vmproto.BootstrappedResponse{}, vm.vm.Bootstrapped()
+	return &vmproto.EmptyMsg{}, vm.vm.Bootstrapped()
 }
 
-func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmproto.ShutdownResponse, error) {
+func (vm *VMServer) Shutdown(context.Context, *vmproto.EmptyMsg) (*vmproto.EmptyMsg, error) {
 	if vm.toEngine == nil {
-		return &vmproto.ShutdownResponse{}, nil
+		return &vmproto.EmptyMsg{}, nil
 	}
 
 	errs := wrappers.Errs{}
@@ -240,10 +240,10 @@ func (vm *VMServer) Shutdown(context.Context, *vmproto.ShutdownRequest) (*vmprot
 	vm.serverCloser.Stop()
 	errs.Add(vm.connCloser.Close())
 
-	return &vmproto.ShutdownResponse{}, errs.Err
+	return &vmproto.EmptyMsg{}, errs.Err
 }
 
-func (vm *VMServer) CreateStaticHandlers(context.Context, *vmproto.CreateStaticHandlersRequest) (*vmproto.CreateStaticHandlersResponse, error) {
+func (vm *VMServer) CreateStaticHandlers(context.Context, *vmproto.EmptyMsg) (*vmproto.CreateStaticHandlersResponse, error) {
 	handlers, err := vm.vm.CreateStaticHandlers()
 	if err != nil {
 		return nil, err
@@ -270,7 +270,7 @@ func (vm *VMServer) CreateStaticHandlers(context.Context, *vmproto.CreateStaticH
 	return resp, nil
 }
 
-func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandlersRequest) (*vmproto.CreateHandlersResponse, error) {
+func (vm *VMServer) CreateHandlers(context.Context, *vmproto.EmptyMsg) (*vmproto.CreateHandlersResponse, error) {
 	handlers, err := vm.vm.CreateHandlers()
 	if err != nil {
 		return nil, err
@@ -297,7 +297,7 @@ func (vm *VMServer) CreateHandlers(_ context.Context, req *vmproto.CreateHandler
 	return resp, nil
 }
 
-func (vm *VMServer) BuildBlock(_ context.Context, _ *vmproto.BuildBlockRequest) (*vmproto.BuildBlockResponse, error) {
+func (vm *VMServer) BuildBlock(context.Context, *vmproto.EmptyMsg) (*vmproto.BuildBlockResponse, error) {
 	blk, err := vm.vm.BuildBlock()
 	if err != nil {
 		return nil, err
@@ -351,15 +351,15 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 	}, err
 }
 
-func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceRequest) (*vmproto.SetPreferenceResponse, error) {
+func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceRequest) (*vmproto.EmptyMsg, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.SetPreferenceResponse{}, vm.vm.SetPreference(id)
+	return &vmproto.EmptyMsg{}, vm.vm.SetPreference(id)
 }
 
-func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmproto.HealthResponse, error) {
+func (vm *VMServer) Health(context.Context, *vmproto.EmptyMsg) (*vmproto.HealthResponse, error) {
 	details, err := vm.vm.HealthCheck()
 	if err != nil {
 		return &vmproto.HealthResponse{}, err
@@ -386,11 +386,43 @@ func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmpr
 	}, nil
 }
 
-func (vm *VMServer) Version(_ context.Context, req *vmproto.VersionRequest) (*vmproto.VersionResponse, error) {
+func (vm *VMServer) Version(context.Context, *vmproto.EmptyMsg) (*vmproto.VersionResponse, error) {
 	version, err := vm.vm.Version()
 	return &vmproto.VersionResponse{
 		Version: version,
 	}, err
+}
+
+func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*vmproto.EmptyMsg, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppRequest(nodeID, req.RequestID, req.Request)
+}
+
+func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestFailedMsg) (*vmproto.EmptyMsg, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppRequestFailed(nodeID, req.RequestID)
+}
+
+func (vm *VMServer) AppResponse(_ context.Context, req *vmproto.AppResponseMsg) (*vmproto.EmptyMsg, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppResponse(nodeID, req.RequestID, req.Response)
+}
+
+func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*vmproto.EmptyMsg, error) {
+	nodeID, err := ids.ToShortID(req.NodeID)
+	if err != nil {
+		return nil, err
+	}
+	return nil, vm.vm.AppGossip(nodeID, req.MsgID, req.Msg)
 }
 
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
@@ -407,7 +439,7 @@ func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyReque
 	}, err
 }
 
-func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptRequest) (*vmproto.BlockAcceptResponse, error) {
+func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptRequest) (*vmproto.EmptyMsg, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
 		return nil, err
@@ -419,10 +451,10 @@ func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptReque
 	if err := blk.Accept(); err != nil {
 		return nil, err
 	}
-	return &vmproto.BlockAcceptResponse{}, nil
+	return &vmproto.EmptyMsg{}, nil
 }
 
-func (vm *VMServer) BlockReject(_ context.Context, req *vmproto.BlockRejectRequest) (*vmproto.BlockRejectResponse, error) {
+func (vm *VMServer) BlockReject(_ context.Context, req *vmproto.BlockRejectRequest) (*vmproto.EmptyMsg, error) {
 	id, err := ids.ToID(req.Id)
 	if err != nil {
 		return nil, err
@@ -434,5 +466,5 @@ func (vm *VMServer) BlockReject(_ context.Context, req *vmproto.BlockRejectReque
 	if err := blk.Reject(); err != nil {
 		return nil, err
 	}
-	return &vmproto.BlockRejectResponse{}, nil
+	return &vmproto.EmptyMsg{}, nil
 }

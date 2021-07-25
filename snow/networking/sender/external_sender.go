@@ -37,5 +37,10 @@ type ExternalSender interface {
 	PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
+	// Send an application-level request
+	AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
+	AppResponse(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
+	AppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte)
+
 	Gossip(chainID ids.ID, containerID ids.ID, container []byte)
 }

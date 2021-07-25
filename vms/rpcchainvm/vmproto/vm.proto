@@ -42,25 +42,11 @@ message VersionedDBServer {
     string version = 2;
 }
 
-message BootstrappingRequest {}
-
-message BootstrappingResponse {}
-
-message BootstrappedRequest {}
-
-message BootstrappedResponse {}
-
-message ShutdownRequest {}
-
-message ShutdownResponse {}
-
-message CreateHandlersRequest {}
+message EmptyMsg {}
 
 message CreateHandlersResponse {
     repeated Handler handlers = 1;
 }
-
-message CreateStaticHandlersRequest {}
 
 message CreateStaticHandlersResponse {
     repeated Handler handlers = 1;
@@ -71,8 +57,6 @@ message Handler {
     uint32 lockOptions = 2;
     uint32 server = 3;
 }
-
-message BuildBlockRequest {}
 
 message BuildBlockResponse {
     bytes id = 1;
@@ -111,8 +95,6 @@ message SetPreferenceRequest {
     bytes id = 1;
 }
 
-message SetPreferenceResponse {}
-
 message BlockVerifyRequest {
     bytes bytes = 1;
 }
@@ -125,41 +107,71 @@ message BlockAcceptRequest {
     bytes id = 1;
 }
 
-message BlockAcceptResponse {}
-
 message BlockRejectRequest {
     bytes id = 1;
 }
-
-message BlockRejectResponse {}
-
-message HealthRequest {}
 
 message HealthResponse {
     string details = 1;
 }
 
-message VersionRequest {}
-
 message VersionResponse {
     string version = 1;
 }
 
+message AppRequestMsg {
+    // The node that sent us this request
+    bytes nodeID = 1;
+    // The ID of this request
+    uint32 requestID = 2;
+    // The request body
+    bytes request = 3;
+}
+
+message AppRequestFailedMsg {
+    // The node that we failed to get a response from
+    bytes nodeID = 1;
+    // The ID of the request we sent and didn't get a response to
+    uint32 requestID = 2;
+}
+
+message AppResponseMsg {
+    // The node that we got a response from
+    bytes nodeID = 1;
+    // Request ID of request that this is in response to
+    uint32 requestID = 2;
+    // The response body
+    bytes response = 3;
+}
+
+message AppGossipMsg {
+    // The node that sent us a gossip message
+    bytes nodeID = 1;
+    // ID of this message
+    uint32 msgID = 2;
+    // The message body
+    bytes msg = 3;
+}
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
-    rpc Bootstrapping(BootstrappingRequest) returns (BootstrappingResponse);
-    rpc Bootstrapped(BootstrappedRequest) returns (BootstrappedResponse);
-    rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
-    rpc CreateHandlers(CreateHandlersRequest) returns (CreateHandlersResponse);
-    rpc CreateStaticHandlers(CreateStaticHandlersRequest) returns (CreateStaticHandlersResponse);
-    rpc BuildBlock(BuildBlockRequest) returns (BuildBlockResponse);
+    rpc Bootstrapping(EmptyMsg) returns (EmptyMsg);
+    rpc Bootstrapped(EmptyMsg) returns (EmptyMsg);
+    rpc Shutdown(EmptyMsg) returns (EmptyMsg);
+    rpc CreateHandlers(EmptyMsg) returns (CreateHandlersResponse);
+    rpc CreateStaticHandlers(EmptyMsg) returns (CreateStaticHandlersResponse);
+    rpc BuildBlock(EmptyMsg) returns (BuildBlockResponse);
     rpc ParseBlock(ParseBlockRequest) returns (ParseBlockResponse);
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
-    rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
-    rpc Health(HealthRequest) returns (HealthResponse);
-    rpc Version(VersionRequest) returns (VersionResponse);
+    rpc SetPreference(SetPreferenceRequest) returns (EmptyMsg);
+    rpc Health(EmptyMsg) returns (HealthResponse);
+    rpc Version(EmptyMsg) returns (VersionResponse);
+    rpc AppRequest(AppRequestMsg) returns (EmptyMsg);
+    rpc AppRequestFailed(AppRequestFailedMsg) returns (EmptyMsg);
+    rpc AppResponse(AppResponseMsg) returns (EmptyMsg);
+    rpc AppGossip(AppGossipMsg) returns (EmptyMsg);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
-    rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);
-    rpc BlockReject(BlockRejectRequest) returns (BlockRejectResponse);
+    rpc BlockAccept(BlockAcceptRequest) returns (EmptyMsg);
+    rpc BlockReject(BlockRejectRequest) returns (EmptyMsg);
 }

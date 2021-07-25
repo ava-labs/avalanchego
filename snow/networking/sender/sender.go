@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -50,6 +51,7 @@ func (s *Sender) Initialize(
 		constants.GetAncestorsMsg:        "get_ancestors",
 		constants.PullQueryMsg:           "pull_query",
 		constants.PushQueryMsg:           "push_query",
+		constants.AppRequestMsg:          "app_request",
 	}
 
 	s.failedDueToBench = make(map[constants.MsgType]prometheus.Counter, len(requestTypes))
@@ -378,6 +380,73 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.QueryFailed(validatorID, s.ctx.ChainID, requestID)
 	}
+}
+
+// AppRequest sends an application-level request to the given nodes.
+// The meaning of this request, and how it should be handled, is defined by the VM.
+func (s *Sender) AppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) {
+	s.ctx.Log.Verbo("Sending AppRequest. RequestID: %d. Message: %s", requestID, formatting.DumpBytes{Bytes: appRequestBytes})
+
+	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
+	timeoutDuration := s.timeouts.TimeoutDuration()
+
+	// Sending a message to myself. No need to send it over the network.
+	// Just put it right into the router. Do so asynchronously to avoid deadlock.
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
+		// Register a timeout in case I don't respond to myself
+		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.AppRequestMsg)
+		go s.router.AppRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), appRequestBytes, nil)
+	}
+
+	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
+	// so we don't even bother sending messages to them. We just have them immediately fail.
+	for nodeID := range nodeIDs {
+		if s.timeouts.IsBenched(nodeID, s.ctx.ChainID) {
+			s.failedDueToBench[constants.AppRequestMsg].Inc() // update metric
+			nodeIDs.Remove(nodeID)
+			s.timeouts.RegisterRequestToUnreachableValidator()
+			// Immediately register a failure. Do so asynchronously to avoid deadlock.
+			go s.router.AppRequestFailed(nodeID, s.ctx.ChainID, requestID)
+		}
+	}
+
+	// Try to send the messages over the network.
+	// [sentTo] are the IDs of nodes who may receive the message.
+	sentTo := s.sender.AppRequest(nodeIDs, s.ctx.ChainID, requestID, timeoutDuration, appRequestBytes)
+
+	// Set timeouts so that if we don't hear back from these nodes, we register a failure.
+	for _, nodeID := range sentTo {
+		nID := nodeID // Prevent overwrite in next loop iteration
+		s.router.RegisterRequest(nID, s.ctx.ChainID, requestID, constants.AppRequestMsg)
+		nodeIDs.Remove(nID)
+	}
+
+	// Register failures for validators we didn't even send a request to.
+	for nodeID := range nodeIDs {
+		s.timeouts.RegisterRequestToUnreachableValidator()
+		go s.router.AppRequestFailed(nodeID, s.ctx.ChainID, requestID)
+	}
+}
+
+// Sends a response to an application-level request from the given node
+func (s *Sender) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
+	if nodeID == s.ctx.NodeID {
+		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
+	} else {
+		s.sender.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes)
+	}
+}
+
+// Sends a application-level gossip message the given nodes. The node doesn't need to respond to
+func (s *Sender) AppGossip(nodeIDs ids.ShortSet, requestID uint32, appResponseBytes []byte) {
+	// Sending a message to myself. No need to send it over the network.
+	// Just put it right into the router. Do so asynchronously to avoid deadlock.
+	if nodeIDs.Contains(s.ctx.NodeID) {
+		nodeIDs.Remove(s.ctx.NodeID)
+		go s.router.AppGossip(s.ctx.NodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
+	}
+	s.sender.AppGossip(nodeIDs, s.ctx.ChainID, requestID, appResponseBytes)
 }
 
 // Chits sends chits

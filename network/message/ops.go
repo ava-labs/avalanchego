@@ -32,6 +32,10 @@ const (
 	// Handshake / peer gossiping
 	Version
 	PeerList
+	// Application level:
+	AppRequest
+	AppResponse
+	AppGossip
 )
 
 var (
@@ -54,6 +58,9 @@ var (
 		Chits,
 		Version,
 		PeerList,
+		AppRequest,
+		AppResponse,
+		AppGossip,
 	}
 
 	// Defines the messages that can be sent/received with this network
@@ -78,6 +85,10 @@ var (
 		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
+		// Application level:
+		AppRequest:  {ChainID, RequestID, Deadline, AppRequestBytes},
+		AppResponse: {ChainID, RequestID, AppResponseBytes},
+		AppGossip:   {ChainID, RequestID, AppGossipBytes},
 	}
 )
 
@@ -126,6 +137,12 @@ func (op Op) String() string {
 		return "pull_query"
 	case Chits:
 		return "chits"
+	case AppRequest:
+		return "app_request"
+	case AppResponse:
+		return "app_response"
+	case AppGossip:
+		return "app_gossip"
 	default:
 		return "Unknown Op"
 	}

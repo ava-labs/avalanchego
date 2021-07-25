@@ -113,6 +113,25 @@ type Builder interface {
 		requestID uint32,
 		containerIDs []ids.ID,
 	) (Message, error)
+
+	AppRequest(
+		chainID ids.ID,
+		requestID uint32,
+		deadline uint64,
+		msg []byte,
+	) (Message, error)
+
+	AppResponse(
+		chainID ids.ID,
+		requestID uint32,
+		msg []byte,
+	) (Message, error)
+
+	AppGossip(
+		chainID ids.ID,
+		requestID uint32,
+		msg []byte,
+	) (Message, error)
 }
 
 type builder struct{ c Codec }
@@ -417,5 +436,48 @@ func (b *builder) Chits(
 		},
 		Chits.Compressable(), // Chits messages can't be compressed
 		Chits.Compressable(),
+	)
+}
+
+// Application level request
+func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (Message, error) {
+	return b.c.Pack(
+		AppRequest,
+		map[Field]interface{}{
+			ChainID:         chainID[:],
+			RequestID:       requestID,
+			Deadline:        deadline,
+			AppRequestBytes: msg,
+		},
+		AppRequest.Compressable(),
+		AppRequest.Compressable(),
+	)
+}
+
+// Application level response
+func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Message, error) {
+	return b.c.Pack(
+		AppResponse,
+		map[Field]interface{}{
+			ChainID:          chainID[:],
+			RequestID:        requestID,
+			AppResponseBytes: msg,
+		},
+		AppResponse.Compressable(),
+		AppResponse.Compressable(),
+	)
+}
+
+// Application level gossiped message
+func (b *builder) AppGossip(chainID ids.ID, requestID uint32, msg []byte) (Message, error) {
+	return b.c.Pack(
+		AppGossip,
+		map[Field]interface{}{
+			ChainID:        chainID[:],
+			RequestID:      requestID,
+			AppGossipBytes: msg,
+		},
+		AppGossip.Compressable(),
+		AppGossip.Compressable(),
 	)
 }

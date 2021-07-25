@@ -28,6 +28,9 @@ const (
 	SigBytes                         // Used in handshake / peer gossiping
 	VersionTime                      // Used in handshake / peer gossiping
 	SignedPeers                      // Used in peer gossiping
+	AppRequestBytes                  // Used at application level
+	AppResponseBytes                 // Used at application level
+	AppGossipBytes                   // Used at application level
 )
 
 // Packer returns the packer function that can be used to pack this field.
@@ -59,6 +62,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackHashes
 	case MultiContainerBytes:
 		return wrappers.TryPack2DBytes
+	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
+		return wrappers.TryPackBytes
 	case SigBytes:
 		return wrappers.TryPackBytes
 	case VersionTime:
@@ -99,6 +104,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackHashes
 	case MultiContainerBytes:
 		return wrappers.TryUnpack2DBytes
+	case AppRequestBytes, AppResponseBytes, AppGossipBytes:
+		return wrappers.TryUnpackBytes
 	case SigBytes:
 		return wrappers.TryUnpackBytes
 	case VersionTime:
@@ -138,6 +145,12 @@ func (f Field) String() string {
 		return "Container IDs"
 	case MultiContainerBytes:
 		return "MultiContainerBytes"
+	case AppRequestBytes:
+		return "AppRequestBytes"
+	case AppResponseBytes:
+		return "AppResponseBytes"
+	case AppGossipBytes:
+		return "AppGossipBytes"
 	case SigBytes:
 		return "SigBytes"
 	case VersionTime:

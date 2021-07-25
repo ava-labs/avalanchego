@@ -121,7 +121,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	engineFinished := make(chan struct{}, 1)
 
 	// MultiPut blocks for two seconds
-	engine.MultiPutF = func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+	engine.MultiPutF = func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
 		time.Sleep(2 * time.Second)
 		engineFinished <- struct{}{}
 		return nil
@@ -202,13 +202,13 @@ func TestRouterTimeout(t *testing.T) {
 		wg = sync.WaitGroup{}
 	)
 
-	engine.GetFailedF = func(validatorID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
-	engine.GetAncestorsFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.GetFailedF = func(nodeID ids.ShortID, requestID uint32) error { wg.Done(); calledGetFailed = true; return nil }
+	engine.GetAncestorsFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAncestorsFailed = true
 		return nil
 	}
-	engine.QueryFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.QueryFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		if !calledQueryFailed {
 			calledQueryFailed = true
@@ -217,12 +217,12 @@ func TestRouterTimeout(t *testing.T) {
 		calledQueryFailed2 = true
 		return nil
 	}
-	engine.GetAcceptedFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.GetAcceptedFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFailed = true
 		return nil
 	}
-	engine.GetAcceptedFrontierFailedF = func(validatorID ids.ShortID, requestID uint32) error {
+	engine.GetAcceptedFrontierFailedF = func(nodeID ids.ShortID, requestID uint32) error {
 		defer wg.Done()
 		calledGetAcceptedFrontierFailed = true
 		return nil

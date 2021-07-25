@@ -828,6 +828,91 @@ func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, vo
 	}
 }
 
+// AppRequest implements the Sender interface.
+// assumes the stateLock is not held.
+func (n *network) AppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID {
+	now := n.clock.Time()
+
+	msg, err := n.b.AppRequest(chainID, requestID, uint64(deadline), appRequestBytes)
+	if err != nil {
+		n.log.Error("failed to build AppRequest(%s, %d): %s", chainID, requestID, err)
+		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
+		n.sendFailRateCalculator.Observe(1, now)
+		return nil
+	}
+
+	sentTo := make([]ids.ShortID, 0, nodeIDs.Len())
+	for _, peerElement := range n.getPeers(nodeIDs) {
+		peer := peerElement.peer
+		nodeID := peerElement.id
+		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
+			n.log.Debug("failed to send AppRequest(%s, %s, %d)", nodeID, chainID, requestID)
+			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
+			n.appRequest.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		} else {
+			sentTo = append(sentTo, nodeID)
+			n.appRequest.numSent.Inc()
+			n.sendFailRateCalculator.Observe(0, now)
+			n.appRequest.sentBytes.Add(float64(len(msg.Bytes())))
+		}
+	}
+	return sentTo
+}
+
+// AppResponse implements the Sender interface.
+// assumes the stateLock is not held.
+func (n *network) AppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponse []byte) {
+	now := n.clock.Time()
+
+	msg, err := n.b.AppResponse(chainID, requestID, appResponse)
+	if err != nil {
+		n.log.Error("failed to build AppResponse(%s, %d): %s", chainID, requestID, err)
+		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponse})
+		n.sendFailRateCalculator.Observe(1, now)
+	}
+
+	peer := n.getPeer(nodeID)
+	if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, true) {
+		n.log.Debug("failed to send AppResponse(%s, %s, %d)", nodeID, chainID, requestID)
+		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: appResponse})
+		n.appResponse.numFailed.Inc()
+		n.sendFailRateCalculator.Observe(1, now)
+	} else {
+		n.appResponse.numSent.Inc()
+		n.sendFailRateCalculator.Observe(0, now)
+		n.appResponse.sentBytes.Add(float64(len(msg.Bytes())))
+	}
+}
+
+// AppGossip implements the Sender interface.
+// assumes the stateLock is not held.
+func (n *network) AppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte) {
+	now := n.clock.Time()
+
+	msg, err := n.b.AppGossip(chainID, requestID, appGossipBytes)
+	if err != nil {
+		n.log.Error("failed to build AppGossip(%s, %d): %s", chainID, requestID, err)
+		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+		n.sendFailRateCalculator.Observe(1, now)
+	}
+
+	for _, peerElement := range n.getPeers(nodeIDs) {
+		peer := peerElement.peer
+		nodeID := peerElement.id
+		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
+			n.log.Debug("failed to send AppGossip(%s, %s, %d)", nodeID, chainID, requestID)
+			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
+			n.appGossip.numFailed.Inc()
+			n.sendFailRateCalculator.Observe(1, now)
+		} else {
+			n.appGossip.numSent.Inc()
+			n.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
+			n.sendFailRateCalculator.Observe(0, now)
+		}
+	}
+}
+
 // Gossip attempts to gossip the container to the network
 // Assumes [n.stateLock] is not held.
 func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
