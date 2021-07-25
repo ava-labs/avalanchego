@@ -20,7 +20,7 @@ import (
 )
 
 func TestCodecPackInvalidOp(t *testing.T) {
-	codec, err := NewCodec(prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false, false)
@@ -31,7 +31,7 @@ func TestCodecPackInvalidOp(t *testing.T) {
 }
 
 func TestCodecPackMissingField(t *testing.T) {
-	codec, err := NewCodec(prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	_, err = codec.Pack(Get, make(map[Field]interface{}), false, false)
@@ -42,7 +42,7 @@ func TestCodecPackMissingField(t *testing.T) {
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
-	codec, err := NewCodec(prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	_, err = codec.Parse([]byte{math.MaxUint8}, true)
@@ -53,7 +53,7 @@ func TestCodecParseInvalidOp(t *testing.T) {
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
-	codec, err := NewCodec(prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry())
 	assert.NoError(t, err)
 
 	_, err = codec.Parse([]byte{byte(GetVersion), 0x00}, false)
@@ -82,7 +82,7 @@ func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
 // Test packing and then parsing messages
 // when using a gzip compressor
 func TestCodecPackParseGzip(t *testing.T) {
-	c, err := NewCodec(prometheus.DefaultRegisterer)
+	c, err := NewCodec("", prometheus.DefaultRegisterer)
 	assert.NoError(t, err)
 	id := ids.GenerateTestID()
 	cert := &x509.Certificate{}

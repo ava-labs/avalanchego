@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -29,8 +30,8 @@ var (
 )
 
 const (
-	maxNameLen    = 1 << 7
-	maxGenesisLen = 1 << 20
+	maxNameLen    = 128
+	maxGenesisLen = units.MiB
 )
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx

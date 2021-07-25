@@ -7,11 +7,12 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	maxPackerSize  = 1 << 30 // max size, in bytes, of something being marshalled by Marshal()
-	maxSliceLength = 1 << 18
+	maxPackerSize  = 1 * units.GiB // max size, in bytes, of something being marshalled by Marshal()
+	maxSliceLength = 256 * 1024
 
 	codecVersion = 0
 )
