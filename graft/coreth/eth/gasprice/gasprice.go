@@ -29,6 +29,7 @@ package gasprice
 import (
 	"context"
 	"math/big"
+	"sort"
 	"sync"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -38,19 +39,29 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-var DefaultMaxPrice = big.NewInt(500 * params.GWei)
+const sampleNumber = 3 // Number of transactions sampled in a block
+
+var (
+	DefaultMaxPrice    = big.NewInt(500 * params.GWei)
+	DefaultIgnorePrice = big.NewInt(2 * params.Wei)
+)
 
 type Config struct {
-	Blocks     int
-	Percentile int
-	Default    *big.Int `toml:",omitempty"`
-	MaxPrice   *big.Int `toml:",omitempty"`
+	Blocks           int
+	Percentile       int
+	MaxHeaderHistory int
+	MaxBlockHistory  int
+	Default          *big.Int `toml:",omitempty"`
+	MaxPrice         *big.Int `toml:",omitempty"`
+	IgnorePrice      *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
 type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
+	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
+	PendingBlockAndReceipts() (*types.Block, types.Receipts)
 	ChainConfig() *params.ChainConfig
 }
 
@@ -59,13 +70,14 @@ type OracleBackend interface {
 type Oracle struct {
 	backend     OracleBackend
 	lastHead    common.Hash
-	minGasPrice *big.Int
+	lastPrice   *big.Int
 	maxPrice    *big.Int
+	ignorePrice *big.Int
 	cacheLock   sync.RWMutex
 	fetchLock   sync.Mutex
 
-	checkBlocks int
-	percentile  int
+	checkBlocks, percentile           int
+	maxHeaderHistory, maxBlockHistory int
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
@@ -90,22 +102,180 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		maxPrice = DefaultMaxPrice
 		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice)
 	}
+	ignorePrice := params.IgnorePrice
+	if ignorePrice == nil || ignorePrice.Int64() <= 0 {
+		ignorePrice = DefaultIgnorePrice
+		log.Warn("Sanitizing invalid gasprice oracle ignore price", "provided", params.IgnorePrice, "updated", ignorePrice)
+	} else if ignorePrice.Int64() > 0 {
+		log.Info("Gasprice oracle is ignoring threshold set", "threshold", ignorePrice)
+	}
 	return &Oracle{
-		backend:     backend,
-		minGasPrice: params.Default,
-		maxPrice:    maxPrice,
-		checkBlocks: blocks,
-		percentile:  percent,
+		backend:          backend,
+		lastPrice:        params.Default,
+		maxPrice:         maxPrice,
+		ignorePrice:      ignorePrice,
+		checkBlocks:      blocks,
+		percentile:       percent,
+		maxHeaderHistory: params.MaxHeaderHistory,
+		maxBlockHistory:  params.MaxBlockHistory,
 	}
 }
 
-// SuggestPrice returns a gasprice so that newly created transaction can
-// have a very high chance to be included in the following blocks.
-func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	return gpo.minGasPrice, nil
+// SuggestTipCap returns a tip cap so that newly created transaction can have a
+// very high chance to be included in the following blocks.
+//
+// Note, for legacy transactions and the legacy eth_gasPrice RPC call, it will be
+// necessary to add the basefee to the returned number to fall back to the legacy
+// behavior.
+func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
+	head, _ := oracle.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	headHash := head.Hash()
+
+	// If the latest gasprice is still available, return it.
+	oracle.cacheLock.RLock()
+	lastHead, lastPrice := oracle.lastHead, oracle.lastPrice
+	oracle.cacheLock.RUnlock()
+	if headHash == lastHead {
+		return new(big.Int).Set(lastPrice), nil
+	}
+	oracle.fetchLock.Lock()
+	defer oracle.fetchLock.Unlock()
+
+	// Try checking the cache again, maybe the last fetch fetched what we need
+	oracle.cacheLock.RLock()
+	lastHead, lastPrice = oracle.lastHead, oracle.lastPrice
+	oracle.cacheLock.RUnlock()
+	if headHash == lastHead {
+		return new(big.Int).Set(lastPrice), nil
+	}
+	var (
+		sent, exp int
+		number    = head.Number.Uint64()
+		result    = make(chan results, oracle.checkBlocks)
+		quit      = make(chan struct{})
+		results   []*big.Int
+	)
+	for sent < oracle.checkBlocks && number > 0 {
+		go oracle.getBlockValues(ctx, types.MakeSigner(oracle.backend.ChainConfig(), big.NewInt(int64(number)), new(big.Int).SetUint64(head.Time)), number, sampleNumber, oracle.ignorePrice, result, quit)
+		sent++
+		exp++
+		number--
+	}
+	for exp > 0 {
+		res := <-result
+		if res.err != nil {
+			close(quit)
+			return new(big.Int).Set(lastPrice), res.err
+		}
+		exp--
+		// Nothing returned. There are two special cases here:
+		// - The block is empty
+		// - All the transactions included are sent by the miner itself.
+		// In these cases, use the latest calculated price for sampling.
+		if len(res.values) == 0 {
+			res.values = []*big.Int{lastPrice}
+		}
+		// Besides, in order to collect enough data for sampling, if nothing
+		// meaningful returned, try to query more blocks. But the maximum
+		// is 2*checkBlocks.
+		if len(res.values) == 1 && len(results)+1+exp < oracle.checkBlocks*2 && number > 0 {
+			go oracle.getBlockValues(ctx, types.MakeSigner(oracle.backend.ChainConfig(), big.NewInt(int64(number)), new(big.Int).SetUint64(head.Time)), number, sampleNumber, oracle.ignorePrice, result, quit)
+			sent++
+			exp++
+			number--
+		}
+		results = append(results, res.values...)
+	}
+	price := lastPrice
+	if len(results) > 0 {
+		sort.Sort(bigIntArray(results))
+		price = results[(len(results)-1)*oracle.percentile/100]
+	}
+	if price.Cmp(oracle.maxPrice) > 0 {
+		price = new(big.Int).Set(oracle.maxPrice)
+	}
+	oracle.cacheLock.Lock()
+	oracle.lastHead = headHash
+	oracle.lastPrice = price
+	oracle.cacheLock.Unlock()
+
+	return new(big.Int).Set(price), nil
 }
 
-// SetGasPrice sets the minimum gas price to [newGasPrice]
-func (gpo *Oracle) SetGasPrice(newGasPrice *big.Int) {
-	gpo.minGasPrice = newGasPrice
+type results struct {
+	values []*big.Int
+	err    error
 }
+
+type txSorter struct {
+	txs     []*types.Transaction
+	baseFee *big.Int
+}
+
+func newSorter(txs []*types.Transaction, baseFee *big.Int) *txSorter {
+	return &txSorter{
+		txs:     txs,
+		baseFee: baseFee,
+	}
+}
+
+func (s *txSorter) Len() int { return len(s.txs) }
+func (s *txSorter) Swap(i, j int) {
+	s.txs[i], s.txs[j] = s.txs[j], s.txs[i]
+}
+func (s *txSorter) Less(i, j int) bool {
+	// It's okay to discard the error because a tx would never be
+	// accepted into a block with an invalid effective tip.
+	tip1, _ := s.txs[i].EffectiveGasTip(s.baseFee)
+	tip2, _ := s.txs[j].EffectiveGasTip(s.baseFee)
+	return tip1.Cmp(tip2) < 0
+}
+
+// getBlockPrices calculates the lowest transaction gas price in a given block
+// and sends it to the result channel. If the block is empty or all transactions
+// are sent by the miner itself(it doesn't make any sense to include this kind of
+// transaction prices for sampling), nil gasprice is returned.
+func (oracle *Oracle) getBlockValues(ctx context.Context, signer types.Signer, blockNum uint64, limit int, ignoreUnder *big.Int, result chan results, quit chan struct{}) {
+	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
+	if block == nil {
+		select {
+		case result <- results{nil, err}:
+		case <-quit:
+		}
+		return
+	}
+	// Sort the transaction by effective tip in ascending sort.
+	txs := make([]*types.Transaction, len(block.Transactions()))
+	copy(txs, block.Transactions())
+	sorter := newSorter(txs, block.BaseFee())
+	sort.Sort(sorter)
+
+	var prices []*big.Int
+	for _, tx := range sorter.txs {
+		tip, _ := tx.EffectiveGasTip(block.BaseFee())
+		if ignoreUnder != nil && tip.Cmp(ignoreUnder) == -1 {
+			continue
+		}
+		sender, err := types.Sender(signer, tx)
+		if err == nil && sender != block.Coinbase() {
+			prices = append(prices, tip)
+			if len(prices) >= limit {
+				break
+			}
+		}
+	}
+	select {
+	case result <- results{prices, nil}:
+	case <-quit:
+	}
+}
+
+func (oracle *Oracle) SetGasPrice(price *big.Int) {
+
+}
+
+type bigIntArray []*big.Int
+
+func (s bigIntArray) Len() int           { return len(s) }
+func (s bigIntArray) Less(i, j int) bool { return s[i].Cmp(s[j]) < 0 }
+func (s bigIntArray) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
