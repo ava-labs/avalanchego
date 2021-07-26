@@ -1632,7 +1632,6 @@ func buildExportTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
 	}}
 }
 
-// todo create asset needs to support secp256k1r
 func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 	return &Tx{UnsignedTx: &CreateAssetTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
@@ -1642,7 +1641,6 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 		Name:         "Team Rocket",
 		Symbol:       "TR",
 		Denomination: 0,
-		// todo add states for propertyfx, secp etc
 		States: []*InitialState{{
 			FxID: 0,
 			Outs: []verify.State{
@@ -1733,13 +1731,7 @@ func buildPropertyFxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) 
 				Addrs: []ids.ShortID{
 					key.PublicKey().Address(),
 				},
-			}}, /*
-				OwnedOutput: propertyfx.OwnedOutput{OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs: []ids.ShortID{
-						key.PublicKey().Address(),
-					},
-				}},*/
+			}},
 		},
 	}
 }
@@ -1748,8 +1740,7 @@ func buildSecpMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Opera
 	return &Operation{
 		Asset: avax.Asset{ID: createAssetTx.ID()},
 		UTXOIDs: []*avax.UTXOID{{
-			TxID: createAssetTx.ID(),
-			// this is referrring to the createAssetInitialState[0] which should be a MintOutput
+			TxID:        createAssetTx.ID(),
 			OutputIndex: 0,
 		}},
 		Op: &secp256k1fx.MintOperation{
