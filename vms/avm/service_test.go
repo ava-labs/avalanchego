@@ -834,8 +834,8 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	// contains the address in the right format
 	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 	// contains the fxID
-	assert.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"2s93jMQyeWDBZiTnoytoHFbUBophTEq8ynzxRCeA23fRmZM7DG\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",")
-	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0xdb5c208917407ecf223d238025ebd713e456dbefb2c15d0d5d4deeea564e39ef76c6a0467bee17c30ed264afee1727a530ed24b0f7d37bb27936cbfd47dfb463005fe81467\"]")
+	assert.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"signatures\":[\"0x571f18cfdb254263ab6b987f742409bd5403eafe08b4dbc297c5cd8d1c85eb8812e4541e11d3dc692cd14b5f4bccc1835ec001df6d8935ce881caf97017c2a48015f4d8f64\"]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
@@ -985,9 +985,9 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	assert.Contains(t, jsonString, "\"assetID\":\"2s93jMQyeWDBZiTnoytoHFbUBophTEq8ynzxRCeA23fRmZM7DG\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
-	assert.Contains(t, jsonString, "\"assetID\":\"2s93jMQyeWDBZiTnoytoHFbUBophTEq8ynzxRCeA23fRmZM7DG\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
-	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x6b4be1e63a5c1cb5e32d624d5dc294880ffcb04e3d38470f7860bb847885ffbb0198cecd30639cf0ba0df4e3fc5cf4e1ad60f92f1031315e6c16db25c80a6efa015bf1f7be\"]")
+	assert.Contains(t, jsonString, "\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
+	assert.Contains(t, jsonString, "\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"signatures\":[\"0x2400cf2cf978697b3484d5340609b524eb9dfa401e5b2bd5d1bc6cee2a6b1ae41926550f00ae0651c312c35e225cb3f39b506d96c5170fb38a820dcfed11ccd8016fe13613\"]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
@@ -1088,8 +1088,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	assert.Contains(t, jsonString, "\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"inputIDs\":[{\"txID\":\"2s93jMQyeWDBZiTnoytoHFbUBophTEq8ynzxRCeA23fRmZM7DG\"")
-	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x412e24e5709adec664f9c436a58bbbb548e44c8cf528924938c3a2e6c6cd3b950afe5321ec4234d7c23a9e080a0c2e37ad47cb9f11df4a1a148804484853ee500076adc1f1\"]")
+	assert.Contains(t, jsonString, "\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"signatures\":[\"0x6d7406d5e1bdb1d80de542e276e2d162b0497d0df1170bec72b14d40e84ecf7929cb571211d60149404413a9342fdfa0a2b5d07b48e6f3eaea1e2f9f183b48050070ec9d88\"]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
@@ -1150,23 +1150,117 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mintSecpOpTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, false, buildSecpMintOp(createAssetTx, key), buildSecpMintOp(createAssetTx, keys[1]))
+	op1 := &Operation{
+		Asset: avax.Asset{ID: createAssetTx.ID()},
+		UTXOIDs: []*avax.UTXOID{{
+			TxID: createAssetTx.ID(),
+			// this is referrring to the createAssetInitialState[0] which should be a MintOutput
+			OutputIndex: 0,
+		}},
+		Op: &secp256k1fx.MintOperation{
+			MintInput: secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+			MintOutput: secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs: []ids.ShortID{
+						key.PublicKey().Address(),
+					},
+				},
+			},
+			TransferOutput: secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		},
+	}
 
+	op2 := &Operation{
+		Asset: avax.Asset{ID: createAssetTx.ID()},
+		UTXOIDs: []*avax.UTXOID{{
+			TxID: createAssetTx.ID(),
+			// this is referrring to the createAssetInitialState[0] which should be a MintOutput
+			OutputIndex: 1,
+		}},
+		Op: &secp256k1fx.MintOperation{
+			MintInput: secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+			MintOutput: secp256k1fx.MintOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs: []ids.ShortID{
+						key.PublicKey().Address(),
+					},
+				},
+			},
+			TransferOutput: secp256k1fx.TransferOutput{
+				Amt: 1,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Locktime:  0,
+					Threshold: 1,
+					Addrs:     []ids.ShortID{key.PublicKey().Address()},
+				},
+			},
+		},
+	}
+
+	mintSecpOpTx := &Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		Ops: []*Operation{op1, op2},
+	}}
+
+	err = mintSecpOpTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
+	assert.NoError(t, err)
+
+	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if txID != mintSecpOpTx.ID() {
+		t.Fatalf("Issue Tx returned wrong TxID")
+	}
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+	ctx.Lock.Lock()
+
+	if txs := vm.PendingTxs(); len(txs) != 2 {
+		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+
+	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.initTx(mintSecpOpTx.UnsignedTx, vm)
+	err = s.GetTx(nil, &api.GetTxArgs{
+		TxID:     txID,
+		Encoding: formatting.JSON,
+	}, &reply)
 	assert.NoError(t, err)
 
-	b, err := json2.Marshal(mintSecpOpTx)
+	assert.Equal(t, reply.Encoding, formatting.JSON)
+	jsonTxBytes, err := json2.Marshal(reply.Tx)
 	assert.NoError(t, err)
-	jsonString := string(b)
+	jsonString := string(jsonTxBytes)
 
 	// contains the address in the right format
 	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	assert.Contains(t, jsonString, "\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"inputIDs\":[{\"txID\":\"2s93jMQyeWDBZiTnoytoHFbUBophTEq8ynzxRCeA23fRmZM7DG\"")
-	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0x91173d90c0520a5a8589494d17aedf46326c2342c412e09ead24584d0feb0b043b0c413394f8734ce0d1b5d4e7103624b53372fdb34d874102e97c064fa5ef0700eb1badad\"]")
+	assert.Contains(t, jsonString, "\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"signatures\":[\"0xcc650f48341601c348d8634e8d207e07ea7b4ee4fbdeed3055fa1f1e4f4e27556d25056447a3bd5d949e5f1cbb0155bb20216ac3a4055356e3c82dca74323e7401542b3712\"]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
@@ -1266,8 +1360,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	assert.Contains(t, jsonString, "\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"inputIDs\":[{\"txID\":\"2s93jMQyeWDBZiTnoytoHFbUBophTEq8ynzxRCeA23fRmZM7DG\"")
-	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0xa5d495289c606bb1ba1a36e9df78424704b1de101d2e864f43fde2dd4a6d656e6c3abfcc71b20fef9db7b437524c8d0c2411b73b59e750f1fd8df804692243b20133ad8dde\"]")
+	assert.Contains(t, jsonString, "\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"signatures\":[\"0xa3a00a03d3f1551ff696d6c0abdde73ae7002cd6dcce1c37d720de3b7ed80757411c9698cd9681a0fa55ca685904ca87056a3b8abc858a8ac08f45483b32a80201b46dcac0\"]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) {
@@ -1328,23 +1422,94 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	mintPropertyFxOpTx := newSignedPropertyFxOperationTxWithOps(t, key, genesisBytes, vm, buildPropertyFxMintOp(createAssetTx, keys[1]), buildPropertyFxMintOp(createAssetTx, keys[2]))
+	op1 := &Operation{
+		Asset: avax.Asset{ID: createAssetTx.ID()},
+		UTXOIDs: []*avax.UTXOID{{
+			TxID:        createAssetTx.ID(),
+			OutputIndex: 4,
+		}},
+		Op: &propertyfx.MintOperation{
+			MintInput: secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+			MintOutput: propertyfx.MintOutput{OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					key.PublicKey().Address(),
+				},
+			}},
+		},
+	}
 
+	op2 := &Operation{
+		Asset: avax.Asset{ID: createAssetTx.ID()},
+		UTXOIDs: []*avax.UTXOID{{
+			TxID:        createAssetTx.ID(),
+			OutputIndex: 5,
+		}},
+		Op: &propertyfx.MintOperation{
+			MintInput: secp256k1fx.Input{
+				SigIndices: []uint32{0},
+			},
+			MintOutput: propertyfx.MintOutput{OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs: []ids.ShortID{
+					key.PublicKey().Address(),
+				},
+			}},
+		},
+	}
+
+	mintPropertyFxOpTx := &Tx{UnsignedTx: &OperationTx{
+		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    networkID,
+			BlockchainID: chainID,
+		}},
+		Ops: []*Operation{op1, op2},
+	}}
+
+	err = mintPropertyFxOpTx.SignPropertyFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
+	assert.NoError(t, err)
+
+	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if txID != mintPropertyFxOpTx.ID() {
+		t.Fatalf("Issue Tx returned wrong TxID")
+	}
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+	ctx.Lock.Lock()
+
+	if txs := vm.PendingTxs(); len(txs) != 2 {
+		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+
+	reply := api.GetTxReply{}
 	s := &Service{vm: vm}
-	err = s.initTx(mintPropertyFxOpTx.UnsignedTx, vm)
+	err = s.GetTx(nil, &api.GetTxArgs{
+		TxID:     txID,
+		Encoding: formatting.JSON,
+	}, &reply)
 	assert.NoError(t, err)
 
-	b, err := json2.Marshal(mintPropertyFxOpTx)
+	assert.Equal(t, reply.Encoding, formatting.JSON)
+	jsonTxBytes, err := json2.Marshal(reply.Tx)
 	assert.NoError(t, err)
-	jsonString := string(b)
+	jsonString := string(jsonTxBytes)
 
 	// contains the address in the right format
-	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1d6kkj0qh4wcmus3tk59npwt3rluc6en72ngurd\"]")
-	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing17fpqs358de5lgu7a5ftpw2t8axf0pm33983krk\"]")
+	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
 	// contains the fxID
-	assert.Contains(t, jsonString, "\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"inputIDs\":[{\"txID\":\"2s93jMQyeWDBZiTnoytoHFbUBophTEq8ynzxRCeA23fRmZM7DG\"")
-	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"signatures\":[\"0xb4b456132aba33e25e0ebf06ed1e3129446e6514ebadb382d250bd955298d499619a5b7690a7c5efaaf89e997df50f4eb632d524a0aeedfc1e1465a744ba0cd501a9921bd0\"]")
+	assert.Contains(t, jsonString, "\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\"")
+	assert.Contains(t, jsonString, "\"credentials\":[{\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"signatures\":[\"0x25b7ca14df108d4a32877bda4f10d84eda6d653c620f4c8d124265bdcf0ac91f45712b58b33f4b62a19698325a3c89adff214b77f772d9f311742860039abb56012caa7e7b\"]")
 }
 
 func newAvaxBaseTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
@@ -1486,8 +1651,7 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
 					},
-				}, &secp256k1fx.TransferOutput{
-					Amt: 12345,
+				}, &secp256k1fx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,
 						Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1515,6 +1679,12 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 		}, {
 			FxID: 2,
 			Outs: []verify.State{
+				&propertyfx.MintOutput{
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
 						Threshold: 1,

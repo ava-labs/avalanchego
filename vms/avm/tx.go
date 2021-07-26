@@ -5,6 +5,7 @@ package avm
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 
@@ -57,23 +58,42 @@ type Tx struct {
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
 }
 
+var (
+	secpCredentialType       = reflect.TypeOf(&secp256k1fx.Credential{})
+	nftfxCredentialType      = reflect.TypeOf(&nftfx.Credential{})
+	propertyfxCredentialType = reflect.TypeOf(&propertyfx.Credential{})
+)
+
 // Init initializes FxID where required
 // Used for JSON marshaling of data
 func (t *Tx) Init(vm *VM) error {
 	for i, n := 0, len(t.Creds); i < n; i++ {
 		cred := t.Creds[i]
-		fxCred, ok := cred.(secp256k1fx.FxCredential)
-		if !ok {
-			// [secp256k1fx.Credential] is embedded by nftx and propertyfx at the moment
-			// so this [if] block will never get called because it will cast to [FxCredential]
-			continue
-		}
-
 		fx, err := vm.getParsedFx(cred)
 		if err != nil {
 			return err
 		}
-		fxCred.InitFx(fx.ID)
+
+		switch reflect.TypeOf(cred) {
+		case secpCredentialType:
+			credential := cred.(*secp256k1fx.Credential)
+			t.Creds[i] = &secp256k1fx.FxCredential{
+				Credential: *credential,
+				FxID:       fx.ID,
+			}
+		case nftfxCredentialType:
+			credential := cred.(*nftfx.Credential).Credential
+			t.Creds[i] = &secp256k1fx.FxCredential{
+				Credential: credential,
+				FxID:       fx.ID,
+			}
+		case propertyfxCredentialType:
+			credential := cred.(*propertyfx.Credential).Credential
+			t.Creds[i] = &secp256k1fx.FxCredential{
+				Credential: credential,
+				FxID:       fx.ID,
+			}
+		}
 	}
 	return nil
 }

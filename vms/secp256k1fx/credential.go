@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -19,25 +21,39 @@ const (
 	defaultEncoding = formatting.Hex
 )
 
-type FxCredential interface {
-	InitFx(fxID ids.ID)
+type FxCredential struct {
+	Credential
+	FxID ids.ID `serialize:"false" json:"fxID"`
+}
+
+func (fxCred *FxCredential) MarshalJSON() ([]byte, error) {
+	jsonFieldMap := make(map[string]interface{}, 2)
+	jsonFieldMap["fxID"] = fxCred.FxID
+	signatures := make([]string, len(fxCred.Sigs))
+
+	for i, sig := range fxCred.Sigs {
+		sigStr, err := formatting.Encode(defaultEncoding, sig[:])
+		if err != nil {
+			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
+		}
+		signatures[i] = sigStr
+	}
+
+	jsonFieldMap["signatures"] = signatures
+	b, err := json2.Marshal(jsonFieldMap)
+	return b, err
 }
 
 // Credential ...
 type Credential struct {
-	FxID ids.ID                          `serialize:"false" json:"fxID"`
+	verify.Verifiable
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
-}
-
-func (cr *Credential) InitFx(fxID ids.ID) {
-	cr.FxID = fxID
 }
 
 // MarshalJSON marshals [cr] to JSON
 // The string representation of each signature is created using the hex formatter
 func (cr *Credential) MarshalJSON() ([]byte, error) {
-	jsonFieldMap := make(map[string]interface{}, 2)
-	jsonFieldMap["fxID"] = cr.FxID
+	jsonFieldMap := make(map[string]interface{}, 1)
 	signatures := make([]string, len(cr.Sigs))
 
 	for i, sig := range cr.Sigs {
