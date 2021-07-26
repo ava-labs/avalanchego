@@ -24,7 +24,6 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -335,8 +334,8 @@ func TestInvalidTransactions(t *testing.T) {
 
 	tx = transaction(1, 100000, key)
 	pool.gasPrice = big.NewInt(1000)
-	if err := pool.AddRemote(tx); !strings.Contains(err.Error(), ErrUnderpriced.Error()) {
-		t.Error("expected error to contain", ErrUnderpriced, "got", err)
+	if err := pool.AddRemote(tx); err != ErrUnderpriced {
+		t.Error("expected", ErrUnderpriced, "got", err)
 	}
 	if err := pool.AddLocal(tx); err != nil {
 		t.Error("expected", nil, "got", err)
@@ -657,8 +656,7 @@ func TestTransactionDropping(t *testing.T) {
 		t.Errorf("total transaction mismatch: have %d, want %d", pool.all.Count(), 4)
 	}
 	// Reduce the block gas limit, check that invalidated transactions are dropped
-	tbc := pool.chain.(*testBlockChain)
-	tbc.reset(tbc.statedb, 100, tbc.chainHeadFeed)
+	pool.chain.(*testBlockChain).gasLimit = 100
 	<-pool.requestReset(nil, nil)
 
 	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
