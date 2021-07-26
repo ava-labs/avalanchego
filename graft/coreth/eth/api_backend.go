@@ -353,12 +353,12 @@ func (b *EthAPIBackend) Downloader() *downloader.Downloader {
 }
 
 func (b *EthAPIBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	return b.gpo.SuggestTipCap(ctx)
+	return b.gpo.SuggestPrice(ctx)
 }
 
 // TODO(aaronbuchwald) migrate to use SuggestedTipCap once implemented in gpo
 func (b *EthAPIBackend) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
-	return b.gpo.SuggestTipCap(ctx)
+	return b.gpo.SuggestPrice(ctx)
 }
 
 func (b *EthAPIBackend) ChainDb() ethdb.Database {
