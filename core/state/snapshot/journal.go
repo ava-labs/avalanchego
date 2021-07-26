@@ -49,7 +49,8 @@ const journalVersion uint64 = 0
 type journalGenerator struct {
 	// Indicator that whether the database was in progress of being wiped.
 	// It's deprecated but keep it here for background compatibility.
-	Wiping   bool
+	Wiping bool
+
 	Done     bool // Whether the generator finished creating the snapshot
 	Marker   []byte
 	Accounts uint64

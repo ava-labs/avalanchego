@@ -453,7 +453,7 @@ type Rules struct {
 }
 
 // Rules ensures c's ChainID is not nil.
-func (c *ChainConfig) rules(num *big.Int) Rules {
+func (c *ChainConfig) Rules(num *big.Int) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
@@ -474,7 +474,7 @@ func (c *ChainConfig) rules(num *big.Int) Rules {
 // AvalancheRules returns the Avalanche modified rules to support Avalanche
 // network upgrades
 func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
-	rules := c.rules(blockNum)
+	rules := c.Rules(blockNum)
 
 	rules.IsApricotPhase1 = c.IsApricotPhase1(blockTimestamp)
 	rules.IsApricotPhase2 = c.IsApricotPhase2(blockTimestamp)

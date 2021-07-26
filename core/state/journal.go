@@ -143,7 +143,6 @@ type (
 	touchChange struct {
 		account *common.Address
 	}
-
 	// Changes to the access list
 	accessListAddAccountChange struct {
 		address *common.Address

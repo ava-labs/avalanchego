@@ -773,7 +773,6 @@ func (t *Tree) Rebuild(root common.Hash) {
 			if layer.genAbort != nil {
 				abort := make(chan *generatorStats)
 				layer.genAbort <- abort
-
 				<-abort
 			}
 			// Layer should be inactive now, mark it as stale

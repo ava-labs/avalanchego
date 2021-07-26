@@ -28,7 +28,6 @@ package core
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"math/big"
 	"sort"
@@ -595,8 +594,8 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return ErrNegativeValue
 	}
 	// Ensure the transaction doesn't exceed the current block limit gas.
-	if txGas := tx.Gas(); pool.currentMaxGas < txGas {
-		return fmt.Errorf("%w: tx gas (%d) > current max gas (%d)", ErrGasLimit, txGas, pool.currentMaxGas)
+	if pool.currentMaxGas < tx.Gas() {
+		return ErrGasLimit
 	}
 	// Sanity check for extremely large numbers
 	if tx.GasFeeCap().BitLen() > 256 {
@@ -616,24 +615,24 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	// Drop non-local transactions under our own minimal accepted gas price or tip
 	if !local && tx.GasTipCapIntCmp(pool.gasPrice) < 0 {
-		return fmt.Errorf("%w: address %s have gas tip cap (%d) < pool gas tip cap (%d)", ErrUnderpriced, from.Hex(), tx.GasTipCap(), pool.gasPrice)
+		return ErrUnderpriced
 	}
 	// Ensure the transaction adheres to nonce ordering
-	if currentNonce, txNonce := pool.currentState.GetNonce(from), tx.Nonce(); currentNonce > txNonce {
-		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)", ErrNonceTooLow, from.Hex(), currentNonce, txNonce)
+	if pool.currentState.GetNonce(from) > tx.Nonce() {
+		return ErrNonceTooLow
 	}
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
-	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
-		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
+	if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
+		return ErrInsufficientFunds
 	}
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
 	if err != nil {
 		return err
 	}
-	if txGas := tx.Gas(); txGas < intrGas {
-		return fmt.Errorf("%w: address %v tx gas (%v) < intrinsic gas (%v)", ErrIntrinsicGas, from.Hex(), tx.Gas(), intrGas)
+	if tx.Gas() < intrGas {
+		return ErrIntrinsicGas
 	}
 	return nil
 }
@@ -1267,7 +1266,7 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 	}
 	statedb, err := pool.chain.StateAt(newHead.Root)
 	if err != nil {
-		log.Error("Failed to reset txpool state", "err", err, "root", newHead.Root)
+		log.Error("Failed to reset txpool state", "err", err)
 		return
 	}
 	pool.currentState = statedb
@@ -1535,7 +1534,6 @@ func (pool *TxPool) demoteUnexecutables() {
 				// Internal shuffle shouldn't touch the lookup set.
 				pool.enqueueTx(hash, tx, false, false)
 			}
-			// This might happen in a reorg, so log it to the metering
 			pendingGauge.Dec(int64(len(gapped)))
 		}
 		// Delete the entire pending entry if it became empty.
