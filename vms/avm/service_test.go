@@ -1008,6 +1008,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
 	err = mintSecpOpTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
+	assert.NoError(t, err)
 
 	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
 	if err != nil {
