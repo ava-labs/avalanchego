@@ -285,7 +285,7 @@ func (b *Block) Version() uint32 {
 	return b.version
 }
 
-// EncodeRLP serializes b into an extended format.
+// EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, extblock{
 		Header:  b.header,

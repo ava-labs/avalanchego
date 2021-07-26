@@ -179,7 +179,6 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 		}
 		return genesis.Config, nil
 	}
-
 	// We have the genesis block in database(perhaps in ancient database)
 	// but the corresponding state is missing.
 	header := rawdb.ReadHeader(db, stored, 0)
@@ -192,13 +191,11 @@ func SetupGenesisBlock(db ethdb.Database, genesis *Genesis) (*params.ChainConfig
 		_, err := genesis.Commit(db)
 		return genesis.Config, err
 	}
-
 	// Check whether the genesis block is already written.
 	hash := genesis.ToBlock(nil).Hash()
 	if hash != stored {
 		return genesis.Config, &GenesisMismatchError{stored, hash}
 	}
-
 	// Get the existing chain configuration.
 	newcfg := genesis.Config
 	if err := newcfg.CheckConfigForkOrder(); err != nil {
