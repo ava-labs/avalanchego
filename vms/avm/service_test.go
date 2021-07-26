@@ -797,7 +797,10 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mintNFTTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, true, buildNFTxMintOp(createAssetTx, key))
+	mintNFTTx := buildOperationTxWithOp(buildNFTxMintOp(createAssetTx, key, 2, 1))
+	err = mintNFTTx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
+	assert.NoError(t, err)
+
 	txID, err := vm.IssueTx(mintNFTTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -896,54 +899,9 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mintOp1 := &Operation{
-		Asset: avax.Asset{ID: createAssetTx.ID()},
-		UTXOIDs: []*avax.UTXOID{{
-			TxID:        createAssetTx.ID(),
-			OutputIndex: 2,
-		}},
-		Op: &nftfx.MintOperation{
-			MintInput: secp256k1fx.Input{
-				SigIndices: []uint32{0},
-			},
-			GroupID: 1,
-			Payload: []byte{'h', 'e', 'l', 'l', 'o'},
-			Outputs: []*secp256k1fx.OutputOwners{{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{key.PublicKey().Address()},
-			}},
-		},
-	}
-
-	mintOp2 := &Operation{
-		Asset: avax.Asset{ID: createAssetTx.ID()},
-		UTXOIDs: []*avax.UTXOID{{
-			TxID:        createAssetTx.ID(),
-			OutputIndex: 3,
-		}},
-		Op: &nftfx.MintOperation{
-			MintInput: secp256k1fx.Input{
-				SigIndices: []uint32{0},
-			},
-			GroupID: 2,
-			Payload: []byte{'h', 'e', 'l', 'l', 'o'},
-			Outputs: []*secp256k1fx.OutputOwners{{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{key.PublicKey().Address()},
-			}},
-		},
-	}
-
-	mintNFTTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		}},
-		Ops: []*Operation{
-			mintOp1,
-			mintOp2,
-		},
-	}}
+	mintOp1 := buildNFTxMintOp(createAssetTx, key, 2, 1)
+	mintOp2 := buildNFTxMintOp(createAssetTx, key, 3, 2)
+	mintNFTTx := buildOperationTxWithOp(mintOp1, mintOp2)
 
 	err = mintNFTTx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
 	assert.NoError(t, err)
@@ -1048,7 +1006,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mintSecpOpTx := newSignedOperationTxWithOps(t, key, genesisBytes, vm, false, buildSecpMintOp(createAssetTx, key))
+	mintSecpOpTx := buildOperationTxWithOp(buildSecpMintOp(createAssetTx, key, 0))
+	err = mintSecpOpTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
 
 	txID, err := vm.IssueTx(mintSecpOpTx.Bytes())
 	if err != nil {
@@ -1150,73 +1109,9 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	op1 := &Operation{
-		Asset: avax.Asset{ID: createAssetTx.ID()},
-		UTXOIDs: []*avax.UTXOID{{
-			TxID: createAssetTx.ID(),
-			// this is referrring to the createAssetInitialState[0] which should be a MintOutput
-			OutputIndex: 0,
-		}},
-		Op: &secp256k1fx.MintOperation{
-			MintInput: secp256k1fx.Input{
-				SigIndices: []uint32{0},
-			},
-			MintOutput: secp256k1fx.MintOutput{
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs: []ids.ShortID{
-						key.PublicKey().Address(),
-					},
-				},
-			},
-			TransferOutput: secp256k1fx.TransferOutput{
-				Amt: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-		},
-	}
-
-	op2 := &Operation{
-		Asset: avax.Asset{ID: createAssetTx.ID()},
-		UTXOIDs: []*avax.UTXOID{{
-			TxID: createAssetTx.ID(),
-			// this is referrring to the createAssetInitialState[0] which should be a MintOutput
-			OutputIndex: 1,
-		}},
-		Op: &secp256k1fx.MintOperation{
-			MintInput: secp256k1fx.Input{
-				SigIndices: []uint32{0},
-			},
-			MintOutput: secp256k1fx.MintOutput{
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs: []ids.ShortID{
-						key.PublicKey().Address(),
-					},
-				},
-			},
-			TransferOutput: secp256k1fx.TransferOutput{
-				Amt: 1,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{key.PublicKey().Address()},
-				},
-			},
-		},
-	}
-
-	mintSecpOpTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		}},
-		Ops: []*Operation{op1, op2},
-	}}
+	op1 := buildSecpMintOp(createAssetTx, key, 0)
+	op2 := buildSecpMintOp(createAssetTx, key, 1)
+	mintSecpOpTx := buildOperationTxWithOp(op1, op2)
 
 	err = mintSecpOpTx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
 	assert.NoError(t, err)
@@ -1320,8 +1215,9 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	mintPropertyFxOpTx := newSignedPropertyFxOperationTxWithOps(t, key, genesisBytes, vm, buildPropertyFxMintOp(createAssetTx, key))
+	mintPropertyFxOpTx := buildOperationTxWithOp(buildPropertyFxMintOp(createAssetTx, key, 4))
+	err = mintPropertyFxOpTx.SignPropertyFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
+	assert.NoError(t, err)
 
 	txID, err := vm.IssueTx(mintPropertyFxOpTx.Bytes())
 	if err != nil {
@@ -1422,51 +1318,9 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	op1 := &Operation{
-		Asset: avax.Asset{ID: createAssetTx.ID()},
-		UTXOIDs: []*avax.UTXOID{{
-			TxID:        createAssetTx.ID(),
-			OutputIndex: 4,
-		}},
-		Op: &propertyfx.MintOperation{
-			MintInput: secp256k1fx.Input{
-				SigIndices: []uint32{0},
-			},
-			MintOutput: propertyfx.MintOutput{OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs: []ids.ShortID{
-					key.PublicKey().Address(),
-				},
-			}},
-		},
-	}
-
-	op2 := &Operation{
-		Asset: avax.Asset{ID: createAssetTx.ID()},
-		UTXOIDs: []*avax.UTXOID{{
-			TxID:        createAssetTx.ID(),
-			OutputIndex: 5,
-		}},
-		Op: &propertyfx.MintOperation{
-			MintInput: secp256k1fx.Input{
-				SigIndices: []uint32{0},
-			},
-			MintOutput: propertyfx.MintOutput{OutputOwners: secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs: []ids.ShortID{
-					key.PublicKey().Address(),
-				},
-			}},
-		},
-	}
-
-	mintPropertyFxOpTx := &Tx{UnsignedTx: &OperationTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    networkID,
-			BlockchainID: chainID,
-		}},
-		Ops: []*Operation{op1, op2},
-	}}
+	op1 := buildPropertyFxMintOp(createAssetTx, key, 4)
+	op2 := buildPropertyFxMintOp(createAssetTx, key, 5)
+	mintPropertyFxOpTx := buildOperationTxWithOp(op1, op2)
 
 	err = mintPropertyFxOpTx.SignPropertyFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}, {key}})
 	assert.NoError(t, err)
@@ -1539,33 +1393,6 @@ func newAvaxCreateAssetTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) 
 	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
 		t.Fatal(err)
 	}
-	return tx
-}
-
-func newSignedOperationTxWithOps(t *testing.T, key *crypto.PrivateKeySECP256K1R, genesisBytes []byte, vm *VM, isSignNFTx bool, op ...*Operation) *Tx {
-	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
-	tx := buildOperationTxWithOp(op...)
-
-	var err error
-	if isSignNFTx {
-		err = tx.SignNFTFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
-	} else {
-		err = tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
-	}
-
-	if err != nil {
-		t.Fatal("error when signing test tx", err)
-	}
-	return tx
-}
-
-func newSignedPropertyFxOperationTxWithOps(t *testing.T, key *crypto.PrivateKeySECP256K1R, genesisBytes []byte, vm *VM, op ...*Operation) *Tx {
-	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
-	tx := buildOperationTxWithOp(op...)
-
-	err := tx.SignPropertyFx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}})
-	assert.NoError(t, err)
-
 	return tx
 }
 
@@ -1694,18 +1521,18 @@ func buildCreateAssetTx(key *crypto.PrivateKeySECP256K1R) *Tx {
 	}}
 }
 
-func buildNFTxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Operation {
+func buildNFTxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R, outputIndex, groupID uint32) *Operation {
 	return &Operation{
 		Asset: avax.Asset{ID: createAssetTx.ID()},
 		UTXOIDs: []*avax.UTXOID{{
 			TxID:        createAssetTx.ID(),
-			OutputIndex: 2,
+			OutputIndex: outputIndex,
 		}},
 		Op: &nftfx.MintOperation{
 			MintInput: secp256k1fx.Input{
 				SigIndices: []uint32{0},
 			},
-			GroupID: 1,
+			GroupID: groupID,
 			Payload: []byte{'h', 'e', 'l', 'l', 'o'},
 			Outputs: []*secp256k1fx.OutputOwners{{
 				Threshold: 1,
@@ -1715,12 +1542,12 @@ func buildNFTxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Opera
 	}
 }
 
-func buildPropertyFxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Operation {
+func buildPropertyFxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R, outputIndex uint32) *Operation {
 	return &Operation{
 		Asset: avax.Asset{ID: createAssetTx.ID()},
 		UTXOIDs: []*avax.UTXOID{{
 			TxID:        createAssetTx.ID(),
-			OutputIndex: 4,
+			OutputIndex: outputIndex,
 		}},
 		Op: &propertyfx.MintOperation{
 			MintInput: secp256k1fx.Input{
@@ -1736,12 +1563,12 @@ func buildPropertyFxMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) 
 	}
 }
 
-func buildSecpMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R) *Operation {
+func buildSecpMintOp(createAssetTx *Tx, key *crypto.PrivateKeySECP256K1R, outputIndex uint32) *Operation {
 	return &Operation{
 		Asset: avax.Asset{ID: createAssetTx.ID()},
 		UTXOIDs: []*avax.UTXOID{{
 			TxID:        createAssetTx.ID(),
-			OutputIndex: 0,
+			OutputIndex: outputIndex,
 		}},
 		Op: &secp256k1fx.MintOperation{
 			MintInput: secp256k1fx.Input{
