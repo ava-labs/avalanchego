@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -169,7 +168,7 @@ func (a *App) Start() int {
 	if !a.config.EnableCrypto {
 		a.log.Warn("transaction signatures are not being checked")
 	}
-	crypto.EnableCrypto = a.config.EnableCrypto
+	// TODO: disable crypto verification
 
 	if err := a.config.ConsensusParams.Valid(); err != nil {
 		a.log.Fatal("consensus parameters are invalid: %s", err)

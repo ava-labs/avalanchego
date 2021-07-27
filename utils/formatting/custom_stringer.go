@@ -3,7 +3,6 @@
 
 package formatting
 
-// CustomStringer ...
 type CustomStringer struct{ Stringer func() string }
 
 func (cs CustomStringer) String() string { return cs.Stringer() }
