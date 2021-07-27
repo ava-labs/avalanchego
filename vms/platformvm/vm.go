@@ -419,6 +419,29 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	// decode single tx
+	tx := &Tx{}
+	_, err := vm.codec.Unmarshal(response, tx)
+	if err != nil {
+		return err
+	}
+	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedTx)
+	if err != nil {
+		return err
+	}
+	tx.Initialize(unsignedBytes, response)
+
+	// TODO: introduce relevant checks
+	// TODO: if checks fail, record ID among rejected tx,
+	// unless it's because of reached mempool size limits
+
+	err = vm.mempool.AddUncheckedTx(tx)
+	if err != nil {
+		return err
+	}
+
+	// TODO: gossip if successfully accepted. To be mocked until done
+
 	return nil
 }
 

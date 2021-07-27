@@ -19,13 +19,39 @@ const (
 
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
+
+	MaxMempoolByteSize = 300*2 ^ 20 // TODO: Should be default, configurable by users
 )
 
 var (
-	errEndOfTime       = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
-	errNoPendingBlocks = errors.New("no pending blocks")
-	errUnknownTxType   = errors.New("unknown transaction type")
+	errEndOfTime              = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
+	errNoPendingBlocks        = errors.New("no pending blocks")
+	errUnknownTxType          = errors.New("unknown transaction type")
+	errTxExceedingMempoolSize = errors.New("dropping incoming tx since mempool would breach maximum size")
 )
+
+type mempoolMetadata struct {
+	totalBytesSize int
+	unissuedTxIDs  ids.Set
+}
+
+func (d *mempoolMetadata) has(txID ids.ID) bool {
+	return d.unissuedTxIDs.Contains(txID)
+}
+
+func (d *mempoolMetadata) hasRoomFor(tx *Tx) bool {
+	return d.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
+}
+
+func (d *mempoolMetadata) register(tx *Tx) {
+	d.unissuedTxIDs.Add(tx.ID())
+	d.totalBytesSize += len(tx.Bytes())
+}
+
+func (d *mempoolMetadata) deregister(tx *Tx) {
+	d.unissuedTxIDs.Remove(tx.ID())
+	d.totalBytesSize -= len(tx.Bytes())
+}
 
 // Mempool implements a simple mempool to convert txs into valid blocks
 type Mempool struct {
@@ -67,7 +93,8 @@ type Mempool struct {
 	unissuedProposalTxs *EventHeap
 	unissuedDecisionTxs []*Tx
 	unissuedAtomicTxs   []*Tx
-	unissuedTxIDs       ids.Set
+
+	mempoolMetadata
 }
 
 // Initialize this mempool.
@@ -99,10 +126,19 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	if err := tx.Sign(m.vm.codec, nil); err != nil {
 		return err
 	}
+
+	return m.AddUncheckedTx(tx)
+}
+
+func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 	txID := tx.ID()
-	if m.unissuedTxIDs.Contains(txID) {
+	if m.has(txID) {
 		return nil
 	}
+	if !m.hasRoomFor(tx) {
+		return errTxExceedingMempoolSize
+	}
+
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.unissuedProposalTxs.Add(tx)
@@ -113,7 +149,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	default:
 		return errUnknownTxType
 	}
-	m.unissuedTxIDs.Add(txID)
+	m.register(tx)
 	m.ResetTimer()
 	return nil
 }
@@ -151,7 +187,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		var txs []*Tx
 		txs, m.unissuedDecisionTxs = m.unissuedDecisionTxs[:numTxs], m.unissuedDecisionTxs[numTxs:]
 		for _, tx := range txs {
-			m.unissuedTxIDs.Remove(tx.ID())
+			m.deregister(tx)
 		}
 		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
@@ -172,7 +208,8 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	if len(m.unissuedAtomicTxs) > 0 {
 		tx := m.unissuedAtomicTxs[0]
 		m.unissuedAtomicTxs = m.unissuedAtomicTxs[1:]
-		m.unissuedTxIDs.Remove(tx.ID())
+		m.deregister(tx)
+
 		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
 		if err != nil {
 			m.ResetTimer()
@@ -258,7 +295,8 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		startTime := utx.StartTime()
 		if startTime.Before(syncTime) {
 			m.unissuedProposalTxs.Remove()
-			m.unissuedTxIDs.Remove(txID)
+			m.deregister(tx)
+
 			errMsg := fmt.Sprintf(
 				"synchrony bound (%s) is later than staker start time (%s)",
 				syncTime,
@@ -274,7 +312,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		// drop the transaction and continue
 		if startTime.After(maxLocalStartTime) {
 			m.unissuedProposalTxs.Remove()
-			m.unissuedTxIDs.Remove(txID)
+			m.deregister(tx)
 			continue
 		}
 
@@ -298,7 +336,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 		// Attempt to issue the transaction
 		m.unissuedProposalTxs.Remove()
-		m.unissuedTxIDs.Remove(txID)
+		m.deregister(tx)
 		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *tx)
 		if err != nil {
 			m.ResetTimer()
@@ -377,8 +415,9 @@ func (m *Mempool) ResetTimer() {
 			return
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
-		txID := m.unissuedProposalTxs.Remove().ID()
-		m.unissuedTxIDs.Remove(txID)
+		tx := m.unissuedProposalTxs.Remove()
+		txID := tx.ID()
+		m.deregister(tx)
 		errMsg := fmt.Sprintf(
 			"synchrony bound (%s) is later than staker start time (%s)",
 			syncTime,
