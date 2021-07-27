@@ -79,7 +79,7 @@ type GetTxReply struct {
 
 // FormattedTx defines a JSON formatted struct containing a Tx in CB58 format
 type FormattedTx struct {
-	Tx       string              `json:"tx,omitempty"`
+	Tx       string              `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
