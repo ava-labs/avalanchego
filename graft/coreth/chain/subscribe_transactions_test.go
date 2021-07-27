@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-func TestSubscribeTransactionsTest(t *testing.T) {
+func TestSubscribeTransactions(t *testing.T) {
 	chain, newTxPoolHeadChan, txSubmitCh := NewDefaultChain(t)
 
 	ethBackend := chain.APIBackend()
@@ -83,16 +83,12 @@ func TestSubscribeTransactionsTest(t *testing.T) {
 	default:
 	}
 
-	select {
-	case pendingTx := <-pendingTxsEventsChannel:
-		if len(pendingTx) != 1 {
-			t.Fatal("Expected a new pending tx")
-		}
-		if pendingTx[0] != signedTx.Hash() {
-			t.Fatalf("Expected a new pending tx for signed hash %s", signedTx.Hash().String())
-		}
-	default:
-		t.Fatal("Expected to receive pending transaction from subscription")
+	pendingTx := <-pendingTxsEventsChannel
+	if len(pendingTx) != 1 {
+		t.Fatal("Expected a new pending tx")
+	}
+	if pendingTx[0] != signedTx.Hash() {
+		t.Fatalf("Expected a new pending tx for signed hash %s", signedTx.Hash().String())
 	}
 
 	if err := chain.Accept(block); err != nil {

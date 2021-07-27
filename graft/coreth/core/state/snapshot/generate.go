@@ -35,10 +35,10 @@ import (
 	"time"
 
 	"github.com/VictoriaMetrics/fastcache"
+	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
@@ -154,13 +154,14 @@ func (gs *generatorStats) Log(msg string, root common.Hash, marker []byte) {
 // generateSnapshot regenerates a brand new snapshot based on an existing state
 // database and head block asynchronously. The snapshot is returned immediately
 // and generation is continued in the background until done.
-func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, root common.Hash) *diskLayer {
+func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash) *diskLayer {
 	// Create a new disk layer with an initialized state marker at zero
 	var (
 		stats     = &generatorStats{start: time.Now()}
 		batch     = diskdb.NewBatch()
 		genMarker = []byte{} // Initialized but empty!
 	)
+	rawdb.WriteSnapshotBlockHash(batch, blockHash)
 	rawdb.WriteSnapshotRoot(batch, root)
 	journalProgress(batch, genMarker, stats)
 	if err := batch.Write(); err != nil {
@@ -169,11 +170,13 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache i
 	base := &diskLayer{
 		diskdb:     diskdb,
 		triedb:     triedb,
+		blockHash:  blockHash,
 		root:       root,
 		cache:      fastcache.New(cache * 1024 * 1024),
 		genMarker:  genMarker,
 		genPending: make(chan struct{}),
-		genAbort:   make(chan chan *generatorStats),
+		genAbort:   make(chan chan struct{}),
+		created:    time.Now(),
 	}
 	go base.generate(stats)
 	log.Debug("Start snapshot generation", "root", root)
@@ -560,7 +563,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		batch     = dl.diskdb.NewBatch()
 		logged    = time.Now()
 		accOrigin = common.CopyBytes(accMarker)
-		abort     chan *generatorStats
+		abort     chan struct{}
 	)
 	stats.Log("Resuming state snapshot generation", dl.root, dl.genMarker)
 
@@ -722,7 +725,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			if abort == nil { // aborted by internal error, wait the signal
 				abort = <-dl.genAbort
 			}
-			abort <- stats
+			dl.genStats = stats
+			close(abort)
 			return
 		}
 		// Abort the procedure if the entire snapshot is generated
@@ -742,7 +746,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 		log.Error("Failed to flush batch", "err", err)
 
 		abort = <-dl.genAbort
-		abort <- stats
+		dl.genStats = stats
+		close(abort)
 		return
 	}
 	batch.Reset()
@@ -752,12 +757,13 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 
 	dl.lock.Lock()
 	dl.genMarker = nil
+	dl.genStats = stats
 	close(dl.genPending)
 	dl.lock.Unlock()
 
 	// Someone will be looking for us, wait it out
 	abort = <-dl.genAbort
-	abort <- nil
+	close(abort)
 }
 
 // increaseKey increase the input key by one bit. Return nil if the entire

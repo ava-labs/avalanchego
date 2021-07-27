@@ -107,8 +107,10 @@ func (b *Block) ID() ids.ID { return b.id }
 // Accept implements the snowman.Block interface
 func (b *Block) Accept() error {
 	vm := b.vm
-	vm.db.StartCommit()
-	defer vm.db.AbortCommit()
+
+	// Although returning an error from Accept is considered fatal, it is good
+	// practice to cleanup the batch we were modifying in the case of an error.
+	defer vm.db.Abort()
 
 	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
@@ -140,16 +142,10 @@ func (b *Block) Accept() error {
 		return vm.db.Commit()
 	}
 
-	// Note: since CommitBatch holds the database lock, this precludes any other
-	// database operations until EndBatch is called. Therefore, calling Accept
-	// on the unsigned atomic tx cannot interact with the vm's database or it will
-	// deadlock. This is ok because it only needs to interact with the shared memory
-	// database.
 	batch, err := vm.db.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("failed to create commit batch due to: %w", err)
 	}
-	defer vm.db.EndBatch()
 
 	return tx.UnsignedAtomicTx.Accept(vm.ctx, batch)
 }

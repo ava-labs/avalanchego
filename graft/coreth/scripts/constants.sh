@@ -3,8 +3,8 @@
 # Set the PATHS
 GOPATH="$(go env GOPATH)"
 
-# Set default binary location
-binary_path="$GOPATH/src/github.com/ava-labs/avalanchego/build/avalanchego-latest/plugins/evm"
+# Set binary location
+binary_path=${CORETH_BINARY_PATH:-"$GOPATH/src/github.com/ava-labs/avalanchego/build/avalanchego-latest/plugins/evm"}
 
 # Avalabs docker hub
 dockerhub_repo="avaplatform/avalanchego"

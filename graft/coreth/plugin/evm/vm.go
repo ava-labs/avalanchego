@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -38,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/database/versionabledb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -191,7 +191,7 @@ type VM struct {
 	chain       *coreth.ETHChain
 	chainConfig *params.ChainConfig
 	// [db] is the VM's current database managed by ChainState
-	db *versionabledb.Database
+	db *versiondb.Database
 	// [chaindb] is the database supplied to the Ethereum backend
 	chaindb Database
 	// [acceptedBlockDB] is the database to store the last accepted
@@ -269,12 +269,17 @@ func (vm *VM) Initialize(
 	toEngine chan<- commonEng.Message,
 	fxs []*commonEng.Fx,
 ) error {
-	log.Info("Initializing Coreth VM", "Version", Version)
 	vm.config.SetDefaults()
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
 			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
 		}
+	}
+	if b, err := json.Marshal(vm.config); err == nil {
+		log.Info("Initializing Coreth VM", "Version", Version, "Config", string(b))
+	} else {
+		// Log a warning message since we have already successfully unmarshalled into the struct
+		log.Warn("Problem initializing Coreth VM", "Version", Version, "Config", string(b), "err", err)
 	}
 
 	if len(fxs) > 0 {
@@ -283,8 +288,9 @@ func (vm *VM) Initialize(
 
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
-	vm.db = versionabledb.New(dbManager.Current().Database)
-	vm.chaindb = Database{prefixdb.New(ethDBPrefix, vm.db)}
+	baseDB := dbManager.Current().Database
+	vm.chaindb = Database{prefixdb.New(ethDBPrefix, baseDB)}
+	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
 	g := new(core.Genesis)
@@ -347,6 +353,9 @@ func (vm *VM) Initialize(
 	ethConfig.TxPool.NoLocals = !vm.config.LocalTxsEnabled
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	ethConfig.Pruning = vm.config.Pruning
+	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
+	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
+
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
 	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
@@ -527,11 +536,11 @@ func (vm *VM) pruneChain() error {
 	}
 	heightBytes := make([]byte, 8)
 	binary.PutUvarint(heightBytes, lastAcceptedHeight)
-	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err == nil {
-		return nil
-	} else {
-		return fmt.Errorf("failed to write pruned rejected blocks to db: %w", err)
+	if err := vm.db.Put(pruneRejectedBlocksKey, heightBytes); err != nil {
+		return err
 	}
+
+	return vm.db.Commit()
 }
 
 // Bootstrapping notifies this VM that the consensus engine is performing
