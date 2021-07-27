@@ -69,7 +69,7 @@ func TestWatchNewFile(t *testing.T) {
 
 	// Ensure the watcher is started before adding any files.
 	ks.Accounts()
-	time.Sleep(1000 * time.Millisecond)
+	time.Sleep(2000 * time.Millisecond)
 
 	// Move in the files.
 	wantAccounts := make([]accounts.Account, len(cachetestAccounts))
@@ -85,7 +85,7 @@ func TestWatchNewFile(t *testing.T) {
 
 	// ks should see the accounts.
 	var list []accounts.Account
-	for d := 200 * time.Millisecond; d < 5*time.Second; d *= 2 {
+	for {
 		list = ks.Accounts()
 		if reflect.DeepEqual(list, wantAccounts) {
 			// ks should have also received change notifications
@@ -96,9 +96,8 @@ func TestWatchNewFile(t *testing.T) {
 			}
 			return
 		}
-		time.Sleep(d)
+		time.Sleep(500 * time.Millisecond)
 	}
-	t.Errorf("got %s, want %s", spew.Sdump(list), spew.Sdump(wantAccounts))
 }
 
 func TestWatchNoDir(t *testing.T) {

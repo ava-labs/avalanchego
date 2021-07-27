@@ -58,7 +58,7 @@ func NewDefaultConfig() Config {
 		TrieCleanCacheRejournal: 60 * time.Minute,
 		TrieDirtyCache:          256,
 		TrieTimeout:             60 * time.Minute,
-		SnapshotCache:           0,
+		SnapshotCache:           128,
 		Miner: miner.Config{
 			GasFloor:              8000000,
 			GasCeil:               8000000,
@@ -86,7 +86,9 @@ type Config struct {
 	// for nodes to connect to.
 	DiscoveryURLs []string
 
-	Pruning bool // Whether to disable pruning and flush everything to disk
+	Pruning        bool // Whether to disable pruning and flush everything to disk
+	SnapshotAsync  bool // Whether to generate the initial snapshot in async mode
+	SnapshotVerify bool // Whether to verify generated snapshots
 
 	// Whitelist of required block number -> hash values to accept
 	Whitelist map[uint64]common.Hash `toml:"-"`

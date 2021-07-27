@@ -61,6 +61,9 @@ var (
 	// snapshotRootKey tracks the hash of the last snapshot.
 	snapshotRootKey = []byte("SnapshotRoot")
 
+	// snapshotBlockHashKey tracks the block hash of the last snapshot.
+	snapshotBlockHashKey = []byte("SnapshotBlockHash")
+
 	// snapshotJournalKey tracks the in-memory diff layers across restarts.
 	snapshotJournalKey = []byte("SnapshotJournal")
 
