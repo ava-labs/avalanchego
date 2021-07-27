@@ -900,8 +900,7 @@ func (n *network) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
 	allPeers := n.getAllPeers()
 
 	numToGossip := 10 // TODO replace this constant with a value given in the config
-
-	if int(numToGossip) > len(allPeers) {
+	if numToGossip > len(allPeers) {
 		numToGossip = len(allPeers)
 	}
 
