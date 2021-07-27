@@ -287,7 +287,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			// checkAndFlush handles abort
 			return
 		}
-		// If the account is in-progress, continue where we left off (otherwise iterate all)
+		// If the iterated account is a contract, iterate through corresponding contract
+		// storage to generate snapshot entries.
 		if acc.Root != emptyRoot {
 			storeTrie, err := trie.NewSecure(acc.Root, dl.triedb)
 			if err != nil {
