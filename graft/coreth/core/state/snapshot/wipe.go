@@ -40,8 +40,8 @@ import (
 // wipeSnapshot starts a goroutine to iterate over the entire key-value database
 // and delete all the data associated with the snapshot (accounts, storage,
 // metadata). After all is done, the snapshot range of the database is compacted
-// to free up unused data blocks.
-func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
+// to free up unused data blocks (if [compact] is true).
+func wipeSnapshot(db ethdb.KeyValueStore, full bool, compact bool) chan struct{} {
 	// Wipe the snapshot root marker synchronously
 	if full {
 		rawdb.DeleteSnapshotBlockHash(db)
@@ -50,7 +50,7 @@ func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 	// Wipe everything else asynchronously
 	wiper := make(chan struct{}, 1)
 	go func() {
-		if err := wipeContent(db); err != nil {
+		if err := wipeContent(db, compact); err != nil {
 			log.Error("Failed to wipe state snapshot", "err", err) // Database close will trigger this
 			return
 		}
@@ -63,14 +63,21 @@ func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 // data associated with the snapshot (accounts, storage), but not the root hash
 // as the wiper is meant to run on a background thread but the root needs to be
 // removed in sync to avoid data races. After all is done, the snapshot range of
-// the database is compacted to free up unused data blocks.
-func wipeContent(db ethdb.KeyValueStore) error {
+// the database is compacted to free up unused data blocks (if [compact] is
+// true).
+func wipeContent(db ethdb.KeyValueStore, compact bool) error {
 	if err := wipeKeyRange(db, "accounts", rawdb.SnapshotAccountPrefix, nil, nil, len(rawdb.SnapshotAccountPrefix)+common.HashLength, true); err != nil {
 		return err
 	}
 	if err := wipeKeyRange(db, "storage", rawdb.SnapshotStoragePrefix, nil, nil, len(rawdb.SnapshotStoragePrefix)+2*common.HashLength, true); err != nil {
 		return err
 	}
+
+	if !compact {
+		log.Info("Skipping snapshot area compaction")
+		return nil
+	}
+
 	// Compact the snapshot section of the database to get rid of unused space
 	start := time.Now()
 

@@ -108,7 +108,7 @@ func generateSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache i
 	// Wipe any previously existing snapshot from the database if no wiper is
 	// currently in progress.
 	if wiper == nil {
-		wiper = wipeSnapshot(diskdb, true)
+		wiper = wipeSnapshot(diskdb, true, false)
 	}
 	// Create a new disk layer with an initialized state marker at zero
 	var (
