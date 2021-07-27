@@ -4,12 +4,8 @@
 package avm
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -61,24 +57,6 @@ type FxOperation interface {
 }
 
 type FxCredential struct {
-	secp256k1fx.Credential
-	FxID ids.ID `serialize:"false" json:"fxID"`
-}
-
-func (fxCred *FxCredential) MarshalJSON() ([]byte, error) {
-	jsonFieldMap := make(map[string]interface{}, 2)
-	jsonFieldMap["fxID"] = fxCred.FxID
-	signatures := make([]string, len(fxCred.Sigs))
-
-	for i, sig := range fxCred.Sigs {
-		sigStr, err := formatting.Encode(formatting.Hex, sig[:])
-		if err != nil {
-			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
-		}
-		signatures[i] = sigStr
-	}
-
-	jsonFieldMap["signatures"] = signatures
-	b, err := json.Marshal(jsonFieldMap)
-	return b, err
+	FxID              ids.ID `serialize:"false" json:"fxID"`
+	verify.Verifiable `serialize:"true"`
 }
