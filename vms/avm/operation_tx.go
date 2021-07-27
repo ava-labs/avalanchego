@@ -33,13 +33,7 @@ func (t *OperationTx) Init(vm *VM) error {
 			return err
 		}
 		op.FxID = fx.ID
-
-		ctxInitializable, ok := op.Op.(snow.ContextInitializable)
-		if !ok {
-			continue
-		}
-
-		ctxInitializable.InitCtx(vm.ctx)
+		op.Op.InitCtx(vm.ctx)
 	}
 
 	return t.BaseTx.Init(vm)

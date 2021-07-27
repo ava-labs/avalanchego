@@ -35,15 +35,8 @@ func (t *ExportTx) Init(vm *VM) error {
 		if err != nil {
 			return err
 		}
-
 		out.FxID = fx.ID
-
-		ctxInitializable, ok := out.Out.(snow.ContextInitializable)
-		if !ok {
-			continue
-		}
-
-		ctxInitializable.InitCtx(vm.ctx)
+		out.InitCtx(vm.ctx)
 	}
 
 	return t.BaseTx.Init(vm)

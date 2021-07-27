@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/snow"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -48,6 +50,7 @@ type TransferableOut interface {
 
 // TransferableOutput ...
 type TransferableOutput struct {
+	snow.ContextInitializable
 	// FxID has serialize false because we don't want this to be encoded in bytes
 	FxID  ids.ID `serialize:"false" json:"fxID"`
 	Asset `serialize:"true"`
