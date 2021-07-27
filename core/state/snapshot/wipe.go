@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/metrics"
 
 	"github.com/ava-labs/coreth/core/rawdb"
 )
@@ -66,10 +65,10 @@ func wipeSnapshot(db ethdb.KeyValueStore, full bool) chan struct{} {
 // removed in sync to avoid data races. After all is done, the snapshot range of
 // the database is compacted to free up unused data blocks.
 func wipeContent(db ethdb.KeyValueStore) error {
-	if err := wipeKeyRange(db, "accounts", rawdb.SnapshotAccountPrefix, nil, nil, len(rawdb.SnapshotAccountPrefix)+common.HashLength, snapWipedAccountMeter, true); err != nil {
+	if err := wipeKeyRange(db, "accounts", rawdb.SnapshotAccountPrefix, nil, nil, len(rawdb.SnapshotAccountPrefix)+common.HashLength, true); err != nil {
 		return err
 	}
-	if err := wipeKeyRange(db, "storage", rawdb.SnapshotStoragePrefix, nil, nil, len(rawdb.SnapshotStoragePrefix)+2*common.HashLength, snapWipedStorageMeter, true); err != nil {
+	if err := wipeKeyRange(db, "storage", rawdb.SnapshotStoragePrefix, nil, nil, len(rawdb.SnapshotStoragePrefix)+2*common.HashLength, true); err != nil {
 		return err
 	}
 	// Compact the snapshot section of the database to get rid of unused space
@@ -99,7 +98,7 @@ func wipeContent(db ethdb.KeyValueStore) error {
 // specifying a particular key range for deletion.
 //
 // Origin is included for wiping and limit is excluded if they are specified.
-func wipeKeyRange(db ethdb.KeyValueStore, kind string, prefix []byte, origin []byte, limit []byte, keylen int, meter metrics.Meter, report bool) error {
+func wipeKeyRange(db ethdb.KeyValueStore, kind string, prefix []byte, origin []byte, limit []byte, keylen int, report bool) error {
 	// Batch deletions together to avoid holding an iterator for too long
 	var (
 		batch = db.NewBatch()
@@ -148,9 +147,6 @@ func wipeKeyRange(db ethdb.KeyValueStore, kind string, prefix []byte, origin []b
 	it.Release()
 	if err := batch.Write(); err != nil {
 		return err
-	}
-	if meter != nil {
-		meter.Mark(int64(items))
 	}
 	if report {
 		log.Info("Deleted state snapshot leftovers", "kind", kind, "wiped", items, "elapsed", common.PrettyDuration(time.Since(start)))
