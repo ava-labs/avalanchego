@@ -94,7 +94,7 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 	if err != nil {
 		return err
 	}
-	b.Sender.AcceptedFrontier(validatorID, requestID, acceptedFrontier)
+	b.Sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
@@ -182,7 +182,7 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 
 // GetAccepted implements the Engine interface.
 func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	b.Sender.Accepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
+	b.Sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
 
@@ -387,7 +387,7 @@ func (b *Bootstrapper) sendGetAcceptedFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Sender.GetAcceptedFrontier(vdrs, b.RequestID)
+		b.Sender.SendGetAcceptedFrontier(vdrs, b.RequestID)
 	}
 }
 
@@ -408,6 +408,6 @@ func (b *Bootstrapper) sendGetAccepted() {
 			vdrs.Len(),
 			b.pendingSendAccepted.Len(),
 		)
-		b.Sender.GetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
+		b.Sender.SendGetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
 	}
 }

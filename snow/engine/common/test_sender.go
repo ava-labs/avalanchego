@@ -13,170 +13,170 @@ import (
 type SenderTest struct {
 	T *testing.T
 
-	CantGetAcceptedFrontier, CantAcceptedFrontier,
-	CantGetAccepted, CantAccepted,
-	CantGet, CantGetAncestors, CantPut, CantMultiPut,
-	CantPullQuery, CantPushQuery, CantChits,
-	CantGossip bool
+	CantSendGetAcceptedFrontier, CantSendAcceptedFrontier,
+	CantSendGetAccepted, CantSendAccepted,
+	CantSendGet, CantSendGetAncestors, CantSendPut, CantSendMultiPut,
+	CantSendPullQuery, CantSendPushQuery, CantSendChits,
+	CantSendGossip bool
 
-	GetAcceptedFrontierF func(ids.ShortSet, uint32)
-	AcceptedFrontierF    func(ids.ShortID, uint32, []ids.ID)
-	GetAcceptedF         func(ids.ShortSet, uint32, []ids.ID)
-	AcceptedF            func(ids.ShortID, uint32, []ids.ID)
-	GetF                 func(ids.ShortID, uint32, ids.ID)
-	GetAncestorsF        func(ids.ShortID, uint32, ids.ID)
-	PutF                 func(ids.ShortID, uint32, ids.ID, []byte)
-	MultiPutF            func(ids.ShortID, uint32, [][]byte)
-	PushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
-	PullQueryF           func(ids.ShortSet, uint32, ids.ID)
-	ChitsF               func(ids.ShortID, uint32, []ids.ID)
-	GossipF              func(ids.ID, []byte)
+	SendGetAcceptedFrontierF func(ids.ShortSet, uint32)
+	SendAcceptedFrontierF    func(ids.ShortID, uint32, []ids.ID)
+	SendGetAcceptedF         func(ids.ShortSet, uint32, []ids.ID)
+	SendAcceptedF            func(ids.ShortID, uint32, []ids.ID)
+	SendGetF                 func(ids.ShortID, uint32, ids.ID)
+	SendGetAncestorsF        func(ids.ShortID, uint32, ids.ID)
+	SendPutF                 func(ids.ShortID, uint32, ids.ID, []byte)
+	SendMultiPutF            func(ids.ShortID, uint32, [][]byte)
+	SendPushQueryF           func(ids.ShortSet, uint32, ids.ID, []byte)
+	SendPullQueryF           func(ids.ShortSet, uint32, ids.ID)
+	SendChitsF               func(ids.ShortID, uint32, []ids.ID)
+	SendGossipF              func(ids.ID, []byte)
 }
 
 // Default set the default callable value to [cant]
 func (s *SenderTest) Default(cant bool) {
-	s.CantGetAcceptedFrontier = cant
-	s.CantAcceptedFrontier = cant
-	s.CantGetAccepted = cant
-	s.CantAccepted = cant
-	s.CantGet = cant
-	s.CantGetAccepted = cant
-	s.CantPut = cant
-	s.CantMultiPut = cant
-	s.CantPullQuery = cant
-	s.CantPushQuery = cant
-	s.CantChits = cant
-	s.CantGossip = cant
+	s.CantSendGetAcceptedFrontier = cant
+	s.CantSendAcceptedFrontier = cant
+	s.CantSendGetAccepted = cant
+	s.CantSendAccepted = cant
+	s.CantSendGet = cant
+	s.CantSendGetAccepted = cant
+	s.CantSendPut = cant
+	s.CantSendMultiPut = cant
+	s.CantSendPullQuery = cant
+	s.CantSendPushQuery = cant
+	s.CantSendChits = cant
+	s.CantSendGossip = cant
 }
 
-// GetAcceptedFrontier calls GetAcceptedFrontierF if it was initialized. If it
+// GetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
-	if s.GetAcceptedFrontierF != nil {
-		s.GetAcceptedFrontierF(validatorIDs, requestID)
-	} else if s.CantGetAcceptedFrontier && s.T != nil {
-		s.T.Fatalf("Unexpectedly called GetAcceptedFrontier")
+func (s *SenderTest) SendGetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
+	if s.SendGetAcceptedFrontierF != nil {
+		s.SendGetAcceptedFrontierF(validatorIDs, requestID)
+	} else if s.CantSendGetAcceptedFrontier && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendGetAcceptedFrontier")
 	}
 }
 
-// AcceptedFrontier calls AcceptedFrontierF if it was initialized. If it wasn't
+// SendAcceptedFrontier calls SendAcceptedFrontierF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
-	if s.AcceptedFrontierF != nil {
-		s.AcceptedFrontierF(validatorID, requestID, containerIDs)
-	} else if s.CantAcceptedFrontier && s.T != nil {
-		s.T.Fatalf("Unexpectedly called AcceptedFrontier")
+func (s *SenderTest) SendAcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+	if s.SendAcceptedFrontierF != nil {
+		s.SendAcceptedFrontierF(validatorID, requestID, containerIDs)
+	} else if s.CantSendAcceptedFrontier && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendAcceptedFrontier")
 	}
 }
 
-// GetAccepted calls GetAcceptedF if it was initialized. If it wasn't
+// SendGetAccepted calls SendGetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
-	if s.GetAcceptedF != nil {
-		s.GetAcceptedF(validatorIDs, requestID, containerIDs)
-	} else if s.CantGetAccepted && s.T != nil {
-		s.T.Fatalf("Unexpectedly called GetAccepted")
+func (s *SenderTest) SendGetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
+	if s.SendGetAcceptedF != nil {
+		s.SendGetAcceptedF(validatorIDs, requestID, containerIDs)
+	} else if s.CantSendGetAccepted && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendGetAccepted")
 	}
 }
 
-// Accepted calls AcceptedF if it was initialized. If it wasn't initialized and
+// SendAccepted calls SendAcceptedF if it was initialized. If it wasn't initialized and
 // this function shouldn't be called and testing was initialized, then testing
 // will fail.
-func (s *SenderTest) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
-	if s.AcceptedF != nil {
-		s.AcceptedF(validatorID, requestID, containerIDs)
-	} else if s.CantAccepted && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Accepted")
+func (s *SenderTest) SendAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+	if s.SendAcceptedF != nil {
+		s.SendAcceptedF(validatorID, requestID, containerIDs)
+	} else if s.CantSendAccepted && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendAccepted")
 	}
 }
 
-// Get calls GetF if it was initialized. If it wasn't initialized and this
+// SendGet calls SendGetF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) {
-	if s.GetF != nil {
-		s.GetF(vdr, requestID, vtxID)
-	} else if s.CantGet && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Get")
+func (s *SenderTest) SendGet(vdr ids.ShortID, requestID uint32, vtxID ids.ID) {
+	if s.SendGetF != nil {
+		s.SendGetF(vdr, requestID, vtxID)
+	} else if s.CantSendGet && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendGet")
 	}
 }
 
-// GetAncestors calls GetAncestorsF if it was initialized. If it
+// SendGetAncestors calls SendGetAncestorsF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) GetAncestors(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) {
-	if s.GetAncestorsF != nil {
-		s.GetAncestorsF(validatorID, requestID, vtxID)
-	} else if s.CantGetAncestors && s.T != nil {
-		s.T.Fatalf("Unexpectedly called CantGetAncestors")
+func (s *SenderTest) SendGetAncestors(validatorID ids.ShortID, requestID uint32, vtxID ids.ID) {
+	if s.SendGetAncestorsF != nil {
+		s.SendGetAncestorsF(validatorID, requestID, vtxID)
+	} else if s.CantSendGetAncestors && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendCantSendGetAncestors")
 	}
 }
 
-// Put calls PutF if it was initialized. If it wasn't initialized and this
+// SendPut calls SendPutF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) Put(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []byte) {
-	if s.PutF != nil {
-		s.PutF(vdr, requestID, vtxID, vtx)
-	} else if s.CantPut && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Put")
+func (s *SenderTest) SendPut(vdr ids.ShortID, requestID uint32, vtxID ids.ID, vtx []byte) {
+	if s.SendPutF != nil {
+		s.SendPutF(vdr, requestID, vtxID, vtx)
+	} else if s.CantSendPut && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendPut")
 	}
 }
 
-// MultiPut calls MultiPutF if it was initialized. If it wasn't initialized and this
+// SendMultiPut calls SendMultiPutF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) MultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) {
-	if s.MultiPutF != nil {
-		s.MultiPutF(vdr, requestID, vtxs)
-	} else if s.CantMultiPut && s.T != nil {
-		s.T.Fatalf("Unexpectedly called MultiPut")
+func (s *SenderTest) SendMultiPut(vdr ids.ShortID, requestID uint32, vtxs [][]byte) {
+	if s.SendMultiPutF != nil {
+		s.SendMultiPutF(vdr, requestID, vtxs)
+	} else if s.CantSendMultiPut && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendMultiPut")
 	}
 }
 
-// PushQuery calls PushQueryF if it was initialized. If it wasn't initialized
+// SendPushQuery calls SendPushQueryF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *SenderTest) PushQuery(vdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
-	if s.PushQueryF != nil {
-		s.PushQueryF(vdrs, requestID, vtxID, vtx)
-	} else if s.CantPushQuery && s.T != nil {
-		s.T.Fatalf("Unexpectedly called PushQuery")
+func (s *SenderTest) SendPushQuery(vdrs ids.ShortSet, requestID uint32, vtxID ids.ID, vtx []byte) {
+	if s.SendPushQueryF != nil {
+		s.SendPushQueryF(vdrs, requestID, vtxID, vtx)
+	} else if s.CantSendPushQuery && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendPushQuery")
 	}
 }
 
-// PullQuery calls PullQueryF if it was initialized. If it wasn't initialized
+// SendPullQuery calls SendPullQueryF if it was initialized. If it wasn't initialized
 // and this function shouldn't be called and testing was initialized, then
 // testing will fail.
-func (s *SenderTest) PullQuery(vdrs ids.ShortSet, requestID uint32, vtxID ids.ID) {
-	if s.PullQueryF != nil {
-		s.PullQueryF(vdrs, requestID, vtxID)
-	} else if s.CantPullQuery && s.T != nil {
-		s.T.Fatalf("Unexpectedly called PullQuery")
+func (s *SenderTest) SendPullQuery(vdrs ids.ShortSet, requestID uint32, vtxID ids.ID) {
+	if s.SendPullQueryF != nil {
+		s.SendPullQueryF(vdrs, requestID, vtxID)
+	} else if s.CantSendPullQuery && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendPullQuery")
 	}
 }
 
-// Chits calls ChitsF if it was initialized. If it wasn't initialized and this
+// SendChits calls SendChitsF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) {
-	if s.ChitsF != nil {
-		s.ChitsF(vdr, requestID, votes)
-	} else if s.CantChits && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Chits")
+func (s *SenderTest) SendChits(vdr ids.ShortID, requestID uint32, votes []ids.ID) {
+	if s.SendChitsF != nil {
+		s.SendChitsF(vdr, requestID, votes)
+	} else if s.CantSendChits && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendChits")
 	}
 }
 
-// Gossip calls GossipF if it was initialized. If it wasn't initialized and this
+// SendGossip calls SendGossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) Gossip(containerID ids.ID, container []byte) {
-	if s.GossipF != nil {
-		s.GossipF(containerID, container)
-	} else if s.CantGossip && s.T != nil {
-		s.T.Fatalf("Unexpectedly called Gossip")
+func (s *SenderTest) SendGossip(containerID ids.ID, container []byte) {
+	if s.SendGossipF != nil {
+		s.SendGossipF(containerID, container)
+	} else if s.CantSendGossip && s.T != nil {
+		s.T.Fatalf("Unexpectedly called SendGossip")
 	}
 }

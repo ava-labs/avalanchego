@@ -198,7 +198,7 @@ func (b *Bootstrapper) fetch(blkID ids.ID) error {
 	b.RequestID++
 
 	b.OutstandingRequests.Add(validatorID, b.RequestID, blkID)
-	b.Sender.GetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
+	b.Sender.SendGetAncestors(validatorID, b.RequestID, blkID) // request block and ancestors
 	return nil
 }
 

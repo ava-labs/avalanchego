@@ -107,7 +107,7 @@ func TestTimeout(t *testing.T) {
 	vdrIDs.Add(ids.ShortID{255})
 	vdrIDs.Add(ids.ShortID{254})
 
-	sender.PullQuery(vdrIDs, 0, ids.Empty)
+	sender.SendPullQuery(vdrIDs, 0, ids.Empty)
 
 	wg.Wait()
 
@@ -184,7 +184,7 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs := ids.ShortSet{}
 			vdrIDs.Add(ids.ShortID{1})
 
-			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -271,7 +271,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// a query failed message
 			vdrIDs := ids.ShortSet{}
 			vdrIDs.Add(ids.GenerateTestShortID())
-			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
 		}
 	}()
 

@@ -162,7 +162,7 @@ func (b *Bootstrapper) fetch(vtxIDs ...ids.ID) error {
 		b.RequestID++
 
 		b.OutstandingRequests.Add(validatorID, b.RequestID, vtxID)
-		b.Sender.GetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
+		b.Sender.SendGetAncestors(validatorID, b.RequestID, vtxID) // request vertex and ancestors
 	}
 	return b.checkFinish()
 }

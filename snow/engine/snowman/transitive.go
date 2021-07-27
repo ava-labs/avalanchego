@@ -141,7 +141,7 @@ func (t *Transitive) Gossip() error {
 		return nil
 	}
 	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
-	t.Sender.Gossip(blkID, blk.Bytes())
+	t.Sender.SendGossip(blkID, blk.Bytes())
 	return nil
 }
 
@@ -163,7 +163,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	t.Sender.Put(vdr, requestID, blkID, blk.Bytes())
+	t.Sender.SendPut(vdr, requestID, blkID, blk.Bytes())
 	return nil
 }
 
@@ -198,7 +198,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	}
 
 	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	t.Sender.MultiPut(vdr, requestID, ancestorsBytes)
+	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -616,7 +616,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 	t.RequestID++
 	t.blkReqs.Add(vdr, t.RequestID, blkID)
 	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, t.RequestID, blkID)
-	t.Sender.Get(vdr, t.RequestID, blkID)
+	t.Sender.SendGet(vdr, t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.numRequests.Set(float64(t.blkReqs.Len()))
@@ -637,7 +637,7 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
-		t.Sender.PullQuery(vdrSet, t.RequestID, blkID)
+		t.Sender.SendPullQuery(vdrSet, t.RequestID, blkID)
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
@@ -658,7 +658,7 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 
-		t.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+		t.Sender.SendPushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}
