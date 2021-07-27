@@ -20,10 +20,6 @@ type MintOperation struct {
 }
 
 func (op *MintOperation) InitCtx(ctx *snow.Context) {
-	if ctx == nil {
-		return
-	}
-
 	for _, out := range op.Outputs {
 		out.InitCtx(ctx)
 	}

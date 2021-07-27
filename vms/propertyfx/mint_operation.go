@@ -19,10 +19,6 @@ type MintOperation struct {
 }
 
 func (op *MintOperation) InitCtx(ctx *snow.Context) {
-	if ctx == nil {
-		return
-	}
-
 	op.MintOutput.OutputOwners.InitCtx(ctx)
 	op.OwnedOutput.OutputOwners.InitCtx(ctx)
 }

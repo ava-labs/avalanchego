@@ -18,10 +18,6 @@ type TransferOperation struct {
 }
 
 func (op *TransferOperation) InitCtx(ctx *snow.Context) {
-	if ctx == nil {
-		return
-	}
-
 	op.Output.OutputOwners.InitCtx(ctx)
 }
 
