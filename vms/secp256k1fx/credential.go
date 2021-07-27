@@ -29,9 +29,7 @@ type Credential struct {
 // MarshalJSON marshals [cr] to JSON
 // The string representation of each signature is created using the hex formatter
 func (cr *Credential) MarshalJSON() ([]byte, error) {
-	jsonFieldMap := make(map[string]interface{}, 1)
 	signatures := make([]string, len(cr.Sigs))
-
 	for i, sig := range cr.Sigs {
 		sigStr, err := formatting.Encode(defaultEncoding, sig[:])
 		if err != nil {
@@ -39,8 +37,9 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 		}
 		signatures[i] = sigStr
 	}
-
-	jsonFieldMap["signatures"] = signatures
+	jsonFieldMap := map[string]interface{}{
+		"signatures": signatures,
+	}
 	b, err := json2.Marshal(jsonFieldMap)
 	return b, err
 }
