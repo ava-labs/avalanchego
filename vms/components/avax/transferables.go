@@ -50,7 +50,7 @@ type TransferableOut interface {
 
 // TransferableOutput ...
 type TransferableOutput struct {
-	snow.ContextInitializable
+	snow.ContextInitializable `serialize:"false" json:"-"`
 	// FxID has serialize false because we don't want this to be encoded in bytes
 	FxID  ids.ID `serialize:"false" json:"fxID"`
 	Asset `serialize:"true"`
