@@ -15,6 +15,7 @@ type Sender interface {
 	FetchSender
 	QuerySender
 	Gossiper
+	AppSender
 }
 
 // FrontierSender defines how a consensus engine sends frontier messages to
@@ -85,4 +86,12 @@ type QuerySender interface {
 type Gossiper interface {
 	// Gossip the provided container throughout the network
 	SendGossip(containerID ids.ID, container []byte)
+}
+
+// Sends app-level messages
+type AppSender interface {
+	// Send an application-level request
+	SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte)
+	SendAppResponse(nodeIDs ids.ShortID, requestID uint32, appResponseBytes []byte)
+	SendAppGossip(nodeIDs ids.ShortSet, requestID uint32, appGossipBytes []byte)
 }

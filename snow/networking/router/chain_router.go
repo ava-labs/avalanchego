@@ -458,7 +458,7 @@ func (cr *ChainRouter) GetAcceptedFailed(
 
 // GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-// The maximum number of ancestors to respond with is defined in snow/engine/commong/bootstrapper.go
+// The maximum number of ancestors to respond with is defined in snow/engine/common/bootstrapper.go
 func (cr *ChainRouter) GetAncestors(
 	validatorID ids.ShortID,
 	chainID ids.ID,

@@ -16,7 +16,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Sender sends consensus messages to other validators
+// Sender is a wrapper around an ExternalSender.
+// Messages to this node are put directly into [router] rather than
+// being sent over the network via the wrapped ExternalSender.
+// Sender registers outbound requests with [router] so that [router]
+// fires a timeout if we don't get a response to the request.
 type Sender struct {
 	ctx      *snow.Context
 	sender   ExternalSender // Actually does the sending over the network

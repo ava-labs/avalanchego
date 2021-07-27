@@ -12,6 +12,8 @@ import (
 // ExternalSender sends consensus messages to other validators
 // Right now this is implemented in the networking package
 type ExternalSender interface {
+	AppSender
+
 	// Send a GetAcceptedFrontier message for chain [chainID] to validators in [nodeIDs].
 	// The validator should reply by [deadline].
 	// Returns the IDs of validators that may receive the message.
@@ -37,10 +39,13 @@ type ExternalSender interface {
 	SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
 	SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
+	SendGossip(chainID ids.ID, containerID ids.ID, container []byte)
+}
+
+// Sends app-level messages
+type AppSender interface {
 	// Send an application-level request
 	SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
 	SendAppResponse(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
 	SendAppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte)
-
-	SendGossip(chainID ids.ID, containerID ids.ID, container []byte)
 }
