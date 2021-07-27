@@ -77,7 +77,6 @@ type EngineTest struct {
 
 var _ Engine = &EngineTest{}
 
-// Default ...
 func (e *EngineTest) Default(cant bool) {
 	e.CantIsBootstrapped = cant
 	e.CantTimeout = cant

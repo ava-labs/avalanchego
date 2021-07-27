@@ -44,7 +44,6 @@ func FromString(idStr string) (ID, error) {
 	return ToID(bytes)
 }
 
-// MarshalJSON ...
 func (id ID) MarshalJSON() ([]byte, error) {
 	str, err := formatting.Encode(defaultEncoding, id[:])
 	if err != nil {
@@ -53,7 +52,6 @@ func (id ID) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + str + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (id *ID) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == "null" { // If "null", do nothing

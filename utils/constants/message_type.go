@@ -5,7 +5,6 @@ package constants
 
 import "fmt"
 
-// MsgType ...
 type MsgType int
 
 const (

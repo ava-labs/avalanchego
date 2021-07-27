@@ -17,7 +17,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// WalletService ...
 type WalletService struct {
 	vm *VM
 

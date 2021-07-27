@@ -43,14 +43,12 @@ type dbElement struct {
 	Traits [][]byte `serialize:"true"`
 }
 
-// Element ...
 type Element struct {
 	Key    []byte
 	Value  []byte
 	Traits [][]byte
 }
 
-// SharedMemory ...
 type SharedMemory interface {
 	// Adds to the peer chain's side
 	Put(peerChainID ids.ID, elems []*Element, batches ...database.Batch) error

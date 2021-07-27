@@ -17,7 +17,6 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-// Client ...
 type Client struct {
 	requester rpc.EndpointRequester
 }

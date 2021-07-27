@@ -7,15 +7,12 @@ import (
 	"strconv"
 )
 
-// Uint8 ...
 type Uint8 uint8
 
-// MarshalJSON ...
 func (u Uint8) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + strconv.FormatUint(uint64(u), 10) + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (u *Uint8) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == Null {
