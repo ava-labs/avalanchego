@@ -2088,7 +2088,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
+	externalSender.SendGetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2155,8 +2155,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
+	externalSender.SendGetAcceptedFrontierF = nil
+	externalSender.SendGetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2166,8 +2166,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.GetAcceptedF = nil
-	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
+	externalSender.SendGetAcceptedF = nil
+	externalSender.SendGetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
 		*reqID = requestID
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
@@ -2179,15 +2179,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.GetF = nil
-	externalSender.CantPushQuery = false
-	externalSender.CantPullQuery = false
+	externalSender.SendGetF = nil
+	externalSender.CantSendPushQuery = false
+	externalSender.CantSendPullQuery = false
 
 	if err := engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.CantPushQuery = true
+	externalSender.CantSendPushQuery = true
 
 	preferred, err = vm.Preferred()
 	if err != nil {

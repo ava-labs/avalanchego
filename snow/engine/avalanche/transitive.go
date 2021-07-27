@@ -133,7 +133,7 @@ func (t *Transitive) Gossip() error {
 	}
 
 	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", vtxID)
-	t.Sender.Gossip(vtxID, vtx.Bytes())
+	t.Sender.SendGossip(vtxID, vtx.Bytes())
 	return nil
 }
 
@@ -147,7 +147,7 @@ func (t *Transitive) Shutdown() error {
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, vtxID ids.ID) error {
 	// If this engine has access to the requested vertex, provide it
 	if vtx, err := t.Manager.GetVtx(vtxID); err == nil {
-		t.Sender.Put(vdr, requestID, vtxID, vtx.Bytes())
+		t.Sender.SendPut(vdr, requestID, vtxID, vtx.Bytes())
 	}
 	return nil
 }
@@ -197,7 +197,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, vtxID ids.I
 	}
 
 	t.metrics.getAncestorsVtxs.Observe(float64(len(ancestorsBytes)))
-	t.Sender.MultiPut(vdr, requestID, ancestorsBytes)
+	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -624,7 +624,7 @@ func (t *Transitive) issueRepoll() {
 	// Poll the network
 	t.RequestID++
 	if err == nil && t.polls.Add(t.RequestID, vdrBag) {
-		t.Sender.PullQuery(vdrSet, t.RequestID, vtxID)
+		t.Sender.SendPullQuery(vdrSet, t.RequestID, vtxID)
 	} else if err != nil {
 		t.Ctx.Log.Error("re-query for %s was dropped due to an insufficient number of validators", vtxID)
 	}
@@ -668,7 +668,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	}
 	t.RequestID++
 	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
-	t.Sender.Get(vdr, t.RequestID, vtxID)
+	t.Sender.SendGet(vdr, t.RequestID, vtxID)
 	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
 

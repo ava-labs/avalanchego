@@ -75,8 +75,7 @@ func (s *Sender) Initialize(
 // Context of this sender
 func (s *Sender) Context() *snow.Context { return s.ctx }
 
-// GetAcceptedFrontier ...
-func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
+func (s *Sender) SendGetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
@@ -104,7 +103,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	// [sentTo] are the IDs of validators who may receive the message.
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sentTo := s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
+	sentTo := s.sender.SendGetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
 
 	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
@@ -122,17 +121,15 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	}
 }
 
-// AcceptedFrontier ...
-func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+func (s *Sender) SendAcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
 		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
 	} else {
-		s.sender.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
+		s.sender.SendAcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
 }
 
-// GetAccepted ...
-func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
+func (s *Sender) SendGetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Asynchronously to avoid deadlock.
 	if validatorIDs.Contains(s.ctx.NodeID) {
@@ -160,7 +157,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	// [sentTo] are the IDs of validators who may receive the message.
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sentTo := s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
+	sentTo := s.sender.SendGetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
 
 	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
@@ -176,17 +173,15 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	}
 }
 
-// Accepted ...
-func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
+func (s *Sender) SendAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
 		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
 	} else {
-		s.sender.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
+		s.sender.SendAccepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
 }
 
-// GetAncestors sends a GetAncestors message
-func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (s *Sender) SendGetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending GetAncestors to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
 	// Sending a GetAncestors to myself will always fail
 	if validatorID == s.ctx.NodeID {
@@ -205,7 +200,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sent := s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
+	sent := s.sender.SendGetAncestors(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
 		// Tell the router to expect a reply message from this validator
@@ -216,19 +211,19 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 	go s.router.GetAncestorsFailed(validatorID, s.ctx.ChainID, requestID)
 }
 
-// MultiPut sends a MultiPut message to the consensus engine running on the specified chain
-// on the specified validator.
+// SendMultiPut sends a MultiPut message to the consensus engine running on the specified chain
+// on the specified node.
 // The MultiPut message gives the recipient the contents of several containers.
-func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
+func (s *Sender) SendMultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
 	s.ctx.Log.Verbo("Sending MultiPut to validator %s. RequestID: %d. NumContainers: %d", validatorID, requestID, len(containers))
-	s.sender.MultiPut(validatorID, s.ctx.ChainID, requestID, containers)
+	s.sender.SendMultiPut(validatorID, s.ctx.ChainID, requestID, containers)
 }
 
-// Get sends a Get message to the consensus engine running on the specified
-// chain to the specified validator. The Get message signifies that this
+// SendGet sends a Get message to the consensus engine running on the specified
+// chain to the specified node. The Get message signifies that this
 // consensus engine would like the recipient to send this consensus engine the
 // specified container.
-func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
+func (s *Sender) SendGet(validatorID ids.ShortID, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending Get to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
 
 	// Sending a Get to myself will always fail
@@ -248,7 +243,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sent := s.sender.Get(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
+	sent := s.sender.SendGet(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
 		// Tell the router to expect a reply message from this validator
@@ -259,20 +254,20 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 	go s.router.GetFailed(validatorID, s.ctx.ChainID, requestID)
 }
 
-// Put sends a Put message to the consensus engine running on the specified chain
-// on the specified validator.
+// SendPut sends a Put message to the consensus engine running on the specified chain
+// on the specified node.
 // The Put message signifies that this consensus engine is giving to the recipient
 // the contents of the specified container.
-func (s *Sender) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
+func (s *Sender) SendPut(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending Put to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
-	s.sender.Put(validatorID, s.ctx.ChainID, requestID, containerID, container)
+	s.sender.SendPut(validatorID, s.ctx.ChainID, requestID, containerID, container)
 }
 
-// PushQuery sends a PushQuery message to the consensus engines running on the specified chains
-// on the specified validators.
+// SendPushQuery sends a PushQuery message to the consensus engines running on the specified chains
+// on the specified nodes.
 // The PushQuery message signifies that this consensus engine would like each validator to send
 // their preferred frontier given the existence of the specified container.
-func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
+func (s *Sender) SendPushQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending PushQuery to validators %v. RequestID: %d. ContainerID: %s", validatorIDs, requestID, containerID)
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
@@ -309,7 +304,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID, container)
+	sentTo := s.sender.SendPushQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID, container)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
@@ -326,11 +321,11 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	}
 }
 
-// PullQuery sends a PullQuery message to the consensus engines running on the specified chains
-// on the specified validators.
+// SendPullQuery sends a PullQuery message to the consensus engines running on the specified chains
+// on the specified nodes.
 // The PullQuery message signifies that this consensus engine would like each validator to send
 // their preferred frontier.
-func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
+func (s *Sender) SendPullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID) {
 	s.ctx.Log.Verbo("Sending PullQuery. RequestID: %d. ContainerID: %s", requestID, containerID)
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
@@ -366,7 +361,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID)
+	sentTo := s.sender.SendPullQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
@@ -382,9 +377,9 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 	}
 }
 
-// AppRequest sends an application-level request to the given nodes.
+// SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *Sender) AppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) {
+func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) {
 	s.ctx.Log.Verbo("Sending AppRequest. RequestID: %d. Message: %s", requestID, formatting.DumpBytes{Bytes: appRequestBytes})
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
@@ -413,7 +408,7 @@ func (s *Sender) AppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBy
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of nodes who may receive the message.
-	sentTo := s.sender.AppRequest(nodeIDs, s.ctx.ChainID, requestID, timeoutDuration, appRequestBytes)
+	sentTo := s.sender.SendAppRequest(nodeIDs, s.ctx.ChainID, requestID, timeoutDuration, appRequestBytes)
 
 	// Set timeouts so that if we don't hear back from these nodes, we register a failure.
 	for _, nodeID := range sentTo {
@@ -430,39 +425,39 @@ func (s *Sender) AppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBy
 }
 
 // Sends a response to an application-level request from the given node
-func (s *Sender) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
+func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
 	if nodeID == s.ctx.NodeID {
 		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
 	} else {
-		s.sender.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes)
+		s.sender.SendAppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes)
 	}
 }
 
 // Sends a application-level gossip message the given nodes. The node doesn't need to respond to
-func (s *Sender) AppGossip(nodeIDs ids.ShortSet, requestID uint32, appResponseBytes []byte) {
+func (s *Sender) SendAppGossip(nodeIDs ids.ShortSet, requestID uint32, appResponseBytes []byte) {
 	// Sending a message to myself. No need to send it over the network.
 	// Just put it right into the router. Do so asynchronously to avoid deadlock.
 	if nodeIDs.Contains(s.ctx.NodeID) {
 		nodeIDs.Remove(s.ctx.NodeID)
 		go s.router.AppGossip(s.ctx.NodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
 	}
-	s.sender.AppGossip(nodeIDs, s.ctx.ChainID, requestID, appResponseBytes)
+	s.sender.SendAppGossip(nodeIDs, s.ctx.ChainID, requestID, appResponseBytes)
 }
 
 // Chits sends chits
-func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID) {
+func (s *Sender) SendChits(validatorID ids.ShortID, requestID uint32, votes []ids.ID) {
 	s.ctx.Log.Verbo("Sending Chits to validator %s. RequestID: %d. Votes: %s", validatorID, requestID, votes)
 	// If [validatorID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorID == s.ctx.NodeID {
 		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes, nil)
 	} else {
-		s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
+		s.sender.SendChits(validatorID, s.ctx.ChainID, requestID, votes)
 	}
 }
 
 // Gossip the provided container
-func (s *Sender) Gossip(containerID ids.ID, container []byte) {
+func (s *Sender) SendGossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
-	s.sender.Gossip(s.ctx.ChainID, containerID, container)
+	s.sender.SendGossip(s.ctx.ChainID, containerID, container)
 }
