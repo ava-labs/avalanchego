@@ -206,6 +206,8 @@ func (dl *diskLayer) checkAndFlush(batch ethdb.Batch, stats *generatorStats, cur
 
 		if abort != nil {
 			stats.Log("Aborting state snapshot generation", dl.root, currentLocation)
+			dl.genStats = stats
+			close(abort)
 			return true
 		}
 	}
@@ -281,7 +283,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 			stats.storage += common.StorageSize(1 + common.HashLength + len(data))
 			stats.accounts++
 		}
-		if !dl.checkAndFlush(batch, stats, accountHash[:]) {
+		if dl.checkAndFlush(batch, stats, accountHash[:]) {
+			// checkAndFlush handles abort
 			return
 		}
 		// If the account is in-progress, continue where we left off (otherwise iterate all)
@@ -304,7 +307,8 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 				stats.storage += common.StorageSize(1 + 2*common.HashLength + len(storeIt.Value))
 				stats.slots++
 
-				if !dl.checkAndFlush(batch, stats, append(accountHash[:], storeIt.Key...)) {
+				if dl.checkAndFlush(batch, stats, append(accountHash[:], storeIt.Key...)) {
+					// checkAndFlush handles abort
 					return
 				}
 			}
