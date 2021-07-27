@@ -54,10 +54,6 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 		return nil, errMarshal
 	}
 
-	result := make(map[string]interface{})
-	result["locktime"] = out.Locktime
-	result["threshold"] = out.Threshold
-
 	addresses := make([]string, addrsLen)
 	for i, n := 0, addrsLen; i < n; i++ {
 		// for each [addr] in [Addrs] we attempt to format it given
@@ -71,7 +67,11 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 		}
 		addresses[i] = fAddr
 	}
-	result["addresses"] = addresses
+	result := map[string]interface{}{
+		"locktime":  out.Locktime,
+		"threshold": out.Threshold,
+		"addresses": addresses,
+	}
 
 	return json.Marshal(result)
 }
