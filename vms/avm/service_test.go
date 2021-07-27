@@ -688,8 +688,8 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
-	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
-	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"inputs\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
+	assert.Contains(t, jsonString, "\"outputs\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 }
 
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
@@ -735,8 +735,8 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
-	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
-	assert.Contains(t, jsonString, "\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"inputs\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
+	assert.Contains(t, jsonString, "\"exportedOutputs\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 }
 
 func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
