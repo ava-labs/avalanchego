@@ -23,6 +23,7 @@ import (
 
 // UnsignedTx ...
 type UnsignedTx interface {
+	Init(*VM) error
 	Initialize(unsignedBytes, bytes []byte)
 	ID() ids.ID
 	UnsignedBytes() []byte
@@ -95,7 +96,7 @@ func (t *Tx) Init(vm *VM) error {
 			}
 		}
 	}
-	return nil
+	return t.UnsignedTx.Init(vm)
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the

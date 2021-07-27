@@ -115,7 +115,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	}
 	var err error
 	if args.Encoding == formatting.JSON {
-		err := service.initTx(tx, service.vm)
+		err = tx.Init(service.vm)
 		if err != nil {
 			return err
 		}
@@ -128,26 +128,6 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}
 	reply.Encoding = args.Encoding
-	return nil
-}
-
-// initTx initializes given UnsignedTx object if it is a CoreTx
-// does nothing if given UnsignedTx object is not a CoreTx
-// returns error if call to CoreTx.Init failed
-func (service *Service) initTx(tx UniqueTx, vm *VM) error {
-	err := tx.Init(vm)
-	if err != nil {
-		return err
-	}
-
-	unsignedTx := tx.UnsignedTx
-	b, ok := unsignedTx.(CoreTx)
-	if !ok {
-		return nil
-	}
-	if err := b.Init(vm); err != nil {
-		return err
-	}
 	return nil
 }
 
