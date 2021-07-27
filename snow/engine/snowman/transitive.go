@@ -408,13 +408,13 @@ func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response 
 }
 
 // AppGossip implements the Engine interface
-func (t *Transitive) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping AppGossip(%s, %d) due to bootstrapping", nodeID, msgID)
+		t.Ctx.Log.Debug("dropping AppGossip(%s) due to bootstrapping", nodeID)
 		return nil
 	}
 	// Notify the VM of this message which has been gossiped to it
-	return t.VM.AppGossip(nodeID, msgID, msg)
+	return t.VM.AppGossip(nodeID, msg)
 }
 
 // Notify implements the Engine interface

@@ -92,6 +92,6 @@ type Gossiper interface {
 type AppSender interface {
 	// Send an application-level request
 	SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte)
-	SendAppResponse(nodeIDs ids.ShortID, requestID uint32, appResponseBytes []byte)
-	SendAppGossip(nodeIDs ids.ShortSet, requestID uint32, appGossipBytes []byte)
+	SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte)
+	SendAppGossip(appGossipBytes []byte)
 }

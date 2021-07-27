@@ -887,21 +887,38 @@ func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID 
 
 // AppGossip implements the Sender interface.
 // assumes the stateLock is not held.
-func (n *network) SendAppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte) {
+func (n *network) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
 	now := n.clock.Time()
 
-	msg, err := n.b.AppGossip(chainID, requestID, appGossipBytes)
+	msg, err := n.b.AppGossip(chainID, appGossipBytes)
 	if err != nil {
-		n.log.Error("failed to build AppGossip(%s, %d): %s", chainID, requestID, err)
+		n.log.Error("failed to build AppGossip(%s): %s", chainID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 		n.sendFailRateCalculator.Observe(1, now)
 	}
 
-	for _, peerElement := range n.getPeers(nodeIDs) {
-		peer := peerElement.peer
-		nodeID := peerElement.id
+	allPeers := n.getAllPeers()
+
+	numToGossip := 10 // TODO replace this constant with a value given in the config
+
+	if int(numToGossip) > len(allPeers) {
+		numToGossip = len(allPeers)
+	}
+
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(len(allPeers))); err != nil {
+		n.log.Warn("couldn't initialize sampler with sample range %d: %s", len(allPeers), err)
+		return
+	}
+	indices, err := s.Sample(numToGossip)
+	if err != nil {
+		n.log.Warn("couldn't sample %d: %s", numToGossip, err)
+		return
+	}
+	for _, index := range indices {
+		peer := allPeers[int(index)]
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
-			n.log.Debug("failed to send AppGossip(%s, %s, %d)", nodeID, chainID, requestID)
+			n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
 			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 			n.appGossip.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)

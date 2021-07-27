@@ -553,11 +553,10 @@ func TestBuildAppGossipMsg(t *testing.T) {
 	appGossipBytes[len(appGossipBytes)-1] = 1
 
 	// Build the message
-	msg, err := TestBuilder.AppGossip(chainID, 1, appGossipBytes)
+	msg, err := TestBuilder.AppGossip(chainID, appGossipBytes)
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, AppGossip, msg.Op())
-	assert.EqualValues(t, 1, msg.Get(RequestID))
 	assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
 	assert.Equal(t, chainID[:], msg.Get(ChainID))
 
@@ -566,7 +565,6 @@ func TestBuildAppGossipMsg(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, msg)
 	assert.Equal(t, AppGossip, msg.Op())
-	assert.EqualValues(t, 1, msg.Get(RequestID))
 	assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
 	assert.Equal(t, chainID[:], msg.Get(ChainID))
 }

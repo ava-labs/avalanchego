@@ -129,7 +129,6 @@ type Builder interface {
 
 	AppGossip(
 		chainID ids.ID,
-		requestID uint32,
 		msg []byte,
 	) (Message, error)
 }
@@ -469,12 +468,11 @@ func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Mes
 }
 
 // Application level gossiped message
-func (b *builder) AppGossip(chainID ids.ID, requestID uint32, msg []byte) (Message, error) {
+func (b *builder) AppGossip(chainID ids.ID, msg []byte) (Message, error) {
 	return b.c.Pack(
 		AppGossip,
 		map[Field]interface{}{
 			ChainID:        chainID[:],
-			RequestID:      requestID,
 			AppGossipBytes: msg,
 		},
 		AppGossip.Compressable(),

@@ -41,7 +41,7 @@ type ExternalSenderTest struct {
 
 	SendAppRequestF  func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
 	SendAppResponseF func(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytyes []byte)
-	SendAppGossipF   func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytyes []byte)
+	SendAppGossipF   func(chainID ids.ID, appGossipBytyes []byte)
 
 	SendGossipF func(chainID ids.ID, containerID ids.ID, container []byte)
 }
@@ -247,10 +247,10 @@ func (s *ExternalSenderTest) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID
 // SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) SendAppResponse(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte) {
+func (s *ExternalSenderTest) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte) {
 	switch {
 	case s.SendAppResponseF != nil:
-		s.SendAppResponseF(nodeIDs, chainID, requestID, appResponseBytes)
+		s.SendAppResponseF(nodeID, chainID, requestID, appResponseBytes)
 	case s.CantSendAppResponse && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppResponse")
 	case s.CantSendAppResponse && s.B != nil:
@@ -261,10 +261,10 @@ func (s *ExternalSenderTest) SendAppResponse(nodeIDs ids.ShortID, chainID ids.ID
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) SendAppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte) {
+func (s *ExternalSenderTest) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
 	switch {
 	case s.SendAppGossipF != nil:
-		s.SendAppGossipF(nodeIDs, chainID, requestID, appGossipBytes)
+		s.SendAppGossipF(chainID, appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppGossip")
 	case s.CantSendAppGossip && s.B != nil:

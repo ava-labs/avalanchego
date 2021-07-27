@@ -46,6 +46,6 @@ type ExternalSender interface {
 type AppSender interface {
 	// Send an application-level request
 	SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
-	SendAppResponse(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
-	SendAppGossip(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, appGossipBytes []byte)
+	SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
+	SendAppGossip(chainID ids.ID, appGossipBytes []byte)
 }

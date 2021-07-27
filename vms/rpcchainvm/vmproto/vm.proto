@@ -139,10 +139,8 @@ message AppResponseMsg {
 message AppGossipMsg {
     // The node that sent us a gossip message
     bytes nodeID = 1;
-    // ID of this message
-    uint32 msgID = 2;
     // The message body
-    bytes msg = 3;
+    bytes msg = 2;
 }
 
 service VM {

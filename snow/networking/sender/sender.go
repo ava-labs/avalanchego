@@ -438,14 +438,8 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 }
 
 // Sends a application-level gossip message the given nodes. The node doesn't need to respond to
-func (s *Sender) SendAppGossip(nodeIDs ids.ShortSet, requestID uint32, appResponseBytes []byte) {
-	// Sending a message to myself. No need to send it over the network.
-	// Just put it right into the router. Do so asynchronously to avoid deadlock.
-	if nodeIDs.Contains(s.ctx.NodeID) {
-		nodeIDs.Remove(s.ctx.NodeID)
-		go s.router.AppGossip(s.ctx.NodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
-	}
-	s.sender.SendAppGossip(nodeIDs, s.ctx.ChainID, requestID, appResponseBytes)
+func (s *Sender) SendAppGossip(appResponseBytes []byte) {
+	s.sender.SendAppGossip(s.ctx.ChainID, appResponseBytes)
 }
 
 // Chits sends chits

@@ -44,7 +44,8 @@ type TestVM struct {
 	ConnectedF                               func(ids.ShortID) error
 	DisconnectedF                            func(ids.ShortID) error
 	HealthCheckF                             func() (interface{}, error)
-	AppRequestF, AppGossipF, AppResponseF    func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppRequestF, AppResponseF                func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppGossipF                               func(nodeID ids.ShortID, msg []byte) error
 	AppRequestFailedF                        func(nodeID ids.ShortID, requestID uint32) error
 	VersionF                                 func() (string, error)
 }
@@ -184,9 +185,9 @@ func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []b
 	return errors.New("unexpectedly called AppResponse")
 }
 
-func (vm *TestVM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+func (vm *TestVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	if vm.AppGossipF != nil {
-		return vm.AppGossipF(nodeID, msgID, msg)
+		return vm.AppGossipF(nodeID, msg)
 	}
 	if !vm.CantAppGossip {
 		return nil

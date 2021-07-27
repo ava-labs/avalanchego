@@ -34,7 +34,7 @@ type SenderTest struct {
 	SendGossipF              func(ids.ID, []byte)
 	SendAppRequestF          func(ids.ShortSet, uint32, []byte)
 	SendAppResponseF         func(ids.ShortID, uint32, []byte)
-	SendAppGossipF           func(ids.ShortSet, uint32, []byte)
+	SendAppGossipF           func([]byte)
 }
 
 // Default set the default callable value to [cant]
@@ -203,10 +203,10 @@ func (s *SenderTest) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appR
 // SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) SendAppResponse(nodeIDs ids.ShortID, requestID uint32, appResponseBytes []byte) {
+func (s *SenderTest) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
 	switch {
 	case s.SendAppResponseF != nil:
-		s.SendAppResponseF(nodeIDs, requestID, appResponseBytes)
+		s.SendAppResponseF(nodeID, requestID, appResponseBytes)
 	case s.CantSendAppResponse && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppResponse")
 	}
@@ -215,10 +215,10 @@ func (s *SenderTest) SendAppResponse(nodeIDs ids.ShortID, requestID uint32, appR
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) SendAppGossip(nodeIDs ids.ShortSet, requestID uint32, appGossipBytes []byte) {
+func (s *SenderTest) SendAppGossip(appGossipBytes []byte) {
 	switch {
 	case s.SendAppGossipF != nil:
-		s.SendAppGossipF(nodeIDs, requestID, appGossipBytes)
+		s.SendAppGossipF(appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppGossip")
 	}

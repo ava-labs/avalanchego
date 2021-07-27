@@ -1181,6 +1181,6 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return nil
 }

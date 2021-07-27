@@ -415,7 +415,7 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*vm
 	if err != nil {
 		return nil, err
 	}
-	return nil, vm.vm.AppGossip(nodeID, req.MsgID, req.Msg)
+	return nil, vm.vm.AppGossip(nodeID, req.Msg)
 }
 
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.EmptyMsg, error) {
