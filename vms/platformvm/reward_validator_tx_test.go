@@ -390,7 +390,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -430,7 +430,7 @@ func TestUptimeDisallowed(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

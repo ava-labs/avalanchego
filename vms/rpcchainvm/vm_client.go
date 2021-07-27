@@ -94,6 +94,7 @@ func (vm *VMClient) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	appSender common.AppSender, // TODO wrap and give to server
 ) error {
 	if len(fxs) != 0 {
 		return errUnsupportedFXs

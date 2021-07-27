@@ -314,7 +314,7 @@ func defaultVM() (*VM, database.Database) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis()
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		panic(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -384,7 +384,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
@@ -1779,7 +1779,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1868,7 +1868,7 @@ func TestRestartPartiallyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1900,7 +1900,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2000,7 +2000,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	secondDB := db.NewPrefixDBManager([]byte{})
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	lastAccepted, err := secondVM.LastAccepted()
@@ -2038,7 +2038,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2246,7 +2246,7 @@ func TestUnverifiedParent(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, dbManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2400,7 +2400,7 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	}()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, baseDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

@@ -37,7 +37,7 @@ type TestVM struct {
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx) error
+	InitializeF                              func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- Message, []*Fx, AppSender) error
 	BootstrappingF, BootstrappedF, ShutdownF func() error
 	CreateHandlersF                          func() (map[string]*HTTPHandler, error)
 	CreateStaticHandlersF                    func() (map[string]*HTTPHandler, error)
@@ -66,9 +66,9 @@ func (vm *TestVM) Default(cant bool) {
 	vm.CantDisconnected = cant
 }
 
-func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx) error {
+func (vm *TestVM) Initialize(ctx *snow.Context, db manager.Manager, genesisBytes, upgradeBytes, configBytes []byte, msgChan chan<- Message, fxs []*Fx, appSender AppSender) error {
 	if vm.InitializeF != nil {
-		return vm.InitializeF(ctx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs)
+		return vm.InitializeF(ctx, db, genesisBytes, upgradeBytes, configBytes, msgChan, fxs, appSender)
 	}
 	if vm.CantInitialize && vm.T != nil {
 		vm.T.Fatal(errInitialize)

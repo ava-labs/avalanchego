@@ -136,6 +136,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
 		return err

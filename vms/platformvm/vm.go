@@ -139,6 +139,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
 
