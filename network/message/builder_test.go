@@ -23,7 +23,7 @@ var (
 )
 
 func init() {
-	codec, err := NewCodec(prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry())
 	if err != nil {
 		panic(err)
 	}
