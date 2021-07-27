@@ -99,7 +99,7 @@ func TestWipe(t *testing.T) {
 		t.Errorf("snapshot block root marker mismatch: have %#x, want <not-nil>", hash)
 	}
 	// Wipe all snapshot entries from the database
-	<-wipeSnapshot(db, true, true)
+	<-wipeSnapshot(db, true)
 
 	// Iterate over the database end ensure no snapshot information remains
 	it = db.NewIterator(rawdb.SnapshotAccountPrefix, nil)
