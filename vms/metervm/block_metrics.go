@@ -15,26 +15,18 @@ type blockMetrics struct {
 	parseBlock,
 	getBlock,
 	setPreference,
-	lastAccepted prometheus.Histogram
+	lastAccepted metric.Averager
 }
 
 func (m *blockMetrics) Initialize(
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) error {
-	m.buildBlock = metric.NewNanosecondsLatencyMetric(namespace, "build_block")
-	m.parseBlock = metric.NewNanosecondsLatencyMetric(namespace, "parse_block")
-	m.getBlock = metric.NewNanosecondsLatencyMetric(namespace, "get_block")
-	m.setPreference = metric.NewNanosecondsLatencyMetric(namespace, "set_preference")
-	m.lastAccepted = metric.NewNanosecondsLatencyMetric(namespace, "last_accepted")
-
 	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(m.buildBlock),
-		registerer.Register(m.parseBlock),
-		registerer.Register(m.getBlock),
-		registerer.Register(m.setPreference),
-		registerer.Register(m.lastAccepted),
-	)
+	m.buildBlock = newAverager(namespace, "build_block", reg, &errs)
+	m.parseBlock = newAverager(namespace, "parse_block", reg, &errs)
+	m.getBlock = newAverager(namespace, "get_block", reg, &errs)
+	m.setPreference = newAverager(namespace, "set_preference", reg, &errs)
+	m.lastAccepted = newAverager(namespace, "last_accepted", reg, &errs)
 	return errs.Err
 }

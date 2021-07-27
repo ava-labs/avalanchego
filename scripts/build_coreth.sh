@@ -15,7 +15,7 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 
 # check if there's args defining different coreth source and build paths
 if [[ $# -eq 2 ]]; then
-    latest_coreth_path=$1
+    coreth_path=$1
     latest_evm_path=$2
 elif [[ $# -eq 0 ]]; then
     if [[ ! -d "$coreth_path" ]]; then

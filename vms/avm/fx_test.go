@@ -24,7 +24,6 @@ type FxTest struct {
 	VerifyOperationF func(tx, op, cred interface{}, utxos []interface{}) error
 }
 
-// Default ...
 func (fx *FxTest) Default(cant bool) {
 	fx.CantInitialize = cant
 	fx.CantBootstrapping = cant

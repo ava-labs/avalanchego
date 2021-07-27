@@ -16,7 +16,6 @@ var addresses = ids.Empty
 
 type userState struct{ vm *VM }
 
-// SetAddresses ...
 func (s *userState) SetAddresses(db *encdb.Database, addrs []ids.ShortID) error {
 	bytes, err := s.vm.codec.Marshal(codecVersion, addrs)
 	if err != nil {
@@ -25,7 +24,6 @@ func (s *userState) SetAddresses(db *encdb.Database, addrs []ids.ShortID) error 
 	return db.Put(addresses[:], bytes)
 }
 
-// Addresses ...
 func (s *userState) Addresses(db *encdb.Database) ([]ids.ShortID, error) {
 	bytes, err := db.Get(addresses[:])
 	if err != nil {
@@ -62,12 +60,10 @@ func (s *userState) Keychain(db *encdb.Database, addresses ids.ShortSet) (*secp2
 	return kc, nil
 }
 
-// SetKey ...
 func (s *userState) SetKey(db *encdb.Database, sk *crypto.PrivateKeySECP256K1R) error {
 	return db.Put(sk.PublicKey().Address().Bytes(), sk.Bytes())
 }
 
-// Key ...
 func (s *userState) Key(db *encdb.Database, address ids.ShortID) (*crypto.PrivateKeySECP256K1R, error) {
 	factory := crypto.FactorySECP256K1R{}
 

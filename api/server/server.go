@@ -168,7 +168,7 @@ func (s *Server) registerChain(chainName string, ctx *snow.Context, engine commo
 
 	s.log.Verbo("About to add API endpoints for chain with ID %s", ctx.ChainID)
 	// all subroutes to a chain begin with "bc/<the chain's ID>"
-	defaultEndpoint := "bc/" + ctx.ChainID.String()
+	defaultEndpoint := constants.ChainAliasPrefix + ctx.ChainID.String()
 
 	// Register each endpoint
 	for extension, handler := range handlers {
@@ -273,7 +273,6 @@ func (s *Server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 	return s.AddAliases(endpoint, aliases...)
 }
 
-// Call ...
 func (s *Server) Call(
 	writer http.ResponseWriter,
 	method,

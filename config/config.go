@@ -212,8 +212,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.StakingIP = utils.NewDynamicIPDesc(ip, stakingPort)
 
 	nodeConfig.DynamicUpdateDuration = v.GetDuration(DynamicUpdateDurationKey)
-	nodeConfig.ConnMeterResetDuration = v.GetDuration(ConnMeterResetDurationKey)
-	nodeConfig.ConnMeterMaxConns = v.GetInt(ConnMeterMaxConnsKey)
 
 	// Staking:
 	nodeConfig.EnableStaking = v.GetBool(StakingEnabledKey)
@@ -341,7 +339,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
 
 	// Throttling
-	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
+	nodeConfig.NetworkConfig.InboundConnThrottlerConfig = throttling.InboundConnThrottlerConfig{
+		AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
+		MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
+	}
 	nodeConfig.NetworkConfig.InboundThrottlerConfig = throttling.MsgThrottlerConfig{
 		AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
 		VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
@@ -397,8 +398,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
 
-	// Metrics Namespace
-	nodeConfig.NetworkConfig.MetricsNamespace = constants.PlatformName
+	nodeConfig.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
 
 	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
 	// [PeerListGossipFreq]
@@ -453,7 +453,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		nodeConfig.MaxValidatorStake = maxValidatorStake
 		nodeConfig.MinDelegatorStake = minDelegatorStake
 
-		if minDelegationFee > 1000000 {
+		if minDelegationFee > 1_000_000 {
 			return node.Config{}, errors.New("delegation fee must be in the range [0, 1000000]")
 		}
 		nodeConfig.MinDelegationFee = uint32(minDelegationFee)

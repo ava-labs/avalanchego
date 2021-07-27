@@ -123,7 +123,6 @@ type ChainConfig struct {
 	Upgrade []byte
 }
 
-// ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled            bool // True iff the network has staking enabled
 	Log                       logging.Logger

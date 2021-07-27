@@ -13,12 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/storage"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
-	gb    = 1 << 30
-	gb200 = 200 * gb
+	gb200 = 200 * units.GiB
 )
 
 type migrationManager struct {
@@ -80,7 +80,7 @@ func (m *migrationManager) verifyDiskStorage() error {
 	required := prevUsed + safetyBuf - currentUsed
 	if avail < required {
 		return fmt.Errorf("available space %dGB is less then required space %dGB for migration",
-			avail/gb, required/gb)
+			avail/units.GiB, required/units.GiB)
 	}
 	if avail < gb200 {
 		m.log.Warn("at least 200GB of free disk space is recommended")
@@ -98,7 +98,8 @@ func (m *migrationManager) shouldMigrate() (bool, error) {
 	)
 	switch m.rootConfig.DBName {
 	case rocksdb.Name:
-		dbManager, err = manager.NewRocksDB(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
+		path := filepath.Join(m.rootConfig.DBPath, rocksdb.Name)
+		dbManager, err = manager.NewRocksDB(path, logging.NoLog{}, version.CurrentDatabase, true)
 	case leveldb.Name:
 		dbManager, err = manager.NewLevelDB(m.rootConfig.DBPath, logging.NoLog{}, version.CurrentDatabase, true)
 	case memdb.Name:

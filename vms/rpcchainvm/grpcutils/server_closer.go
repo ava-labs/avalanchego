@@ -9,14 +9,12 @@ import (
 	"google.golang.org/grpc"
 )
 
-// ServerCloser ...
 type ServerCloser struct {
 	lock    sync.Mutex
 	closed  bool
 	servers []*grpc.Server
 }
 
-// Add ...
 func (s *ServerCloser) Add(server *grpc.Server) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -28,7 +26,6 @@ func (s *ServerCloser) Add(server *grpc.Server) {
 	}
 }
 
-// Stop ...
 func (s *ServerCloser) Stop() {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -40,7 +37,6 @@ func (s *ServerCloser) Stop() {
 	s.servers = nil
 }
 
-// GracefulStop ...
 func (s *ServerCloser) GracefulStop() {
 	s.lock.Lock()
 	defer s.lock.Unlock()

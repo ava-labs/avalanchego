@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Client ...
 type Client struct {
 	requester rpc.EndpointRequester
 }
