@@ -232,6 +232,7 @@ func (dl *diskLayer) generate(stats *generatorStats) {
 
 		// If generator was aborted during wipe, return
 		case abort := <-dl.genAbort:
+			stats.Log("Aborting state snapshot generation", dl.root, dl.genMarker)
 			dl.genStats = stats
 			close(abort)
 			return
