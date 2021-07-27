@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
@@ -20,29 +19,6 @@ var errNilCredential = errors.New("nil credential")
 const (
 	defaultEncoding = formatting.Hex
 )
-
-type FxCredential struct {
-	Credential
-	FxID ids.ID `serialize:"false" json:"fxID"`
-}
-
-func (fxCred *FxCredential) MarshalJSON() ([]byte, error) {
-	jsonFieldMap := make(map[string]interface{}, 2)
-	jsonFieldMap["fxID"] = fxCred.FxID
-	signatures := make([]string, len(fxCred.Sigs))
-
-	for i, sig := range fxCred.Sigs {
-		sigStr, err := formatting.Encode(defaultEncoding, sig[:])
-		if err != nil {
-			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
-		}
-		signatures[i] = sigStr
-	}
-
-	jsonFieldMap["signatures"] = signatures
-	b, err := json2.Marshal(jsonFieldMap)
-	return b, err
-}
 
 // Credential ...
 type Credential struct {

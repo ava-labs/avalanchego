@@ -77,19 +77,19 @@ func (t *Tx) Init(vm *VM) error {
 		switch reflect.TypeOf(cred) {
 		case secpCredentialType:
 			credential := cred.(*secp256k1fx.Credential)
-			t.Creds[i] = &secp256k1fx.FxCredential{
+			t.Creds[i] = &FxCredential{
 				Credential: *credential,
 				FxID:       fx.ID,
 			}
 		case nftfxCredentialType:
 			credential := cred.(*nftfx.Credential).Credential
-			t.Creds[i] = &secp256k1fx.FxCredential{
+			t.Creds[i] = &FxCredential{
 				Credential: credential,
 				FxID:       fx.ID,
 			}
 		case propertyfxCredentialType:
 			credential := cred.(*propertyfx.Credential).Credential
-			t.Creds[i] = &secp256k1fx.FxCredential{
+			t.Creds[i] = &FxCredential{
 				Credential: credential,
 				FxID:       fx.ID,
 			}
