@@ -30,8 +30,7 @@ type ExportTx struct {
 }
 
 func (t *ExportTx) Init(vm *VM) error {
-	for i, n := 0, len(t.ExportedOuts); i < n; i++ {
-		out := t.ExportedOuts[i]
+	for _, out := range t.ExportedOuts {
 		fx, err := vm.getParsedFx(out.Out)
 		if err != nil {
 			return err

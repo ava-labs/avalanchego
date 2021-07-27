@@ -28,8 +28,7 @@ type ImportTx struct {
 }
 
 func (t *ImportTx) Init(vm *VM) error {
-	for i, n := 0, len(t.ImportedIns); i < n; i++ {
-		in := t.ImportedIns[i]
+	for _, in := range t.ImportedIns {
 		fx, err := vm.getParsedFx(in.In)
 		if err != nil {
 			return err

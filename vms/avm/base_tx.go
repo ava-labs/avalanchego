@@ -25,8 +25,7 @@ type BaseTx struct {
 // Also sets the [ctx] in the OutputOwners to the given [vm.ctx] so that the
 // addresses can be json marshalled into human readable format
 func (t *BaseTx) Init(vm *VM) error {
-	for i, n := 0, len(t.Ins); i < n; i++ {
-		in := t.Ins[i]
+	for _, in := range t.Ins {
 		fx, err := vm.getParsedFx(in.In)
 		if err != nil {
 			return err
@@ -35,8 +34,7 @@ func (t *BaseTx) Init(vm *VM) error {
 		in.FxID = fx.ID
 	}
 
-	for i, n := 0, len(t.Outs); i < n; i++ {
-		out := t.Outs[i]
+	for _, out := range t.Outs {
 		fx, err := vm.getParsedFx(out.Out)
 		if err != nil {
 			return err
