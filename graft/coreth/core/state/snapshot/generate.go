@@ -29,7 +29,6 @@ package snapshot
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -51,8 +50,6 @@ var (
 
 	// emptyCode is the known hash of the empty EVM bytecode.
 	emptyCode = crypto.Keccak256Hash(nil)
-
-	errAborted = errors.New("aborted")
 )
 
 // generatorStats is a collection of statistics gathered by the snapshot generator
