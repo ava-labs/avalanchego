@@ -83,10 +83,11 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 		if err != nil {
 			continue
 		}
+
 		status := blk.Status()
 		blkID := blk.ID()
 		for status.Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
-			blkID := blk.Parent()
+			blkID = blk.Parent()
 			blk, err = v.t.GetBlock(blkID)
 			if err != nil {
 				status = choices.Unknown
@@ -94,15 +95,9 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 			}
 			status = blk.Status()
 		}
-		switch {
-		case status == choices.Unknown:
-			if v.t.Consensus.Processing(blkID) {
-				bubbledVotes.AddCount(blkID, count)
-			}
-		case !status.Decided():
-			if v.t.Consensus.DecidedOrProcessing(blk) {
-				bubbledVotes.AddCount(blkID, count)
-			}
+
+		if !status.Decided() && blk != nil && v.t.Consensus.DecidedOrProcessing(blk) {
+			bubbledVotes.AddCount(blkID, count)
 		}
 	}
 	return bubbledVotes

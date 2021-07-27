@@ -525,15 +525,9 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 		status = blk.Status()
 	}
 
-	if status == choices.Unknown {
-		if t.Consensus.Processing(blkID) {
-			return true, nil
-		}
-	} else {
-		// The block was issued into consensus. This is the happy path.
-		if t.Consensus.DecidedOrProcessing(blk) {
-			return true, nil
-		}
+	// The block was issued into consensus. This is the happy path.
+	if blk != nil && t.Consensus.DecidedOrProcessing(blk) {
+		return true, nil
 	}
 
 	// There's an outstanding request for this block.

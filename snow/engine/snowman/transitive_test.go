@@ -8,9 +8,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -19,12 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
 	errUnknownBlock = errors.New("unknown block")
-
-	Genesis = ids.GenerateTestID()
+	errUnknownBytes = errors.New("unknown bytes")
+	Genesis         = ids.GenerateTestID()
 )
 
 func setup(t *testing.T) (ids.ShortID, validators.Set, *common.SenderTest, *block.TestVM, *Transitive, snowman.Block) {
@@ -1436,26 +1435,7 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 	sender.PushQueryF = func(_ ids.ShortSet, requestID uint32, _ ids.ID, _ []byte) {
 		*reqID = requestID
 	}
-
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case gBlk.ID():
-			return gBlk, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-	sender.ChitsF = func(ids.ShortID, uint32, []ids.ID) {}
-
-	if err := te.issue(validBlk); err != nil {
-		t.Fatal(err)
-	}
-
-	sender.PushQueryF = nil
-
-	if err := te.issue(invalidBlk); err != nil {
-		t.Fatal(err)
-	}
+	sender.PullQueryF = func(_ ids.ShortSet, requestID uint32, _ ids.ID) {}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -1463,18 +1443,23 @@ func TestEngineUndeclaredDependencyDeadlock(t *testing.T) {
 			return gBlk, nil
 		case validBlk.ID():
 			return validBlk, nil
-		case invalidBlkID:
+		case invalidBlk.ID():
 			return invalidBlk, nil
 		default:
 			return nil, errUnknownBlock
 		}
 	}
+	if err := te.issue(validBlk); err != nil {
+		t.Fatal(err)
+	}
+	sender.PushQueryF = nil
+	if err := te.issue(invalidBlk); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := te.Chits(vdr, *reqID, []ids.ID{invalidBlkID}); err != nil {
 		t.Fatal(err)
 	}
-
-	vm.GetBlockF = nil
 
 	if status := validBlk.Status(); status != choices.Accepted {
 		t.Log(status)
@@ -1553,14 +1538,17 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if !*parsed {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case pendingBlk.ID():
+			if !*parsed {
+				return nil, errUnknownBlock
+			}
+			return pendingBlk, nil
+		default:
 			return nil, errUnknownBlock
 		}
-
-		if blkID == pendingBlk.ID() {
-			return pendingBlk, nil
-		}
-		return nil, errUnknownBlock
 	}
 
 	reqID := new(uint32)
@@ -1591,14 +1579,17 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if !*parsed {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case missingBlk.ID():
+			if !*parsed {
+				return nil, errUnknownBlock
+			}
+			return missingBlk, nil
+		default:
 			return nil, errUnknownBlock
 		}
-
-		if blkID == missingBlk.ID() {
-			return missingBlk, nil
-		}
-		return nil, errUnknownBlock
 	}
 	sender.CantPushQuery = false
 	sender.CantChits = false
@@ -1651,14 +1642,17 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if !*parsed {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case pendingBlk.ID():
+			if !*parsed {
+				return nil, errUnknownBlock
+			}
+			return pendingBlk, nil
+		default:
 			return nil, errUnknownBlock
 		}
-
-		if blkID == pendingBlk.ID() {
-			return pendingBlk, nil
-		}
-		return nil, errUnknownBlock
 	}
 
 	reqID := new(uint32)
@@ -1692,14 +1686,17 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		return nil, errUnknownBlock
 	}
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if !*parsed {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case missingBlk.ID():
+			if !*parsed {
+				return nil, errUnknownBlock
+			}
+			return missingBlk, nil
+		default:
 			return nil, errUnknownBlock
 		}
-
-		if blkID == missingBlk.ID() {
-			return missingBlk, nil
-		}
-		return nil, errUnknownBlock
 	}
 	sender.CantPushQuery = false
 	sender.CantChits = false
@@ -1792,14 +1789,17 @@ func TestEngineAggressivePolling(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if !*parsed {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case pendingBlk.ID():
+			if !*parsed {
+				return nil, errUnknownBlock
+			}
+			return pendingBlk, nil
+		default:
 			return nil, errUnknownBlock
 		}
-
-		if blkID == pendingBlk.ID() {
-			return pendingBlk, nil
-		}
-		return nil, errUnknownBlock
 	}
 
 	numPushed := new(int)
@@ -2062,6 +2062,15 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 		}
 	}
 
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
 	blkToReturn := 0
 	vm.BuildBlockF = func() (snowman.Block, error) {
 		if blkToReturn >= len(blks) {
@@ -2089,10 +2098,14 @@ func TestEngineBuildBlockLimit(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if blkID != blk0.ID() {
-			t.Fatalf("wrong block requested")
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case blk0.ID():
+			return blk0, nil
+		default:
+			return nil, errUnknownBlock
 		}
-		return blk0, nil
 	}
 
 	if err := te.Chits(vdr, reqID, []ids.ID{blk0.ID()}); err != nil {
@@ -2149,6 +2162,17 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 		}
 	}
 
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case acceptedBlk.ID():
+			return acceptedBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
 	var (
 		asked bool
 		reqID uint32
@@ -2164,13 +2188,6 @@ func TestEngineReceiveNewRejectedBlock(t *testing.T) {
 
 	if !asked {
 		t.Fatalf("Didn't query for the new block")
-	}
-
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if blkID != acceptedBlk.ID() {
-			t.Fatalf("Wrong block requested")
-		}
-		return acceptedBlk, nil
 	}
 
 	if err := te.Chits(vdr, reqID, []ids.ID{acceptedBlk.ID()}); err != nil {
@@ -2249,6 +2266,17 @@ func TestEngineRejectionAmplification(t *testing.T) {
 		}
 	}
 
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case acceptedBlk.ID():
+			return acceptedBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
 	var (
 		queried bool
 		reqID   uint32
@@ -2267,10 +2295,14 @@ func TestEngineRejectionAmplification(t *testing.T) {
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if blkID != acceptedBlk.ID() {
-			t.Fatalf("Wrong block requested")
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case acceptedBlk.ID():
+			return acceptedBlk, nil
+		default:
+			return nil, errUnknownBlock
 		}
-		return acceptedBlk, nil
 	}
 
 	if err := te.Chits(vdr, reqID, []ids.ID{acceptedBlk.ID()}); err != nil {
@@ -2364,6 +2396,19 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		}
 	}
 
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case acceptedBlk.ID():
+			return acceptedBlk, nil
+		case rejectedBlk.ID():
+			return rejectedBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
 	var (
 		queried bool
 		reqID   uint32
@@ -2379,13 +2424,6 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 
 	if !queried {
 		t.Fatalf("Didn't query for the new block")
-	}
-
-	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if blkID != acceptedBlk.ID() {
-			t.Fatalf("Wrong block requested")
-		}
-		return acceptedBlk, nil
 	}
 
 	if err := te.Chits(vdr, reqID, []ids.ID{acceptedBlk.ID()}); err != nil {
@@ -2458,6 +2496,15 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		}
 	}
 
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
 	var (
 		queried bool
 		reqID   uint32
@@ -2476,10 +2523,16 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 	}
 
 	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
-		if blkID != acceptedBlk.ID() {
-			t.Fatalf("Wrong block requested")
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		case rejectedBlk.ID():
+			return rejectedBlk, nil
+		case acceptedBlk.ID():
+			return acceptedBlk, nil
+		default:
+			return nil, errUnknownBlock
 		}
-		return acceptedBlk, nil
 	}
 
 	if err := te.Chits(vdr, reqID, []ids.ID{acceptedBlk.ID()}); err != nil {
@@ -2535,6 +2588,15 @@ func TestEngineNonPreferredAmplification(t *testing.T) {
 		default:
 			t.Fatalf("Unknown block bytes")
 			return nil, nil
+		}
+	}
+
+	vm.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case gBlk.ID():
+			return gBlk, nil
+		default:
+			return nil, errUnknownBlock
 		}
 	}
 

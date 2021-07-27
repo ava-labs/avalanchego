@@ -163,7 +163,7 @@ func (ts *Topological) AcceptedOrProcessing(blk Block) bool {
 	if blk.Status() == choices.Accepted {
 		return true
 	}
-	return ts.Processing(blk.ID())
+	return ts.processing(blk.ID())
 }
 
 // DecidedOrProcessing implements the Snowman interface
@@ -177,11 +177,11 @@ func (ts *Topological) DecidedOrProcessing(blk Block) bool {
 	if blk.Status() == choices.Processing && blk.Height() <= ts.height {
 		return true
 	}
-	return ts.Processing(blk.ID())
+	return ts.processing(blk.ID())
 }
 
 // Processing implements the Snowman interface
-func (ts *Topological) Processing(blkID ids.ID) bool {
+func (ts *Topological) processing(blkID ids.ID) bool {
 	// If the block is in the map of current blocks, then the block is currently
 	// processing.
 	_, ok := ts.blocks[blkID]
