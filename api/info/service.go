@@ -206,7 +206,6 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 	return nil
 }
 
-// GetTxFeeResponse ...
 type GetTxFeeResponse struct {
 	CreationTxFee json.Uint64 `json:"creationTxFee"`
 	TxFee         json.Uint64 `json:"txFee"`

@@ -11,19 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Client ...
 type Client struct {
 	requester rpc.EndpointRequester
 }
 
-// NewClient ...
 func NewClient(uri string, requestTimeout time.Duration) *Client {
 	return &Client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/keystore", "keystore", requestTimeout),
 	}
 }
 
-// CreateUser ...
 func (c *Client) CreateUser(user api.UserPass) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("createUser", &user, res)

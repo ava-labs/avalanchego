@@ -273,7 +273,6 @@ func (s *Server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 	return s.AddAliases(endpoint, aliases...)
 }
 
-// Call ...
 func (s *Server) Call(
 	writer http.ResponseWriter,
 	method,

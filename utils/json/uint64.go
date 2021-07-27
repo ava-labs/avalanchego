@@ -5,15 +5,12 @@ package json
 
 import "strconv"
 
-// Uint64 ...
 type Uint64 uint64
 
-// MarshalJSON ...
 func (u Uint64) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + strconv.FormatUint(uint64(u), 10) + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (u *Uint64) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == Null {

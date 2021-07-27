@@ -15,7 +15,6 @@ import (
 
 var errNilUTXOID = errors.New("nil utxo ID is not valid")
 
-// UTXOID ...
 type UTXOID struct {
 	// Serialized:
 	TxID        ids.ID `serialize:"true" json:"txID"`
@@ -74,10 +73,8 @@ func (utxos innerSortUTXOIDs) Less(i, j int) bool {
 func (utxos innerSortUTXOIDs) Len() int      { return len(utxos) }
 func (utxos innerSortUTXOIDs) Swap(i, j int) { utxos[j], utxos[i] = utxos[i], utxos[j] }
 
-// SortUTXOIDs ...
 func SortUTXOIDs(utxos []*UTXOID) { sort.Sort(innerSortUTXOIDs(utxos)) }
 
-// IsSortedAndUniqueUTXOIDs ...
 func IsSortedAndUniqueUTXOIDs(utxos []*UTXOID) bool {
 	return utils.IsSortedAndUnique(innerSortUTXOIDs(utxos))
 }

@@ -56,7 +56,6 @@ var (
 // Service defines the API calls that can be made to the platform chain
 type Service struct{ vm *VM }
 
-// GetHeightResponse ...
 type GetHeightResponse struct {
 	Height json.Uint64 `json:"height"`
 }
@@ -171,7 +170,6 @@ func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
  ******************************************************
  */
 
-// GetBalanceResponse ...
 type GetBalanceResponse struct {
 	// Balance, in nAVAX, of the address
 	Balance            json.Uint64    `json:"balance"`
@@ -2062,7 +2060,6 @@ func (service *Service) GetTx(_ *http.Request, args *api.GetTxArgs, response *ap
 	return nil
 }
 
-// GetTxStatusArgs ...
 type GetTxStatusArgs struct {
 	TxID ids.ID `json:"txID"`
 	// If IncludeReason is false returns a response that looks like:
@@ -2084,7 +2081,6 @@ type GetTxStatusArgs struct {
 	IncludeReason bool `json:"includeReason"`
 }
 
-// GetTxStatusResponse ...
 type GetTxStatusResponse struct {
 	Status Status `json:"status"`
 	// Reason this tx was dropped.
