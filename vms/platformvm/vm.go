@@ -92,7 +92,8 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	mempool Mempool
+	mempool   Mempool
+	appSender common.AppSender
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -178,6 +179,7 @@ func (vm *VM) Initialize(
 	vm.currentBlocks = make(map[ids.ID]Block)
 
 	vm.mempool.Initialize(vm)
+	vm.appSender = appSender
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
 	if err != nil {
@@ -421,6 +423,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	// decode single tx
+	// TODO: version response for futureproofing
 	tx := &Tx{}
 	_, err := vm.codec.Unmarshal(response, tx)
 	if err != nil {
@@ -441,7 +444,8 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		return err
 	}
 
-	// TODO: gossip if successfully accepted. To be mocked until done
+	// gossip newly accepted tx
+	vm.appSender.SendAppGossip(response)
 
 	return nil
 }

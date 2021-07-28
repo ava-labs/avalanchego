@@ -35,7 +35,6 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mempool.IssueTx(tx)
 	if err := mempool.IssueTx(tx); err != nil {
 		t.Fatal("Could not add tx to mempool")
 	}
@@ -44,13 +43,19 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	}
 
 	// show that build block include that tx and removes it from mempool
-	if blk, err := mempool.BuildBlock(); err != nil {
+	blk, err := mempool.BuildBlock()
+	if err != nil {
 		t.Fatal("could not build block out of mempool")
-	} else if stdBlk, ok := blk.(*StandardBlock); !ok {
+	}
+
+	stdBlk, ok := blk.(*StandardBlock)
+	if !ok {
 		t.Fatal("expected standard block")
-	} else if len(stdBlk.Txs) != 1 {
+	}
+	if len(stdBlk.Txs) != 1 {
 		t.Fatal("standard block should include a single transaction")
-	} else if stdBlk.Txs[0].ID() != tx.ID() {
+	}
+	if stdBlk.Txs[0].ID() != tx.ID() {
 		t.Fatal("standard block does not include expected transaction")
 	}
 
@@ -98,13 +103,19 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	}
 
 	// show that build block include that tx and removes it from mempool
-	if blk, err := mempool.BuildBlock(); err != nil {
+	blk, err := mempool.BuildBlock()
+	if err != nil {
 		t.Fatal("could not build block out of mempool")
-	} else if stdBlk, ok := blk.(*StandardBlock); !ok {
+	}
+
+	stdBlk, ok := blk.(*StandardBlock)
+	if !ok {
 		t.Fatal("expected standard block")
-	} else if len(stdBlk.Txs) != 1 {
+	}
+	if len(stdBlk.Txs) != 1 {
 		t.Fatal("standard block should include a single transaction")
-	} else if stdBlk.Txs[0].ID() != tx.ID() {
+	}
+	if stdBlk.Txs[0].ID() != tx.ID() {
 		t.Fatal("standard block does not include expected transaction")
 	}
 

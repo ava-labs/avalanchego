@@ -314,7 +314,8 @@ func defaultVM() (*VM, database.Database) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 	_, genesisBytes := defaultGenesis()
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
+	appSender := &common.SenderTest{}
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		panic(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {
