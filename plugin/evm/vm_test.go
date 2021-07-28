@@ -585,6 +585,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
 
+	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk1Root := ethBlk1.Root(); vm.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	}
+
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
 	vm.State.Flush()
 	blk2Refreshed, err := vm.GetBlockInternal(blk2.ID())
