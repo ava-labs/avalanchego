@@ -1100,6 +1100,12 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 		// the block. Note that insertBlock should only be called on a block
 		// once if it returns nil
 
+		if bc.newTip(block) {
+			log.Debug("Setting head to be known block", "number", block.Number(), "hash", block.Hash())
+		} else {
+			log.Debug("Reprocessing already known block", "number", block.Number(), "hash", block.Hash())
+		}
+
 	// Pruning of the EVM is disabled, so we should never encounter this case.
 	// Because side chain insertion can have complex side effects, we error when
 	// we encounter it to prevent the accidental execution of these side effects.
