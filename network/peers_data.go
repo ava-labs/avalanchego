@@ -1,8 +1,6 @@
 package network
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
@@ -100,11 +98,7 @@ func (p *peersData) sample(n int) ([]*peer, error) {
 			// return what we have
 			return peers, nil
 		}
-		peer, found := p.getByIdx(int(idx))
-		if !found {
-			// This should never happen
-			return nil, fmt.Errorf("no peer at index %d", idx)
-		}
+		peer := p.peersList[idx]
 		if !peer.finishedHandshake.GetValue() {
 			continue
 		}
