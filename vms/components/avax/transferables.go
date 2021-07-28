@@ -29,6 +29,7 @@ var (
 
 // Amounter is a data structure that has an amount of something associated with it
 type Amounter interface {
+	snow.ContextInitializable
 	// Amount returns how much value this element represents of the asset in its
 	// transaction.
 	Amount() uint64
@@ -44,6 +45,7 @@ type TransferableIn interface {
 // TransferableOut is the interface a feature extension must provide to transfer
 // value between features extensions.
 type TransferableOut interface {
+	snow.ContextInitializable
 	verify.State
 	Amounter
 }
@@ -55,6 +57,10 @@ type TransferableOutput struct {
 	FxID  ids.ID `serialize:"false" json:"fxID"`
 	Asset `serialize:"true"`
 	Out   TransferableOut `serialize:"true" json:"output"`
+}
+
+func (out *TransferableOutput) InitCtx(ctx *snow.Context) {
+	out.Out.InitCtx(ctx)
 }
 
 // Output returns the feature extension output that this Output is using.

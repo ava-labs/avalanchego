@@ -6,6 +6,8 @@ package secp256k1fx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/snow"
+
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -19,6 +21,10 @@ type TransferOutput struct {
 	Amt uint64 `serialize:"true" json:"amount"`
 
 	OutputOwners `serialize:"true"`
+}
+
+func (out *TransferOutput) InitCtx(ctx *snow.Context) {
+	out.OutputOwners.InitCtx(ctx)
 }
 
 // Amount returns the quantity of the asset this output consumes

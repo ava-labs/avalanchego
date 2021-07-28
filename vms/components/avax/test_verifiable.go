@@ -3,6 +3,8 @@
 
 package avax
 
+import "github.com/ava-labs/avalanchego/snow"
+
 // TestVerifiable ...
 type TestVerifiable struct{ Err error }
 
@@ -17,6 +19,10 @@ type TestTransferable struct {
 	TestVerifiable
 
 	Val uint64 `serialize:"true"`
+}
+
+func (t *TestTransferable) InitCtx(*snow.Context) {
+	// no op
 }
 
 // Amount ...
