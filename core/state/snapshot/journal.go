@@ -41,8 +41,6 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-const journalVersion uint64 = 0
-
 // journalGenerator is a disk layer entry containing the generator progress marker.
 type journalGenerator struct {
 	// Indicator that whether the database was in progress of being wiped.
