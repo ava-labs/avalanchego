@@ -1,0 +1,35 @@
+syntax = "proto3";
+package appsenderproto;
+option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/sender/appsenderproto";
+
+message SendAppRequestMsg {
+    // The nodes to send this request to
+    repeated bytes nodeIDs = 1;
+    // The ID of this request
+    uint32 requestID = 2;
+    // The request body
+    bytes request = 3;
+}
+
+
+message SendAppResponseMsg {
+    // The node to send a response to
+    bytes nodeID = 1;
+    // ID of this request
+    uint32 requestID = 2;
+    // The response body
+    bytes response = 3;
+}
+
+message SendAppGossipMsg {
+    // The message body
+    bytes msg = 1;
+}
+
+message EmptyMsg {}
+
+service AppSender {
+    rpc SendAppRequest(SendAppRequestMsg) returns (EmptyMsg);
+    rpc SendAppResponse(SendAppResponseMsg) returns (EmptyMsg);
+    rpc SendAppGossip(SendAppGossipMsg) returns (EmptyMsg);
+}
