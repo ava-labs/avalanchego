@@ -1,6 +1,11 @@
 package network
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/sampler"
+)
 
 // peersData encapsulate all peers known to Network.
 // peers in peersData can be retrieved by their id and can be iterated over
@@ -68,4 +73,40 @@ func (p *peersData) getByIdx(idx int) (*peer, bool) {
 
 func (p *peersData) size() int {
 	return len(p.peersList)
+}
+
+// Randomly sample [n] peers that have finished the handshake.
+// If < [n] peers have finished the handshake, returns < [n] peers.
+// If [n] > [p.size()], returns <= [p.size()] peers.
+// [n] must be >= 0.
+// The returned list has no nil elements.
+// [p] must not be modified while this method is executing.
+func (p *peersData) sample(n int) ([]*peer, error) {
+	numPeers := p.size()
+	if numPeers < n {
+		n = numPeers
+	}
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(numPeers)); err != nil {
+		return nil, err
+	}
+	peers := make([]*peer, 0, n) // peers we'll gossip to
+	for len(peers) < n {
+		idx, err := s.Next()
+		if err != nil {
+			// all peers have been sampled and not enough valid ones found.
+			// return what we have
+			return peers, nil
+		}
+		peer, found := p.getByIdx(int(idx))
+		if !found {
+			// This should never happen
+			return nil, fmt.Errorf("no peer at index %d", idx)
+		}
+		if !peer.finishedHandshake.GetValue() {
+			continue
+		}
+		peers = append(peers, peer)
+	}
+	return peers, nil
 }
