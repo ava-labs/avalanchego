@@ -735,12 +735,6 @@ func (bc *BlockChain) Stop() {
 	close(bc.quit)
 	bc.wg.Wait()
 
-	// Ensure that the entirety of the state snapshot is journalled to disk.
-	if bc.snaps != nil {
-		if _, err := bc.snaps.Journal(); err != nil {
-			log.Error("Failed to journal state snapshot", "err", err)
-		}
-	}
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
