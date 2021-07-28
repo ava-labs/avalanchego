@@ -125,11 +125,11 @@ func loadAndParseJournal(db ethdb.KeyValueStore, base *diskLayer) (snapshot, jou
 	// It can happen that Geth crashes without persisting the latest
 	// diff journal.
 	if !bytes.Equal(blockHash.Bytes(), base.blockHash.Bytes()) {
-		log.Warn("Loaded snapshot journal", "diskBlockHash", base.blockHash, "diffs", "unmatched")
+		log.Warn("Loaded snapshot journal block hash mismatch. Ignoring snapshot journal.", "diskBlockHash", base.blockHash, "journalBlockHash", blockHash, "diffs", "unmatched")
 		return base, generator, nil
 	}
 	if !bytes.Equal(root.Bytes(), base.root.Bytes()) {
-		log.Warn("Loaded snapshot journal", "diskroot", base.root, "diffs", "unmatched")
+		log.Warn("Loaded snapshot journal block root mismatch. Ignoring snapshot journal.", "diskroot", base.root, "journalBlockRoot", root, "diffs", "unmatched")
 		return base, generator, nil
 	}
 	// Load all the snapshot diffs from the journal
