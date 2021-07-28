@@ -79,12 +79,14 @@ func (p *peersData) size() int {
 // If < [n] peers have finished the handshake, returns < [n] peers.
 // If [n] > [p.size()], returns <= [p.size()] peers.
 // [n] must be >= 0.
-// The returned list has no nil elements.
 // [p] must not be modified while this method is executing.
 func (p *peersData) sample(n int) ([]*peer, error) {
 	numPeers := p.size()
 	if numPeers < n {
 		n = numPeers
+	}
+	if n == 0 {
+		return nil, nil
 	}
 	s := sampler.NewUniform()
 	if err := s.Initialize(uint64(numPeers)); err != nil {
