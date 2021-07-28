@@ -604,7 +604,7 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	// Note: this is only called when building a new block, so caching
 	// verification will only be a significant optimization for nodes
 	// that produce a large number of blocks.
-	if err := blk.Verify(); err != nil {
+	if err := blk.verify(false); err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}

@@ -1047,7 +1047,7 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 	bc.chainmu.Lock()
 	defer bc.chainmu.Unlock()
 	for n, block := range chain {
-		if err := bc.insertBlock(block); err != nil {
+		if err := bc.insertBlock(block, true); err != nil {
 			return n, err
 		}
 	}
@@ -1056,12 +1056,16 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 }
 
 func (bc *BlockChain) InsertBlock(block *types.Block) error {
+	return bc.InsertBlockManual(block, true)
+}
+
+func (bc *BlockChain) InsertBlockManual(block *types.Block, writes bool) error {
 	bc.blockProcFeed.Send(true)
 	defer bc.blockProcFeed.Send(false)
 
 	bc.wg.Add(1)
 	bc.chainmu.Lock()
-	err := bc.insertBlock(block)
+	err := bc.insertBlock(block, writes)
 	bc.chainmu.Unlock()
 	bc.wg.Done()
 
@@ -1085,7 +1089,7 @@ func (bc *BlockChain) gatherBlockLogs(hash common.Hash, number uint64, removed b
 	return logs
 }
 
-func (bc *BlockChain) insertBlock(block *types.Block) error {
+func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	senderCacher.recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
 
 	err := bc.engine.VerifyHeader(bc, block.Header())
@@ -1099,19 +1103,13 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 		// snapshot layer and add a reference to the triedb, so we re-execute
 		// the block. Note that insertBlock should only be called on a block
 		// once if it returns nil
-
 		if bc.newTip(block) {
 			log.Debug("Setting head to be known block", "number", block.Number(), "hash", block.Hash())
 		} else {
 			log.Debug("Reprocessing already known block", "number", block.Number(), "hash", block.Hash())
 		}
 
-	// Pruning of the EVM is disabled, so we should never encounter this case.
-	// Because side chain insertion can have complex side effects, we error when
-	// we encounter it to prevent the accidental execution of these side effects.
-	//
-	// When supporting EVM pruning, we must re-enable this and ensure it is
-	// compatible with external consensus invariants.
+	// If an ancestor has been pruned, then this block cannot be acceptable.
 	case errors.Is(err, consensus.ErrPrunedAncestor):
 		return errors.New("side chain insertion is not supported")
 
@@ -1173,6 +1171,11 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 	if err := bc.validator.ValidateState(block, statedb, receipts, usedGas); err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
+	}
+
+	// If [writes] is false, skip [writeBlockWithState]
+	if !writes {
+		return nil
 	}
 
 	// Write the block to the chain and get the status.
