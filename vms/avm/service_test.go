@@ -739,6 +739,95 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	assert.Contains(t, jsonString, "\"exportedOutputs\":[{\"fxID\":\"11111111111111111111111111111111LpoYY\",\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 }
 
+func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
+	vm := &VM{}
+	ctx := NewContext(t)
+	ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		ctx.Lock.Unlock()
+	}()
+
+	genesisBytes := BuildGenesisTest(t)
+	issuer := make(chan common.Message, 1)
+	err := vm.Initialize(
+		ctx,
+		manager.NewMemDB(version.DefaultVersion1_0_0),
+		genesisBytes,
+		nil,
+		nil,
+		issuer,
+		[]*common.Fx{
+			{
+				ID: ids.Empty.Prefix(0),
+				Fx: &secp256k1fx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(1),
+				Fx: &nftfx.Fx{},
+			},
+			{
+				ID: ids.Empty.Prefix(2),
+				Fx: &propertyfx.Fx{},
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.batchTimeout = 0
+
+	err = vm.Bootstrapping()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = vm.Bootstrapped()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	txID, err := vm.IssueTx(createAssetTx.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if txID != createAssetTx.ID() {
+		t.Fatalf("Issue Tx returned wrong TxID")
+	}
+	ctx.Lock.Unlock()
+
+	msg := <-issuer
+	if msg != common.PendingTxs {
+		t.Fatalf("Wrong message")
+	}
+	ctx.Lock.Lock()
+
+	if txs := vm.PendingTxs(); len(txs) != 1 {
+		t.Fatalf("Should have returned %d tx(s)", 1)
+	}
+
+	reply := api.GetTxReply{}
+	s := &Service{vm: vm}
+	err = s.GetTx(nil, &api.GetTxArgs{
+		TxID:     txID,
+		Encoding: formatting.JSON,
+	}, &reply)
+	assert.NoError(t, err)
+
+	assert.Equal(t, reply.Encoding, formatting.JSON)
+	jsonTxBytes, err := json2.Marshal(reply.Tx)
+	assert.NoError(t, err)
+	jsonString := string(jsonTxBytes)
+
+	// contains the address in the right format
+	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"initialStates\":[{\"fxID\":0,\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxID\":1,\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxID\":2,\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]}]}")
+}
+
 func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	vm := &VM{}
 	ctx := NewContext(t)

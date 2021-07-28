@@ -8,7 +8,8 @@ import "github.com/ava-labs/avalanchego/snow"
 // TestVerifiable ...
 type TestVerifiable struct{ Err error }
 
-func (v *TestVerifiable) Verify() error { return v.Err }
+func (v *TestVerifiable) InitCtx(ctx *snow.Context) {}
+func (v *TestVerifiable) Verify() error             { return v.Err }
 
 func (v *TestVerifiable) VerifyState() error { return v.Err }
 

@@ -45,6 +45,13 @@ type CreateAssetTx struct {
 	States       []*InitialState `serialize:"true" json:"initialStates"`
 }
 
+func (t *CreateAssetTx) Init(vm *VM) error {
+	for _, state := range t.States {
+		state.InitCtx(vm.ctx)
+	}
+	return t.BaseTx.Init(vm)
+}
+
 // InitialStates track which virtual machines, and the initial state of these
 // machines, this asset uses. The returned array should not be modified.
 func (t *CreateAssetTx) InitialStates() []*InitialState { return t.States }

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sort"
 
+	"github.com/ava-labs/avalanchego/snow"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -22,6 +24,12 @@ var (
 type InitialState struct {
 	FxID uint32         `serialize:"true" json:"fxID"`
 	Outs []verify.State `serialize:"true" json:"outputs"`
+}
+
+func (is *InitialState) InitCtx(ctx *snow.Context) {
+	for _, out := range is.Outs {
+		out.InitCtx(ctx)
+	}
 }
 
 // Verify implements the verify.Verifiable interface

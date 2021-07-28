@@ -3,12 +3,19 @@
 
 package secp256k1fx
 
-import "github.com/ava-labs/avalanchego/vms/components/verify"
+import (
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+)
 
 var _ verify.State = &MintOutput{}
 
 type MintOutput struct {
 	OutputOwners `serialize:"true"`
+}
+
+func (out *MintOutput) InitCtx(ctx *snow.Context) {
+	out.OutputOwners.InitCtx(ctx)
 }
 
 func (out *MintOutput) Verify() error {
