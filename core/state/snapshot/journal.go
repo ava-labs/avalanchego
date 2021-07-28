@@ -82,6 +82,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 		return nil, false, fmt.Errorf("failed to decode snapshot generator: %v", err)
 	}
 
+	// Instantiate snapshot as disk layer with last recorded block hash and root
 	snapshot := &diskLayer{
 		diskdb:    diskdb,
 		triedb:    triedb,
@@ -90,40 +91,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 		blockHash: baseBlockHash,
 		created:   time.Now(),
 	}
-	// Entire snapshot journal loaded, sanity check the head. If the loaded
-	// snapshot is not matched with current state root, print a warning log
-	// or discard the entire snapshot it's legacy snapshot.
-	//
-	// Possible scenario: Geth was crashed without persisting journal and then
-	// restart, the head is rewound to the point with available state(trie)
-	// which is below the snapshot. In this case the snapshot can be recovered
-	// by re-executing blocks but right now it's unavailable.
-	if head := snapshot.Root(); head != root {
-		// If it's legacy snapshot, or it's new-format snapshot but
-		// it's not in recovery mode, returns the error here for
-		// rebuilding the entire snapshot forcibly.
-		if !recovery {
-			return nil, false, fmt.Errorf("head doesn't match snapshot: have %#x, want %#x", head, root)
-		}
-		// It's in snapshot recovery, the assumption is held that
-		// the disk layer is always higher than chain head. It can
-		// be eventually recovered when the chain head beyonds the
-		// disk layer.
-		log.Warn("Snapshot is not continuous with chain", "snaproot", head, "chainroot", root)
-	}
-	if headBlockHash := snapshot.BlockHash(); headBlockHash != blockHash {
-		// If it's legacy snapshot, or it's new-format snapshot but
-		// it's not in recovery mode, returns the error here for
-		// rebuilding the entire snapshot forcibly.
-		if !recovery {
-			return nil, false, fmt.Errorf("head block hash doesn't match snapshot: have %#x, want %#x", headBlockHash, blockHash)
-		}
-		// It's in snapshot recovery, the assumption is held that
-		// the disk layer is always higher than chain head. It can
-		// be eventually recovered when the chain head beyonds the
-		// disk layer.
-		log.Warn("Snapshot is not continuous with chain", "snapBlockHash", headBlockHash, "chainBlockHash", blockHash)
-	}
+
 	// Everything loaded correctly, resume any suspended operations
 	if !generator.Done {
 		// If the generator was still wiping, restart one from scratch (fine for
@@ -155,5 +123,6 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 			storage:  common.StorageSize(generator.Storage),
 		})
 	}
+
 	return snapshot, generator.Done, nil
 }
