@@ -244,7 +244,7 @@ func NewBlockChain(
 		// also avoids a costly async generation process when reaching tip.
 		async := bc.cacheConfig.SnapshotAsync && head.NumberU64() > 0
 		log.Info("Initializing snapshots", "async", async)
-		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), async, true, false, bc.cacheConfig.SnapshotVerify)
+		bc.snaps, err = snapshot.New(bc.db, bc.stateCache.TrieDB(), bc.cacheConfig.SnapshotLimit, head.Hash(), head.Root(), async, true, bc.cacheConfig.SnapshotVerify)
 		if err != nil {
 			log.Error("failed to initialize snapshots", "headHash", head.Hash(), "headRoot", head.Root(), "err", err, "async", async)
 		}
@@ -735,12 +735,6 @@ func (bc *BlockChain) Stop() {
 	close(bc.quit)
 	bc.wg.Wait()
 
-	// Ensure that the entirety of the state snapshot is journalled to disk.
-	if bc.snaps != nil {
-		if _, err := bc.snaps.Journal(); err != nil {
-			log.Error("Failed to journal state snapshot", "err", err)
-		}
-	}
 	if err := bc.stateManager.Shutdown(); err != nil {
 		log.Error("Failed to Shutdown state manager", "err", err)
 	}
