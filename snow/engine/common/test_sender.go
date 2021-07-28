@@ -81,9 +81,9 @@ func (s *SenderTest) SendAcceptedFrontier(validatorID ids.ShortID, requestID uin
 // SendGetAccepted calls SendGetAcceptedF if it was initialized. If it wasn't
 // initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
-func (s *SenderTest) SendGetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
+func (s *SenderTest) SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID) {
 	if s.SendGetAcceptedF != nil {
-		s.SendGetAcceptedF(validatorIDs, requestID, containerIDs)
+		s.SendGetAcceptedF(nodeIDs, requestID, containerIDs)
 	} else if s.CantSendGetAccepted && s.T != nil {
 		s.T.Fatalf("Unexpectedly called SendGetAccepted")
 	}

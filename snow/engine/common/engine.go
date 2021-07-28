@@ -128,10 +128,11 @@ type AcceptedHandler interface {
 	GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error
 }
 
-type App interface {
+type AppHandler interface {
 	// Notify this engine of a request for data from [nodeID].
 	// This node should send an AppResponse to [nodeID] in response to
 	// this message using the same request ID.
+	// The VM may choose to not send a response to this request.
 	// The meaning of [request], and what should be sent in response to it,
 	// is application (VM) defined.
 	AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error
@@ -146,9 +147,6 @@ type App interface {
 
 	// Notify this engine of a response to the AppRequest message it sent
 	// to [nodeID] with request ID [requestID].
-	// If no such request was sent, this message should be ignored.
-	// If an AppRequestFailed with the same node ID and request ID has
-	// already been received, this message should be ignored.
 	// The meaning of [response] is application (VM) defined.
 	AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error
 
@@ -162,7 +160,7 @@ type App interface {
 // FetchHandler defines how a consensus engine reacts to retrieval messages from
 // other validators. Functions only return fatal errors if they occur.
 type FetchHandler interface {
-	App
+	AppHandler
 
 	// Notify this engine of a request for a container.
 	//

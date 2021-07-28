@@ -12,7 +12,7 @@ import (
 
 // VM describes the interface that all consensus VMs must implement
 type VM interface {
-	App
+	AppHandler
 
 	// Returns nil if the VM is healthy.
 	// Periodically called and reported via the node's Health API.
