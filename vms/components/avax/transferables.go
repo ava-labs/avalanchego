@@ -50,7 +50,6 @@ type TransferableOut interface {
 	Amounter
 }
 
-// TransferableOutput ...
 type TransferableOutput struct {
 	snow.ContextInitializable `serialize:"false" json:"-"`
 	// FxID has serialize false because we don't want this to be encoded in bytes
@@ -120,7 +119,6 @@ func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Manager) bo
 	return sort.IsSorted(&innerSortTransferableOutputs{outs: outs, codec: c})
 }
 
-// TransferableInput ...
 type TransferableInput struct {
 	// FxID has serialize false because we don't want this to be encoded in bytes
 	FxID   ids.ID `serialize:"false" json:"fxID"`
@@ -162,10 +160,8 @@ func (ins innerSortTransferableInputs) Less(i, j int) bool {
 func (ins innerSortTransferableInputs) Len() int      { return len(ins) }
 func (ins innerSortTransferableInputs) Swap(i, j int) { ins[j], ins[i] = ins[i], ins[j] }
 
-// SortTransferableInputs ...
 func SortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTransferableInputs(ins)) }
 
-// IsSortedAndUniqueTransferableInputs ...
 func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
 	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
 }

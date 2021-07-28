@@ -20,7 +20,6 @@ const (
 	defaultEncoding = formatting.Hex
 )
 
-// Credential ...
 type Credential struct {
 	verify.Verifiable
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
@@ -44,7 +43,6 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 	return b, err
 }
 
-// Verify ...
 func (cr *Credential) Verify() error {
 	switch {
 	case cr == nil:

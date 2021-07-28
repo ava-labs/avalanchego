@@ -52,7 +52,6 @@ const (
 	JSON
 )
 
-// String ...
 func (enc Encoding) String() string {
 	switch enc {
 	case Hex:
@@ -74,7 +73,6 @@ func (enc Encoding) valid() bool {
 	return false
 }
 
-// MarshalJSON ...
 func (enc Encoding) MarshalJSON() ([]byte, error) {
 	if !enc.valid() {
 		return nil, errInvalidEncoding
@@ -82,7 +80,6 @@ func (enc Encoding) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + enc.String() + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (enc *Encoding) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == "null" {

@@ -29,7 +29,6 @@ var (
 	_                    common.Bootstrapable = &Bootstrapper{}
 )
 
-// Config ...
 type Config struct {
 	common.Config
 
@@ -41,7 +40,6 @@ type Config struct {
 	Bootstrapped func()
 }
 
-// Bootstrapper ...
 type Bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
@@ -127,7 +125,6 @@ func (b *Bootstrapper) FilterAccepted(containerIDs []ids.ID) []ids.ID {
 	return acceptedIDs
 }
 
-// ForceAccepted ...
 func (b *Bootstrapper) ForceAccepted(acceptedContainerIDs []ids.ID) error {
 	if err := b.VM.Bootstrapping(); err != nil {
 		return fmt.Errorf("failed to notify VM that bootstrapping has started: %w",

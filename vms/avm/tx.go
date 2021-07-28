@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// UnsignedTx ...
 type UnsignedTx interface {
 	Init(*VM) error
 	Initialize(unsignedBytes, bytes []byte)
@@ -126,7 +125,6 @@ func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx) error {
 	return t.UnsignedTx.SemanticVerify(vm, tx, t.Credentials())
 }
 
-// SignSECP256K1Fx ...
 func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
 	if err != nil {
@@ -187,7 +185,6 @@ func (t *Tx) SignPropertyFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP2
 	return nil
 }
 
-// SignNFTFx ...
 func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
 	if err != nil {

@@ -16,7 +16,6 @@ var (
 	_                verify.State = &OutputOwners{}
 )
 
-// TransferOutput ...
 type TransferOutput struct {
 	Amt uint64 `serialize:"true" json:"amount"`
 
@@ -30,7 +29,6 @@ func (out *TransferOutput) InitCtx(ctx *snow.Context) {
 // Amount returns the quantity of the asset this output consumes
 func (out *TransferOutput) Amount() uint64 { return out.Amt }
 
-// Verify ...
 func (out *TransferOutput) Verify() error {
 	switch {
 	case out == nil:
@@ -42,8 +40,6 @@ func (out *TransferOutput) Verify() error {
 	}
 }
 
-// VerifyState ...
 func (out *TransferOutput) VerifyState() error { return out.Verify() }
 
-// Owners ...
 func (out *TransferOutput) Owners() interface{} { return &out.OutputOwners }

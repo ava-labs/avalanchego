@@ -23,7 +23,6 @@ var (
 	errNotSortedAndUniqueUTXOIDs = errors.New("utxo IDs not sorted and unique")
 )
 
-// Operation ...
 type Operation struct {
 	FxID       ids.ID `serialize:"false" json:"fxID"`
 	avax.Asset `serialize:"true"`

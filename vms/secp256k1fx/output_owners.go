@@ -25,7 +25,6 @@ var (
 	_                       verify.State = &OutputOwners{}
 )
 
-// OutputOwners ...
 type OutputOwners struct {
 	Locktime  uint64        `serialize:"true" json:"locktime"`
 	Threshold uint32        `serialize:"true" json:"threshold"`
@@ -109,7 +108,6 @@ func (out *OutputOwners) Equals(other *OutputOwners) bool {
 	return true
 }
 
-// Verify ...
 func (out *OutputOwners) Verify() error {
 	switch {
 	case out == nil:
@@ -125,10 +123,8 @@ func (out *OutputOwners) Verify() error {
 	}
 }
 
-// VerifyState ...
 func (out *OutputOwners) VerifyState() error { return out.Verify() }
 
-// Sort ...
 func (out *OutputOwners) Sort() { ids.SortShortIDs(out.Addrs) }
 
 // FormatAddress formats a given [addr] into human readable format using

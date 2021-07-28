@@ -20,7 +20,6 @@ var (
 	_                    verify.State = &TransferOutput{}
 )
 
-// TransferOutput ...
 type TransferOutput struct {
 	GroupID                  uint32 `serialize:"true" json:"groupID"`
 	Payload                  []byte `serialize:"true" json:"payload"`
@@ -45,5 +44,4 @@ func (out *TransferOutput) Verify() error {
 	}
 }
 
-// VerifyState ...
 func (out *TransferOutput) VerifyState() error { return out.Verify() }

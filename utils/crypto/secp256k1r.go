@@ -42,7 +42,6 @@ const (
 	compactSigMagicOffset = 27
 )
 
-// FactorySECP256K1R ...
 type FactorySECP256K1R struct{ Cache cache.LRU }
 
 // NewPrivateKey implements the Factory interface
@@ -106,7 +105,6 @@ func (f *FactorySECP256K1R) RecoverHashPublicKey(hash, sig []byte) (PublicKey, e
 	return pubkey, nil
 }
 
-// PublicKeySECP256K1R ...
 type PublicKeySECP256K1R struct {
 	pk    *secp256k1.PublicKey
 	addr  ids.ShortID
@@ -153,7 +151,6 @@ func (k *PublicKeySECP256K1R) Bytes() []byte {
 	return k.bytes
 }
 
-// PrivateKeySECP256K1R ...
 type PrivateKeySECP256K1R struct {
 	sk    *secp256k1.PrivateKey
 	pk    *PublicKeySECP256K1R

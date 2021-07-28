@@ -16,7 +16,6 @@ import (
 )
 
 const (
-	// maxExcessCapacityFactor ...
 	// If, when the validator set is reset, cap(set)/len(set) > MaxExcessCapacityFactor,
 	// the underlying arrays' capacities will be reduced by a factor of capacityReductionFactor.
 	// Higher value for maxExcessCapacityFactor --> less aggressive array downsizing --> less memory allocations
@@ -24,7 +23,6 @@ const (
 	// Higher value for capacityReductionFactor --> more aggressive array downsizing --> more memory allocations
 	// but less unnecessary data in the underlying array that can't be garbage collected.
 	maxExcessCapacityFactor = 4
-	// CapacityReductionFactor ...
 	capacityReductionFactor = 2
 )
 

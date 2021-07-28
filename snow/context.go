@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
-// EventDispatcher ...
 type EventDispatcher interface {
 	Issue(ctx *Context, containerID ids.ID, container []byte) error
 	// If the returned error is non-nil, the chain associated with [ctx] should shut
@@ -28,13 +27,11 @@ type EventDispatcher interface {
 	Reject(ctx *Context, containerID ids.ID, container []byte) error
 }
 
-// AliasLookup ...
 type AliasLookup interface {
 	Lookup(alias string) (ids.ID, error)
 	PrimaryAlias(id ids.ID) (string, error)
 }
 
-// SubnetLookup ...
 type SubnetLookup interface {
 	SubnetID(chainID ids.ID) (ids.ID, error)
 }
@@ -101,7 +98,6 @@ func (ctx *Context) Epoch() uint32 {
 	return uint32(currentEpoch)
 }
 
-// DefaultContextTest ...
 func DefaultContextTest() *Context {
 	aliaser := &ids.Aliaser{}
 	aliaser.Initialize()

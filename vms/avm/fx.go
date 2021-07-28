@@ -48,7 +48,6 @@ type Fx interface {
 	VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error
 }
 
-// FxOperation ...
 type FxOperation interface {
 	verify.Verifiable
 	snow.ContextInitializable

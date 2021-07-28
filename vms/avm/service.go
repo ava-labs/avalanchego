@@ -333,13 +333,11 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	return nil
 }
 
-// Balance ...
 type Balance struct {
 	AssetID string      `json:"asset"`
 	Balance json.Uint64 `json:"balance"`
 }
 
-// GetAllBalancesArgs ...
 type GetAllBalancesArgs struct {
 	api.JSONAddress
 	IncludePartial bool `json:"includePartial"`

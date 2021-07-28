@@ -27,7 +27,6 @@ var errUnknownAssetType = errors.New("unknown asset type")
 // StaticService defines the base service for the asset vm
 type StaticService struct{}
 
-// CreateStaticService ...
 func CreateStaticService() *StaticService {
 	return &StaticService{}
 }
@@ -39,7 +38,6 @@ type BuildGenesisArgs struct {
 	Encoding    formatting.Encoding        `json:"encoding"`
 }
 
-// AssetDefinition ...
 type AssetDefinition struct {
 	Name         string                   `json:"name"`
 	Symbol       string                   `json:"symbol"`
