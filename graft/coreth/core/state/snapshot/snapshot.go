@@ -41,7 +41,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
 
@@ -157,11 +156,6 @@ type snapshot interface {
 	// Note, the maps are retained by the method to avoid copying everything.
 	Update(blockHash, blockRoot common.Hash, destructs map[common.Hash]struct{}, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) *diffLayer
 
-	// Journal commits an entire diff hierarchy to disk into a single journal entry.
-	// This is meant to be used during shutdown to persist the snapshot without
-	// flattening everything down (bad for reorgs).
-	Journal(buffer *bytes.Buffer) (common.Hash, error)
-
 	// Stale return whether this layer has become stale (was flattened across) or
 	// if it's still live.
 	Stale() bool
@@ -203,10 +197,8 @@ type Tree struct {
 //
 // If the snapshot is missing or the disk layer is broken, the entire is deleted
 // and will be reconstructed from scratch based on the tries in the key-value
-// store, on a background thread. If the memory layers from the journal is not
-// continuous with disk layer or the journal is missing, all diffs will be discarded
-// iff it's in "recovery" mode, otherwise rebuild is mandatory.
-func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, async bool, rebuild bool, recovery bool, verify bool) (*Tree, error) {
+// store, on a background thread.
+func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, async bool, rebuild bool, verify bool) (*Tree, error) {
 	// Create a new, empty snapshot tree
 	snap := &Tree{
 		diskdb:      diskdb,
@@ -218,7 +210,7 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 	}
 
 	// Attempt to load a previously persisted snapshot and rebuild one if failed
-	head, generated, err := loadSnapshot(diskdb, triedb, cache, blockHash, root, recovery)
+	head, generated, err := loadSnapshot(diskdb, triedb, cache, blockHash, root)
 	if err != nil {
 		if rebuild {
 			log.Warn("Failed to load snapshot, regenerating", "err", err)
@@ -727,49 +719,6 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 		}
 	}
 	return res, base.genMarker == nil, nil
-}
-
-// Journal commits an entire diff hierarchy to disk into a single journal entry.
-// This is meant to be used during shutdown to persist the snapshot without
-// flattening everything down (bad for reorgs).
-//
-// The method returns the root hash of the base layer that needs to be persisted
-// to disk as a trie too to allow continuing any pending generation op.
-func (t *Tree) Journal() (common.Hash, error) {
-	// Run the journaling
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	// Firstly write out the metadata of journal
-	journal := new(bytes.Buffer)
-	if err := rlp.Encode(journal, journalVersion); err != nil {
-		return common.Hash{}, err
-	}
-	disklayer := t.disklayer()
-	diskBlockhash := disklayer.blockHash
-	if diskBlockhash == (common.Hash{}) {
-		return common.Hash{}, errors.New("invalid disk block hash")
-	}
-	diskroot := disklayer.root
-	if diskroot == (common.Hash{}) {
-		return common.Hash{}, errors.New("invalid disk root")
-	}
-	// Secondly write out the disk layer block hash and state root, ensure the
-	// diff journal is continuous with disk.
-	if err := rlp.Encode(journal, diskBlockhash); err != nil {
-		return common.Hash{}, err
-	}
-	if err := rlp.Encode(journal, diskroot); err != nil {
-		return common.Hash{}, err
-	}
-	// Finally write out the journal of each layer in reverse order.
-	base, err := disklayer.Journal(journal)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	// Store the journal into the database and return
-	rawdb.WriteSnapshotJournal(t.diskdb, journal.Bytes())
-	return base, nil
 }
 
 // Rebuild wipes all available snapshot data from the persistent database and
