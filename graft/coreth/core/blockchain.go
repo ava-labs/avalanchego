@@ -1173,7 +1173,9 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 		return err
 	}
 
-	// If [writes] is false, skip [writeBlockWithState]
+	// If [writes] are disabled, skip [writeBlockWithState] so that we do not write the block
+	// or the state trie to disk.
+	// Note: in pruning mode, this prevents us from generating a reference to the state root.
 	if !writes {
 		return nil
 	}
