@@ -1094,17 +1094,12 @@ func (bc *BlockChain) insertBlock(block *types.Block) error {
 	}
 
 	switch {
-	// If the block is already known, no need to re-insert
 	case errors.Is(err, ErrKnownBlock):
-		// If [block] represents a new tip of the canonical chain, otherwise we ignore the already
-		// known block.
-		if bc.newTip(block) {
-			log.Debug("Setting head to be known block", "number", block.Number(), "hash", block.Hash())
-			bc.writeCanonicalBlockWithLogs(block, bc.gatherBlockLogs(block.Hash(), block.NumberU64(), false))
-		} else {
-			log.Debug("Ignoring already known block", "number", block.Number(), "hash", block.Hash())
-		}
-		return nil
+		// even if the block is already known, we still need to generate the
+		// snapshot layer and add a reference to the triedb, so we re-execute
+		// the block. Note that insertBlock should only be called on a block
+		// once if it returns nil
+
 	// Pruning of the EVM is disabled, so we should never encounter this case.
 	// Because side chain insertion can have complex side effects, we error when
 	// we encounter it to prevent the accidental execution of these side effects.
