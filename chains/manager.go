@@ -125,7 +125,6 @@ type ChainConfig struct {
 	Upgrade []byte
 }
 
-// ManagerConfig ...
 type ManagerConfig struct {
 	StakingEnabled            bool            // True iff the network has staking enabled
 	StakingCert               tls.Certificate // needed to sign snowman++ blocks
@@ -515,8 +514,15 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	// Passes messages from the consensus engine to the network
+	sender := sender.Sender{}
+	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, consensusParams.Namespace, consensusParams.Metrics)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs, &sender); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -524,13 +530,6 @@ func (m *manager) createAvalancheChain(
 	// persistence of vertices
 	vtxManager := &state.Serializer{}
 	vtxManager.Initialize(ctx, vm, vertexDB)
-
-	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, consensusParams.Namespace, consensusParams.Metrics)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
-	}
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -645,8 +644,18 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	// Initialize the ProposerVM and the vm wrapped inside it
-	chainConfig := m.getChainConfig(ctx.ChainID)
+	// Passes messages from the consensus engine to the network
+	sender := sender.Sender{}
+	if err := sender.Initialize(
+		ctx,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	); err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorVM == nil {
@@ -662,23 +671,12 @@ func (m *manager) createSnowmanChain(
 		vm = proposervm.New(vm, vmPlus.GetActivationTime()) // enable ProposerVM on this VM
 	}
 
+	// Initialize the ProposerVM and the vm wrapped inside it
+	chainConfig := m.getChainConfig(ctx.ChainID)
 	if err := vm.Initialize(ctx, vmDBManager, genesisData,
-		chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+		chainConfig.Upgrade, chainConfig.Config, msgChan,
+		fxs, &sender); err != nil {
 		return nil, err
-	}
-
-	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	err = sender.Initialize(
-		ctx,
-		m.Net,
-		m.ManagerConfig.Router,
-		m.TimeoutManager,
-		consensusParams.Namespace,
-		consensusParams.Metrics,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
 	sampleK := consensusParams.K

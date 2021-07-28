@@ -879,6 +879,7 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 				Fx: fx,
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1302,6 +1303,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 				Fx: fx,
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1446,6 +1448,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 				Fx: fx,
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

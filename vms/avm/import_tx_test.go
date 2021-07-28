@@ -249,6 +249,7 @@ func TestIssueImportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -399,6 +400,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

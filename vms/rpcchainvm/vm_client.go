@@ -95,6 +95,7 @@ func (vm *VMClient) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	appSender common.AppSender, // TODO wrap and give to server
 ) error {
 	if len(fxs) != 0 {
 		return errUnsupportedFXs
@@ -486,12 +487,11 @@ func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response [
 	return err
 }
 
-func (vm *VMClient) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+func (vm *VMClient) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	_, err := vm.client.AppGossip(
 		context.Background(),
 		&vmproto.AppGossipMsg{
 			NodeID: nodeID[:],
-			MsgID:  msgID,
 			Msg:    msg,
 		},
 	)

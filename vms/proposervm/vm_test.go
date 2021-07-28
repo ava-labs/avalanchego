@@ -59,7 +59,9 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	coreVM := &block.TestVM{}
 	coreVM.T = t
 
-	coreVM.InitializeF = func(*snow.Context, manager.Manager, []byte, []byte, []byte, chan<- common.Message, []*common.Fx) error {
+	coreVM.InitializeF = func(*snow.Context, manager.Manager,
+		[]byte, []byte, []byte, chan<- common.Message,
+		[]*common.Fx, common.AppSender) error {
 		return nil
 	}
 	coreVM.CantLastAccepted = true
@@ -101,7 +103,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
-	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil); err != nil {
+	if err := proVM.Initialize(ctx, dummyDBManager, initialState, nil, nil, nil, nil, nil); err != nil {
 		t.Fatalf("failed to initialize proposerVM with %s", err)
 	}
 

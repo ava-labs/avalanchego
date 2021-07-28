@@ -191,7 +191,8 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		EpochDuration:        time.Duration(req.EpochDuration),
 	}
 
-	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil); err != nil {
+	// TODO wrap AppSender and pass it in below
+	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, nil); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
 		close(toEngine)
@@ -422,7 +423,7 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*vm
 	if err != nil {
 		return nil, err
 	}
-	return nil, vm.vm.AppGossip(nodeID, req.MsgID, req.Msg)
+	return nil, vm.vm.AppGossip(nodeID, req.Msg)
 }
 
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {

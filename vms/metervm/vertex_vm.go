@@ -37,12 +37,13 @@ func (vm *vertexVM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	if err := vm.vertexMetrics.Initialize(fmt.Sprintf("metervm_%s", ctx.Namespace), ctx.Metrics); err != nil {
 		return err
 	}
 
-	return vm.DAGVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs)
+	return vm.DAGVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }
 
 func (vm *vertexVM) PendingTxs() []snowstorm.Tx {

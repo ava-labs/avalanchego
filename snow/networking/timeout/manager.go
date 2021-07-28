@@ -35,7 +35,6 @@ func (m *Manager) Initialize(
 	return m.tm.Initialize(timeoutConfig, metricsNamespace, metricsRegister)
 }
 
-// Dispatch ...
 func (m *Manager) Dispatch() {
 	m.tm.Dispatch()
 }
@@ -51,7 +50,6 @@ func (m *Manager) IsBenched(validatorID ids.ShortID, chainID ids.ID) bool {
 	return m.benchlistMgr.IsBenched(validatorID, chainID)
 }
 
-// RegisterChain ...
 func (m *Manager) RegisterChain(ctx *snow.Context, namespace string) error {
 	if err := m.metrics.RegisterChain(ctx, namespace); err != nil {
 		return fmt.Errorf("couldn't register timeout metrics for chain %s: %w", ctx.ChainID, err)

@@ -16,7 +16,11 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Sender sends consensus messages to other validators
+// Sender is a wrapper around an ExternalSender.
+// Messages to this node are put directly into [router] rather than
+// being sent over the network via the wrapped ExternalSender.
+// Sender registers outbound requests with [router] so that [router]
+// fires a timeout if we don't get a response to the request.
 type Sender struct {
 	ctx      *snow.Context
 	sender   ExternalSender // Actually does the sending over the network
@@ -434,14 +438,8 @@ func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRespon
 }
 
 // Sends a application-level gossip message the given nodes. The node doesn't need to respond to
-func (s *Sender) SendAppGossip(nodeIDs ids.ShortSet, requestID uint32, appResponseBytes []byte) {
-	// Sending a message to myself. No need to send it over the network.
-	// Just put it right into the router. Do so asynchronously to avoid deadlock.
-	if nodeIDs.Contains(s.ctx.NodeID) {
-		nodeIDs.Remove(s.ctx.NodeID)
-		go s.router.AppGossip(s.ctx.NodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
-	}
-	s.sender.SendAppGossip(nodeIDs, s.ctx.ChainID, requestID, appResponseBytes)
+func (s *Sender) SendAppGossip(appResponseBytes []byte) {
+	s.sender.SendAppGossip(s.ctx.ChainID, appResponseBytes)
 }
 
 // Chits sends chits

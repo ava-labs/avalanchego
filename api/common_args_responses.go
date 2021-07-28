@@ -63,7 +63,6 @@ type JSONSpendHeader struct {
 	JSONChangeAddr
 }
 
-// GetTxArgs ...
 type GetTxArgs struct {
 	TxID     ids.ID              `json:"txID"`
 	Encoding formatting.Encoding `json:"encoding"`

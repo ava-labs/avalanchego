@@ -214,7 +214,7 @@ func (h *Handler) handleConsensusMsg(msg message) error {
 	case constants.DisconnectedMsg:
 		err = h.engine.Disconnected(msg.nodeID)
 	case constants.AppGossipMsg:
-		err = h.engine.AppGossip(msg.nodeID, msg.requestID, msg.appMsgBytes)
+		err = h.engine.AppGossip(msg.nodeID, msg.appMsgBytes)
 	case constants.AppRequestMsg:
 		err = h.engine.AppRequest(msg.nodeID, msg.requestID, msg.appMsgBytes)
 	case constants.AppResponseMsg:
@@ -504,11 +504,10 @@ func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseB
 }
 
 // AppGossip passes an application-level gossip message from the given node to the consensus engine.
-func (h *Handler) AppGossip(nodeID ids.ShortID, msgID uint32, appGossipBytes []byte, onFinishedHandling func()) {
+func (h *Handler) AppGossip(nodeID ids.ShortID, appGossipBytes []byte, onFinishedHandling func()) {
 	h.push(message{
 		messageType:    constants.AppGossipMsg,
 		nodeID:         nodeID,
-		requestID:      msgID,
 		appMsgBytes:    appGossipBytes,
 		received:       h.clock.Time(),
 		onDoneHandling: onFinishedHandling,

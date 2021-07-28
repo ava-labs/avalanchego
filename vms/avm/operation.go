@@ -21,7 +21,6 @@ var (
 	errNotSortedAndUniqueUTXOIDs = errors.New("utxo IDs not sorted and unique")
 )
 
-// Operation ...
 type Operation struct {
 	avax.Asset `serialize:"true"`
 

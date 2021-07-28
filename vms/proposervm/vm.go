@@ -67,6 +67,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	vm.ctx = ctx
 	rawDB := dbManager.Current().Database
@@ -93,6 +94,7 @@ func (vm *VM) Initialize(
 		configBytes,
 		vmToEngine,
 		fxs,
+		appSender,
 	)
 }
 

@@ -146,6 +146,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
 
@@ -446,7 +447,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return nil
 }
 

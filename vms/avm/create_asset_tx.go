@@ -126,5 +126,4 @@ func (t *CreateAssetTx) SyntacticVerify(
 	return nil
 }
 
-// Sort ...
 func (t *CreateAssetTx) Sort() { sortInitialStates(t.States) }

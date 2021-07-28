@@ -48,13 +48,13 @@ func (_m *Engine) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, co
 	return r0
 }
 
-// AppGossip provides a mock function with given fields: nodeID, requestID, msg
-func (_m *Engine) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
-	ret := _m.Called(nodeID, msgID, msg)
+// AppGossip provides a mock function with given fields: nodeID, msg
+func (_m *Engine) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	ret := _m.Called(nodeID, msg)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
-		r0 = rf(nodeID, msgID, msg)
+	if rf, ok := ret.Get(0).(func(ids.ShortID, []byte) error); ok {
+		r0 = rf(nodeID, msg)
 	} else {
 		r0 = ret.Error(0)
 	}

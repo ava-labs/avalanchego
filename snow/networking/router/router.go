@@ -41,6 +41,7 @@ type Router interface {
 // ExternalRouter routes messages from the network to the
 // Handler of the consensus engine that the message is intended for
 type ExternalRouter interface {
+	AppRouter
 	RegisterRequest(
 		nodeID ids.ShortID,
 		chainID ids.ID,
@@ -131,6 +132,10 @@ type ExternalRouter interface {
 		votes []ids.ID,
 		onFinishedHandling func(),
 	)
+}
+
+// Routes app-level messages
+type AppRouter interface {
 	AppRequest(
 		nodeID ids.ShortID,
 		chainID ids.ID,
@@ -149,7 +154,6 @@ type ExternalRouter interface {
 	AppGossip(
 		nodeID ids.ShortID,
 		chainID ids.ID,
-		requestID uint32,
 		appGossipBytes []byte,
 		onFinishedHandling func(),
 	)

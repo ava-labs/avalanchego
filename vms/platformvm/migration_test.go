@@ -64,7 +64,7 @@ func TestMigrateUptime(t *testing.T) {
 	msgChan := make(chan common.Message, 1)
 	_, genesisBytes := defaultGenesis()
 	vm.StakeMintingPeriod = 365 * 24 * time.Hour
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

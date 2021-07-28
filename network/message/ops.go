@@ -88,7 +88,7 @@ var (
 		// Application level:
 		AppRequest:  {ChainID, RequestID, Deadline, AppRequestBytes},
 		AppResponse: {ChainID, RequestID, AppResponseBytes},
-		AppGossip:   {ChainID, RequestID, AppGossipBytes},
+		AppGossip:   {ChainID, AppGossipBytes},
 	}
 )
 

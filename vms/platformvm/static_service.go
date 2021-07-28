@@ -154,7 +154,6 @@ type Genesis struct {
 	Message       string         `serialize:"true"`
 }
 
-// Initialize ...
 func (g *Genesis) Initialize() error {
 	for _, tx := range g.Validators {
 		if err := tx.Sign(GenesisCodec, nil); err != nil {

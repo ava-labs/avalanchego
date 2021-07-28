@@ -68,16 +68,16 @@ type EngineTest struct {
 	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(nodeID ids.ShortID, requestID uint32) error
-	ConnectedF, DisconnectedF             func(nodeID ids.ShortID) error
-	HealthF                               func() (interface{}, error)
-	GetVtxF                               func() (avalanche.Vertex, error)
-	GetVMF                                func() VM
-	AppRequestF, AppGossipF, AppResponseF func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	ConnectedF, DisconnectedF func(nodeID ids.ShortID) error
+	HealthF                   func() (interface{}, error)
+	GetVtxF                   func() (avalanche.Vertex, error)
+	GetVMF                    func() VM
+	AppRequestF, AppResponseF func(nodeID ids.ShortID, requestID uint32, msg []byte) error
+	AppGossipF                func(nodeID ids.ShortID, msg []byte) error
 }
 
 var _ Engine = &EngineTest{}
 
-// Default ...
 func (e *EngineTest) Default(cant bool) {
 	e.CantIsBootstrapped = cant
 	e.CantTimeout = cant
@@ -417,9 +417,9 @@ func (e *EngineTest) AppResponse(nodeID ids.ShortID, requestID uint32, response 
 	return errors.New("unexpectedly called AppResponse")
 }
 
-func (e *EngineTest) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+func (e *EngineTest) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	if e.AppGossipF != nil {
-		return e.AppGossipF(nodeID, msgID, msg)
+		return e.AppGossipF(nodeID, msg)
 	}
 	if !e.CantAppGossip {
 		return nil

@@ -458,7 +458,7 @@ func (cr *ChainRouter) GetAcceptedFailed(
 
 // GetAncestors routes an incoming GetAncestors message from the validator with ID [validatorID]
 // to the consensus engine working on the chain with ID [chainID]
-// The maximum number of ancestors to respond with is defined in snow/engine/commong/bootstrapper.go
+// The maximum number of ancestors to respond with is defined in snow/engine/common/bootstrapper.go
 func (cr *ChainRouter) GetAncestors(
 	validatorID ids.ShortID,
 	chainID ids.ID,
@@ -843,7 +843,6 @@ func (cr *ChainRouter) AppResponse(
 func (cr *ChainRouter) AppGossip(
 	nodeID ids.ShortID,
 	chainID ids.ID,
-	requestID uint32,
 	appGossipBytes []byte,
 	onFinishedHandling func(),
 ) {
@@ -852,14 +851,14 @@ func (cr *ChainRouter) AppGossip(
 
 	chain, exists := cr.chains[chainID]
 	if !exists {
-		cr.log.Debug("AppGossip(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
+		cr.log.Debug("AppGossip(%s, %s) dropped due to unknown chain", nodeID, chainID)
 		cr.log.Verbo("dropped message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 		onFinishedHandling()
 		return
 	}
 
 	// Pass the message to the chain
-	chain.AppGossip(nodeID, requestID, appGossipBytes, onFinishedHandling)
+	chain.AppGossip(nodeID, appGossipBytes, onFinishedHandling)
 }
 
 // QueryFailed routes an incoming QueryFailed message from the validator with ID [validatorID]

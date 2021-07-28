@@ -142,6 +142,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
 		return err
@@ -812,7 +813,6 @@ func (vm *VM) LoadUser(
 	return utxos, kc, db.Close()
 }
 
-// Spend ...
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -879,7 +879,6 @@ func (vm *VM) Spend(
 	return amountsSpent, ins, keys, nil
 }
 
-// SpendNFT ...
 func (vm *VM) SpendNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -954,7 +953,6 @@ func (vm *VM) SpendNFT(
 	return ops, keys, nil
 }
 
-// SpendAll ...
 func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1004,7 +1002,6 @@ func (vm *VM) SpendAll(
 	return amountsSpent, ins, keys, nil
 }
 
-// Mint ...
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1078,7 +1075,6 @@ func (vm *VM) Mint(
 	return ops, keys, nil
 }
 
-// MintNFT ...
 func (vm *VM) MintNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1191,6 +1187,6 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 }
 
 // This VM doesn't (currently) have any app-specific messages
-func (vm *VM) AppGossip(nodeID ids.ShortID, msgID uint32, msg []byte) error {
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return nil
 }
