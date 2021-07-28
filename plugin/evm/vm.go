@@ -600,6 +600,7 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	// Verify is called on a non-wrapped block here, such that this
 	// does not add [blk] to the processing blocks map in ChainState.
 	// TODO cache verification since Verify() will be called by the
+	// consensus engine as well.
 	// Note: this is only called when building a new block, so caching
 	// verification will only be a significant optimization for nodes
 	// that produce a large number of blocks.
