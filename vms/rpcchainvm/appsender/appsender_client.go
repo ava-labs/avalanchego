@@ -15,14 +15,17 @@ var _ common.AppSender = &Client{}
 
 type Client struct {
 	client appsenderproto.AppSenderClient
+	// called if any method calls return a non-nil error
+	// TODO is this how we should handle errors?
+	onErrorF func()
 }
 
-// NewClient returns a client that is connected to a remote AppSender
-func NewClient(client appsenderproto.AppSenderClient) *Client {
+// NewClient returns a client that is connected to a remote AppSender.
+// If any method returns an error, calls [onErrorF].
+func NewClient(client appsenderproto.AppSenderClient, onErrorF func()) *Client {
 	return &Client{client: client}
 }
 
-// TODO handle the error
 func (c *Client) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, request []byte) {
 	nodeIDsBytes := make([][]byte, nodeIDs.Len())
 	i := 0
@@ -31,7 +34,7 @@ func (c *Client) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, request 
 		nodeIDsBytes[i] = nodeID[:]
 		i++
 	}
-	_, _ = c.client.SendAppRequest(
+	_, err := c.client.SendAppRequest(
 		context.Background(),
 		&appsenderproto.SendAppRequestMsg{
 			NodeIDs:   nodeIDsBytes,
@@ -39,11 +42,13 @@ func (c *Client) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, request 
 			Request:   request,
 		},
 	)
+	if err != nil {
+		c.onErrorF()
+	}
 }
 
-// TODO handle the error
 func (c *Client) SendAppResponse(nodeID ids.ShortID, requestID uint32, response []byte) {
-	_, _ = c.client.SendAppResponse(
+	_, err := c.client.SendAppResponse(
 		context.Background(),
 		&appsenderproto.SendAppResponseMsg{
 			NodeID:    nodeID[:],
@@ -51,14 +56,19 @@ func (c *Client) SendAppResponse(nodeID ids.ShortID, requestID uint32, response 
 			Response:  response,
 		},
 	)
+	if err != nil {
+		c.onErrorF()
+	}
 }
 
-// TODO handle the error
 func (c *Client) SendAppGossip(msg []byte) {
-	_, _ = c.client.SendAppGossip(
+	_, err := c.client.SendAppGossip(
 		context.Background(),
 		&appsenderproto.SendAppGossipMsg{
 			Msg: msg,
 		},
 	)
+	if err != nil {
+		c.onErrorF()
+	}
 }
