@@ -97,7 +97,7 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 }
 
 // GetTx returns the specified transaction
-func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.FormattedTx) error {
+func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.GetTxReply) error {
 	service.vm.ctx.Log.Debug("AVM: GetTx called with %s", args.TxID)
 
 	if args.TxID == ids.Empty {
@@ -112,12 +112,18 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errUnknownTx
 	}
 
+	reply.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		reply.Tx = tx
+		return tx.Init(service.vm)
+	}
+
 	var err error
-	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
+	reply.Tx, err = formatting.EncodeWithChecksum(args.Encoding, tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}
-	reply.Encoding = args.Encoding
 	return nil
 }
 
@@ -198,7 +204,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i], err = formatting.Encode(args.Encoding, b)
+		reply.UTXOs[i], err = formatting.EncodeWithChecksum(args.Encoding, b)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
 		}
@@ -496,8 +502,8 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 
 	initialState := &InitialState{
-		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
+		FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
+		Outs:    make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
 	}
 	for _, holder := range args.InitialHolders {
 		addr, err := service.vm.ParseLocalAddress(holder.Address)
@@ -651,8 +657,8 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	initialState := &InitialState{
-		FxID: 1, // TODO: Should lookup nftfx FxID
-		Outs: make([]verify.State, 0, len(args.MinterSets)),
+		FxIndex: 1, // TODO: Should lookup nftfx FxID
+		Outs:    make([]verify.State, 0, len(args.MinterSets)),
 	}
 	for i, owner := range args.MinterSets {
 		minter := &nftfx.MintOutput{
@@ -810,7 +816,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
+	privKeyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }

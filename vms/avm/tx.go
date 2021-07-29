@@ -15,10 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 type UnsignedTx interface {
+	Init(*VM) error
 	Initialize(unsignedBytes, bytes []byte)
 	ID() ids.ID
 	UnsignedBytes() []byte
@@ -51,12 +53,31 @@ type UnsignedTx interface {
 type Tx struct {
 	UnsignedTx `serialize:"true" json:"unsignedTx"`
 
-	Creds []verify.Verifiable `serialize:"true" json:"credentials"` // The credentials of this transaction
+	Creds []*FxCredential `serialize:"true" json:"credentials"` // The credentials of this transaction
+}
+
+// Init initializes FxID where required
+// Used for JSON marshaling of data
+func (t *Tx) Init(vm *VM) error {
+	for _, cred := range t.Creds {
+		fx, err := vm.getParsedFx(cred.Verifiable)
+		if err != nil {
+			return err
+		}
+		cred.FxID = fx.ID
+	}
+	return t.UnsignedTx.Init(vm)
 }
 
 // Credentials describes the authorization that allows the Inputs to consume the
 // specified UTXOs. The returned array should not be modified.
-func (t *Tx) Credentials() []verify.Verifiable { return t.Creds }
+func (t *Tx) Credentials() []verify.Verifiable {
+	creds := make([]verify.Verifiable, len(t.Creds))
+	for i, fxCred := range t.Creds {
+		creds[i] = fxCred.Verifiable
+	}
+	return creds
+}
 
 // SyntacticVerify verifies that this transaction is well-formed.
 func (t *Tx) SyntacticVerify(
@@ -96,7 +117,7 @@ func (t *Tx) SemanticVerify(vm *VM, tx UnsignedTx) error {
 		return errNilTx
 	}
 
-	return t.UnsignedTx.SemanticVerify(vm, tx, t.Creds)
+	return t.UnsignedTx.SemanticVerify(vm, tx, t.Credentials())
 }
 
 func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
@@ -117,7 +138,36 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, cred)
+		t.Creds = append(t.Creds, &FxCredential{Verifiable: cred})
+	}
+
+	signedBytes, err := c.Marshal(codecVersion, t)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+	t.Initialize(unsignedBytes, signedBytes)
+	return nil
+}
+
+func (t *Tx) SignPropertyFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
+	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
+	if err != nil {
+		return fmt.Errorf("problem creating transaction: %w", err)
+	}
+
+	hash := hashing.ComputeHash256(unsignedBytes)
+	for _, keys := range signers {
+		cred := &propertyfx.Credential{Credential: secp256k1fx.Credential{
+			Sigs: make([][crypto.SECP256K1RSigLen]byte, len(keys)),
+		}}
+		for i, key := range keys {
+			sig, err := key.SignHash(hash)
+			if err != nil {
+				return fmt.Errorf("problem creating transaction: %w", err)
+			}
+			copy(cred.Sigs[i][:], sig)
+		}
+		t.Creds = append(t.Creds, &FxCredential{Verifiable: cred})
 	}
 
 	signedBytes, err := c.Marshal(codecVersion, t)
@@ -146,7 +196,7 @@ func (t *Tx) SignNFTFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R
 			}
 			copy(cred.Sigs[i][:], sig)
 		}
-		t.Creds = append(t.Creds, cred)
+		t.Creds = append(t.Creds, &FxCredential{Verifiable: cred})
 	}
 
 	signedBytes, err := c.Marshal(codecVersion, t)

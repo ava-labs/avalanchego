@@ -16,7 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var errNoExportOutputs = errors.New("no export outputs")
+var (
+	errNoExportOutputs = errors.New("no export outputs")
+
+	_ UnsignedTx = &ExportTx{}
+)
 
 // ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {
@@ -27,6 +31,18 @@ type ExportTx struct {
 
 	// The outputs this transaction is sending to the other chain
 	ExportedOuts []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
+}
+
+func (t *ExportTx) Init(vm *VM) error {
+	for _, out := range t.ExportedOuts {
+		fx, err := vm.getParsedFx(out.Out)
+		if err != nil {
+			return err
+		}
+		out.FxID = fx.ID
+		out.InitCtx(vm.ctx)
+	}
+	return t.BaseTx.Init(vm)
 }
 
 // SyntacticVerify that this transaction is well-formed.

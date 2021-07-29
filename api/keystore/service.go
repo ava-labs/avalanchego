@@ -90,7 +90,7 @@ func (s *service) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Expor
 	}
 
 	// Encode the user from bytes to string
-	reply.User, err = formatting.Encode(args.Encoding, userBytes)
+	reply.User, err = formatting.EncodeWithChecksum(args.Encoding, userBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode user to string: %w", err)
 	}

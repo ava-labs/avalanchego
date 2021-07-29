@@ -15,7 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var errNoImportInputs = errors.New("no import inputs")
+var (
+	errNoImportInputs = errors.New("no import inputs")
+
+	_ UnsignedTx = &ImportTx{}
+)
 
 // ImportTx is a transaction that imports an asset from another blockchain.
 type ImportTx struct {
@@ -26,6 +30,17 @@ type ImportTx struct {
 
 	// The inputs to this transaction
 	ImportedIns []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
+}
+
+func (t *ImportTx) Init(vm *VM) error {
+	for _, in := range t.ImportedIns {
+		fx, err := vm.getParsedFx(in.In)
+		if err != nil {
+			return err
+		}
+		in.FxID = fx.ID
+	}
+	return t.BaseTx.Init(vm)
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
