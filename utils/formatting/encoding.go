@@ -120,10 +120,7 @@ func EncodeWithoutChecksum(encoding Encoding, bytes []byte) (string, error) {
 	if err := validateEncoding(encoding, bytes); err != nil {
 		return "", err
 	}
-
-	unchecked := make([]byte, len(bytes)+checksumLen)
-	copy(unchecked, bytes)
-	return encode(encoding, unchecked)
+	return encode(encoding, bytes)
 }
 
 // encode encodes given [bytes] to [encoding] format
