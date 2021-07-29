@@ -6,6 +6,7 @@ package avm
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -141,5 +142,5 @@ func (t *ImportTx) ExecuteWithSideEffects(vm *VM, batch database.Batch) error {
 		inputID := in.UTXOID.InputID()
 		utxoIDs[i] = inputID[:]
 	}
-	return vm.ctx.SharedMemory.Remove(t.SourceChain, utxoIDs, batch)
+	return vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{t.SourceChain: {RemoveRequests: utxoIDs}}, batch)
 }

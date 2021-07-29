@@ -176,7 +176,7 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			configFile := setupConfigJSON(t, root, configJSON)
 
 			dirToCreate := path.Join(root, test.structure)
-			assert.NoError(os.MkdirAll(dirToCreate, 0700))
+			assert.NoError(os.MkdirAll(dirToCreate, 0o700))
 
 			for key, value := range test.file {
 				setupFile(t, dirToCreate, key, value)
@@ -312,15 +312,15 @@ func TestReadVMAliasesDirNotExists(t *testing.T) {
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := path.Join(rootPath, "config.json")
-	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0600))
+	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0o600))
 	return configFilePath
 }
 
 // setups file creates necessary path and writes value to it.
 func setupFile(t *testing.T, path string, fileName string, value string) {
-	assert.NoError(t, os.MkdirAll(path, 0700))
+	assert.NoError(t, os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
-	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0600))
+	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0o600))
 }
 
 func setupViper(configFilePath string) *viper.Viper {
