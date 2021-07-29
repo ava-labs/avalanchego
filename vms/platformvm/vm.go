@@ -92,9 +92,9 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	mempool      Mempool
-	appSender    common.AppSender
-	AppRequestID uint32
+	mempool         Mempool
+	appSender       common.AppSender
+	lastIssuedReqID uint32
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -418,15 +418,65 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	// decode single id
+	txID := ids.ID{}
+	_, err := vm.codec.Unmarshal(request, &txID) // TODO: cleanup way we serialize this
+	if err != nil {
+		return err
+	}
+
+	if !vm.mempool.has(txID) {
+		return nil // return nothing is tx is unknown. Is it fine?
+	}
+
+	// fetch tx
+	var resTx *Tx // TODO: make search more efficient
+
+	for _, tx := range vm.mempool.unissuedProposalTxs.Txs {
+		if txID == tx.ID() {
+			resTx = tx
+			break
+		}
+	}
+	if resTx == nil {
+		for _, tx := range vm.mempool.unissuedDecisionTxs {
+			if txID == tx.ID() {
+				resTx = tx
+				break
+			}
+		}
+	}
+	if resTx == nil {
+		for _, tx := range vm.mempool.unissuedAtomicTxs {
+			if txID == tx.ID() {
+				resTx = tx
+				break
+			}
+		}
+	}
+	if resTx == nil {
+		return fmt.Errorf("incoherent mempool. Could not find registered tx")
+	}
+
+	// send response
+	response, err := vm.codec.Marshal(codecVersion, *resTx)
+	if err != nil {
+		return err
+	}
+
+	vm.lastIssuedReqID++
+
+	vm.appSender.SendAppResponse(nodeID, requestID, response)
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	// TODO: handle requestID
+
 	// decode single tx
-	// TODO: cleanup way we serialize this
 	tx := &Tx{}
-	_, err := vm.codec.Unmarshal(response, tx)
+	_, err := vm.codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
 	if err != nil {
 		return err
 	}
@@ -459,9 +509,8 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	// decode single id
-	// TODO: cleanup way we serialize this
 	txID := ids.ID{}
-	_, err := vm.codec.Unmarshal(msg, &txID)
+	_, err := vm.codec.Unmarshal(msg, &txID) // TODO: cleanup way we serialize this
 	if err != nil {
 		return err
 	}
@@ -470,10 +519,11 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 
-	vm.AppRequestID++
+	vm.lastIssuedReqID++
+
 	nodesSet := ids.NewShortSet(1)
 	nodesSet.Add(nodeID)
-	vm.appSender.SendAppRequest(nodesSet, vm.AppRequestID, msg)
+	vm.appSender.SendAppRequest(nodesSet, vm.lastIssuedReqID, msg)
 
 	return nil
 }

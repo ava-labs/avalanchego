@@ -124,7 +124,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	}
 }
 
-func TestMempool_Add_MaxSize(t *testing.T) {
+func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
 	// shows that valid tx is not added to mempool if this would exceed its maximum size
 
 	vm, _, _ := defaultVM()
@@ -166,7 +166,7 @@ func TestMempool_Add_MaxSize(t *testing.T) {
 	}
 }
 
-func TestMempool_AppResponseAndReGossiping(t *testing.T) {
+func TestMempool_AppResponseHandling(t *testing.T) {
 	// show that a tx discovered by a GossipResponse is re-gossiped
 	// only if duly added to mempool
 
@@ -198,9 +198,8 @@ func TestMempool_AppResponseAndReGossiping(t *testing.T) {
 	}
 
 	// gossip tx and check it is accepted and re-gossiped
-	dummyNodeID := ids.ShortID{}
-	dummyReqID := uint32(1)
-	if err := vm.AppResponse(dummyNodeID, dummyReqID, tx.Bytes()); err != nil {
+	dummyNodeID := ids.ShortID{'n', 'o', 'd', 'e'}
+	if err := vm.AppResponse(dummyNodeID, vm.lastIssuedReqID, tx.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !mempool.has(tx.ID()) {
@@ -214,7 +213,7 @@ func TestMempool_AppResponseAndReGossiping(t *testing.T) {
 
 	// case 1: reinsertion attempt
 	isTxRequested = false
-	if err := vm.AppResponse(dummyNodeID, dummyReqID, tx.Bytes()); err != nil {
+	if err := vm.AppResponse(dummyNodeID, vm.lastIssuedReqID, tx.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isTxRequested {
@@ -236,7 +235,7 @@ func TestMempool_AppResponseAndReGossiping(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.mempool.totalBytesSize = MaxMempoolByteSize
-	if err := vm.AppResponse(dummyNodeID, dummyReqID, tx2.Bytes()); err != nil {
+	if err := vm.AppResponse(dummyNodeID, vm.lastIssuedReqID, tx2.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isTxRequested {
@@ -246,7 +245,7 @@ func TestMempool_AppResponseAndReGossiping(t *testing.T) {
 	// TODO: case 3: received invalid tx
 }
 
-func TestMempool_AppGossipAndRequest(t *testing.T) {
+func TestMempool_AppGossipHandling(t *testing.T) {
 	// show that a txID discovered from gossip is requested to the same node
 	// only if the txID is unknown
 
@@ -283,7 +282,6 @@ func TestMempool_AppGossipAndRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	txID, err := vm.codec.Marshal(codecVersion, tx.ID())
 	if err != nil {
 		t.Fatal(err)
@@ -311,5 +309,64 @@ func TestMempool_AppGossipAndRequest(t *testing.T) {
 	}
 	if isTxRequested {
 		t.Fatal("known txID should not be requested")
+	}
+}
+
+func TestMempool_AppRequestHandling(t *testing.T) {
+	// show that a node answer to request with response
+	// only if it has the requested tx
+
+	vm, _, sender := defaultVM()
+	isResponseIssued := false
+	sender.CantSendAppResponse = true
+	sender.SendAppResponseF = func(nodeID ids.ShortID, reqID uint32, resp []byte) {
+		isResponseIssued = true
+	}
+	vm.ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+	mempool := &vm.mempool
+
+	// create a tx
+	tx, err := vm.newCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		avm.ID,
+		nil,
+		"chain name",
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	txID, err := vm.codec.Marshal(codecVersion, tx.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// show that there is no response if tx is unknown
+	dummyNodeID := ids.ShortID{'n', 'o', 'd', 'e'}
+	if err := vm.AppRequest(dummyNodeID, 19, txID); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if isResponseIssued {
+		t.Fatal("there should be no response with unknown tx")
+	}
+
+	// show that there is response if tx is unknown
+	if err := mempool.AddUncheckedTx(tx); err != nil {
+		t.Fatal("could not add tx to mempool")
+	}
+
+	if err := vm.AppRequest(dummyNodeID, 19, txID); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if !isResponseIssued {
+		t.Fatal("there should be a response with known tx")
 	}
 }
