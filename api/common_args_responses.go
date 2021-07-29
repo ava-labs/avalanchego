@@ -70,8 +70,10 @@ type GetTxArgs struct {
 
 // GetTxReply defines an object containing a single [Tx] object along with Encoding
 type GetTxReply struct {
-	// Tx is in [string] format when [GetTxArgs.Encoding] is [Hex] or [CB58]
-	// Tx is a Tx object when [GetTxArgs.Encoding] is [JSON]
+	// If [GetTxArgs.Encoding] is [Hex] or [CB58], [Tx] is the string
+	// representation of the tx under that encoding.
+	// If [GetTxArgs.Encoding] is [JSON], [Tx] is the actual tx, which will be
+	// returned as JSON to the caller.
 	Tx       interface{}         `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
