@@ -506,8 +506,8 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 
 	initialState := &InitialState{
-		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
+		FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
+		Outs:    make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
 	}
 	for _, holder := range args.InitialHolders {
 		addr, err := service.vm.ParseLocalAddress(holder.Address)
@@ -661,8 +661,8 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	initialState := &InitialState{
-		FxID: 1, // TODO: Should lookup nftfx FxID
-		Outs: make([]verify.State, 0, len(args.MinterSets)),
+		FxIndex: 1, // TODO: Should lookup nftfx FxID
+		Outs:    make([]verify.State, 0, len(args.MinterSets)),
 	}
 	for i, owner := range args.MinterSets {
 		minter := &nftfx.MintOutput{

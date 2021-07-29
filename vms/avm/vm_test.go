@@ -544,7 +544,7 @@ func TestTxSerialization(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{
 			{
-				FxID: 0,
+				FxIndex: 0,
 				Outs: []verify.State{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -915,7 +915,7 @@ func TestIssueNFT(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 1,
+			FxIndex: 1,
 			Outs: []verify.State{
 				&nftfx.MintOutput{
 					GroupID: 1,
@@ -1066,7 +1066,7 @@ func TestIssueProperty(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 2,
+			FxIndex: 2,
 			Outs: []verify.State{
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{

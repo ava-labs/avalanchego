@@ -714,7 +714,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
-		if state.FxID == uint32(fxID) {
+		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx
 			fxIDs.Add(uint(fxID))
 		}
