@@ -70,7 +70,7 @@ type ChainRouter struct {
 	timedRequests linkedhashmap.LinkedHashmap
 	// Last time at which there were no outstanding requests
 	lastTimeNoOutstanding time.Time
-	// Must only be accessed method [createRequestID]..
+	// Must only be accessed in method [createRequestID].
 	// [lock] must be held when [requestIDBytes] is accessed.
 	requestIDBytes []byte
 }
