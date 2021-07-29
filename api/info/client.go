@@ -6,6 +6,7 @@ package info
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
@@ -22,10 +23,22 @@ func NewClient(uri string, requestTimeout time.Duration) *Client {
 	}
 }
 
+func (c *Client) GetNodeVersion() (*GetNodeVersionReply, error) {
+	res := &GetNodeVersionReply{}
+	err := c.requester.SendRequest("getNodeVersion", struct{}{}, res)
+	return res, err
+}
+
 func (c *Client) GetNodeID() (string, error) {
 	res := &GetNodeIDReply{}
 	err := c.requester.SendRequest("getNodeID", struct{}{}, res)
 	return res.NodeID, err
+}
+
+func (c *Client) GetNodeIP() (string, error) {
+	res := &GetNodeIPReply{}
+	err := c.requester.SendRequest("getNodeIP", struct{}{}, res)
+	return res.IP, err
 }
 
 func (c *Client) GetNetworkID() (uint32, error) {
@@ -40,7 +53,7 @@ func (c *Client) GetNetworkName() (string, error) {
 	return res.NetworkName, err
 }
 
-func (c *Client) GetBlockchainID(alias string) (string, error) {
+func (c *Client) GetBlockchainID(alias string) (ids.ID, error) {
 	res := &GetBlockchainIDReply{}
 	err := c.requester.SendRequest("getBlockchainID", &GetBlockchainIDArgs{
 		Alias: alias,
@@ -65,17 +78,5 @@ func (c *Client) IsBootstrapped(chain string) (bool, error) {
 func (c *Client) GetTxFee() (*GetTxFeeResponse, error) {
 	res := &GetTxFeeResponse{}
 	err := c.requester.SendRequest("getTxFee", struct{}{}, res)
-	return res, err
-}
-
-func (c *Client) GetNodeIP() (string, error) {
-	res := &GetNodeIPReply{}
-	err := c.requester.SendRequest("getNodeIP", struct{}{}, res)
-	return res.IP, err
-}
-
-func (c *Client) GetNodeVersion() (*GetNodeVersionReply, error) {
-	res := &GetNodeVersionReply{}
-	err := c.requester.SendRequest("getNodeVersion", struct{}{}, res)
 	return res, err
 }

@@ -107,6 +107,19 @@ type GetNetworkIDReply struct {
 	NetworkID json.Uint32 `json:"networkID"`
 }
 
+// GetNodeIPReply are the results from calling GetNodeIP
+type GetNodeIPReply struct {
+	IP string `json:"ip"`
+}
+
+// GetNodeIP returns the IP of this node
+func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
+	service.log.Debug("Info: GetNodeIP called")
+
+	reply.IP = service.networking.IP().String()
+	return nil
+}
+
 // GetNetworkID returns the network ID this node is running on
 func (service *Info) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
 	service.log.Debug("Info: GetNetworkID called")
@@ -135,7 +148,7 @@ type GetBlockchainIDArgs struct {
 
 // GetBlockchainIDReply are the results from calling GetBlockchainID
 type GetBlockchainIDReply struct {
-	BlockchainID string `json:"blockchainID"`
+	BlockchainID ids.ID `json:"blockchainID"`
 }
 
 // GetBlockchainID returns the blockchain ID that resolves the alias that was supplied
@@ -143,7 +156,7 @@ func (service *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs,
 	service.log.Debug("Info: GetBlockchainID called")
 
 	bID, err := service.chainManager.Lookup(args.Alias)
-	reply.BlockchainID = bID.String()
+	reply.BlockchainID = bID
 	return err
 }
 
@@ -216,18 +229,5 @@ type GetTxFeeResponse struct {
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
 	reply.CreationTxFee = json.Uint64(service.creationTxFee)
 	reply.TxFee = json.Uint64(service.txFee)
-	return nil
-}
-
-// GetNodeIPReply are the results from calling GetNodeIP
-type GetNodeIPReply struct {
-	IP string `json:"ip"`
-}
-
-// GetNodeIP returns the IP of this node
-func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
-	service.log.Debug("Info: GetNodeIP called")
-
-	reply.IP = service.networking.IP().String()
 	return nil
 }
