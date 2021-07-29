@@ -4,7 +4,7 @@
 
 ---
 
-Official node implementation of the [Avalanche](https://avax.network) network -
+Node implementation for the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
 
 ## Installation
