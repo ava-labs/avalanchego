@@ -685,6 +685,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
+	assert.Contains(t, jsonString, "\"memo\":\"0x0102030405060708d29d6f72\"")
 	assert.Contains(t, jsonString, "\"inputs\":[{\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
 	assert.Contains(t, jsonString, "\"outputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 }
@@ -919,7 +920,9 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 	jsonTxBytes, err := json2.Marshal(reply.Tx)
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
-
+	// assert memo and payload are in hex
+	assert.Contains(t, jsonString, "\"memo\":\"0x7852b855\"")
+	assert.Contains(t, jsonString, "\"payload\":\"0x68656c6c6f938b9824\"")
 	// contains the address in the right format
 	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 	// contains the fxID
@@ -1128,6 +1131,8 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 
+	// ensure memo is in hex
+	assert.Contains(t, jsonString, "\"memo\":\"0x7852b855\"")
 	// contains the address in the right format
 	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
@@ -1338,6 +1343,8 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 	assert.NoError(t, err)
 	jsonString := string(jsonTxBytes)
 
+	// ensure memo is in hex
+	assert.Contains(t, jsonString, "\"memo\":\"0x7852b855\"")
 	// contains the address in the right format
 	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
 
@@ -1486,6 +1493,7 @@ func buildBaseTx(avaxTx *Tx, vm *VM, key *crypto.PrivateKeySECP256K1R) *Tx {
 	return &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
 		NetworkID:    networkID,
 		BlockchainID: chainID,
+		Memo:         []byte{1, 2, 3, 4, 5, 6, 7, 8},
 		Ins: []*avax.TransferableInput{{
 			UTXOID: avax.UTXOID{
 				TxID:        avaxTx.ID(),
