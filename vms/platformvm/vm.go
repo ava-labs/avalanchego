@@ -92,8 +92,9 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	mempool   Mempool
-	appSender common.AppSender
+	mempool      Mempool
+	appSender    common.AppSender
+	AppRequestID uint32
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -423,7 +424,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	// decode single tx
-	// TODO: version response for futureproofing
+	// TODO: cleanup way we serialize this
 	tx := &Tx{}
 	_, err := vm.codec.Unmarshal(response, tx)
 	if err != nil {
@@ -457,6 +458,23 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	// decode single id
+	// TODO: cleanup way we serialize this
+	txID := ids.ID{}
+	_, err := vm.codec.Unmarshal(msg, &txID)
+	if err != nil {
+		return err
+	}
+
+	if vm.mempool.has(txID) {
+		return nil
+	}
+
+	vm.AppRequestID++
+	nodesSet := ids.NewShortSet(1)
+	nodesSet.Add(nodeID)
+	vm.appSender.SendAppRequest(nodesSet, vm.AppRequestID, msg)
+
 	return nil
 }
 
