@@ -46,3 +46,17 @@ func TestGzipCompressDecompress(t *testing.T) {
 	_, err = compressor.Decompress(nonGzipData)
 	assert.Error(t, err)
 }
+
+func TestGzipCompressBomb(t *testing.T) {
+	data := make([]byte, 3*units.MiB)
+	compressor := NewGzipCompressor(2 * units.MiB)
+	_, err := compressor.Compress(data) // should be too large
+	assert.Error(t, err)
+
+	compressor2 := NewGzipCompressor(4 * units.MiB)
+	dataCompressed, err := compressor2.Compress(data)
+	assert.NoError(t, err)
+
+	_, err = compressor.Decompress(dataCompressed) // should be too large
+	assert.Error(t, err)
+}
