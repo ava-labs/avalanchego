@@ -73,3 +73,9 @@ func (c *Client) GetNodeIP() (string, error) {
 	err := c.requester.SendRequest("getNodeIP", struct{}{}, res)
 	return res.IP, err
 }
+
+func (c *Client) GetNodeVersion() (*GetNodeVersionReply, error) {
+	res := &GetNodeVersionReply{}
+	err := c.requester.SendRequest("getNodeVersion", struct{}{}, res)
+	return res, err
+}

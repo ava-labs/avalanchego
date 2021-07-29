@@ -219,7 +219,7 @@ func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeRe
 	return nil
 }
 
-// GetNodeIPReply are the results from calling GetNodeVersion
+// GetNodeIPReply are the results from calling GetNodeIP
 type GetNodeIPReply struct {
 	IP string `json:"ip"`
 }
