@@ -17,6 +17,8 @@ var (
 	errOperationsNotSortedUnique = errors.New("operations not sorted and unique")
 	errNoOperations              = errors.New("an operationTx must have at least one operation")
 	errDoubleSpend               = errors.New("inputs attempt to double spend an input")
+
+	_ UnsignedTx = &OperationTx{}
 )
 
 // OperationTx is a transaction with no credentials.

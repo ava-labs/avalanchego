@@ -16,7 +16,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var errNoExportOutputs = errors.New("no export outputs")
+var (
+	errNoExportOutputs = errors.New("no export outputs")
+
+	_ UnsignedTx = &ExportTx{}
+)
 
 // ExportTx is a transaction that exports an asset to another blockchain.
 type ExportTx struct {

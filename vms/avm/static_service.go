@@ -25,7 +25,27 @@ import (
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var errUnknownAssetType = errors.New("unknown asset type")
+var (
+	errUnknownAssetType = errors.New("unknown asset type")
+
+	_ avax.TransferableIn  = &secp256k1fx.TransferInput{}
+	_ verify.State         = &secp256k1fx.MintOutput{}
+	_ avax.TransferableOut = &secp256k1fx.TransferOutput{}
+	_ FxOperation          = &secp256k1fx.MintOperation{}
+	_ verify.Verifiable    = &secp256k1fx.Credential{}
+
+	_ verify.State      = &nftfx.MintOutput{}
+	_ verify.State      = &nftfx.TransferOutput{}
+	_ FxOperation       = &nftfx.MintOperation{}
+	_ FxOperation       = &nftfx.TransferOperation{}
+	_ verify.Verifiable = &nftfx.Credential{}
+
+	_ verify.State      = &propertyfx.MintOutput{}
+	_ verify.State      = &propertyfx.OwnedOutput{}
+	_ FxOperation       = &propertyfx.MintOperation{}
+	_ FxOperation       = &propertyfx.BurnOperation{}
+	_ verify.Verifiable = &propertyfx.Credential{}
+)
 
 // StaticService defines the base service for the asset vm
 type StaticService struct{}
@@ -169,32 +189,6 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	reply.Encoding = args.Encoding
 	return nil
 }
-
-var (
-	_ UnsignedTx = &BaseTx{}
-	_ UnsignedTx = &CreateAssetTx{}
-	_ UnsignedTx = &OperationTx{}
-	_ UnsignedTx = &ImportTx{}
-	_ UnsignedTx = &ExportTx{}
-
-	_ avax.TransferableIn  = &secp256k1fx.TransferInput{}
-	_ verify.State         = &secp256k1fx.MintOutput{}
-	_ avax.TransferableOut = &secp256k1fx.TransferOutput{}
-	_ FxOperation          = &secp256k1fx.MintOperation{}
-	_ verify.Verifiable    = &secp256k1fx.Credential{}
-
-	_ verify.State      = &nftfx.MintOutput{}
-	_ verify.State      = &nftfx.TransferOutput{}
-	_ FxOperation       = &nftfx.MintOperation{}
-	_ FxOperation       = &nftfx.TransferOperation{}
-	_ verify.Verifiable = &nftfx.Credential{}
-
-	_ verify.State      = &propertyfx.MintOutput{}
-	_ verify.State      = &propertyfx.OwnedOutput{}
-	_ FxOperation       = &propertyfx.MintOperation{}
-	_ FxOperation       = &propertyfx.BurnOperation{}
-	_ verify.Verifiable = &propertyfx.Credential{}
-)
 
 func staticCodec() (codec.Manager, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)

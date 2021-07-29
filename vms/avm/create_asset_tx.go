@@ -34,6 +34,8 @@ var (
 	errIllegalSymbolCharacter       = errors.New("asset's symbol must be all upper case letters")
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
+
+	_ UnsignedTx = &CreateAssetTx{}
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
