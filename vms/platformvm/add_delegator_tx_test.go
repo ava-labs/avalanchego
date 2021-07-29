@@ -14,7 +14,7 @@ import (
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -203,7 +203,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 		}
 	}
 
-	freshVM, _ := defaultVM()
+	freshVM, _, _ := defaultVM()
 	currentTimestamp := freshVM.internalState.GetTimestamp()
 
 	type test struct {
@@ -333,7 +333,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			vm, _ := defaultVM()
+			vm, _, _ := defaultVM()
 			vm.ctx.Lock.Lock()
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -367,7 +367,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 }
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

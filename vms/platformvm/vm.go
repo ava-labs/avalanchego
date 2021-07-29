@@ -436,18 +436,23 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	tx.Initialize(unsignedBytes, response)
 
 	// TODO: introduce relevant checks
-	// TODO: if checks fail, record ID among rejected tx,
-	// unless it's because of reached mempool size limits
-
 	err = vm.mempool.AddUncheckedTx(tx)
-	if err != nil {
+	switch err {
+	case nil:
+		vm.appSender.SendAppGossip(response)
+		return nil
+	case errTxExceedingMempoolSize:
+		// tx has not been accepted to mempool due to size
+		// do not gossip since we cannot serve it
+		return nil
+	case errAttemptReRegisterTx:
+		// we already have the tx [maybe requested multiple times to different nodes?].
+		// Do not regossip
+		return nil
+	default:
+		// TODO: record among rejected to avoid requesting again
 		return err
 	}
-
-	// gossip newly accepted tx
-	vm.appSender.SendAppGossip(response)
-
-	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages

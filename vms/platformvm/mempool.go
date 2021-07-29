@@ -28,6 +28,7 @@ var (
 	errEndOfTime              = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
 	errNoPendingBlocks        = errors.New("no pending blocks")
 	errUnknownTxType          = errors.New("unknown transaction type")
+	errAttemptReRegisterTx    = errors.New("transaction already in mempool, could no reinsert")
 	errTxExceedingMempoolSize = errors.New("dropping incoming tx since mempool would breach maximum size")
 )
 
@@ -128,13 +129,20 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 		return err
 	}
 
-	return m.AddUncheckedTx(tx)
+	switch err := m.AddUncheckedTx(tx); err {
+	case nil:
+		return nil
+	case errAttemptReRegisterTx:
+		return nil // backward compatibility
+	default:
+		return err
+	}
 }
 
 func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 	txID := tx.ID()
 	if m.has(txID) {
-		return nil
+		return errAttemptReRegisterTx
 	}
 	if !m.hasRoomFor(tx) {
 		return errTxExceedingMempoolSize

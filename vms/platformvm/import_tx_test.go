@@ -17,7 +17,7 @@ import (
 )
 
 func TestNewImportTx(t *testing.T) {
-	vm, baseDB := defaultVM()
+	vm, baseDB, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

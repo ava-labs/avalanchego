@@ -12,7 +12,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	// shows that a locally generated CreateChainTx can be added to mempool
 	// and then removed by inclusion in a block
 
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -68,7 +68,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	// shows that a CreateChainTx received as gossip response can be added to mempool
 	// and then remove by inclusion in a block
 
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -127,7 +127,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 func TestMempool_Add_MaxSize(t *testing.T) {
 	// shows that valid tx is not added to mempool if this would exceed its maximum size
 
-	vm, _ := defaultVM()
+	vm, _, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -164,4 +164,84 @@ func TestMempool_Add_MaxSize(t *testing.T) {
 	if err := mempool.AddUncheckedTx(tx); err != nil {
 		t.Fatal("should be possible to add tx")
 	}
+}
+
+func TestMempool_GossipResposeAndReGossiping(t *testing.T) {
+	// show that a tx discovered by a GossipResponse is re-gossiped
+	// only if duly added to mempool
+
+	vm, _, sender := defaultVM()
+	txGossiped := false
+	sender.CantSendAppGossip = true
+	sender.SendAppGossipF = func(b []byte) { txGossiped = true }
+	vm.ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+	mempool := &vm.mempool
+
+	// create tx to be received from AppGossipResponse
+	tx, err := vm.newCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		avm.ID,
+		nil,
+		"chain name",
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// gossip tx and check it is accepted and re-gossiped
+	dummyNodeID := ids.ShortID{}
+	dummyReqID := uint32(1)
+	if err := vm.AppResponse(dummyNodeID, dummyReqID, tx.Bytes()); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if !mempool.has(tx.ID()) {
+		t.Fatal("Issued tx not recorded into mempool")
+	}
+	if !txGossiped {
+		t.Fatal("tx accepted in mempool should have been re-gossiped")
+	}
+
+	// show that if tx is not accepted to mempool is not regossiped
+
+	// case 1: reinsertion attempt
+	txGossiped = false
+	if err := vm.AppResponse(dummyNodeID, dummyReqID, tx.Bytes()); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if txGossiped {
+		t.Fatal("unaccepted tx should have not been regossiped")
+	}
+
+	// case 2: filled mempool
+	txGossiped = false
+	tx2, err := vm.newCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		avm.ID,
+		nil,
+		"chain name 2",
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.mempool.totalBytesSize = MaxMempoolByteSize
+	if err := vm.AppResponse(dummyNodeID, dummyReqID, tx2.Bytes()); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if txGossiped {
+		t.Fatal("unaccepted tx should have not been regossiped")
+	}
+
+	// TODO: case 3: received invalid tx
 }
