@@ -5,7 +5,6 @@ package avax
 
 import "github.com/ava-labs/avalanchego/snow"
 
-// TestVerifiable ...
 type TestVerifiable struct{ Err error }
 
 func (v *TestVerifiable) InitCtx(ctx *snow.Context) {}
@@ -23,7 +22,6 @@ func (t *TestTransferable) InitCtx(*snow.Context) {
 	// no op
 }
 
-// Amount ...
 func (t *TestTransferable) Amount() uint64 { return t.Val }
 
 type TestAddressable struct {

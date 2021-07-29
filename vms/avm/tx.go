@@ -152,8 +152,6 @@ func (t *Tx) SignSECP256K1Fx(c codec.Manager, signers [][]*crypto.PrivateKeySECP
 	return nil
 }
 
-// SignPropertyFx ...
-// todo cleanup sign methods
 func (t *Tx) SignPropertyFx(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
 	unsignedBytes, err := c.Marshal(codecVersion, &t.UnsignedTx)
 	if err != nil {

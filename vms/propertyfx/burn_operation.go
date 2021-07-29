@@ -14,5 +14,4 @@ func (op *BurnOperation) InitCtx(ctx *snow.Context) {
 	// no op
 }
 
-// Outs ...
 func (op *BurnOperation) Outs() []verify.State { return nil }

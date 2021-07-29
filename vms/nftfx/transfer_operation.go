@@ -20,7 +20,6 @@ func (op *TransferOperation) InitCtx(ctx *snow.Context) {
 	op.Output.OutputOwners.InitCtx(ctx)
 }
 
-// Outs ...
 func (op *TransferOperation) Outs() []verify.State {
 	return []verify.State{&op.Output}
 }

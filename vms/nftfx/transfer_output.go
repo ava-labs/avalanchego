@@ -32,7 +32,6 @@ func (out *TransferOutput) InitCtx(ctx *snow.Context) {
 	out.OutputOwners.InitCtx(ctx)
 }
 
-// Verify ...
 func (out *TransferOutput) Verify() error {
 	switch {
 	case out == nil:

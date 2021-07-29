@@ -24,7 +24,6 @@ func (op *MintOperation) InitCtx(ctx *snow.Context) {
 	op.TransferOutput.OutputOwners.InitCtx(ctx)
 }
 
-// Outs ...
 func (op *MintOperation) Outs() []verify.State {
 	return []verify.State{&op.MintOutput, &op.TransferOutput}
 }
