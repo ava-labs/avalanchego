@@ -5,7 +5,6 @@ package utils
 
 import (
 	"crypto/rand"
-	"io"
 )
 
 // CopyBytes returns a copy of the provided byte slice. If nil is provided, nil
@@ -26,29 +25,4 @@ func RandomBytes(n int) []byte {
 	b := make([]byte, n)
 	_, _ = rand.Read(b)
 	return b
-}
-
-// ReadAtMost is adapted from io.ReadFull
-func ReadAtMost(r io.Reader, maxSize int) ([]byte, error) {
-	b := make([]byte, 0, 512)
-	for {
-		if len(b) == cap(b) {
-			// Add more capacity (let append pick how much).
-			b = append(b, 0)[:len(b)]
-		}
-
-		limit := cap(b)
-		if limit > maxSize {
-			limit = maxSize
-		}
-
-		n, err := r.Read(b[len(b):limit])
-		b = b[:len(b)+n]
-		if err == io.EOF || len(b) >= maxSize {
-			return b, nil
-		}
-		if err != nil {
-			return b, err
-		}
-	}
 }

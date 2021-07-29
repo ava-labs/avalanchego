@@ -48,7 +48,7 @@ type codec struct {
 	compressor            compression.Compressor
 }
 
-func NewCodec(namespace string, metrics prometheus.Registerer, maxMessageSize int) (Codec, error) {
+func NewCodec(namespace string, metrics prometheus.Registerer, maxMessageSize int64) (Codec, error) {
 	return NewCodecWithAllocator(
 		namespace,
 		metrics,
@@ -57,7 +57,7 @@ func NewCodec(namespace string, metrics prometheus.Registerer, maxMessageSize in
 	)
 }
 
-func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getBytes func() []byte, maxMessageSize int) (Codec, error) {
+func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getBytes func() []byte, maxMessageSize int64) (Codec, error) {
 	c := &codec{
 		getBytes:              getBytes,
 		bytesSavedMetrics:     make(map[Op]metric.Averager, len(ops)),

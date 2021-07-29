@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"errors"
+	"io"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -16,7 +17,7 @@ var errTooLarge = errors.New("message too large")
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
-	maxSize int
+	maxSize int64
 
 	lock sync.Mutex
 
@@ -29,7 +30,7 @@ type gzipCompressor struct {
 
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
-	if len(msg) > g.maxSize {
+	if int64(len(msg)) > g.maxSize {
 		return nil, errTooLarge
 	}
 
@@ -59,19 +60,19 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.gzipReader.Reset(g.bytesReader); err != nil {
 		return nil, err
 	}
-
-	decompressed, err := utils.ReadAtMost(g.gzipReader, g.maxSize+1)
+	limitedReader := io.LimitReader(g.gzipReader, g.maxSize+1)
+	decompressed, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}
-	if len(decompressed) > g.maxSize {
+	if int64(len(decompressed)) > g.maxSize {
 		return nil, errTooLarge
 	}
 	return decompressed, g.gzipReader.Close()
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
-func NewGzipCompressor(maxSize int) Compressor {
+func NewGzipCompressor(maxSize int64) Compressor {
 	var buf bytes.Buffer
 	return &gzipCompressor{
 		maxSize: maxSize,
