@@ -29,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/components/missing"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/appsender"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/appsender/appsenderproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
@@ -67,6 +69,7 @@ type VMClient struct {
 	sharedMemory *gsharedmemory.Server
 	bcLookup     *galiaslookup.Server
 	snLookup     *gsubnetlookup.Server
+	appSender    *appsender.Server
 
 	serverCloser grpcutils.ServerCloser
 	conns        []*grpc.ClientConn
@@ -95,7 +98,7 @@ func (vm *VMClient) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
-	appSender common.AppSender, // TODO wrap and give to server
+	appSender common.AppSender,
 ) error {
 	if len(fxs) != 0 {
 		return errUnsupportedFXs
@@ -127,6 +130,7 @@ func (vm *VMClient) Initialize(
 	vm.sharedMemory = gsharedmemory.NewServer(ctx.SharedMemory, dbManager.Current().Database)
 	vm.bcLookup = galiaslookup.NewServer(ctx.BCLookup)
 	vm.snLookup = gsubnetlookup.NewServer(ctx.SNLookup)
+	vm.appSender = appsender.NewServer(appSender)
 
 	// start the db server
 	dbBrokerID := vm.broker.NextId()
@@ -152,6 +156,10 @@ func (vm *VMClient) Initialize(
 	snLookupBrokerID := vm.broker.NextId()
 	go vm.broker.AcceptAndServe(snLookupBrokerID, vm.startSNLookupServer)
 
+	// start the AppSender server
+	appSenderBrokerID := vm.broker.NextId()
+	go vm.broker.AcceptAndServe(appSenderBrokerID, vm.startAppSenderServer)
+
 	resp, err := vm.client.Initialize(context.Background(), &vmproto.InitializeRequest{
 		NetworkID:            ctx.NetworkID,
 		SubnetID:             ctx.SubnetID[:],
@@ -168,6 +176,7 @@ func (vm *VMClient) Initialize(
 		SharedMemoryServer:   sharedMemoryBrokerID,
 		BcLookupServer:       bcLookupBrokerID,
 		SnLookupServer:       snLookupBrokerID,
+		AppSenderServer:      appSenderBrokerID,
 		EpochFirstTransition: epochFirstTransitionBytes,
 		EpochDuration:        uint64(ctx.EpochDuration),
 	})
@@ -272,6 +281,13 @@ func (vm *VMClient) startSNLookupServer(opts []grpc.ServerOption) *grpc.Server {
 	server := grpc.NewServer(opts...)
 	vm.serverCloser.Add(server)
 	gsubnetlookupproto.RegisterSubnetLookupServer(server, vm.snLookup)
+	return server
+}
+
+func (vm *VMClient) startAppSenderServer(opts []grpc.ServerOption) *grpc.Server {
+	server := grpc.NewServer(opts...)
+	vm.serverCloser.Add(server)
+	appsenderproto.RegisterAppSenderServer(server, vm.appSender)
 	return server
 }
 

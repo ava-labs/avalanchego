@@ -6,6 +6,7 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -27,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/appsender"
+	"github.com/ava-labs/avalanchego/vms/rpcchainvm/appsender/appsenderproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
@@ -44,8 +47,9 @@ var _ vmproto.VMServer = &VMServer{}
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
 	vmproto.UnimplementedVMServer
-	vm     block.ChainVM
-	broker *plugin.GRPCBroker
+	sync.Once // used in Shutdown
+	vm        block.ChainVM
+	broker    *plugin.GRPCBroker
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -159,11 +163,28 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		return nil, err
 	}
 
+	appSenderConn, err := vm.broker.Dial(req.AppSenderServer)
+	if err != nil {
+		// Ignore closing error to return the original error
+		_ = vm.connCloser.Close()
+		return nil, err
+	}
+
 	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
 	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(keystoreConn), vm.broker)
 	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(sharedMemoryConn))
 	bcLookupClient := galiaslookup.NewClient(galiaslookupproto.NewAliasLookupClient(bcLookupConn))
 	snLookupClient := gsubnetlookup.NewClient(gsubnetlookupproto.NewSubnetLookupClient(snLookupConn))
+	appSenderClient := appsender.NewClient(
+		appsenderproto.NewAppSenderClient(appSenderConn),
+		func() {
+			// If there's an error while sending an app-level message,
+			// shut down this VM. This can only happen due to a plugin/gRPC
+			// level error (the methods of common.AppSender don't return errors.)
+			// Ignore the error below; there's nothing to be done with it.
+			_, _ = vm.Shutdown(context.Background(), &vmproto.EmptyMsg{})
+		},
+	)
 
 	toEngine := make(chan common.Message, 1)
 	go func() {
@@ -191,8 +212,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		EpochDuration:        time.Duration(req.EpochDuration),
 	}
 
-	// TODO wrap AppSender and pass it in below
-	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, nil); err != nil {
+	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
 		close(toEngine)
@@ -233,13 +253,20 @@ func (vm *VMServer) Shutdown(context.Context, *vmproto.EmptyMsg) (*vmproto.Empty
 	if vm.toEngine == nil {
 		return &vmproto.EmptyMsg{}, nil
 	}
-
 	errs := wrappers.Errs{}
-	errs.Add(vm.vm.Shutdown())
-	close(vm.toEngine)
-
-	vm.serverCloser.Stop()
-	errs.Add(vm.connCloser.Close())
+	// Recall that appSenderClient calls Shutdown if there's an error while sending an app-level message.
+	// (See call to appsender.NewClient in Initialize.)
+	// We use a sync.Once here to make sure that we don't accidentally execute Shutdown twice.
+	// (That would cause a panic from closing a closed channel.)
+	// This might happen during node shutdown: the engine calls Shutdown on this VM,
+	// and sending an app-level message may also error because the node is shutting down,
+	// causing Shutdown to be called a second time.
+	vm.Once.Do(func() {
+		errs.Add(vm.vm.Shutdown())
+		close(vm.toEngine)
+		vm.serverCloser.Stop()
+		errs.Add(vm.connCloser.Close())
+	})
 
 	return &vmproto.EmptyMsg{}, errs.Err
 }

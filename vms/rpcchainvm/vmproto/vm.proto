@@ -23,9 +23,11 @@ message InitializeRequest {
     uint32 sharedMemoryServer = 13;
     uint32 bcLookupServer = 14;
     uint32 snLookupServer = 15;
+    uint32 appSenderServer = 16;
 
-    bytes epochFirstTransition = 16;
-    uint64 EpochDuration = 17;
+    bytes epochFirstTransition = 17;
+    uint64 EpochDuration = 18;
+
 }
 
 message InitializeResponse {
