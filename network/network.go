@@ -429,6 +429,7 @@ func NewNetwork(
 		func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
 		},
+		int(maxMessageSize),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing codec failed with: %s", err)

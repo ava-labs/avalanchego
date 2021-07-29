@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +22,7 @@ func TestGzipCompressDecompress(t *testing.T) {
 		data2[i] = byte(rand.Intn(256)) // #nosec G404
 	}
 
-	compressor := NewGzipCompressor()
+	compressor := NewGzipCompressor(2 * units.MiB)
 
 	dataCompressed, err := compressor.Compress(data)
 	assert.NoError(t, err)
