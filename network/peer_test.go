@@ -41,7 +41,7 @@ func (m *TestMsg) Bytes() []byte {
 	return m.bytes
 }
 
-func (m *TestMsg) BytesSaved() int {
+func (m *TestMsg) BytesSavedCompression() int {
 	return 0
 }
 

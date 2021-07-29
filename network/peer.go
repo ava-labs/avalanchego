@@ -417,7 +417,8 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 	}
 	msgMetrics.numReceived.Inc()
 	msgMetrics.receivedBytes.Add(float64(msgLen))
-	if saved := msg.BytesSaved(); saved != 0 {
+	// assume that if [saved] == 0, [msg] wasn't compressed
+	if saved := msg.BytesSavedCompression(); saved != 0 {
 		msgMetrics.savedReceivedBytes.Observe(float64(saved))
 	}
 
@@ -529,7 +530,8 @@ func (p *peer) sendGetVersion() {
 	if sent {
 		p.net.metrics.getVersion.numSent.Inc()
 		p.net.metrics.getVersion.sentBytes.Add(float64(lenMsg))
-		if saved := msg.BytesSaved(); saved != 0 {
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.getVersion.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -565,7 +567,8 @@ func (p *peer) sendVersion() {
 	if sent {
 		p.net.metrics.version.numSent.Inc()
 		p.net.metrics.version.sentBytes.Add(float64(lenMsg))
-		if saved := msg.BytesSaved(); saved != 0 {
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.version.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -586,7 +589,8 @@ func (p *peer) sendGetPeerList() {
 	if sent {
 		p.net.getPeerlist.numSent.Inc()
 		p.net.getPeerlist.sentBytes.Add(float64(lenMsg))
-		if saved := msg.BytesSaved(); saved != 0 {
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.getPeerlist.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -617,7 +621,8 @@ func (p *peer) sendPeerList() {
 	if sent {
 		p.net.peerList.numSent.Inc()
 		p.net.peerList.sentBytes.Add(float64(lenMsg))
-		if saved := msg.BytesSaved(); saved != 0 {
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.peerList.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -637,7 +642,8 @@ func (p *peer) sendPing() {
 	if sent {
 		p.net.ping.numSent.Inc()
 		p.net.ping.sentBytes.Add(float64(lenMsg))
-		if saved := msg.BytesSaved(); saved != 0 {
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.ping.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
@@ -656,7 +662,8 @@ func (p *peer) sendPong() {
 	if sent {
 		p.net.pong.numSent.Inc()
 		p.net.pong.sentBytes.Add(float64(lenMsg))
-		if saved := msg.BytesSaved(); saved != 0 {
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
 			p.net.metrics.pong.savedSentBytes.Observe(float64(saved))
 		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())

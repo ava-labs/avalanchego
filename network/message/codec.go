@@ -154,7 +154,7 @@ func (c *codec) Pack(
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
 	c.compressTimeMetrics[op].Observe(float64(time.Since(startTime)))
-	msg.bytesSaved = len(payloadBytes) - len(compressedPayloadBytes) // may be negative
+	msg.bytesSavedCompression = len(payloadBytes) - len(compressedPayloadBytes) // may be negative
 	// Remove the uncompressed payload (keep just the message type and isCompressed)
 	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen]
 	// Attach the compressed payload
@@ -222,9 +222,9 @@ func (c *codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error)
 	}
 
 	return &message{
-		op:         op,
-		fields:     fieldValues,
-		bytes:      p.Bytes,
-		bytesSaved: bytesSaved,
+		op:                    op,
+		fields:                fieldValues,
+		bytes:                 p.Bytes,
+		bytesSavedCompression: bytesSaved,
 	}, p.Err
 }
