@@ -6,14 +6,12 @@ package compression
 import (
 	"bytes"
 	"compress/gzip"
-	"errors"
+	"fmt"
 	"io"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
-
-var errTooLarge = errors.New("message too large")
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
@@ -31,7 +29,7 @@ type gzipCompressor struct {
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
 	if int64(len(msg)) > g.maxSize {
-		return nil, errTooLarge
+		return nil, fmt.Errorf("msg length (%d) > maximum msg length (%d)", len(msg), g.maxSize)
 	}
 
 	g.lock.Lock()
@@ -66,7 +64,7 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 	if int64(len(decompressed)) > g.maxSize {
-		return nil, errTooLarge
+		return nil, fmt.Errorf("msg length > maximum msg length (%d)", g.maxSize)
 	}
 	return decompressed, g.gzipReader.Close()
 }
