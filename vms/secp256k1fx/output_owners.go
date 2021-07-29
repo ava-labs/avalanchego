@@ -55,7 +55,7 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 	for i, addr := range out.Addrs {
 		// for each [addr] in [Addrs] we attempt to format it given
 		// the [out.ctx] object
-		fAddr, err := FormatAddress(out.ctx, addr)
+		fAddr, err := formatAddress(out.ctx, addr)
 		if err != nil {
 			// we expect these addresses to be valid, return error
 			// if they are not
