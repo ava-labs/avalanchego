@@ -41,6 +41,10 @@ func (m *TestMsg) Bytes() []byte {
 	return m.bytes
 }
 
+func (m *TestMsg) BytesSavedCompression() int {
+	return 0
+}
+
 func TestPeer_Close(t *testing.T) {
 	log := logging.NoLog{}
 	ip := utils.NewDynamicIPDesc(
