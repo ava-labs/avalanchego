@@ -108,6 +108,10 @@ func (b *Block) ID() ids.ID { return b.id }
 func (b *Block) Accept() error {
 	vm := b.vm
 
+	// Although returning an error from Accept is considered fatal, it is good
+	// practice to cleanup the batch we were modifying in the case of an error.
+	defer vm.db.Abort()
+
 	b.status = choices.Accepted
 	log.Debug(fmt.Sprintf("Accepting block %s (%s) at height %d", b.ID().Hex(), b.ID(), b.Height()))
 	if err := vm.chain.Accept(b.ethBlock); err != nil {
@@ -202,16 +206,10 @@ func (b *Block) syntacticVerify() (params.Rules, error) {
 
 // Verify implements the snowman.Block interface
 func (b *Block) Verify() error {
-	if err := b.VerifyWithoutWrites(); err != nil {
-		return err
-	}
-
-	// InsertBlock must be the last step in verification to prevent a memory leak in the management
-	// of tries that the chain maintains an active reference to.
-	return b.vm.chain.InsertBlock(b.ethBlock)
+	return b.verify(true)
 }
 
-func (b *Block) VerifyWithoutWrites() error {
+func (b *Block) verify(writes bool) error {
 	rules, err := b.syntacticVerify()
 	if err != nil {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
@@ -233,43 +231,31 @@ func (b *Block) VerifyWithoutWrites() error {
 	if err != nil {
 		return err
 	}
-	if atomicTx == nil {
-		return nil
-	}
+	if atomicTx != nil {
+		// If the ancestor is unknown, then the parent failed verification when
+		// it was called.
+		// If the ancestor is rejected, then this block shouldn't be inserted
+		// into the canonical chain because the parent is will be missing.
+		if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+			return errRejectedParent
+		}
+		ancestor, ok := ancestorIntf.(*Block)
+		if !ok {
+			return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
+		}
 
-	// If the ancestor is unknown, then the parent failed verification when
-	// it was called.
-	// If the ancestor is rejected, then this block shouldn't be inserted
-	// into the canonical chain because the parent is will be missing.
-	if blkStatus := ancestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
-		return errRejectedParent
-	}
-	ancestor, ok := ancestorIntf.(*Block)
-	if !ok {
-		return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorIntf)
-	}
-
-	parentState, err := vm.chain.BlockState(ancestor.ethBlock)
-	if err != nil {
-		return err
-	}
-
-	if bonusBlocks.Contains(b.id) {
-		log.Info("skipping atomic tx verification on bonus block", "block", b.id)
-	} else {
-		utx := atomicTx.UnsignedAtomicTx
-		if err := utx.SemanticVerify(vm, atomicTx, ancestor, rules); err != nil {
-			return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
+		if bonusBlocks.Contains(b.id) {
+			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
+		} else {
+			utx := atomicTx.UnsignedAtomicTx
+			if err := utx.SemanticVerify(vm, atomicTx, ancestor, rules); err != nil {
+				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
+			}
 		}
 	}
 
-	// TODO: Because InsertChain calls Process, can't this invocation be removed?
 	bc := vm.chain.BlockChain()
-	_, _, _, err = bc.Processor().Process(b.ethBlock, parentState, *bc.GetVMConfig())
-	if err != nil {
-		return fmt.Errorf("invalid block due to failed processing: %w", err)
-	}
-	return nil
+	return bc.InsertBlockManual(b.ethBlock, writes)
 }
 
 // Bytes implements the snowman.Block interface

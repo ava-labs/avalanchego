@@ -185,6 +185,7 @@ func New(stack *node.Node, config *Config,
 			Pruning:        config.Pruning,
 			SnapshotLimit:  config.SnapshotCache,
 			SnapshotAsync:  config.SnapshotAsync,
+			SnapshotVerify: config.SnapshotVerify,
 			Preimages:      config.Preimages,
 		}
 	)
