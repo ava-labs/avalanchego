@@ -61,15 +61,13 @@ type Tx struct {
 // Init initializes FxID where required
 // Used for JSON marshaling of data
 func (t *Tx) Init(vm *VM) error {
-	for i, n := 0, len(t.Creds); i < n; i++ {
-		cred := t.Creds[i].Verifiable
-		fx, err := vm.getParsedFx(cred)
+	for _, cred := range t.Creds {
+		fx, err := vm.getParsedFx(cred.Verifiable)
 		if err != nil {
 			return err
 		}
 
-		// change this to pointer so that it does not need to be re-initialised
-		t.Creds[i].FxID = fx.ID
+		cred.FxID = fx.ID
 	}
 	return t.UnsignedTx.Init(vm)
 }
