@@ -8,6 +8,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils"
@@ -59,7 +60,7 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 	limitedReader := io.LimitReader(g.gzipReader, g.maxSize+1)
-	decompressed, err := io.ReadAll(limitedReader)
+	decompressed, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
 	}
