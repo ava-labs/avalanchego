@@ -239,13 +239,13 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -419,13 +419,13 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -589,13 +589,13 @@ func TestNewImportTx(t *testing.T) {
 
 			xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 			inputID := utxo.InputID()
-			if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+			if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 				Key:   inputID[:],
 				Value: utxoBytes,
 				Traits: [][]byte{
 					testKeys[0].PublicKey().Address().Bytes(),
 				},
-			}}); err != nil {
+			}}}}); err != nil {
 				t.Fatal(err)
 			}
 
