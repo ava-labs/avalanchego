@@ -102,21 +102,38 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 // [bytes] may be nil, in which case it will be treated the same
 // as an empty slice
 func Encode(encoding Encoding, bytes []byte) (string, error) {
-	switch {
-	case !encoding.valid():
-		return "", errInvalidEncoding
-	case encoding == CB58 && len(bytes) > maxCB58EncodeSize:
-		return "", fmt.Errorf("byte slice length (%d) > maximum for cb58 (%d)", len(bytes), maxCB58EncodeSize)
+	if err := validateEncoding(encoding, bytes); err != nil {
+		return "", err
 	}
 
 	checked := make([]byte, len(bytes)+checksumLen)
 	copy(checked, bytes)
 	copy(checked[len(bytes):], hashing.Checksum(bytes, checksumLen))
+	return encode(encoding, checked)
+}
+
+// EncodeWithoutChecksum [bytes] to a string using the given encoding format
+// [bytes] may be nil, in which case it will be treated the same
+// as an empty slice
+// does not apply checksum
+func EncodeWithoutChecksum(encoding Encoding, bytes []byte) (string, error) {
+	if err := validateEncoding(encoding, bytes); err != nil {
+		return "", err
+	}
+
+	unchecked := make([]byte, len(bytes)+checksumLen)
+	copy(unchecked, bytes)
+	return encode(encoding, unchecked)
+}
+
+// encode encodes given [bytes] to [encoding] format
+// does not validate [validateEncoding] must be called to check
+func encode(encoding Encoding, bytes []byte) (string, error) {
 	switch encoding {
 	case Hex:
-		return fmt.Sprintf("0x%x", checked), nil
+		return fmt.Sprintf("0x%x", bytes), nil
 	case CB58:
-		return base58.Encode(checked), nil
+		return base58.Encode(bytes), nil
 	case JSON:
 		// JSON Marshal does not support []byte input and we rely on the
 		// router's json marshalling to marshal our interface{} into JSON
@@ -125,6 +142,18 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 	default:
 		return "", errInvalidEncoding
 	}
+}
+
+// validateEncoding validates given [encoding] to [bytes]
+// Returns error if encoding is invalid or not applicable
+func validateEncoding(encoding Encoding, bytes []byte) error {
+	switch {
+	case !encoding.valid():
+		return errInvalidEncoding
+	case encoding == CB58 && len(bytes) > maxCB58EncodeSize:
+		return fmt.Errorf("byte slice length (%d) > maximum for cb58 (%d)", len(bytes), maxCB58EncodeSize)
+	}
+	return nil
 }
 
 // Decode [str] to bytes using the given encoding
