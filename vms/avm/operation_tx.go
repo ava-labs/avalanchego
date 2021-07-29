@@ -26,8 +26,7 @@ type OperationTx struct {
 }
 
 func (t *OperationTx) Init(vm *VM) error {
-	for i, n := 0, len(t.Ops); i < n; i++ {
-		op := t.Ops[i]
+	for _, op := range t.Ops {
 		fx, err := vm.getParsedFx(op.Op)
 		if err != nil {
 			return err
