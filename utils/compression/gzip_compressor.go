@@ -59,7 +59,12 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.gzipReader.Reset(g.bytesReader); err != nil {
 		return nil, err
 	}
+
+	// We allow [io.LimitReader] to read up to [g.maxSize + 1] bytes, so that if
+	// the decompressed payload is greater than the maximum size, this function
+	// will return the appropriate error instead of an incomplete byte slice.
 	limitedReader := io.LimitReader(g.gzipReader, g.maxSize+1)
+
 	decompressed, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err

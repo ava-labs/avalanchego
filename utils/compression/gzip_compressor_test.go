@@ -47,7 +47,7 @@ func TestGzipCompressDecompress(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestGzipCompressBomb(t *testing.T) {
+func TestGzipSizeLimiting(t *testing.T) {
 	data := make([]byte, 3*units.MiB)
 	compressor := NewGzipCompressor(2 * units.MiB)
 	_, err := compressor.Compress(data) // should be too large
