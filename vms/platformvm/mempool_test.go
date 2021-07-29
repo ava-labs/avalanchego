@@ -1,7 +1,9 @@
 package platformvm
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -93,9 +95,8 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	}
 
 	// gossip tx and check it is accepted
-	dummyNodeID := ids.ShortID{}
-	dummyReqID := uint32(1)
-	if err := vm.AppResponse(dummyNodeID, dummyReqID, tx.Bytes()); err != nil {
+	dummyNodeID := ids.ShortID{'n', 'o', 'd', 'e'}
+	if err := vm.AppResponse(dummyNodeID, vm.issueRequestID(), tx.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !mempool.has(tx.ID()) {
@@ -199,7 +200,8 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 
 	// gossip tx and check it is accepted and re-gossiped
 	dummyNodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	if err := vm.AppResponse(dummyNodeID, vm.lastIssuedReqID, tx.Bytes()); err != nil {
+	reqID := vm.issueRequestID()
+	if err := vm.AppResponse(dummyNodeID, reqID, tx.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !mempool.has(tx.ID()) {
@@ -213,7 +215,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 
 	// case 1: reinsertion attempt
 	isTxRequested = false
-	if err := vm.AppResponse(dummyNodeID, vm.lastIssuedReqID, tx.Bytes()); err != nil {
+	if err := vm.AppResponse(dummyNodeID, vm.issueRequestID(), tx.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isTxRequested {
@@ -235,7 +237,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.mempool.totalBytesSize = MaxMempoolByteSize
-	if err := vm.AppResponse(dummyNodeID, vm.lastIssuedReqID, tx2.Bytes()); err != nil {
+	if err := vm.AppResponse(dummyNodeID, vm.issueRequestID(), tx2.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isTxRequested {
@@ -351,7 +353,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 
 	// show that there is no response if tx is unknown
 	dummyNodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	if err := vm.AppRequest(dummyNodeID, 19, txID); err != nil {
+	if err := vm.AppRequest(dummyNodeID, vm.issueRequestID(), txID); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isResponseIssued {
@@ -363,10 +365,84 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	if err := vm.AppRequest(dummyNodeID, 19, txID); err != nil {
+	if err := vm.AppRequest(dummyNodeID, vm.issueRequestID(), txID); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !isResponseIssued {
 		t.Fatal("there should be a response with known tx")
+	}
+}
+
+func TestMempool_AppRequestIDHandling(t *testing.T) {
+	// show that multiple outstanding requests can be issued, with increasing reqID
+	// response can arrive in any order. Requests with unknown reqID are dropped
+
+	vm, _, _ := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+
+	// show that reqID increase starting from zero
+	issueRounds := []uint32{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	for _, i := range issueRounds {
+		currentID := vm.issueRequestID()
+		if currentID != i {
+			t.Fatal("unexpected reqID")
+		}
+	}
+
+	// show that unknown reqID results in error
+	unknownID := uint32(len(issueRounds)) + 1
+	if err := vm.consumeReqID(unknownID); err == nil {
+		t.Fatalf("should not be possible to consume unknownID")
+	}
+
+	// show response can come in any order
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(issueRounds), func(i, j int) {
+		issueRounds[i], issueRounds[j] = issueRounds[j], issueRounds[i]
+	})
+
+	for it, i := range issueRounds {
+		if err := vm.consumeReqID(i); err != nil {
+			t.Fatalf("consume: err %v at iteration %d, index %d, permutation %v", err, it, i, issueRounds)
+		}
+
+		// re-consuming same reqID should fail
+		if err := vm.consumeReqID(i); err == nil {
+			t.Fatalf("re-consume: err %v at iteration %d, index %d, permutation %v", err, it, i, issueRounds)
+		}
+	}
+
+	// show that consumed reqIDs are recycled
+	firstID := vm.issueRequestID()
+	secondID := vm.issueRequestID()
+	thirdID := vm.issueRequestID()
+
+	if err := vm.consumeReqID(secondID); err != nil {
+		t.Fatalf("could not consume secondID")
+	}
+	if err := vm.consumeReqID(thirdID); err != nil {
+		t.Fatalf("could not consume thirdID")
+	}
+
+	fourthID := vm.issueRequestID()
+	if fourthID != secondID {
+		t.Fatalf("could not reuse consumed ID")
+	}
+
+	if err := vm.consumeReqID(fourthID); err != nil {
+		t.Fatalf("could not consume fourthID")
+	}
+	if err := vm.consumeReqID(firstID); err != nil {
+		t.Fatalf("could not consume firstID")
+	}
+
+	if lastID := vm.issueRequestID(); lastID != firstID {
+		t.Fatalf("could not reuse consumed ID")
 	}
 }

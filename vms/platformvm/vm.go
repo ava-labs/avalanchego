@@ -92,9 +92,10 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	mempool         Mempool
-	appSender       common.AppSender
-	lastIssuedReqID uint32
+	mempool          Mempool
+	appSender        common.AppSender
+	outstandingReqID map[uint32]struct{}
+	lastIssuedReqID  uint32
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -181,6 +182,7 @@ func (vm *VM) Initialize(
 
 	vm.mempool.Initialize(vm)
 	vm.appSender = appSender
+	vm.outstandingReqID = make(map[uint32]struct{})
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
 	if err != nil {
@@ -464,15 +466,41 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		return err
 	}
 
-	vm.lastIssuedReqID++
-
 	vm.appSender.SendAppResponse(nodeID, requestID, response)
+	return nil
+}
+
+func (vm *VM) issueRequestID() uint32 {
+	vm.lastIssuedReqID++
+	vm.outstandingReqID[vm.lastIssuedReqID] = struct{}{}
+	return vm.lastIssuedReqID
+}
+
+func (vm *VM) consumeReqID(reqID uint32) error {
+	if _, ok := vm.outstandingReqID[reqID]; !ok {
+		return fmt.Errorf("unknown ReqID")
+	}
+
+	delete(vm.outstandingReqID, reqID)
+
+	// reset lastIssuedReqID
+	vm.lastIssuedReqID = 0
+	for id := range vm.outstandingReqID {
+		if vm.lastIssuedReqID < id {
+			vm.lastIssuedReqID = id
+		}
+	}
+
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	// TODO: handle requestID
+	if err := vm.consumeReqID(requestID); err != nil {
+		vm.ctx.Log.Debug("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %v",
+			nodeID, requestID)
+		return nil
+	}
 
 	// decode single tx
 	tx := &Tx{}
@@ -519,11 +547,9 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 
-	vm.lastIssuedReqID++
-
 	nodesSet := ids.NewShortSet(1)
 	nodesSet.Add(nodeID)
-	vm.appSender.SendAppRequest(nodesSet, vm.lastIssuedReqID, msg)
+	vm.appSender.SendAppRequest(nodesSet, vm.issueRequestID(), msg)
 
 	return nil
 }
