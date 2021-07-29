@@ -141,39 +141,28 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 		file       map[string]string
 		err        error
 		errMessage string
-		flagSet    bool
 		expected   map[string]chains.ChainConfig
 	}{
 		"cdir not exist": {
 			structure: "/",
 			file:      map[string]string{"config.ex": "noeffect"},
 			err:       os.ErrNotExist,
-			flagSet:   true,
 			expected:  nil,
 		},
 		"cdir is file ": {
 			structure:  "/",
 			file:       map[string]string{"cdir": "noeffect"},
 			errMessage: "not a directory",
-			flagSet:    true,
 			expected:   nil,
-		},
-		"cdir not exist flag not set": {
-			structure: "/",
-			file:      map[string]string{"config.ex": "noeffect"},
-			flagSet:   false,
-			expected:  map[string]chains.ChainConfig{},
 		},
 		"chain subdir not exist": {
 			structure: "/cdir/",
 			file:      map[string]string{"config.ex": "noeffect"},
-			flagSet:   true,
 			expected:  map[string]chains.ChainConfig{},
 		},
 		"full structure": {
 			structure: "/cdir/C/",
 			file:      map[string]string{"config.ex": "hello"},
-			flagSet:   true,
 			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
@@ -183,12 +172,7 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
 			chainConfigDir := path.Join(root, "cdir")
-			var configJSON string
-			if test.flagSet {
-				configJSON = fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
-			} else {
-				configJSON = "{}"
-			}
+			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
 			configFile := setupConfigJSON(t, root, configJSON)
 
 			dirToCreate := path.Join(root, test.structure)
@@ -200,9 +184,8 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			v := setupViper(configFile)
 
 			// Parse config
-			if test.flagSet {
-				assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
-			}
+			assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
+
 			// don't read with getConfigFromViper since it's very slow.
 			chainConfigs, err := getChainConfigs(v)
 			switch {
