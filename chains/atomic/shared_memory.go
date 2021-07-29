@@ -18,14 +18,12 @@ type Requests struct {
 	peerChainID ids.ID
 }
 
-// Element ...
 type Element struct {
 	Key    []byte
 	Value  []byte
 	Traits [][]byte
 }
 
-// SharedMemory ...
 type SharedMemory interface {
 	// Fetches from this chain's side
 	Get(peerChainID ids.ID, keys [][]byte) (values [][]byte, err error)

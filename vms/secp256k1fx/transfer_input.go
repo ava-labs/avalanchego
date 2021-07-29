@@ -9,7 +9,6 @@ import (
 
 var errNoValueInput = errors.New("input has no value")
 
-// TransferInput ...
 type TransferInput struct {
 	Amt   uint64 `serialize:"true" json:"amount"`
 	Input `serialize:"true"`

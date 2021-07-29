@@ -11,7 +11,6 @@ import (
 // routerMetrics about router messages
 type routerMetrics struct {
 	outstandingRequests   prometheus.Gauge
-	msgDropRate           prometheus.Gauge
 	longestRunningRequest prometheus.Gauge
 }
 
@@ -20,21 +19,14 @@ func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*rout
 	rMetrics.outstandingRequests = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "outstanding_requests",
+			Name:      "outstanding",
 			Help:      "Number of outstanding requests (all types)",
-		},
-	)
-	rMetrics.msgDropRate = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "msg_drop_rate",
-			Help:      "Rate of messages dropped",
 		},
 	)
 	rMetrics.longestRunningRequest = prometheus.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "longest_running_request",
+			Name:      "longest_running",
 			Help:      "Time (in ns) the longest request took",
 		},
 	)
@@ -42,7 +34,6 @@ func newRouterMetrics(namespace string, registerer prometheus.Registerer) (*rout
 	errs := wrappers.Errs{}
 	errs.Add(
 		registerer.Register(rMetrics.outstandingRequests),
-		registerer.Register(rMetrics.msgDropRate),
 		registerer.Register(rMetrics.longestRunningRequest),
 	)
 	return rMetrics, errs.Err

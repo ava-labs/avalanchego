@@ -44,7 +44,6 @@ func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
 	return ShortFromString(strings.TrimPrefix(idStr, prefix))
 }
 
-// MarshalJSON ...
 func (id ShortID) MarshalJSON() ([]byte, error) {
 	str, err := formatting.Encode(defaultEncoding, id[:])
 	if err != nil {
@@ -53,7 +52,6 @@ func (id ShortID) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + str + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (id *ShortID) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == "null" { // If "null", do nothing

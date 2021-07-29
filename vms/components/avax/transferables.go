@@ -46,7 +46,6 @@ type TransferableOut interface {
 	Amounter
 }
 
-// TransferableOutput ...
 type TransferableOutput struct {
 	Asset `serialize:"true"`
 
@@ -110,7 +109,6 @@ func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Manager) bo
 	return sort.IsSorted(&innerSortTransferableOutputs{outs: outs, codec: c})
 }
 
-// TransferableInput ...
 type TransferableInput struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
@@ -151,10 +149,8 @@ func (ins innerSortTransferableInputs) Less(i, j int) bool {
 func (ins innerSortTransferableInputs) Len() int      { return len(ins) }
 func (ins innerSortTransferableInputs) Swap(i, j int) { ins[j], ins[i] = ins[i], ins[j] }
 
-// SortTransferableInputs ...
 func SortTransferableInputs(ins []*TransferableInput) { sort.Sort(innerSortTransferableInputs(ins)) }
 
-// IsSortedAndUniqueTransferableInputs ...
 func IsSortedAndUniqueTransferableInputs(ins []*TransferableInput) bool {
 	return utils.IsSortedAndUnique(innerSortTransferableInputs(ins))
 }

@@ -19,7 +19,6 @@ var (
 	_         Upgrader = &tlsClientUpgrader{}
 )
 
-// Upgrader ...
 type Upgrader interface {
 	// Must be thread safe
 	Upgrade(net.Conn) (ids.ShortID, net.Conn, *x509.Certificate, error)
@@ -29,7 +28,6 @@ type tlsServerUpgrader struct {
 	config *tls.Config
 }
 
-// NewTLSServerUpgrader ...
 func NewTLSServerUpgrader(config *tls.Config) Upgrader {
 	return tlsServerUpgrader{
 		config: config,
@@ -44,7 +42,6 @@ type tlsClientUpgrader struct {
 	config *tls.Config
 }
 
-// NewTLSClientUpgrader ...
 func NewTLSClientUpgrader(config *tls.Config) Upgrader {
 	return tlsClientUpgrader{
 		config: config,

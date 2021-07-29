@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// WalletClient ...
 type WalletClient struct {
 	requester rpc.EndpointRequester
 }

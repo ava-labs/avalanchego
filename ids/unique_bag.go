@@ -12,7 +12,6 @@ const (
 	minUniqueBagSize = 16
 )
 
-// UniqueBag ...
 type UniqueBag map[ID]BitSet
 
 func (b *UniqueBag) init() {
@@ -21,7 +20,6 @@ func (b *UniqueBag) init() {
 	}
 }
 
-// Add ...
 func (b *UniqueBag) Add(setID uint, idSet ...ID) {
 	bs := BitSet(0)
 	bs.Add(setID)
@@ -31,7 +29,6 @@ func (b *UniqueBag) Add(setID uint, idSet ...ID) {
 	}
 }
 
-// UnionSet ...
 func (b *UniqueBag) UnionSet(id ID, set BitSet) {
 	b.init()
 
@@ -40,7 +37,6 @@ func (b *UniqueBag) UnionSet(id ID, set BitSet) {
 	(*b)[id] = previousSet
 }
 
-// DifferenceSet ...
 func (b *UniqueBag) DifferenceSet(id ID, set BitSet) {
 	b.init()
 
@@ -49,7 +45,6 @@ func (b *UniqueBag) DifferenceSet(id ID, set BitSet) {
 	(*b)[id] = previousSet
 }
 
-// Difference ...
 func (b *UniqueBag) Difference(diff *UniqueBag) {
 	b.init()
 
@@ -61,13 +56,10 @@ func (b *UniqueBag) Difference(diff *UniqueBag) {
 	}
 }
 
-// GetSet ...
 func (b *UniqueBag) GetSet(id ID) BitSet { return (*b)[id] }
 
-// RemoveSet ...
 func (b *UniqueBag) RemoveSet(id ID) { delete(*b, id) }
 
-// List ...
 func (b *UniqueBag) List() []ID {
 	idList := make([]ID, len(*b))
 	i := 0
@@ -78,7 +70,6 @@ func (b *UniqueBag) List() []ID {
 	return idList
 }
 
-// Bag ...
 func (b *UniqueBag) Bag(alpha int) Bag {
 	bag := Bag{
 		counts: make(map[ID]int, len(*b)),
