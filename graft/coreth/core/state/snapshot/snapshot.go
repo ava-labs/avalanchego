@@ -41,7 +41,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
-	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
 )
 
@@ -157,11 +156,6 @@ type snapshot interface {
 	// Note, the maps are retained by the method to avoid copying everything.
 	Update(blockHash, blockRoot common.Hash, destructs map[common.Hash]struct{}, accounts map[common.Hash][]byte, storage map[common.Hash]map[common.Hash][]byte) *diffLayer
 
-	// Journal commits an entire diff hierarchy to disk into a single journal entry.
-	// This is meant to be used during shutdown to persist the snapshot without
-	// flattening everything down (bad for reorgs).
-	Journal(buffer *bytes.Buffer) (common.Hash, error)
-
 	// Stale return whether this layer has become stale (was flattened across) or
 	// if it's still live.
 	Stale() bool
@@ -203,10 +197,8 @@ type Tree struct {
 //
 // If the snapshot is missing or the disk layer is broken, the entire is deleted
 // and will be reconstructed from scratch based on the tries in the key-value
-// store, on a background thread. If the memory layers from the journal is not
-// continuous with disk layer or the journal is missing, all diffs will be discarded
-// iff it's in "recovery" mode, otherwise rebuild is mandatory.
-func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, async bool, rebuild bool, recovery bool) (*Tree, error) {
+// store, on a background thread.
+func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash, root common.Hash, async bool, rebuild bool, verify bool) (*Tree, error) {
 	// Create a new, empty snapshot tree
 	snap := &Tree{
 		diskdb:      diskdb,
@@ -214,17 +206,18 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 		cache:       cache,
 		blockLayers: make(map[common.Hash]snapshot),
 		stateLayers: make(map[common.Hash]map[common.Hash]snapshot),
+		verified:    !verify, // if verify is false, all verification will be bypassed
 	}
 
 	// Attempt to load a previously persisted snapshot and rebuild one if failed
-	head, generated, err := loadSnapshot(diskdb, triedb, cache, blockHash, root, recovery)
+	head, generated, err := loadSnapshot(diskdb, triedb, cache, blockHash, root)
 	if err != nil {
 		if rebuild {
 			log.Warn("Failed to load snapshot, regenerating", "err", err)
 			snap.Rebuild(blockHash, root)
 			if !async {
-				if err := snap.waitBuild(); err != nil {
-					return nil, fmt.Errorf("sync snapshot generation failed: %w", err)
+				if err := snap.verifyIntegrity(snap.disklayer(), true); err != nil {
+					return nil, err
 				}
 			}
 			return snap, nil
@@ -242,16 +235,10 @@ func New(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, blockHash
 		head = head.Parent()
 	}
 
-	// We assume a snapshot read from disk on startup was previously verified. This prevents
-	// us from a doing a costly re-verification procedure when it is not needed.
-	if generated {
-		snap.verified = true
-		return snap, nil
-	}
-
-	if !async {
-		if err := snap.waitBuild(); err != nil {
-			return nil, fmt.Errorf("sync snapshot generation failed: %w", err)
+	// Verify any synchronously generated or loaded snapshot from disk
+	if !async || generated {
+		if err := snap.verifyIntegrity(snap.disklayer(), !async && !generated); err != nil {
+			return nil, err
 		}
 	}
 
@@ -268,29 +255,6 @@ func (t *Tree) insertSnap(snap snapshot) {
 		t.stateLayers[snap.Root()] = blockSnaps
 	}
 	blockSnaps[snap.BlockHash()] = snap
-}
-
-// waitBuild blocks until the snapshot finishes rebuilding. This method is meant
-// to be used by tests to ensure we're testing what we believe we are. It is
-// assumed that the caller either holds the [snapTree] lock or calls this
-// function during initialization.
-func (t *Tree) waitBuild() error {
-	// Find the rebuild termination channel
-	var done chan struct{}
-
-	t.lock.RLock()
-	diskLayer := t.disklayer()
-	if diskLayer != nil {
-		done = diskLayer.genPending
-	}
-	t.lock.RUnlock()
-	if done == nil {
-		return nil
-	}
-
-	// Wait until the snapshot is generated
-	<-done
-	return t.verifyIntegrity(diskLayer, true)
 }
 
 // Snapshot retrieves a snapshot belonging to the given state root, or nil if no
@@ -372,11 +336,28 @@ func (t *Tree) Update(blockHash, blockRoot, parentBlockHash common.Hash, destruc
 	return nil
 }
 
-// verifyIntegrity performs an integrity check on the current snapshot. It is
-// assumed that the caller holds the [snapTree] lock.
-func (t *Tree) verifyIntegrity(base *diskLayer, snapshotGenerated bool) error {
-	if t.verified || !snapshotGenerated {
+// verifyIntegrity performs an integrity check on the current snapshot using
+// verify. Most importantly, verifyIntegrity ensures verify is called at
+// most once during the entire lifetime of [Tree], returning immediately if
+// already invoked. If [waitBuild] is true, verifyIntegrity will wait for
+// generation of the snapshot to finish before verifying.
+//
+// It is assumed that the caller holds the [snapTree] lock
+// when calling this function.
+func (t *Tree) verifyIntegrity(base *diskLayer, waitBuild bool) error {
+	// Find the rebuild termination channel and wait until
+	// the snapshot is generated
+	if done := base.genPending; waitBuild && done != nil {
+		log.Info("Waiting for snapshot generation", "root", base.root)
+		<-done
+	}
+
+	if t.verified {
 		return nil
+	}
+
+	if base.genMarker != nil {
+		return errors.New("cannot verify integrity of an unfinished snapshot")
 	}
 
 	start := time.Now()
@@ -490,7 +471,11 @@ func (t *Tree) Flatten(blockHash common.Hash) error {
 	}
 	rebloom(base.blockHash)
 	log.Debug("Flattened snapshot tree", "blockHash", blockHash, "root", base.root, "size", len(t.blockLayers), "elapsed", common.PrettyDuration(time.Since(start)))
-	return t.verifyIntegrity(base, snapshotGenerated)
+
+	if !snapshotGenerated {
+		return nil
+	}
+	return t.verifyIntegrity(base, false)
 }
 
 // Length returns the number of snapshot layers that is currently being maintained.
@@ -558,10 +543,6 @@ func (t *Tree) AbortGeneration() {
 	defer t.lock.Unlock()
 
 	dl := t.disklayer()
-	if dl == nil {
-		return
-	}
-
 	dl.abortGeneration()
 }
 
@@ -740,49 +721,6 @@ func diffToDisk(bottom *diffLayer) (*diskLayer, bool, error) {
 	return res, base.genMarker == nil, nil
 }
 
-// Journal commits an entire diff hierarchy to disk into a single journal entry.
-// This is meant to be used during shutdown to persist the snapshot without
-// flattening everything down (bad for reorgs).
-//
-// The method returns the root hash of the base layer that needs to be persisted
-// to disk as a trie too to allow continuing any pending generation op.
-func (t *Tree) Journal() (common.Hash, error) {
-	// Run the journaling
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
-	// Firstly write out the metadata of journal
-	journal := new(bytes.Buffer)
-	if err := rlp.Encode(journal, journalVersion); err != nil {
-		return common.Hash{}, err
-	}
-	disklayer := t.disklayer()
-	diskBlockhash := disklayer.blockHash
-	if diskBlockhash == (common.Hash{}) {
-		return common.Hash{}, errors.New("invalid disk block hash")
-	}
-	diskroot := disklayer.root
-	if diskroot == (common.Hash{}) {
-		return common.Hash{}, errors.New("invalid disk root")
-	}
-	// Secondly write out the disk layer block hash and state root, ensure the
-	// diff journal is continuous with disk.
-	if err := rlp.Encode(journal, diskBlockhash); err != nil {
-		return common.Hash{}, err
-	}
-	if err := rlp.Encode(journal, diskroot); err != nil {
-		return common.Hash{}, err
-	}
-	// Finally write out the journal of each layer in reverse order.
-	base, err := disklayer.Journal(journal)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	// Store the journal into the database and return
-	rawdb.WriteSnapshotJournal(t.diskdb, journal.Bytes())
-	return base, nil
-}
-
 // Rebuild wipes all available snapshot data from the persistent database and
 // discard all caches and diff layers. Afterwards, it starts a new snapshot
 // generator with the given root hash.
@@ -793,7 +731,9 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 	// Firstly delete any recovery flag in the database. Because now we are
 	// building a brand new snapshot. Also reenable the snapshot feature.
 	rawdb.DeleteSnapshotRecoveryNumber(t.diskdb)
-	rawdb.DeleteSnapshotDisabled(t.diskdb)
+
+	// Track whether there's a wipe currently running and keep it alive if so
+	var wiper chan struct{}
 
 	// Iterate over and mark all layers stale
 	for _, layer := range t.blockLayers {
@@ -803,8 +743,12 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 			if layer.genAbort != nil {
 				abort := make(chan struct{})
 				layer.genAbort <- abort
-
 				<-abort
+
+				if stats := layer.genStats; stats != nil {
+					wiper = stats.wiping
+				}
+
 			}
 			// Layer should be inactive now, mark it as stale
 			layer.lock.Lock()
@@ -824,7 +768,7 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 	// Start generating a new snapshot from scratch on a background thread. The
 	// generator will run a wiper first if there's not one running right now.
 	log.Info("Rebuilding state snapshot")
-	base := generateSnapshot(t.diskdb, t.triedb, t.cache, blockHash, root)
+	base := generateSnapshot(t.diskdb, t.triedb, t.cache, blockHash, root, wiper)
 	t.blockLayers = map[common.Hash]snapshot{
 		blockHash: base,
 	}
@@ -836,7 +780,9 @@ func (t *Tree) Rebuild(blockHash, root common.Hash) {
 }
 
 // AccountIterator creates a new account iterator for the specified root hash and
-// seeks to a starting account hash.
+// seeks to a starting account hash. When [force] is true, a new account
+// iterator is created without acquiring the [snapTree] lock and without
+// confirming that the snapshot on the disk layer is fully generated.
 func (t *Tree) AccountIterator(root common.Hash, seek common.Hash, force bool) (AccountIterator, error) {
 	if !force {
 		ok, err := t.generating()
@@ -851,7 +797,9 @@ func (t *Tree) AccountIterator(root common.Hash, seek common.Hash, force bool) (
 }
 
 // StorageIterator creates a new storage iterator for the specified root hash and
-// account. The iterator will be move to the specific start position.
+// account. The iterator will be move to the specific start position. When [force]
+// is true, a new account iterator is created without acquiring the [snapTree]
+// lock and without confirming that the snapshot on the disk layer is fully generated.
 func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek common.Hash, force bool) (StorageIterator, error) {
 	if !force {
 		ok, err := t.generating()
@@ -867,12 +815,14 @@ func (t *Tree) StorageIterator(root common.Hash, account common.Hash, seek commo
 
 // Verify iterates the whole state(all the accounts as well as the corresponding storages)
 // with the specific root and compares the re-computed hash with the original one.
-// When [force] is true, it is assumed that the caller has confirmed that the
-// snapshot is generated and that they hold the snapTree lock.
 func (t *Tree) Verify(root common.Hash) error {
 	return t.verify(root, false)
 }
 
+// verify iterates the whole state(all the accounts as well as the corresponding storages)
+// with the specific root and compares the re-computed hash with the original one.
+// When [force] is true, it is assumed that the caller has confirmed that the
+// snapshot is generated and that they hold the snapTree lock.
 func (t *Tree) verify(root common.Hash, force bool) error {
 	acctIt, err := t.AccountIterator(root, common.Hash{}, force)
 	if err != nil {

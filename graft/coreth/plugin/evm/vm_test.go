@@ -585,6 +585,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
 
+	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk1Root := ethBlk1.Root(); vm.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	}
+
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
 	vm.State.Flush()
 	blk2Refreshed, err := vm.GetBlockInternal(blk2.ID())
@@ -759,6 +764,11 @@ func TestSetPreferenceRace(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -862,6 +872,15 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -929,6 +948,11 @@ func TestSetPreferenceRace(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Block D
@@ -1022,6 +1046,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
 
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
@@ -1120,6 +1147,11 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 
 	if err := vm.SetPreference(blk0.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk0.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -1312,6 +1344,11 @@ func TestReorgProtection(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1413,6 +1450,15 @@ func TestReorgProtection(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Create list of 10 successive transactions to build block A on vm1
@@ -1525,6 +1571,11 @@ func TestNonCanonicalAccept(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1626,6 +1677,15 @@ func TestNonCanonicalAccept(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Create list of 10 successive transactions to build block A on vm1
@@ -1731,6 +1791,11 @@ func TestStickyPreference(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1834,6 +1899,15 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -1906,6 +1980,11 @@ func TestStickyPreference(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
@@ -2030,6 +2109,11 @@ func TestUncleBlock(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2133,6 +2217,15 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -2194,6 +2287,11 @@ func TestUncleBlock(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:10])
@@ -2363,6 +2461,11 @@ func TestAcceptReorg(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2466,6 +2569,15 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("VM2 failed to accept block: %s", err)
 	}
 
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	// Create list of 10 successive transactions to build block A on vm1
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
@@ -2526,6 +2638,11 @@ func TestAcceptReorg(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
@@ -2700,6 +2817,9 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2773,6 +2893,11 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	txs := make([]*types.Transaction, 10)
@@ -2866,6 +2991,9 @@ func TestApricotPhase1Transition(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2941,6 +3069,11 @@ func TestApricotPhase1Transition(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 5; i++ {
 		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -3008,6 +3141,11 @@ func TestApricotPhase1Transition(t *testing.T) {
 		if ethBlkTxs[i].Hash() != tx.Hash() {
 			t.Fatalf("expected tx at index %d to have hash: %x but has: %x", i, txs[i].Hash(), tx.Hash())
 		}
+	}
+
+	newHead = <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blkB.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm1.chain.AddRemoteTxs(txs[5:])

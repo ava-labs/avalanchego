@@ -56,6 +56,7 @@ type diskLayer struct {
 	genStats *generatorStats // Stats for snapshot generation (generation aborted/finished if non-nil)
 
 	created      time.Time // Time at which disk layer was created
+	logged       time.Time // Time at which last logged generation progress
 	abortStarted time.Time // Time as which disk layer started to be aborted
 
 	lock sync.RWMutex

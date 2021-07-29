@@ -354,6 +354,7 @@ func (vm *VM) Initialize(
 	ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	ethConfig.Pruning = vm.config.Pruning
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
+	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
@@ -603,7 +604,10 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	// Note: this is only called when building a new block, so caching
 	// verification will only be a significant optimization for nodes
 	// that produce a large number of blocks.
-	if err := blk.Verify(); err != nil {
+	// We call verify without writes here to avoid generating a reference
+	// to the blk state root in the triedb when we are going to call verify
+	// again from the consensus engine with writes enabled.
+	if err := blk.verify(false); err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}
