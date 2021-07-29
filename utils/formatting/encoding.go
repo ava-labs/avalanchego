@@ -126,7 +126,7 @@ func EncodeWithoutChecksum(encoding Encoding, bytes []byte) (string, error) {
 }
 
 // encode encodes given [bytes] to [encoding] format
-// does not validate [validateEncoding] must be called to check
+// validateEncoding([encoding],[bytes]) should be called before this
 func encode(encoding Encoding, bytes []byte) (string, error) {
 	switch encoding {
 	case Hex:
