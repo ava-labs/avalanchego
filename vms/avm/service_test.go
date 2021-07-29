@@ -5,36 +5,33 @@ package avm
 
 import (
 	"bytes"
-	json2 "encoding/json"
 	"fmt"
 	"math/rand"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	json2 "encoding/json"
 
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/version"
-
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-
-	"github.com/ava-labs/avalanchego/vms/nftfx"
-
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/sampler"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/stretchr/testify/assert"
 )
 
 var testChangeAddr = ids.GenerateTestShortID()

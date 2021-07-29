@@ -6,11 +6,10 @@ package avm
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/snow"
-
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -21,9 +20,7 @@ type testOperable struct {
 	Outputs []verify.State `serialize:"true"`
 }
 
-func (o *testOperable) InitCtx(ctx *snow.Context) {
-	// no op
-}
+func (o *testOperable) InitCtx(ctx *snow.Context) {}
 
 func (o *testOperable) Outs() []verify.State { return o.Outputs }
 

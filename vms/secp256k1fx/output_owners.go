@@ -7,12 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-
-	"github.com/ava-labs/avalanchego/snow"
-
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 

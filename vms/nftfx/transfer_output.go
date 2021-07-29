@@ -3,7 +3,6 @@ package nftfx
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -24,12 +23,6 @@ type TransferOutput struct {
 	GroupID                  uint32 `serialize:"true" json:"groupID"`
 	Payload                  []byte `serialize:"true" json:"payload"`
 	secp256k1fx.OutputOwners `serialize:"true"`
-}
-
-// InitCtx assigns the OutputOwners.ctx object to given [ctx] object
-// Must be called at least once for MarshalJSON to work successfully
-func (out *TransferOutput) InitCtx(ctx *snow.Context) {
-	out.OutputOwners.InitCtx(ctx)
 }
 
 func (out *TransferOutput) Verify() error {

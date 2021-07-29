@@ -113,21 +113,19 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownTx
 	}
-	var err error
-	if args.Encoding == formatting.JSON {
-		err = tx.Init(service.vm)
-		if err != nil {
-			return err
-		}
 
+	reply.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
 		reply.Tx = tx
-	} else {
-		reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
+		return tx.Init(service.vm)
 	}
+
+	var err error
+	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}
-	reply.Encoding = args.Encoding
 	return nil
 }
 

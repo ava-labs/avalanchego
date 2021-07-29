@@ -12,10 +12,11 @@ import (
 var errNoValueInput = errors.New("input has no value")
 
 type TransferInput struct {
-	snow.ContextInitializable `serialize:"false" json:"-"`
-	Amt                       uint64 `serialize:"true" json:"amount"`
-	Input                     `serialize:"true"`
+	Amt   uint64 `serialize:"true" json:"amount"`
+	Input `serialize:"true"`
 }
+
+func (in *TransferInput) InitCtx(*snow.Context) {}
 
 // Amount returns the quantity of the asset this input produces
 func (in *TransferInput) Amount() uint64 { return in.Amt }

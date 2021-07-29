@@ -7,7 +7,6 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/snow"
-
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 

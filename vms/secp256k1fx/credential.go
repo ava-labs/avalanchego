@@ -4,7 +4,7 @@
 package secp256k1fx
 
 import (
-	json2 "encoding/json"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -36,7 +36,7 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 	jsonFieldMap := map[string]interface{}{
 		"signatures": signatures,
 	}
-	b, err := json2.Marshal(jsonFieldMap)
+	b, err := json.Marshal(jsonFieldMap)
 	return b, err
 }
 
