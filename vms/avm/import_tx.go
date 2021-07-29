@@ -33,10 +33,8 @@ func (t *ImportTx) Init(vm *VM) error {
 		if err != nil {
 			return err
 		}
-
 		in.FxID = fx.ID
 	}
-
 	return t.BaseTx.Init(vm)
 }
 

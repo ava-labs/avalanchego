@@ -30,7 +30,6 @@ func (t *BaseTx) Init(vm *VM) error {
 		if err != nil {
 			return err
 		}
-
 		in.FxID = fx.ID
 	}
 

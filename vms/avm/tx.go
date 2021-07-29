@@ -53,7 +53,6 @@ type UnsignedTx interface {
 type Tx struct {
 	UnsignedTx `serialize:"true" json:"unsignedTx"`
 
-	// change to pointer for better state management
 	Creds []*FxCredential `serialize:"true" json:"credentials"` // The credentials of this transaction
 }
 
@@ -65,7 +64,6 @@ func (t *Tx) Init(vm *VM) error {
 		if err != nil {
 			return err
 		}
-
 		cred.FxID = fx.ID
 	}
 	return t.UnsignedTx.Init(vm)

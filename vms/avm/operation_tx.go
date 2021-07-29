@@ -34,7 +34,6 @@ func (t *OperationTx) Init(vm *VM) error {
 		op.FxID = fx.ID
 		op.Op.InitCtx(vm.ctx)
 	}
-
 	return t.BaseTx.Init(vm)
 }
 

@@ -49,7 +49,6 @@ func (t *CreateAssetTx) Init(vm *VM) error {
 	for _, state := range t.States {
 		fx := vm.fxs[state.FxIndex]
 		state.FxID = fx.ID
-
 		state.InitCtx(vm.ctx)
 	}
 	return t.BaseTx.Init(vm)

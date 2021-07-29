@@ -104,12 +104,10 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 		return errNilTxID
 	}
 
-	// replace with service.vm.GetTxBytes instead
 	tx := UniqueTx{
 		vm:   service.vm,
 		txID: args.TxID,
 	}
-
 	if status := tx.Status(); !status.Fetched() {
 		return errUnknownTx
 	}

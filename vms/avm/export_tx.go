@@ -38,7 +38,6 @@ func (t *ExportTx) Init(vm *VM) error {
 		out.FxID = fx.ID
 		out.InitCtx(vm.ctx)
 	}
-
 	return t.BaseTx.Init(vm)
 }
 
