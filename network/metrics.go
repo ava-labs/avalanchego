@@ -9,14 +9,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/network/message"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type messageMetrics struct {
 	receivedBytes, sentBytes, numSent, numFailed, numReceived prometheus.Counter
+	savedReceivedBytes, savedSentBytes                        metric.Averager
 }
 
-func (mm *messageMetrics) initialize(msgType message.Op, namespace string, registerer prometheus.Registerer) error {
+func (mm *messageMetrics) initialize(msgType message.Op, namespace string, metrics prometheus.Registerer) error {
 	mm.numSent = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_sent", msgType),
@@ -44,14 +46,34 @@ func (mm *messageMetrics) initialize(msgType message.Op, namespace string, regis
 	})
 
 	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(mm.numSent),
-		registerer.Register(mm.numFailed),
-		registerer.Register(mm.numReceived),
-		registerer.Register(mm.receivedBytes),
-		registerer.Register(mm.sentBytes),
-	)
 
+	if msgType.Compressable() {
+		mm.savedReceivedBytes = metric.NewAveragerWithErrs(
+			namespace,
+			fmt.Sprintf("%s_saved_received_bytes", msgType),
+			fmt.Sprintf("bytes saved (not received) due to compression of %s messages", msgType),
+			metrics,
+			&errs,
+		)
+		mm.savedSentBytes = metric.NewAveragerWithErrs(
+			namespace,
+			fmt.Sprintf("%s_saved_sent_bytes", msgType),
+			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", msgType),
+			metrics,
+			&errs,
+		)
+	} else {
+		mm.savedReceivedBytes = metric.NewNoAverager()
+		mm.savedSentBytes = metric.NewNoAverager()
+	}
+
+	errs.Add(
+		metrics.Register(mm.numSent),
+		metrics.Register(mm.numFailed),
+		metrics.Register(mm.numReceived),
+		metrics.Register(mm.receivedBytes),
+		metrics.Register(mm.sentBytes),
+	)
 	return errs.Err
 }
 

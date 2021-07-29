@@ -10,12 +10,14 @@ type Message interface {
 	Op() Op
 	Get(Field) interface{}
 	Bytes() []byte
+	BytesSaved() int
 }
 
 type message struct {
-	op     Op
-	fields map[Field]interface{}
-	bytes  []byte
+	op         Op
+	fields     map[Field]interface{}
+	bytes      []byte
+	bytesSaved int
 }
 
 // Field returns the value of the specified field in this message
@@ -26,3 +28,6 @@ func (msg *message) Get(field Field) interface{} { return msg.fields[field] }
 
 // Bytes returns this message in bytes
 func (msg *message) Bytes() []byte { return msg.bytes }
+
+// BytesSaved returns the number of bytes this message saved due to compression
+func (msg *message) BytesSaved() int { return msg.bytesSaved }
