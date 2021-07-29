@@ -202,7 +202,7 @@ func TestServiceIssueTx(t *testing.T) {
 		t.Fatal("Expected empty transaction to return an error")
 	}
 	tx := NewTx(t, genesisBytes, vm)
-	txArgs.Tx, err = formatting.Encode(formatting.Hex, tx.Bytes())
+	txArgs.Tx, err = formatting.EncodeWithChecksum(formatting.Hex, tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func TestServiceGetTxStatus(t *testing.T) {
 		)
 	}
 
-	txStr, err := formatting.Encode(formatting.Hex, tx.Bytes())
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, tx.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2275,7 +2275,7 @@ func TestNFTWorkflow(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			payload, err := formatting.Encode(formatting.Hex, []byte{1, 2, 3, 4, 5})
+			payload, err := formatting.EncodeWithChecksum(formatting.Hex, []byte{1, 2, 3, 4, 5})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -2353,7 +2353,7 @@ func TestImportExportKey(t *testing.T) {
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
 
-	privKeyStr, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	privKeyStr, err := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2414,7 +2414,7 @@ func TestImportAVMKeyNoDuplicates(t *testing.T) {
 		t.Fatalf("problem generating private key: %s", err)
 	}
 	sk := skIntf.(*crypto.PrivateKeySECP256K1R)
-	privKeyStr, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	privKeyStr, err := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}

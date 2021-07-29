@@ -122,7 +122,7 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.G
 	}
 
 	var err error
-	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
+	reply.Tx, err = formatting.EncodeWithChecksum(args.Encoding, tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}
@@ -206,7 +206,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i], err = formatting.Encode(args.Encoding, b)
+		reply.UTXOs[i], err = formatting.EncodeWithChecksum(args.Encoding, b)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
 		}
@@ -818,7 +818,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
+	privKeyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }

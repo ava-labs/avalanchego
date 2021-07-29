@@ -98,10 +98,11 @@ func (enc *Encoding) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Encode [bytes] to a string using the given encoding format
+// EncodeWithChecksum [bytes] to a string using the given encoding format
 // [bytes] may be nil, in which case it will be treated the same
-// as an empty slice
-func Encode(encoding Encoding, bytes []byte) (string, error) {
+// as an empty slice.
+// This function includes a checksum in the encoded string.
+func EncodeWithChecksum(encoding Encoding, bytes []byte) (string, error) {
 	if err := validateEncoding(encoding, bytes); err != nil {
 		return "", err
 	}
@@ -114,8 +115,9 @@ func Encode(encoding Encoding, bytes []byte) (string, error) {
 
 // EncodeWithoutChecksum [bytes] to a string using the given encoding format
 // [bytes] may be nil, in which case it will be treated the same
-// as an empty slice
-// does not apply checksum
+// as an empty slice.
+// Unlike EncodeWithChecksum, this function does not include a checksum in the
+// encoded string.
 func EncodeWithoutChecksum(encoding Encoding, bytes []byte) (string, error) {
 	if err := validateEncoding(encoding, bytes); err != nil {
 		return "", err

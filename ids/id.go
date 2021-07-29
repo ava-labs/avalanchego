@@ -45,7 +45,7 @@ func FromString(idStr string) (ID, error) {
 }
 
 func (id ID) MarshalJSON() ([]byte, error) {
-	str, err := formatting.Encode(defaultEncoding, id[:])
+	str, err := formatting.EncodeWithChecksum(defaultEncoding, id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (id ID) Hex() string { return hex.EncodeToString(id[:]) }
 func (id ID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	s, _ := formatting.Encode(defaultEncoding, id[:])
+	s, _ := formatting.EncodeWithChecksum(defaultEncoding, id[:])
 	return s
 }
 
