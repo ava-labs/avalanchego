@@ -17,6 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
@@ -167,6 +170,32 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	return nil
 }
 
+var (
+	_ UnsignedTx = &BaseTx{}
+	_ UnsignedTx = &CreateAssetTx{}
+	_ UnsignedTx = &OperationTx{}
+	_ UnsignedTx = &ImportTx{}
+	_ UnsignedTx = &ExportTx{}
+
+	_ avax.TransferableIn  = &secp256k1fx.TransferInput{}
+	_ verify.State         = &secp256k1fx.MintOutput{}
+	_ avax.TransferableOut = &secp256k1fx.TransferOutput{}
+	_ FxOperation          = &secp256k1fx.MintOperation{}
+	_ verify.Verifiable    = &secp256k1fx.Credential{}
+
+	_ verify.State      = &nftfx.MintOutput{}
+	_ verify.State      = &nftfx.TransferOutput{}
+	_ FxOperation       = &nftfx.MintOperation{}
+	_ FxOperation       = &nftfx.TransferOperation{}
+	_ verify.Verifiable = &nftfx.Credential{}
+
+	_ verify.State      = &propertyfx.MintOutput{}
+	_ verify.State      = &propertyfx.OwnedOutput{}
+	_ FxOperation       = &propertyfx.MintOperation{}
+	_ FxOperation       = &propertyfx.BurnOperation{}
+	_ verify.Verifiable = &propertyfx.Credential{}
+)
+
 func staticCodec() (codec.Manager, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	manager := codec.NewManager(math.MaxUint32)
@@ -183,6 +212,16 @@ func staticCodec() (codec.Manager, error) {
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
 		c.RegisterType(&secp256k1fx.MintOperation{}),
 		c.RegisterType(&secp256k1fx.Credential{}),
+		c.RegisterType(&nftfx.MintOutput{}),
+		c.RegisterType(&nftfx.TransferOutput{}),
+		c.RegisterType(&nftfx.MintOperation{}),
+		c.RegisterType(&nftfx.TransferOperation{}),
+		c.RegisterType(&nftfx.Credential{}),
+		c.RegisterType(&propertyfx.MintOutput{}),
+		c.RegisterType(&propertyfx.OwnedOutput{}),
+		c.RegisterType(&propertyfx.MintOperation{}),
+		c.RegisterType(&propertyfx.BurnOperation{}),
+		c.RegisterType(&propertyfx.Credential{}),
 		manager.RegisterCodec(codecVersion, c),
 	)
 	return manager, errs.Err
