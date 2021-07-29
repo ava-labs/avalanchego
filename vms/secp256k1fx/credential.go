@@ -36,8 +36,7 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 	jsonFieldMap := map[string]interface{}{
 		"signatures": signatures,
 	}
-	b, err := json.Marshal(jsonFieldMap)
-	return b, err
+	return json.Marshal(jsonFieldMap)
 }
 
 func (cr *Credential) Verify() error {

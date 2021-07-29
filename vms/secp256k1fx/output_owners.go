@@ -68,7 +68,6 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 		"threshold": out.Threshold,
 		"addresses": addresses,
 	}
-
 	return json.Marshal(result)
 }
 
@@ -124,9 +123,9 @@ func (out *OutputOwners) VerifyState() error { return out.Verify() }
 
 func (out *OutputOwners) Sort() { ids.SortShortIDs(out.Addrs) }
 
-// FormatAddress formats a given [addr] into human readable format using
+// formatAddress formats a given [addr] into human readable format using
 // [ChainID] and [NetworkID] from the provided [ctx].
-func FormatAddress(ctx *snow.Context, addr ids.ShortID) (string, error) {
+func formatAddress(ctx *snow.Context, addr ids.ShortID) (string, error) {
 	chainIDAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
 	if err != nil {
 		return "", err
