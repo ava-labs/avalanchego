@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
@@ -21,7 +19,6 @@ const (
 )
 
 type Credential struct {
-	verify.Verifiable
 	Sigs [][crypto.SECP256K1RSigLen]byte `serialize:"true" json:"signatures"`
 }
 
