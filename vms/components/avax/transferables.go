@@ -52,10 +52,10 @@ type TransferableOut interface {
 
 type TransferableOutput struct {
 	snow.ContextInitializable `serialize:"false" json:"-"`
+	Asset                     `serialize:"true"`
 	// FxID has serialize false because we don't want this to be encoded in bytes
-	FxID  ids.ID `serialize:"false" json:"fxID"`
-	Asset `serialize:"true"`
-	Out   TransferableOut `serialize:"true" json:"output"`
+	FxID ids.ID          `serialize:"false" json:"fxID"`
+	Out  TransferableOut `serialize:"true" json:"output"`
 }
 
 func (out *TransferableOutput) InitCtx(ctx *snow.Context) {
@@ -120,11 +120,11 @@ func IsSortedTransferableOutputs(outs []*TransferableOutput, c codec.Manager) bo
 }
 
 type TransferableInput struct {
-	// FxID has serialize false because we don't want this to be encoded in bytes
-	FxID   ids.ID `serialize:"false" json:"fxID"`
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`
-	In     TransferableIn `serialize:"true" json:"input"`
+	// FxID has serialize false because we don't want this to be encoded in bytes
+	FxID ids.ID         `serialize:"false" json:"fxID"`
+	In   TransferableIn `serialize:"true" json:"input"`
 }
 
 // Input returns the feature extension input that this Input is using.

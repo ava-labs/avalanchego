@@ -24,9 +24,9 @@ var (
 )
 
 type Operation struct {
-	FxID       ids.ID `serialize:"false" json:"fxID"`
 	avax.Asset `serialize:"true"`
 	UTXOIDs    []*avax.UTXOID `serialize:"true" json:"inputIDs"`
+	FxID       ids.ID         `serialize:"false" json:"fxID"`
 	Op         FxOperation    `serialize:"true" json:"operation"`
 }
 
