@@ -17,7 +17,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// WalletService ...
 type WalletService struct {
 	vm *VM
 
@@ -88,7 +87,7 @@ func (w *WalletService) update(utxos []*avax.UTXO) ([]*avax.UTXO, error) {
 
 // IssueTx attempts to issue a transaction into consensus
 func (w *WalletService) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
-	w.vm.ctx.Log.Info("AVM Wallet: IssueTx called with %s", args.Tx)
+	w.vm.ctx.Log.Debug("AVM Wallet: IssueTx called with %s", args.Tx)
 
 	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
@@ -110,7 +109,7 @@ func (w *WalletService) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 
 // SendMultiple sends a transaction with multiple outputs.
 func (w *WalletService) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
-	w.vm.ctx.Log.Info("AVM Wallet: Send called with username: %s", args.Username)
+	w.vm.ctx.Log.Debug("AVM Wallet: SendMultiple called with username: %s", args.Username)
 
 	// Validate the memo field
 	memoBytes := []byte(args.Memo)

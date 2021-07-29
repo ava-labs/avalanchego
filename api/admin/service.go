@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
@@ -57,14 +58,14 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
 func (service *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: StartCPUProfiler called")
+	service.log.Debug("Admin: StartCPUProfiler called")
 	reply.Success = true
 	return service.profiler.StartCPUProfiler()
 }
 
 // StopCPUProfiler stops the cpu profile
 func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: StopCPUProfiler called")
+	service.log.Debug("Admin: StopCPUProfiler called")
 
 	reply.Success = true
 	return service.profiler.StopCPUProfiler()
@@ -72,7 +73,7 @@ func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *api.S
 
 // MemoryProfile runs a memory profile writing to the specified file
 func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: MemoryProfile called")
+	service.log.Debug("Admin: MemoryProfile called")
 
 	reply.Success = true
 	return service.profiler.MemoryProfile()
@@ -80,7 +81,7 @@ func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *api.Suc
 
 // LockProfile runs a mutex profile writing to the specified file
 func (service *Admin) LockProfile(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: LockProfile called")
+	service.log.Debug("Admin: LockProfile called")
 
 	reply.Success = true
 	return service.profiler.LockProfile()
@@ -94,7 +95,7 @@ type AliasArgs struct {
 
 // Alias attempts to alias an HTTP endpoint to a new name
 func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
+	service.log.Debug("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {
 		return errAliasTooLong
@@ -112,7 +113,7 @@ type AliasChainArgs struct {
 
 // AliasChain attempts to alias a chain to a new name
 func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
+	service.log.Debug("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {
 		return errAliasTooLong
@@ -127,7 +128,7 @@ func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *a
 	}
 
 	reply.Success = true
-	return service.httpServer.AddAliasesWithReadLock("bc/"+chainID.String(), "bc/"+args.Alias)
+	return service.httpServer.AddAliasesWithReadLock(constants.ChainAliasPrefix+chainID.String(), constants.ChainAliasPrefix+args.Alias)
 }
 
 // GetChainAliasesArgs are the arguments for calling GetChainAliases
@@ -142,7 +143,7 @@ type GetChainAliasesReply struct {
 
 // GetChainAliases returns the aliases of the chain
 func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
-	service.log.Info("Admin: GetChainAliases called with Chain: %s", args.Chain)
+	service.log.Debug("Admin: GetChainAliases called with Chain: %s", args.Chain)
 
 	id, err := ids.FromString(args.Chain)
 	if err != nil {
@@ -155,7 +156,7 @@ func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs
 
 // Stacktrace returns the current global stacktrace
 func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: Stacktrace called")
+	service.log.Debug("Admin: Stacktrace called")
 
 	reply.Success = true
 	stacktrace := []byte(logging.Stacktrace{Global: true}.String())

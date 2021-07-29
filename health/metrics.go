@@ -22,7 +22,7 @@ func newMetrics(log logging.Logger, namespace string, registerer prometheus.Regi
 		log: log,
 		failingChecks: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
-			Name:      "health_checks_failing",
+			Name:      "checks_failing",
 			Help:      "number of currently failing health checks",
 		}),
 	}

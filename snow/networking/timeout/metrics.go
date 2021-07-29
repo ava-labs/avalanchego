@@ -14,27 +14,23 @@ import (
 )
 
 const (
-	defaultRequestHelpMsg = "Time spent waiting for a response to this message in milliseconds"
+	defaultRequestHelpMsg = "time (in ns) spent waiting for a response to this message"
 	validatorIDLabel      = "validatorID"
 )
 
-func initHistogram(
+func initAverager(
 	namespace,
 	name string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 	errs *wrappers.Errs,
-) prometheus.Histogram {
-	histogram := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespace,
-		Name:      name,
-		Help:      defaultRequestHelpMsg,
-		Buckets:   metric.MillisecondsBuckets,
-	})
-
-	if err := registerer.Register(histogram); err != nil {
-		errs.Add(fmt.Errorf("failed to register %s statistics: %w", name, err))
-	}
-	return histogram
+) metric.Averager {
+	return metric.NewAveragerWithErrs(
+		namespace,
+		name,
+		defaultRequestHelpMsg,
+		reg,
+		errs,
+	)
 }
 
 func initSummary(
@@ -96,7 +92,7 @@ type chainMetrics struct {
 
 	getAcceptedFrontier, getAccepted,
 	getAncestors, get,
-	pushQuery, pullQuery prometheus.Histogram
+	pushQuery, pullQuery metric.Averager
 }
 
 // Initialize implements the Engine interface
@@ -113,18 +109,18 @@ func (cm *chainMetrics) Initialize(ctx *snow.Context, namespace string, summaryE
 	cm.pushQuerySummary = initSummary(queryLatencyNamespace, "push_query_peer", ctx.Metrics, &errs)
 	cm.pullQuerySummary = initSummary(queryLatencyNamespace, "pull_query_peer", ctx.Metrics, &errs)
 
-	cm.getAcceptedFrontier = initHistogram(queryLatencyNamespace, "get_accepted_frontier", ctx.Metrics, &errs)
-	cm.getAccepted = initHistogram(queryLatencyNamespace, "get_accepted", ctx.Metrics, &errs)
-	cm.getAncestors = initHistogram(queryLatencyNamespace, "get_ancestors", ctx.Metrics, &errs)
-	cm.get = initHistogram(queryLatencyNamespace, "get", ctx.Metrics, &errs)
-	cm.pushQuery = initHistogram(queryLatencyNamespace, "push_query", ctx.Metrics, &errs)
-	cm.pullQuery = initHistogram(queryLatencyNamespace, "pull_query", ctx.Metrics, &errs)
+	cm.getAcceptedFrontier = initAverager(queryLatencyNamespace, "get_accepted_frontier", ctx.Metrics, &errs)
+	cm.getAccepted = initAverager(queryLatencyNamespace, "get_accepted", ctx.Metrics, &errs)
+	cm.getAncestors = initAverager(queryLatencyNamespace, "get_ancestors", ctx.Metrics, &errs)
+	cm.get = initAverager(queryLatencyNamespace, "get", ctx.Metrics, &errs)
+	cm.pushQuery = initAverager(queryLatencyNamespace, "push_query", ctx.Metrics, &errs)
+	cm.pullQuery = initAverager(queryLatencyNamespace, "pull_query", ctx.Metrics, &errs)
 
 	return errs.Err
 }
 
 func (cm *chainMetrics) observe(validatorID ids.ShortID, msgType constants.MsgType, latency time.Duration) {
-	lat := float64(latency.Milliseconds())
+	lat := float64(latency)
 	switch msgType {
 	case constants.GetAcceptedFrontierMsg:
 		cm.getAcceptedFrontier.Observe(lat)

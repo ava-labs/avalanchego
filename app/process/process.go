@@ -5,6 +5,7 @@ package process
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -14,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -98,7 +98,8 @@ func (a *App) Start() int {
 	var dbManager manager.Manager
 	switch a.config.DBName {
 	case rocksdb.Name:
-		dbManager, err = manager.NewRocksDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
+		path := filepath.Join(a.config.DBPath, rocksdb.Name)
+		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase, !a.config.FetchOnly)
 	case leveldb.Name:
 		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
 	case memdb.Name:
@@ -167,7 +168,7 @@ func (a *App) Start() int {
 	if !a.config.EnableCrypto {
 		a.log.Warn("transaction signatures are not being checked")
 	}
-	crypto.EnableCrypto = a.config.EnableCrypto
+	// TODO: disable crypto verification
 
 	if err := a.config.ConsensusParams.Valid(); err != nil {
 		a.log.Fatal("consensus parameters are invalid: %s", err)

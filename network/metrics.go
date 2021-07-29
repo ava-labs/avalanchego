@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/network/message"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -16,30 +16,29 @@ type messageMetrics struct {
 	receivedBytes, sentBytes, numSent, numFailed, numReceived prometheus.Counter
 }
 
-func (mm *messageMetrics) initialize(msgType Op, registerer prometheus.Registerer) error {
+func (mm *messageMetrics) initialize(msgType message.Op, namespace string, registerer prometheus.Registerer) error {
 	mm.numSent = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_sent", msgType),
 		Help:      fmt.Sprintf("Number of %s messages sent over the network", msgType),
 	})
 	mm.numFailed = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_failed", msgType),
 		Help:      fmt.Sprintf("Number of %s messages that failed to be sent over the network", msgType),
 	})
 	mm.numReceived = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_received", msgType),
 		Help:      fmt.Sprintf("Number of %s messages received from the network", msgType),
 	})
-
 	mm.receivedBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_received_bytes", msgType),
 		Help:      fmt.Sprintf("Number of bytes of %s messages received from the network", msgType),
 	})
 	mm.sentBytes = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_sent_bytes", msgType),
 		Help:      fmt.Sprintf("Size of bytes of %s messages received from the network", msgType),
 	})
@@ -65,6 +64,8 @@ type metrics struct {
 	failedToParse            prometheus.Counter
 	connected                prometheus.Counter
 	disconnected             prometheus.Counter
+	inboundConnRateLimited   prometheus.Counter
+	inboundConnAllowed       prometheus.Counter
 
 	getVersion, version,
 	getPeerlist, peerList,
@@ -76,47 +77,56 @@ type metrics struct {
 	pushQuery, pullQuery, chits messageMetrics
 }
 
-func (m *metrics) initialize(registerer prometheus.Registerer) error {
-	// Set up metrics
+func (m *metrics) initialize(namespace string, registerer prometheus.Registerer) error {
 	m.numPeers = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "peers",
 		Help:      "Number of network peers",
 	})
 	m.timeSinceLastMsgReceived = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "time_since_last_msg_received",
-		Help:      "Time since the last msg was received in milliseconds",
+		Help:      "Time (in ns) since the last msg was received",
 	})
 	m.timeSinceLastMsgSent = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "time_since_last_msg_sent",
-		Help:      "Time since the last msg was sent in milliseconds",
+		Help:      "Time (in ns) since the last msg was sent",
 	})
 	m.sendQueuePortionFull = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "send_queue_portion_full",
 		Help:      "Percentage of use in Send Queue",
 	})
 	m.sendFailRate = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "send_fail_rate",
 		Help:      "Portion of messages that recently failed to be sent over the network",
 	})
 	m.failedToParse = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "msgs_failed_to_parse",
 		Help:      "Number of messages that could not be parsed or were invalidly formed",
 	})
 	m.connected = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "times_connected",
 		Help:      "Times this node successfully completed a handshake with a peer",
 	})
 	m.disconnected = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "times_disconnected",
 		Help:      "Times this node disconnected from a peer it had completed a handshake with",
+	})
+	m.inboundConnAllowed = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "inbound_conn_throttler_allowed",
+		Help:      "Times this node allowed (attempted to upgrade) an inbound connection",
+	})
+	m.inboundConnRateLimited = prometheus.NewCounter(prometheus.CounterOpts{
+		Namespace: namespace,
+		Name:      "inbound_conn_throttler_rate_limited",
+		Help:      "Times this node rejected an inbound connection due to rate-limiting.",
 	})
 
 	errs := wrappers.Errs{}
@@ -129,63 +139,65 @@ func (m *metrics) initialize(registerer prometheus.Registerer) error {
 		registerer.Register(m.failedToParse),
 		registerer.Register(m.connected),
 		registerer.Register(m.disconnected),
+		registerer.Register(m.inboundConnAllowed),
+		registerer.Register(m.inboundConnRateLimited),
 
-		m.getVersion.initialize(GetVersion, registerer),
-		m.version.initialize(Version, registerer),
-		m.getPeerlist.initialize(GetPeerList, registerer),
-		m.peerList.initialize(PeerList, registerer),
-		m.ping.initialize(Ping, registerer),
-		m.pong.initialize(Pong, registerer),
-		m.getAcceptedFrontier.initialize(GetAcceptedFrontier, registerer),
-		m.acceptedFrontier.initialize(AcceptedFrontier, registerer),
-		m.getAccepted.initialize(GetAccepted, registerer),
-		m.accepted.initialize(Accepted, registerer),
-		m.getAncestors.initialize(GetAncestors, registerer),
-		m.multiPut.initialize(MultiPut, registerer),
-		m.get.initialize(Get, registerer),
-		m.put.initialize(Put, registerer),
-		m.pushQuery.initialize(PushQuery, registerer),
-		m.pullQuery.initialize(PullQuery, registerer),
-		m.chits.initialize(Chits, registerer),
+		m.getVersion.initialize(message.GetVersion, namespace, registerer),
+		m.version.initialize(message.Version, namespace, registerer),
+		m.getPeerlist.initialize(message.GetPeerList, namespace, registerer),
+		m.peerList.initialize(message.PeerList, namespace, registerer),
+		m.ping.initialize(message.Ping, namespace, registerer),
+		m.pong.initialize(message.Pong, namespace, registerer),
+		m.getAcceptedFrontier.initialize(message.GetAcceptedFrontier, namespace, registerer),
+		m.acceptedFrontier.initialize(message.AcceptedFrontier, namespace, registerer),
+		m.getAccepted.initialize(message.GetAccepted, namespace, registerer),
+		m.accepted.initialize(message.Accepted, namespace, registerer),
+		m.getAncestors.initialize(message.GetAncestors, namespace, registerer),
+		m.multiPut.initialize(message.MultiPut, namespace, registerer),
+		m.get.initialize(message.Get, namespace, registerer),
+		m.put.initialize(message.Put, namespace, registerer),
+		m.pushQuery.initialize(message.PushQuery, namespace, registerer),
+		m.pullQuery.initialize(message.PullQuery, namespace, registerer),
+		m.chits.initialize(message.Chits, namespace, registerer),
 	)
 	return errs.Err
 }
 
-func (m *metrics) message(msgType Op) *messageMetrics {
+func (m *metrics) message(msgType message.Op) *messageMetrics {
 	switch msgType {
-	case GetVersion:
+	case message.GetVersion:
 		return &m.getVersion
-	case Version:
+	case message.Version:
 		return &m.version
-	case GetPeerList:
+	case message.GetPeerList:
 		return &m.getPeerlist
-	case PeerList:
+	case message.PeerList:
 		return &m.peerList
-	case Ping:
+	case message.Ping:
 		return &m.ping
-	case Pong:
+	case message.Pong:
 		return &m.pong
-	case GetAcceptedFrontier:
+	case message.GetAcceptedFrontier:
 		return &m.getAcceptedFrontier
-	case AcceptedFrontier:
+	case message.AcceptedFrontier:
 		return &m.acceptedFrontier
-	case GetAccepted:
+	case message.GetAccepted:
 		return &m.getAccepted
-	case Accepted:
+	case message.Accepted:
 		return &m.accepted
-	case GetAncestors:
+	case message.GetAncestors:
 		return &m.getAncestors
-	case MultiPut:
+	case message.MultiPut:
 		return &m.multiPut
-	case Get:
+	case message.Get:
 		return &m.get
-	case Put:
+	case message.Put:
 		return &m.put
-	case PushQuery:
+	case message.PushQuery:
 		return &m.pushQuery
-	case PullQuery:
+	case message.PullQuery:
 		return &m.pullQuery
-	case Chits:
+	case message.Chits:
 		return &m.chits
 	default:
 		return nil

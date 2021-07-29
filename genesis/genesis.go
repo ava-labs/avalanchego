@@ -474,7 +474,6 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 	return append(allNodeAllocations, currentNodeAllocation)
 }
 
-// VMGenesis ...
 func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 	genesis := platformvm.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
@@ -492,7 +491,6 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 	return nil, fmt.Errorf("couldn't find blockchain with VM ID %s", vmID)
 }
 
-// AVAXAssetID ...
 func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	c := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
 	m := codec.NewManager(math.MaxUint32)
