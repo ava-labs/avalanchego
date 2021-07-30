@@ -462,7 +462,7 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 		return
 	}
 
-	switch op { // Consensus-related messages
+	switch op { // Consensus and app-level messages
 	case message.GetAcceptedFrontier:
 		p.handleGetAcceptedFrontier(msg, onFinishedHandling)
 	case message.AcceptedFrontier:
@@ -485,6 +485,12 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 		p.handlePullQuery(msg, onFinishedHandling)
 	case message.Chits:
 		p.handleChits(msg, onFinishedHandling)
+	case message.AppRequest:
+		p.handleAppRequest(msg, onFinishedHandling)
+	case message.AppResponse:
+		p.handleAppResponse(msg, onFinishedHandling)
+	case message.AppGossip:
+		p.handleAppGossip(msg, onFinishedHandling)
 	default:
 		p.net.log.Debug("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
 		onFinishedHandling()
@@ -1197,6 +1203,54 @@ func (p *peer) handleChits(msg message.Message, onFinishedHandling func()) {
 		chainID,
 		requestID,
 		containerIDs,
+		onFinishedHandling,
+	)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) handleAppRequest(msg message.Message, onFinishedHandling func()) {
+	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(message.RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
+	request := msg.Get(message.AppRequestBytes).([]byte)
+
+	p.net.router.AppRequest(
+		p.nodeID,
+		chainID,
+		requestID,
+		deadline,
+		request,
+		onFinishedHandling,
+	)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) handleAppResponse(msg message.Message, onFinishedHandling func()) {
+	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(message.RequestID).(uint32)
+	response := msg.Get(message.AppResponseBytes).([]byte)
+
+	p.net.router.AppResponse(
+		p.nodeID,
+		chainID,
+		requestID,
+		response,
+		onFinishedHandling,
+	)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) handleAppGossip(msg message.Message, onFinishedHandling func()) {
+	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	gossipedMsg := msg.Get(message.AppGossipBytes).([]byte)
+
+	p.net.router.AppGossip(
+		p.nodeID,
+		chainID,
+		gossipedMsg,
 		onFinishedHandling,
 	)
 }
