@@ -9,6 +9,8 @@ import (
 	"sort"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -20,8 +22,15 @@ var (
 )
 
 type InitialState struct {
-	FxID uint32         `serialize:"true" json:"fxID"`
-	Outs []verify.State `serialize:"true" json:"outputs"`
+	FxIndex uint32         `serialize:"true" json:"fxIndex"`
+	FxID    ids.ID         `serialize:"false" json:"fxID"`
+	Outs    []verify.State `serialize:"true" json:"outputs"`
+}
+
+func (is *InitialState) InitCtx(ctx *snow.Context) {
+	for _, out := range is.Outs {
+		out.InitCtx(ctx)
+	}
 }
 
 // Verify implements the verify.Verifiable interface
@@ -29,7 +38,7 @@ func (is *InitialState) Verify(c codec.Manager, numFxs int) error {
 	switch {
 	case is == nil:
 		return errNilInitialState
-	case is.FxID >= uint32(numFxs):
+	case is.FxIndex >= uint32(numFxs):
 		return errUnknownFx
 	}
 
@@ -82,7 +91,7 @@ func isSortedState(vers []verify.State, c codec.Manager) bool {
 
 type innerSortInitialState []*InitialState
 
-func (iss innerSortInitialState) Less(i, j int) bool { return iss[i].FxID < iss[j].FxID }
+func (iss innerSortInitialState) Less(i, j int) bool { return iss[i].FxIndex < iss[j].FxIndex }
 func (iss innerSortInitialState) Len() int           { return len(iss) }
 func (iss innerSortInitialState) Swap(i, j int)      { iss[j], iss[i] = iss[i], iss[j] }
 

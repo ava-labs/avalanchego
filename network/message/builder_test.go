@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -23,7 +24,7 @@ var (
 )
 
 func init() {
-	codec, err := NewCodec("", prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	if err != nil {
 		panic(err)
 	}

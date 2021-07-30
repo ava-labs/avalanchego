@@ -545,7 +545,7 @@ func TestTxSerialization(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{
 			{
-				FxID: 0,
+				FxIndex: 0,
 				Outs: []verify.State{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -920,7 +920,7 @@ func TestIssueNFT(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 1,
+			FxIndex: 1,
 			Outs: []verify.State{
 				&nftfx.MintOutput{
 					GroupID: 1,
@@ -998,8 +998,8 @@ func TestIssueNFT(t *testing.T) {
 				},
 			}},
 		},
-		Creds: []verify.Verifiable{
-			&nftfx.Credential{},
+		Creds: []*FxCredential{
+			{Verifiable: &nftfx.Credential{}},
 		},
 	}
 	if err := transferNFTTx.SignNFTFx(vm.codec, nil); err != nil {
@@ -1072,7 +1072,7 @@ func TestIssueProperty(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 2,
+			FxIndex: 2,
 			Outs: []verify.State{
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -1130,10 +1130,12 @@ func TestIssueProperty(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{
-		Credential: secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &FxCredential{
+		Verifiable: &propertyfx.Credential{
+			Credential: secp256k1fx.Credential{
+				Sigs: [][crypto.SECP256K1RSigLen]byte{
+					fixedSig,
+				},
 			},
 		},
 	})
@@ -1163,7 +1165,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
+	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &FxCredential{Verifiable: &propertyfx.Credential{}})
 
 	unsignedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {

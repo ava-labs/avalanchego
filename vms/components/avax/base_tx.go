@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/types"
 )
 
 // MaxMemoSize is the maximum number of bytes in the memo field
@@ -28,7 +29,7 @@ type BaseTx struct {
 	BlockchainID ids.ID                `serialize:"true" json:"blockchainID"` // ID of the chain on which this transaction exists (prevents replay attacks)
 	Outs         []*TransferableOutput `serialize:"true" json:"outputs"`      // The outputs of this transaction
 	Ins          []*TransferableInput  `serialize:"true" json:"inputs"`       // The inputs to this transaction
-	Memo         []byte                `serialize:"true" json:"memo"`         // Memo field contains arbitrary bytes, up to maxMemoSize
+	Memo         types.JSONByteSlice   `serialize:"true" json:"memo"`         // Memo field contains arbitrary bytes, up to maxMemoSize
 }
 
 // InputUTXOs track which UTXOs this transaction is consuming.
