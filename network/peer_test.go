@@ -46,6 +46,8 @@ func (m *TestMsg) BytesSavedCompression() int {
 }
 
 func TestPeer_Close(t *testing.T) {
+	initCerts(t)
+
 	log := logging.NoLog{}
 	ip := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
