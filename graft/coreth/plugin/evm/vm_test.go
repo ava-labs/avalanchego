@@ -338,13 +338,13 @@ func TestIssueAtomicTxs(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -487,13 +487,13 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -586,6 +586,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
 
+	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk1Root := ethBlk1.Root(); vm.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	}
+
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
 	vm.State.Flush()
 	blk2Refreshed, err := vm.GetBlockInternal(blk2.ID())
@@ -662,13 +667,13 @@ func TestConflictingImportTxs(t *testing.T) {
 		}
 
 		inputID := utxo.InputID()
-		if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+		if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 			Key:   inputID[:],
 			Value: utxoBytes,
 			Traits: [][]byte{
 				key.PublicKey().Address().Bytes(),
 			},
-		}}); err != nil {
+		}}}}); err != nil {
 			t.Fatal(err)
 		}
 
@@ -761,6 +766,11 @@ func TestSetPreferenceRace(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -796,22 +806,22 @@ func TestSetPreferenceRace(t *testing.T) {
 	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
 	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm1.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory2.Apply(map[ids.ID]*atomic.Requests{vm2.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -862,6 +872,15 @@ func TestSetPreferenceRace(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Create list of 10 successive transactions to build block A on vm1
@@ -931,6 +950,11 @@ func TestSetPreferenceRace(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Block D
@@ -1025,6 +1049,9 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1076,7 +1103,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 	}
 
 	xChainSharedMemory := atomicMemory.NewSharedMemory(vm.ctx.XChainID)
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{
 		{
 			Key:   input0ID[:],
 			Value: utxo0Bytes,
@@ -1091,7 +1118,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 				addr1.Bytes(),
 			},
 		},
-	}); err != nil {
+	}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1122,6 +1149,11 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 
 	if err := vm.SetPreference(blk0.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk0.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
@@ -1226,13 +1258,13 @@ func TestBonusBlocksTxs(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1255,7 +1287,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 	bonusBlocks.Add(blk.ID())
 
 	// Remove the UTXOs from shared memory, so that non-bonus blocks will fail verification
-	if err := vm.ctx.SharedMemory.Remove(vm.ctx.XChainID, [][]byte{inputID[:]}); err != nil {
+	if err := vm.ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.XChainID: {RemoveRequests: [][]byte{inputID[:]}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1314,6 +1346,11 @@ func TestReorgProtection(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1349,22 +1386,22 @@ func TestReorgProtection(t *testing.T) {
 	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
 	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm1.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory2.Apply(map[ids.ID]*atomic.Requests{vm2.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1415,6 +1452,15 @@ func TestReorgProtection(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Create list of 10 successive transactions to build block A on vm1
@@ -1527,6 +1573,11 @@ func TestNonCanonicalAccept(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1562,22 +1613,22 @@ func TestNonCanonicalAccept(t *testing.T) {
 	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
 	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm1.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory2.Apply(map[ids.ID]*atomic.Requests{vm2.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1628,6 +1679,15 @@ func TestNonCanonicalAccept(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Create list of 10 successive transactions to build block A on vm1
@@ -1733,6 +1793,11 @@ func TestStickyPreference(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -1768,22 +1833,22 @@ func TestStickyPreference(t *testing.T) {
 	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
 	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm1.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory2.Apply(map[ids.ID]*atomic.Requests{vm2.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1834,6 +1899,15 @@ func TestStickyPreference(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Create list of 10 successive transactions to build block A on vm1
@@ -1908,6 +1982,11 @@ func TestStickyPreference(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
@@ -2032,6 +2111,11 @@ func TestUncleBlock(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2067,22 +2151,22 @@ func TestUncleBlock(t *testing.T) {
 	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
 	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm1.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory2.Apply(map[ids.ID]*atomic.Requests{vm2.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2133,6 +2217,15 @@ func TestUncleBlock(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	txs := make([]*types.Transaction, 10)
@@ -2196,6 +2289,11 @@ func TestUncleBlock(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:10])
@@ -2287,13 +2385,13 @@ func TestEmptyBlock(t *testing.T) {
 
 	xChainSharedMemory1 := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2365,6 +2463,11 @@ func TestAcceptReorg(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan1 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan1)
+	newTxPoolHeadChan2 := make(chan core.NewTxPoolReorgEvent, 1)
+	vm2.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan2)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2400,22 +2503,22 @@ func TestAcceptReorg(t *testing.T) {
 	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
 	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm1.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory2.Apply(map[ids.ID]*atomic.Requests{vm2.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2466,6 +2569,15 @@ func TestAcceptReorg(t *testing.T) {
 	}
 	if err := vm2BlkA.Accept(); err != nil {
 		t.Fatalf("VM2 failed to accept block: %s", err)
+	}
+
+	newHead := <-newTxPoolHeadChan1
+	if newHead.Head.Hash() != common.Hash(vm1BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	// Create list of 10 successive transactions to build block A on vm1
@@ -2528,6 +2640,11 @@ func TestAcceptReorg(t *testing.T) {
 
 	if err := vm2.SetPreference(vm2BlkC.ID()); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead = <-newTxPoolHeadChan2
+	if newHead.Head.Hash() != common.Hash(vm2BlkC.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	errs = vm2.chain.AddRemoteTxs(txs[5:])
@@ -2633,13 +2750,13 @@ func TestFutureBlock(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2702,6 +2819,9 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2735,13 +2855,13 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2775,6 +2895,11 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 
 	if err := blk.Accept(); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	txs := make([]*types.Transaction, 10)
@@ -2868,6 +2993,9 @@ func TestApricotPhase1Transition(t *testing.T) {
 		}
 	}()
 
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm1.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
 	key, err := accountKeystore.NewKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
@@ -2901,13 +3029,13 @@ func TestApricotPhase1Transition(t *testing.T) {
 
 	xChainSharedMemory1 := sharedMemory1.NewSharedMemory(vm1.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory1.Put(vm1.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory1.Apply(map[ids.ID]*atomic.Requests{vm1.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2941,6 +3069,11 @@ func TestApricotPhase1Transition(t *testing.T) {
 
 	if err := blkA.Accept(); err != nil {
 		t.Fatal(err)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blkA.ID()) {
+		t.Fatalf("Expected new block to match")
 	}
 
 	txs := make([]*types.Transaction, 10)
@@ -3012,6 +3145,11 @@ func TestApricotPhase1Transition(t *testing.T) {
 		}
 	}
 
+	newHead = <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blkB.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
 	errs = vm1.chain.AddRemoteTxs(txs[5:])
 	for i, err := range errs {
 		if err != nil {
@@ -3069,13 +3207,13 @@ func TestApricotPhase1Transition(t *testing.T) {
 		}
 	}()
 	xChainSharedMemory2 := sharedMemory2.NewSharedMemory(vm2.ctx.XChainID)
-	if err := xChainSharedMemory2.Put(vm2.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory2.Apply(map[ids.ID]*atomic.Requests{vm2.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3174,13 +3312,13 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3284,13 +3422,13 @@ func TestReissueAtomicTx(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3404,13 +3542,13 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
