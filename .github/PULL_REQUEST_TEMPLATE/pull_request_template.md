@@ -2,14 +2,14 @@
 Please go through this checklist and check the item relevant, delete unrelevant ones and provide related links
 
 * [ ] Does this PR change a config flag?
-  * PR for docs:
-  * PR for Avash:
-  * PR for AvalancheJS: 
+  * PR for docs under https://github.com/ava-labs/avalanche-docs/pulls
+  * PR for Avash under https://github.com/ava-labs/avash/pulls
+  * PR for AvalancheJS under https://github.com/ava-labs/avalanchejs/pulls
 * [ ] Does this PR change a Prometheus metric?
-  * PR for docs (for Granfana):
+  * PR for docs (for Granfana) under https://github.com/ava-labs/avalanche-docs/pulls
 * [ ] Does this PR change an API?
-  * PR for docs:
-  * PR for AvalancheJS: 
+  * PR for docs under https://github.com/ava-labs/avalanche-docs/pulls
+  * PR for AvalancheJS under https://github.com/ava-labs/avalanchejs/pulls
 * [ ] Is this change backward compatible with the previous version of AvalancheGo?
 * [ ] Does this PR change where AvalancheGo looks for/puts files?
 * [ ] Does this PR change the serialization of anything?
