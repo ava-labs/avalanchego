@@ -32,6 +32,7 @@ type handlerMetrics struct {
 	getAncestors, multiPut, getAncestorsFailed,
 	get, put, getFailed,
 	pushQuery, pullQuery, chits, queryFailed,
+	appRequest, appResponse, appGossip,
 	connected, disconnected,
 	timeout,
 	notify,
@@ -68,6 +69,9 @@ func (m *handlerMetrics) Initialize(namespace string, reg prometheus.Registerer)
 	m.pullQuery = initAverager(namespace, "pull_query", reg, &errs)
 	m.chits = initAverager(namespace, "chits", reg, &errs)
 	m.queryFailed = initAverager(namespace, "query_failed", reg, &errs)
+	m.appRequest = initAverager(namespace, "app_request", reg, &errs)
+	m.appResponse = initAverager(namespace, "app_response", reg, &errs)
+	m.appGossip = initAverager(namespace, "app_gossip", reg, &errs)
 	m.connected = initAverager(namespace, "connected", reg, &errs)
 	m.disconnected = initAverager(namespace, "disconnected", reg, &errs)
 	m.timeout = initAverager(namespace, "timeout", reg, &errs)
@@ -125,6 +129,12 @@ func (m *handlerMetrics) getMSGHistogram(msg constants.MsgType) metric.Averager 
 		return m.connected
 	case constants.DisconnectedMsg:
 		return m.disconnected
+	case constants.AppRequestMsg:
+		return m.appRequest
+	case constants.AppResponseMsg:
+		return m.appResponse
+	case constants.AppGossipMsg:
+		return m.appGossip
 	default:
 		panic(fmt.Sprintf("unknown message type %s", msg))
 	}
