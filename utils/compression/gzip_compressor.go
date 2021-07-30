@@ -6,6 +6,8 @@ package compression
 import (
 	"bytes"
 	"compress/gzip"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"sync"
 
@@ -14,6 +16,8 @@ import (
 
 // gzipCompressor implements Compressor
 type gzipCompressor struct {
+	maxSize int64
+
 	lock sync.Mutex
 
 	writeBuffer *bytes.Buffer
@@ -25,6 +29,10 @@ type gzipCompressor struct {
 
 // Compress [msg] and returns the compressed bytes.
 func (g *gzipCompressor) Compress(msg []byte) ([]byte, error) {
+	if int64(len(msg)) > g.maxSize {
+		return nil, fmt.Errorf("msg length (%d) > maximum msg length (%d)", len(msg), g.maxSize)
+	}
+
 	g.lock.Lock()
 	defer g.lock.Unlock()
 
@@ -51,17 +59,28 @@ func (g *gzipCompressor) Decompress(msg []byte) ([]byte, error) {
 	if err := g.gzipReader.Reset(g.bytesReader); err != nil {
 		return nil, err
 	}
-	decompressed, err := ioutil.ReadAll(g.gzipReader)
+
+	// We allow [io.LimitReader] to read up to [g.maxSize + 1] bytes, so that if
+	// the decompressed payload is greater than the maximum size, this function
+	// will return the appropriate error instead of an incomplete byte slice.
+	limitedReader := io.LimitReader(g.gzipReader, g.maxSize+1)
+
+	decompressed, err := ioutil.ReadAll(limitedReader)
 	if err != nil {
 		return nil, err
+	}
+	if int64(len(decompressed)) > g.maxSize {
+		return nil, fmt.Errorf("msg length > maximum msg length (%d)", g.maxSize)
 	}
 	return decompressed, g.gzipReader.Close()
 }
 
 // NewGzipCompressor returns a new gzip Compressor that compresses
-func NewGzipCompressor() Compressor {
+func NewGzipCompressor(maxSize int64) Compressor {
 	var buf bytes.Buffer
 	return &gzipCompressor{
+		maxSize: maxSize,
+
 		writeBuffer: &buf,
 		gzipWriter:  gzip.NewWriter(&buf),
 

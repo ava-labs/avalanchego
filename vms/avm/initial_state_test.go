@@ -40,10 +40,10 @@ func TestInitialStateVerifyUnknownFxID(t *testing.T) {
 	numFxs := 1
 
 	is := InitialState{
-		FxID: 1,
+		FxIndex: 1,
 	}
 	if err := is.Verify(m, numFxs); err == nil {
-		t.Fatalf("Should have errored due to unknown FxID")
+		t.Fatalf("Should have errored due to unknown FxIndex")
 	}
 }
 
@@ -56,8 +56,8 @@ func TestInitialStateVerifyNilOutput(t *testing.T) {
 	numFxs := 1
 
 	is := InitialState{
-		FxID: 0,
-		Outs: []verify.State{nil},
+		FxIndex: 0,
+		Outs:    []verify.State{nil},
 	}
 	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to a nil output")
@@ -76,8 +76,8 @@ func TestInitialStateVerifyInvalidOutput(t *testing.T) {
 	numFxs := 1
 
 	is := InitialState{
-		FxID: 0,
-		Outs: []verify.State{&avax.TestVerifiable{Err: errors.New("")}},
+		FxIndex: 0,
+		Outs:    []verify.State{&avax.TestVerifiable{Err: errors.New("")}},
 	}
 	if err := is.Verify(m, numFxs); err == nil {
 		t.Fatalf("Should have errored due to an invalid output")
@@ -96,7 +96,7 @@ func TestInitialStateVerifyUnsortedOutputs(t *testing.T) {
 	numFxs := 1
 
 	is := InitialState{
-		FxID: 0,
+		FxIndex: 0,
 		Outs: []verify.State{
 			&avax.TestTransferable{Val: 1},
 			&avax.TestTransferable{Val: 0},
@@ -143,7 +143,7 @@ func TestInitialStateVerifySerialization(t *testing.T) {
 	}
 
 	is := &InitialState{
-		FxID: 0,
+		FxIndex: 0,
 		Outs: []verify.State{
 			&secp256k1fx.TransferOutput{
 				Amt: 12345,

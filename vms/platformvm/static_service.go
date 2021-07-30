@@ -351,7 +351,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}
-	reply.Bytes, err = formatting.Encode(args.Encoding, bytes)
+	reply.Bytes, err = formatting.EncodeWithChecksum(args.Encoding, bytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode genesis as string: %w", err)
 	}
