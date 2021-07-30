@@ -17,10 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 func TestCodecPackInvalidOp(t *testing.T) {
-	codec, err := NewCodec("", prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
 	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false, false)
@@ -31,7 +32,7 @@ func TestCodecPackInvalidOp(t *testing.T) {
 }
 
 func TestCodecPackMissingField(t *testing.T) {
-	codec, err := NewCodec("", prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
 	_, err = codec.Pack(Get, make(map[Field]interface{}), false, false)
@@ -42,7 +43,7 @@ func TestCodecPackMissingField(t *testing.T) {
 }
 
 func TestCodecParseInvalidOp(t *testing.T) {
-	codec, err := NewCodec("", prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
 	_, err = codec.Parse([]byte{math.MaxUint8}, true)
@@ -53,7 +54,7 @@ func TestCodecParseInvalidOp(t *testing.T) {
 }
 
 func TestCodecParseExtraSpace(t *testing.T) {
-	codec, err := NewCodec("", prometheus.NewRegistry())
+	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
 	_, err = codec.Parse([]byte{byte(GetVersion), 0x00}, false)
@@ -66,7 +67,7 @@ func TestCodecParseExtraSpace(t *testing.T) {
 // If [compress] == true and [includeIsCompressedFlag] == false, error
 func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
 	c := codec{
-		compressor: compression.NewGzipCompressor(),
+		compressor: compression.NewGzipCompressor(2 * units.MiB),
 	}
 	id := ids.GenerateTestID()
 	fields := map[Field]interface{}{
@@ -82,7 +83,7 @@ func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
 // Test packing and then parsing messages
 // when using a gzip compressor
 func TestCodecPackParseGzip(t *testing.T) {
-	c, err := NewCodec("", prometheus.DefaultRegisterer)
+	c, err := NewCodec("", prometheus.DefaultRegisterer, 2*units.MiB)
 	assert.NoError(t, err)
 	id := ids.GenerateTestID()
 	cert := &x509.Certificate{}

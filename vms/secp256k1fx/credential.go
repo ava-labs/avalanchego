@@ -4,7 +4,7 @@
 package secp256k1fx
 
 import (
-	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -25,19 +25,18 @@ type Credential struct {
 // MarshalJSON marshals [cr] to JSON
 // The string representation of each signature is created using the hex formatter
 func (cr *Credential) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString("{\"signatures\":[")
+	signatures := make([]string, len(cr.Sigs))
 	for i, sig := range cr.Sigs {
-		sigStr, err := formatting.Encode(defaultEncoding, sig[:])
+		sigStr, err := formatting.EncodeWithoutChecksum(defaultEncoding, sig[:])
 		if err != nil {
 			return nil, fmt.Errorf("couldn't convert signature to string: %w", err)
 		}
-		buffer.WriteString(fmt.Sprintf("\"%s\"", sigStr))
-		if i != len(cr.Sigs)-1 {
-			buffer.WriteString(",")
-		}
+		signatures[i] = sigStr
 	}
-	buffer.WriteString("]}")
-	return buffer.Bytes(), nil
+	jsonFieldMap := map[string]interface{}{
+		"signatures": signatures,
+	}
+	return json.Marshal(jsonFieldMap)
 }
 
 func (cr *Credential) Verify() error {

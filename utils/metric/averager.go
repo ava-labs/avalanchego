@@ -51,3 +51,11 @@ func (a *averager) Observe(v float64) {
 	a.count.Inc()
 	a.sum.Add(v)
 }
+
+type noAverager struct{}
+
+func NewNoAverager() Averager {
+	return noAverager{}
+}
+
+func (noAverager) Observe(float64) {}

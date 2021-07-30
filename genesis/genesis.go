@@ -247,7 +247,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 
 		var err error
-		avax.Memo, err = formatting.Encode(defaultEncoding, memoBytes)
+		avax.Memo, err = formatting.EncodeWithChecksum(defaultEncoding, memoBytes)
 		if err != nil {
 			return nil, ids.Empty, fmt.Errorf("couldn't parse memo bytes to string: %w", err)
 		}
@@ -302,7 +302,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 		}
 		for _, unlock := range allocation.UnlockSchedule {
 			if unlock.Amount > 0 {
-				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+				msgStr, err := formatting.EncodeWithChecksum(defaultEncoding, allocation.ETHAddr.Bytes())
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
@@ -339,7 +339,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 				return nil, ids.ID{}, err
 			}
 			for _, unlock := range allocation.UnlockSchedule {
-				msgStr, err := formatting.Encode(defaultEncoding, allocation.ETHAddr.Bytes())
+				msgStr, err := formatting.EncodeWithChecksum(defaultEncoding, allocation.ETHAddr.Bytes())
 				if err != nil {
 					return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 				}
@@ -373,7 +373,7 @@ func FromConfig(config *Config) ([]byte, ids.ID, error) {
 	}
 
 	// Specify the chains that exist upon this network's creation
-	genesisStr, err := formatting.Encode(defaultEncoding, []byte(config.CChainGenesis))
+	genesisStr, err := formatting.EncodeWithChecksum(defaultEncoding, []byte(config.CChainGenesis))
 	if err != nil {
 		return nil, ids.Empty, fmt.Errorf("couldn't encode message: %w", err)
 	}

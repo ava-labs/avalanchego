@@ -28,11 +28,13 @@ type blockchainKeystore struct {
 }
 
 func (bks *blockchainKeystore) GetDatabase(username, password string) (*encdb.Database, error) {
-	bks.ks.log.Info("Keystore: GetDatabase called with %s from %s", username, bks.blockchainID)
+	bks.ks.log.Debug("Keystore: GetDatabase called with %s from %s", username, bks.blockchainID)
+
 	return bks.ks.GetDatabase(bks.blockchainID, username, password)
 }
 
 func (bks *blockchainKeystore) GetRawDatabase(username, password string) (database.Database, error) {
-	bks.ks.log.Info("Keystore: GetRawDatabase called with %s from %s", username, bks.blockchainID)
+	bks.ks.log.Debug("Keystore: GetRawDatabase called with %s from %s", username, bks.blockchainID)
+
 	return bks.ks.GetRawDatabase(bks.blockchainID, username, password)
 }

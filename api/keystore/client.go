@@ -48,7 +48,7 @@ func (c *Client) ExportUser(user api.UserPass) ([]byte, error) {
 
 // ImportUser imports the keystore user in [account] under [user]
 func (c *Client) ImportUser(user api.UserPass, account []byte) (bool, error) {
-	accountStr, err := formatting.Encode(formatting.Hex, account)
+	accountStr, err := formatting.EncodeWithChecksum(formatting.Hex, account)
 	if err != nil {
 		return false, err
 	}

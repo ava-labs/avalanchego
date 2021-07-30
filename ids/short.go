@@ -45,7 +45,7 @@ func ShortFromPrefixedString(idStr, prefix string) (ShortID, error) {
 }
 
 func (id ShortID) MarshalJSON() ([]byte, error) {
-	str, err := formatting.Encode(defaultEncoding, id[:])
+	str, err := formatting.EncodeWithChecksum(defaultEncoding, id[:])
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (id ShortID) Hex() string { return hex.EncodeToString(id.Bytes()) }
 func (id ShortID) String() string {
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of an ID
-	str, _ := formatting.Encode(defaultEncoding, id.Bytes())
+	str, _ := formatting.EncodeWithChecksum(defaultEncoding, id.Bytes())
 	return str
 }
 
