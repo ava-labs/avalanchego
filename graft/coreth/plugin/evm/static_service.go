@@ -27,7 +27,7 @@ func (*StaticService) BuildGenesis(_ context.Context, args *core.Genesis) (*Buil
 	if err != nil {
 		return nil, err
 	}
-	bytesStr, err := formatting.Encode(formatting.Hex, bytes)
+	bytesStr, err := formatting.EncodeWithChecksum(formatting.Hex, bytes)
 	if err != nil {
 		return nil, err
 	}
