@@ -426,37 +426,15 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 	if err != nil {
 		return err
 	}
+	vm.ctx.Log.Debug("called AppRequest with txID %v", txID)
 
 	if !vm.mempool.has(txID) {
 		return nil // return nothing is tx is unknown. Is it fine?
 	}
 
 	// fetch tx
-	var resTx *Tx // TODO: make search more efficient
-
-	for _, tx := range vm.mempool.unissuedProposalTxs.Txs {
-		if txID == tx.ID() {
-			resTx = tx
-			break
-		}
-	}
-	if resTx == nil {
-		for _, tx := range vm.mempool.unissuedDecisionTxs {
-			if txID == tx.ID() {
-				resTx = tx
-				break
-			}
-		}
-	}
-	if resTx == nil {
-		for _, tx := range vm.mempool.unissuedAtomicTxs {
-			if txID == tx.ID() {
-				resTx = tx
-				break
-			}
-		}
-	}
-	if resTx == nil {
+	resTx, ok := vm.mempool.unissuedTxs[txID]
+	if !ok {
 		return fmt.Errorf("incoherent mempool. Could not find registered tx")
 	}
 
@@ -513,6 +491,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		return err
 	}
 	tx.Initialize(unsignedBytes, response)
+	vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
 
 	// TODO: introduce relevant checks
 	err = vm.mempool.AddUncheckedTx(tx)
@@ -542,6 +521,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	if err != nil {
 		return err
 	}
+	vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
 
 	if vm.mempool.has(txID) {
 		return nil

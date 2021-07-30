@@ -153,14 +153,14 @@ func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
 	}
 
 	// shortcut to simulated almost filled mempool
-	mempool.mempoolMetadata.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes()) + 1
+	mempool.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes()) + 1
 
 	if err := mempool.AddUncheckedTx(tx); err != errTxExceedingMempoolSize {
 		t.Fatal("max mempool size breached")
 	}
 
 	// shortcut to simulated almost filled mempool
-	mempool.mempoolMetadata.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes())
+	mempool.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes())
 
 	if err := mempool.AddUncheckedTx(tx); err != nil {
 		t.Fatal("should be possible to add tx")

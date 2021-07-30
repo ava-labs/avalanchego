@@ -32,29 +32,6 @@ var (
 	errTxExceedingMempoolSize = errors.New("dropping incoming tx since mempool would breach maximum size")
 )
 
-type mempoolMetadata struct {
-	totalBytesSize int
-	unissuedTxIDs  ids.Set
-}
-
-func (d *mempoolMetadata) has(txID ids.ID) bool {
-	return d.unissuedTxIDs.Contains(txID)
-}
-
-func (d *mempoolMetadata) hasRoomFor(tx *Tx) bool {
-	return d.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
-}
-
-func (d *mempoolMetadata) register(tx *Tx) {
-	d.unissuedTxIDs.Add(tx.ID())
-	d.totalBytesSize += len(tx.Bytes())
-}
-
-func (d *mempoolMetadata) deregister(tx *Tx) {
-	d.unissuedTxIDs.Remove(tx.ID())
-	d.totalBytesSize -= len(tx.Bytes())
-}
-
 // Mempool implements a simple mempool to convert txs into valid blocks
 type Mempool struct {
 	vm *VM
@@ -95,8 +72,27 @@ type Mempool struct {
 	unissuedProposalTxs *EventHeap
 	unissuedDecisionTxs []*Tx
 	unissuedAtomicTxs   []*Tx
+	unissuedTxs         map[ids.ID]*Tx
+	totalBytesSize      int
+}
 
-	mempoolMetadata
+func (m *Mempool) has(txID ids.ID) bool {
+	_, ok := m.unissuedTxs[txID]
+	return ok
+}
+
+func (m *Mempool) hasRoomFor(tx *Tx) bool {
+	return m.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
+}
+
+func (m *Mempool) register(tx *Tx) {
+	m.unissuedTxs[tx.ID()] = tx
+	m.totalBytesSize += len(tx.Bytes())
+}
+
+func (m *Mempool) deregister(tx *Tx) {
+	delete(m.unissuedTxs, tx.ID())
+	m.totalBytesSize -= len(tx.Bytes())
 }
 
 // Initialize this mempool.
@@ -107,6 +103,7 @@ func (m *Mempool) Initialize(vm *VM) {
 
 	// Transactions from clients that have not yet been put into blocks and
 	// added to consensus
+	m.unissuedTxs = make(map[ids.ID]*Tx)
 	m.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
 
 	m.timer = timer.NewTimer(func() {
