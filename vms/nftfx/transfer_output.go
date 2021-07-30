@@ -3,6 +3,8 @@ package nftfx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/vms/types"
+
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -20,8 +22,8 @@ var (
 )
 
 type TransferOutput struct {
-	GroupID                  uint32 `serialize:"true" json:"groupID"`
-	Payload                  []byte `serialize:"true" json:"payload"`
+	GroupID                  uint32              `serialize:"true" json:"groupID"`
+	Payload                  types.JSONByteSlice `serialize:"true" json:"payload"`
 	secp256k1fx.OutputOwners `serialize:"true"`
 }
 

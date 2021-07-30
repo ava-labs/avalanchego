@@ -5,6 +5,7 @@ package avm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -49,6 +50,12 @@ type Fx interface {
 
 type FxOperation interface {
 	verify.Verifiable
+	snow.ContextInitializable
 
 	Outs() []verify.State
+}
+
+type FxCredential struct {
+	FxID              ids.ID `serialize:"false" json:"fxID"`
+	verify.Verifiable `serialize:"true" json:"credential"`
 }

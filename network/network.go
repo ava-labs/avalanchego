@@ -429,6 +429,7 @@ func NewNetwork(
 		func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
 		},
+		int64(maxMessageSize),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing codec failed with: %s", err)
@@ -467,6 +468,10 @@ func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, 
 			n.getAcceptedFrontier.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.getAcceptedFrontier.savedSentBytes.Observe(float64(saved))
+			}
 		}
 	}
 	return sentTo
@@ -502,6 +507,10 @@ func (n *network) SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, reque
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
 		n.acceptedFrontier.sentBytes.Add(float64(msgLen))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.acceptedFrontier.savedSentBytes.Observe(float64(saved))
+		}
 	}
 }
 
@@ -538,6 +547,10 @@ func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestI
 			n.getAccepted.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.getAccepted.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.getAccepted.savedSentBytes.Observe(float64(saved))
+			}
 			sentTo = append(sentTo, vID)
 		}
 	}
@@ -574,6 +587,10 @@ func (n *network) SendAccepted(nodeID ids.ShortID, chainID ids.ID, requestID uin
 		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
 		n.accepted.sentBytes.Add(float64(msgLen))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.accepted.savedSentBytes.Observe(float64(saved))
+		}
 	}
 }
 
@@ -605,6 +622,10 @@ func (n *network) SendGetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID
 	n.getAncestors.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
 	n.getAncestors.sentBytes.Add(float64(msgLen))
+	// assume that if [saved] == 0, [msg] wasn't compressed
+	if saved := msg.BytesSavedCompression(); saved != 0 {
+		n.getAncestors.savedSentBytes.Observe(float64(saved))
+	}
 	return true
 }
 
@@ -637,6 +658,10 @@ func (n *network) SendMultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uin
 		n.multiPut.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
 		n.multiPut.sentBytes.Add(float64(msgLen))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.multiPut.savedSentBytes.Observe(float64(saved))
+		}
 	}
 }
 
@@ -663,6 +688,10 @@ func (n *network) SendGet(nodeID ids.ShortID, chainID ids.ID, requestID uint32, 
 	n.get.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
 	n.get.sentBytes.Add(float64(msgLen))
+	// assume that if [saved] == 0, [msg] wasn't compressed
+	if saved := msg.BytesSavedCompression(); saved != 0 {
+		n.get.savedSentBytes.Observe(float64(saved))
+	}
 	return true
 }
 
@@ -701,6 +730,10 @@ func (n *network) SendPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, 
 		n.put.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
 		n.put.sentBytes.Add(float64(msgLen))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.put.savedSentBytes.Observe(float64(saved))
+		}
 	}
 }
 
@@ -759,6 +792,10 @@ func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 			n.pushQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.pushQuery.savedSentBytes.Observe(float64(saved))
+			}
 		}
 	}
 	return sentTo
@@ -790,6 +827,10 @@ func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.pullQuery.sentBytes.Add(float64(msgLen))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.pullQuery.savedSentBytes.Observe(float64(saved))
+			}
 		}
 	}
 	return sentTo
@@ -825,6 +866,10 @@ func (n *network) SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32
 		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
 		n.chits.sentBytes.Add(float64(msgLen))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.chits.savedSentBytes.Observe(float64(saved))
+		}
 	}
 }
 
@@ -1200,6 +1245,10 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		if peer.Send(msg, false) {
 			n.put.numSent.Inc()
 			n.put.sentBytes.Add(float64(len(msg.Bytes())))
+			// assume that if [saved] == 0, [msg] wasn't compressed
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.put.savedSentBytes.Observe(float64(saved))
+			}
 			n.sendFailRateCalculator.Observe(0, now)
 		} else {
 			n.sendFailRateCalculator.Observe(1, now)
