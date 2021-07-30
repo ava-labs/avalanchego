@@ -385,7 +385,8 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
-	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
+	appSender := &common.SenderTest{}
+	if err := vm.Initialize(ctx, chainDBManager, genesisBytes, nil, nil, msgChan, nil, appSender); err != nil {
 		t.Fatal(err)
 	}
 	if err := vm.Bootstrapped(); err != nil {

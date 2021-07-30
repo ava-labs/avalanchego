@@ -128,6 +128,13 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 
 	switch err := m.AddUncheckedTx(tx); err {
 	case nil:
+		txID := tx.ID()
+		m.vm.ctx.Log.Debug("Gossiping txID %v", txID)
+		txIDBytes, err := m.vm.codec.Marshal(codecVersion, txID)
+		if err != nil {
+			return err
+		}
+		m.vm.appSender.SendAppGossip(txIDBytes)
 		return nil
 	case errAttemptReRegisterTx:
 		return nil // backward compatibility

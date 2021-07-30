@@ -415,15 +415,21 @@ func (vm *VM) Version() (string, error) {
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	vm.ctx.Log.Verbo("called AppRequestFailed")
+
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	vm.ctx.Log.Verbo("called AppRequest")
+
 	// decode single id
 	txID := ids.ID{}
 	_, err := vm.codec.Unmarshal(request, &txID) // TODO: cleanup way we serialize this
 	if err != nil {
+		vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
 		return err
 	}
 	vm.ctx.Log.Debug("called AppRequest with txID %v", txID)
@@ -474,6 +480,7 @@ func (vm *VM) consumeReqID(reqID uint32) error {
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	vm.ctx.Log.Verbo("called AppResponse")
 	if err := vm.consumeReqID(requestID); err != nil {
 		vm.ctx.Log.Debug("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %v",
 			nodeID, requestID)
@@ -484,10 +491,14 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	tx := &Tx{}
 	_, err := vm.codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
 	if err != nil {
+		vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
 		return err
 	}
 	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
+		vm.ctx.Log.Debug("AppResponse: failed unmarshalling unsignedTx from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
 		return err
 	}
 	tx.Initialize(unsignedBytes, response)
@@ -497,7 +508,13 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	err = vm.mempool.AddUncheckedTx(tx)
 	switch err {
 	case nil:
-		vm.appSender.SendAppGossip(response)
+		txID := tx.ID()
+		vm.ctx.Log.Debug("Gossiping txID %v", txID)
+		txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
+		if err != nil {
+			return err
+		}
+		vm.appSender.SendAppGossip(txIDBytes)
 		return nil
 	case errTxExceedingMempoolSize:
 		// tx has not been accepted to mempool due to size
@@ -509,16 +526,21 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		return nil
 	default:
 		// TODO: record among rejected to avoid requesting again
+		vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
 		return err
 	}
 }
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	vm.ctx.Log.Verbo("called AppGossip")
+
 	// decode single id
 	txID := ids.ID{}
 	_, err := vm.codec.Unmarshal(msg, &txID) // TODO: cleanup way we serialize this
 	if err != nil {
+		vm.ctx.Log.Debug("AppGossip: failed unmarshalling message from Node %v, err %v", nodeID, err)
 		return err
 	}
 	vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
