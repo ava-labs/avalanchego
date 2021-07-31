@@ -415,8 +415,7 @@ func (vm *VM) Version() (string, error) {
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	vm.ctx.Log.Verbo("called AppRequestFailed")
-
+	vm.ctx.Log.Warn("Failed AppRequest to node %v, reqID %v", nodeID, requestID)
 	return nil
 }
 
