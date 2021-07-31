@@ -138,6 +138,10 @@ type peer struct {
 
 	// True if we can compress messages sent to this peer
 	canHandleCompressed utils.AtomicBool
+
+	// trackedSubnets hold subnetIDs that this peer is interested in.
+	trackedSubnets    ids.Set
+	trackedSubnetLock sync.RWMutex
 }
 
 // newPeer returns a properly initialized *peer.
@@ -150,7 +154,7 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 		tickerCloser:  make(chan struct{}),
 	}
 	p.aliasTimer = timer.NewTimer(p.releaseExpiredAliases)
-
+	p.trackedSubnets.Add(constants.PrimaryNetworkID)
 	return p
 }
 
@@ -271,7 +275,9 @@ func (p *peer) ReadMessages() {
 		// Invariant: When done processing this message, onFinishedHandling() is called.
 		// If this is not honored, the message throttler will leak until no new messages can be read.
 		// You can look at message throttler metrics to verify that there is no leak.
-		onFinishedHandling := func() { p.net.inboundMsgThrottler.Release(uint64(msgLen), p.nodeID) }
+		onFinishedHandling := func() {
+			p.net.inboundMsgThrottler.Release(uint64(msgLen), p.nodeID)
+		}
 
 		// Time out and close connection if we can't read message
 		if err := p.conn.SetReadDeadline(p.nextTimeout()); err != nil {
@@ -1346,4 +1352,18 @@ func ipAndTimeBytes(ip utils.IPDesc, timestamp uint64) []byte {
 
 func ipAndTimeHash(ip utils.IPDesc, timestamp uint64) []byte {
 	return hashing.ComputeHash256(ipAndTimeBytes(ip, timestamp))
+}
+
+func (p *peer) addTracked(subnetID ids.ID) {
+	p.trackedSubnetLock.Lock()
+	defer p.trackedSubnetLock.Unlock()
+
+	p.trackedSubnets.Add(subnetID)
+}
+
+func (p *peer) isTracked(subnetID ids.ID) bool {
+	p.trackedSubnetLock.Lock()
+	defer p.trackedSubnetLock.Unlock()
+
+	return p.trackedSubnets.Contains(subnetID)
 }

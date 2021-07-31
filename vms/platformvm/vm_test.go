@@ -2105,7 +2105,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
+	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2173,7 +2173,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.GetAcceptedFrontierF = nil
-	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
+	externalSender.GetAcceptedF = func(ids ids.ShortSet, _, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2184,7 +2184,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	externalSender.GetAcceptedF = nil
-	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
 		*reqID = requestID
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
