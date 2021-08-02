@@ -28,6 +28,9 @@ type UnsignedTx interface {
 type UnsignedDecisionTx interface {
 	UnsignedTx
 
+	// Attempts to verify transaction is well-formed
+	SynctacticVerify(vm *VM) error
+
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, vs VersionedState, stx *Tx) (
 		onAcceptFunc func() error,
@@ -38,6 +41,9 @@ type UnsignedDecisionTx interface {
 // UnsignedProposalTx is an unsigned operation that can be proposed
 type UnsignedProposalTx interface {
 	UnsignedTx
+
+	// Attempts to verify transaction is well-formed
+	SynctacticVerify(vm *VM) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, state MutableState, stx *Tx) (
@@ -53,6 +59,9 @@ type UnsignedProposalTx interface {
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type UnsignedAtomicTx interface {
 	UnsignedTx
+
+	// Attempts to verify transaction is well-formed
+	SynctacticVerify(vm *VM) error
 
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set

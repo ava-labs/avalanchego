@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -65,39 +63,31 @@ func (tx *UnsignedAddValidatorTx) Weight() uint64 {
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddValidatorTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	minStake uint64,
-	maxStake uint64,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
-	minDelegationFee uint32,
-) error {
+func (tx *UnsignedAddValidatorTx) SynctacticVerify(vm *VM) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
+	case tx.Validator.Wght < vm.MinValidatorStake: // Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
-	case tx.Validator.Wght > maxStake: // Ensure validator isn't staking too much
+	case tx.Validator.Wght > vm.MaxValidatorStake: // Ensure validator isn't staking too much
 		return errWeightTooLarge
 	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
-	case tx.Shares < minDelegationFee:
+	case tx.Shares < vm.MinDelegationFee:
 		return errInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < minStakeDuration: // Ensure staking length is not too short
+	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
 		return errStakeTooShort
-	case duration > maxStakeDuration: // Ensure staking length is not too long
+	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(vm.ctx, vm.codec); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -141,15 +131,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	if err := tx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-		vm.MinDelegationFee,
-	); err != nil {
+	if err := tx.SynctacticVerify(vm); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -303,13 +285,5 @@ func (vm *VM) newAddValidatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-		vm.MinDelegationFee,
-	)
+	return tx, utx.SynctacticVerify(vm)
 }

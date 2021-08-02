@@ -43,6 +43,16 @@ type UnsignedRewardValidatorTx struct {
 	shouldPreferCommit bool
 }
 
+func (tx *UnsignedRewardValidatorTx) SynctacticVerify(vm *VM) error {
+	if tx == nil {
+		return errNilTx
+	}
+	if tx.TxID == ids.Empty {
+		return errInvalidID
+	}
+	return nil
+}
+
 // SemanticVerify this transaction performs a valid state transition.
 //
 // The current validating set must have at least one member.
@@ -60,12 +70,11 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	switch {
-	case tx == nil:
-		return nil, nil, nil, nil, tempError{errNilTx}
-	case tx.TxID == ids.Empty:
-		return nil, nil, nil, nil, tempError{errInvalidID}
-	case len(stx.Creds) != 0:
+	if err := tx.SynctacticVerify(vm); err != nil {
+		return nil, nil, nil, nil, tempError{err}
+	}
+
+	if len(stx.Creds) != 0 {
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 

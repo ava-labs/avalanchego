@@ -139,7 +139,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.UnsignedTx.(*UnsignedCreateChainTx).syntacticallyVerified = false
 		tx.UnsignedTx = test.setup(tx.UnsignedTx.(*UnsignedCreateChainTx))
-		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).Verify(vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil && !test.shouldErr {
+		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).SynctacticVerify(vm); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)

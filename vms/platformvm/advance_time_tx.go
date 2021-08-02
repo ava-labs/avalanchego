@@ -32,6 +32,13 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
+func (tx *UnsignedAdvanceTimeTx) SynctacticVerify(vm *VM) error {
+	if tx == nil {
+		return errNilTx
+	}
+	return nil
+}
+
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
@@ -44,11 +51,12 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	switch {
-	case tx == nil:
-		return nil, nil, nil, nil, tempError{errNilTx}
-	case len(stx.Creds) != 0:
+	if len(stx.Creds) != 0 {
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
+	}
+
+	if err := tx.SynctacticVerify(vm); err != nil {
+		return nil, nil, nil, nil, tempError{err}
 	}
 
 	timestamp := tx.Timestamp()

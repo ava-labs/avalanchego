@@ -456,6 +456,8 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	vm.ctx.Log.Verbo("called AppResponse")
+
+	// check requestID
 	if err := vm.ReclaimID(requestID); err != nil {
 		vm.ctx.Log.Debug("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %v",
 			nodeID, requestID)
@@ -479,9 +481,32 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	tx.Initialize(unsignedBytes, response)
 	vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
 
-	// TODO: introduce relevant checks
-	err = vm.mempool.AddUncheckedTx(tx)
-	switch err {
+	// validate tx
+	switch typedTx := tx.UnsignedTx.(type) {
+	case UnsignedDecisionTx:
+		if err := typedTx.SynctacticVerify(vm); err != nil {
+			vm.ctx.Log.Warn("AppResponse: UnsignedDecisionTx %v is syntactically invalid, err %v. Rejecting it.",
+				tx.ID(), err)
+			return nil // TODO handle rejection
+		}
+	case UnsignedProposalTx:
+		if err := typedTx.SynctacticVerify(vm); err != nil {
+			vm.ctx.Log.Warn("AppResponse: UnsignedProposalTx %v is syntactically invalid, err %v. Rejecting it.",
+				tx.ID(), err)
+			return err // TODO handle rejection
+		}
+	case UnsignedAtomicTx:
+		if err := typedTx.SynctacticVerify(vm); err != nil {
+			vm.ctx.Log.Warn("AppResponse: UnsignedAtomicTx %v is syntactically invalid, err %v. Rejecting it.",
+				tx.ID(), err)
+			return err // TODO handle rejection
+		}
+	default:
+		return errUnknownTxType
+	}
+
+	// add to mempool and possibly re-gossip
+	switch err := vm.mempool.AddUncheckedTx(tx); err {
 	case nil:
 		txID := tx.ID()
 		vm.ctx.Log.Debug("Gossiping txID %v", txID)

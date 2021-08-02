@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -42,26 +41,20 @@ type UnsignedExportTx struct {
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 
 // Verify this transaction is well-formed
-func (tx *UnsignedExportTx) Verify(
-	avmID ids.ID,
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
+func (tx *UnsignedExportTx) SynctacticVerify(vm *VM) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DestinationChain != avmID:
+	case tx.DestinationChain != vm.ctx.XChainID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(vm.ctx, vm.codec); err != nil {
 		return err
 	}
 
@@ -87,7 +80,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	parentState MutableState,
 	stx *Tx,
 ) (VersionedState, TxError) {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.SynctacticVerify(vm); err != nil {
 		return nil, permError{err}
 	}
 
@@ -203,5 +196,5 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.SynctacticVerify(vm)
 }

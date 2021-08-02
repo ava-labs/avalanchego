@@ -48,9 +48,8 @@ import (
 )
 
 var (
-	defaultMinStakingDuration        = 24 * time.Hour
-	defaultMaxStakingDuration        = 365 * 24 * time.Hour
-	defaultMinDelegationFee   uint32 = 0
+	defaultMinStakingDuration = 24 * time.Hour
+	defaultMaxStakingDuration = 365 * 24 * time.Hour
 
 	// AVAX asset ID in tests
 	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}

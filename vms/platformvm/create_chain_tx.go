@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"unicode"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -52,13 +50,8 @@ type UnsignedCreateChainTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-// Verify this transaction is well-formed
-func (tx *UnsignedCreateChainTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
+// verify this transaction is well-formed
+func (tx *UnsignedCreateChainTx) SynctacticVerify(vm *VM) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -82,7 +75,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 		}
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(vm.ctx, vm.codec); err != nil {
 		return err
 	}
 	if err := tx.SubnetAuth.Verify(); err != nil {
@@ -106,7 +99,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.SynctacticVerify(vm); err != nil {
 		return nil, permError{err}
 	}
 
@@ -199,5 +192,5 @@ func (vm *VM) newCreateChainTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.SynctacticVerify(vm)
 }
