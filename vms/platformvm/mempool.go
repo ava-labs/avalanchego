@@ -70,8 +70,11 @@ type Mempool struct {
 	// Transactions that have not been put into blocks yet
 	dropIncoming        bool
 	unissuedProposalTxs *EventHeap
+	rejectedProposalTxs map[ids.ID]struct{}
 	unissuedDecisionTxs []*Tx
+	rejectedDecisionTxs map[ids.ID]struct{}
 	unissuedAtomicTxs   []*Tx
+	rejectedAtomicTxs   map[ids.ID]struct{}
 	unissuedTxs         map[ids.ID]*Tx
 	totalBytesSize      int
 }
@@ -83,6 +86,33 @@ func (m *Mempool) has(txID ids.ID) bool {
 
 func (m *Mempool) hasRoomFor(tx *Tx) bool {
 	return m.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
+}
+
+func (m *Mempool) markReject(tx *Tx) error {
+	switch tx.UnsignedTx.(type) {
+	case UnsignedProposalTx:
+		m.rejectedProposalTxs[tx.ID()] = struct{}{}
+	case UnsignedDecisionTx:
+		m.rejectedDecisionTxs[tx.ID()] = struct{}{}
+	case UnsignedAtomicTx:
+		m.rejectedAtomicTxs[tx.ID()] = struct{}{}
+	default:
+		return errUnknownTxType
+	}
+	return nil
+}
+
+func (m *Mempool) isAlreadyRejected(txID ids.ID) bool {
+	res := false
+	if _, ok := m.rejectedProposalTxs[txID]; ok {
+		res = true
+	} else if _, ok := m.rejectedDecisionTxs[txID]; ok {
+		res = true
+	} else if _, ok := m.rejectedAtomicTxs[txID]; ok {
+		res = true
+	}
+
+	return res
 }
 
 func (m *Mempool) register(tx *Tx) {
@@ -105,6 +135,10 @@ func (m *Mempool) Initialize(vm *VM) {
 	// added to consensus
 	m.unissuedTxs = make(map[ids.ID]*Tx)
 	m.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
+
+	m.rejectedProposalTxs = make(map[ids.ID]struct{})
+	m.rejectedDecisionTxs = make(map[ids.ID]struct{})
+	m.rejectedAtomicTxs = make(map[ids.ID]struct{})
 
 	m.timer = timer.NewTimer(func() {
 		m.vm.ctx.Lock.Lock()
