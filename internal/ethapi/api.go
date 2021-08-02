@@ -87,6 +87,41 @@ func (s *PublicEthereumAPI) MaxPriorityFeePerGas(ctx context.Context) (*hexutil.
 	return (*hexutil.Big)(tipcap), err
 }
 
+// TODO(aaronbuchwald) enable after migrating v1.10.6 gasprice changes
+// type feeHistoryResult struct {
+// 	OldestBlock  rpc.BlockNumber  `json:"oldestBlock"`
+// 	Reward       [][]*hexutil.Big `json:"reward,omitempty"`
+// 	BaseFee      []*hexutil.Big   `json:"baseFeePerGas,omitempty"`
+// 	GasUsedRatio []float64        `json:"gasUsedRatio"`
+// }
+
+// func (s *PublicEthereumAPI) FeeHistory(ctx context.Context, blockCount int, lastBlock rpc.BlockNumber, rewardPercentiles []float64) (*feeHistoryResult, error) {
+// 	oldest, reward, baseFee, gasUsed, err := s.b.FeeHistory(ctx, blockCount, lastBlock, rewardPercentiles)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	results := &feeHistoryResult{
+// 		OldestBlock:  oldest,
+// 		GasUsedRatio: gasUsed,
+// 	}
+// 	if reward != nil {
+// 		results.Reward = make([][]*hexutil.Big, len(reward))
+// 		for i, w := range reward {
+// 			results.Reward[i] = make([]*hexutil.Big, len(w))
+// 			for j, v := range w {
+// 				results.Reward[i][j] = (*hexutil.Big)(v)
+// 			}
+// 		}
+// 	}
+// 	if baseFee != nil {
+// 		results.BaseFee = make([]*hexutil.Big, len(baseFee))
+// 		for i, v := range baseFee {
+// 			results.BaseFee[i] = (*hexutil.Big)(v)
+// 		}
+// 	}
+// 	return results, nil
+// }
+
 // Syncing returns false in case the node is currently not syncing with the network. It can be up to date or has not
 // yet received the latest block headers from its pears. In case it is synchronizing:
 // - startingBlock: block number this node started to synchronise from
@@ -146,6 +181,29 @@ func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]*RPCTransac
 		}
 		content["queued"][account.Hex()] = dump
 	}
+	return content
+}
+
+// ContentFrom returns the transactions contained within the transaction pool.
+func (s *PublicTxPoolAPI) ContentFrom(addr common.Address) map[string]map[string]*RPCTransaction {
+	content := make(map[string]map[string]*RPCTransaction, 2)
+	pending, queue := s.b.TxPoolContentFrom(addr)
+	curHeader := s.b.CurrentHeader()
+
+	// Build the pending transactions
+	dump := make(map[string]*RPCTransaction, len(pending))
+	for _, tx := range pending {
+		dump[fmt.Sprintf("%d", tx.Nonce())] = newRPCPendingTransaction(tx, curHeader, s.b.ChainConfig())
+	}
+	content["pending"] = dump
+
+	// Build the queued transactions
+	dump = make(map[string]*RPCTransaction, len(queue))
+	for _, tx := range queue {
+		dump[fmt.Sprintf("%d", tx.Nonce())] = newRPCPendingTransaction(tx, curHeader, s.b.ChainConfig())
+	}
+	content["queued"] = dump
+
 	return content
 }
 
@@ -1417,7 +1475,7 @@ func AccessList(ctx context.Context, b Backend, blockNrOrHash rpc.BlockNumberOrH
 		}
 		// Copy the original db so we don't modify it
 		statedb := db.Copy()
-		msg := types.NewMessage(args.from(), args.To, uint64(*args.Nonce), args.Value.ToInt(), uint64(*args.Gas), args.GasPrice.ToInt(), nil, nil, args.data(), accessList, false)
+		msg := types.NewMessage(args.from(), args.To, uint64(*args.Nonce), args.Value.ToInt(), uint64(*args.Gas), args.GasPrice.ToInt(), big.NewInt(0), big.NewInt(0), args.data(), accessList, false)
 
 		// Apply the transaction with the access list tracer
 		tracer := vm.NewAccessListTracer(accessList, args.from(), to, precompiles)

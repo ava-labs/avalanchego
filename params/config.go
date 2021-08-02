@@ -85,7 +85,7 @@ var (
 		// TODO(aaronbuchwald) schedule Apricot Phase 3 + Apricot Phase 4
 	}
 
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
 	TestRules       = TestChainConfig.AvalancheRules(new(big.Int), new(big.Int))
 )
 
@@ -114,8 +114,6 @@ type ChainConfig struct {
 	PetersburgBlock     *big.Int `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
 	IstanbulBlock       *big.Int `json:"istanbulBlock,omitempty"`       // Istanbul switch block (nil = no fork, 0 = already on istanbul)
 	MuirGlacierBlock    *big.Int `json:"muirGlacierBlock,omitempty"`    // Eip-2384 (bomb delay) switch block (nil = no fork, 0 = already activated)
-
-	EWASMBlock *big.Int `json:"ewasmBlock,omitempty"` // EWASM switch block (nil = no fork, 0 = already activated)
 
 	// Avalanche Network Upgrades
 	ApricotPhase1BlockTimestamp *big.Int `json:"apricotPhase1BlockTimestamp,omitempty"` // Apricot Phase 1 Block Timestamp (nil = no fork, 0 = already activated)
@@ -200,11 +198,6 @@ func (c *ChainConfig) IsPetersburg(num *big.Int) bool {
 // IsIstanbul returns whether num is either equal to the Istanbul fork block or greater.
 func (c *ChainConfig) IsIstanbul(num *big.Int) bool {
 	return isForked(c.IstanbulBlock, num)
-}
-
-// IsEWASM returns whether num represents a block number after the EWASM fork
-func (c *ChainConfig) IsEWASM(num *big.Int) bool {
-	return isForked(c.EWASMBlock, num)
 }
 
 // Avalanche Upgrades:
@@ -372,9 +365,6 @@ func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *Confi
 	}
 	if isForkIncompatible(c.MuirGlacierBlock, newcfg.MuirGlacierBlock, head) {
 		return newCompatError("Muir Glacier fork block", c.MuirGlacierBlock, newcfg.MuirGlacierBlock)
-	}
-	if isForkIncompatible(c.EWASMBlock, newcfg.EWASMBlock, head) {
-		return newCompatError("ewasm fork block", c.EWASMBlock, newcfg.EWASMBlock)
 	}
 	// TODO(aaronbuchwald) ensure that Avalanche Blocktimestamps are not modified
 	return nil
