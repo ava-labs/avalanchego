@@ -1118,22 +1118,14 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	allPeers := n.getAllPeers()
-
-	if int(numToGossip) > len(allPeers) {
-		numToGossip = uint(len(allPeers))
-	}
-
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(allPeers))); err != nil {
-		return err
-	}
-	indices, err := s.Sample(int(numToGossip))
+	n.stateLock.RLock()
+	peers, err := n.peers.sample(int(numToGossip))
+	n.stateLock.RUnlock()
 	if err != nil {
 		return err
 	}
-	for _, index := range indices {
-		peer := allPeers[int(index)]
+
+	for _, peer := range peers {
 		canHandleCompressed := peer.canHandleCompressed.GetValue()
 		var msg message.Message
 		if canHandleCompressed {
@@ -1141,7 +1133,8 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		} else {
 			msg = msgWithoutIsCompressedFlag
 		}
-		if peer.Send(msg, false) {
+		sent := peer.Send(msg, false)
+		if sent {
 			n.put.numSent.Inc()
 			n.put.sentBytes.Add(float64(len(msg.Bytes())))
 			// assume that if [saved] == 0, [msg] wasn't compressed
