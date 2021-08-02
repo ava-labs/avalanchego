@@ -39,10 +39,9 @@ import (
 )
 
 const (
-	avalanchegoLatest     = "avalanchego-latest"
-	avalanchegoPreupgrade = "avalanchego-preupgrade"
-	chainConfigFileName   = "config"
-	chainUpgradeFileName  = "upgrade"
+	pluginsDirName       = "plugins"
+	chainConfigFileName  = "config"
+	chainUpgradeFileName = "upgrade"
 )
 
 var (
@@ -61,28 +60,20 @@ func GetProcessConfig(v *viper.Viper) (process.Config, error) {
 	}
 
 	// Build directory should have this structure:
+	//
 	// build
-	// |_avalanchego-latest
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-	// |_avalanchego-preupgrade
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
+	// ├── avalanchego (the binary from compiling the app directory)
+	// └── plugins
+	//     └── evm
 	validBuildDir := func(dir string) bool {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
 			return false
 		}
-		// make sure both expected subdirectories exist
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoLatest)); err != nil {
-			return false
-		}
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoPreupgrade)); err != nil {
-			return false
-		}
-		return true
+
+		// make sure the expected subdirectory exists
+		_, err = os.Stat(filepath.Join(dir, pluginsDirName))
+		return err == nil
 	}
 	if validBuildDir(config.BuildDir) {
 		return config, nil
@@ -110,8 +101,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// First, get the process config
 	nodeConfig := node.Config{}
 
-	// Plugin directory defaults to [buildDirectory]/avalanchego-latest/plugins
-	nodeConfig.PluginDir = filepath.Join(buildDir, avalanchegoLatest, "plugins")
+	// Plugin directory defaults to [buildDir]/[pluginsDirName]
+	nodeConfig.PluginDir = filepath.Join(buildDir, pluginsDirName)
 
 	// Consensus Parameters
 	nodeConfig.ConsensusParams.K = v.GetInt(SnowSampleSizeKey)
