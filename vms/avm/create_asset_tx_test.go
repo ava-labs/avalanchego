@@ -64,7 +64,7 @@ func validCreateAssetTx(t *testing.T) (*CreateAssetTx, codec.Manager, *snow.Cont
 		Denomination: byte(2),
 		States: []*InitialState{
 			{
-				FxID: 0,
+				FxIndex: 0,
 				Outs: []verify.State{
 					&secp256k1fx.TransferOutput{
 						Amt: 12345,
@@ -239,7 +239,7 @@ func TestCreateAssetTxSerialization(t *testing.T) {
 		Denomination: 2,
 		States: []*InitialState{
 			{
-				FxID: 0,
+				FxIndex: 0,
 				Outs: []verify.State{
 					&secp256k1fx.TransferOutput{
 						Amt: 12345,
@@ -286,14 +286,14 @@ func TestCreateAssetTxGetters(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
 
 	if initialStates := tx.InitialStates(); len(initialStates) != 1 {
 		t.Fatalf("Wrong number of assets returned")
-	} else if initialState := initialStates[0]; initialState.FxID != 0 {
+	} else if initialState := initialStates[0]; initialState.FxIndex != 0 {
 		t.Fatalf("Wrong fxID returned")
 	} else if len(initialState.Outs) != 0 {
 		t.Fatalf("Wrong number of outs returned")
@@ -315,7 +315,7 @@ func TestCreateAssetTxSyntacticVerify(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -349,7 +349,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooShort(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -374,7 +374,7 @@ func TestCreateAssetTxSyntacticVerifyNameTooLong(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -397,7 +397,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooShort(t *testing.T) {
 		Symbol:       "",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -420,7 +420,7 @@ func TestCreateAssetTxSyntacticVerifySymbolTooLong(t *testing.T) {
 		Symbol:       "BRADY",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -463,7 +463,7 @@ func TestCreateAssetTxSyntacticVerifyDenominationTooLong(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: denominationTooLarge,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -486,7 +486,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithWhitespace(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -509,7 +509,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithInvalidCharacter(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -532,7 +532,7 @@ func TestCreateAssetTxSyntacticVerifyNameWithUnicodeCharacter(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -555,7 +555,7 @@ func TestCreateAssetTxSyntacticVerifySymbolWithInvalidCharacter(t *testing.T) {
 		Symbol:       "TOM!",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -578,7 +578,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidBaseTx(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 0,
+			FxIndex: 0,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -601,7 +601,7 @@ func TestCreateAssetTxSyntacticVerifyInvalidInitialState(t *testing.T) {
 		Symbol:       "TOM",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 1,
+			FxIndex: 1,
 		}},
 	}
 	tx.Initialize(nil, nil)
@@ -625,10 +625,10 @@ func TestCreateAssetTxSyntacticVerifyUnsortedInitialStates(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{
 			{
-				FxID: 1,
+				FxIndex: 1,
 			},
 			{
-				FxID: 0,
+				FxIndex: 0,
 			},
 		},
 	}
@@ -705,7 +705,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 
 	tx.States = []*InitialState{
 		{
-			FxID: 5, // Invalid FxID
+			FxIndex: 5, // Invalid FxIndex
 			Outs: []verify.State{
 				&secp256k1fx.TransferOutput{
 					Amt: 12345,
@@ -718,14 +718,14 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 		},
 	}
 
-	// NumFxs is 1, so FxID 5 should cause an error
+	// NumFxs is 1, so FxIndex 5 should cause an error
 	if err := tx.SyntacticVerify(ctx, c, assetID, 0, 0, 1); err == nil {
 		t.Fatal("CreateAssetTx should have failed syntactic verification due to invalid Fx")
 	}
 
 	uniqueStates := []*InitialState{
 		{
-			FxID: 0,
+			FxIndex: 0,
 			Outs: []verify.State{
 				&secp256k1fx.TransferOutput{
 					Amt: 12345,
@@ -737,7 +737,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 			},
 		},
 		{
-			FxID: 1,
+			FxIndex: 1,
 			Outs: []verify.State{
 				&secp256k1fx.TransferOutput{
 					Amt: 12345,
@@ -749,7 +749,7 @@ func TestCreateAssetTxSyntacticVerifyInitialStates(t *testing.T) {
 			},
 		},
 		{
-			FxID: 2,
+			FxIndex: 2,
 			Outs: []verify.State{
 				&secp256k1fx.TransferOutput{
 					Amt: 12345,

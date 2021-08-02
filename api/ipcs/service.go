@@ -58,7 +58,8 @@ type PublishBlockchainReply struct {
 
 // PublishBlockchain publishes the finalized accepted transactions from the blockchainID over the IPC
 func (ipc *IPCServer) PublishBlockchain(r *http.Request, args *PublishBlockchainArgs, reply *PublishBlockchainReply) error {
-	ipc.log.Info("IPCs: PublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+	ipc.log.Debug("IPCs: PublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+
 	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
 		ipc.log.Error("unknown blockchainID: %s", err)
@@ -84,7 +85,8 @@ type UnpublishBlockchainArgs struct {
 
 // UnpublishBlockchain closes publishing of a blockchainID
 func (ipc *IPCServer) UnpublishBlockchain(r *http.Request, args *UnpublishBlockchainArgs, reply *api.SuccessResponse) error {
-	ipc.log.Info("IPCs: UnpublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+	ipc.log.Debug("IPCs: UnpublishBlockchain called with BlockchainID: %s", args.BlockchainID)
+
 	chainID, err := ipc.chainManager.Lookup(args.BlockchainID)
 	if err != nil {
 		ipc.log.Error("unknown blockchainID %s: %s", args.BlockchainID, err)

@@ -17,21 +17,17 @@ message Batch {
     int64 id = 3;
 }
 
+message AtomicRequest {
+    repeated bytes removeRequests = 1;
+    repeated Element putRequests = 2;
+    bytes peerChainID = 3;
+}
+
 message Element {
     bytes Key = 1;
     bytes Value = 2;
     repeated bytes Traits = 3;
 }
-
-message PutRequest {
-    bytes peerChainID = 1;
-    repeated Element elems = 2;
-    repeated Batch batches = 3;
-    int64 id = 4;
-    bool continues = 5;
-}
-
-message PutResponse {}
 
 message GetRequest {
     bytes peerChainID = 1;
@@ -62,19 +58,17 @@ message IndexedResponse {
     bool continues = 4;
 }
 
-message RemoveRequest {
-    bytes peerChainID = 1;
-    repeated bytes keys = 2;
-    repeated Batch batches = 3;
-    int64 id = 4;
-    bool continues = 5;
+message ApplyRequest {
+    repeated AtomicRequest requests = 1;
+    repeated Batch batches = 2;
+    int64 id = 3;
+    bool continues = 4;
 }
 
-message RemoveResponse {}
+message ApplyResponse {}
 
 service SharedMemory {
-    rpc Put(PutRequest) returns (PutResponse);
     rpc Get(GetRequest) returns (GetResponse);
     rpc Indexed(IndexedRequest) returns (IndexedResponse);
-    rpc Remove(RemoveRequest) returns (RemoveResponse);
+    rpc Apply(ApplyRequest) returns (ApplyResponse);
 }
