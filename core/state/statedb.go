@@ -365,17 +365,6 @@ func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, 
 	return proof, err
 }
 
-// GetStorageProofByHash returns the Merkle proof for given storage slot.
-func (s *StateDB) GetStorageProofByHash(a common.Address, key common.Hash) ([][]byte, error) {
-	var proof proofList
-	trie := s.StorageTrie(a)
-	if trie == nil {
-		return proof, errors.New("storage trie for requested address does not exist")
-	}
-	err := trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
-	return proof, err
-}
-
 // GetCommittedState retrieves a value from the given account's committed storage trie.
 func (s *StateDB) GetCommittedState(addr common.Address, hash common.Hash) common.Hash {
 	stateObject := s.getStateObject(addr)
@@ -1015,7 +1004,7 @@ func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHas
 			log.Crit("Failed to commit dirty codes", "error", err)
 		}
 	}
-	// Write the account trie changes, measuing the amount of wasted time
+	// Write the account trie changes, measuring the amount of wasted time
 	var start time.Time
 	if metrics.EnabledExpensive {
 		start = time.Now()
