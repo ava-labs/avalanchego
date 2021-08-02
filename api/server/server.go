@@ -80,6 +80,7 @@ func (s *Server) Initialize(
 	s.nodeID = nodeID
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
+
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,

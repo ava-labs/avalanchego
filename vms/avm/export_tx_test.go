@@ -785,7 +785,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err != nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -905,7 +905,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an unknown utxo")
 	}
 }
@@ -989,7 +989,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an invalid asset ID")
 	}
 }
@@ -1170,7 +1170,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an invalid credential")
 	}
 }
@@ -1424,7 +1424,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	utxoID := utxo.InputID()
 
 	peerSharedMemory := m.NewSharedMemory(platformID)
-	if err := peerSharedMemory.Remove(vm.ctx.ChainID, [][]byte{utxoID[:]}); err != nil {
+	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {RemoveRequests: [][]byte{utxoID[:]}}}); err != nil {
 		t.Fatal(err)
 	}
 

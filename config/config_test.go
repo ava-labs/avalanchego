@@ -141,39 +141,28 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 		file       map[string]string
 		err        error
 		errMessage string
-		flagSet    bool
 		expected   map[string]chains.ChainConfig
 	}{
 		"cdir not exist": {
 			structure: "/",
 			file:      map[string]string{"config.ex": "noeffect"},
 			err:       os.ErrNotExist,
-			flagSet:   true,
 			expected:  nil,
 		},
 		"cdir is file ": {
 			structure:  "/",
 			file:       map[string]string{"cdir": "noeffect"},
 			errMessage: "not a directory",
-			flagSet:    true,
 			expected:   nil,
-		},
-		"cdir not exist flag not set": {
-			structure: "/",
-			file:      map[string]string{"config.ex": "noeffect"},
-			flagSet:   false,
-			expected:  map[string]chains.ChainConfig{},
 		},
 		"chain subdir not exist": {
 			structure: "/cdir/",
 			file:      map[string]string{"config.ex": "noeffect"},
-			flagSet:   true,
 			expected:  map[string]chains.ChainConfig{},
 		},
 		"full structure": {
 			structure: "/cdir/C/",
 			file:      map[string]string{"config.ex": "hello"},
-			flagSet:   true,
 			expected:  map[string]chains.ChainConfig{"C": {Config: []byte("hello"), Upgrade: []byte(nil)}},
 		},
 	}
@@ -183,16 +172,11 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			assert := assert.New(t)
 			root := t.TempDir()
 			chainConfigDir := path.Join(root, "cdir")
-			var configJSON string
-			if test.flagSet {
-				configJSON = fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
-			} else {
-				configJSON = "{}"
-			}
+			configJSON := fmt.Sprintf(`{%q: %q}`, ChainConfigDirKey, chainConfigDir)
 			configFile := setupConfigJSON(t, root, configJSON)
 
 			dirToCreate := path.Join(root, test.structure)
-			assert.NoError(os.MkdirAll(dirToCreate, 0700))
+			assert.NoError(os.MkdirAll(dirToCreate, 0o700))
 
 			for key, value := range test.file {
 				setupFile(t, dirToCreate, key, value)
@@ -200,9 +184,8 @@ func TestSetChainConfigsDirNotExist(t *testing.T) {
 			v := setupViper(configFile)
 
 			// Parse config
-			if test.flagSet {
-				assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
-			}
+			assert.Equal(chainConfigDir, v.GetString(ChainConfigDirKey))
+
 			// don't read with getConfigFromViper since it's very slow.
 			chainConfigs, err := getChainConfigs(v)
 			switch {
@@ -329,15 +312,15 @@ func TestReadVMAliasesDirNotExists(t *testing.T) {
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := path.Join(rootPath, "config.json")
-	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0600))
+	assert.NoError(t, ioutil.WriteFile(configFilePath, []byte(value), 0o600))
 	return configFilePath
 }
 
 // setups file creates necessary path and writes value to it.
 func setupFile(t *testing.T, path string, fileName string, value string) {
-	assert.NoError(t, os.MkdirAll(path, 0700))
+	assert.NoError(t, os.MkdirAll(path, 0o700))
 	filePath := filepath.Join(path, fileName)
-	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0600))
+	assert.NoError(t, ioutil.WriteFile(filePath, []byte(value), 0o600))
 }
 
 func setupViper(configFilePath string) *viper.Viper {

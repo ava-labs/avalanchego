@@ -680,6 +680,18 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 	return fx, nil
 }
 
+// getParsedFx returns the parsedFx object for a given TransferableInput
+// or TransferableOutput object
+func (vm *VM) getParsedFx(val interface{}) (*parsedFx, error) {
+	idx, err := vm.getFx(val)
+	if err != nil {
+		return nil, err
+	}
+
+	fx := vm.fxs[idx]
+	return fx, nil
+}
+
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// Check cache to see whether this asset supports this fx
 	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
@@ -702,7 +714,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
-		if state.FxID == uint32(fxID) {
+		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx
 			fxIDs.Add(uint(fxID))
 		}

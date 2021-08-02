@@ -8,11 +8,6 @@ import (
 	"sync"
 )
 
-const (
-	ChainAliasPrefix = "bc/"
-	VMAliasPrefix    = "vm/"
-)
-
 // Aliaser allows one to give an ID aliases and lookup the aliases given to an
 // ID. An ID can have arbitrarily many aliases; two IDs may not have the same
 // alias.

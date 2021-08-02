@@ -36,6 +36,13 @@ type SubnetLookup interface {
 	SubnetID(chainID ids.ID) (ids.ID, error)
 }
 
+// ContextInitializable represents an object that can be initialized
+// given a *Context object
+type ContextInitializable interface {
+	// InitCtx initializes an object provided a *Context object
+	InitCtx(ctx *Context)
+}
+
 // Context is information about the current execution.
 // [NetworkID] is the ID of the network this context exists within.
 // [ChainID] is the ID of the chain this context exists within.

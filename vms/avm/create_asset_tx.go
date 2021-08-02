@@ -34,6 +34,8 @@ var (
 	errIllegalSymbolCharacter       = errors.New("asset's symbol must be all upper case letters")
 	errUnexpectedWhitespace         = errors.New("unexpected whitespace provided")
 	errDenominationTooLarge         = errors.New("denomination is too large")
+
+	_ UnsignedTx = &CreateAssetTx{}
 )
 
 // CreateAssetTx is a transaction that creates a new asset.
@@ -43,6 +45,15 @@ type CreateAssetTx struct {
 	Symbol       string          `serialize:"true" json:"symbol"`
 	Denomination byte            `serialize:"true" json:"denomination"`
 	States       []*InitialState `serialize:"true" json:"initialStates"`
+}
+
+func (t *CreateAssetTx) Init(vm *VM) error {
+	for _, state := range t.States {
+		fx := vm.fxs[state.FxIndex]
+		state.FxID = fx.ID
+		state.InitCtx(vm.ctx)
+	}
+	return t.BaseTx.Init(vm)
 }
 
 // InitialStates track which virtual machines, and the initial state of these
