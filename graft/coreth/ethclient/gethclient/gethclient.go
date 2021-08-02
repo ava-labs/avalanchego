@@ -34,8 +34,9 @@ import (
 	"runtime/debug"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -54,7 +55,7 @@ func New(c *rpc.Client) *Client {
 
 // CreateAccessList tries to create an access list for a specific transaction based on the
 // current pending state of the blockchain.
-func (ec *Client) CreateAccessList(ctx context.Context, msg ethereum.CallMsg) (*types.AccessList, uint64, string, error) {
+func (ec *Client) CreateAccessList(ctx context.Context, msg interfaces.CallMsg) (*types.AccessList, uint64, string, error) {
 	type accessListResult struct {
 		Accesslist *types.AccessList `json:"accessList"`
 		Error      string            `json:"error,omitempty"`
@@ -106,7 +107,7 @@ func (ec *Client) GetProof(ctx context.Context, account common.Address, keys []s
 	}
 
 	var res accountResult
-	err := ec.c.CallContext(ctx, &res, "eth_getProof", account, keys, toBlockNumArg(blockNumber))
+	err := ec.c.CallContext(ctx, &res, "eth_getProof", account, keys, ethclient.ToBlockNumArg(blockNumber))
 	// Turn hexutils back to normal datatypes
 	storageResults := make([]StorageResult, 0, len(res.StorageProof))
 	for _, st := range res.StorageProof {
@@ -146,11 +147,11 @@ type OverrideAccount struct {
 // overrides specifies a map of contract states that should be overwritten before executing
 // the message call.
 // Please use ethclient.CallContract instead if you don't need the override functionality.
-func (ec *Client) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int, overrides *map[common.Address]OverrideAccount) ([]byte, error) {
+func (ec *Client) CallContract(ctx context.Context, msg interfaces.CallMsg, blockNumber *big.Int, overrides *map[common.Address]OverrideAccount) ([]byte, error) {
 	var hex hexutil.Bytes
 	err := ec.c.CallContext(
 		ctx, &hex, "eth_call", toCallArg(msg),
-		toBlockNumArg(blockNumber), toOverrideMap(overrides),
+		ethclient.ToBlockNumArg(blockNumber), toOverrideMap(overrides),
 	)
 	return hex, err
 }
@@ -174,18 +175,7 @@ func (ec *Client) SubscribePendingTransactions(ctx context.Context, ch chan<- co
 	return ec.c.EthSubscribe(ctx, ch, "newPendingTransactions")
 }
 
-func toBlockNumArg(number *big.Int) string {
-	if number == nil {
-		return "latest"
-	}
-	pending := big.NewInt(-1)
-	if number.Cmp(pending) == 0 {
-		return "pending"
-	}
-	return hexutil.EncodeBig(number)
-}
-
-func toCallArg(msg ethereum.CallMsg) interface{} {
+func toCallArg(msg interfaces.CallMsg) interface{} {
 	arg := map[string]interface{}{
 		"from": msg.From,
 		"to":   msg.To,

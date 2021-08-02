@@ -95,7 +95,7 @@ func (ec *Client) BlockByHash(ctx context.Context, hash common.Hash) (*types.Blo
 // Note that loading full blocks requires two requests. Use HeaderByNumber
 // if you don't need all transactions or uncle headers.
 func (ec *Client) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
-	return ec.getBlock(ctx, "eth_getBlockByNumber", toBlockNumArg(number), true)
+	return ec.getBlock(ctx, "eth_getBlockByNumber", ToBlockNumArg(number), true)
 }
 
 // BlockNumber returns the most recent block number
@@ -192,7 +192,7 @@ func (ec *Client) HeaderByHash(ctx context.Context, hash common.Hash) (*types.He
 // nil, the latest known header is returned.
 func (ec *Client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	var head *types.Header
-	err := ec.c.CallContext(ctx, &head, "eth_getBlockByNumber", toBlockNumArg(number), false)
+	err := ec.c.CallContext(ctx, &head, "eth_getBlockByNumber", ToBlockNumArg(number), false)
 	if err == nil && head == nil {
 		err = interfaces.NotFound
 	}
@@ -366,7 +366,7 @@ func (ec *Client) NetworkID(ctx context.Context) (*big.Int, error) {
 // The block number can be nil, in which case the balance is taken from the latest known block.
 func (ec *Client) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
 	var result hexutil.Big
-	err := ec.c.CallContext(ctx, &result, "eth_getBalance", account, toBlockNumArg(blockNumber))
+	err := ec.c.CallContext(ctx, &result, "eth_getBalance", account, ToBlockNumArg(blockNumber))
 	return (*big.Int)(&result), err
 }
 
@@ -374,7 +374,7 @@ func (ec *Client) BalanceAt(ctx context.Context, account common.Address, blockNu
 // The block number can be nil, in which case the balance is taken from the latest known block.
 func (ec *Client) AssetBalanceAt(ctx context.Context, account common.Address, assetID ids.ID, blockNumber *big.Int) (*big.Int, error) {
 	var result hexutil.Big
-	err := ec.c.CallContext(ctx, &result, "eth_getAssetBalance", account, toBlockNumArg(blockNumber), assetID)
+	err := ec.c.CallContext(ctx, &result, "eth_getAssetBalance", account, ToBlockNumArg(blockNumber), assetID)
 	return (*big.Int)(&result), err
 }
 
@@ -382,7 +382,7 @@ func (ec *Client) AssetBalanceAt(ctx context.Context, account common.Address, as
 // The block number can be nil, in which case the value is taken from the latest known block.
 func (ec *Client) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
 	var result hexutil.Bytes
-	err := ec.c.CallContext(ctx, &result, "eth_getStorageAt", account, key, toBlockNumArg(blockNumber))
+	err := ec.c.CallContext(ctx, &result, "eth_getStorageAt", account, key, ToBlockNumArg(blockNumber))
 	return result, err
 }
 
@@ -390,7 +390,7 @@ func (ec *Client) StorageAt(ctx context.Context, account common.Address, key com
 // The block number can be nil, in which case the code is taken from the latest known block.
 func (ec *Client) CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error) {
 	var result hexutil.Bytes
-	err := ec.c.CallContext(ctx, &result, "eth_getCode", account, toBlockNumArg(blockNumber))
+	err := ec.c.CallContext(ctx, &result, "eth_getCode", account, ToBlockNumArg(blockNumber))
 	return result, err
 }
 
@@ -398,7 +398,7 @@ func (ec *Client) CodeAt(ctx context.Context, account common.Address, blockNumbe
 // The block number can be nil, in which case the nonce is taken from the latest known block.
 func (ec *Client) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
 	var result hexutil.Uint64
-	err := ec.c.CallContext(ctx, &result, "eth_getTransactionCount", account, toBlockNumArg(blockNumber))
+	err := ec.c.CallContext(ctx, &result, "eth_getTransactionCount", account, ToBlockNumArg(blockNumber))
 	return uint64(result), err
 }
 
@@ -438,9 +438,9 @@ func toFilterArg(q interfaces.FilterQuery) (interface{}, error) {
 		if q.FromBlock == nil {
 			arg["fromBlock"] = "0x0"
 		} else {
-			arg["fromBlock"] = toBlockNumArg(q.FromBlock)
+			arg["fromBlock"] = ToBlockNumArg(q.FromBlock)
 		}
-		arg["toBlock"] = toBlockNumArg(q.ToBlock)
+		arg["toBlock"] = ToBlockNumArg(q.ToBlock)
 	}
 	return arg, nil
 }
@@ -493,7 +493,7 @@ func toFilterArg(q interfaces.FilterQuery) (interface{}, error) {
 // blocks might not be available.
 func (ec *Client) CallContract(ctx context.Context, msg interfaces.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	var hex hexutil.Bytes
-	err := ec.c.CallContext(ctx, &hex, "eth_call", toCallArg(msg), toBlockNumArg(blockNumber))
+	err := ec.c.CallContext(ctx, &hex, "eth_call", toCallArg(msg), ToBlockNumArg(blockNumber))
 	if err != nil {
 		return nil, err
 	}
@@ -556,18 +556,10 @@ func (ec *Client) SendTransaction(ctx context.Context, tx *types.Transaction) er
 	return ec.c.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(data))
 }
 
-func toBlockNumArg(number *big.Int) string {
+func ToBlockNumArg(number *big.Int) string {
 	// The Ethereum implementation uses a different mapping from
 	// negative numbers to special strings (latest, pending) then is
 	// used on its server side. See rpc/types.go for the comparison.
-	// if number == nil {
-	// 	return "latest"
-	// }
-	// pending := big.NewInt(-1)
-	// if number.Cmp(pending) == 0 {
-	// 	return "pending"
-	// }
-
 	// In Coreth, latest, pending, and accepted are all treated the same
 	// therefore, if [number] is nil or a negative number in [-3, -1]
 	// we want the latest accepted block
