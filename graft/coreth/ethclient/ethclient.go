@@ -297,32 +297,6 @@ func (ec *Client) TransactionReceipt(ctx context.Context, txHash common.Hash) (*
 	return r, err
 }
 
-func toBlockNumArg(number *big.Int) string {
-	// The Ethereum implementation uses a different mapping from
-	// negative numbers to special strings (latest, pending) then is
-	// used on its server side. See rpc/types.go for the comparison.
-	// if number == nil {
-	// 	return "latest"
-	// }
-	// pending := big.NewInt(-1)
-	// if number.Cmp(pending) == 0 {
-	// 	return "pending"
-	// }
-
-	// In Coreth, latest, pending, and accepted are all treated the same
-	// therefore, if [number] is nil or a negative number in [-3, -1]
-	// we want the latest accepted block
-	if number == nil {
-		return "latest"
-	}
-	low := big.NewInt(-3)
-	high := big.NewInt(-1)
-	if number.Cmp(low) >= 0 && number.Cmp(high) <= 0 {
-		return "latest"
-	}
-	return hexutil.EncodeBig(number)
-}
-
 // type rpcProgress struct {
 // 	StartingBlock hexutil.Uint64
 // 	CurrentBlock  hexutil.Uint64
@@ -509,8 +483,6 @@ func toFilterArg(q interfaces.FilterQuery) (interface{}, error) {
 // 	return uint(num), err
 // }
 
-// TODO: SubscribePendingTransactions (needs server side)
-
 // Contract Calling
 
 // CallContract executes a message call transaction, which is directly executed in the VM
@@ -582,6 +554,32 @@ func (ec *Client) SendTransaction(ctx context.Context, tx *types.Transaction) er
 		return err
 	}
 	return ec.c.CallContext(ctx, nil, "eth_sendRawTransaction", hexutil.Encode(data))
+}
+
+func toBlockNumArg(number *big.Int) string {
+	// The Ethereum implementation uses a different mapping from
+	// negative numbers to special strings (latest, pending) then is
+	// used on its server side. See rpc/types.go for the comparison.
+	// if number == nil {
+	// 	return "latest"
+	// }
+	// pending := big.NewInt(-1)
+	// if number.Cmp(pending) == 0 {
+	// 	return "pending"
+	// }
+
+	// In Coreth, latest, pending, and accepted are all treated the same
+	// therefore, if [number] is nil or a negative number in [-3, -1]
+	// we want the latest accepted block
+	if number == nil {
+		return "latest"
+	}
+	low := big.NewInt(-3)
+	high := big.NewInt(-1)
+	if number.Cmp(low) >= 0 && number.Cmp(high) <= 0 {
+		return "latest"
+	}
+	return hexutil.EncodeBig(number)
 }
 
 func toCallArg(msg interfaces.CallMsg) interface{} {
