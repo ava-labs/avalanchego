@@ -231,8 +231,10 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
+	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
 	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		n.Log,
+		networkNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
 		n.Config.NetworkConfig.InboundThrottlerConfig,
@@ -243,6 +245,7 @@ func (n *Node) initNetworking() error {
 
 	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
 		n.Log,
+		networkNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 		primaryNetworkValidators,
 		n.Config.NetworkConfig.OutboundThrottlerConfig,
@@ -251,7 +254,8 @@ func (n *Node) initNetworking() error {
 		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
 	}
 
-	n.Net = network.NewDefaultNetwork(
+	n.Net, err = network.NewDefaultNetwork(
+		networkNamespace,
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
@@ -266,9 +270,7 @@ func (n *Node) initNetworking() error {
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
-		n.Config.ConnMeterResetDuration,
-		n.Config.ConnMeterMaxConns,
-		n.Config.SendQueueSize,
+		n.Config.NetworkConfig.InboundConnThrottlerConfig,
 		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
 		n.Config.PeerAliasTimeout,
@@ -278,10 +280,11 @@ func (n *Node) initNetworking() error {
 		n.Config.PeerListGossipFreq,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		n.Config.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
 	)
-	return nil
+	return err
 }
 
 type insecureValidatorManager struct {
@@ -594,12 +597,14 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
+	requestsNamespace := fmt.Sprintf("%s_requests", constants.PlatformName)
+
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
 	if err := timeoutManager.Initialize(
 		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
 		n.benchlistManager,
-		n.Config.NetworkConfig.MetricsNamespace,
+		requestsNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 	); err != nil {
 		return err
@@ -616,7 +621,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		criticalChains,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
-		n.Config.NetworkConfig.MetricsNamespace,
+		requestsNamespace,
 		n.Config.NetworkConfig.MetricsRegisterer,
 	)
 	if err != nil {
@@ -874,7 +879,12 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	healthService, err := health.NewService(n.Config.HealthCheckFreq, n.Log, n.Config.NetworkConfig.MetricsNamespace, n.Config.ConsensusParams.Metrics)
+	healthService, err := health.NewService(
+		n.Config.HealthCheckFreq,
+		n.Log,
+		fmt.Sprintf("%s_health", constants.PlatformName),
+		n.Config.ConsensusParams.Metrics,
+	)
 	if err != nil {
 		return err
 	}
@@ -969,10 +979,10 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	for vmID, aliases := range n.Config.VMAliases {
 		urlAliases := []string{}
 		for _, alias := range aliases {
-			urlAliases = append(urlAliases, ids.VMAliasPrefix+alias)
+			urlAliases = append(urlAliases, constants.VMAliasPrefix+alias)
 		}
 
-		url := ids.VMAliasPrefix + vmID.String()
+		url := constants.VMAliasPrefix + vmID.String()
 		if err := n.APIServer.AddAliases(url, urlAliases...); err != nil {
 			return err
 		}

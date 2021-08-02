@@ -56,9 +56,6 @@ type Config struct {
 	StakingTLSCert        tls.Certificate
 	DisabledStakingWeight uint64
 
-	// Throttling
-	SendQueueSize uint32
-
 	// Health
 	HealthCheckFreq time.Duration
 
@@ -67,6 +64,7 @@ type Config struct {
 	PeerListSize       uint32
 	PeerListGossipSize uint32
 	PeerListGossipFreq time.Duration
+	CompressionEnabled bool
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
@@ -128,10 +126,6 @@ type Config struct {
 	DynamicUpdateDuration time.Duration
 
 	DynamicPublicIPResolver dynamicip.Resolver
-
-	// Throttling incoming connections
-	ConnMeterResetDuration time.Duration
-	ConnMeterMaxConns      int
 
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set

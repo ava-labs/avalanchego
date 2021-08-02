@@ -6,24 +6,27 @@ package secp256k1fx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
 var errNilMintOperation = errors.New("nil mint operation")
 
-// MintOperation ...
 type MintOperation struct {
 	MintInput      Input          `serialize:"true" json:"mintInput"`
 	MintOutput     MintOutput     `serialize:"true" json:"mintOutput"`
 	TransferOutput TransferOutput `serialize:"true" json:"transferOutput"`
 }
 
-// Outs ...
+func (op *MintOperation) InitCtx(ctx *snow.Context) {
+	op.MintOutput.OutputOwners.InitCtx(ctx)
+	op.TransferOutput.OutputOwners.InitCtx(ctx)
+}
+
 func (op *MintOperation) Outs() []verify.State {
 	return []verify.State{&op.MintOutput, &op.TransferOutput}
 }
 
-// Verify ...
 func (op *MintOperation) Verify() error {
 	switch {
 	case op == nil:

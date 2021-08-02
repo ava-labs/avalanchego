@@ -15,7 +15,6 @@ import (
 
 const rsaPSSSize = 3072
 
-// FactoryRSAPSS ...
 type FactoryRSAPSS struct{}
 
 // NewPrivateKey implements the Factory interface
@@ -56,7 +55,6 @@ func (*FactoryRSAPSS) ToPrivateKey(b []byte) (PrivateKey, error) {
 	}, nil
 }
 
-// PublicKeyRSAPSS ...
 type PublicKeyRSAPSS struct {
 	pk    *rsa.PublicKey
 	addr  ids.ShortID
@@ -97,7 +95,6 @@ func (k *PublicKeyRSAPSS) Bytes() []byte {
 	return k.bytes
 }
 
-// PrivateKeyRSAPSS ...
 type PrivateKeyRSAPSS struct {
 	sk    *rsa.PrivateKey
 	pk    *PublicKeyRSAPSS

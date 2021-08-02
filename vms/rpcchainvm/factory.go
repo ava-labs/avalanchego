@@ -7,32 +7,27 @@ import (
 	"errors"
 	"io/ioutil"
 	"log"
-	"os/exec"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 )
 
 var errWrongVM = errors.New("wrong vm type")
 
-// Factory ...
 type Factory struct {
 	Path string
 }
 
-// New ...
 func (f *Factory) New(ctx *snow.Context) (interface{}, error) {
 	// Ignore warning from launching an executable with a variable command
 	// because the command is a controlled and required input
 
-	// #nosec G204
-	cmd := exec.Command(f.Path)
-
 	config := &plugin.ClientConfig{
 		HandshakeConfig: Handshake,
 		Plugins:         PluginMap,
-		Cmd:             cmd,
+		Cmd:             subprocess.New(f.Path),
 		AllowedProtocols: []plugin.Protocol{
 			plugin.ProtocolNetRPC,
 			plugin.ProtocolGRPC,
