@@ -85,7 +85,6 @@ func runTrace(tracer *Tracer, vmctx *vmContext, chaincfg *params.ChainConfig) (j
 	}
 	return tracer.GetResult()
 }
-
 func TestTracer(t *testing.T) {
 	execTracer := func(code string) ([]byte, string) {
 		t.Helper()
@@ -213,5 +212,36 @@ func TestNoStepExec(t *testing.T) {
 		if have := execTracer(tt.code); tt.want != string(have) {
 			t.Errorf("testcase %d: expected return value to be %s got %s\n\tcode: %v", i, tt.want, string(have), tt.code)
 		}
+	}
+}
+
+func TestIsPrecompile(t *testing.T) {
+	chaincfg := &params.ChainConfig{ChainID: big.NewInt(1), HomesteadBlock: big.NewInt(0), DAOForkBlock: nil, DAOForkSupport: false, EIP150Block: big.NewInt(0), EIP150Hash: common.Hash{}, EIP155Block: big.NewInt(0), EIP158Block: big.NewInt(0), ByzantiumBlock: big.NewInt(100), ConstantinopleBlock: big.NewInt(0), PetersburgBlock: big.NewInt(0), IstanbulBlock: big.NewInt(200), MuirGlacierBlock: big.NewInt(0), ApricotPhase2BlockTimestamp: big.NewInt(300), ApricotPhase3BlockTimestamp: big.NewInt(0), ApricotPhase4BlockTimestamp: nil}
+	chaincfg.ByzantiumBlock = big.NewInt(100)
+	chaincfg.IstanbulBlock = big.NewInt(200)
+	chaincfg.ApricotPhase3BlockTimestamp = big.NewInt(300)
+	txCtx := vm.TxContext{GasPrice: big.NewInt(100000)}
+	tracer, err := New("{addr: toAddress('0000000000000000000000000000000000000009'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", new(Context))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	blockCtx := vm.BlockContext{BlockNumber: big.NewInt(150), Time: big.NewInt(150)}
+	res, err := runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(res) != "false" {
+		t.Errorf("Tracer should not consider blake2f as precompile in byzantium")
+	}
+
+	tracer, _ = New("{addr: toAddress('0000000000000000000000000000000000000009'), res: null, step: function() { this.res = isPrecompiled(this.addr); }, fault: function() {}, result: function() { return this.res; }}", new(Context))
+	blockCtx = vm.BlockContext{BlockNumber: big.NewInt(250), Time: big.NewInt(250)}
+	res, err = runTrace(tracer, &vmContext{blockCtx, txCtx}, chaincfg)
+	if err != nil {
+		t.Error(err)
+	}
+	if string(res) != "true" {
+		t.Errorf("Tracer should consider blake2f as precompile in istanbul")
 	}
 }
