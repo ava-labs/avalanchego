@@ -474,9 +474,8 @@ func TestStateParent(t *testing.T) {
 	}
 
 	missingBlk1ID := parsedBlk2.Parent()
-	missingBlk1, _ := chainState.GetBlock(missingBlk1ID)
 
-	if missingBlk1 != nil {
+	if _, err := chainState.GetBlock(missingBlk1ID); err == nil {
 		t.Fatalf("Expected  parent of blk2 to be not found")
 	}
 

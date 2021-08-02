@@ -41,6 +41,9 @@ type ChainVM interface {
 	// Attempt to load a block.
 	//
 	// If the block does not exist, then an error should be returned.
+	//
+	// TODO: we should change the invariant of the GetBlock, GetTx, and GetVertex
+	// calls to report database.ErrNotFound if the operation is missing.
 	GetBlock(ids.ID) (snowman.Block, error)
 
 	// Notify the VM of the currently preferred block.

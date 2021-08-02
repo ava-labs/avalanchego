@@ -77,6 +77,8 @@ func (v *voter) Update() {
 
 func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
+
+votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
 		blk, err := v.t.VM.GetBlock(vote)
@@ -91,12 +93,12 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 			blk, err = v.t.GetBlock(blkID)
 			if err != nil {
 				status = choices.Unknown
-				break
+				continue votesLoop
 			}
 			status = blk.Status()
 		}
 
-		if !status.Decided() && blk != nil && v.t.Consensus.DecidedOrProcessing(blk) {
+		if !status.Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
 			bubbledVotes.AddCount(blkID, count)
 		}
 	}
