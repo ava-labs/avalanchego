@@ -658,7 +658,7 @@ func TestTransactionDropping(t *testing.T) {
 	}
 	// Reduce the block gas limit, check that invalidated transactions are dropped
 	tbc := pool.chain.(*testBlockChain)
-	pool.chain.(*testBlockChain).reset(tbc.statedb, 100, tbc.chainHeadFeed)
+	tbc.reset(tbc.statedb, 100, tbc.chainHeadFeed)
 	<-pool.requestReset(nil, nil)
 
 	if _, ok := pool.pending[account].txs.items[tx0.Nonce()]; !ok {
