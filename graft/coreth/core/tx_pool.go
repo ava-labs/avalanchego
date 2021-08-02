@@ -519,6 +519,23 @@ func (pool *TxPool) Content() (map[common.Address]types.Transactions, map[common
 	return pending, queued
 }
 
+// ContentFrom retrieves the data content of the transaction pool, returning the
+// pending as well as queued transactions of this address, grouped by nonce.
+func (pool *TxPool) ContentFrom(addr common.Address) (types.Transactions, types.Transactions) {
+	pool.mu.RLock()
+	defer pool.mu.RUnlock()
+
+	var pending types.Transactions
+	if list, ok := pool.pending[addr]; ok {
+		pending = list.Flatten()
+	}
+	var queued types.Transactions
+	if list, ok := pool.queue[addr]; ok {
+		queued = list.Flatten()
+	}
+	return pending, queued
+}
+
 // Pending retrieves all currently processable transactions, grouped by origin
 // account and sorted by nonce. The returned transaction set is a copy and can be
 // freely modified by calling code.
@@ -1535,6 +1552,7 @@ func (pool *TxPool) demoteUnexecutables() {
 				// Internal shuffle shouldn't touch the lookup set.
 				pool.enqueueTx(hash, tx, false, false)
 			}
+			// This might happen in a reorg, so log it to the metering
 			pendingGauge.Dec(int64(len(gapped)))
 		}
 		// Delete the entire pending entry if it became empty.
