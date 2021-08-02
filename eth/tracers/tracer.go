@@ -589,7 +589,7 @@ func (jst *Tracer) CaptureStart(env *vm.EVM, from common.Address, to common.Addr
 	jst.ctx["block"] = env.Context.BlockNumber.Uint64()
 	jst.dbWrapper.db = env.StateDB
 	// Update list of precompiles based on current block
-	rules := env.ChainConfig().Rules(env.Context.BlockNumber)
+	rules := env.ChainConfig().AvalancheRules(env.Context.BlockNumber, env.Context.Time)
 	jst.activePrecompiles = vm.ActivePrecompiles(rules)
 
 	// Compute intrinsic gas
