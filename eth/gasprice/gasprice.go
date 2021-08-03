@@ -33,6 +33,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
@@ -116,6 +117,46 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		checkBlocks: blocks,
 		percentile:  percent,
 	}
+}
+
+// EstiamteBaseFee returns an estimate of what the base fee will be on a block
+// produced at the current time. If ApricotPhase3 has not been activated, it may
+// return a nil value and a nil error.
+func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
+	// Fetch the most recent block by number
+	block, err := oracle.backend.BlockByNumber(ctx, rpc.LatestBlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	// If the fetched block does not have a base fee, return nil as the base fee
+	if block.BaseFee() == nil {
+		return nil, nil
+	}
+
+	// If the block does have a baseFee, calculate the next base fee
+	// based on the current time and add it to the tip to estimate the
+	// total gas price estimate.
+	_, nextBaseFee, err := dummy.CalcBaseFee(oracle.backend.ChainConfig(), block.Header(), oracle.clock.Unix())
+	return nextBaseFee, err
+}
+
+// SuggestPrice returns an estimated price for legacy transactions.
+func (oracle *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
+	// Estimate the effective tip based on recent blocks.
+	tip, err := oracle.suggestTipCap(ctx)
+	if err != nil {
+		return nil, err
+	}
+	nextBaseFee, err := oracle.EstimateBaseFee(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// If [nextBaseFee] is nil, return [tip] without modification.
+	if nextBaseFee == nil {
+		return tip, nil
+	}
+
+	return tip.Add(tip, nextBaseFee), nil
 }
 
 // SuggestTipCap returns a tip cap so that newly created transaction can have a
