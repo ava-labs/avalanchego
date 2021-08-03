@@ -4,7 +4,6 @@
 package config
 
 const (
-	FetchOnlyKey                              = "fetch-only"
 	ConfigFileKey                             = "config-file"
 	VersionKey                                = "version"
 	GenesisConfigFileKey                      = "genesis"

@@ -160,7 +160,6 @@ type network struct {
 	inboundConnThrottler         throttling.InboundConnThrottler
 	c                            message.Codec
 	b                            message.Builder
-	isFetchOnly                  bool
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -274,7 +273,6 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
-	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
 	appGossipSize uint,
@@ -320,7 +318,6 @@ func NewDefaultNetwork(
 		benchlistManager,
 		peerAliasTimeout,
 		tlsKey,
-		isFetchOnly,
 		compressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
@@ -366,7 +363,6 @@ func NewNetwork(
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
-	isFetchOnly bool,
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
@@ -418,7 +414,6 @@ func NewNetwork(
 		benchlistManager:             benchlistManager,
 		tlsKey:                       tlsKey,
 		latestPeerIP:                 make(map[ids.ShortID]signedPeerIP),
-		isFetchOnly:                  isFetchOnly,
 		byteSlicePool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 0, defaultByteSliceCap)

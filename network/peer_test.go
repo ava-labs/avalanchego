@@ -113,7 +113,6 @@ func TestPeer_Close(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		defaultAppGossipSize,
