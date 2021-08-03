@@ -16,10 +16,6 @@ import (
 	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 )
 
-const (
-	latestVersionDir = "avalanchego-latest"
-)
-
 // nodeProcess wraps a node client
 type nodeProcess struct {
 	log logging.Logger
@@ -59,15 +55,11 @@ func (np *nodeProcess) stop() error {
 
 type nodeManager struct {
 	// Path to the build directory, which should have this structure:
+	//
 	// build
-	// |_avalanchego-latest
-	//   |_avalanchego-process (the node/binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-	// |_avalanchego-preupgrade
-	//   |_avalanchego-process (the node/binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
+	// ├── avalanchego (the binary from compiling the app directory)
+	// └── plugins
+	//     └── evm
 	buildDirPath string
 	log          logging.Logger
 	// nodeProcess binary path --> nodeProcess
@@ -191,7 +183,7 @@ func (nm *nodeManager) runNormal() (int, error) {
 		fmt.Sprintf("--%s=true", config.PluginModeKey), // run as plugin
 	)
 
-	binaryPath := filepath.Join(nm.buildDirPath, latestVersionDir, "avalanchego-process")
+	binaryPath := filepath.Join(nm.buildDirPath, "avalanchego")
 	node, err := nm.newNode(binaryPath, args, true)
 	if err != nil {
 		nm.lock.Unlock()
