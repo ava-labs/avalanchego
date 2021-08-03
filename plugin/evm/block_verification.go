@@ -349,13 +349,6 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 		return errEmptyBlock
 	}
 
-	// Make sure that all the txs have the correct fee set.
-	for _, tx := range txs {
-		if tx.GasPrice().Cmp(params.ApricotPhase1MinGasPrice) < 0 {
-			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.ApricotPhase1MinGasPrice)
-		}
-	}
-
 	// Make sure the block isn't too far in the future
 	blockTimestamp := b.ethBlock.Time()
 	if maxBlockTime := uint64(b.vm.clock.Time().Add(maxFutureBlockTime).Unix()); blockTimestamp > maxBlockTime {
