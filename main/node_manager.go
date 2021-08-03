@@ -6,21 +6,14 @@ import (
 	"path/filepath"
 	"sync"
 
-	appplugin "github.com/ava-labs/avalanchego/app/plugin"
-	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/node"
-	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/subprocess"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
-)
 
-const (
-	latestVersionDir     = "avalanchego-latest"
-	preupgradeVersionDir = "avalanchego-preupgrade"
+	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/subprocess"
+
+	appplugin "github.com/ava-labs/avalanchego/app/plugin"
 )
 
 // nodeProcess wraps a node client
@@ -62,15 +55,11 @@ func (np *nodeProcess) stop() error {
 
 type nodeManager struct {
 	// Path to the build directory, which should have this structure:
+	//
 	// build
-	// |_avalanchego-latest
-	//   |_avalanchego-process (the node/binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-	// |_avalanchego-preupgrade
-	//   |_avalanchego-process (the node/binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
+	// ├── avalanchego (the binary from compiling the app directory)
+	// └── plugins
+	//     └── evm
 	buildDirPath string
 	log          logging.Logger
 	// nodeProcess binary path --> nodeProcess
@@ -176,50 +165,6 @@ func (nm *nodeManager) newNode(path string, args []string, printToStdOut bool) (
 	return np, nil
 }
 
-// Return a node compatible with the previous database version.
-// Assumes the node binary path is [buildDir]/avalanchego-preupgrade/avalanchego-process
-// Assumes the node's plugin path is [buildDir]/avalanchego-preupgrade/plugins
-// Assumes the binary can be served as a plugin.
-func (nm *nodeManager) preDBUpgradeNode() (*nodeProcess, error) {
-	args := make([]string, len(os.Args)+1)
-	copy(args, os.Args[1:])
-	args = append(
-		args,
-		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
-		fmt.Sprintf("--%s=%s", config.BuildDirKey, nm.buildDirPath),
-	)
-
-	binaryPath := filepath.Join(nm.buildDirPath, preupgradeVersionDir, "avalanchego-process")
-	return nm.newNode(binaryPath, args, true)
-}
-
-// Return the latest version node, override configs to run in fetch-only mode.
-func (nm *nodeManager) latestVersionNodeFetchOnly(rootConfig node.Config) (*nodeProcess, error) {
-	nodeID, err := ids.ToShortID(hashing.PubkeyBytesToAddress(rootConfig.StakingTLSCert.Leaf.Raw))
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse node ID: %w", err)
-	}
-	args := make([]string, len(os.Args)+9)
-	copy(args, os.Args[1:])
-	args = append(
-		args,
-		// Tell this node to run in fetch only mode and to bootstrap only from the local node
-		fmt.Sprintf("--%s=127.0.0.1:%d", config.BootstrapIPsKey, int(rootConfig.StakingIP.Port)),
-		fmt.Sprintf("--%s=%s%s", config.BootstrapIDsKey, constants.NodeIDPrefix, nodeID),
-		fmt.Sprintf("--%s=%s", config.FetchOnlyKey, "true"),
-		fmt.Sprintf("--%s=%d", config.StakingPortKey, 0), // use any available port for staking port
-		fmt.Sprintf("--%s=%d", config.HTTPPortKey, 0),    // use any available port for HTTP port
-		fmt.Sprintf("--%s=%s", config.PluginModeKey, "true"),
-		fmt.Sprintf("--%s=%s", config.LogsDirKey, rootConfig.LoggingConfig.Directory+"-fetch-only"),
-		fmt.Sprintf("--%s=%s", config.RetryBootstrapKey, "true"),
-		fmt.Sprintf("--%s=%d", config.RetryBootstrapMaxAttemptsKey, 1000),
-		fmt.Sprintf("--%s=%s", config.BenchlistMinFailingDurationKey, "1000h"),
-	)
-
-	binaryPath := filepath.Join(nm.buildDirPath, latestVersionDir, "avalanchego-process")
-	return nm.newNode(binaryPath, args, false)
-}
-
 // Run the latest node version in plugin-mode and with the supplied configurations.
 // Runs until the node exits.
 // Returns the node's exit code.
@@ -235,11 +180,10 @@ func (nm *nodeManager) runNormal() (int, error) {
 	copy(args, os.Args[1:])
 	args = append(
 		args,
-		fmt.Sprintf("--%s=false", config.FetchOnlyKey), // don't run in fetch only mode
 		fmt.Sprintf("--%s=true", config.PluginModeKey), // run as plugin
 	)
 
-	binaryPath := filepath.Join(nm.buildDirPath, latestVersionDir, "avalanchego-process")
+	binaryPath := filepath.Join(nm.buildDirPath, "avalanchego")
 	node, err := nm.newNode(binaryPath, args, true)
 	if err != nil {
 		nm.lock.Unlock()

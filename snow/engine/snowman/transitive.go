@@ -92,7 +92,7 @@ func (t *Transitive) finishBootstrapping() error {
 	if err != nil {
 		return err
 	}
-	lastAccepted, err := t.VM.GetBlock(lastAcceptedID)
+	lastAccepted, err := t.GetBlock(lastAcceptedID)
 	if err != nil {
 		t.Ctx.Log.Error("failed to get last accepted block due to: %s", err)
 		return err
@@ -135,7 +135,7 @@ func (t *Transitive) Gossip() error {
 	if err != nil {
 		return err
 	}
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		t.Ctx.Log.Warn("dropping gossip request as %s couldn't be loaded due to %s", blkID, err)
 		return nil
@@ -153,7 +153,7 @@ func (t *Transitive) Shutdown() error {
 
 // Get implements the Engine interface
 func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		// If we failed to get the block, that means either an unexpected error
 		// has occurred, [vdr] is not following the protocol, or the
@@ -170,7 +170,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 // GetAncestors implements the Engine interface
 func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.ID) error {
 	startTime := time.Now()
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil { // Don't have the block. Drop this request.
 		t.Ctx.Log.Verbo("couldn't get block %s. dropping GetAncestors(%s, %d, %s)", blkID, vdr, requestID, blkID)
 		return nil
@@ -182,8 +182,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
-		blk = blk.Parent()
-		if blk.Status() == choices.Unknown {
+		if blk, err = t.GetBlock(blk.Parent()); err != nil {
 			break
 		}
 		blkBytes := blk.Bytes()
@@ -351,7 +350,6 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	if err != nil {
 		return err
 	}
-
 	// Wait until [blkID] has been issued to consensus before for applying this chit.
 	if !added {
 		v.deps.Add(blkID)
@@ -460,7 +458,7 @@ func (t *Transitive) buildBlocks() error {
 
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
-		parentID := blk.Parent().ID()
+		parentID := blk.Parent()
 		if pref := t.Consensus.Preference(); parentID != pref {
 			t.Ctx.Log.Warn("built block with parent: %s, expected %s", parentID, pref)
 		}
@@ -496,7 +494,7 @@ func (t *Transitive) repoll() {
 // If we do not have [blkID], request it.
 // Returns true if the block is processing in consensus or is decided.
 func (t *Transitive) issueFromByID(vdr ids.ShortID, blkID ids.ID) (bool, error) {
-	blk, err := t.VM.GetBlock(blkID)
+	blk, err := t.GetBlock(blkID)
 	if err != nil {
 		t.sendRequest(vdr, blkID)
 		return false, nil
@@ -518,11 +516,12 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 			return false, err
 		}
 
-		blk = blk.Parent()
-		blkID = blk.ID()
+		blkID = blk.Parent()
+		var err error
+		blk, err = t.GetBlock(blkID)
 
 		// If we don't have this ancestor, request it from [vdr]
-		if !blk.Status().Fetched() {
+		if err != nil || !blk.Status().Fetched() {
 			t.sendRequest(vdr, blkID)
 			return false, nil
 		}
@@ -550,16 +549,22 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
-	for blk.Status().Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+	status := blk.Status()
+	for status.Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
-		blk = blk.Parent()
-		blkID = blk.ID()
+		blkID = blk.Parent()
+		var err error
+		if blk, err = t.GetBlock(blkID); err != nil {
+			status = choices.Unknown
+			break
+		}
+		status = blk.Status()
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if t.Consensus.DecidedOrProcessing(blk) {
+	if status != choices.Unknown && t.Consensus.DecidedOrProcessing(blk) {
 		return true, nil
 	}
 
@@ -592,8 +597,8 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	}
 
 	// block on the parent if needed
-	if parent := blk.Parent(); !t.Consensus.DecidedOrProcessing(parent) {
-		parentID := parent.ID()
+	parentID := blk.Parent()
+	if parent, err := t.GetBlock(parentID); err != nil || !t.Consensus.DecidedOrProcessing(parent) {
 		t.Ctx.Log.Verbo("block %s waiting for parent %s to be issued", blkID, parentID)
 		i.deps.Add(parentID)
 	}
@@ -674,8 +679,12 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// longer pending
 	blkID := blk.ID()
 	t.pending.Remove(blkID)
-
-	if !t.Consensus.AcceptedOrProcessing(blk.Parent()) {
+	parentID := blk.Parent()
+	parent, err := t.GetBlock(parentID)
+	// Because the dependency must have been fulfilled by the time this function
+	// is called - we don't expect [err] to be non-nil. But it is handled for
+	// completness and future proofing.
+	if err != nil || !t.Consensus.AcceptedOrProcessing(parent) {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(blkID)

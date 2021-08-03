@@ -1850,7 +1850,11 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 
 	block, ok := blockIntf.(decision)
 	if !ok {
-		block, ok = blockIntf.Parent().(decision)
+		parentBlockIntf, err := blockIntf.parentBlock()
+		if err != nil {
+			return false, err
+		}
+		block, ok = parentBlockIntf.(decision)
 		if !ok {
 			return false, errMissingDecisionBlock
 		}

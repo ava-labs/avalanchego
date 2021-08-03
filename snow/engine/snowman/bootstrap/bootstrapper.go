@@ -271,6 +271,7 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 	if blkHeight > b.tipHeight && b.startingAcceptedFrontier.Contains(blkID) {
 		b.tipHeight = blkHeight
 	}
+
 	for status == choices.Processing {
 		if b.Halted() {
 			return nil
@@ -283,15 +284,20 @@ func (b *Bootstrapper) process(blk snowman.Block) error {
 			numAccepted: b.numAccepted,
 			numDropped:  b.numDropped,
 			blk:         blk,
+			vm:          b.VM,
 		})
 		if err != nil {
 			return err
 		}
 
 		// Traverse to the next block regardless of if the block is pushed
-		blk = blk.Parent()
-		status = blk.Status()
-		blkID = blk.ID()
+		blkID = blk.Parent()
+		blk, err = b.VM.GetBlock(blkID)
+		if err != nil {
+			status = choices.Unknown
+		} else {
+			status = blk.Status()
+		}
 
 		if !pushed {
 			// If this block is already on the queue, then we can stop
