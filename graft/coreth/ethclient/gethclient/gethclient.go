@@ -24,8 +24,8 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package gethclient provides an RPC client for geth-specific APIs.
-package gethclient
+// Package corethclient provides an RPC client for coreth-specific APIs.
+package corethclient
 
 import (
 	"context"
