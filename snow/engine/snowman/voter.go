@@ -5,7 +5,6 @@ package snowman
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
 // Voter records chits received from [vdr] once its dependencies are met.
@@ -92,7 +91,6 @@ votesLoop:
 			blkID = blk.Parent()
 			blk, err = v.t.GetBlock(blkID)
 			if err != nil {
-				status = choices.Unknown
 				continue votesLoop
 			}
 			status = blk.Status()

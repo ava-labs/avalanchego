@@ -526,7 +526,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	}
 
 	// The block was issued into consensus. This is the happy path.
-	if status != choices.Unknown && blk != nil && t.Consensus.DecidedOrProcessing(blk) {
+	if status != choices.Unknown && t.Consensus.DecidedOrProcessing(blk) {
 		return true, nil
 	}
 
