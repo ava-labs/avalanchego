@@ -45,7 +45,6 @@ var (
 	currentSupplyKey = []byte("current supply")
 	lastAcceptedKey  = []byte("last accepted")
 	initializedKey   = []byte("initialized")
-	migratedKey      = []byte("migrated")
 
 	errWrongNetworkID = errors.New("tx has wrong network ID")
 
@@ -92,9 +91,6 @@ type InternalState interface {
 	Commit() error
 	CommitBatch() (database.Batch, error)
 	Close() error
-
-	SetMigrated() error
-	IsMigrated() (bool, error)
 }
 
 /*
@@ -139,7 +135,6 @@ type InternalState interface {
  * |     '-- txID -> nil
  * '-. singletons
  *   |-- initializedKey -> nil
- *   |-- migratedKey -> nil
  *   |-- timestampKey -> timestamp
  *   |-- currentSupplyKey -> currentSupply
  *   '-- lastAcceptedKey -> lastAccepted
@@ -1313,14 +1308,6 @@ func (st *internalStateImpl) loadPendingValidators() error {
 
 	st.pendingStakerChainState = ps
 	return nil
-}
-
-func (st *internalStateImpl) IsMigrated() (bool, error) {
-	return st.singletonDB.Has(migratedKey)
-}
-
-func (st *internalStateImpl) SetMigrated() error {
-	return st.singletonDB.Put(migratedKey, nil)
 }
 
 func (st *internalStateImpl) shouldInit() (bool, error) {

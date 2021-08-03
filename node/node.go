@@ -278,7 +278,6 @@ func (n *Node) initNetworking() error {
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
-		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
 		n.Config.CompressionEnabled,
@@ -637,8 +636,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		FetchOnly:                              n.Config.FetchOnly,
-		FetchOnlyFrom:                          fetchOnlyFrom,
 		StakingEnabled:                         n.Config.EnableStaking,
 		Log:                                    n.Log,
 		LogFactory:                             n.LogFactory,
@@ -769,11 +766,7 @@ func (n *Node) initSharedMemory() error {
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
-	ks, err := keystore.New(n.Log, keystoreDB)
-	if err != nil {
-		return err
-	}
-	n.keystore = ks
+	n.keystore = keystore.New(n.Log, keystoreDB)
 	keystoreHandler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
@@ -824,7 +817,7 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir)
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir, n.LogFactory)
 	if err != nil {
 		return err
 	}
@@ -986,10 +979,10 @@ func (n *Node) initAPIAliases(genesisBytes []byte) error {
 	for vmID, aliases := range n.Config.VMAliases {
 		urlAliases := []string{}
 		for _, alias := range aliases {
-			urlAliases = append(urlAliases, ids.VMAliasPrefix+alias)
+			urlAliases = append(urlAliases, constants.VMAliasPrefix+alias)
 		}
 
-		url := ids.VMAliasPrefix + vmID.String()
+		url := constants.VMAliasPrefix + vmID.String()
 		if err := n.APIServer.AddAliases(url, urlAliases...); err != nil {
 			return err
 		}

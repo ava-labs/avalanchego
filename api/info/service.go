@@ -75,7 +75,7 @@ type GetNodeVersionReply struct {
 
 // GetNodeVersion returns the version this node is running
 func (service *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersionReply) error {
-	service.log.Info("Info: GetNodeVersion called")
+	service.log.Debug("Info: GetNodeVersion called")
 
 	vmVersions, err := service.vmManager.Versions()
 	if err != nil {
@@ -96,7 +96,7 @@ type GetNodeIDReply struct {
 
 // GetNodeID returns the node ID of this node
 func (service *Info) GetNodeID(_ *http.Request, _ *struct{}, reply *GetNodeIDReply) error {
-	service.log.Info("Info: GetNodeID called")
+	service.log.Debug("Info: GetNodeID called")
 
 	reply.NodeID = service.nodeID.PrefixedString(constants.NodeIDPrefix)
 	return nil
@@ -107,9 +107,22 @@ type GetNetworkIDReply struct {
 	NetworkID json.Uint32 `json:"networkID"`
 }
 
+// GetNodeIPReply are the results from calling GetNodeIP
+type GetNodeIPReply struct {
+	IP string `json:"ip"`
+}
+
+// GetNodeIP returns the IP of this node
+func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
+	service.log.Debug("Info: GetNodeIP called")
+
+	reply.IP = service.networking.IP().String()
+	return nil
+}
+
 // GetNetworkID returns the network ID this node is running on
 func (service *Info) GetNetworkID(_ *http.Request, _ *struct{}, reply *GetNetworkIDReply) error {
-	service.log.Info("Info: GetNetworkID called")
+	service.log.Debug("Info: GetNetworkID called")
 
 	reply.NetworkID = json.Uint32(service.networkID)
 	return nil
@@ -122,7 +135,7 @@ type GetNetworkNameReply struct {
 
 // GetNetworkName returns the network name this node is running on
 func (service *Info) GetNetworkName(_ *http.Request, _ *struct{}, reply *GetNetworkNameReply) error {
-	service.log.Info("Info: GetNetworkName called")
+	service.log.Debug("Info: GetNetworkName called")
 
 	reply.NetworkName = constants.NetworkName(service.networkID)
 	return nil
@@ -135,15 +148,15 @@ type GetBlockchainIDArgs struct {
 
 // GetBlockchainIDReply are the results from calling GetBlockchainID
 type GetBlockchainIDReply struct {
-	BlockchainID string `json:"blockchainID"`
+	BlockchainID ids.ID `json:"blockchainID"`
 }
 
 // GetBlockchainID returns the blockchain ID that resolves the alias that was supplied
 func (service *Info) GetBlockchainID(_ *http.Request, args *GetBlockchainIDArgs, reply *GetBlockchainIDReply) error {
-	service.log.Info("Info: GetBlockchainID called")
+	service.log.Debug("Info: GetBlockchainID called")
 
 	bID, err := service.chainManager.Lookup(args.Alias)
-	reply.BlockchainID = bID.String()
+	reply.BlockchainID = bID
 	return err
 }
 
@@ -162,7 +175,7 @@ type PeersReply struct {
 
 // Peers returns the list of current validators
 func (service *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error {
-	service.log.Info("Info: Peers called")
+	service.log.Debug("Info: Peers called")
 
 	nodeIDs := make([]ids.ShortID, 0, len(args.NodeIDs))
 	for _, nodeID := range args.NodeIDs {
@@ -194,7 +207,8 @@ type IsBootstrappedResponse struct {
 // IsBootstrapped returns nil and sets [reply.IsBootstrapped] == true iff [args.Chain] exists and is done bootstrapping
 // Returns an error if the chain doesn't exist
 func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, reply *IsBootstrappedResponse) error {
-	service.log.Info("Info: IsBootstrapped called with chain: %s", args.Chain)
+	service.log.Debug("Info: IsBootstrapped called with chain: %s", args.Chain)
+
 	if args.Chain == "" {
 		return fmt.Errorf("argument 'chain' not given")
 	}
@@ -215,18 +229,5 @@ type GetTxFeeResponse struct {
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
 	reply.CreationTxFee = json.Uint64(service.creationTxFee)
 	reply.TxFee = json.Uint64(service.txFee)
-	return nil
-}
-
-// GetNodeIPReply are the results from calling GetNodeVersion
-type GetNodeIPReply struct {
-	IP string `json:"ip"`
-}
-
-// GetNodeIP returns the IP of this node
-func (service *Info) GetNodeIP(_ *http.Request, _ *struct{}, reply *GetNodeIPReply) error {
-	service.log.Info("Info: GetNodeIP called")
-
-	reply.IP = service.networking.IP().String()
 	return nil
 }

@@ -30,7 +30,7 @@ func NewClient(uri, chain string, requestTimeout time.Duration) *Client {
 
 // IssueTx issues a transaction to a node and returns the TxID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
-	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -392,7 +392,7 @@ func (c *Client) MintNFT(
 	payload []byte,
 	to string,
 ) (ids.ID, error) {
-	payloadStr, err := formatting.Encode(formatting.Hex, payload)
+	payloadStr, err := formatting.EncodeWithChecksum(formatting.Hex, payload)
 	if err != nil {
 		return ids.ID{}, err
 	}

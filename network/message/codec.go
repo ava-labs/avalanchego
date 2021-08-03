@@ -42,27 +42,26 @@ type codec struct {
 	// [getBytes] must be safe for concurrent access by multiple goroutines.
 	getBytes func() []byte
 
-	bytesSavedMetrics     map[Op]metric.Averager
 	compressTimeMetrics   map[Op]metric.Averager
 	decompressTimeMetrics map[Op]metric.Averager
 	compressor            compression.Compressor
 }
 
-func NewCodec(namespace string, metrics prometheus.Registerer) (Codec, error) {
+func NewCodec(namespace string, metrics prometheus.Registerer, maxMessageSize int64) (Codec, error) {
 	return NewCodecWithAllocator(
 		namespace,
 		metrics,
 		func() []byte { return nil },
+		maxMessageSize,
 	)
 }
 
-func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getBytes func() []byte) (Codec, error) {
+func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getBytes func() []byte, maxMessageSize int64) (Codec, error) {
 	c := &codec{
 		getBytes:              getBytes,
-		bytesSavedMetrics:     make(map[Op]metric.Averager, len(ops)),
 		compressTimeMetrics:   make(map[Op]metric.Averager, len(ops)),
 		decompressTimeMetrics: make(map[Op]metric.Averager, len(ops)),
-		compressor:            compression.NewGzipCompressor(),
+		compressor:            compression.NewGzipCompressor(maxMessageSize),
 	}
 
 	errs := wrappers.Errs{}
@@ -71,13 +70,6 @@ func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getB
 			continue
 		}
 
-		c.bytesSavedMetrics[op] = metric.NewAveragerWithErrs(
-			namespace,
-			fmt.Sprintf("%s_bytes_saved", op),
-			fmt.Sprintf("bytes saved (not sent) due to compression of %s messages", op),
-			metrics,
-			&errs,
-		)
 		c.compressTimeMetrics[op] = metric.NewAveragerWithErrs(
 			namespace,
 			fmt.Sprintf("%s_compress_time", op),
@@ -163,8 +155,7 @@ func (c *codec) Pack(
 		return nil, fmt.Errorf("couldn't compress payload of %s message: %s", op, err)
 	}
 	c.compressTimeMetrics[op].Observe(float64(time.Since(startTime)))
-	bytesSaved := len(payloadBytes) - len(compressedPayloadBytes) // may be negative
-	c.bytesSavedMetrics[op].Observe(float64(bytesSaved))
+	msg.bytesSavedCompression = len(payloadBytes) - len(compressedPayloadBytes) // may be negative
 	// Remove the uncompressed payload (keep just the message type and isCompressed)
 	msg.bytes = msg.bytes[:wrappers.BoolLen+wrappers.ByteLen]
 	// Attach the compressed payload
@@ -198,6 +189,8 @@ func (c *codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error)
 		return nil, p.Err
 	}
 
+	bytesSaved := 0
+
 	// If the payload is compressed, decompress it
 	if compressed {
 		// The slice below is guaranteed to be in-bounds because [p.Err] == nil
@@ -216,6 +209,7 @@ func (c *codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error)
 		p.Offset -= wrappers.BoolLen
 		// Attach the decompressed payload.
 		p.Bytes = append(p.Bytes, payloadBytes...)
+		bytesSaved = len(payloadBytes) - len(compressedPayloadBytes)
 	}
 
 	// Parse each field of the payload
@@ -229,8 +223,9 @@ func (c *codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error)
 	}
 
 	return &message{
-		op:     op,
-		fields: fieldValues,
-		bytes:  p.Bytes,
+		op:                    op,
+		fields:                fieldValues,
+		bytes:                 p.Bytes,
+		bytesSavedCompression: bytesSaved,
 	}, p.Err
 }
