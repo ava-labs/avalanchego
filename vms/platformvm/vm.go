@@ -483,6 +483,15 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	tx.Initialize(unsignedBytes, response)
 	vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
 
+	// Note: we currently do not check whether nodes send us exactly the tx matching
+	// the txID we asked for. At least we should check we do not receive total garbage
+	switch {
+	case vm.mempool.has(tx.ID()):
+		return nil
+	case vm.mempool.isAlreadyRejected(tx.ID()):
+		return nil
+	}
+
 	// validate tx
 	switch typedTx := tx.UnsignedTx.(type) {
 	case UnsignedDecisionTx:
@@ -522,14 +531,10 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		// tx has not been accepted to mempool due to size
 		// do not gossip since we cannot serve it
 		return nil
-	case errAttemptReRegisterTx:
-		// we already have the tx [maybe requested multiple times to different nodes?].
-		// Do not regossip
-		return nil
 	default:
-		// TODO: record among rejected to avoid requesting again
 		vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
+		_ = vm.mempool.markReject(tx)
 		return err
 	}
 }

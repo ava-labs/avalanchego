@@ -200,9 +200,22 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// gossip tx and check it is accepted and re-gossiped
+	// responses with unknown requestID are rejected
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
+
+	unknownReqID := reqID + 1
+	if err := vm.AppResponse(nodeID, unknownReqID, tx.Bytes()); err != nil {
+		t.Fatal("responses with unknown requestID should be dropped")
+	}
+	if mempool.has(tx.ID()) {
+		t.Fatal("responses with unknown requestID should not affect mempool")
+	}
+	if isTxReGossiped {
+		t.Fatal("responses with unknown requestID should not result in gossiping")
+	}
+
+	// received tx and check it is accepted and re-gossiped
 	if err := vm.AppResponse(nodeID, reqID, tx.Bytes()); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -293,6 +306,9 @@ func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 	}
 	if isTxReGossiped {
 		t.Fatal("invalid tx should not be re-gossiped")
+	}
+	if !mempool.isAlreadyRejected(illFormedTx.ID()) {
+		t.Fatal("invalid tx should be marked as rejected")
 	}
 }
 
