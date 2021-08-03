@@ -451,8 +451,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		return err
 	}
 
-	vm.appSender.SendAppResponse(nodeID, requestID, response)
-	return nil
+	return vm.appSender.SendAppResponse(nodeID, requestID, response)
 }
 
 // This VM doesn't (currently) have any app-specific messages
@@ -525,8 +524,8 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		if err != nil {
 			return err
 		}
-		vm.appSender.SendAppGossip(txIDBytes)
-		return nil
+
+		return vm.appSender.SendAppGossip(txIDBytes)
 	case errTxExceedingMempoolSize:
 		// tx has not been accepted to mempool due to size
 		// do not gossip since we cannot serve it
@@ -561,9 +560,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 
 	nodesSet := ids.NewShortSet(1)
 	nodesSet.Add(nodeID)
-	vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
-
-	return nil
+	return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
 }
 
 // CreateHandlers returns a map where:

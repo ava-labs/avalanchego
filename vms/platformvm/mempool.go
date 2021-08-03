@@ -168,8 +168,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 		if err != nil {
 			return err
 		}
-		m.vm.appSender.SendAppGossip(txIDBytes)
-		return nil
+		return m.vm.appSender.SendAppGossip(txIDBytes)
 	case errAttemptReRegisterTx:
 		return nil // backward compatibility
 	default:

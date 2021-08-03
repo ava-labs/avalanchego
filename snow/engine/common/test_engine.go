@@ -378,19 +378,6 @@ func (e *EngineTest) QueryFailed(nodeID ids.ShortID, requestID uint32) error {
 	return errors.New("unexpectedly called QueryFailed")
 }
 
-func (e *EngineTest) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	if e.AppRequestFailedF != nil {
-		return e.AppRequestFailedF(nodeID, requestID)
-	}
-	if !e.CantAppRequestFailed {
-		return nil
-	}
-	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called AppRequestFailed")
-	}
-	return errors.New("unexpectedly called AppRequestFailed")
-}
-
 func (e *EngineTest) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
 	if e.AppRequestF != nil {
 		return e.AppRequestF(nodeID, requestID, request)
@@ -415,6 +402,19 @@ func (e *EngineTest) AppResponse(nodeID ids.ShortID, requestID uint32, response 
 		e.T.Fatalf("Unexpectedly called AppResponse")
 	}
 	return errors.New("unexpectedly called AppResponse")
+}
+
+func (e *EngineTest) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if e.AppRequestFailedF != nil {
+		return e.AppRequestFailedF(nodeID, requestID)
+	}
+	if !e.CantAppRequestFailed {
+		return nil
+	}
+	if e.T != nil {
+		e.T.Fatalf("Unexpectedly called AppRequestFailed")
+	}
+	return errors.New("unexpectedly called AppRequestFailed")
 }
 
 func (e *EngineTest) AppGossip(nodeID ids.ShortID, msg []byte) error {

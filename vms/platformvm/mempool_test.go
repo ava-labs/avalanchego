@@ -173,9 +173,10 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	isTxReGossiped := false
 	var gossipedBytes []byte
 	sender.CantSendAppGossip = true
-	sender.SendAppGossipF = func(b []byte) {
+	sender.SendAppGossipF = func(b []byte) error {
 		isTxReGossiped = true
 		gossipedBytes = b
+		return nil
 	}
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -271,7 +272,10 @@ func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 	vm, _, sender := defaultVM()
 	isTxReGossiped := false
 	sender.CantSendAppGossip = true
-	sender.SendAppGossipF = func([]byte) { isTxReGossiped = true }
+	sender.SendAppGossipF = func([]byte) error {
+		isTxReGossiped = true
+		return nil
+	}
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -322,12 +326,13 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 	IsRightNodeRequested := false
 	var requestedBytes []byte
 	sender.CantSendAppRequest = true
-	sender.SendAppRequestF = func(nodes ids.ShortSet, reqID uint32, resp []byte) {
+	sender.SendAppRequestF = func(nodes ids.ShortSet, reqID uint32, resp []byte) error {
 		isTxRequested = true
 		if nodes.Contains(nodeID) {
 			IsRightNodeRequested = true
 		}
 		requestedBytes = resp
+		return nil
 	}
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -392,8 +397,9 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	vm, _, sender := defaultVM()
 	isTxRequested := false
 	sender.CantSendAppRequest = true
-	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) {
+	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
 		isTxRequested = true
+		return nil
 	}
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -444,9 +450,10 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	isResponseIssued := false
 	var respondedBytes []byte
 	sender.CantSendAppResponse = true
-	sender.SendAppResponseF = func(nodeID ids.ShortID, reqID uint32, resp []byte) {
+	sender.SendAppResponseF = func(nodeID ids.ShortID, reqID uint32, resp []byte) error {
 		isResponseIssued = true
 		respondedBytes = resp
+		return nil
 	}
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -510,8 +517,9 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 	vm, _, sender := defaultVM()
 	isResponseIssued := false
 	sender.CantSendAppResponse = true
-	sender.SendAppResponseF = func(ids.ShortID, uint32, []byte) {
+	sender.SendAppResponseF = func(ids.ShortID, uint32, []byte) error {
 		isResponseIssued = true
+		return nil
 	}
 	vm.ctx.Lock.Lock()
 	defer func() {
@@ -554,7 +562,10 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 	vm, _, sender := defaultVM()
 	gossipedBytes := make([]byte, 0)
 	sender.CantSendAppGossip = true
-	sender.SendAppGossipF = func(b []byte) { gossipedBytes = b }
+	sender.SendAppGossipF = func(b []byte) error {
+		gossipedBytes = b
+		return nil
+	}
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {

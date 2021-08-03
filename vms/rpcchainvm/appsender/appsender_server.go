@@ -32,8 +32,8 @@ func (s *Server) SendAppRequest(_ context.Context, req *appsenderproto.SendAppRe
 		}
 		nodeIDs.Add(nodeID)
 	}
-	s.appSender.SendAppRequest(nodeIDs, req.RequestID, req.Request)
-	return &appsenderproto.EmptyMsg{}, nil
+	err := s.appSender.SendAppRequest(nodeIDs, req.RequestID, req.Request)
+	return &appsenderproto.EmptyMsg{}, err
 }
 
 func (s *Server) SendAppResponse(_ context.Context, req *appsenderproto.SendAppResponseMsg) (*appsenderproto.EmptyMsg, error) {
@@ -41,11 +41,11 @@ func (s *Server) SendAppResponse(_ context.Context, req *appsenderproto.SendAppR
 	if err != nil {
 		return nil, err
 	}
-	s.appSender.SendAppResponse(nodeID, req.RequestID, req.Response)
-	return &appsenderproto.EmptyMsg{}, nil
+	err = s.appSender.SendAppResponse(nodeID, req.RequestID, req.Response)
+	return &appsenderproto.EmptyMsg{}, err
 }
 
 func (s *Server) SendAppGossip(_ context.Context, req *appsenderproto.SendAppGossipMsg) (*appsenderproto.EmptyMsg, error) {
-	s.appSender.SendAppGossip(req.Msg)
-	return &appsenderproto.EmptyMsg{}, nil
+	err := s.appSender.SendAppGossip(req.Msg)
+	return &appsenderproto.EmptyMsg{}, err
 }

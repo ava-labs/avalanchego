@@ -799,7 +799,7 @@ func (cr *ChainRouter) AppResponse(
 		return
 	}
 
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.AppResponseMsg)
+	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.AppRequestMsg)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -824,6 +824,27 @@ func (cr *ChainRouter) AppResponse(
 
 	// Pass the response to the chain
 	chain.AppResponse(nodeID, requestID, appResponseBytes, onFinishedHandling)
+}
+
+// AppRequestFailed notifies the given chain that it will not receive a response to its request
+// with the given ID to the given node.
+func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32) {
+	cr.lock.Lock()
+	defer cr.lock.Unlock()
+
+	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.AppRequestMsg)
+
+	// Remove the outstanding request
+	cr.removeRequest(uniqueRequestID)
+
+	chain, exists := cr.chains[chainID]
+	if !exists {
+		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
+		return
+	}
+
+	// Pass the response to the chain
+	chain.AppRequestFailed(nodeID, requestID)
 }
 
 // AppGossip routes an incoming application-level gossip message from the given node
@@ -875,27 +896,6 @@ func (cr *ChainRouter) QueryFailed(
 
 	// Pass the response to the chain
 	chain.QueryFailed(validatorID, requestID)
-}
-
-// AppRequestFailed notifies the given chain that it will not receive a response to its request
-// with the given ID to the given node.
-func (cr *ChainRouter) AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32) {
-	cr.lock.Lock()
-	defer cr.lock.Unlock()
-
-	uniqueRequestID := cr.createRequestID(nodeID, chainID, requestID, constants.AppRequestFailedMsg)
-
-	// Remove the outstanding request
-	cr.removeRequest(uniqueRequestID)
-
-	chain, exists := cr.chains[chainID]
-	if !exists {
-		cr.log.Debug("AppRequestFailed(%s, %s, %d) dropped due to unknown chain", nodeID, chainID, requestID)
-		return
-	}
-
-	// Pass the response to the chain
-	chain.AppRequestFailed(nodeID, requestID)
 }
 
 // Connected routes an incoming notification that a validator was just connected
