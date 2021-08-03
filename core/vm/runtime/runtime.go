@@ -107,7 +107,7 @@ func setDefaults(cfg *Config) {
 		}
 	}
 	if cfg.BaseFee == nil {
-		cfg.BaseFee = big.NewInt(params.InitialBaseFee)
+		cfg.BaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 	}
 }
 

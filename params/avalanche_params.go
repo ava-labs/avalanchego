@@ -13,4 +13,9 @@ var (
 	ApricotPhase1MinGasPrice = big.NewInt(225 * GWei)
 
 	ApricotPhase1GasLimit uint64 = 8_000_000
+
+	ApricotPhase3ExtraDataSize        = 80
+	ApricotPhase3MinBaseFee     int64 = 25_000_000_000
+	ApricotPhase3MaxBaseFee     int64 = 225_000_000_000
+	ApricotPhase3InitialBaseFee int64 = 225_000_000_000
 )
