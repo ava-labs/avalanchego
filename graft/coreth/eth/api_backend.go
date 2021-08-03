@@ -352,25 +352,12 @@ func (b *EthAPIBackend) Downloader() *downloader.Downloader {
 	return b.eth.Downloader()
 }
 
+func (b *EthAPIBackend) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
+	return b.gpo.EstimateBaseFee(ctx)
+}
+
 func (b *EthAPIBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	// Calculate the required tip
-	tip, err := b.gpo.SuggestTipCap(ctx)
-	if err != nil {
-		return nil, err
-	}
-	// Fetch the most recent block by number
-	block, err := b.BlockByNumber(ctx, rpc.LatestBlockNumber)
-	if err != nil {
-		return nil, err
-	}
-	// If the fetched block does not have a base fee, return the tip without
-	// modification
-	if block.BaseFee() == nil {
-		return tip, nil
-	}
-	// If the block does have a baseFee, add it to the tip to estimate
-	// the total gas price estimate.
-	return tip.Add(tip, block.BaseFee()), nil
+	return b.gpo.SuggestPrice(ctx)
 }
 
 func (b *EthAPIBackend) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
