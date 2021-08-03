@@ -83,10 +83,15 @@ type Gossiper interface {
 	SendGossip(containerID ids.ID, container []byte)
 }
 
-// Sends app-level messages
+// Sends app-level messages.
 type AppSender interface {
-	// Send an application-level request
-	SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte)
-	SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte)
-	SendAppGossip(appGossipBytes []byte)
+	// Send an application-level request.
+	// A non-nil error should be considered fatal.
+	SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error
+	// Send an application-level response to a request.
+	// A non-nil error should be considered fatal.
+	SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error
+	// Gossip an application-level message.
+	// A non-nil error should be considered fatal.
+	SendAppGossip(appGossipBytes []byte) error
 }

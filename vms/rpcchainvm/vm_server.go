@@ -6,7 +6,6 @@ package rpcchainvm
 import (
 	"context"
 	"encoding/json"
-	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -47,9 +46,8 @@ var _ vmproto.VMServer = &VMServer{}
 // VMServer is a VM that is managed over RPC.
 type VMServer struct {
 	vmproto.UnimplementedVMServer
-	sync.Once // used in Shutdown
-	vm        block.ChainVM
-	broker    *plugin.GRPCBroker
+	vm     block.ChainVM
+	broker *plugin.GRPCBroker
 
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
@@ -175,16 +173,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	sharedMemoryClient := gsharedmemory.NewClient(gsharedmemoryproto.NewSharedMemoryClient(sharedMemoryConn))
 	bcLookupClient := galiaslookup.NewClient(galiaslookupproto.NewAliasLookupClient(bcLookupConn))
 	snLookupClient := gsubnetlookup.NewClient(gsubnetlookupproto.NewSubnetLookupClient(snLookupConn))
-	appSenderClient := appsender.NewClient(
-		appsenderproto.NewAppSenderClient(appSenderConn),
-		func() {
-			// If there's an error while sending an app-level message,
-			// shut down this VM. This can only happen due to a plugin/gRPC
-			// level error (the methods of common.AppSender don't return errors.)
-			// Ignore the error below; there's nothing to be done with it.
-			_, _ = vm.Shutdown(context.Background(), &vmproto.EmptyMsg{})
-		},
-	)
+	appSenderClient := appsender.NewClient(appsenderproto.NewAppSenderClient(appSenderConn))
 
 	toEngine := make(chan common.Message, 1)
 	go func() {
@@ -252,20 +241,10 @@ func (vm *VMServer) Shutdown(context.Context, *vmproto.EmptyMsg) (*vmproto.Empty
 		return &vmproto.EmptyMsg{}, nil
 	}
 	errs := wrappers.Errs{}
-	// Recall that appSenderClient calls Shutdown if there's an error while sending an app-level message.
-	// (See call to appsender.NewClient in Initialize.)
-	// We use a sync.Once here to make sure that we don't accidentally execute Shutdown twice.
-	// (That would cause a panic from closing a closed channel.)
-	// This might happen during node shutdown: the engine calls Shutdown on this VM,
-	// and sending an app-level message may also error because the node is shutting down,
-	// causing Shutdown to be called a second time.
-	vm.Once.Do(func() {
-		errs.Add(vm.vm.Shutdown())
-		close(vm.toEngine)
-		vm.serverCloser.Stop()
-		errs.Add(vm.connCloser.Close())
-	})
-
+	errs.Add(vm.vm.Shutdown())
+	close(vm.toEngine)
+	vm.serverCloser.Stop()
+	errs.Add(vm.connCloser.Close())
 	return &vmproto.EmptyMsg{}, errs.Err
 }
 

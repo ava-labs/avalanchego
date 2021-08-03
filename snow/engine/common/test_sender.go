@@ -4,6 +4,7 @@
 package common
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -32,9 +33,9 @@ type SenderTest struct {
 	SendPullQueryF           func(ids.ShortSet, uint32, ids.ID)
 	SendChitsF               func(ids.ShortID, uint32, []ids.ID)
 	SendGossipF              func(ids.ID, []byte)
-	SendAppRequestF          func(ids.ShortSet, uint32, []byte)
-	SendAppResponseF         func(ids.ShortID, uint32, []byte)
-	SendAppGossipF           func([]byte)
+	SendAppRequestF          func(ids.ShortSet, uint32, []byte) error
+	SendAppResponseF         func(ids.ShortID, uint32, []byte) error
+	SendAppGossipF           func([]byte) error
 }
 
 // Default set the default callable value to [cant]
@@ -191,35 +192,38 @@ func (s *SenderTest) SendGossip(containerID ids.ID, container []byte) {
 // SendAppRequest calls SendAppRequestF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) {
+func (s *SenderTest) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error {
 	switch {
 	case s.SendAppRequestF != nil:
-		s.SendAppRequestF(nodeIDs, requestID, appRequestBytes)
+		return s.SendAppRequestF(nodeIDs, requestID, appRequestBytes)
 	case s.CantSendAppRequest && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppRequest")
 	}
+	return errors.New("unexpectedly called SendAppRequest")
 }
 
 // SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
+func (s *SenderTest) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	switch {
 	case s.SendAppResponseF != nil:
-		s.SendAppResponseF(nodeID, requestID, appResponseBytes)
+		return s.SendAppResponseF(nodeID, requestID, appResponseBytes)
 	case s.CantSendAppResponse && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppResponse")
 	}
+	return errors.New("unexpectedly called SendAppResponse")
 }
 
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *SenderTest) SendAppGossip(appGossipBytes []byte) {
+func (s *SenderTest) SendAppGossip(appGossipBytes []byte) error {
 	switch {
 	case s.SendAppGossipF != nil:
-		s.SendAppGossipF(appGossipBytes)
+		return s.SendAppGossipF(appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppGossip")
 	}
+	return errors.New("unexpectedly called SendAppGossip")
 }

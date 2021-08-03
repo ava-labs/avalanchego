@@ -383,7 +383,7 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 
 // SendAppRequest sends an application-level request to the given nodes.
 // The meaning of this request, and how it should be handled, is defined by the VM.
-func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) {
+func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error {
 	s.ctx.Log.Verbo("Sending AppRequest. RequestID: %d. Message: %s", requestID, formatting.DumpBytes{Bytes: appRequestBytes})
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
@@ -426,20 +426,23 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		s.timeouts.RegisterRequestToUnreachableValidator()
 		go s.router.AppRequestFailed(nodeID, s.ctx.ChainID, requestID)
 	}
+	return nil
 }
 
 // Sends a response to an application-level request from the given node
-func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) {
+func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
 		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
 	} else {
 		s.sender.SendAppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes)
 	}
+	return nil
 }
 
-// Sends a application-level gossip message the given nodes. The node doesn't need to respond to
-func (s *Sender) SendAppGossip(appResponseBytes []byte) {
+// Sends an application-level gossip message.
+func (s *Sender) SendAppGossip(appResponseBytes []byte) error {
 	s.sender.SendAppGossip(s.ctx.ChainID, appResponseBytes)
+	return nil
 }
 
 // Chits sends chits
