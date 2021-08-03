@@ -68,9 +68,9 @@ func (a *App) Start() int {
 	switch a.config.DBName {
 	case rocksdb.Name:
 		path := filepath.Join(a.config.DBPath, rocksdb.Name)
-		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase, true)
+		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase)
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase, true)
+		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:
