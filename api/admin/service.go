@@ -175,12 +175,12 @@ type SetLoggerLevelArgs struct {
 // SetLoggerLevel sets the log level and/or display level for loggers.
 // If len([args.LoggerName]) == 0, sets the log/display level of all loggers.
 // Otherwise, sets the log/display level of the loggers named in that argument.
-// Sets the log level of these loggers to [args.LogLevel].
-// If len([args.LogLevel]) == 0, doesn't set the log level of these loggers.
-// If len([args.LogLevel]) > 0, must be a valid string representation of a log level.
-// Sets the display level of these loggers to [args.LogLevel].
-// If len([args.DisplayLevel]) == 0, doesn't set the display level of these loggers.
-// If len([args.DisplayLevel]) > 0, must be a valid string representation of a log level.
+// Sets the log level of these loggers to args.LogLevel.
+// If args.LogLevel == nil, doesn't set the log level of these loggers.
+// If args.LogLevel != nil, must be a valid string representation of a log level.
+// Sets the display level of these loggers to args.LogLevel.
+// If args.DisplayLevel == nil, doesn't set the display level of these loggers.
+// If args.DisplayLevel != nil, must be a valid string representation of a log level.
 func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, reply *api.SuccessResponse) error {
 	service.log.Info("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
 
