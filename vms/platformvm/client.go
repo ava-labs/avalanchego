@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Client ...
 type Client struct {
 	requester rpc.EndpointRequester
 }
@@ -328,7 +327,7 @@ func (c *Client) CreateBlockchain(
 	name string,
 	genesisData []byte,
 ) (ids.ID, error) {
-	genesisDataStr, err := formatting.Encode(formatting.Hex, genesisData)
+	genesisDataStr, err := formatting.EncodeWithChecksum(formatting.Hex, genesisData)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -386,7 +385,7 @@ func (c *Client) GetBlockchains() ([]APIBlockchain, error) {
 
 // IssueTx issues the transaction and returns its transaction ID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
-	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}

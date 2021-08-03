@@ -121,7 +121,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	for _, test := range tests {
 		// Encode the bytes
-		strResult, err := Encode(test.encoding, test.bytes)
+		strResult, err := EncodeWithChecksum(test.encoding, test.bytes)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -139,13 +139,13 @@ func TestEncodeDecode(t *testing.T) {
 
 // Test that encoding nil bytes works
 func TestEncodeNil(t *testing.T) {
-	str, err := Encode(CB58, nil)
+	str, err := EncodeWithChecksum(CB58, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	assert.Equal(t, "45PJLL", str)
 
-	str, err = Encode(Hex, nil)
+	str, err = EncodeWithChecksum(Hex, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

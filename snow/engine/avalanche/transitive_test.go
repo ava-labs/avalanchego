@@ -1273,6 +1273,13 @@ func TestEngineReissue(t *testing.T) {
 		}
 		return vtx, nil
 	}
+
+	// must vote on the first poll for the second one to settle
+	// *queryRequestID is 1
+	if err := te.Chits(vdr, *queryRequestID, []ids.ID{vtx.ID()}); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := te.Put(vdr, 0, vtx.ID(), vtx.Bytes()); err != nil {
 		t.Fatal(err)
 	}
@@ -1283,9 +1290,12 @@ func TestEngineReissue(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// vote on second poll, *queryRequestID is 2
 	if err := te.Chits(vdr, *queryRequestID, []ids.ID{vtx.ID()}); err != nil {
 		t.Fatal(err)
 	}
+
+	// all polls settled
 
 	if len(lastVtx.TxsV) != 1 || lastVtx.TxsV[0].ID() != tx0.ID() {
 		t.Fatalf("Should have re-issued the tx")

@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-// Params ...
 type Params struct {
 	// Transaction fee
 	TxFee uint64
@@ -42,7 +41,6 @@ type Params struct {
 	EpochDuration time.Duration
 }
 
-// GetParams ...
 func GetParams(networkID uint32) *Params {
 	switch networkID {
 	case constants.MainnetID:

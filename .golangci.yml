@@ -29,7 +29,6 @@ linters:
     - nolintlint
     - prealloc
     - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
@@ -42,5 +41,6 @@ linters:
     # - interfacer
     # - staticcheck
     # - structcheck
+    # - typecheck
     # - goerr113
     # - noctx

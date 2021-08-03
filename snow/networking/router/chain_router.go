@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/linkedhashmap"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -69,13 +68,10 @@ type ChainRouter struct {
 	healthConfig HealthConfig
 	// aggregator of requests based on their time
 	timedRequests linkedhashmap.LinkedHashmap
-	// Measures average rate at which messages are dropped
-	dropRateCalculator math.Averager
 	// Last time at which there were no outstanding requests
 	lastTimeNoOutstanding time.Time
-	// Used in [createRequestID].
-	// Should only be accessed in that method.
-	// [lock] should be held when [requestIDBytes] is accessed.
+	// Must only be accessed in method [createRequestID].
+	// [lock] must be held when [requestIDBytes] is accessed.
 	requestIDBytes []byte
 }
 
@@ -110,10 +106,8 @@ func (cr *ChainRouter) Initialize(
 	cr.onFatal = onFatal
 	cr.timedRequests = linkedhashmap.New()
 	cr.peers.Add(nodeID)
-	// Set up meter to count dropped messages
-	cr.dropRateCalculator = math.NewAverager(0, cr.healthConfig.MaxDropRateHalflife, cr.clock.Time())
 	cr.healthConfig = healthConfig
-	cr.requestIDBytes = make([]byte, 2*hashing.HashLen+wrappers.IntLen) // Validator ID, Chain ID, Request ID
+	cr.requestIDBytes = make([]byte, 2*hashing.HashLen+wrappers.IntLen+wrappers.ByteLen) // Validator ID, Chain ID, Request ID, Msg Type
 
 	// Register metrics
 	rMetrics, err := newRouterMetrics(metricsNamespace, metricsRegisterer)
@@ -147,7 +141,10 @@ func (cr *ChainRouter) RegisterRequest(
 	msgType constants.MsgType,
 ) {
 	cr.lock.Lock()
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// When we receive a response message type (Chits, Put, Accepted, etc.)
+	// we validate that we actually sent the corresponding request.
+	// Give this request a unique ID so we can do that validation.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, msgType)
 	if cr.timedRequests.Len() == 0 {
 		cr.lastTimeNoOutstanding = cr.clock.Time()
 	}
@@ -303,7 +300,8 @@ func (cr *ChainRouter) AcceptedFrontier(
 		return
 	}
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAcceptedFrontierMsg)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -313,11 +311,6 @@ func (cr *ChainRouter) AcceptedFrontier(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	if request.msgType != constants.GetAcceptedFrontierMsg {
-		onFinishedHandling()
-		// We got back a reply of wrong type. Ignore.
-		return
-	}
 	cr.timedRequests.Delete(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
@@ -341,7 +334,8 @@ func (cr *ChainRouter) GetAcceptedFrontierFailed(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAcceptedFrontierMsg)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -404,7 +398,8 @@ func (cr *ChainRouter) Accepted(
 		return
 	}
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAcceptedMsg)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -414,11 +409,6 @@ func (cr *ChainRouter) Accepted(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	if request.msgType != constants.GetAcceptedMsg {
-		// We got back a reply of wrong type. Ignore.
-		onFinishedHandling()
-		return
-	}
 	cr.timedRequests.Delete(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
@@ -442,7 +432,8 @@ func (cr *ChainRouter) GetAcceptedFailed(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAcceptedMsg)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -505,7 +496,8 @@ func (cr *ChainRouter) MultiPut(
 		return
 	}
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAncestorsMsg)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -515,11 +507,6 @@ func (cr *ChainRouter) MultiPut(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	if request.msgType != constants.GetAncestorsMsg {
-		// We got back a reply of wrong type. Ignore.
-		onFinishedHandling()
-		return
-	}
 	cr.timedRequests.Delete(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
@@ -542,7 +529,8 @@ func (cr *ChainRouter) GetAncestorsFailed(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetAncestorsMsg)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -618,7 +606,8 @@ func (cr *ChainRouter) Put(
 		return
 	}
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetMsg)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -628,11 +617,6 @@ func (cr *ChainRouter) Put(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	if request.msgType != constants.GetMsg {
-		// We got back a reply of wrong type. Ignore.
-		onFinishedHandling()
-		return
-	}
 	cr.timedRequests.Delete(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
@@ -655,7 +639,8 @@ func (cr *ChainRouter) GetFailed(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.GetMsg)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -741,7 +726,10 @@ func (cr *ChainRouter) Chits(
 		return
 	}
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
+	// See [createRequestID].
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.PullQueryMsg)
 
 	// Mark that an outstanding request has been fulfilled
 	requestIntf, exists := cr.timedRequests.Get(uniqueRequestID)
@@ -751,11 +739,6 @@ func (cr *ChainRouter) Chits(
 		return
 	}
 	request := requestIntf.(requestEntry)
-	if request.msgType != constants.PullQueryMsg && request.msgType != constants.PushQueryMsg {
-		// We got back a reply of wrong type. Ignore.
-		onFinishedHandling()
-		return
-	}
 	cr.timedRequests.Delete(uniqueRequestID)
 
 	// Calculate how long it took [validatorID] to reply
@@ -778,7 +761,10 @@ func (cr *ChainRouter) QueryFailed(
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID)
+	// Create the request ID of the request we sent that this message is (allegedly) in response to.
+	// Note that we treat PullQueryMsg and PushQueryMsg the same for the sake of creating request IDs.
+	// See [createRequestID].
+	uniqueRequestID := cr.createRequestID(validatorID, chainID, requestID, constants.PullQueryMsg)
 
 	// Remove the outstanding request
 	cr.removeRequest(uniqueRequestID)
@@ -893,27 +879,22 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	cr.lock.Lock()
 	defer cr.lock.Unlock()
 
-	dropRate := cr.dropRateCalculator.Read()
-	healthy := dropRate <= cr.healthConfig.MaxDropRate
-	details := map[string]interface{}{
-		"msgDropRate": dropRate,
-	}
-	cr.metrics.msgDropRate.Set(dropRate)
-
 	numOutstandingReqs := cr.timedRequests.Len()
-	healthy = healthy && numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
-	details["outstandingRequests"] = numOutstandingReqs
+	healthy := numOutstandingReqs <= cr.healthConfig.MaxOutstandingRequests
+	details := map[string]interface{}{
+		"outstandingRequests": numOutstandingReqs,
+	}
 
 	// check for long running requests
 	now := cr.clock.Time()
 	processingRequest := now
-	if longestRunning, exists := cr.timedRequests.Oldest(); exists {
+	if _, longestRunning, exists := cr.timedRequests.Oldest(); exists {
 		processingRequest = longestRunning.(requestEntry).time
 	}
 	timeReqRunning := now.Sub(processingRequest)
 	healthy = healthy && timeReqRunning <= cr.healthConfig.MaxOutstandingDuration
 	details["longestRunningRequest"] = timeReqRunning.String()
-	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning.Milliseconds()))
+	cr.metrics.longestRunningRequest.Set(float64(timeReqRunning))
 
 	if !healthy {
 		// The router is not healthy
@@ -922,10 +903,18 @@ func (cr *ChainRouter) HealthCheck() (interface{}, error) {
 	return details, nil
 }
 
-// Assumes [cr.lock] is held
-func (cr *ChainRouter) createRequestID(validatorID ids.ShortID, chainID ids.ID, requestID uint32) ids.ID {
-	copy(cr.requestIDBytes, validatorID[:])
+// Assumes [cr.lock] is held.
+// Assumes [constants.msgType] is an alias of byte.
+func (cr *ChainRouter) createRequestID(nodeID ids.ShortID, chainID ids.ID, requestID uint32, msgType constants.MsgType) ids.ID {
+	// If we receive Chits, they may be in response to either a PullQuery or a PushQuery.
+	// Treat PullQuery and PushQuery messages as being the same for the sake of validating
+	// that Chits we receive are in response to a query (either push or pull) that we sent.
+	if msgType == constants.PullQueryMsg {
+		msgType = constants.PushQueryMsg
+	}
+	copy(cr.requestIDBytes, nodeID[:])
 	copy(cr.requestIDBytes[hashing.HashLen:], chainID[:])
 	binary.BigEndian.PutUint32(cr.requestIDBytes[2*hashing.HashLen:], requestID)
+	cr.requestIDBytes[2*hashing.HashLen+wrappers.IntLen] = byte(msgType)
 	return hashing.ComputeHash256Array(cr.requestIDBytes)
 }

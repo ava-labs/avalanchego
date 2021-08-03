@@ -292,7 +292,6 @@ func (l *Log) stopAndExit(exit func()) {
 // RecoverAndExit implements the Logger interface
 func (l *Log) RecoverAndExit(f, exit func()) { defer l.stopAndExit(exit); f() }
 
-// SetLogLevel ...
 func (l *Log) SetLogLevel(lvl Level) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
