@@ -51,7 +51,7 @@ func TestNoInboundConnThrottler(t *testing.T) {
 }
 
 func TestInboundConnThrottler(t *testing.T) {
-	cooldown := 250 * time.Millisecond
+	cooldown := 5 * time.Second
 	throttlerIntf := NewInboundConnThrottler(
 		logging.NoLog{},
 		InboundConnThrottlerConfig{
@@ -80,9 +80,6 @@ func TestInboundConnThrottler(t *testing.T) {
 	assert.False(t, throttlerIntf.Allow(host1))
 	assert.False(t, throttlerIntf.Allow(host2))
 	assert.False(t, throttlerIntf.Allow(host3))
-
-	// Wait for the cooldown to elapse
-	time.Sleep(cooldown)
 
 	// Make sure [throttler.done] isn't closed
 	throttler := throttlerIntf.(*inboundConnThrottler)
