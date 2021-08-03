@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
@@ -467,11 +466,8 @@ func (b *BlockClient) Reject() error {
 
 func (b *BlockClient) Status() choices.Status { return b.status }
 
-func (b *BlockClient) Parent() snowman.Block {
-	if parent, err := b.vm.GetBlockInternal(b.parentID); err == nil {
-		return parent
-	}
-	return &missing.Block{BlkID: b.parentID}
+func (b *BlockClient) Parent() ids.ID {
+	return b.parentID
 }
 
 func (b *BlockClient) Verify() error {
