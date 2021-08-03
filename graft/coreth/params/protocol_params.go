@@ -130,11 +130,8 @@ const (
 	// Introduced in Tangerine Whistle (Eip 150)
 	CreateBySelfdestructGas uint64 = 25000
 
-	BaseFeeChangeDenominator = 8              // Bounds the amount the base fee can change between blocks.
-	ElasticityMultiplier     = 2              // Bounds the maximum gas limit an EIP-1559 block may have.
-	InitialBaseFee           = 50_000_000_000 // Initial base fee for ApricotPhase3 is set to 50 GWei
-	MinBaseFee               = 25_000_000_000
-	MaxBaseFee               = 225_000_000_000
+	BaseFeeChangeDenominator = 8 // Bounds the amount the base fee can change between blocks.
+	ElasticityMultiplier     = 2 // Bounds the maximum gas limit an EIP-1559 block may have.
 
 	MaxCodeSize = 24576 // Maximum bytecode to permit for a contract
 

@@ -56,8 +56,7 @@ func NewFaker() *DummyEngine {
 }
 
 var (
-	allowedFutureBlockTime     = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
-	apricotPhase3ExtraDataSize = 80
+	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 )
 
 var (
@@ -82,8 +81,8 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
 		}
 	} else {
-		if len(header.Extra) != apricotPhase3ExtraDataSize {
-			return fmt.Errorf("expected extra-data field to be: %d, but found %d", apricotPhase3ExtraDataSize, len(header.Extra))
+		if len(header.Extra) != params.ApricotPhase3ExtraDataSize {
+			return fmt.Errorf("expected extra-data field to be: %d, but found %d", params.ApricotPhase3ExtraDataSize, len(header.Extra))
 		}
 		// Verify baseFee and rollupWindow encoding as part of header verification
 		expectedRollupWindowBytes, expectedBaseFee, err := CalcBaseFee(chain.Config(), parent, header.Time)

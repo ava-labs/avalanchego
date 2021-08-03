@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	InitialBaseFee = new(big.Int).SetUint64(params.InitialBaseFee)
-	MaxGasPrice    = new(big.Int).SetUint64(params.MaxBaseFee)
-	MinGasPrice    = new(big.Int).SetUint64(params.MinBaseFee)
+	InitialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
+	MaxGasPrice    = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	MinGasPrice    = big.NewInt(params.ApricotPhase3MinBaseFee)
 	TargetGas      = uint64(24_000_000)
 	BlockGasFee    = uint64(500_000)
 )
@@ -30,26 +30,24 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
 	if !config.IsApricotPhase3(new(big.Int).SetUint64(parent.Time)) || parent.Number.Cmp(common.Big0) == 0 {
-		initialSlice := make([]byte, 80)
-		initialBaseFee := new(big.Int).SetUint64(params.InitialBaseFee)
+		initialSlice := make([]byte, params.ApricotPhase3ExtraDataSize)
+		initialBaseFee := big.NewInt(params.ApricotPhase3InitialBaseFee)
 		return initialSlice, initialBaseFee, nil
 	}
-	if len(parent.Extra) != 80 {
-		return nil, nil, fmt.Errorf("expected length of parent extra data to be 80, but found %d", len(parent.Extra))
+	if len(parent.Extra) != params.ApricotPhase3ExtraDataSize {
+		return nil, nil, fmt.Errorf("expected length of parent extra data to be %d, but found %d", params.ApricotPhase3ExtraDataSize, len(parent.Extra))
 	}
 
 	roll := timestamp - parent.Time
-	rollupWindowData := parent.Extra
-	// Take the first 80 bytes as the rollup interval of the past 10 seconds
-	shortInterval := rollupWindowData[:80]
 	// roll the window over by the difference between the timestamps to generate
 	// the new rollup window.
-	newRollupWindow, err := rollWindow(shortInterval, 8, int(roll))
+	// 8 is the size of a long
+	newRollupWindow, err := rollLongWindow(parent.Extra, int(roll))
 	if err != nil {
 		return nil, nil, err
 	}
-	if len(newRollupWindow) != 80 {
-		return nil, nil, fmt.Errorf("expected length of new rollup window to be 80, but found %d", len(parent.Extra))
+	if len(newRollupWindow) != params.ApricotPhase3ExtraDataSize {
+		return nil, nil, fmt.Errorf("expected length of new rollup window to be %d, but found %d", params.ApricotPhase3ExtraDataSize, len(parent.Extra))
 	}
 
 	var (
@@ -148,4 +146,10 @@ func rollWindow(consumptionWindow []byte, size, roll int) ([]byte, error) {
 	}
 	copy(res[:], consumptionWindow[roll*size:])
 	return res, nil
+}
+
+func rollLongWindow(consumptionWindow []byte, roll int) ([]byte, error) {
+	// Passes in [8] as the size of the individual value to be rolled over
+	// so that it can be used to roll an array of long values (8 bytes).
+	return rollWindow(consumptionWindow, 8, roll)
 }

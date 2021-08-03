@@ -29,7 +29,7 @@ func testRollup(t *testing.T, longs []uint64, roll int) {
 		binary.BigEndian.PutUint64(slice[8*i:], longs[i])
 	}
 
-	newSlice, err := rollWindow(slice, 8, roll)
+	newSlice, err := rollLongWindow(slice, roll)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,8 +116,8 @@ func TestDynamicFees(t *testing.T) {
 		{
 			extraData: nil,
 			baseFee:   nil,
-			minFee:    big.NewInt(params.MinBaseFee),
-			maxFee:    big.NewInt(params.MaxBaseFee),
+			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
+			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
 			blocks: []blockDefinition{
 				{
 					timestamp: 1,
@@ -136,8 +136,8 @@ func TestDynamicFees(t *testing.T) {
 		{
 			extraData: nil,
 			baseFee:   nil,
-			minFee:    big.NewInt(params.MinBaseFee),
-			maxFee:    big.NewInt(params.MaxBaseFee),
+			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
+			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
 			blocks: []blockDefinition{
 				{
 					timestamp: 1,
