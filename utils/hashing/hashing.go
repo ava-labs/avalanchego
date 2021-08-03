@@ -13,10 +13,8 @@ import (
 
 var errBadLength = errors.New("input has insufficient length")
 
-// HashLen ...
 const HashLen = sha256.Size
 
-// AddrLen ...
 const AddrLen = ripemd160.Size
 
 // Hash256 A 256 bit long hash value.
@@ -83,7 +81,6 @@ func Checksum(bytes []byte, length int) []byte {
 	return hash[len(hash)-length:]
 }
 
-// ToHash256 ...
 func ToHash256(bytes []byte) (Hash256, error) {
 	hash := Hash256{}
 	if len(bytes) != HashLen {
@@ -93,7 +90,6 @@ func ToHash256(bytes []byte) (Hash256, error) {
 	return hash, nil
 }
 
-// ToHash160 ...
 func ToHash160(bytes []byte) (Hash160, error) {
 	hash := Hash160{}
 	if len(bytes) != ripemd160.Size {
@@ -103,7 +99,6 @@ func ToHash160(bytes []byte) (Hash160, error) {
 	return hash, nil
 }
 
-// PubkeyBytesToAddress ...
 func PubkeyBytesToAddress(key []byte) []byte {
 	return ComputeHash160(ComputeHash256(key))
 }

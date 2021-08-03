@@ -88,9 +88,7 @@ message IteratorNextRequest {
 }
 
 message IteratorNextResponse {
-    bool foundNext = 1;
-    bytes key = 2;
-    bytes value = 3;
+    repeated PutRequest data = 1;
 }
 
 message IteratorErrorRequest {

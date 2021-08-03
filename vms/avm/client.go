@@ -10,13 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-// Client ...
 type Client struct {
 	requester rpc.EndpointRequester
 }
@@ -24,13 +24,13 @@ type Client struct {
 // NewClient returns an AVM client for interacting with avm [chain]
 func NewClient(uri, chain string, requestTimeout time.Duration) *Client {
 	return &Client{
-		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s", chain), "avm", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s", constants.ChainAliasPrefix+chain), "avm", requestTimeout),
 	}
 }
 
 // IssueTx issues a transaction to a node and returns the TxID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
-	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}
@@ -392,7 +392,7 @@ func (c *Client) MintNFT(
 	payload []byte,
 	to string,
 ) (ids.ID, error) {
-	payloadStr, err := formatting.Encode(formatting.Hex, payload)
+	payloadStr, err := formatting.EncodeWithChecksum(formatting.Hex, payload)
 	if err != nil {
 		return ids.ID{}, err
 	}

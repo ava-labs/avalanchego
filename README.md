@@ -4,7 +4,7 @@
 
 ---
 
-Official node implementation of the [Avalanche](https://avax.network) network -
+Node implementation for the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
 
 ## Installation
@@ -165,3 +165,10 @@ scripts/protobuf_codegen.sh
 ```
 
 For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).
+
+### Running protobuf codegen from docker
+
+```sh
+docker build -t avalanche:protobuf_codegen -f Dockerfile.protoc .
+docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
+```

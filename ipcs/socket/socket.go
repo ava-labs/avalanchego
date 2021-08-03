@@ -15,12 +15,13 @@ import (
 	"syscall"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
 	// DefaultMaxMessageSize is the number of bytes to cap messages at by default
-	DefaultMaxMessageSize = 1 << 21
+	DefaultMaxMessageSize = 2 * units.MiB
 )
 
 // ErrMessageTooLarge is returned when reading a message that is larger than

@@ -14,7 +14,6 @@ var (
 	errNotSortedUnique = errors.New("signatures not sorted and unique")
 )
 
-// Input ...
 type Input struct {
 	// This input consumes an output, which has an owner list.
 	// This input will be spent with a list of signatures.

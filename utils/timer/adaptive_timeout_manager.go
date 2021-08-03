@@ -98,17 +98,17 @@ func (tm *AdaptiveTimeoutManager) Initialize(
 ) error {
 	tm.networkTimeoutMetric = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
-		Name:      "network_timeout",
+		Name:      "current_timeout",
 		Help:      "Duration of current network timeout in nanoseconds",
 	})
 	tm.avgLatency = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: metricsNamespace,
-		Name:      "avg_network_latency",
+		Name:      "average_latency",
 		Help:      "Average network latency in nanoseconds",
 	})
 	tm.numTimeouts = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: metricsNamespace,
-		Name:      "request_timeouts",
+		Name:      "timeouts",
 		Help:      "Number of timed out requests",
 	})
 
@@ -145,7 +145,6 @@ func (tm *AdaptiveTimeoutManager) TimeoutDuration() time.Duration {
 	return tm.currentTimeout
 }
 
-// Dispatch ...
 func (tm *AdaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
 
 // Stop executing timeouts
