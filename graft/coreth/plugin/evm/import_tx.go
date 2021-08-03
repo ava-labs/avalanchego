@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -213,7 +214,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 		inputID := in.InputID()
 		utxoIDs[i] = inputID[:]
 	}
-	return ctx.SharedMemory.Remove(tx.SourceChain, utxoIDs, batch)
+	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{tx.SourceChain: {RemoveRequests: utxoIDs}}, batch)
 }
 
 // newImportTx returns a new ImportTx

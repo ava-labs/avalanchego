@@ -27,7 +27,6 @@
 package vm
 
 import (
-	"errors"
 	"math/big"
 	"sync/atomic"
 	"time"
@@ -68,14 +67,6 @@ func (evm *EVM) precompile(addr common.Address) (StatefulPrecompiledContract, bo
 	}
 	p, ok := precompiles[addr]
 	return p, ok
-}
-
-// run runs the given contract and takes care of running precompiles with a fallback to the byte code interpreter.
-func run(evm *EVM, contract *Contract, input []byte, readOnly bool) ([]byte, error) {
-	if evm.interpreter.CanRun(contract.Code) {
-		return evm.interpreter.Run(contract, input, readOnly)
-	}
-	return nil, errors.New("no compatible interpreter")
 }
 
 // BlockContext provides the EVM with auxiliary information. Once provided
@@ -160,28 +151,7 @@ func NewEVM(blockCtx BlockContext, txCtx TxContext, statedb StateDB, chainConfig
 		chainConfig: chainConfig,
 		chainRules:  chainConfig.AvalancheRules(blockCtx.BlockNumber, blockCtx.Time),
 	}
-
-	// if chainConfig.IsEWASM(blockCtx.BlockNumber) {
-	// 	// to be implemented by EVM-C and Wagon PRs.
-	// 	// if vmConfig.EWASMInterpreter != "" {
-	// 	//  extIntOpts := strings.Split(vmConfig.EWASMInterpreter, ":")
-	// 	//  path := extIntOpts[0]
-	// 	//  options := []string{}
-	// 	//  if len(extIntOpts) > 1 {
-	// 	//    options = extIntOpts[1..]
-	// 	//  }
-	// 	//  evm.interpreters = append(evm.interpreters, NewEVMVCInterpreter(evm, vmConfig, options))
-	// 	// } else {
-	// 	// 	evm.interpreters = append(evm.interpreters, NewEWASMInterpreter(evm, vmConfig))
-	// 	// }
-	// 	panic("No supported ewasm interpreter yet.")
-	// }
-
-	// vmConfig.EVMInterpreter will be used by EVM-C, it won't be checked here
-	// as we always want to have the built-in EVM as the failover option.
-	// evm.interpreters = append(evm.interpreters, NewEVMInterpreter(evm, vmConfig))
 	evm.interpreter = NewEVMInterpreter(evm, config)
-
 	return evm
 }
 
@@ -204,7 +174,7 @@ func (evm *EVM) Cancelled() bool {
 }
 
 // Interpreter returns the current interpreter
-func (evm *EVM) Interpreter() Interpreter {
+func (evm *EVM) Interpreter() *EVMInterpreter {
 	return evm.interpreter
 }
 
@@ -262,7 +232,7 @@ func (evm *EVM) Call(caller ContractRef, addr common.Address, input []byte, gas 
 			// The depth-check is already done, and precompiles handled above
 			contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 			contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
-			ret, err = run(evm, contract, input, false)
+			ret, err = evm.interpreter.Run(contract, input, false)
 			gas = contract.Gas
 		}
 	}
@@ -339,7 +309,7 @@ func (evm *EVM) CallExpert(caller ContractRef, addr common.Address, input []byte
 		// The depth-check is already done, and precompiles handled above
 		contract := NewContract(caller, AccountRef(addrCopy), value, gas)
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), code)
-		ret, err = run(evm, contract, input, false)
+		ret, err = evm.interpreter.Run(contract, input, false)
 		gas = contract.Gas
 	}
 	//}
@@ -391,7 +361,7 @@ func (evm *EVM) CallCode(caller ContractRef, addr common.Address, input []byte, 
 		// The contract is a scoped environment for this execution context only.
 		contract := NewContract(caller, AccountRef(caller.Address()), value, gas)
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
-		ret, err = run(evm, contract, input, false)
+		ret, err = evm.interpreter.Run(contract, input, false)
 		gas = contract.Gas
 	}
 	if err != nil {
@@ -426,7 +396,7 @@ func (evm *EVM) DelegateCall(caller ContractRef, addr common.Address, input []by
 		// Initialise a new contract and make initialise the delegate values
 		contract := NewContract(caller, AccountRef(caller.Address()), nil, gas).AsDelegate()
 		contract.SetCallCode(&addrCopy, evm.StateDB.GetCodeHash(addrCopy), evm.StateDB.GetCode(addrCopy))
-		ret, err = run(evm, contract, input, false)
+		ret, err = evm.interpreter.Run(contract, input, false)
 		gas = contract.Gas
 	}
 	if err != nil {
@@ -477,7 +447,7 @@ func (evm *EVM) StaticCall(caller ContractRef, addr common.Address, input []byte
 		// When an error was returned by the EVM or when setting the creation code
 		// above we revert to the snapshot and consume any gas remaining. Additionally
 		// when we're in Homestead this also counts for code storage gas errors.
-		ret, err = run(evm, contract, input, true)
+		ret, err = evm.interpreter.Run(contract, input, true)
 		gas = contract.Gas
 	}
 	if err != nil {
@@ -545,7 +515,7 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 	}
 	start := time.Now()
 
-	ret, err := run(evm, contract, nil, false)
+	ret, err := evm.interpreter.Run(contract, nil, false)
 
 	// Check whether the max code size has been exceeded, assign err if the case.
 	if err == nil && evm.chainRules.IsEIP158 && len(ret) > params.MaxCodeSize {

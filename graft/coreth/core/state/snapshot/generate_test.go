@@ -76,7 +76,7 @@ func TestGeneration(t *testing.T) {
 	if have, want := root, common.HexToHash("0xa819054cfef894169a5b56ccc4e5e06f14829d4a57498e8b9fb13ff21491828d"); have != want {
 		t.Fatalf("have %#x want %#x", have, want)
 	}
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -86,7 +86,7 @@ func TestGeneration(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -141,7 +141,7 @@ func TestGenerateExistentState(t *testing.T) {
 	root, _ := accTrie.Commit(nil) // Root: 0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -151,7 +151,7 @@ func TestGenerateExistentState(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -232,7 +232,7 @@ func (t *testHelper) makeStorageTrie(keys []string, vals []string) []byte {
 func (t *testHelper) Generate() (common.Hash, *diskLayer) {
 	root, _ := t.accTrie.Commit(nil)
 	t.triedb.Commit(root, false, nil)
-	snap := generateSnapshot(t.diskdb, t.triedb, 16, root)
+	snap := generateSnapshot(t.diskdb, t.triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	return root, snap
 }
 
@@ -324,7 +324,7 @@ func TestGenerateExistentStateWithWrongStorage(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -377,7 +377,7 @@ func TestGenerateExistentStateWithWrongAccounts(t *testing.T) {
 	checkSnapRoot(t, snap, root)
 
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -410,7 +410,7 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 	triedb.Commit(common.HexToHash("0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978"), false, nil)
 	diskdb.Delete(common.HexToHash("0x65145f923027566669a1ae5ccac66f945b55ff6eaeb17d2ea8e048b7d381f2d7").Bytes())
 
-	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978"))
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), common.HexToHash("0xa04693ea110a31037fb5ee814308a6f1d76bdab0b11676bdf4541d2de55ba978"), nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -420,7 +420,7 @@ func TestGenerateCorruptAccountTrie(t *testing.T) {
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -466,7 +466,7 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 	// Delete a storage trie root and ensure the generator chokes
 	diskdb.Delete(common.HexToHash("0xddefcd9376dd029653ef384bd2f0a126bb755fe84fdcc9e7cf421ba454f2bc67").Bytes())
 
-	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"))
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"), nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -476,7 +476,7 @@ func TestGenerateMissingStorageTrie(t *testing.T) {
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -521,7 +521,7 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 	// Delete a storage trie leaf and ensure the generator chokes
 	diskdb.Delete(common.HexToHash("0x16691bc8a441197767e40bb66f521b92952edaf1462813f4f5bcca39aae72ffa").Bytes())
 
-	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"))
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), common.HexToHash("0xe3712f1a226f3782caca78ca770ccc19ee000552813a9f59d479f8611db9b1fd"), nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -531,7 +531,7 @@ func TestGenerateCorruptStorageTrie(t *testing.T) {
 		// Not generated fast enough, hopefully blocked inside on missing trie node fail
 	}
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -585,7 +585,7 @@ func TestGenerateWithExtraAccounts(t *testing.T) {
 		t.Fatalf("expected snap storage to exist")
 	}
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -595,7 +595,7 @@ func TestGenerateWithExtraAccounts(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 	// If we now inspect the snap db, there should exist no extraneous storage items
@@ -643,7 +643,7 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -653,7 +653,7 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -668,7 +668,6 @@ func TestGenerateWithManyExtraAccounts(t *testing.T) {
 // So in trie, we iterate 2 entries 0x03, 0x07. We create the 0x07 in the database and abort the procedure, because the trie is exhausted.
 // But in the database, we still have the stale storage slots 0x04, 0x05. They are not iterated yet, but the procedure is finished.
 func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
-	accountCheckRange = 3
 	if false {
 		enableLogging()
 	}
@@ -696,7 +695,7 @@ func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -706,7 +705,7 @@ func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -714,7 +713,6 @@ func TestGenerateWithExtraBeforeAndAfter(t *testing.T) {
 // TestGenerateWithMalformedSnapdata tests what happes if we have some junk
 // in the snapshot database, which cannot be parsed back to an account
 func TestGenerateWithMalformedSnapdata(t *testing.T) {
-	accountCheckRange = 3
 	if false {
 		enableLogging()
 	}
@@ -740,7 +738,7 @@ func TestGenerateWithMalformedSnapdata(t *testing.T) {
 	t.Logf("root: %x", root)
 	triedb.Commit(root, false, nil)
 
-	snap := generateSnapshot(diskdb, triedb, 16, root)
+	snap := generateSnapshot(diskdb, triedb, 16, common.HexToHash("0xdeadbeef"), root, nil)
 	select {
 	case <-snap.genPending:
 		// Snapshot generation succeeded
@@ -750,7 +748,7 @@ func TestGenerateWithMalformedSnapdata(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 	// If we now inspect the snap db, there should exist no extraneous storage items
@@ -761,8 +759,6 @@ func TestGenerateWithMalformedSnapdata(t *testing.T) {
 
 func TestGenerateFromEmptySnap(t *testing.T) {
 	//enableLogging()
-	accountCheckRange = 10
-	storageCheckRange = 20
 	helper := newHelper()
 	stRoot := helper.makeStorageTrie([]string{"key-1", "key-2", "key-3"}, []string{"val-1", "val-2", "val-3"})
 	// Add 1K accounts to the trie
@@ -782,7 +778,7 @@ func TestGenerateFromEmptySnap(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }
@@ -795,7 +791,6 @@ func TestGenerateFromEmptySnap(t *testing.T) {
 // This hits a case where the snap verification passes, but there are more elements in the trie
 // which we must also add.
 func TestGenerateWithIncompleteStorage(t *testing.T) {
-	storageCheckRange = 4
 	helper := newHelper()
 	stKeys := []string{"1", "2", "3", "4", "5", "6", "7", "8"}
 	stVals := []string{"v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"}
@@ -829,7 +824,7 @@ func TestGenerateWithIncompleteStorage(t *testing.T) {
 	}
 	checkSnapRoot(t, snap, root)
 	// Signal abortion to the generator and wait for it to tear down
-	stop := make(chan *generatorStats)
+	stop := make(chan struct{})
 	snap.genAbort <- stop
 	<-stop
 }

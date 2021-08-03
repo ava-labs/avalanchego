@@ -52,6 +52,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		beneficiary common.Address
 		baseFee     *big.Int
 	)
+
 	// If we don't have an explicit author (i.e. not mining), extract from the header
 	if author == nil {
 		beneficiary, _ = chain.Engine().Author(header) // Ignore error, we're past header validation

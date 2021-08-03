@@ -28,7 +28,6 @@ package tests
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -43,11 +42,6 @@ import (
 
 	"github.com/ava-labs/coreth/params"
 )
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	os.Exit(m.Run())
-}
 
 func readJSON(reader io.Reader, value interface{}) error {
 	data, err := ioutil.ReadAll(reader)

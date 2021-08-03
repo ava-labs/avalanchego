@@ -34,12 +34,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
-const (
-	ColdAccountAccessCostEIP2929 = uint64(2600) // COLD_ACCOUNT_ACCESS_COST
-	ColdSloadCostEIP2929         = uint64(2100) // COLD_SLOAD_COST
-	WarmStorageReadCostEIP2929   = uint64(100)  // WARM_STORAGE_READ_COST
-)
-
 // gasSStoreEIP2929 implements gas cost for SSTORE according to EIP-2929
 //
 // When calling SSTORE, check if the (address, storage_key) pair is in accessed_storage_keys.
@@ -209,7 +203,7 @@ func gasSelfdestructEIP2929(evm *EVM, contract *Contract, stack *Stack, mem *Mem
 	if !evm.StateDB.AddressInAccessList(address) {
 		// If the caller cannot afford the cost, this change will be rolled back
 		evm.StateDB.AddAddressToAccessList(address)
-		gas = ColdAccountAccessCostEIP2929
+		gas = params.ColdAccountAccessCostEIP2929
 	}
 	// if empty and transfers value
 	if evm.StateDB.Empty(address) && evm.StateDB.GetBalance(contract.Address()).Sign() != 0 {

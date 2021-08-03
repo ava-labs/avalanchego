@@ -34,19 +34,19 @@ type ConsensusCallbacks struct {
 }
 
 type DummyEngine struct {
-	cb           *ConsensusCallbacks
-	skipBlockFee bool
+	cb *ConsensusCallbacks
+	// skipBlockFee bool
 }
 
-func NewDummyEngine(cb *ConsensusCallbacks, skipBlockFee bool) *DummyEngine {
+func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
-		cb:           cb,
-		skipBlockFee: skipBlockFee,
+		cb: cb,
+		// skipBlockFee: skipBlockFee,
 	}
 }
 
 func NewFaker() *DummyEngine {
-	return NewDummyEngine(new(ConsensusCallbacks), true)
+	return NewDummyEngine(new(ConsensusCallbacks))
 }
 
 var (
@@ -169,11 +169,12 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 }
 
 func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) error {
+	// TODO(aaronbuchwald) this may become necessary again for the dummy engine
 	// If the engine is not charging the base fee, skip the verification.
 	// Note: this is a hack to support tests migrated from geth without substantial modification.
-	if self.skipBlockFee {
-		return nil
-	}
+	// if self.skipBlockFee {
+	// 	return nil
+	// }
 	bigTimestamp := new(big.Int).SetUint64(header.Time)
 
 	var (

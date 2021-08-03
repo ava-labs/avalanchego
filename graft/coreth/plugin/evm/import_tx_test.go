@@ -239,13 +239,13 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -318,7 +318,6 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	if err := unsignedImportTx.Accept(vm.ctx, commitBatch); err != nil {
 		t.Fatalf("Accept failed due to: %s", err)
 	}
-	vm.db.EndBatch()
 
 	if err := unsignedImportTx.EVMStateTransfer(vm.ctx, state); err != nil {
 		t.Fatalf("EVM State Transfer failed due to: %s", err)
@@ -420,13 +419,13 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			testKeys[0].PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -512,12 +511,9 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create commit batch for VM due to %s", err)
 	}
-
 	if err := unsignedImportTx.Accept(vm.ctx, commitBatch); err != nil {
 		t.Fatalf("Accept failed due to: %s", err)
 	}
-
-	vm.db.EndBatch()
 
 	if err := unsignedImportTx.EVMStateTransfer(vm.ctx, state); err != nil {
 		t.Fatalf("EVM State Transfer failed due to: %s", err)
@@ -593,13 +589,13 @@ func TestNewImportTx(t *testing.T) {
 
 			xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
 			inputID := utxo.InputID()
-			if err := xChainSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+			if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 				Key:   inputID[:],
 				Value: utxoBytes,
 				Traits: [][]byte{
 					testKeys[0].PublicKey().Address().Bytes(),
 				},
-			}}); err != nil {
+			}}}}); err != nil {
 				t.Fatal(err)
 			}
 
@@ -614,16 +610,11 @@ func TestNewImportTx(t *testing.T) {
 				t.Fatal("newImportTx created an invalid transaction")
 			}
 
-			vm.db.StartCommit()
-			defer vm.db.AbortCommit()
-
-			batch, err := vm.db.CommitBatch()
+			commitBatch, err := vm.db.CommitBatch()
 			if err != nil {
-				t.Fatalf("Failed to creaet commit batch due to %s", err)
+				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
-			defer vm.db.EndBatch()
-
-			if err := importTx.Accept(vm.ctx, batch); err != nil {
+			if err := importTx.Accept(vm.ctx, commitBatch); err != nil {
 				t.Fatalf("Failed to accept import transaction due to: %s", err)
 			}
 		})

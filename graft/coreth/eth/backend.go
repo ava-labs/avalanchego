@@ -147,7 +147,7 @@ func New(stack *node.Node, config *Config,
 		chainDb:           chainDb,
 		eventMux:          stack.EventMux(),
 		accountManager:    stack.AccountManager(),
-		engine:            dummy.NewDummyEngine(cb, false),
+		engine:            dummy.NewDummyEngine(cb),
 		closeBloomHandler: make(chan struct{}),
 		networkID:         config.NetworkId,
 		gasPrice:          config.Miner.GasPrice,
@@ -175,8 +175,6 @@ func New(stack *node.Node, config *Config,
 	var (
 		vmConfig = vm.Config{
 			EnablePreimageRecording: config.EnablePreimageRecording,
-			EWASMInterpreter:        config.EWASMInterpreter,
-			EVMInterpreter:          config.EVMInterpreter,
 			AllowUnfinalizedQueries: config.AllowUnfinalizedQueries,
 		}
 		cacheConfig = &core.CacheConfig{
@@ -184,6 +182,8 @@ func New(stack *node.Node, config *Config,
 			TrieDirtyLimit: config.TrieDirtyCache,
 			Pruning:        config.Pruning,
 			SnapshotLimit:  config.SnapshotCache,
+			SnapshotAsync:  config.SnapshotAsync,
+			SnapshotVerify: config.SnapshotVerify,
 			Preimages:      config.Preimages,
 		}
 	)

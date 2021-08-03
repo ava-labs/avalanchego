@@ -146,7 +146,7 @@ func (service *AvaxAPI) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 	if err != nil {
 		return fmt.Errorf("problem retrieving private key: %w", err)
 	}
-	encodedKey, err := formatting.Encode(formatting.CB58, sk.Bytes())
+	encodedKey, err := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
 	if err != nil {
 		return fmt.Errorf("problem encoding bytes as cb58: %w", err)
 	}
@@ -398,7 +398,7 @@ func (service *AvaxAPI) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		str, err := formatting.Encode(args.Encoding, b)
+		str, err := formatting.EncodeWithChecksum(args.Encoding, b)
 		if err != nil {
 			return fmt.Errorf("problem encoding utxo: %w", err)
 		}
@@ -500,7 +500,7 @@ func (service *AvaxAPI) GetAtomicTx(r *http.Request, args *api.GetTxArgs, reply 
 		return fmt.Errorf("could not find tx %s", args.TxID)
 	}
 
-	txBytes, err := formatting.Encode(args.Encoding, tx.Bytes())
+	txBytes, err := formatting.EncodeWithChecksum(args.Encoding, tx.Bytes())
 	if err != nil {
 		return err
 	}

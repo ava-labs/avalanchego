@@ -59,7 +59,7 @@ type TransactionArgs struct {
 	Data  *hexutil.Bytes `json:"data"`
 	Input *hexutil.Bytes `json:"input"`
 
-	// For non-legacy transactions
+	// Introduced by AccessListTxType transaction.
 	AccessList *types.AccessList `json:"accessList,omitempty"`
 	ChainID    *hexutil.Big      `json:"chainId,omitempty"`
 }
@@ -118,6 +118,9 @@ func (args *TransactionArgs) setDefaults(ctx context.Context, b Backend) error {
 				return err
 			}
 			if b.ChainConfig().IsApricotPhase3(new(big.Int).SetUint64(head.Time)) {
+				// The legacy tx gas price suggestion should not add 2x base fee
+				// because all fees are consumed, so it would result in a spiral
+				// upwards.
 				price.Add(price, head.BaseFee)
 			}
 			args.GasPrice = (*hexutil.Big)(price)

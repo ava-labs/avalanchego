@@ -48,6 +48,7 @@ func TestWipe(t *testing.T) {
 			rawdb.WriteStorageSnapshot(db, account, randomHash(), randomHash().Bytes())
 		}
 	}
+	rawdb.WriteSnapshotBlockHash(db, randomHash())
 	rawdb.WriteSnapshotRoot(db, randomHash())
 
 	// Add some random non-snapshot data too to make wiping harder
@@ -91,8 +92,11 @@ func TestWipe(t *testing.T) {
 	if items != 128+128*1024 {
 		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 128+128*1024)
 	}
+	if hash := rawdb.ReadSnapshotBlockHash(db); hash == (common.Hash{}) {
+		t.Errorf("snapshot block hash marker mismatch: have %#x, want <not-nil>", hash)
+	}
 	if hash := rawdb.ReadSnapshotRoot(db); hash == (common.Hash{}) {
-		t.Errorf("snapshot block marker mismatch: have %#x, want <not-nil>", hash)
+		t.Errorf("snapshot block root marker mismatch: have %#x, want <not-nil>", hash)
 	}
 	// Wipe all snapshot entries from the database
 	<-wipeSnapshot(db, true)
@@ -116,8 +120,11 @@ func TestWipe(t *testing.T) {
 			t.Errorf("snapshot entry remained after wipe: %x", key)
 		}
 	}
+	if hash := rawdb.ReadSnapshotBlockHash(db); hash != (common.Hash{}) {
+		t.Errorf("snapshot block hash marker remained after wipe: %#x", hash)
+	}
 	if hash := rawdb.ReadSnapshotRoot(db); hash != (common.Hash{}) {
-		t.Errorf("snapshot block marker remained after wipe: %#x", hash)
+		t.Errorf("snapshot block root marker remained after wipe: %#x", hash)
 	}
 	// Iterate over the database and ensure miscellaneous items are present
 	items = 0
