@@ -76,20 +76,6 @@ func (_m *Engine) AppRequest(nodeID ids.ShortID, requestID uint32, request []byt
 	return r0
 }
 
-// AppRequestFailed provides a mock function with given fields: nodeID, requestID
-func (_m *Engine) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	ret := _m.Called(nodeID, requestID)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
-		r0 = rf(nodeID, requestID)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // AppResponse provides a mock function with given fields: nodeID, requestID, response
 func (_m *Engine) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	ret := _m.Called(nodeID, requestID, response)
@@ -97,6 +83,20 @@ func (_m *Engine) AppResponse(nodeID ids.ShortID, requestID uint32, response []b
 	var r0 error
 	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32, []byte) error); ok {
 		r0 = rf(nodeID, requestID, response)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// AppRequestFailed provides a mock function with given fields: nodeID, requestID
+func (_m *Engine) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	ret := _m.Called(nodeID, requestID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(ids.ShortID, uint32) error); ok {
+		r0 = rf(nodeID, requestID)
 	} else {
 		r0 = ret.Error(0)
 	}

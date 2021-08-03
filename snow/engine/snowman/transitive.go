@@ -377,16 +377,6 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	return t.buildBlocks()
 }
 
-// AppRequestFailed implements the Engine interface
-func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	if !t.Ctx.IsBootstrapped() {
-		t.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
-		return nil
-	}
-	// Notify the VM that a request it made failed
-	return t.VM.AppRequestFailed(nodeID, requestID)
-}
-
 // AppRequest implements the Engine interface
 func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
 	if !t.Ctx.IsBootstrapped() {
@@ -405,6 +395,16 @@ func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response 
 	}
 	// Notify the VM of a response to its request
 	return t.VM.AppResponse(nodeID, requestID, response)
+}
+
+// AppRequestFailed implements the Engine interface
+func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM that a request it made failed
+	return t.VM.AppRequestFailed(nodeID, requestID)
 }
 
 // AppGossip implements the Engine interface

@@ -503,6 +503,16 @@ func (h *Handler) AppResponse(nodeID ids.ShortID, requestID uint32, appResponseB
 	})
 }
 
+// AppRequestFailed notifies the consensus engine that an application-level request failed
+// and it won't receive a response to the request.
+func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
+	h.push(message{
+		messageType: constants.AppRequestFailedMsg,
+		nodeID:      nodeID,
+		requestID:   requestID,
+	})
+}
+
 // AppGossip passes an application-level gossip message from the given node to the consensus engine.
 func (h *Handler) AppGossip(nodeID ids.ShortID, appGossipBytes []byte, onFinishedHandling func()) {
 	h.push(message{
@@ -511,16 +521,6 @@ func (h *Handler) AppGossip(nodeID ids.ShortID, appGossipBytes []byte, onFinishe
 		appMsgBytes:    appGossipBytes,
 		received:       h.clock.Time(),
 		onDoneHandling: onFinishedHandling,
-	})
-}
-
-// AppRequestFailed notifies the consensus engine that an application-level request failed
-// and it won't receive a response to the request.
-func (h *Handler) AppRequestFailed(nodeID ids.ShortID, requestID uint32) {
-	h.push(message{
-		messageType: constants.AppRequestFailedMsg,
-		nodeID:      nodeID,
-		requestID:   requestID,
 	})
 }
 

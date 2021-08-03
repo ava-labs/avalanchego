@@ -442,17 +442,6 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 	)
 }
 
-func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	_, err := vm.client.AppRequestFailed(
-		context.Background(),
-		&vmproto.AppRequestFailedMsg{
-			NodeID:    nodeID[:],
-			RequestID: requestID,
-		},
-	)
-	return err
-}
-
 func (vm *VMClient) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
 	_, err := vm.client.AppRequest(
 		context.Background(),
@@ -472,6 +461,17 @@ func (vm *VMClient) AppResponse(nodeID ids.ShortID, requestID uint32, response [
 			NodeID:    nodeID[:],
 			RequestID: requestID,
 			Response:  response,
+		},
+	)
+	return err
+}
+
+func (vm *VMClient) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	_, err := vm.client.AppRequestFailed(
+		context.Background(),
+		&vmproto.AppRequestFailedMsg{
+			NodeID:    nodeID[:],
+			RequestID: requestID,
 		},
 	)
 	return err
