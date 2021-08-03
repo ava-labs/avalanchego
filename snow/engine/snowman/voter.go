@@ -49,8 +49,10 @@ func (v *voter) Update() {
 		results[i] = v.bubbleVotes(result)
 	}
 
-	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
 	for _, result := range results {
+		result := result
+
+		v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &result)
 		if err := v.t.Consensus.RecordPoll(result); err != nil {
 			v.t.errs.Add(err)
 		}
