@@ -25,9 +25,6 @@ import (
 type Config struct {
 	genesis.Params
 
-	// If true, bootstrap the current database version and then end the node.
-	FetchOnly bool
-
 	// Genesis information
 	GenesisBytes []byte
 	AvaxAssetID  ids.ID

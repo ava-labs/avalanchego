@@ -108,8 +108,7 @@ func (ts *Topological) NumProcessing() int { return len(ts.blocks) - 1 }
 
 // Add implements the Snowman interface
 func (ts *Topological) Add(blk Block) error {
-	parent := blk.Parent()
-	parentID := parent.ID()
+	parentID := blk.Parent()
 
 	blkID := blk.ID()
 	blkBytes := blk.Bytes()
@@ -164,28 +163,28 @@ func (ts *Topological) AcceptedOrProcessing(blk Block) bool {
 	if blk.Status() == choices.Accepted {
 		return true
 	}
-	// If the block is in the map of current blocks, then the block is currently
-	// processing.
-	_, ok := ts.blocks[blk.ID()]
-	return ok
+	return ts.processing(blk.ID())
 }
 
 // DecidedOrProcessing implements the Snowman interface
 func (ts *Topological) DecidedOrProcessing(blk Block) bool {
-	switch blk.Status() {
 	// If the block is decided, then it must have been previously issued.
-	case choices.Accepted, choices.Rejected:
+	if blk.Status().Decided() {
 		return true
+	}
 	// If the block is marked as fetched, we can check if it has been
 	// transitively rejected.
-	case choices.Processing:
-		if blk.Height() <= ts.height {
-			return true
-		}
+	if blk.Status() == choices.Processing && blk.Height() <= ts.height {
+		return true
 	}
+	return ts.processing(blk.ID())
+}
+
+// Processing implements the Snowman interface
+func (ts *Topological) processing(blkID ids.ID) bool {
 	// If the block is in the map of current blocks, then the block is currently
 	// processing.
-	_, ok := ts.blocks[blk.ID()]
+	_, ok := ts.blocks[blkID]
 	return ok
 }
 
@@ -264,7 +263,7 @@ func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
 	// Traverse from the preferred ID to the last accepted ancestor.
 	for block := startBlock; !block.Accepted(); {
 		ts.preferredIDs.Add(block.blk.ID())
-		block = ts.blocks[block.blk.Parent().ID()]
+		block = ts.blocks[block.blk.Parent()]
 	}
 	// Traverse from the preferred ID to the preferred child until there are no
 	// children.
@@ -323,8 +322,7 @@ func (ts *Topological) calculateInDegree(votes ids.Bag) {
 		}
 
 		// The parent contains the snowball instance of its children
-		parent := votedBlock.blk.Parent()
-		parentID := parent.ID()
+		parentID := votedBlock.blk.Parent()
 
 		// Add the votes for this block to the parent's set of responses
 		numVotes := votes.Count(vote)
@@ -344,8 +342,7 @@ func (ts *Topological) calculateInDegree(votes ids.Bag) {
 		// iterate through all the block's ancestors and set up the inDegrees of
 		// the blocks
 		for n := ts.blocks[parentID]; !n.Accepted(); n = ts.blocks[parentID] {
-			parent = n.blk.Parent()
-			parentID = parent.ID()
+			parentID = n.blk.Parent()
 
 			// Increase the inDegree by one
 			kahn := ts.kahnNodes[parentID]
@@ -395,8 +392,7 @@ func (ts *Topological) pushVotes() []votes {
 			continue
 		}
 
-		parent := block.blk.Parent()
-		parentID := parent.ID()
+		parentID := block.blk.Parent()
 
 		// Remove an inbound edge from the parent kahn node and push the votes.
 		parentKahnNode := ts.kahnNodes[parentID]

@@ -49,8 +49,10 @@ func (v *voter) Update() {
 		results[i] = v.bubbleVotes(result)
 	}
 
-	v.t.Ctx.Log.Debug("Finishing poll [%d] with:\n%s", v.requestID, &results)
 	for _, result := range results {
+		result := result
+
+		v.t.Ctx.Log.Debug("Finishing poll with:\n%s", &result)
 		if err := v.t.Consensus.RecordPoll(result); err != nil {
 			v.t.errs.Add(err)
 		}
@@ -76,19 +78,28 @@ func (v *voter) Update() {
 
 func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
+
+votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.VM.GetBlock(vote)
+		blk, err := v.t.GetBlock(vote)
 		if err != nil {
 			continue
 		}
 
-		for blk.Status().Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
-			blk = blk.Parent()
+		status := blk.Status()
+		blkID := blk.ID()
+		for status.Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
+			blkID = blk.Parent()
+			blk, err = v.t.GetBlock(blkID)
+			if err != nil {
+				continue votesLoop
+			}
+			status = blk.Status()
 		}
 
-		if !blk.Status().Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
-			bubbledVotes.AddCount(blk.ID(), count)
+		if !status.Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
+			bubbledVotes.AddCount(blkID, count)
 		}
 	}
 	return bubbledVotes
