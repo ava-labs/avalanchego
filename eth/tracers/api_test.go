@@ -96,6 +96,11 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i i
 	if n, err := chain.InsertChain(blocks); err != nil {
 		t.Fatalf("block %d: failed to insert into chain: %v", n, err)
 	}
+	for _, block := range blocks {
+		if err := chain.Accept(block); err != nil {
+			t.Fatalf("block %d: failed to accept block in chain: %v", n, err)
+		}
+	}
 	backend.chain = chain
 	return backend
 }
