@@ -4,6 +4,7 @@
 package logging
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -121,4 +122,18 @@ func (l Level) AlignedString() string {
 	default:
 		return s[:alignedStringLen]
 	}
+}
+
+func (l Level) MarshalJSON() ([]byte, error) {
+	return json.Marshal(l.String())
+}
+
+func (l *Level) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+	var err error
+	*l, err = ToLevel(str)
+	return err
 }

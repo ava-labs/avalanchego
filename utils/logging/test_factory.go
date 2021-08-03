@@ -17,8 +17,8 @@ func (NoFactory) SetLogLevel(name string, level Level) error { return nil }
 
 func (NoFactory) SetDisplayLevel(name string, level Level) error { return nil }
 
-func (NoFactory) GetLogLevel(name string) (Level, error) { return -1, nil }
+func (NoFactory) GetLogLevel(name string) (Level, error) { return Off, nil }
 
-func (NoFactory) GetDisplayLevel(name string) (Level, error) { return -1, nil }
+func (NoFactory) GetDisplayLevel(name string) (Level, error) { return Off, nil }
 
 func (NoFactory) GetLoggerNames() []string { return nil }

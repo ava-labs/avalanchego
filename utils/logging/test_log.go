@@ -67,10 +67,10 @@ func (NoLog) SetLogLevel(Level) {}
 func (NoLog) SetDisplayLevel(Level) {}
 
 // GetLogLevel ...
-func (NoLog) GetLogLevel() Level { return -1 }
+func (NoLog) GetLogLevel() Level { return Off }
 
 // GetDisplayLevel ...
-func (NoLog) GetDisplayLevel() Level { return -1 }
+func (NoLog) GetDisplayLevel() Level { return Off }
 
 // SetPrefix ...
 func (NoLog) SetPrefix(string) {}
