@@ -9,28 +9,32 @@ import (
 )
 
 func TestStatusValid(t *testing.T) {
-	if err := Validating.Valid(); err != nil {
-		t.Fatalf("%s failed verification", Validating)
-	} else if err := Created.Valid(); err != nil {
-		t.Fatalf("%s failed verification", Created)
-	} else if err := Preferred.Valid(); err != nil {
-		t.Fatalf("%s failed verification", Preferred)
+	if err := Committed.Valid(); err != nil {
+		t.Fatalf("%s failed verification", Committed)
+	} else if err := Aborted.Valid(); err != nil {
+		t.Fatalf("%s failed verification", Aborted)
+	} else if err := Processing.Valid(); err != nil {
+		t.Fatalf("%s failed verification", Processing)
 	} else if err := Unknown.Valid(); err != nil {
 		t.Fatalf("%s failed verification", Unknown)
+	} else if err := Dropped.Valid(); err != nil {
+		t.Fatalf("%s failed verification", Dropped)
 	} else if badStatus := Status(math.MaxInt32); badStatus.Valid() == nil {
 		t.Fatalf("%s passed verification", badStatus)
 	}
 }
 
 func TestStatusString(t *testing.T) {
-	if Validating.String() != "Validating" {
-		t.Fatalf("%s failed printing", Validating)
-	} else if Created.String() != "Created" {
-		t.Fatalf("%s failed printing", Created)
-	} else if Preferred.String() != "Preferred" {
-		t.Fatalf("%s failed printing", Preferred)
+	if Committed.String() != "Committed" {
+		t.Fatalf("%s failed printing", Committed)
+	} else if Aborted.String() != "Aborted" {
+		t.Fatalf("%s failed printing", Aborted)
+	} else if Processing.String() != "Processing" {
+		t.Fatalf("%s failed printing", Processing)
 	} else if Unknown.String() != "Unknown" {
 		t.Fatalf("%s failed printing", Unknown)
+	} else if Dropped.String() != "Dropped" {
+		t.Fatalf("%s failed printing", Dropped)
 	} else if badStatus := Status(math.MaxInt32); badStatus.String() != "Invalid status" {
 		t.Fatalf("%s failed printing", badStatus)
 	}
