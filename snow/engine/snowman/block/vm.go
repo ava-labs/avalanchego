@@ -25,6 +25,7 @@ import (
 // Consensus will ensure the network agrees on the number at every block height.
 type ChainVM interface {
 	common.VM
+	Getter
 
 	// Attempt to create a new block from data contained in the VM.
 	//
@@ -38,14 +39,6 @@ type ChainVM interface {
 	// bytes.
 	ParseBlock([]byte) (snowman.Block, error)
 
-	// Attempt to load a block.
-	//
-	// If the block does not exist, then an error should be returned.
-	//
-	// TODO: we should change the invariant of the GetBlock, GetTx, and GetVertex
-	// calls to report database.ErrNotFound if the operation is missing.
-	GetBlock(ids.ID) (snowman.Block, error)
-
 	// Notify the VM of the currently preferred block.
 	//
 	// This should always be a block that has no children known to consensus.
@@ -57,4 +50,15 @@ type ChainVM interface {
 	// a definitionally accepted block, the Genesis block, that will be
 	// returned.
 	LastAccepted() (ids.ID, error)
+}
+
+// Getter defines the functionality for fetching a block by its ID.
+type Getter interface {
+	// Attempt to load a block.
+	//
+	// If the block does not exist, an error should be returned.
+	//
+	// TODO: Update the invariant to report database.ErrNotFound if the
+	//       operation is missing.
+	GetBlock(ids.ID) (snowman.Block, error)
 }

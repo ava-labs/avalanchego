@@ -182,9 +182,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	ancestorsBytesLen := len(blk.Bytes()) + wrappers.IntLen // length, in bytes, of all elements of ancestors
 
 	for numFetched := 1; numFetched < t.Config.MultiputMaxContainersSent && time.Since(startTime) < t.Config.MaxTimeGetAncestors; numFetched++ {
-		blkID := blk.Parent()
-		var err error
-		if blk, err = t.GetBlock(blkID); err != nil {
+		if blk, err = t.GetBlock(blk.Parent()); err != nil {
 			break
 		}
 		blkBytes := blk.Bytes()
@@ -643,6 +641,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.pending.Remove(blkID)
 	parentID := blk.Parent()
 	parent, err := t.GetBlock(parentID)
+	// Because the dependency must have been fulfilled by the time this function
+	// is called - we don't expect [err] to be non-nil. But it is handled for
+	// completness and future proofing.
 	if err != nil || !t.Consensus.AcceptedOrProcessing(parent) {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected

@@ -43,7 +43,7 @@ type blockJob struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	blk                     snowman.Block
-	vm                      block.ChainVM
+	vm                      block.Getter
 }
 
 func (b *blockJob) ID() ids.ID { return b.blk.ID() }

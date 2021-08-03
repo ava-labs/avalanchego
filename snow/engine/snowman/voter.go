@@ -80,7 +80,7 @@ func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
-		blk, err := v.t.VM.GetBlock(vote)
+		blk, err := v.t.GetBlock(vote)
 		if err != nil {
 			continue
 		}
