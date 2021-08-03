@@ -285,7 +285,6 @@ func (api *PublicDebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, sta
 		} else {
 			block = api.eth.blockchain.GetBlockByNumber(uint64(number))
 		}
-
 		if block == nil {
 			return state.IteratorDump{}, fmt.Errorf("block #%d not found", number)
 		}

@@ -78,7 +78,6 @@ type StateDB struct {
 	trie         Trie
 	hasher       crypto.KeccakState
 
-	snaps         *snapshot.Tree
 	snap          snapshot.Snapshot
 	snapDestructs map[common.Hash]struct{}
 	snapAccounts  map[common.Hash][]byte
@@ -99,10 +98,10 @@ type StateDB struct {
 	// The refund counter, also used by state transitioning.
 	refund uint64
 
-	thash, bhash common.Hash
-	txIndex      int
-	logs         map[common.Hash][]*types.Log
-	logSize      uint
+	thash   common.Hash
+	txIndex int
+	logs    map[common.Hash][]*types.Log
+	logSize uint
 
 	preimages map[common.Hash][]byte
 
@@ -131,6 +130,18 @@ type StateDB struct {
 
 // New creates a new state from a given trie.
 func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) {
+	var snap snapshot.Snapshot
+	if snaps != nil {
+		snap = snaps.Snapshot(root)
+	}
+	return NewWithSnapshot(root, db, snap)
+}
+
+// NewWithSnapshot creates a new state from a given trie with the specified [snap]
+// If [snap] doesn't have the same root as [root], then NewWithSnapshot will return
+// an error. If snap is nil, then no snapshot will be used and CommitWithSnapshot
+// cannot be called on the returned StateDB.
+func NewWithSnapshot(root common.Hash, db Database, snap snapshot.Snapshot) (*StateDB, error) {
 	tr, err := db.OpenTrie(root)
 	if err != nil {
 		return nil, err
@@ -139,7 +150,6 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
 		db:                  db,
 		trie:                tr,
 		originalRoot:        root,
-		snaps:               snaps,
 		stateObjects:        make(map[common.Address]*stateObject),
 		stateObjectsPending: make(map[common.Address]struct{}),
 		stateObjectsDirty:   make(map[common.Address]struct{}),
@@ -149,12 +159,14 @@ func New(root common.Hash, db Database, snaps *snapshot.Tree) (*StateDB, error) 
 		accessList:          newAccessList(),
 		hasher:              crypto.NewKeccakState(),
 	}
-	if sdb.snaps != nil {
-		if sdb.snap = sdb.snaps.Snapshot(root); sdb.snap != nil {
-			sdb.snapDestructs = make(map[common.Hash]struct{})
-			sdb.snapAccounts = make(map[common.Hash][]byte)
-			sdb.snapStorage = make(map[common.Hash]map[common.Hash][]byte)
+	if snap != nil {
+		if snap.Root() != root {
+			return nil, fmt.Errorf("cannot create new statedb for root: %s, using snapshot with mismatched root: %s", root, snap.Root().Hex())
 		}
+		sdb.snap = snap
+		sdb.snapDestructs = make(map[common.Hash]struct{})
+		sdb.snapAccounts = make(map[common.Hash][]byte)
+		sdb.snapStorage = make(map[common.Hash]map[common.Hash][]byte)
 	}
 	return sdb, nil
 }
@@ -196,15 +208,18 @@ func (s *StateDB) AddLog(log *types.Log) {
 	s.journal.append(addLogChange{txhash: s.thash})
 
 	log.TxHash = s.thash
-	log.BlockHash = s.bhash
 	log.TxIndex = uint(s.txIndex)
 	log.Index = s.logSize
 	s.logs[s.thash] = append(s.logs[s.thash], log)
 	s.logSize++
 }
 
-func (s *StateDB) GetLogs(hash common.Hash) []*types.Log {
-	return s.logs[hash]
+func (s *StateDB) GetLogs(hash common.Hash, blockHash common.Hash) []*types.Log {
+	logs := s.logs[hash]
+	for _, l := range logs {
+		l.BlockHash = blockHash
+	}
+	return logs
 }
 
 func (s *StateDB) Logs() []*types.Log {
@@ -271,10 +286,10 @@ func (s *StateDB) GetBalance(addr common.Address) *big.Int {
 }
 
 // Retrieve the balance from the given address or 0 if object not found
-func (self *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *big.Int {
-	stateObject := self.getStateObject(addr)
+func (s *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *big.Int {
+	stateObject := s.getStateObject(addr)
 	if stateObject != nil {
-		return stateObject.BalanceMultiCoin(coinID, self.db)
+		return stateObject.BalanceMultiCoin(coinID, s.db)
 	}
 	return common.Big0
 }
@@ -291,11 +306,6 @@ func (s *StateDB) GetNonce(addr common.Address) uint64 {
 // TxIndex returns the current transaction index set by Prepare.
 func (s *StateDB) TxIndex() int {
 	return s.txIndex
-}
-
-// BlockHash returns the current block hash set by Prepare.
-func (s *StateDB) BlockHash() common.Hash {
-	return s.bhash
 }
 
 func (s *StateDB) GetCode(addr common.Address) []byte {
@@ -346,17 +356,6 @@ func (s *StateDB) GetProofByHash(addrHash common.Hash) ([][]byte, error) {
 
 // GetStorageProof returns the Merkle proof for given storage slot.
 func (s *StateDB) GetStorageProof(a common.Address, key common.Hash) ([][]byte, error) {
-	var proof proofList
-	trie := s.StorageTrie(a)
-	if trie == nil {
-		return proof, errors.New("storage trie for requested address does not exist")
-	}
-	err := trie.Prove(crypto.Keccak256(key.Bytes()), 0, &proof)
-	return proof, err
-}
-
-// GetStorageProofByHash returns the Merkle proof for given storage slot.
-func (s *StateDB) GetStorageProofByHash(a common.Address, key common.Hash) ([][]byte, error) {
 	var proof proofList
 	trie := s.StorageTrie(a)
 	if trie == nil {
@@ -654,7 +653,6 @@ func (s *StateDB) createObject(addr common.Address) (newobj, prev *stateObject) 
 		}
 	}
 	newobj = newObject(s, addr, Account{})
-	newobj.setNonce(0) // sets the object to dirty
 	if prev == nil {
 		s.journal.append(createObjectChange{account: &addr})
 	} else {
@@ -785,12 +783,11 @@ func (s *StateDB) Copy() *StateDB {
 	if s.prefetcher != nil {
 		state.prefetcher = s.prefetcher.copy()
 	}
-	if s.snaps != nil {
+	if s.snap != nil {
 		// In order for the miner to be able to use and make additions
 		// to the snapshot tree, we need to copy that aswell.
 		// Otherwise, any block mined by ourselves will cause gaps in the tree,
 		// and force the miner to operate trie-backed only
-		state.snaps = s.snaps
 		state.snap = s.snap
 		// deep copy needed
 		state.snapDestructs = make(map[common.Hash]struct{})
@@ -949,11 +946,10 @@ func (s *StateDB) IntermediateRoot(deleteEmptyObjects bool) common.Hash {
 	return s.trie.Hash()
 }
 
-// Prepare sets the current transaction hash and index and block hash which is
+// Prepare sets the current transaction hash and index which are
 // used when the EVM emits new state logs.
-func (s *StateDB) Prepare(thash, bhash common.Hash, ti int) {
+func (s *StateDB) Prepare(thash common.Hash, ti int) {
 	s.thash = thash
-	s.bhash = bhash
 	s.txIndex = ti
 	s.accessList = newAccessList()
 }
@@ -968,6 +964,17 @@ func (s *StateDB) clearJournalAndRefund() {
 
 // Commit writes the state to the underlying in-memory trie database.
 func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
+	return s.commit(deleteEmptyObjects, nil, common.Hash{}, common.Hash{})
+}
+
+// CommitWithSnap writes the state to the underlying in-memory trie database and
+// generates a snapshot layer for the newly committed state.
+func (s *StateDB) CommitWithSnap(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHash, parentHash common.Hash) (common.Hash, error) {
+	return s.commit(deleteEmptyObjects, snaps, blockHash, parentHash)
+}
+
+// Commit writes the state to the underlying in-memory trie database.
+func (s *StateDB) commit(deleteEmptyObjects bool, snaps *snapshot.Tree, blockHash, parentHash common.Hash) (common.Hash, error) {
 	if s.dbErr != nil {
 		return common.Hash{}, fmt.Errorf("commit aborted due to earlier error: %v", s.dbErr)
 	}
@@ -1018,18 +1025,19 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 		s.AccountCommits += time.Since(start)
 	}
 	// If snapshotting is enabled, update the snapshot tree with this new version
-	if s.snap != nil {
+	if snaps != nil {
+		if s.snap == nil {
+			log.Error(fmt.Sprintf("cannot commit with snaps without a pre-existing snap layer, parentHash: %s, blockHash: %s", parentHash, blockHash))
+		}
 		if metrics.EnabledExpensive {
 			defer func(start time.Time) { s.SnapshotCommits += time.Since(start) }(time.Now())
 		}
-		// Only update if there's a state transition (skip empty Clique blocks)
-		if parent := s.snap.Root(); parent != root {
-			if err := s.snaps.Update(root, parent, s.snapDestructs, s.snapAccounts, s.snapStorage); err != nil {
-				log.Warn("Failed to update snapshot tree", "from", parent, "to", root, "err", err)
-			}
+		if err := snaps.Update(blockHash, root, parentHash, s.snapDestructs, s.snapAccounts, s.snapStorage); err != nil {
+			log.Warn("Failed to update snapshot tree", "to", root, "err", err)
 		}
 		s.snap, s.snapDestructs, s.snapAccounts, s.snapStorage = nil, nil, nil, nil
 	}
+
 	return root, err
 }
 

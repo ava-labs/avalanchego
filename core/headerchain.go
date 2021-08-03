@@ -220,18 +220,6 @@ func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
 	hc.currentHeaderHash = head.Hash()
 }
 
-type (
-	// UpdateHeadBlocksCallback is a callback function that is called by SetHead
-	// before head header is updated. The method will return the actual block it
-	// updated the head to (missing state) and a flag if setHead should continue
-	// rewinding till that forcefully (exceeded ancient limits)
-	UpdateHeadBlocksCallback func(ethdb.KeyValueWriter, *types.Header) (uint64, bool)
-
-	// DeleteBlockContentCallback is a callback function that is called by SetHead
-	// before each header is deleted.
-	DeleteBlockContentCallback func(ethdb.KeyValueWriter, common.Hash, uint64)
-)
-
 // SetGenesis sets a new genesis block header for the chain
 func (hc *HeaderChain) SetGenesis(head *types.Header) {
 	hc.genesisHeader = head

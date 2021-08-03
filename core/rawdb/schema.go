@@ -61,6 +61,9 @@ var (
 	// snapshotRootKey tracks the hash of the last snapshot.
 	snapshotRootKey = []byte("SnapshotRoot")
 
+	// snapshotBlockHashKey tracks the block hash of the last snapshot.
+	snapshotBlockHashKey = []byte("SnapshotBlockHash")
+
 	// snapshotJournalKey tracks the in-memory diff layers across restarts.
 	snapshotJournalKey = []byte("SnapshotJournal")
 
@@ -110,8 +113,6 @@ var (
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 )
 
-// We don't remove these constants to minimize the amount of changes that need
-// to be made to other files.
 const (
 	// freezerHeaderTable indicates the name of the freezer header table.
 	freezerHeaderTable = "headers"
