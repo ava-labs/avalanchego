@@ -900,6 +900,9 @@ func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID
 			n.appRequest.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.appRequest.sentBytes.Add(float64(len(msg.Bytes())))
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.appRequest.savedSentBytes.Observe(float64(saved))
+			}
 		}
 	}
 	return sentTo
@@ -927,6 +930,9 @@ func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID 
 		n.appResponse.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
 		n.appResponse.sentBytes.Add(float64(len(msg.Bytes())))
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			n.appResponse.savedSentBytes.Observe(float64(saved))
+		}
 	}
 }
 
@@ -970,6 +976,9 @@ func (n *network) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
 			n.appGossip.numSent.Inc()
 			n.appGossip.sentBytes.Add(float64(len(msg.Bytes())))
 			n.sendFailRateCalculator.Observe(0, now)
+			if saved := msg.BytesSavedCompression(); saved != 0 {
+				n.appGossip.savedSentBytes.Observe(float64(saved))
+			}
 		}
 	}
 }
