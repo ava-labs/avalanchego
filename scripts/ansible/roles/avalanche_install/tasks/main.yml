@@ -74,8 +74,7 @@
     mode: u=rwx,go=rx
     remote_src: true
   loop:
-    - src: "{{ repo_folder }}/build/avalanchego-preupgrade"
-    - src: "{{ repo_folder }}/build/avalanchego-latest"
+    - src: "{{ repo_folder }}/build/plugins"
   loop_control:
     label: "{{ avalanche_daemon_lib_dir }}/{{ item.src | basename }}"
   notify:

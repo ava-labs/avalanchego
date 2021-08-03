@@ -21,10 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	bufSize = 1 << 20
+	bufSize = units.MiB
 )
 
 func TestInterface(t *testing.T) {

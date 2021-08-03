@@ -9,7 +9,6 @@ import (
 
 var errUnknownStatus = errors.New("unknown status")
 
-// Status ...
 type Status uint32
 
 // List of possible status values
@@ -26,7 +25,6 @@ const (
 	Dropped    Status = 8
 )
 
-// MarshalJSON ...
 func (s Status) MarshalJSON() ([]byte, error) {
 	if err := s.Valid(); err != nil {
 		return nil, err
@@ -34,7 +32,6 @@ func (s Status) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + s.String() + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (s *Status) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == "null" {
