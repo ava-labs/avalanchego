@@ -281,6 +281,7 @@ func (n *Node) initNetworking() error {
 		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		n.Config.AppGossipSize,
 		n.Config.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,

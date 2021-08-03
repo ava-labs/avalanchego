@@ -152,6 +152,7 @@ type network struct {
 	allowPrivateIPs              bool
 	gossipAcceptedFrontierSize   uint
 	gossipOnAcceptSize           uint
+	appGossipSize                uint
 	pingPongTimeout              time.Duration
 	pingFrequency                time.Duration
 	readBufferSize               uint32
@@ -276,6 +277,7 @@ func NewDefaultNetwork(
 	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
+	appGossipSize uint,
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
@@ -308,6 +310,7 @@ func NewDefaultNetwork(
 		defaultAllowPrivateIPs,
 		gossipAcceptedFrontierSize,
 		gossipOnAcceptSize,
+		appGossipSize,
 		defaultPingPongTimeout,
 		defaultPingFrequency,
 		defaultReadBufferSize,
@@ -353,6 +356,7 @@ func NewNetwork(
 	allowPrivateIPs bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
+	appGossipSize uint,
 	pingPongTimeout time.Duration,
 	pingFrequency time.Duration,
 	readBufferSize uint32,
@@ -398,6 +402,7 @@ func NewNetwork(
 		allowPrivateIPs:              allowPrivateIPs,
 		gossipAcceptedFrontierSize:   gossipAcceptedFrontierSize,
 		gossipOnAcceptSize:           gossipOnAcceptSize,
+		appGossipSize:                appGossipSize,
 		pingPongTimeout:              pingPongTimeout,
 		pingFrequency:                pingFrequency,
 		disconnectedIPs:              make(map[string]struct{}),
@@ -948,26 +953,17 @@ func (n *network) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
 		n.sendFailRateCalculator.Observe(1, now)
 	}
 
-	allPeers := n.getAllPeers()
-
-	numToGossip := 10 // TODO replace this constant with a value given in the config
-	if numToGossip > len(allPeers) {
-		numToGossip = len(allPeers)
-	}
-
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(allPeers))); err != nil {
-		n.log.Warn("couldn't initialize sampler with sample range %d: %s", len(allPeers), err)
-		return
-	}
-	indices, err := s.Sample(numToGossip)
+	n.stateLock.RLock()
+	peers, err := n.peers.sample(int(n.appGossipSize))
+	n.stateLock.RUnlock()
 	if err != nil {
-		n.log.Warn("couldn't sample %d: %s", numToGossip, err)
+		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.appGossipSize, err)
 		return
 	}
-	for _, index := range indices {
-		peer := allPeers[int(index)]
-		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
+
+	for _, peer := range peers {
+		sent := peer.Send(msg, false)
+		if !sent {
 			n.log.Debug("failed to send AppGossip(%s, %s)", peer.nodeID, chainID)
 			n.log.Verbo("failed message: %s", formatting.DumpBytes{Bytes: appGossipBytes})
 			n.appGossip.numFailed.Inc()

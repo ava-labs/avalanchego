@@ -116,6 +116,7 @@ func TestPeer_Close(t *testing.T) {
 		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
+		defaultAppGossipSize,
 		true,
 		defaultInboundMsgThrottler,
 		defaultOutboundMsgThrottler,

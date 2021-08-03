@@ -130,6 +130,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 	nodeConfig.ConsensusGossipAcceptedFrontierSize = uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey))
 	nodeConfig.ConsensusGossipOnAcceptSize = uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey))
+	nodeConfig.AppGossipSize = uint(v.GetUint32(AppGossipSizeKey))
 
 	// Logging:
 	loggingConfig, err := logging.DefaultConfig()

@@ -124,6 +124,8 @@ type Config struct {
 	ConsensusGossipAcceptedFrontierSize uint
 	// Number of peers to gossip each accepted container to
 	ConsensusGossipOnAcceptSize uint
+	// Number of peers to gossip an AppGossip message
+	AppGossipSize uint
 
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration

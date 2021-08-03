@@ -97,6 +97,7 @@ const (
 	ConsensusGossipFrequencyKey               = "consensus-gossip-frequency"
 	ConsensusGossipAcceptedFrontierSizeKey    = "consensus-accepted-frontier-gossip-size"
 	ConsensusGossipOnAcceptSizeKey            = "consensus-on-accept-gossip-size"
+	AppGossipSizeKey                          = "consensus-app-gossip-size"
 	ConsensusShutdownTimeoutKey               = "consensus-shutdown-timeout"
 	FdLimitKey                                = "fd-limit"
 	CorethConfigKey                           = "coreth-config"
