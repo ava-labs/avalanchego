@@ -52,8 +52,8 @@ type VMServer struct {
 	serverCloser grpcutils.ServerCloser
 	connCloser   wrappers.Closer
 
-	ctx      *snow.Context
-	toEngine chan common.Message
+	ctx    *snow.Context
+	closed chan struct{}
 }
 
 // NewServer returns a vm instance connected to a remote vm instance
@@ -160,6 +160,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		_ = vm.connCloser.Close()
 		return nil, err
 	}
+	vm.connCloser.Add(snLookupConn)
 
 	appSenderConn, err := vm.broker.Dial(req.AppSenderServer)
 	if err != nil {
@@ -167,6 +168,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		_ = vm.connCloser.Close()
 		return nil, err
 	}
+	vm.connCloser.Add(appSenderConn)
 
 	msgClient := messenger.NewClient(messengerproto.NewMessengerClient(msgConn))
 	keystoreClient := gkeystore.NewClient(gkeystoreproto.NewKeystoreClient(keystoreConn), vm.broker)
@@ -176,10 +178,19 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	appSenderClient := appsender.NewClient(appsenderproto.NewAppSenderClient(appSenderConn))
 
 	toEngine := make(chan common.Message, 1)
+	vm.closed = make(chan struct{})
 	go func() {
-		for msg := range toEngine {
-			// Nothing to do with the error within the goroutine
-			_ = msgClient.Notify(msg)
+		for {
+			select {
+			case msg, ok := <-toEngine:
+				if !ok {
+					return
+				}
+				// Nothing to do with the error within the goroutine
+				_ = msgClient.Notify(msg)
+			case <-vm.closed:
+				return
+			}
 		}
 	}()
 
@@ -204,19 +215,28 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	if err := vm.vm.Initialize(vm.ctx, dbManager, req.GenesisBytes, req.UpgradeBytes, req.ConfigBytes, toEngine, nil, appSenderClient); err != nil {
 		// Ignore errors closing resources to return the original error
 		_ = vm.connCloser.Close()
-		close(toEngine)
+		close(vm.closed)
 		return nil, err
 	}
 
-	vm.toEngine = toEngine
 	lastAccepted, err := vm.vm.LastAccepted()
 	if err != nil {
+		// Ignore errors closing resources to return the original error
+		_ = vm.vm.Shutdown()
+		_ = vm.connCloser.Close()
+		close(vm.closed)
 		return nil, err
 	}
+
 	blk, err := vm.vm.GetBlock(lastAccepted)
 	if err != nil {
+		// Ignore errors closing resources to return the original error
+		_ = vm.vm.Shutdown()
+		_ = vm.connCloser.Close()
+		close(vm.closed)
 		return nil, err
 	}
+
 	parentID := blk.Parent()
 	return &vmproto.InitializeResponse{
 		LastAcceptedID:       lastAccepted[:],
@@ -224,7 +244,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 		Status:               uint32(choices.Accepted),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
-	}, err
+	}, nil
 }
 
 func (vm *VMServer) Bootstrapping(context.Context, *vmproto.EmptyMsg) (*vmproto.EmptyMsg, error) {
@@ -237,12 +257,12 @@ func (vm *VMServer) Bootstrapped(context.Context, *vmproto.EmptyMsg) (*vmproto.E
 }
 
 func (vm *VMServer) Shutdown(context.Context, *vmproto.EmptyMsg) (*vmproto.EmptyMsg, error) {
-	if vm.toEngine == nil {
+	if vm.closed == nil {
 		return &vmproto.EmptyMsg{}, nil
 	}
 	errs := wrappers.Errs{}
 	errs.Add(vm.vm.Shutdown())
-	close(vm.toEngine)
+	close(vm.closed)
 	vm.serverCloser.Stop()
 	errs.Add(vm.connCloser.Close())
 	return &vmproto.EmptyMsg{}, errs.Err
