@@ -702,8 +702,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
-			Fee:         n.Config.TxFee,
-			CreationFee: n.Config.CreateAssetTxFee,
+			TxFee:            n.Config.TxFee,
+			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
