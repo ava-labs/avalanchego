@@ -106,6 +106,19 @@ func TestCodecPackParseGzip(t *testing.T) {
 			},
 		},
 		{
+			op: VersionWithSubnets,
+			fields: map[Field]interface{}{
+				NetworkID:      uint32(0),
+				NodeID:         uint32(1337),
+				MyTime:         uint64(time.Now().Unix()),
+				IP:             utils.IPDesc{IP: net.IPv4(1, 2, 3, 4)},
+				VersionStr:     "v1.2.3",
+				VersionTime:    uint64(time.Now().Unix()),
+				SigBytes:       []byte{'y', 'e', 'e', 't'},
+				TrackedSubnets: [][]byte{id[:]},
+			},
+		},
+		{
 			op:     GetPeerList,
 			fields: map[Field]interface{}{},
 		},
