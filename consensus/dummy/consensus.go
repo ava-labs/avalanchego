@@ -34,20 +34,12 @@ type ConsensusCallbacks struct {
 }
 
 type DummyEngine struct {
-	cb           *ConsensusCallbacks
-	skipBlockFee bool
+	cb *ConsensusCallbacks
 }
 
 func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
 		cb: cb,
-	}
-}
-
-func NewFakerSkipBlockFee() *DummyEngine {
-	return &DummyEngine{
-		cb:           new(ConsensusCallbacks),
-		skipBlockFee: true,
 	}
 }
 
@@ -173,60 +165,10 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 	return nil
 }
 
-func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) error {
-	// If the engine is not charging the base fee, skip the verification.
-	// Note: this is a hack to support tests migrated from geth without substantial modification.
-	if self.skipBlockFee {
-		return nil
-	}
-	bigTimestamp := new(big.Int).SetUint64(header.Time)
-
-	var (
-		blockFeePremium      = new(big.Int)
-		blockFeeContribution = new(big.Int)
-		totalBlockFee        = new(big.Int)
-	)
-	// Require that block after ApricotPhase4 pay a minimum block fee derived from the premium
-	// paid above the block's base fee.
-	if chain.Config().IsApricotPhase4(bigTimestamp) {
-		// Calculate the total excess over the base fee that was paid towards the block fee
-		for i, receipt := range receipts {
-			// Each transaction contributes the excess over the baseFee towards the totalBlockFee
-			// This should be equivalent to the sum of the "priority fees" within EIP-1559.
-			blockFeePremium = blockFeePremium.Sub(txs[i].GasPrice(), header.BaseFee)
-			blockFeeContribution = blockFeeContribution.Mul(blockFeePremium, new(big.Int).SetUint64(receipt.GasUsed))
-
-			totalBlockFee = totalBlockFee.Add(totalBlockFee, blockFeeContribution)
-		}
-		// TODO factor atomic transactions into the calculation.
-		// In order to divide safely, we require that the baseFee must never be 0
-		if header.BaseFee.Cmp(common.Big0) <= 0 {
-			return fmt.Errorf("invalid base fee (%d) in apricot phase 4", header.BaseFee)
-		}
-		// Calculate how much gas the [totalBlockFee] would purchase at the price level
-		// set by this block.
-		blockGas := new(big.Int).Div(totalBlockFee, new(big.Int).Set(header.BaseFee))
-		if !blockGas.IsUint64() {
-			return fmt.Errorf("calculated block gas was not uint64: %d", blockGas)
-		}
-		// We require that [blockGas] covers at least [blockGasFee] to ensure that it
-		// costs a minimum amount to produce a valid block.
-		if blockGas.Cmp(blockGasFee) < 0 {
-			return fmt.Errorf("insufficient gas (%d) to cover the block fee (%d) at base fee (%d) (total block fee: %d)", blockGas, blockGasFee, header.BaseFee, totalBlockFee)
-		}
-	}
-
-	return nil
-}
-
 func (self *DummyEngine) Finalize(
 	chain consensus.ChainHeaderReader, header *types.Header,
 	state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt,
 	uncles []*types.Header) error {
-	if err := self.verifyBlockFee(chain, header, txs, receipts); err != nil {
-		return err
-	}
-
 	if self.cb.OnFinalize != nil {
 		return self.cb.OnFinalize(chain, header, state, txs, receipts, uncles)
 	}
@@ -242,9 +184,6 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		if err != nil {
 			return nil, err
 		}
-	}
-	if err := self.verifyBlockFee(chain, header, txs, receipts); err != nil {
-		return nil, err
 	}
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))

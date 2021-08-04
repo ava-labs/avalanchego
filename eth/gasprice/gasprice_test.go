@@ -80,9 +80,8 @@ func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int) *testBac
 		signer = types.LatestSigner(gspec.Config)
 	} else {
 		gspec.Config.ApricotPhase3BlockTimestamp = nil
-		gspec.Config.ApricotPhase4BlockTimestamp = nil
 	}
-	engine := dummy.NewFakerSkipBlockFee()
+	engine := dummy.NewFaker()
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
 
