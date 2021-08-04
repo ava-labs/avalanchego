@@ -1772,7 +1772,7 @@ type GetBlockchainStatusArgs struct {
 // GetBlockchainStatusReply is the reply from calling GetBlockchainStatus
 // [Status] is the blockchain's status.
 type GetBlockchainStatusReply struct {
-	Status Status `json:"status"`
+	Status BlockchainStatus `json:"status"`
 }
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
