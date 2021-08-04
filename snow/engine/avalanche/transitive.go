@@ -119,7 +119,7 @@ func (t *Transitive) Gossip() error {
 	}
 
 	if err := t.uniformSampler.Initialize(uint64(len(edge))); err != nil {
-		return err // Should never really happen
+		return err // Should never happen
 	}
 	indices, err := t.uniformSampler.Sample(1)
 	if err != nil {

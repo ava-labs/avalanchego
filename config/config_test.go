@@ -220,7 +220,7 @@ func TestSetChainConfigDefaultDir(t *testing.T) {
 	assert.Equal(expected, chainConfigs)
 }
 
-func TestReadVMAliases(t *testing.T) {
+func TestGetVMAliases(t *testing.T) {
 	tests := map[string]struct {
 		givenJSON  string
 		expected   map[ids.ID][]string
@@ -255,7 +255,7 @@ func TestReadVMAliases(t *testing.T) {
 			configFilePath := setupConfigJSON(t, root, configJSON)
 			setupFile(t, root, "aliases.json", test.givenJSON)
 			v := setupViper(configFilePath)
-			vmAliases, err := readVMAliases(v)
+			vmAliases, err := getVMAliases(v)
 			if len(test.errMessage) > 0 {
 				assert.Error(err)
 				assert.Contains(err.Error(), test.errMessage)
@@ -267,7 +267,7 @@ func TestReadVMAliases(t *testing.T) {
 	}
 }
 
-func TestReadVMAliasesDefaultDir(t *testing.T) {
+func TestGetVMAliasesDefaultDir(t *testing.T) {
 	assert := assert.New(t)
 	root := t.TempDir()
 	// changes internal package variable, since using defaultDir (under user home) is risky.
@@ -278,7 +278,7 @@ func TestReadVMAliasesDefaultDir(t *testing.T) {
 	assert.Equal(defaultVMAliasFilePath, v.GetString(VMAliasesFileKey))
 
 	setupFile(t, root, "aliases.json", `{"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": ["vm1","vm2"]}`)
-	vmAliases, err := readVMAliases(v)
+	vmAliases, err := getVMAliases(v)
 	assert.NoError(err)
 
 	expected := map[ids.ID][]string{}
@@ -287,7 +287,7 @@ func TestReadVMAliasesDefaultDir(t *testing.T) {
 	assert.Equal(expected, vmAliases)
 }
 
-func TestReadVMAliasesDirNotExists(t *testing.T) {
+func TestGetVMAliasesDirNotExists(t *testing.T) {
 	assert := assert.New(t)
 	root := t.TempDir()
 	aliasPath := "/not/exists"
@@ -295,7 +295,7 @@ func TestReadVMAliasesDirNotExists(t *testing.T) {
 	configJSON := fmt.Sprintf(`{%q: %q}`, VMAliasesFileKey, aliasPath)
 	configFilePath := setupConfigJSON(t, root, configJSON)
 	v := setupViper(configFilePath)
-	vmAliases, err := readVMAliases(v)
+	vmAliases, err := getVMAliases(v)
 	assert.Nil(vmAliases)
 	assert.Error(err)
 	assert.Contains(err.Error(), "vm alias file does not exist")
@@ -304,7 +304,7 @@ func TestReadVMAliasesDirNotExists(t *testing.T) {
 	configJSON = "{}"
 	configFilePath = setupConfigJSON(t, root, configJSON)
 	v = setupViper(configFilePath)
-	vmAliases, err = readVMAliases(v)
+	vmAliases, err = getVMAliases(v)
 	assert.Nil(vmAliases)
 	assert.NoError(err)
 }

@@ -112,16 +112,12 @@ func (a *App) Start() int {
 	}
 	// TODO: disable crypto verification
 
-	if err := a.config.ConsensusParams.Valid(); err != nil {
-		a.log.Fatal("consensus parameters are invalid: %s", err)
-		return 1
-	}
-
 	// Track if assertions should be executed
 	if a.config.LoggingConfig.Assertions {
 		a.log.Debug("assertions are enabled. This may slow down execution")
 	}
 
+	// TODO move this to config
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
 	if a.config.AttemptedNATTraversal && !a.config.Nat.SupportsNAT() {
@@ -133,15 +129,15 @@ func (a *App) Start() int {
 	defer mapper.UnmapAllPorts()
 
 	// Open staking port we want for NAT Traversal to have the external port
-	// (config.StakingIP.Port) to connect to our internal listening port
+	// (config.IP.Port) to connect to our internal listening port
 	// (config.InternalStakingPort) which should be the same in most cases.
-	if a.config.StakingIP.IP().Port != 0 {
+	if a.config.IP.IP().Port != 0 {
 		mapper.Map(
 			"TCP",
-			a.config.StakingIP.IP().Port,
-			a.config.StakingIP.IP().Port,
+			a.config.IP.IP().Port,
+			a.config.IP.IP().Port,
 			stakingPortName,
-			&a.config.StakingIP,
+			&a.config.IP,
 			a.config.DynamicUpdateDuration,
 		)
 	}
@@ -165,7 +161,7 @@ func (a *App) Start() int {
 		a.config.DynamicPublicIPResolver,
 		a.config.DynamicUpdateDuration,
 		a.log,
-		&a.config.StakingIP,
+		&a.config.IP,
 	)
 	defer externalIPUpdater.Stop()
 

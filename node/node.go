@@ -153,17 +153,17 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingIP.Port))
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.IP.Port))
 	if err != nil {
 		return err
 	}
 
 	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
 	if err != nil {
-		n.Log.Info("this node's IP is set to: %q", n.Config.StakingIP.IP())
+		n.Log.Info("this node's IP is set to: %q", n.Config.IP.IP())
 	} else {
 		ipDesc = utils.IPDesc{
-			IP:   n.Config.StakingIP.IP().IP,
+			IP:   n.Config.IP.IP().IP,
 			Port: ipDesc.Port,
 		}
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
@@ -259,7 +259,7 @@ func (n *Node) initNetworking() error {
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
-		n.Config.StakingIP,
+		n.Config.IP,
 		n.Config.NetworkID,
 		versionManager,
 		version.NewDefaultApplicationParser(),
@@ -273,14 +273,14 @@ func (n *Node) initNetworking() error {
 		n.Config.NetworkConfig.InboundConnThrottlerConfig,
 		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
-		n.Config.PeerAliasTimeout,
+		n.Config.NetworkConfig.PeerAliasTimeout,
 		tlsKey,
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
-		n.Config.CompressionEnabled,
+		n.Config.NetworkConfig.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
 	)
@@ -371,7 +371,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peerIP := range n.Config.BootstrapIPs {
-		if !peerIP.Equal(n.Config.StakingIP.IP()) {
+		if !peerIP.Equal(n.Config.IP.IP()) {
 			n.Net.TrackIP(peerIP)
 		}
 	}

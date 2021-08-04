@@ -21,59 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 )
 
-// Config contains all of the configurations of an Avalanche node.
-type Config struct {
-	genesis.Params
+type IPCConfig struct {
+	IPCPath            string
+	IPCDefaultChainIDs []string
+}
 
-	// Genesis information
-	GenesisBytes []byte
-	AvaxAssetID  ids.ID
-
-	// protocol to use for opening the network interface
-	Nat nat.Router
-
-	// Attempted NAT Traversal did we attempt
-	AttemptedNATTraversal bool
-
-	// ID of the network this node should connect to
-	NetworkID uint32
-
-	// Assertions configuration
-	EnableAssertions bool
-
-	// Crypto configuration
-	EnableCrypto bool
-
-	// Path to database
-	DBPath string
-
-	// Name of the database type to use
-	DBName string
-
-	// Staking configuration
-	StakingIP             utils.DynamicIPDesc
-	EnableStaking         bool
-	StakingTLSCert        tls.Certificate
-	DisabledStakingWeight uint64
-
-	// Health
-	HealthCheckFreq time.Duration
-
-	// Network configuration
-	NetworkConfig      network.Config
-	PeerListSize       uint32
-	PeerListGossipSize uint32
-	PeerListGossipFreq time.Duration
-	CompressionEnabled bool
-
-	// Benchlist Configuration
-	BenchlistConfig benchlist.Config
-
-	// Bootstrapping configuration
-	BootstrapIDs []ids.ShortID
-	BootstrapIPs []utils.IPDesc
-
-	// HTTP configuration
+type APIConfig struct {
 	HTTPHost string
 	HTTPPort uint16
 
@@ -91,6 +44,86 @@ type Config struct {
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
 	IndexAPIEnabled    bool
+	IPCAPIEnabled      bool
+}
+
+type PeerListGossipConfig struct {
+	PeerListSize       uint32
+	PeerListGossipSize uint32
+	PeerListGossipFreq time.Duration
+}
+
+type ConsensusGossipConfig struct {
+	// Gossip a container in the accepted frontier every [ConsensusGossipFrequency]
+	ConsensusGossipFrequency time.Duration
+	// Number of peers to gossip to when gossiping accepted frontier
+	ConsensusGossipAcceptedFrontierSize uint
+	// Number of peers to gossip each accepted container to
+	ConsensusGossipOnAcceptSize uint
+}
+
+type GossipConfig struct {
+	PeerListGossipConfig
+	ConsensusGossipConfig
+}
+
+// TODO do we need all these fields?
+type IPConfig struct {
+	IP utils.DynamicIPDesc
+	// True if we attempted NAT Traversal
+	AttemptedNATTraversal bool
+	// Tries to perform network address translation
+	Nat nat.Router
+	// Dynamic Update duration for IP or NAT traversal
+	DynamicUpdateDuration time.Duration
+	// Tries to resolve our IP from an external source
+	DynamicPublicIPResolver dynamicip.Resolver
+}
+
+// Config contains all of the configurations of an Avalanche node.
+type Config struct {
+	genesis.Params
+	APIConfig
+	IPCConfig
+	GossipConfig
+	IPConfig
+
+	// Genesis information
+	GenesisBytes []byte
+	AvaxAssetID  ids.ID
+
+	// ID of the network this node should connect to
+	NetworkID uint32
+
+	// Assertions configuration
+	EnableAssertions bool
+
+	// Crypto configuration
+	EnableCrypto bool
+
+	// Path to database
+	DBPath string
+
+	// Name of the database type to use
+	DBName string
+
+	// Staking configuration
+	EnableStaking         bool
+	StakingTLSCert        tls.Certificate
+	DisabledStakingWeight uint64
+
+	// Health
+	HealthCheckFreq time.Duration
+
+	// Network configuration
+	NetworkConfig network.Config
+
+	// Benchlist Configuration
+	BenchlistConfig benchlist.Config
+
+	// Bootstrapping configuration
+	BootstrapIDs []ids.ShortID
+	BootstrapIPs []utils.IPDesc
 
 	// Profiling configurations
 	ProfilerConfig profiler.Config
@@ -105,9 +138,7 @@ type Config struct {
 	ConsensusParams avalanche.Parameters
 
 	// IPC configuration
-	IPCAPIEnabled      bool
-	IPCPath            string
-	IPCDefaultChainIDs []string
+	IPCAPIEnabled bool
 
 	// Metrics
 	MeterVMEnabled bool
@@ -116,16 +147,6 @@ type Config struct {
 	ConsensusRouter          router.Router
 	RouterHealthConfig       router.HealthConfig
 	ConsensusShutdownTimeout time.Duration
-	ConsensusGossipFrequency time.Duration
-	// Number of peers to gossip to when gossiping accepted frontier
-	ConsensusGossipAcceptedFrontierSize uint
-	// Number of peers to gossip each accepted container to
-	ConsensusGossipOnAcceptSize uint
-
-	// Dynamic Update duration for IP or NAT traversal
-	DynamicUpdateDuration time.Duration
-
-	DynamicPublicIPResolver dynamicip.Resolver
 
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
@@ -147,9 +168,6 @@ type Config struct {
 	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
 	BootstrapMultiputMaxContainersReceived int
-
-	// Peer alias configuration
-	PeerAliasTimeout time.Duration
 
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig

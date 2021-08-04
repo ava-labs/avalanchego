@@ -243,7 +243,10 @@ type Config struct {
 	timer.AdaptiveTimeoutConfig
 	DialerConfig dialer.Config
 	// [Registerer] is set in node's initMetricsAPI method
-	MetricsRegisterer prometheus.Registerer
+	MetricsRegisterer  prometheus.Registerer
+	CompressionEnabled bool
+	// Peer alias configuration
+	PeerAliasTimeout time.Duration
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
