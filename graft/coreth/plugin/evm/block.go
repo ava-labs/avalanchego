@@ -16,13 +16,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
-var (
-	bonusBlocks = ids.Set{}
-)
+var bonusBlocks = ids.Set{}
 
 func init() {
 	blockIDStrs := []string{
@@ -173,14 +169,8 @@ func (b *Block) Status() choices.Status {
 }
 
 // Parent implements the snowman.Block interface
-func (b *Block) Parent() snowman.Block {
-	parentID := ids.ID(b.ethBlock.ParentHash())
-	parentBlk, err := b.vm.GetBlockInternal(parentID)
-	if err != nil {
-		return &missing.Block{BlkID: parentID}
-	}
-
-	return parentBlk
+func (b *Block) Parent() ids.ID {
+	return ids.ID(b.ethBlock.ParentHash())
 }
 
 // Height implements the snowman.Block interface
@@ -217,9 +207,13 @@ func (b *Block) verify(writes bool) error {
 
 	vm := b.vm
 
-	ancestorIntf := b.Parent()
 	// Ensure that the parent was verified and inserted correctly.
-	ancestorID := ancestorIntf.ID()
+	ancestorID := b.Parent()
+	ancestorIntf, err := b.vm.GetBlockInternal(ancestorID)
+	if err != nil {
+		return err
+	}
+
 	ancestorHash := common.Hash(ancestorID)
 	if !vm.chain.BlockChain().HasBlock(ancestorHash, b.Height()-1) {
 		return errRejectedParent

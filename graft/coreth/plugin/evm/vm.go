@@ -827,7 +827,10 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 		}
 
 		// Move up the chain.
-		nextAncestorIntf := ancestor.Parent()
+		nextAncestorIntf, err := vm.GetBlockInternal(ancestor.Parent())
+		if err != nil {
+			return err
+		}
 		// If the ancestor is unknown, then the parent failed
 		// verification when it was called.
 		// If the ancestor is rejected, then this block shouldn't be

@@ -132,10 +132,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.NewDefaultVersion(1, 4, 5)))
-	if err != nil {
-		t.Fatal(err)
-	}
+	userKeystore := keystore.New(logging.NoLog{}, manager.NewMemDB(version.NewDefaultVersion(1, 4, 5)))
 	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -601,7 +598,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected refreshed blk2 to be Accepted, but found status: %s", status)
 	}
 
-	blk1Refreshed := blk2Refreshed.Parent()
+	blk1RefreshedID := blk2Refreshed.Parent()
+	blk1Refreshed, err := vm.GetBlockInternal(blk1RefreshedID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if status := blk1Refreshed.Status(); status != choices.Accepted {
 		t.Fatalf("Expected refreshed blk1 to be Accepted, but found status: %s", status)
 	}
@@ -714,7 +715,7 @@ func TestConflictingImportTxs(t *testing.T) {
 			t.Fatalf("Expected status of built block %d to be %s, but found %s", i, choices.Processing, status)
 		}
 
-		if parentID := blk.Parent().ID(); parentID != expectedParentBlkID {
+		if parentID := blk.Parent(); parentID != expectedParentBlkID {
 			t.Fatalf("Expected parent to have blockID %s, but found %s", expectedParentBlkID, parentID)
 		}
 
