@@ -94,7 +94,7 @@ var (
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
 		TxFee:                 units.MilliAvax,
-		CreateAssetTxFee:      10 * units.MilliAvax,
+		CreateAssetTxFee:      units.MilliAvax,
 		CreateSubnetTxFee:     100 * units.MilliAvax,
 		CreateBlockchainTxFee: 100 * units.MilliAvax,
 		UptimeRequirement:     .6, // 60%
