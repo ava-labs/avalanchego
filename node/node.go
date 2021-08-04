@@ -284,6 +284,7 @@ func (n *Node) initNetworking() error {
 		n.Config.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
+		n.Config.WhitelistedSubnets,
 	)
 	return err
 }

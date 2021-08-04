@@ -38,7 +38,7 @@ type ExternalSenderTest struct {
 	PullQueryF func(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
 	ChitsF     func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
-	GossipF func(chainID ids.ID, containerID ids.ID, container []byte)
+	GossipF func(subnetID, chainID, containerID ids.ID, container []byte)
 }
 
 // Default set the default callable value to [cant]
@@ -225,10 +225,10 @@ func (s *ExternalSenderTest) Chits(vdr ids.ShortID, chainID ids.ID, requestID ui
 // Gossip calls GossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) Gossip(chainID ids.ID, containerID ids.ID, container []byte) {
+func (s *ExternalSenderTest) Gossip(subnetID, chainID ids.ID, containerID ids.ID, container []byte) {
 	switch {
 	case s.GossipF != nil:
-		s.GossipF(chainID, containerID, container)
+		s.GossipF(subnetID, chainID, containerID, container)
 	case s.CantGossip && s.T != nil:
 		s.T.Fatalf("Unexpectedly called Gossip")
 	case s.CantGossip && s.B != nil:

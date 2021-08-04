@@ -341,7 +341,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net)
@@ -477,7 +477,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -511,7 +511,7 @@ func TestEstablishConnection(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -658,7 +658,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -692,7 +692,7 @@ func TestDoubleTrack(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -840,7 +840,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -874,7 +874,7 @@ func TestDoubleClose(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1027,7 +1027,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1061,7 +1061,7 @@ func TestTrackConnected(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1188,7 +1188,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1222,7 +1222,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1480,7 +1480,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1514,7 +1514,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1548,7 +1548,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -1582,7 +1582,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net3)
@@ -1937,7 +1937,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1971,7 +1971,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -2005,7 +2005,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -2039,7 +2039,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net3)
@@ -2310,7 +2310,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -2344,7 +2344,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -2378,7 +2378,7 @@ func TestPeerSignature(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -2756,7 +2756,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -2790,7 +2790,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)

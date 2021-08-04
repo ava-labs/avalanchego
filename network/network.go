@@ -234,6 +234,9 @@ type network struct {
 
 	// Rate-limits outgoing messages
 	outboundMsgThrottler throttling.OutboundMsgThrottler
+
+	// WhitelistedSubnets of the node
+	whitelistedSubnets ids.Set
 }
 
 type Config struct {
@@ -279,6 +282,7 @@ func NewDefaultNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	whitelistedSubnets ids.Set,
 ) (Network, error) {
 	return NewNetwork(
 		namespace,
@@ -321,6 +325,7 @@ func NewDefaultNetwork(
 		compressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
+		whitelistedSubnets,
 	)
 }
 
@@ -366,6 +371,7 @@ func NewNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	whitelistedSubnets ids.Set,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
@@ -422,6 +428,7 @@ func NewNetwork(
 		compressionEnabled:   compressionEnabled,
 		inboundMsgThrottler:  inboundMsgThrottler,
 		outboundMsgThrottler: outboundMsgThrottler,
+		whitelistedSubnets:   whitelistedSubnets,
 	}
 	codec, err := message.NewCodecWithAllocator(
 		fmt.Sprintf("%s_codec", namespace),
@@ -875,8 +882,8 @@ func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, vo
 
 // Gossip attempts to gossip the container to the network
 // Assumes [n.stateLock] is not held.
-func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
+func (n *network) Gossip(subnetID, chainID, containerID ids.ID, container []byte) {
+	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -889,7 +896,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
+	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -1103,7 +1110,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
+func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
 	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
@@ -1118,7 +1125,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	allPeers := n.getAllPeers()
+	allPeers := n.getAllPeers(subnetID)
 
 	if int(numToGossip) > len(allPeers) {
 		numToGossip = uint(len(allPeers))
@@ -1199,7 +1206,7 @@ func (n *network) gossipPeerList() {
 			return
 		}
 
-		allPeers := n.getAllPeers()
+		allPeers := n.getAllPeers(constants.PrimaryNetworkID)
 		if len(allPeers) == 0 {
 			continue
 		}
@@ -1632,7 +1639,6 @@ func (n *network) disconnected(p *peer) {
 	defer p.net.stateLock.Unlock()
 
 	ip := p.getIP()
-
 	n.log.Debug("disconnected from %s at %s", p.nodeID, ip)
 
 	n.peers.remove(p)
@@ -1696,7 +1702,7 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
 // Returns a copy of the peer set.
 // Only includes peers that have finished the handshake.
 // Assumes [n.stateLock] is not held.
-func (n *network) getAllPeers() []*peer {
+func (n *network) getAllPeers(subnetID ids.ID) []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1706,7 +1712,7 @@ func (n *network) getAllPeers() []*peer {
 
 	peers := make([]*peer, 0, n.peers.size())
 	for _, peer := range n.peers.peersList {
-		if peer.finishedHandshake.GetValue() {
+		if peer.finishedHandshake.GetValue() && peer.trackedSubnets.Contains(subnetID) {
 			peers = append(peers, peer)
 		}
 	}
