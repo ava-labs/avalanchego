@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
@@ -16,11 +17,12 @@ import (
 )
 
 var (
-	InitialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
-	MaxGasPrice    = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	MinGasPrice    = big.NewInt(params.ApricotPhase3MinBaseFee)
-	TargetGas      = uint64(24_000_000)
-	BlockGasFee    = uint64(500_000)
+	InitialBaseFee        = big.NewInt(params.ApricotPhase3InitialBaseFee)
+	MaxGasPrice           = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	MinGasPrice           = big.NewInt(params.ApricotPhase3MinBaseFee)
+	TargetGas             = uint64(12_000_000)
+	BlockGasFee           = uint64(500_000)
+	rollupWindow   uint64 = 10
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
@@ -38,16 +40,16 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		return nil, nil, fmt.Errorf("expected length of parent extra data to be %d, but found %d", params.ApricotPhase3ExtraDataSize, len(parent.Extra))
 	}
 
+	if timestamp < parent.Time {
+		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp (%d) prior to parent timestamp (%d)", timestamp, parent.Time)
+	}
 	roll := timestamp - parent.Time
+
 	// roll the window over by the difference between the timestamps to generate
 	// the new rollup window.
-	// 8 is the size of a long
 	newRollupWindow, err := rollLongWindow(parent.Extra, int(roll))
 	if err != nil {
 		return nil, nil, err
-	}
-	if len(newRollupWindow) != params.ApricotPhase3ExtraDataSize {
-		return nil, nil, fmt.Errorf("expected length of new rollup window to be %d, but found %d", params.ApricotPhase3ExtraDataSize, len(parent.Extra))
 	}
 
 	var (
@@ -60,24 +62,18 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// Add in the gas used by the parent block in the correct place
 	// If the parent consumed gas within the rollup window, add the consumed
 	// gas in.
-	if roll < 10 {
-		slot := 9 - roll
-		start := slot * 8
-		prevGasConsumed := binary.BigEndian.Uint64(newRollupWindow[start:])
-		// Count gas consumed as the previous gas consumed + parent block gas consumed
-		// + BlockGasFee to charge for the block itself.
-		gasConsumed := prevGasConsumed + parent.GasUsed + BlockGasFee
-		binary.BigEndian.PutUint64(newRollupWindow[start:], gasConsumed)
-		log.Info("stats", "gasConsumed", gasConsumed, "prevGasConsumed", prevGasConsumed, "parentGasUsed", parent.GasUsed, "BlockGasFee", BlockGasFee)
+	if roll < rollupWindow {
+		addedGas, overflow := math.SafeAdd(parent.GasUsed, BlockGasFee)
+		if overflow {
+			addedGas = math.MaxUint64
+		}
+		slot := rollupWindow - 1 - roll
+		start := slot * wrappers.LongLen
+		updateLongWindow(newRollupWindow, start, addedGas)
 	}
 
-	// Sum the rollup window
-	// If there are a large number of blocks in the same 10s window, this will cause more
-	// state transitions and push the base fee up more.
-	totalGas := uint64(0)
-	for i := 0; i < 10; i++ {
-		totalGas += binary.BigEndian.Uint64(newRollupWindow[8*i:])
-	}
+	// Calculate the amount of gas consumed within the rollup window.
+	totalGas := sumLongWindow(newRollupWindow, int(rollupWindow))
 
 	if totalGas == TargetGas {
 		return newRollupWindow, baseFee, nil
@@ -103,12 +99,14 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		y := x.Div(x, parentGasTargetBig)
 		baseFeeDelta := x.Div(y, baseFeeChangeDenominator)
 
-		// If [roll] is greater than 10, apply the state transition to the base fee to account
+		// If [roll] is greater than [rollupWindow], apply the state transition to the base fee to account
 		// for the interval during which no blocks were produced.
-		// We use roll/10, so that the transition is applied for every 10s that elapsed between
-		// the parent and this block.
-		if roll > 10 {
-			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/10))
+		// We use roll/rollupWindow, so that the transition is applied for every [rollupWindow] seconds
+		// that has elapsed between the parent and this block.
+		if roll > rollupWindow {
+			// TODO(aaronbuchwald) add something to dampen this here to make high prices a little stickier
+			// in the case of a quiescent network.
+			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/rollupWindow))
 		}
 		baseFee = math.BigMax(baseFee.Sub(baseFee, baseFeeDelta), MinGasPrice)
 	}
@@ -149,7 +147,39 @@ func rollWindow(consumptionWindow []byte, size, roll int) ([]byte, error) {
 }
 
 func rollLongWindow(consumptionWindow []byte, roll int) ([]byte, error) {
-	// Passes in [8] as the size of the individual value to be rolled over
-	// so that it can be used to roll an array of long values (8 bytes).
-	return rollWindow(consumptionWindow, 8, roll)
+	// Passes in [wrappers.LongLen] as the size of the individual value to be rolled over
+	// so that it can be used to roll an array of long values.
+	return rollWindow(consumptionWindow, wrappers.LongLen, roll)
+}
+
+// sumLongWindow sums [numLongs] encoded in [window]. Assumes that the length of [window]
+// is sufficient to contain [numLongs] or else this function panics.
+// If an overflow occurs, while summing the contents, the maximum uint64 value is returned.
+func sumLongWindow(window []byte, numLongs int) uint64 {
+	var (
+		sum      uint64 = 0
+		overflow bool
+	)
+	for i := 0; i < numLongs; i++ {
+		sum, overflow = math.SafeAdd(sum, binary.BigEndian.Uint64(window[wrappers.LongLen*i:]))
+		if overflow {
+			return math.MaxUint64
+		}
+	}
+	return sum
+}
+
+// updateLongWindow adds [gasConsumed] in at index within [window].
+// Assumes that [index] has already been validated.
+// If an overflow occurs, the maximum uint64 value is used.
+func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
+	prevGasConsumed := binary.BigEndian.Uint64(window[start:])
+
+	totalGasConsumed, overflow := math.SafeAdd(prevGasConsumed, gasConsumed)
+	if overflow {
+		totalGasConsumed = math.MaxUint64
+	}
+	binary.BigEndian.PutUint64(window[start:], totalGasConsumed)
+	// TODO(aaronbuchwald) remove overly verbose log
+	log.Info("stats", "prevGasConsumed", prevGasConsumed, "parentGasConsumed", gasConsumed, "BlockGasFee", BlockGasFee, "totalGasConsumed", totalGasConsumed)
 }

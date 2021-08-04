@@ -62,7 +62,7 @@ var (
 		MuirGlacierBlock:            big.NewInt(0),
 		ApricotPhase1BlockTimestamp: big.NewInt(1617199200), // 10am EST 3/31/2021
 		ApricotPhase2BlockTimestamp: big.NewInt(1620644400), // 10am EST 5/10/2021
-		// TODO(aaronbuchwald) schedule Apricot Phase 3 + Apricot Phase 4
+		// TODO(aaronbuchwald) schedule Apricot Phase 3
 	}
 
 	// AvalancheFujiChainConfig is the configuration for the Fuji Test Network
@@ -82,7 +82,7 @@ var (
 		MuirGlacierBlock:            big.NewInt(0),
 		ApricotPhase1BlockTimestamp: big.NewInt(1616767200), // 10am EST 3/26/2021
 		ApricotPhase2BlockTimestamp: big.NewInt(1620223200), // 10am EST 5/5/2021
-		// TODO(aaronbuchwald) schedule Apricot Phase 3 + Apricot Phase 4
+		// TODO(aaronbuchwald) schedule Apricot Phase 3
 	}
 
 	TestChainConfig            = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
