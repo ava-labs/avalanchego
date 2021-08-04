@@ -446,7 +446,7 @@ func NewNetwork(
 
 // GetAcceptedFrontier implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) GetAcceptedFrontier(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
+func (n *network) GetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
 	n.log.AssertNoError(err)
 	msgLen := len(msg.Bytes())
@@ -465,7 +465,6 @@ func (n *network) GetAcceptedFrontier(nodeIDs ids.ShortSet, subnetID, chainID id
 			n.sendFailRateCalculator.Observe(1, now)
 		} else {
 			sentTo = append(sentTo, nodeID)
-			peer.addTracked(subnetID)
 			n.getAcceptedFrontier.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.getAcceptedFrontier.sentBytes.Add(float64(msgLen))
@@ -480,7 +479,7 @@ func (n *network) GetAcceptedFrontier(nodeIDs ids.ShortSet, subnetID, chainID id
 
 // AcceptedFrontier implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) AcceptedFrontier(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (n *network) AcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -505,7 +504,6 @@ func (n *network) AcceptedFrontier(nodeID ids.ShortID, subnetID, chainID ids.ID,
 		n.acceptedFrontier.numFailed.Inc()
 		n.sendFailRateCalculator.Observe(1, now)
 	} else {
-		peer.addTracked(subnetID)
 		n.acceptedFrontier.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
 		n.acceptedFrontier.sentBytes.Add(float64(msgLen))
@@ -518,7 +516,7 @@ func (n *network) AcceptedFrontier(nodeID ids.ShortID, subnetID, chainID ids.ID,
 
 // GetAccepted implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) GetAccepted(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+func (n *network) GetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
 	now := n.clock.Time()
 
 	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
@@ -546,7 +544,6 @@ func (n *network) GetAccepted(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, re
 			n.getAccepted.numFailed.Inc()
 			n.sendFailRateCalculator.Observe(1, now)
 		} else {
-			peer.addTracked(subnetID)
 			n.getAccepted.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.getAccepted.sentBytes.Add(float64(msgLen))
@@ -562,7 +559,7 @@ func (n *network) GetAccepted(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, re
 
 // Accepted implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) Accepted(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (n *network) Accepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
 	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
@@ -587,7 +584,6 @@ func (n *network) Accepted(nodeID ids.ShortID, subnetID, chainID ids.ID, request
 		n.accepted.numFailed.Inc()
 		n.sendFailRateCalculator.Observe(1, now)
 	} else {
-		peer.addTracked(subnetID)
 		n.sendFailRateCalculator.Observe(0, now)
 		n.accepted.numSent.Inc()
 		n.accepted.sentBytes.Add(float64(msgLen))
@@ -600,7 +596,7 @@ func (n *network) Accepted(nodeID ids.ShortID, subnetID, chainID ids.ID, request
 
 // GetAncestors implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) GetAncestors(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+func (n *network) GetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -623,7 +619,6 @@ func (n *network) GetAncestors(nodeID ids.ShortID, subnetID, chainID ids.ID, req
 		n.sendFailRateCalculator.Observe(1, now)
 		return false
 	}
-	peer.addTracked(subnetID)
 	n.getAncestors.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
 	n.getAncestors.sentBytes.Add(float64(msgLen))
@@ -636,7 +631,7 @@ func (n *network) GetAncestors(nodeID ids.ShortID, subnetID, chainID ids.ID, req
 
 // MultiPut implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) MultiPut(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID uint32, containers [][]byte) {
+func (n *network) MultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -660,7 +655,6 @@ func (n *network) MultiPut(nodeID ids.ShortID, subnetID, chainID ids.ID, request
 		n.multiPut.numFailed.Inc()
 		n.sendFailRateCalculator.Observe(1, now)
 	} else {
-		peer.addTracked(subnetID)
 		n.multiPut.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
 		n.multiPut.sentBytes.Add(float64(msgLen))
@@ -673,7 +667,7 @@ func (n *network) MultiPut(nodeID ids.ShortID, subnetID, chainID ids.ID, request
 
 // Get implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) Get(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+func (n *network) Get(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
 	now := n.clock.Time()
 
 	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
@@ -691,7 +685,6 @@ func (n *network) Get(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID ui
 		n.sendFailRateCalculator.Observe(1, now)
 		return false
 	}
-	peer.addTracked(subnetID)
 	n.get.numSent.Inc()
 	n.sendFailRateCalculator.Observe(0, now)
 	n.get.sentBytes.Add(float64(msgLen))
@@ -704,7 +697,7 @@ func (n *network) Get(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID ui
 
 // Put implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) Put(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+func (n *network) Put(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -734,7 +727,6 @@ func (n *network) Put(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID ui
 		n.put.numFailed.Inc()
 		n.sendFailRateCalculator.Observe(1, now)
 	} else {
-		peer.addTracked(subnetID)
 		n.put.numSent.Inc()
 		n.sendFailRateCalculator.Observe(0, now)
 		n.put.sentBytes.Add(float64(msgLen))
@@ -747,7 +739,7 @@ func (n *network) Put(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID ui
 
 // PushQuery implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) PushQuery(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
+func (n *network) PushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
 	now := n.clock.Time()
 
 	msgWithIsCompressedFlag, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, true, n.compressionEnabled)
@@ -797,7 +789,6 @@ func (n *network) PushQuery(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requ
 			n.sendFailRateCalculator.Observe(1, now)
 		} else {
 			sentTo = append(sentTo, vID)
-			peer.addTracked(subnetID)
 			n.pushQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.pushQuery.sentBytes.Add(float64(len(msg.Bytes())))
@@ -812,7 +803,7 @@ func (n *network) PushQuery(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requ
 
 // PullQuery implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) PullQuery(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
+func (n *network) PullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
 	now := n.clock.Time()
 
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
@@ -833,7 +824,6 @@ func (n *network) PullQuery(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requ
 			n.sendFailRateCalculator.Observe(1, now)
 		} else {
 			sentTo = append(sentTo, vID)
-			peer.addTracked(subnetID)
 			n.pullQuery.numSent.Inc()
 			n.sendFailRateCalculator.Observe(0, now)
 			n.pullQuery.sentBytes.Add(float64(msgLen))
@@ -848,7 +838,7 @@ func (n *network) PullQuery(nodeIDs ids.ShortSet, subnetID, chainID ids.ID, requ
 
 // Chits implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) Chits(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID uint32, votes []ids.ID) {
+func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -873,7 +863,6 @@ func (n *network) Chits(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID 
 		n.chits.numFailed.Inc()
 		n.sendFailRateCalculator.Observe(1, now)
 	} else {
-		peer.addTracked(subnetID)
 		n.sendFailRateCalculator.Observe(0, now)
 		n.chits.numSent.Inc()
 		n.chits.sentBytes.Add(float64(msgLen))
@@ -886,8 +875,8 @@ func (n *network) Chits(nodeID ids.ShortID, subnetID, chainID ids.ID, requestID 
 
 // Gossip attempts to gossip the container to the network
 // Assumes [n.stateLock] is not held.
-func (n *network) Gossip(subnetID, chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
+func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
+	if err := n.gossipContainer(chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -900,7 +889,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
+	return n.gossipContainer(ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -1114,7 +1103,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint) error {
+func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
 	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
@@ -1129,7 +1118,8 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	allPeers := n.getAllPeers(subnetID)
+	allPeers := n.getAllPeers()
+
 	if int(numToGossip) > len(allPeers) {
 		numToGossip = uint(len(allPeers))
 	}
@@ -1209,7 +1199,7 @@ func (n *network) gossipPeerList() {
 			return
 		}
 
-		allPeers := n.getAllPeers(constants.PrimaryNetworkID)
+		allPeers := n.getAllPeers()
 		if len(allPeers) == 0 {
 			continue
 		}
@@ -1706,7 +1696,7 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
 // Returns a copy of the peer set.
 // Only includes peers that have finished the handshake.
 // Assumes [n.stateLock] is not held.
-func (n *network) getAllPeers(subnetID ids.ID) []*peer {
+func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1716,7 +1706,7 @@ func (n *network) getAllPeers(subnetID ids.ID) []*peer {
 
 	peers := make([]*peer, 0, n.peers.size())
 	for _, peer := range n.peers.peersList {
-		if peer.finishedHandshake.GetValue() && peer.isTracked(subnetID) {
+		if peer.finishedHandshake.GetValue() {
 			peers = append(peers, peer)
 		}
 	}

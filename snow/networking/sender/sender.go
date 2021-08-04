@@ -101,7 +101,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	// [sentTo] are the IDs of validators who may receive the message.
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sentTo := s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.SubnetID, s.ctx.ChainID, requestID, timeoutDuration)
+	sentTo := s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
 
 	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
@@ -123,7 +123,7 @@ func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, con
 	if validatorID == s.ctx.NodeID {
 		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
 	} else {
-		s.sender.AcceptedFrontier(validatorID, s.ctx.SubnetID, s.ctx.ChainID, requestID, containerIDs)
+		s.sender.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
 }
 
@@ -155,7 +155,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	// [sentTo] are the IDs of validators who may receive the message.
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sentTo := s.sender.GetAccepted(validatorIDs, s.ctx.SubnetID, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
+	sentTo := s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
 
 	// Tell the router to expect a reply message from these validators
 	for _, validatorID := range sentTo {
@@ -175,7 +175,7 @@ func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerID
 	if validatorID == s.ctx.NodeID {
 		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
 	} else {
-		s.sender.Accepted(validatorID, s.ctx.SubnetID, s.ctx.ChainID, requestID, containerIDs)
+		s.sender.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
 }
 
@@ -199,7 +199,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sent := s.sender.GetAncestors(validatorID, s.ctx.SubnetID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
+	sent := s.sender.GetAncestors(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
 		// Tell the router to expect a reply message from this validator
@@ -215,7 +215,7 @@ func (s *Sender) GetAncestors(validatorID ids.ShortID, requestID uint32, contain
 // The MultiPut message gives the recipient the contents of several containers.
 func (s *Sender) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) {
 	s.ctx.Log.Verbo("Sending MultiPut to validator %s. RequestID: %d. NumContainers: %d", validatorID, requestID, len(containers))
-	s.sender.MultiPut(validatorID, s.ctx.SubnetID, s.ctx.ChainID, requestID, containers)
+	s.sender.MultiPut(validatorID, s.ctx.ChainID, requestID, containers)
 }
 
 // Get sends a Get message to the consensus engine running on the specified
@@ -242,7 +242,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 
 	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sent := s.sender.Get(validatorID, s.ctx.SubnetID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
+	sent := s.sender.Get(validatorID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	if sent {
 		// Tell the router to expect a reply message from this validator
@@ -259,7 +259,7 @@ func (s *Sender) Get(validatorID ids.ShortID, requestID uint32, containerID ids.
 // the contents of the specified container.
 func (s *Sender) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Sending Put to validator %s. RequestID: %d. ContainerID: %s", validatorID, requestID, containerID)
-	s.sender.Put(validatorID, s.ctx.SubnetID, s.ctx.ChainID, requestID, containerID, container)
+	s.sender.Put(validatorID, s.ctx.ChainID, requestID, containerID, container)
 }
 
 // PushQuery sends a PushQuery message to the consensus engines running on the specified chains
@@ -303,7 +303,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.PushQuery(validatorIDs, s.ctx.SubnetID, s.ctx.ChainID, requestID, timeoutDuration, containerID, container)
+	sentTo := s.sender.PushQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID, container)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
@@ -360,7 +360,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Try to send the messages over the network.
 	// [sentTo] are the IDs of validators who may receive the message.
-	sentTo := s.sender.PullQuery(validatorIDs, s.ctx.SubnetID, s.ctx.ChainID, requestID, timeoutDuration, containerID)
+	sentTo := s.sender.PullQuery(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerID)
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
@@ -384,12 +384,12 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID
 	if validatorID == s.ctx.NodeID {
 		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes, nil)
 	} else {
-		s.sender.Chits(validatorID, s.ctx.SubnetID, s.ctx.ChainID, requestID, votes)
+		s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
 	}
 }
 
 // Gossip the provided container
 func (s *Sender) Gossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
-	s.sender.Gossip(s.ctx.SubnetID, s.ctx.ChainID, containerID, container)
+	s.sender.Gossip(s.ctx.ChainID, containerID, container)
 }
