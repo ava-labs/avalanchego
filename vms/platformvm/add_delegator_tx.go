@@ -226,7 +226,14 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		if err != nil {
 			return nil, nil, nil, nil, permError{errStakeOverflow}
 		}
-		canDelegate, err := CanDelegate(currentDelegators, pendingDelegators, tx, currentWeight, maximumWeight)
+		canDelegate, err := CanDelegate(
+			currentDelegators,
+			pendingDelegators,
+			tx,
+			currentWeight,
+			maximumWeight,
+			!currentTimestamp.Before(vm.ApricotPhase3Time),
+		)
 		if err != nil {
 			return nil, nil, nil, nil, permError{err}
 		}
@@ -335,8 +342,9 @@ func CanDelegate(
 	new *UnsignedAddDelegatorTx,
 	currentStake,
 	maximumStake uint64,
+	useHeapCorrectly bool, // TODO: this should be removed after AP3 is live
 ) (bool, error) {
-	maxStake, err := MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+	maxStake, err := MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake, useHeapCorrectly)
 	if err != nil {
 		return false, err
 	}
@@ -353,6 +361,7 @@ func MaxStakeAmount(
 	startTime time.Time,
 	endTime time.Time,
 	currentStake uint64,
+	useHeapCorrectly bool, // TODO: this should be removed after AP3 is live
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
@@ -386,11 +395,14 @@ func MaxStakeAmount(
 				maxStake = currentStake
 			}
 
-			// TODO: in a future network upgrade, this should be changed to:
-			// toRemove := toRemoveHeap.Remove()
-			// So that we don't mangle the underlying heap.
-			toRemove := toRemoveHeap[0]
-			toRemoveHeap = toRemoveHeap[1:]
+			var toRemove *Validator
+			if useHeapCorrectly {
+				toRemove = toRemoveHeap.Remove()
+			} else {
+				// TODO: this should be removed after AP3 is live
+				toRemove = toRemoveHeap[0]
+				toRemoveHeap = toRemoveHeap[1:]
+			}
 
 			currentStake, err = math.Sub64(currentStake, toRemove.Wght)
 			if err != nil {
@@ -418,11 +430,14 @@ func MaxStakeAmount(
 			break
 		}
 
-		// TODO: in a future network upgrade, this should be changed to:
-		// toRemove := toRemoveHeap.Remove()
-		// So that we don't mangle the underlying heap.
-		toRemove := toRemoveHeap[0]
-		toRemoveHeap = toRemoveHeap[1:]
+		var toRemove *Validator
+		if useHeapCorrectly {
+			toRemove = toRemoveHeap.Remove()
+		} else {
+			// TODO: this should be removed after AP3 is live
+			toRemove = toRemoveHeap[0]
+			toRemoveHeap = toRemoveHeap[1:]
+		}
 
 		currentStake, err = math.Sub64(currentStake, toRemove.Wght)
 		if err != nil {
@@ -527,6 +542,10 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 			startTime,
 			endTime,
 			currentWeight,
+			// TODO: this should be removed after AP3 is live
+			// This is only called by the API - so it is safe to be more
+			// restrictive here
+			false,
 		)
 	case database.ErrNotFound:
 		futureValidator, err := pendingStakers.GetValidatorTx(nodeID)
@@ -549,6 +568,10 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 			startTime,
 			endTime,
 			futureValidator.Weight(),
+			// TODO: this should be removed after AP3 is live
+			// This is only called by the API - so it is safe to be more
+			// restrictive here
+			false,
 		)
 	default:
 		return 0, err
