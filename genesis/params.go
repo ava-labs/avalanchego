@@ -9,11 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-type Params struct {
-	// Transaction fee
-	TxFee uint64
-	// Transaction fee for transactions that create new state
-	CreationTxFee uint64
+type StakingConfig struct {
 	// Staking uptime requirements
 	UptimeRequirement float64
 	// Minimum stake, in nAVAX, required to validate the primary network
@@ -34,6 +30,16 @@ type Params struct {
 	MaxStakeDuration time.Duration
 	// StakeMintingPeriod is the amount of time for a consumption period.
 	StakeMintingPeriod time.Duration
+}
+
+type TxFeeConfig struct {
+	// Transaction fee
+	TxFee uint64
+	// Transaction fee for transactions that create new state
+	CreationTxFee uint64
+}
+
+type EpochConfig struct {
 	// EpochFirstTransition is the time that the transition from epoch 0 to 1
 	// should occur.
 	EpochFirstTransition time.Time
@@ -41,15 +47,47 @@ type Params struct {
 	EpochDuration time.Duration
 }
 
-func GetParams(networkID uint32) *Params {
+type Params struct {
+	StakingConfig
+	TxFeeConfig
+	EpochConfig
+}
+
+func GetEpochConfig(networkID uint32) EpochConfig {
 	switch networkID {
 	case constants.MainnetID:
-		return &MainnetParams
+		return MainnetParams.EpochConfig
 	case constants.FujiID:
-		return &FujiParams
+		return FujiParams.EpochConfig
 	case constants.LocalID:
-		return &LocalParams
+		return LocalParams.EpochConfig
 	default:
-		return &LocalParams
+		return LocalParams.EpochConfig
+	}
+}
+
+func GetTxFeeConfig(networkID uint32) TxFeeConfig {
+	switch networkID {
+	case constants.MainnetID:
+		return MainnetParams.TxFeeConfig
+	case constants.FujiID:
+		return FujiParams.TxFeeConfig
+	case constants.LocalID:
+		return LocalParams.TxFeeConfig
+	default:
+		return LocalParams.TxFeeConfig
+	}
+}
+
+func GetStakingConfig(networkID uint32) StakingConfig {
+	switch networkID {
+	case constants.MainnetID:
+		return MainnetParams.StakingConfig
+	case constants.FujiID:
+		return FujiParams.StakingConfig
+	case constants.LocalID:
+		return LocalParams.StakingConfig
+	default:
+		return LocalParams.StakingConfig
 	}
 }

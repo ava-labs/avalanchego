@@ -93,17 +93,23 @@ var (
 
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
-		TxFee:                units.MilliAvax,
-		CreationTxFee:        10 * units.MilliAvax,
-		UptimeRequirement:    .6, // 60%
-		MinValidatorStake:    1 * units.Avax,
-		MaxValidatorStake:    3 * units.MegaAvax,
-		MinDelegatorStake:    1 * units.Avax,
-		MinDelegationFee:     20000, // 2%
-		MinStakeDuration:     24 * time.Hour,
-		MaxStakeDuration:     365 * 24 * time.Hour,
-		StakeMintingPeriod:   365 * 24 * time.Hour,
-		EpochFirstTransition: time.Unix(1607626800, 0),
-		EpochDuration:        5 * time.Minute,
+		TxFeeConfig: TxFeeConfig{
+			TxFee:         units.MilliAvax,
+			CreationTxFee: 10 * units.MilliAvax,
+		},
+		StakingConfig: StakingConfig{
+			UptimeRequirement:  .6, // 60%
+			MinValidatorStake:  1 * units.Avax,
+			MaxValidatorStake:  3 * units.MegaAvax,
+			MinDelegatorStake:  1 * units.Avax,
+			MinDelegationFee:   20000, // 2%
+			MinStakeDuration:   24 * time.Hour,
+			MaxStakeDuration:   365 * 24 * time.Hour,
+			StakeMintingPeriod: 365 * 24 * time.Hour,
+		},
+		EpochConfig: EpochConfig{
+			EpochFirstTransition: time.Unix(1607626800, 0),
+			EpochDuration:        5 * time.Minute,
+		},
 	}
 )

@@ -4,6 +4,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -288,13 +289,45 @@ func getBenchlistConfig(v *viper.Viper, alpha, k int) benchlist.Config {
 	return config
 }
 
-func getBootstrapConfig(v *viper.Viper, nodeConfig *node.Config) {
-	nodeConfig.RetryBootstrap = v.GetBool(RetryBootstrapKey)
-	nodeConfig.RetryBootstrapMaxAttempts = v.GetInt(RetryBootstrapMaxAttemptsKey)
-	nodeConfig.BootstrapBeaconConnectionTimeout = v.GetDuration(BootstrapBeaconConnectionTimeoutKey)
-	nodeConfig.BootstrapMaxTimeGetAncestors = v.GetDuration(BootstrapMaxTimeGetAncestorsKey)
-	nodeConfig.BootstrapMultiputMaxContainersSent = int(v.GetUint(BootstrapMultiputMaxContainersSentKey))
-	nodeConfig.BootstrapMultiputMaxContainersReceived = int(v.GetUint(BootstrapMultiputMaxContainersReceivedKey))
+func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
+	config := node.BootstrapConfig{
+		RetryBootstrap:                         v.GetBool(RetryBootstrapKey),
+		RetryBootstrapMaxAttempts:              v.GetInt(RetryBootstrapMaxAttemptsKey),
+		BootstrapBeaconConnectionTimeout:       v.GetDuration(BootstrapBeaconConnectionTimeoutKey),
+		BootstrapMaxTimeGetAncestors:           v.GetDuration(BootstrapMaxTimeGetAncestorsKey),
+		BootstrapMultiputMaxContainersSent:     int(v.GetUint(BootstrapMultiputMaxContainersSentKey)),
+		BootstrapMultiputMaxContainersReceived: int(v.GetUint(BootstrapMultiputMaxContainersReceivedKey)),
+	}
+
+	bootstrapIPs, bootstrapIDs := genesis.SampleBeacons(networkID, 5)
+	if v.IsSet(BootstrapIPsKey) {
+		bootstrapIPs = strings.Split(v.GetString(BootstrapIPsKey), ",")
+	}
+	for _, ip := range bootstrapIPs {
+		if ip == "" {
+			continue
+		}
+		addr, err := utils.ToIPDesc(ip)
+		if err != nil {
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
+		}
+		config.BootstrapIPs = append(config.BootstrapIPs, addr)
+	}
+
+	if v.IsSet(BootstrapIDsKey) {
+		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
+	}
+	for _, id := range bootstrapIDs {
+		if id == "" {
+			continue
+		}
+		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
+		if err != nil {
+			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
+		}
+		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
+	}
+	return config, nil
 }
 
 func getGossipConfig(v *viper.Viper) (node.GossipConfig, error) {
@@ -373,6 +406,116 @@ func getProfilerConfig(v *viper.Viper) profiler.Config {
 	}
 }
 
+func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
+	if v.GetBool(StakingEphemeralCertEnabledKey) {
+		// Use an ephemeral staking key/cert
+		cert, err := staking.NewTLSCert()
+		if err != nil {
+			return tls.Certificate{}, fmt.Errorf("couldn't generate ephemeral staking key/cert: %w", err)
+		}
+		return *cert, nil
+	}
+
+	// Parse the staking key/cert paths and expand environment variables
+	stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
+	stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
+
+	// If staking key/cert locations are specified but not found, error
+	if v.IsSet(StakingKeyPathKey) || v.IsSet(StakingCertPathKey) {
+		if _, err := os.Stat(stakingKeyPath); os.IsNotExist(err) {
+			return tls.Certificate{}, fmt.Errorf("couldn't find staking key at %s", stakingKeyPath)
+		} else if _, err := os.Stat(stakingCertPath); os.IsNotExist(err) {
+			return tls.Certificate{}, fmt.Errorf("couldn't find staking certificate at %s", stakingCertPath)
+		}
+	} else {
+		// Create the staking key/cert if [stakingKeyPath] and [stakingCertPath] don't exist
+		if err := staking.InitNodeStakingKeyPair(stakingKeyPath, stakingCertPath); err != nil {
+			return tls.Certificate{}, fmt.Errorf("couldn't generate staking key/cert: %w", err)
+		}
+	}
+
+	// Load and parse the staking key/cert
+	cert, err := staking.LoadTLSCert(stakingKeyPath, stakingCertPath)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("problem reading staking certificate: %w", err)
+	}
+	return *cert, nil
+}
+
+func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
+	config := node.StakingConfig{
+		EnableStaking:         v.GetBool(StakingEnabledKey),
+		DisabledStakingWeight: v.GetUint64(StakingDisabledWeightKey),
+	}
+	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
+		return node.StakingConfig{}, errInvalidStakerWeights
+	}
+	var err error
+	config.StakingTLSCert, err = getStakingTLSCert(v)
+	if err != nil {
+		return node.StakingConfig{}, err
+	}
+	if networkID != constants.MainnetID && networkID != constants.FujiID {
+		config.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
+		config.MinValidatorStake = v.GetUint64(MinValidatorStakeKey)
+		config.MaxValidatorStake = v.GetUint64(MaxValidatorStakeKey)
+		config.MinDelegatorStake = v.GetUint64(MinDelegatorStakeKey)
+		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
+		switch {
+		case config.UptimeRequirement < 0:
+			return node.StakingConfig{}, fmt.Errorf("%q must be <= 0", UptimeRequirementKey)
+		case config.MinValidatorStake > config.MaxValidatorStake:
+			return node.StakingConfig{}, errors.New("minimum validator stake can't be greater than maximum validator stake")
+		case config.MinDelegationFee > 1_000_000:
+			return node.StakingConfig{}, errors.New("delegation fee must be in the range [0, 1,000,000]")
+		case config.MinStakeDuration == 0:
+			return node.StakingConfig{}, errors.New("min stake duration can't be zero")
+		case config.MaxStakeDuration < config.MinStakeDuration:
+			return node.StakingConfig{}, errors.New("max stake duration can't be less than min stake duration")
+		case config.StakeMintingPeriod < config.MaxStakeDuration:
+			return node.StakingConfig{}, errors.New("stake minting period can't be less than max stake duration")
+		}
+	} else {
+		config.StakingConfig = genesis.GetStakingConfig(networkID)
+	}
+	return config, nil
+}
+
+func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
+	if networkID != constants.MainnetID && networkID != constants.FujiID {
+		return genesis.TxFeeConfig{
+			TxFee:         v.GetUint64(TxFeeKey),
+			CreationTxFee: v.GetUint64(CreationTxFeeKey),
+		}
+	}
+	return genesis.GetTxFeeConfig(networkID)
+}
+
+func getEpochConfig(v *viper.Viper, networkID uint32) genesis.EpochConfig {
+	if networkID != constants.MainnetID && networkID != constants.FujiID {
+		return genesis.EpochConfig{
+			EpochFirstTransition: time.Unix(v.GetInt64(SnowEpochFirstTransition), 0),
+			EpochDuration:        v.GetDuration(SnowEpochDuration),
+		}
+	}
+	return genesis.GetEpochConfig(networkID)
+}
+
+func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
+	whitelistedSubnetIDs := ids.Set{}
+	whitelistedSubnetIDs.Add(constants.PrimaryNetworkID)
+	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
+		if subnet != "" {
+			subnetID, err := ids.FromString(subnet)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't parse subnetID %qZ: %w", subnet, err)
+			}
+			whitelistedSubnetIDs.Add(subnetID)
+		}
+	}
+	return whitelistedSubnetIDs, nil
+}
+
 func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig := node.Config{}
 
@@ -402,12 +545,11 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// NetworkID
-	networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
+	// Network ID
+	nodeConfig.NetworkID, err = constants.NetworkID(v.GetString(NetworkNameKey))
 	if err != nil {
 		return node.Config{}, err
 	}
-	nodeConfig.NetworkID = networkID
 
 	// Database
 	nodeConfig.DBName = v.GetString(DBTypeKey)
@@ -423,63 +565,15 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Staking
-	nodeConfig.EnableStaking = v.GetBool(StakingEnabledKey)
-	nodeConfig.DisabledStakingWeight = v.GetUint64(StakingDisabledWeightKey)
-	nodeConfig.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
-	nodeConfig.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
-	nodeConfig.StakeMintingPeriod = v.GetDuration(StakeMintingPeriodKey)
-	if !nodeConfig.EnableStaking && nodeConfig.DisabledStakingWeight == 0 {
-		return node.Config{}, errInvalidStakerWeights
-	}
-
-	if v.GetBool(StakingEphemeralCertEnabledKey) {
-		// In fetch only mode or if explicitly set, use an ephemeral staking key/cert
-		cert, err := staking.NewTLSCert()
-		if err != nil {
-			return node.Config{}, fmt.Errorf("couldn't generate ephemeral staking key/cert: %w", err)
-		}
-		nodeConfig.StakingTLSCert = *cert
-	} else {
-		// Parse the staking key/cert paths
-		stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
-		stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
-
-		switch {
-		// If staking key/cert locations are specified but not found, error
-		case v.IsSet(StakingKeyPathKey) || v.IsSet(StakingCertPathKey):
-			if _, err := os.Stat(stakingKeyPath); os.IsNotExist(err) {
-				return node.Config{}, fmt.Errorf("couldn't find staking key at %s", stakingKeyPath)
-			} else if _, err := os.Stat(stakingCertPath); os.IsNotExist(err) {
-				return node.Config{}, fmt.Errorf("couldn't find staking certificate at %s", stakingCertPath)
-			}
-		default:
-			// Create the staking key/cert if [stakingKeyPath] doesn't exist
-			if err := staking.InitNodeStakingKeyPair(stakingKeyPath, stakingCertPath); err != nil {
-				return node.Config{}, fmt.Errorf("couldn't generate staking key/cert: %w", err)
-			}
-		}
-
-		// Load and parse the staking key/cert
-		cert, err := staking.LoadTLSCert(stakingKeyPath, stakingCertPath)
-		if err != nil {
-			return node.Config{}, fmt.Errorf("problem reading staking certificate: %w", err)
-		}
-		nodeConfig.StakingTLSCert = *cert
-	}
-
-	if err := getBootstrapPeers(v, &nodeConfig); err != nil {
+	nodeConfig.StakingConfig, err = getStakingConfig(v, nodeConfig.NetworkID)
+	if err != nil {
 		return node.Config{}, err
 	}
 
-	nodeConfig.WhitelistedSubnets.Add(constants.PrimaryNetworkID)
-	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
-		if subnet != "" {
-			subnetID, err := ids.FromString(subnet)
-			if err != nil {
-				return node.Config{}, fmt.Errorf("couldn't parse subnetID %s: %w", subnet, err)
-			}
-			nodeConfig.WhitelistedSubnets.Add(subnetID)
-		}
+	// Whitelisted Subnets
+	nodeConfig.WhitelistedSubnets, err = getWhitelistedSubnets(v)
+	if err != nil {
+		return node.Config{}, err
 	}
 
 	// HTTP APIs
@@ -524,51 +618,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
 	}
 
-	// Network Parameters
-	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		txFee := v.GetUint64(TxFeeKey)
-		creationTxFee := v.GetUint64(CreationTxFeeKey)
-		uptimeRequirement := v.GetFloat64(UptimeRequirementKey)
-		nodeConfig.TxFee = txFee
-		nodeConfig.CreationTxFee = creationTxFee
-		nodeConfig.UptimeRequirement = uptimeRequirement
-
-		minValidatorStake := v.GetUint64(MinValidatorStakeKey)
-		maxValidatorStake := v.GetUint64(MaxValidatorStakeKey)
-		minDelegatorStake := v.GetUint64(MinDelegatorStakeKey)
-		minDelegationFee := v.GetUint64(MinDelegatorFeeKey)
-		if minValidatorStake > maxValidatorStake {
-			return node.Config{}, errors.New("minimum validator stake can't be greater than maximum validator stake")
-		}
-
-		nodeConfig.MinValidatorStake = minValidatorStake
-		nodeConfig.MaxValidatorStake = maxValidatorStake
-		nodeConfig.MinDelegatorStake = minDelegatorStake
-
-		if minDelegationFee > 1_000_000 {
-			return node.Config{}, errors.New("delegation fee must be in the range [0, 1000000]")
-		}
-		nodeConfig.MinDelegationFee = uint32(minDelegationFee)
-
-		if nodeConfig.MinStakeDuration == 0 {
-			return node.Config{}, errors.New("min stake duration can't be zero")
-		}
-		if nodeConfig.MaxStakeDuration < nodeConfig.MinStakeDuration {
-			return node.Config{}, errors.New("max stake duration can't be less than min stake duration")
-		}
-		if nodeConfig.StakeMintingPeriod < nodeConfig.MaxStakeDuration {
-			return node.Config{}, errors.New("stake minting period can't be less than max stake duration")
-		}
-
-		nodeConfig.EpochFirstTransition = time.Unix(v.GetInt64(SnowEpochFirstTransition), 0)
-		nodeConfig.EpochDuration = v.GetDuration(SnowEpochDuration)
-	} else {
-		nodeConfig.Params = *genesis.GetParams(networkID)
-	}
+	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
+	nodeConfig.EpochConfig = getEpochConfig(v, nodeConfig.NetworkID)
 
 	// Load genesis data
 	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
-		networkID,
+		nodeConfig.NetworkID,
 		os.ExpandEnv(v.GetString(GenesisConfigFileKey)),
 	)
 	if err != nil {
@@ -585,8 +640,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
 
 	// Bootstrap Configs
-	// TODO use same pattern as elsewhere
-	getBootstrapConfig(v, &nodeConfig)
+	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Chain Configs
 	nodeConfig.ChainConfigs, err = getChainConfigs(v)
@@ -678,39 +735,6 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 		chainConfigs[cChainPrimaryAlias] = cChainConfig
 	}
 	return chainConfigs, nil
-}
-
-// Initialize config.BootstrapPeers.
-func getBootstrapPeers(v *viper.Viper, config *node.Config) error {
-	bootstrapIPs, bootstrapIDs := genesis.SampleBeacons(config.NetworkID, 5)
-	if v.IsSet(BootstrapIPsKey) {
-		bootstrapIPs = strings.Split(v.GetString(BootstrapIPsKey), ",")
-	}
-	for _, ip := range bootstrapIPs {
-		if ip == "" {
-			continue
-		}
-		addr, err := utils.ToIPDesc(ip)
-		if err != nil {
-			return fmt.Errorf("couldn't parse bootstrap ip %s: %w", ip, err)
-		}
-		config.BootstrapIPs = append(config.BootstrapIPs, addr)
-	}
-
-	if v.IsSet(BootstrapIDsKey) {
-		bootstrapIDs = strings.Split(v.GetString(BootstrapIDsKey), ",")
-	}
-	for _, id := range bootstrapIDs {
-		if id == "" {
-			continue
-		}
-		nodeID, err := ids.ShortFromPrefixedString(id, constants.NodeIDPrefix)
-		if err != nil {
-			return fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
-		}
-		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
-	}
-	return nil
 }
 
 // ReadsChainConfigs reads chain config files from static directories and returns map with contents,

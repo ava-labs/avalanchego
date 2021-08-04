@@ -80,13 +80,50 @@ type IPConfig struct {
 	DynamicPublicIPResolver dynamicip.Resolver
 }
 
+// TODO move fields from genesis.Params here
+type StakingConfig struct {
+	genesis.StakingConfig
+	EnableStaking         bool
+	StakingTLSCert        tls.Certificate
+	DisabledStakingWeight uint64
+}
+
+type BootstrapConfig struct {
+	// Should Bootstrap be retried
+	RetryBootstrap bool
+
+	// Max number of times to retry bootstrap
+	RetryBootstrapMaxAttempts int
+
+	// Timeout when connecting to bootstrapping beacons
+	BootstrapBeaconConnectionTimeout time.Duration
+
+	// Max number of containers in a multiput message sent by this node.
+	BootstrapMultiputMaxContainersSent int
+
+	// This node will only consider the first [MultiputMaxContainersReceived]
+	// containers in a multiput it receives.
+	BootstrapMultiputMaxContainersReceived int
+
+	// Max time to spend fetching a container and its
+	// ancestors while responding to a GetAncestors message
+	BootstrapMaxTimeGetAncestors time.Duration
+
+	BootstrapIDs []ids.ShortID
+	BootstrapIPs []utils.IPDesc
+}
+
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
-	genesis.Params
+	//genesis.Params
 	APIConfig
 	IPCConfig
 	GossipConfig
 	IPConfig
+	StakingConfig
+	genesis.TxFeeConfig
+	genesis.EpochConfig
+	BootstrapConfig
 
 	// Genesis information
 	GenesisBytes []byte
@@ -108,9 +145,6 @@ type Config struct {
 	DBName string
 
 	// Staking configuration
-	EnableStaking         bool
-	StakingTLSCert        tls.Certificate
-	DisabledStakingWeight uint64
 
 	// Health
 	HealthCheckFreq time.Duration
@@ -120,10 +154,6 @@ type Config struct {
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config
-
-	// Bootstrapping configuration
-	BootstrapIDs []ids.ShortID
-	BootstrapIPs []utils.IPDesc
 
 	// Profiling configurations
 	ProfilerConfig profiler.Config
@@ -153,28 +183,8 @@ type Config struct {
 
 	IndexAllowIncomplete bool
 
-	// Should Bootstrap be retried
-	RetryBootstrap bool
-
-	// Max number of times to retry bootstrap
-	RetryBootstrapMaxAttempts int
-
-	// Timeout when connecting to bootstrapping beacons
-	BootstrapBeaconConnectionTimeout time.Duration
-
-	// Max number of containers in a multiput message sent by this node.
-	BootstrapMultiputMaxContainersSent int
-
-	// This node will only consider the first [MultiputMaxContainersReceived]
-	// containers in a multiput it receives.
-	BootstrapMultiputMaxContainersReceived int
-
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig
-
-	// Max time to spend fetching a container and its
-	// ancestors while responding to a GetAncestors message
-	BootstrapMaxTimeGetAncestors time.Duration
 
 	// VM Aliases
 	VMAliases map[ids.ID][]string
