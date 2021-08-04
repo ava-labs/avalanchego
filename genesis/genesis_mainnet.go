@@ -175771,17 +175771,19 @@ var (
 
 	// MainnetParams are the params used for mainnet
 	MainnetParams = Params{
-		TxFee:                units.MilliAvax,
-		CreationTxFee:        10 * units.MilliAvax,
-		UptimeRequirement:    .6, // 60%
-		MinValidatorStake:    2 * units.KiloAvax,
-		MaxValidatorStake:    3 * units.MegaAvax,
-		MinDelegatorStake:    25 * units.Avax,
-		MinDelegationFee:     20000, // 2%
-		MinStakeDuration:     2 * 7 * 24 * time.Hour,
-		MaxStakeDuration:     365 * 24 * time.Hour,
-		StakeMintingPeriod:   365 * 24 * time.Hour,
-		EpochFirstTransition: time.Unix(1607626800, 0),
-		EpochDuration:        6 * time.Hour,
+		TxFee:                 units.MilliAvax,
+		CreateAssetTxFee:      10 * units.MilliAvax,
+		CreateSubnetTxFee:     1 * units.Avax,
+		CreateBlockchainTxFee: 1 * units.Avax,
+		UptimeRequirement:     .6, // 60%
+		MinValidatorStake:     2 * units.KiloAvax,
+		MaxValidatorStake:     3 * units.MegaAvax,
+		MinDelegatorStake:     25 * units.Avax,
+		MinDelegationFee:      20000, // 2%
+		MinStakeDuration:      2 * 7 * 24 * time.Hour,
+		MaxStakeDuration:      365 * 24 * time.Hour,
+		StakeMintingPeriod:    365 * 24 * time.Hour,
+		EpochFirstTransition:  time.Unix(1607626800, 0),
+		EpochDuration:         6 * time.Hour,
 	}
 )
