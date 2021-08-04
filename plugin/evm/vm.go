@@ -57,6 +57,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	gossipReq "github.com/ava-labs/avalanchego/vms/platformvm/request"
+
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -222,6 +224,8 @@ type VM struct {
 	clock     timer.Clock
 	txFee     uint64
 	mempool   *Mempool
+	appSender commonEng.AppSender
+	gossipReq.Handler
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -372,6 +376,8 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 	// TODO: read size from settings
 	vm.mempool = NewMempool(defaultMempoolSize)
+	vm.appSender = appSender
+	vm.Handler = gossipReq.NewHandler()
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -695,17 +701,119 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	return nil
+	vm.ctx.Log.Verbo("called AppRequest")
+
+	// decode single id
+	txID := ids.ID{}
+	_, err := vm.codec.Unmarshal(request, &txID) // TODO: cleanup way we serialize this
+	if err != nil {
+		vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
+		return err
+	}
+	vm.ctx.Log.Debug("called AppRequest with txID %v", txID)
+
+	if !vm.mempool.has(txID) {
+		return nil
+	}
+	// Note: rejected tx do not need to be explicitly handled,
+	// since they are not added to mempool
+
+	// fetch tx
+	resTx, dropped, found := vm.mempool.GetTx(txID)
+	if !dropped && !found {
+		return fmt.Errorf("incoherent mempool. Could not find registered tx")
+	}
+
+	// send response
+	response, err := vm.codec.Marshal(codecVersion, *resTx)
+	if err != nil {
+		return err
+	}
+
+	return vm.appSender.SendAppResponse(nodeID, requestID, response)
 }
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	return nil
+	vm.ctx.Log.Verbo("called AppResponse")
+
+	// check requestID
+	if err := vm.ReclaimID(requestID); err != nil {
+		vm.ctx.Log.Debug("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %v",
+			nodeID, requestID)
+		return nil
+	}
+
+	// decode single tx
+	tx := &Tx{}
+	_, err := vm.codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
+	if err != nil {
+		vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
+		return err
+	}
+	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
+	if err != nil {
+		vm.ctx.Log.Debug("AppResponse: failed unmarshalling UnsignedAtomicTx from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
+		return err
+	}
+	tx.Initialize(unsignedBytes, response)
+	vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
+
+	// Note: we currently do not check whether nodes send us exactly the tx matching
+	// the txID we asked for. At least we should check we do not receive total garbage
+	switch {
+	case vm.mempool.has(tx.ID()):
+		return nil
+		// TODO: handle rejected txes
+	}
+
+	// TODO: validate tx
+
+	// add to mempool and possibly re-gossip
+	switch err := vm.mempool.AddTx(tx); err {
+	case nil:
+		txID := tx.ID()
+		vm.ctx.Log.Debug("Gossiping txID %v", txID)
+		txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
+		if err != nil {
+			return err
+		}
+
+		return vm.appSender.SendAppGossip(txIDBytes)
+	// TODO: add max mempool size
+	default:
+		vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
+			nodeID, requestID, err)
+		// TODO: mark rejected
+		return err
+	}
 }
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	return nil
+	vm.ctx.Log.Verbo("called AppGossip")
+
+	// decode single id
+	txID := ids.ID{}
+	_, err := vm.codec.Unmarshal(msg, &txID) // TODO: cleanup way we serialize this
+	if err != nil {
+		vm.ctx.Log.Debug("AppGossip: failed unmarshalling message from Node %v, err %v", nodeID, err)
+		return err
+	}
+	vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
+
+	switch {
+	case vm.mempool.has(txID):
+		return nil
+		// TODO: handle rejected txes
+	}
+
+	nodesSet := ids.NewShortSet(1)
+	nodesSet.Add(nodeID)
+	return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
 }
 
 // NewHandler returns a new Handler for a service where:
@@ -1032,7 +1140,18 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 // atomic transactions that there is an atomic transaction ready to be
 // put into a block.
 func (vm *VM) issueTx(tx *Tx) error {
-	return vm.mempool.AddTx(tx)
+	if err := vm.mempool.AddTx(tx); err != nil {
+		return err
+	}
+
+	txID := tx.ID()
+	vm.ctx.Log.Debug("Gossiping txID %v", txID)
+	txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
+	if err != nil {
+		return err
+	}
+
+	return vm.appSender.SendAppGossip(txIDBytes)
 }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is

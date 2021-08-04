@@ -58,6 +58,21 @@ func (m *Mempool) length() int {
 	return len(m.txs) + len(m.issuedTxs)
 }
 
+func (m *Mempool) has(txID ids.ID) bool {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	if _, ok := m.txs[txID]; ok {
+		return true
+	}
+
+	if _, ok := m.issuedTxs[txID]; ok {
+		return true
+	}
+
+	return false
+}
+
 // Add attempts to add [tx] to the mempool and returns an error if
 // it could not be addeed to the mempool.
 func (m *Mempool) AddTx(tx *Tx) error {
