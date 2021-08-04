@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -113,6 +114,7 @@ func TestDynamicFees(t *testing.T) {
 	}
 
 	var tests []test = []test{
+		// Test minimal gas usage
 		{
 			extraData: nil,
 			baseFee:   nil,
@@ -128,8 +130,53 @@ func TestDynamicFees(t *testing.T) {
 					gasUsed:   21000,
 				},
 				{
-					timestamp: 1,
+					timestamp: 2,
 					gasUsed:   21000,
+				},
+				{
+					timestamp: 5,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 15,
+					gasUsed:   21000,
+				},
+				{
+					timestamp: 120,
+					gasUsed:   21000,
+				},
+			},
+		},
+		// Test overflow handling
+		{
+			extraData: nil,
+			baseFee:   nil,
+			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
+			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
+			blocks: []blockDefinition{
+				{
+					timestamp: 1,
+					gasUsed:   math.MaxUint64,
+				},
+				{
+					timestamp: 1,
+					gasUsed:   math.MaxUint64,
+				},
+				{
+					timestamp: 2,
+					gasUsed:   math.MaxUint64,
+				},
+				{
+					timestamp: 5,
+					gasUsed:   math.MaxUint64,
+				},
+				{
+					timestamp: 15,
+					gasUsed:   math.MaxUint64,
+				},
+				{
+					timestamp: 120,
+					gasUsed:   math.MaxUint64,
 				},
 			},
 		},
@@ -204,6 +251,53 @@ func TestDynamicFees(t *testing.T) {
 				BaseFee: nextBaseFee,
 				Extra:   nextExtraData,
 			}
+		}
+	}
+}
+
+func TestLongWindow(t *testing.T) {
+	longs := []uint64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	sumLongs := uint64(0)
+	longWindow := make([]byte, 10*8)
+	for i, long := range longs {
+		sumLongs = sumLongs + long
+		binary.BigEndian.PutUint64(longWindow[i*8:], long)
+	}
+
+	sum := sumLongWindow(longWindow, 10)
+	if sum != sumLongs {
+		t.Fatalf("Expected sum to be %d but found %d", sumLongs, sum)
+	}
+
+	for i := uint64(0); i < 10; i++ {
+		updateLongWindow(longWindow, i*8, i)
+		sum = sumLongWindow(longWindow, 10)
+		sumLongs += i
+
+		if sum != sumLongs {
+			t.Fatalf("Expected sum to be %d but found %d (iteration: %d)", sumLongs, sum, i)
+		}
+	}
+}
+
+func TestLongWindowOverflow(t *testing.T) {
+	longs := []uint64{0, 0, 0, 0, 0, 0, 0, 0, 2, math.MaxUint64 - 1}
+	longWindow := make([]byte, 10*8)
+	for i, long := range longs {
+		binary.BigEndian.PutUint64(longWindow[i*8:], long)
+	}
+
+	sum := sumLongWindow(longWindow, 10)
+	if sum != math.MaxUint64 {
+		t.Fatalf("Expected sum to be maxUint64 (%d), but found %d", uint64(math.MaxUint64), sum)
+	}
+
+	for i := uint64(0); i < 10; i++ {
+		updateLongWindow(longWindow, i*8, i)
+		sum = sumLongWindow(longWindow, 10)
+
+		if sum != math.MaxUint64 {
+			t.Fatalf("Expected sum to be maxUint64 (%d), but found %d", uint64(math.MaxUint64), sum)
 		}
 	}
 }

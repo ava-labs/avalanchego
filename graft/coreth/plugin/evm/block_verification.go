@@ -298,14 +298,12 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 	if hash := types.CalcExtDataHash(b.ethBlock.ExtData()); ethHeader.ExtDataHash != hash {
 		return fmt.Errorf("extra data hash mismatch: have %x, want %x", ethHeader.ExtDataHash, hash)
 	}
-	// TODO(aaronbuchwald) require ExtraData is the correct size
-	// headerExtraDataSize := uint64(len(ethHeader.Extra))
-	// if headerExtraDataSize != 0 {
-	// 	return fmt.Errorf(
-	// 		"expected header ExtraData to be <= 0 but got %d: %w",
-	// 		headerExtraDataSize, errHeaderExtraDataTooBig,
-	// 	)
-	// }
+	if headerExtraDataSize := len(ethHeader.Extra); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
+		return fmt.Errorf(
+			"expected header ExtraData to be %d but got %d: %w",
+			params.ApricotPhase3ExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,
+		)
+	}
 	if ethHeader.BaseFee == nil {
 		return fmt.Errorf("base fee is not set with apricot phase 3 enabled for block: %s", ethHeader.Hash())
 	}
