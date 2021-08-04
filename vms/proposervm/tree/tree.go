@@ -26,8 +26,7 @@ func New() Tree {
 }
 
 func (t *tree) Add(blk snowman.Block) {
-	parent := blk.Parent()
-	parentID := parent.ID()
+	parentID := blk.Parent()
 	children, exists := t.nodes[parentID]
 	if !exists {
 		children = make(map[ids.ID]snowman.Block)
@@ -38,8 +37,7 @@ func (t *tree) Add(blk snowman.Block) {
 }
 
 func (t *tree) Contains(blk snowman.Block) bool {
-	parent := blk.Parent()
-	parentID := parent.ID()
+	parentID := blk.Parent()
 	children := t.nodes[parentID]
 	blkID := blk.ID()
 	_, exists := children[blkID]
@@ -53,8 +51,7 @@ func (t *tree) Accept(blk snowman.Block) error {
 	}
 
 	// get the siblings of the block
-	parent := blk.Parent()
-	parentID := parent.ID()
+	parentID := blk.Parent()
 	children := t.nodes[parentID]
 	blkID := blk.ID()
 	delete(children, blkID)

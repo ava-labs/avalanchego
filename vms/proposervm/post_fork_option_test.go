@@ -39,7 +39,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
-			ParentV:    coreGenBlk,
+			ParentV:    coreGenBlk.ID(),
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 	}
@@ -50,7 +50,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{2},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 		&snowman.TestBlock{
@@ -59,7 +59,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{3},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 	}
@@ -132,7 +132,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 			IDV:     ids.Empty.Prefix(4444),
 			StatusV: choices.Processing,
 		},
-		ParentV:    oracleCoreBlk.opts[0],
+		ParentV:    oracleCoreBlk.opts[0].ID(),
 		BytesV:     []byte{4},
 		TimestampV: oracleCoreBlk.opts[0].Timestamp().Add(proposer.MaxDelay),
 	}
@@ -165,7 +165,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
-			ParentV:    coreGenBlk,
+			ParentV:    coreGenBlk.ID(),
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 	}
@@ -175,7 +175,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{2},
-		ParentV:    oracleCoreBlk,
+		ParentV:    oracleCoreBlk.ID(),
 		TimestampV: oracleCoreBlk.Timestamp(),
 	}
 	coreOpt1 := &snowman.TestBlock{
@@ -184,7 +184,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{3},
-		ParentV:    oracleCoreBlk,
+		ParentV:    oracleCoreBlk.ID(),
 		TimestampV: oracleCoreBlk.Timestamp(),
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
@@ -276,7 +276,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
-			ParentV:    coreGenBlk,
+			ParentV:    coreGenBlk.ID(),
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 	}
@@ -287,7 +287,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{2},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 		&snowman.TestBlock{
@@ -296,7 +296,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{3},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 	}
@@ -396,7 +396,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
-			ParentV:    coreGenBlk,
+			ParentV:    coreGenBlk.ID(),
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 	}
@@ -407,7 +407,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{2},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 		&snowman.TestBlock{
@@ -416,7 +416,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{3},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 	}

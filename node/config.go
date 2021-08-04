@@ -25,9 +25,6 @@ import (
 type Config struct {
 	genesis.Params
 
-	// If true, bootstrap the current database version and then end the node.
-	FetchOnly bool
-
 	// Genesis information
 	GenesisBytes []byte
 	AvaxAssetID  ids.ID
@@ -124,6 +121,8 @@ type Config struct {
 	ConsensusGossipAcceptedFrontierSize uint
 	// Number of peers to gossip each accepted container to
 	ConsensusGossipOnAcceptSize uint
+	// Number of peers to gossip an AppGossip message
+	AppGossipSize uint
 
 	// Dynamic Update duration for IP or NAT traversal
 	DynamicUpdateDuration time.Duration

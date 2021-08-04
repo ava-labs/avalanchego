@@ -6,9 +6,9 @@ package proposervm
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 )
@@ -62,13 +62,8 @@ func (b *postForkBlock) Status() choices.Status { return b.status }
 
 // Return this block's parent, or a *missing.Block if
 // we don't have the parent.
-func (b *postForkBlock) Parent() snowman.Block {
-	parentID := b.ParentID()
-	res, err := b.vm.getBlock(parentID)
-	if err != nil {
-		return &missing.Block{BlkID: parentID}
-	}
-	return res
+func (b *postForkBlock) Parent() ids.ID {
+	return b.ParentID()
 }
 
 // If Verify() returns nil, Accept() or Reject() will eventually be called
@@ -154,8 +149,7 @@ func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 
 	// Make sure [b]'s inner block is the parent of [child]'s inner block
 	expectedInnerParentID := b.innerBlk.ID()
-	innerParent := child.innerBlk.Parent()
-	innerParentID := innerParent.ID()
+	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
 		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork option; expected inner parent %s but got %s",
 			expectedInnerParentID, innerParentID)

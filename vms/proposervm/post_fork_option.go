@@ -6,9 +6,9 @@ package proposervm
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 )
@@ -23,7 +23,11 @@ type postForkOption struct {
 
 func (b *postForkOption) Timestamp() time.Time {
 	// A *postForkOption's timestamp is its parent's timestamp
-	parent := b.Parent()
+	parentID := b.Parent()
+	parent, err := b.vm.GetBlock(parentID)
+	if err != nil {
+		b.vm.ctx.Log.Error("Could not find option %v 's parent block %v to retrieve its timestamp", b.ID(), b.Parent())
+	}
 	return parent.Timestamp()
 }
 
@@ -64,13 +68,8 @@ func (b *postForkOption) Reject() error {
 
 func (b *postForkOption) Status() choices.Status { return b.status }
 
-func (b *postForkOption) Parent() snowman.Block {
-	parentID := b.ParentID()
-	res, err := b.vm.getBlock(parentID)
-	if err != nil {
-		return &missing.Block{BlkID: parentID}
-	}
-	return res
+func (b *postForkOption) Parent() ids.ID {
+	return b.ParentID()
 }
 
 // If Verify returns nil, Accept or Reject is eventually called on

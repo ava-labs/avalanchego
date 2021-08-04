@@ -85,8 +85,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 	}
 
 	expectedInnerParentID := p.innerBlk.ID()
-	innerParent := child.innerBlk.Parent()
-	innerParentID := innerParent.ID()
+	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
 		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected inner parent %s but got %s",
 			expectedInnerParentID, innerParentID)

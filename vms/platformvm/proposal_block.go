@@ -50,7 +50,7 @@ func (pb *ProposalBlock) Accept() error {
 		"Accepting Proposal Block %s at height %d with parent %s",
 		blkID,
 		pb.Height(),
-		pb.ParentID(),
+		pb.Parent(),
 	)
 
 	pb.status = choices.Accepted
@@ -64,7 +64,7 @@ func (pb *ProposalBlock) Reject() error {
 		"Rejecting Proposal Block %s at height %d with parent %s",
 		pb.ID(),
 		pb.Height(),
-		pb.ParentID(),
+		pb.Parent(),
 	)
 
 	pb.onCommitState = nil
@@ -151,7 +151,7 @@ func (pb *ProposalBlock) Verify() error {
 		return errWrongTxType
 	}
 
-	parentIntf, parentErr := pb.parent()
+	parentIntf, parentErr := pb.parentBlock()
 	if parentErr != nil {
 		return parentErr
 	}

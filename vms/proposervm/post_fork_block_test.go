@@ -100,7 +100,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.CantBuildBlock = true
@@ -136,7 +136,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 
 	// .. create child block ...
 	childCoreBlk := &snowman.TestBlock{
-		ParentV:    prntCoreBlk,
+		ParentV:    prntCoreBlk.ID(),
 		BytesV:     []byte{2},
 		TimestampV: prntCoreBlk.Timestamp(),
 	}
@@ -202,7 +202,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	coreVM.CantBuildBlock = true
@@ -241,7 +241,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		ParentV: prntCoreBlk,
+		ParentV: prntCoreBlk.ID(),
 		BytesV:  []byte{2},
 	}
 
@@ -389,7 +389,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	coreVM.CantBuildBlock = true
@@ -428,7 +428,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		ParentV:    prntCoreBlk,
+		ParentV:    prntCoreBlk.ID(),
 		BytesV:     []byte{2},
 		TimestampV: prntProBlk.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -548,7 +548,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
-			ParentV:    coreGenBlk,
+			ParentV:    coreGenBlk.ID(),
 			TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 		},
 	}
@@ -559,7 +559,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{2},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 		&snowman.TestBlock{
@@ -568,7 +568,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{3},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: oracleCoreBlk.Timestamp(),
 		},
 	}
@@ -627,7 +627,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			IDV:     ids.Empty.Prefix(2222),
 			StatusV: choices.Processing,
 		},
-		ParentV:    oracleCoreBlk.opts[0],
+		ParentV:    oracleCoreBlk.opts[0].ID(),
 		BytesV:     []byte{2},
 		TimestampV: parentBlk.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -744,7 +744,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	coreVM.CantBuildBlock = true
@@ -808,7 +808,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
 	coreVM.CantBuildBlock = true
@@ -873,7 +873,7 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -919,7 +919,7 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}

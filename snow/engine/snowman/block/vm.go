@@ -27,6 +27,7 @@ import (
 // Consensus will ensure the network agrees on the number at every block height.
 type ChainVM interface {
 	common.VM
+	Getter
 
 	// Attempt to create a new block from data contained in the VM.
 	//
@@ -39,11 +40,6 @@ type ChainVM interface {
 	// The block should be represented by the full byte array, without extra
 	// bytes.
 	ParseBlock([]byte) (snowman.Block, error)
-
-	// Attempt to load a block.
-	//
-	// If the block does not exist, then an error should be returned.
-	GetBlock(ids.ID) (snowman.Block, error)
 
 	// Notify the VM of the currently preferred block.
 	//
@@ -60,4 +56,15 @@ type ChainVM interface {
 
 type SnowmanPlusPlusVM interface {
 	GetActivationTime() time.Time
+	// Getter defines the functionality for fetching a block by its ID.
+}
+
+type Getter interface {
+	// Attempt to load a block.
+	//
+	// If the block does not exist, an error should be returned.
+	//
+	// TODO: Update the invariant to report database.ErrNotFound if the
+	//       operation is missing.
+	GetBlock(ids.ID) (snowman.Block, error)
 }

@@ -6,6 +6,7 @@ package proposervm
 import (
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -19,18 +20,14 @@ type preForkBlock struct {
 	vm *VM
 }
 
-func (b *preForkBlock) Parent() snowman.Block {
-	// A preForkBlock's parent is always a preForkBlock
-	return &preForkBlock{
-		Block: b.Block.Parent(),
-		vm:    b.vm,
-	}
+func (b *preForkBlock) Parent() ids.ID {
+	return b.Block.Parent()
 }
 
 func (b *preForkBlock) Verify() error {
 	b.vm.ctx.Log.Debug("Snowman++ calling verify on %s", b.ID())
 
-	parent, err := b.vm.getBlock(b.Block.Parent().ID())
+	parent, err := b.vm.getBlock(b.Block.Parent())
 	if err != nil {
 		return err
 	}
@@ -92,8 +89,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 
 	// Make sure [b] is the parent of [child]'s inner block
 	expectedInnerParentID := b.ID()
-	innerParent := child.innerBlk.Parent()
-	innerParentID := innerParent.ID()
+	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
 		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected inner parent %s but got %s",
 			expectedInnerParentID, innerParentID)

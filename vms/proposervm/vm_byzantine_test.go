@@ -36,7 +36,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    gBlock,
+		ParentV:    gBlock.ID(),
 		HeightV:    gBlock.Height() + 1,
 		TimestampV: gBlock.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -64,7 +64,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     yBlockBytes,
-		ParentV:    xBlock,
+		ParentV:    xBlock.ID(),
 		HeightV:    xBlock.Height() + 1,
 		TimestampV: xBlock.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -100,7 +100,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
-			ParentV:    coreGenBlk,
+			ParentV:    coreGenBlk.ID(),
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 	}
@@ -111,7 +111,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{2},
-			ParentV:    coreGenBlk, // valid block should reference oracleCoreBlk
+			ParentV:    coreGenBlk.ID(), // valid block should reference oracleCoreBlk
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 		&snowman.TestBlock{
@@ -120,7 +120,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{3},
-			ParentV:    coreGenBlk, // valid block should reference oracleCoreBlk
+			ParentV:    coreGenBlk.ID(), // valid block should reference oracleCoreBlk
 			TimestampV: coreGenBlk.Timestamp(),
 		},
 	}

@@ -28,7 +28,7 @@ func TestAcceptSingleBlock(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.ID(),
 	}
 
 	tr := New()
@@ -54,7 +54,7 @@ func TestAcceptBlockConflict(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.ID(),
 	}
 
 	blockToReject := &snowman.TestBlock{
@@ -62,7 +62,7 @@ func TestAcceptBlockConflict(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.ID(),
 	}
 
 	tr := New()
@@ -90,7 +90,7 @@ func TestAcceptChainConflict(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.ID(),
 	}
 
 	blockToReject := &snowman.TestBlock{
@@ -98,7 +98,7 @@ func TestAcceptChainConflict(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.ID(),
 	}
 
 	blockToRejectChild := &snowman.TestBlock{
@@ -106,7 +106,7 @@ func TestAcceptChainConflict(t *testing.T) {
 			IDV:     ids.GenerateTestID(),
 			StatusV: choices.Processing,
 		},
-		ParentV: blockToReject,
+		ParentV: blockToReject.ID(),
 	}
 
 	tr := New()

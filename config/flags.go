@@ -67,13 +67,10 @@ func addProcessFlags(fs *flag.FlagSet) {
 	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Plugin
-	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin")
+	fs.Bool(PluginModeKey, false, "Whether the app should run as a plugin")
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
-	// Fetch only mode
-	fs.Bool(FetchOnlyKey, false, "If true, bootstrap the current database version then stop")
-
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
@@ -154,6 +151,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(ConsensusShutdownTimeoutKey, 5*time.Second, "Timeout before killing an unresponsive chain.")
 	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
+	fs.Uint(AppGossipSizeKey, 20, "Number of peers to gossip an AppGossip message to")
 
 	// Inbound Throttling
 	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler.")

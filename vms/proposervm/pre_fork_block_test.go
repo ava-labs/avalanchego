@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -51,7 +50,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:  []byte{1},
-			ParentV: coreGenBlk,
+			ParentV: coreGenBlk.ID(),
 		},
 	}
 	oracleCoreBlk.opts = [2]snowman.Block{
@@ -61,7 +60,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:  []byte{2},
-			ParentV: oracleCoreBlk,
+			ParentV: oracleCoreBlk.ID(),
 		},
 		&snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
@@ -69,7 +68,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:  []byte{3},
-			ParentV: oracleCoreBlk,
+			ParentV: oracleCoreBlk.ID(),
 		},
 	}
 
@@ -121,7 +120,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:  []byte{4},
-			ParentV: oracleCoreBlk.opts[0],
+			ParentV: oracleCoreBlk.opts[0].ID(),
 		},
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return lastCoreBlk, nil }
@@ -147,7 +146,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
-			ParentV:    coreGenBlk,
+			ParentV:    coreGenBlk.ID(),
 			TimestampV: activationTime.Add(-1 * time.Second),
 		},
 	}
@@ -160,7 +159,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{2},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: activationTime.Add(time.Second),
 		},
 		&snowman.TestBlock{
@@ -169,7 +168,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{3},
-			ParentV:    oracleCoreBlk,
+			ParentV:    oracleCoreBlk.ID(),
 			TimestampV: activationTime.Add(time.Second),
 		},
 	}
@@ -222,7 +221,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 				StatusV: choices.Processing,
 			},
 			BytesV:  []byte{4},
-			ParentV: oracleCoreBlk.opts[0],
+			ParentV: oracleCoreBlk.opts[0].ID(),
 		},
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return lastCoreBlk, nil }
@@ -251,7 +250,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp(),
 	}
 	coreVM.CantBuildBlock = true
@@ -300,14 +299,14 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	}
 
 	// child block referring unknown parent does not verify
-	childCoreBlk.ParentV = &missing.Block{}
+	childCoreBlk.ParentV = ids.Empty
 	err = childProBlk.Verify()
 	if err == nil {
 		t.Fatal("Block with unknown parent should not verify")
 	}
 
 	// child block referring known parent does verify
-	childCoreBlk.ParentV = prntProBlk
+	childCoreBlk.ParentV = prntProBlk.ID()
 	if err := childProBlk.Verify(); err != nil {
 		t.Fatal("Block with known parent should verify")
 	}
@@ -328,7 +327,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: preActivationTime,
 		VerifyV:    nil,
 	}
@@ -390,7 +389,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 			IDV: ids.Empty.Prefix(2222),
 		},
 		BytesV:     []byte{2},
-		ParentV:    coreBlk,
+		ParentV:    coreBlk.ID(),
 		TimestampV: postActivationTime,
 		VerifyV:    nil,
 	}
@@ -427,7 +426,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 			IDV: ids.Empty.Prefix(333),
 		},
 		BytesV:     []byte{3},
-		ParentV:    secondCoreBlk,
+		ParentV:    secondCoreBlk.ID(),
 		TimestampV: postActivationTime,
 		VerifyV:    nil,
 	}
@@ -471,7 +470,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp(),
 		VerifyV:    nil,
 	}
@@ -510,7 +509,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk,
+		ParentV: coreGenBlk.ID(),
 	}
 	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
@@ -570,7 +569,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:  []byte{1},
-		ParentV: coreGenBlk,
+		ParentV: coreGenBlk.ID(),
 		HeightV: coreGenBlk.Height() + 1,
 	}
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }

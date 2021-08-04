@@ -39,10 +39,9 @@ import (
 )
 
 const (
-	avalanchegoLatest     = "avalanchego-latest"
-	avalanchegoPreupgrade = "avalanchego-preupgrade"
-	chainConfigFileName   = "config"
-	chainUpgradeFileName  = "upgrade"
+	pluginsDirName       = "plugins"
+	chainConfigFileName  = "config"
+	chainUpgradeFileName = "upgrade"
 )
 
 var (
@@ -61,28 +60,20 @@ func GetProcessConfig(v *viper.Viper) (process.Config, error) {
 	}
 
 	// Build directory should have this structure:
+	//
 	// build
-	// |_avalanchego-latest
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-	// |_avalanchego-preupgrade
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
+	// ├── avalanchego (the binary from compiling the app directory)
+	// └── plugins
+	//     └── evm
 	validBuildDir := func(dir string) bool {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
 			return false
 		}
-		// make sure both expected subdirectories exist
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoLatest)); err != nil {
-			return false
-		}
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoPreupgrade)); err != nil {
-			return false
-		}
-		return true
+
+		// make sure the expected subdirectory exists
+		_, err = os.Stat(filepath.Join(dir, pluginsDirName))
+		return err == nil
 	}
 	if validBuildDir(config.BuildDir) {
 		return config, nil
@@ -110,10 +101,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// First, get the process config
 	nodeConfig := node.Config{}
 
-	// Plugin directory defaults to [buildDirectory]/avalanchego-latest/plugins
-	nodeConfig.PluginDir = filepath.Join(buildDir, avalanchegoLatest, "plugins")
-
-	nodeConfig.FetchOnly = v.GetBool(FetchOnlyKey)
+	// Plugin directory defaults to [buildDir]/[pluginsDirName]
+	nodeConfig.PluginDir = filepath.Join(buildDir, pluginsDirName)
 
 	// Consensus Parameters
 	nodeConfig.ConsensusParams.K = v.GetInt(SnowSampleSizeKey)
@@ -130,6 +119,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 	nodeConfig.ConsensusGossipAcceptedFrontierSize = uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey))
 	nodeConfig.ConsensusGossipOnAcceptSize = uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey))
+	nodeConfig.AppGossipSize = uint(v.GetUint32(AppGossipSizeKey))
 
 	// Logging:
 	loggingConfig, err := logging.DefaultConfig()
@@ -223,7 +213,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, errInvalidStakerWeights
 	}
 
-	if nodeConfig.FetchOnly || v.GetBool(StakingEphemeralCertEnabledKey) {
+	if v.GetBool(StakingEphemeralCertEnabledKey) {
 		// In fetch only mode or if explicitly set, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {

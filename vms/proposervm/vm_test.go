@@ -133,7 +133,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -161,7 +161,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -194,7 +194,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -228,7 +228,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
@@ -245,7 +245,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{2},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
@@ -298,7 +298,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{3},
-		ParentV:    prefcoreBlk,
+		ParentV:    prefcoreBlk.ID(),
 		HeightV:    prefcoreBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
@@ -312,7 +312,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	}
 
 	// ...show that parent is the preferred one
-	if builtBlk.Parent().ID() != proBlk2.ID() {
+	if builtBlk.Parent() != proBlk2.ID() {
 		t.Fatal("proposer block not built on preferred parent")
 	}
 }
@@ -326,7 +326,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{1},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
@@ -343,7 +343,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{2},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
@@ -396,7 +396,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{3},
-		ParentV:    wronglyPreferredcoreBlk,
+		ParentV:    wronglyPreferredcoreBlk.ID(),
 		HeightV:    wronglyPreferredcoreBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
@@ -459,7 +459,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	// create two Proposer blocks at the same height
 	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
-		ParentV:    gencoreBlk,
+		ParentV:    gencoreBlk.ID(),
 		HeightV:    gencoreBlk.Height() + 1,
 		TimestampV: proVM.Time(),
 	}
@@ -556,7 +556,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
 		BytesV:     []byte{111},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: genesisTimestamp,
 	}
@@ -576,7 +576,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	// another block with same parent comes from network and is parsed
 	netcoreBlk := &snowman.TestBlock{
 		BytesV:     []byte{222},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: genesisTimestamp,
 	}
@@ -635,7 +635,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.GenerateTestID(),
 		},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		BytesV:     []byte{1},
 		VerifyV:    nil,
 		TimestampV: coreGenBlk.Timestamp(),
@@ -644,7 +644,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.GenerateTestID(),
 		},
-		ParentV:    coreBlk1,
+		ParentV:    coreBlk1.ID(),
 		BytesV:     []byte{2},
 		VerifyV:    nil,
 		TimestampV: coreBlk1.Timestamp(),
@@ -708,7 +708,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		TestDecidable: choices.TestDecidable{
 			IDV: ids.GenerateTestID(),
 		},
-		ParentV:    coreBlk2,
+		ParentV:    coreBlk2.ID(),
 		BytesV:     []byte{3},
 		VerifyV:    nil,
 		TimestampV: coreBlk2.Timestamp(),
@@ -723,7 +723,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 		t.Fatal("Could not build block")
 	}
 
-	if proBlk3.Parent().ID() != proBlk2.ID() {
+	if proBlk3.Parent() != proBlk2.ID() {
 		t.Fatal("Error in building Block")
 	}
 
@@ -787,7 +787,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{3},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
@@ -879,7 +879,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{3},
-		ParentV:    coreGenBlk,
+		ParentV:    coreGenBlk.ID(),
 		HeightV:    coreGenBlk.Height() + 1,
 		TimestampV: coreGenBlk.Timestamp(),
 	}
@@ -911,7 +911,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 			StatusV: choices.Processing,
 		},
 		BytesV:     []byte{3},
-		ParentV:    coreBlk0,
+		ParentV:    coreBlk0.ID(),
 		HeightV:    coreBlk0.Height() + 1,
 		TimestampV: coreBlk0.Timestamp(),
 	}
@@ -921,7 +921,7 @@ func TestPreFork_SetPreference(t *testing.T) {
 	if err != nil {
 		t.Fatal("Could not build proposer block")
 	}
-	if nextBlk.Parent().ID() != builtBlk.ID() {
+	if nextBlk.Parent() != builtBlk.ID() {
 		t.Fatal("Preferred block should be parent of next built block")
 	}
 }
