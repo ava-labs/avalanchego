@@ -50,8 +50,6 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 func (tx *UnsignedImportTx) Verify(
 	avmID ids.ID,
 	ctx *snow.Context,
-	feeAmount uint64,
-	feeAssetID ids.ID,
 	rules params.Rules,
 ) error {
 	switch {
@@ -124,6 +122,12 @@ func (tx *UnsignedImportTx) Burned(assetID ids.ID) (uint64, error) {
 	return math.Sub64(input, spent)
 }
 
+// Gas returns the amount of gas consumed by producing the outputs in the
+// import transaction.
+func (tx *UnsignedImportTx) Gas() uint64 {
+	return OutputFee*uint64(len(tx.Outs)) + TxBytesFee*uint64(len(tx.Bytes()))
+}
+
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
@@ -131,32 +135,41 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	parent *Block,
 	baseFee *big.Int,
 	rules params.Rules,
-) TxError {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {
-		return tempError{err}
+) error {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, rules); err != nil {
+		return err
 	}
 
-	if len(stx.Creds) != len(tx.ImportedInputs) {
-		return permError{errSignatureInputsMismatch}
-	}
-
-	// do flow-checking
+	// Check the transaction consumes and produces the right amounts
 	fc := avax.NewFlowChecker()
-
 	// Apply transaction fee to import transactions as of Apricot Phase 2
-	if rules.IsApricotPhase2 {
-		fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
+	switch {
+	case rules.IsApricotPhase3:
+		txGas, err := stx.Gas()
+		if err != nil {
+			return err
+		}
+		txFee, err := calculateDynamicFee(txGas, baseFee)
+		if err != nil {
+			return err
+		}
+		fc.Produce(vm.ctx.AVAXAssetID, txFee)
+	case rules.IsApricotPhase2:
+		fc.Produce(vm.ctx.AVAXAssetID, vm.txFee) // TODO(aaronbuchwald) - replace vm.txFee with a constant in Avalanche params
 	}
-
 	for _, out := range tx.Outs {
 		fc.Produce(out.AssetID, out.Amount)
 	}
-
 	for _, in := range tx.ImportedInputs {
 		fc.Consume(in.AssetID(), in.Input().Amount())
 	}
+
 	if err := fc.Verify(); err != nil {
-		return permError{err}
+		return err
+	}
+
+	if len(stx.Creds) != len(tx.ImportedInputs) {
+		return errSignatureInputsMismatch
 	}
 
 	if !vm.ctx.IsBootstrapped() {
@@ -172,7 +185,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
-		return tempError{fmt.Errorf("failed to fetch import UTXOs from %s with %w", tx.SourceChain, err)}
+		return fmt.Errorf("failed to fetch import UTXOs from %s with %w", tx.SourceChain, err)
 	}
 
 	for i, in := range tx.ImportedInputs {
@@ -180,7 +193,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 		utxo := &avax.UTXO{}
 		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return tempError{err}
+			return err
 		}
 
 		cred := stx.Creds[i]
@@ -188,19 +201,15 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		utxoAssetID := utxo.AssetID()
 		inAssetID := in.AssetID()
 		if utxoAssetID != inAssetID {
-			return permError{errAssetIDMismatch}
+			return errAssetIDMismatch
 		}
 
 		if err := vm.fx.VerifyTransfer(tx, in.In, cred, utxo.Out); err != nil {
-			return tempError{err}
+			return err
 		}
 	}
 
-	if err := vm.conflicts(tx.InputUTXOs(), parent); err != nil {
-		return tempError{err}
-	}
-
-	return nil
+	return vm.conflicts(tx.InputUTXOs(), parent)
 }
 
 // Accept this transaction and spend imported inputs
@@ -314,7 +323,7 @@ func (vm *VM) newImportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.currentRules())
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.currentRules())
 }
 
 // EVMStateTransfer performs the state transfer to increase the balances of

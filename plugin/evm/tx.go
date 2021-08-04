@@ -36,6 +36,13 @@ var (
 	errEmptyAssetID      = errors.New("empty asset ID is not valid")
 )
 
+// Constants for calculating the gas consumed by atomic transactions
+var (
+	SignatureFee uint64 = 21000 // Based on TxGas cost
+	OutputFee    uint64 = 20000 // Based on SSTORE cost
+	TxBytesFee   uint64 = 16    // Based on TxDataNonZeroGasEIP2028 cost
+)
+
 // EVMOutput defines an output that is added to the EVM state created by import transactions
 type EVMOutput struct {
 	Address common.Address `serialize:"true" json:"address"`
@@ -92,7 +99,7 @@ type UnsignedAtomicTx interface {
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) TxError
+	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
 
 	// Fee amount denominated in base 10^9.
 	Burned(assetID ids.ID) (uint64, error)
@@ -101,6 +108,10 @@ type UnsignedAtomicTx interface {
 	Accept(ctx *snow.Context, batch database.Batch) error
 
 	EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error
+
+	// Gas returns the amount of gas consumed by the atomic transaction
+	// Note: this does not include the gas cost of the credentials.
+	Gas() uint64
 }
 
 // Tx is a signed transaction
@@ -112,7 +123,18 @@ type Tx struct {
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 }
 
-// (*secp256k1fx.Credential)
+func (tx *Tx) Gas() (uint64, error) {
+	unsignedTxGas := tx.UnsignedAtomicTx.Gas()
+	totalSignatures := uint64(0)
+	for _, cred := range tx.Creds {
+		secpCred, ok := cred.(*secp256k1fx.Credential)
+		if !ok {
+			return 0, fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)
+		}
+		totalSignatures += uint64(len(secpCred.Sigs))
+	}
+	return unsignedTxGas + totalSignatures*SignatureFee, nil
+}
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
@@ -212,4 +234,18 @@ func IsSortedEVMOutputs(outputs []EVMOutput) bool {
 // and unique based on the account addresses and assetIDs
 func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
 	return utils.IsSortedAndUnique(&innerSortEVMOutputs{outputs: outputs})
+}
+
+// calculates the amount of AVAX that must be burned by an atomic transaction
+// that consumes [gas] at [baseFee].
+// TODO(aaronbuchwald) thoroughly check this and make sure it's not broken
+func calculateDynamicFee(gas uint64, baseFee *big.Int) (uint64, error) {
+	// Calculate the amount of C-Chain AVAX to be consumed
+	txGas := new(big.Int).SetUint64(gas)
+	txGas.Mul(txGas, baseFee)
+
+	// Transform [txGas] from denomination base 18 to base 9 to be
+	// used in atomic transaction flow checker.
+	txGas.Div(txGas, x2cRate)
+	return txGas.Uint64(), nil
 }

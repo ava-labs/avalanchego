@@ -15,7 +15,7 @@ import (
 
 func TestImportTxVerifyNil(t *testing.T) {
 	var importTx *UnsignedImportTx
-	if err := importTx.Verify(testXChainID, NewContext(), testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, NewContext(), apricotRulesPhase1); err == nil {
 		t.Fatal("Verify should have failed due to nil transaction")
 	}
 }
@@ -76,28 +76,28 @@ func TestImportTxVerify(t *testing.T) {
 	SortEVMOutputs(importTx.Outs)
 
 	// Test Valid ImportTx
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err != nil {
 		t.Fatalf("Failed to verify ImportTx: %s", err)
 	}
 
 	importTx.NetworkID = testNetworkID + 1
 
 	// // Test Incorrect Network ID Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to incorrect network ID")
 	}
 
 	importTx.NetworkID = testNetworkID
 	importTx.BlockchainID = nonExistentID
 	// // Test Incorrect Blockchain ID Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to incorrect blockchain ID")
 	}
 
 	importTx.BlockchainID = testCChainID
 	importTx.SourceChain = nonExistentID
 	// // Test Incorrect Destination Chain ID Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to incorrect source chain")
 	}
 
@@ -106,29 +106,29 @@ func TestImportTxVerify(t *testing.T) {
 	evmOutputs := importTx.Outs
 	importTx.ImportedInputs = nil
 	// // Test No Imported Inputs Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to no imported inputs")
 	}
 
 	importTx.ImportedInputs = []*avax.TransferableInput{importedIns[1], importedIns[0]}
 	// // Test Unsorted Imported Inputs Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to unsorted import inputs")
 	}
 
 	importTx.ImportedInputs = []*avax.TransferableInput{importedIns[0], nil}
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to invalid input")
 	}
 
 	importTx.ImportedInputs = []*avax.TransferableInput{importedIns[0], importedIns[1]}
 	importTx.Outs = []EVMOutput{evmOutputs[1], evmOutputs[0]}
 	// Test unsorted EVM Outputs pass verification prior to AP1
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase0); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase0); err != nil {
 		t.Fatalf("ImportTx should have passed verification prior to AP1, but failed due to %s", err)
 	}
 	// Test unsorted EVM Outputs fails verification after AP1
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to unsorted EVM Outputs in AP1")
 	}
 	importTx.Outs = []EVMOutput{
@@ -139,19 +139,19 @@ func TestImportTxVerify(t *testing.T) {
 		},
 	}
 	// Test ImportTx with invalid EVM Output Amount 0 fails verification
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to 0 value amount")
 	}
 	importTx.Outs = []EVMOutput{evmOutputs[0], evmOutputs[0]}
 	// Test non-unique EVM Outputs passes verification for AP0 and AP1
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase0); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err != nil {
 		t.Fatal(err)
 	}
 	// Test non-unique EVM Outputs fails verification for AP2
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase2); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase2); err == nil {
 		t.Fatal("ImportTx should have failed verification due to non-unique outputs in AP2")
 	}
 }
@@ -223,7 +223,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 		t.Fatal("Expected ethereum address to have empty starting balance.")
 	}
 
-	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -403,7 +403,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 		t.Fatal("Expected ethereum address to have empty starting balance.")
 	}
 
-	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 
