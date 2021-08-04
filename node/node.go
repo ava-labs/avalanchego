@@ -702,8 +702,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
-			CreationFee: n.Config.CreateAssetTxFee,
 			Fee:         n.Config.TxFee,
+			CreationFee: n.Config.CreateAssetTxFee,
 		}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
@@ -863,8 +863,10 @@ func (n *Node) initInfoAPI() error {
 		n.chainManager,
 		n.vmManager,
 		n.Net,
-		n.Config.CreateAssetTxFee,
 		n.Config.TxFee,
+		n.Config.CreateAssetTxFee,
+		n.Config.CreateSubnetTxFee,
+		n.Config.CreateBlockchainTxFee,
 	)
 	if err != nil {
 		return err
