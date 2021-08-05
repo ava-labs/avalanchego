@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 const DatabaseOpErrorExitCode int = 5
@@ -103,8 +102,13 @@ func NewIndexer(
 
 // add marks that [txID] changes the balance of [assetID] for [addrs]
 // This data is either written in Accept() or cleared in Clear()
-func (i *indexer) add(txID, assetID ids.ID, addrs []ids.ShortID) {
-	for _, address := range addrs {
+func (i *indexer) add(txID, assetID ids.ID, addrs [][]byte) error {
+	for _, addressBytes := range addrs {
+		address, err := ids.ToShortID(addressBytes)
+		if err != nil {
+			// should never happen
+			return err
+		}
 		if _, exists := i.balanceChanges[txID]; !exists {
 			i.balanceChanges[txID] = make(map[ids.ShortID]map[ids.ID]struct{})
 		}
@@ -113,6 +117,7 @@ func (i *indexer) add(txID, assetID ids.ID, addrs []ids.ShortID) {
 		}
 		i.balanceChanges[txID][address][assetID] = struct{}{}
 	}
+	return nil
 }
 
 // See AddressTxsIndexer
@@ -131,12 +136,14 @@ func (i *indexer) Add(
 		utxos = append(utxos, utxo)
 	}
 	for _, utxo := range utxos {
-		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		out, ok := utxo.Out.(avax.Addressable)
 		if !ok {
 			i.log.Verbo("skipping UTXO %s for indexing", utxo.InputID())
 			continue
 		}
-		i.add(txID, utxo.AssetID(), out.Addrs)
+		if err := i.add(txID, utxo.AssetID(), out.Addresses()); err != nil {
+			return fmt.Errorf("error adding to index: %s", err)
+		}
 	}
 	return nil
 }
