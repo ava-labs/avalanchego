@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -167,4 +168,10 @@ func (ids *Set) Pop() (ID, bool) {
 		return id, true
 	}
 	return ID{}, false
+}
+
+func (ids *Set) MarshalJSON() ([]byte, error) {
+	idsList := ids.List()
+	SortIDs(idsList)
+	return json.Marshal(idsList)
 }

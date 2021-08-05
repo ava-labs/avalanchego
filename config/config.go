@@ -279,10 +279,10 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	}
 
 	// Outbound connection throttling
-	config.DialerConfig = dialer.NewConfig(
-		v.GetUint32(OutboundConnectionThrottlingRps),
-		v.GetDuration(OutboundConnectionTimeout),
-	)
+	config.DialerConfig = dialer.Config{
+		ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
+		ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
+	}
 
 	// Compression
 	config.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
@@ -436,6 +436,9 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	// Parse the staking key/cert paths and expand environment variables
 	stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
 	stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
+	// TODO add the below
+	//	nodeConfig.StakingKeyFile = stakingKeyPath
+	//	nodeConfig.StakingCertFile = stakingCertPath
 
 	// If staking key/cert locations are specified but not found, error
 	if v.IsSet(StakingKeyPathKey) || v.IsSet(StakingCertPathKey) {
