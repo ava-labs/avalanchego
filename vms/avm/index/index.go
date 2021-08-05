@@ -88,7 +88,7 @@ func NewIndexer(
 		log:            log,
 	}
 	// initialize the indexer
-	if err := i.init(allowIncompleteIndices); err != nil {
+	if err := checkIndexStatus(i.db, true, allowIncompleteIndices); err != nil {
 		return nil, err
 	}
 	// initialize the metrics
@@ -241,11 +241,6 @@ func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uin
 // Clear clears data about which balances [txID] changed.
 func (i *indexer) Clear(txID ids.ID) {
 	i.balanceChanges[txID] = make(map[ids.ShortID]map[ids.ID]struct{})
-}
-
-// Init initialises indexing, returning error if the state is invalid
-func (i *indexer) init(allowIncomplete bool) error {
-	return checkIndexStatus(i.db, true, allowIncomplete)
 }
 
 // checkIndexStatus checks the indexing status in the database, returning error if the state
