@@ -822,7 +822,16 @@ func (n *Node) initAdminAPI() error {
 	if err != nil {
 		return fmt.Errorf("couldn't marshal config: %w", err)
 	}
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir, n.LogFactory, configJSON)
+	service, err := admin.NewService(
+		admin.Config{
+			Log:          n.Log,
+			ChainManager: n.chainManager,
+			HTTPServer:   &n.APIServer,
+			ProfileDir:   n.Config.ProfilerConfig.Dir,
+			LogFactory:   n.LogFactory,
+			NodeConfig:   configJSON,
+		},
+	)
 	if err != nil {
 		return err
 	}

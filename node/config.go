@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 )
@@ -28,9 +27,11 @@ type VMAliases map[ids.ID][]string
 
 func (v *VMAliases) MarshalJSON() ([]byte, error) {
 	// Sort so we have deterministic ordering
-	vmIDs := []ids.ID{}
+	vmIDs := make([]ids.ID, len(*v))
+	i := 0
 	for vmID := range *v {
-		vmIDs = append(vmIDs, vmID)
+		vmIDs[i] = vmID
+		i++
 	}
 	ids.SortIDs(vmIDs)
 
@@ -42,29 +43,16 @@ func (v *VMAliases) MarshalJSON() ([]byte, error) {
 		for i, alias := range aliases {
 			b.WriteString(fmt.Sprintf("\"%s\"", alias))
 			if i != len(aliases)-1 {
-				b.WriteString(", ")
+				b.WriteString(",")
 			}
 		}
 		b.WriteString("]")
 		if i != len(vmIDs)-1 {
-			b.WriteString(", ")
+			b.WriteString(",")
 		}
 	}
 	b.WriteString("}")
 	return []byte(b.String()), nil
-}
-
-// Alias []byte so we can specify a MarshalJSON, which will be called
-// when MarshalJSON is called on Config. (The JSON representation of the
-// node's Config can be retrieved via the Admin API.)
-type GenesisBytes []byte
-
-func (g *GenesisBytes) MarshalJSON() ([]byte, error) {
-	encoded, err := formatting.EncodeWithChecksum(formatting.Hex, *g)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't encode genesis bytes to hex+checksum: %w", err)
-	}
-	return []byte(fmt.Sprintf("\"%s\"", encoded)), nil
 }
 
 // Config contains all of the configurations of an Avalanche node.
@@ -72,8 +60,8 @@ type Config struct {
 	genesis.Params
 
 	// Genesis information
-	GenesisBytes GenesisBytes `json:"genesisBytes"`
-	AvaxAssetID  ids.ID       `json:"avaxAssetID"`
+	GenesisBytes []byte `json:"-"`
+	AvaxAssetID  ids.ID `json:"avaxAssetID"`
 
 	// protocol to use for opening the network interface
 	Nat nat.Router `json:"-"`
@@ -123,9 +111,12 @@ type Config struct {
 	HTTPHost string `json:"httpHost"`
 	HTTPPort uint16 `json:"httpPort"`
 
-	HTTPSEnabled        bool     `json:"httpsEnabled"`
+	HTTPSEnabled bool `json:"httpsEnabled"`
+	// TODO pass the HTTPS certificate in the way we pass in StakingTLSCert
 	HTTPSKeyFile        string   `json:"httpsKeyFile"`
 	HTTPSCertFile       string   `json:"httpsCertFile"`
+	StakingKeyFile      string   `json:"stakingKeyFile"`  // TODO populate
+	StakingCertFile     string   `json:"stakingCertFile"` // TODO populate
 	APIRequireAuthToken bool     `json:"apiRequireAuthToken"`
 	APIAuthPassword     string   `json:"apiAuthPassword"`
 	APIAllowedOrigins   []string `json:"apiAllowedOrigins"`

@@ -29,7 +29,7 @@ type Config struct {
 	Assertions                  bool          `json:"assertions"`
 	LogLevel                    Level         `json:"logLevel"`
 	DisplayLevel                Level         `json:"displayLevel"`
-	DisplayHighlight            Highlight     `json:"-"`
+	DisplayHighlight            Highlight     `json:"displayHighlight"`
 	Directory                   string        `json:"-"`
 	MsgPrefix                   string        `json:"-"`
 	LoggerName                  string        `json:"-"`

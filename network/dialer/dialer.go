@@ -35,13 +35,6 @@ type Config struct {
 	ConnectionTimeout time.Duration `json:"connectionTimeout"`
 }
 
-func NewConfig(throttleRps uint32, dialTimeout time.Duration) Config {
-	return Config{
-		throttleRps,
-		dialTimeout,
-	}
-}
-
 // NewDialer returns a new Dialer that calls net.Dial with the provided network.
 // [network] is the network passed into Dial. Should probably be "TCP".
 // [dialerConfig.connectionTimeout] gives the timeout when dialing an IP.

@@ -178,6 +178,6 @@ func TestSetMarshalJSON(t *testing.T) {
 	{
 		asJSON, err := set.MarshalJSON()
 		assert.NoError(err)
-		assert.Equal(fmt.Sprintf("[\"%s\", \"%s\"]", id1, id2), string(asJSON))
+		assert.Equal(fmt.Sprintf("[\"%s\",\"%s\"]", id1, id2), string(asJSON))
 	}
 }
