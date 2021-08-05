@@ -4,7 +4,6 @@
 package admin
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -36,7 +35,7 @@ type Config struct {
 	Log          logging.Logger
 	ProfileDir   string
 	LogFactory   logging.Factory
-	NodeConfig   []byte
+	NodeConfig   map[string]interface{}
 	ChainManager chains.Manager
 	HTTPServer   *server.Server
 }
@@ -266,5 +265,6 @@ type GetConfigReply struct {
 
 // GetConfig returns the config that the node was started with.
 func (service *Admin) GetConfig(_ *http.Request, args *struct{}, reply *GetConfigReply) error {
-	return json.Unmarshal(service.NodeConfig, &reply.Config)
+	reply.Config = service.NodeConfig
+	return nil
 }

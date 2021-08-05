@@ -818,9 +818,14 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
+	// Convert node config to map
 	configJSON, err := json.Marshal(n.Config)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal config: %w", err)
+	}
+	configMap := make(map[string]interface{})
+	if err := json.Unmarshal(configJSON, &configMap); err != nil {
+		return fmt.Errorf("couldn't unmarshal config: %w", err)
 	}
 	service, err := admin.NewService(
 		admin.Config{
@@ -829,7 +834,7 @@ func (n *Node) initAdminAPI() error {
 			HTTPServer:   &n.APIServer,
 			ProfileDir:   n.Config.ProfilerConfig.Dir,
 			LogFactory:   n.LogFactory,
-			NodeConfig:   configJSON,
+			NodeConfig:   configMap,
 		},
 	)
 	if err != nil {
