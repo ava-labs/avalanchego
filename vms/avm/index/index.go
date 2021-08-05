@@ -22,8 +22,10 @@ import (
 )
 
 var (
-	idxKey         = []byte("idx")
-	idxCompleteKey = []byte("complete")
+	idxKey                         = []byte("idx")
+	idxCompleteKey                 = []byte("complete")
+	errIndexingRequiredFromGenesis = errors.New("running would create incomplete index. Allow incomplete indices or re-sync from genesis with indexing enabled")
+	errCausesIncompleteIndex       = errors.New("running would create incomplete index. Allow incomplete indices or enable indexing")
 )
 
 // AddressTxsIndexer maintains information about which transactions changed
@@ -255,23 +257,28 @@ func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowInc
 		return err
 	}
 
-	if !idxComplete { // In a previous run, we did not index so it's incomplete.
-		if enableIndexing && !allowIncomplete {
-			// indexing was disabled before but now we want to index.
-			return errors.New("running would create incomplete index. Allow incomplete indices or re-sync from genesis with indexing enabled")
-		}
+	if idxComplete && enableIndexing {
+		// indexing has been enabled in the past and we're enabling it now
+		return nil
+	}
+
+	if !idxComplete && enableIndexing && !allowIncomplete {
+		// In a previous run, we did not index so it's incomplete.
+		// indexing was disabled before but now we want to index.
+		return errIndexingRequiredFromGenesis
+	} else if !idxComplete {
 		// either indexing is disabled, or incomplete indices are ok, so we don't care that index is incomplete
 		return nil
 	}
 
 	// the index is complete
-	if !enableIndexing { // indexing is disabled this run
-		if !allowIncomplete {
-			return errors.New("running would create incomplete index. Allow incomplete indices or enable indexing")
-		}
+	if !enableIndexing && !allowIncomplete { // indexing is disabled this run
+		return errCausesIncompleteIndex
+	} else if !enableIndexing {
 		// running without indexing makes it incomplete
 		return database.PutBool(db, idxCompleteKey, false)
 	}
+
 	return nil
 }
 
