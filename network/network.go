@@ -1121,7 +1121,7 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(int(numToGossip))
+	peers, err := n.peers.sample(subnetID, int(numToGossip))
 	n.stateLock.RUnlock()
 	if err != nil {
 		return err

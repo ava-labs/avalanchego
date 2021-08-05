@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -100,61 +101,64 @@ func TestPeersData(t *testing.T) {
 func TestPeersDataSample(t *testing.T) {
 	data := peersData{}
 	data.initialize()
-
+	trackedSubnetIDs := ids.Set{}
+	trackedSubnetIDs.Add(constants.PrimaryNetworkID)
 	// Case: Empty
-	peers, err := data.sample(0)
+	peers, err := data.sample(constants.PrimaryNetworkID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.sample(1)
+	peers, err = data.sample(constants.PrimaryNetworkID, 1)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
 	// Case: 1 peer who hasn't finished handshake
 	peer1 := peer{
-		nodeID: ids.ShortID{0x01},
+		nodeID:         ids.ShortID{0x01},
+		trackedSubnets: trackedSubnetIDs,
 	}
 	data.add(&peer1)
-	peers, err = data.sample(0)
+	peers, err = data.sample(constants.PrimaryNetworkID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.sample(1)
+	peers, err = data.sample(constants.PrimaryNetworkID, 1)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
 	// Case: 1 peer who hasn't finished handshake, 1 who has
 	peer2 := peer{
-		nodeID: ids.ShortID{0x02},
+		nodeID:         ids.ShortID{0x02},
+		trackedSubnets: trackedSubnetIDs,
 	}
 	peer2.finishedHandshake.SetValue(true)
 	data.add(&peer2)
 
-	peers, err = data.sample(0)
+	peers, err = data.sample(constants.PrimaryNetworkID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.sample(1)
+	peers, err = data.sample(constants.PrimaryNetworkID, 1)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 1)
 	assert.EqualValues(t, peers[0].nodeID, peer2.nodeID)
 
-	peers, err = data.sample(2)
+	peers, err = data.sample(constants.PrimaryNetworkID, 2)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 1)
 	assert.EqualValues(t, peers[0].nodeID, peer2.nodeID)
 
 	// Case: 2 peers who have finished handshake
 	peer1.finishedHandshake.SetValue(true)
-	peers, err = data.sample(0)
+	peers, err = data.sample(constants.PrimaryNetworkID, 0)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	peers, err = data.sample(1)
+	peers, err = data.sample(constants.PrimaryNetworkID, 1)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 1)
 
-	peers, err = data.sample(2)
+	peers, err = data.sample(constants.PrimaryNetworkID, 2)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 2)
 	// Ensure both peers are sampled once
@@ -163,7 +167,7 @@ func TestPeersDataSample(t *testing.T) {
 			(peers[0].nodeID == peer2.nodeID && peers[1].nodeID == peer1.nodeID),
 	)
 
-	peers, err = data.sample(3)
+	peers, err = data.sample(constants.PrimaryNetworkID, 3)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 2)
 	// Ensure both peers are sampled once
