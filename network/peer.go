@@ -597,7 +597,7 @@ func (p *peer) sendVersionWithSubnets() {
 		p.net.stateLock.RUnlock()
 		return
 	}
-	trackedSubnets := p.net.whitelistedSubnets
+	whitelistedSubnets := p.net.whitelistedSubnets
 	msg, err := p.net.b.VersionWithSubnets(
 		p.net.networkID,
 		p.net.nodeID,
@@ -606,7 +606,7 @@ func (p *peer) sendVersionWithSubnets() {
 		p.net.versionCompatibility.Version().String(),
 		myVersionTime,
 		myVersionSig,
-		trackedSubnets.List(),
+		whitelistedSubnets.List(),
 	)
 	p.net.stateLock.RUnlock()
 	p.net.log.AssertNoError(err)
@@ -762,7 +762,6 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 	case p.closed.GetValue():
 		return
 	}
-
 	myTime := float64(p.net.clock.Unix())
 	peerTime := float64(msg.Get(message.MyTime).(uint64))
 	if math.Abs(peerTime-myTime) > p.net.maxClockDifference.Seconds() {
