@@ -29,8 +29,8 @@ import (
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
 
@@ -52,6 +52,7 @@ func BenchmarkInsertChain_valueTx_100kB_memdb(b *testing.B) {
 func BenchmarkInsertChain_valueTx_100kB_diskdb(b *testing.B) {
 	benchInsertChain(b, true, genValueTx(100*1024))
 }
+
 /*
 func BenchmarkInsertChain_uncles_memdb(b *testing.B) {
 	benchInsertChain(b, false, genUncles)
@@ -137,6 +138,7 @@ func genTxRing(naccounts int) func(int, *BlockGen) {
 }
 
 // genUncles generates blocks with two uncle headers.
+/*
 func genUncles(i int, gen *BlockGen) {
 	if i >= 6 {
 		b2 := gen.PrevBlock(i - 6).Header()
@@ -147,6 +149,7 @@ func genUncles(i int, gen *BlockGen) {
 		gen.AddUncle(b3)
 	}
 }
+*/
 
 func benchInsertChain(b *testing.B, disk bool, gen func(int, *BlockGen)) {
 	// Create the database in memory or in a temporary directory.

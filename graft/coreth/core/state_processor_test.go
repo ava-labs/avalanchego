@@ -221,7 +221,7 @@ func TestStateProcessorErrors(t *testing.T) {
 						Nonce:   0,
 					},
 				},
-				GasLimit: params.ApricotPhase1GasLimit, // dummy checks against it 
+				GasLimit: params.ApricotPhase1GasLimit, // dummy checks against it
 			}
 			genesis       = gspec.MustCommit(db)
 			blockchain, _ = NewBlockChain(db, defaultCacheConfig, gspec.Config, dummy.NewFaker(), vm.Config{}, common.Hash{})
