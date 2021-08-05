@@ -2999,7 +2999,6 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	wg1.Wait()
 	peers := net0.(*network).peers
 	count := 0
-	t.Log(peers)
 	for _, peer := range peers.peersList {
 		if peer == nil {
 			continue
