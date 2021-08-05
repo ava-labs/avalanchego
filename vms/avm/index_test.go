@@ -372,7 +372,7 @@ func TestMissingInputUTXOReturnsError(t *testing.T) {
 		{
 			TxID:        txID,
 			OutputIndex: uint32(0),
-			Symbol:      true,
+			Symbol:      false,
 		},
 	}
 	var outputUTXOs []*avax.UTXO

@@ -129,6 +129,10 @@ func (i *indexer) Add(
 ) error {
 	utxos := outputUTXOs
 	for _, utxoID := range inputUTXOIDs {
+		if utxoID.Symbolic() {
+			continue
+		}
+
 		utxo, err := getUTXOF(utxoID)
 		if err != nil { // should never happen
 			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
