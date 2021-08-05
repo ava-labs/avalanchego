@@ -450,10 +450,10 @@ func TestGetBalance(t *testing.T) {
 			t.Fatal(err)
 		}
 		if reply.Balance != cjson.Uint64(defaultBalance) {
-			t.Fatalf("Wrong balance. Expected %d ; Returned %d", reply.Balance, defaultBalance)
+			t.Fatalf("Wrong balance. Expected %d ; Returned %d", defaultBalance, reply.Balance)
 		}
 		if reply.Unlocked != cjson.Uint64(defaultBalance) {
-			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", reply.Unlocked, defaultBalance)
+			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", defaultBalance, reply.Unlocked)
 		}
 		if reply.LockedStakeable != 0 {
 			t.Fatalf("Wrong locked stakeable balance. Expected %d ; Returned %d", reply.LockedStakeable, 0)

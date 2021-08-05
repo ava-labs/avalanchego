@@ -60,7 +60,7 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	timestamp := vm.internalState.GetTimestamp()
+	timestamp := vs.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	// Make sure this transaction is well formed.
 	if err := tx.Verify(vm.ctx, vm.codec, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
