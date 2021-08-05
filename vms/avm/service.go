@@ -33,7 +33,7 @@ const (
 	maxKeystoreAddresses = 5000
 
 	// Max number of items allowed in a page
-	maxPageSize uint64 = 1000
+	maxPageSize uint64 = 1024
 )
 
 var (
