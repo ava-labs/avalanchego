@@ -70,7 +70,7 @@ var (
 	keys []*crypto.PrivateKeySECP256K1R
 
 	defaultMinValidatorStake = 5 * units.MilliAvax
-	defaultMaxValidatorStake = SupplyCap
+	defaultMaxValidatorStake = 100 * defaultMinValidatorStake
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
