@@ -241,11 +241,14 @@ func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
 // TODO(aaronbuchwald) thoroughly check this and make sure it's not broken
 func calculateDynamicFee(gas uint64, baseFee *big.Int) (uint64, error) {
 	// Calculate the amount of C-Chain AVAX to be consumed
+	// Note: [big.Int] math operations assign to the caller, but we do the
+	// assignment here as a style choice to make the math being performed
+	// more readable.
 	txGas := new(big.Int).SetUint64(gas)
-	txGas.Mul(txGas, baseFee)
+	txGas = txGas.Mul(txGas, baseFee)
 
 	// Transform [txGas] from denomination base 18 to base 9 to be
 	// used in atomic transaction flow checker.
-	txGas.Div(txGas, x2cRate)
+	txGas = txGas.Div(txGas, x2cRate)
 	return txGas.Uint64(), nil
 }
