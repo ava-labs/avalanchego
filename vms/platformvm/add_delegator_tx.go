@@ -486,6 +486,7 @@ func FixedMaxStakeAmount(
 				break
 			}
 
+			// Changed in AP3:
 			// If the new delegator has started, then this current delegator
 			// should have an end time that is > [startTime].
 			newDelegatorHasStartedBeforeFinish := toRemoveEndTime.After(startTime)
@@ -498,6 +499,9 @@ func FixedMaxStakeAmount(
 				return 0, err
 			}
 
+			// Changed in AP3:
+			// Remove the delegator from the heap and update the heap so that
+			// the top of the heap is the next delegator to remove.
 			toRemoveHeap.Remove()
 		}
 
@@ -508,8 +512,11 @@ func FixedMaxStakeAmount(
 			return 0, err
 		}
 
+		// Changed in AP3:
 		// If the new delegator has started, then this pending delegator should
-		// have a start time that is >= [startTime].
+		// have a start time that is >= [startTime]. Otherwise, the delegator
+		// hasn't started yet and the [currentStake] shouldn't count towards the
+		// [maximumStake] during the delegators delegation period.
 		newDelegatorHasStarted := !nextPendingStartTime.Before(startTime)
 		if newDelegatorHasStarted && currentStake > maxStake {
 			maxStake = currentStake
@@ -533,6 +540,9 @@ func FixedMaxStakeAmount(
 			return 0, err
 		}
 
+		// Changed in AP3:
+		// Remove the delegator from the heap and update the heap so that the
+		// top of the heap is the next delegator to remove.
 		toRemoveHeap.Remove()
 	}
 
