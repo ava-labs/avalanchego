@@ -239,8 +239,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Int(SnowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
 	fs.Int(SnowMaxProcessingKey, 1024, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, 2*time.Minute, "Maximum amount of time an item should be processing and still be healthy")
-	fs.Int64(SnowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
-	fs.Duration(SnowEpochDuration, 6*time.Hour, "Duration of each epoch")
+	fs.Int64(SnowEpochFirstTransitionKey, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
+	fs.Duration(SnowEpochDurationKey, 6*time.Hour, "Duration of each epoch")
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, false, "Enable Meter VMs to track VM performance with more granularity")

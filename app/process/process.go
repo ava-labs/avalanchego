@@ -65,25 +65,25 @@ func (a *App) Start() int {
 
 	// start the db manager
 	var dbManager manager.Manager
-	switch a.config.DBName {
+	switch a.config.DatabaseConfig.Name {
 	case rocksdb.Name:
-		path := filepath.Join(a.config.DBPath, rocksdb.Name)
+		path := filepath.Join(a.config.DatabaseConfig.Path, rocksdb.Name)
 		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase)
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase)
+		dbManager, err = manager.NewLevelDB(a.config.DatabaseConfig.Path, a.log, version.CurrentDatabase)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:
 		err = fmt.Errorf(
 			"db-type was %q but should have been one of {%s, %s, %s}",
-			a.config.DBName,
+			a.config.DatabaseConfig.Name,
 			leveldb.Name,
 			rocksdb.Name,
 			memdb.Name,
 		)
 	}
 	if err != nil {
-		a.log.Fatal("couldn't create %q db manager at %s: %s", a.config.DBName, a.config.DBPath, err)
+		a.log.Fatal("couldn't create %q db manager at %s: %s", a.config.DatabaseConfig.Name, a.config.DatabaseConfig.Path, err)
 		return 1
 	}
 

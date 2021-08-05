@@ -22,20 +22,27 @@ import (
 )
 
 type IPCConfig struct {
+	IPCAPIEnabled      bool
 	IPCPath            string
 	IPCDefaultChainIDs []string
 }
 
+type APIAuthConfig struct {
+	APIRequireAuthToken bool
+	APIAuthPassword     string
+}
+
 type APIConfig struct {
+	APIAuthConfig
+
 	HTTPHost string
 	HTTPPort uint16
 
-	HTTPSEnabled        bool
-	HTTPSKeyFile        string
-	HTTPSCertFile       string
-	APIRequireAuthToken bool
-	APIAuthPassword     string
-	APIAllowedOrigins   []string
+	HTTPSEnabled  bool
+	HTTPSKeyFile  string
+	HTTPSCertFile string
+
+	APIAllowedOrigins []string
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool
@@ -44,7 +51,6 @@ type APIConfig struct {
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
 	IndexAPIEnabled    bool
-	IPCAPIEnabled      bool
 }
 
 type PeerListGossipConfig struct {
@@ -113,9 +119,16 @@ type BootstrapConfig struct {
 	BootstrapIPs []utils.IPDesc
 }
 
+type DatabaseConfig struct {
+	// Path to database
+	Path string
+
+	// Name of the database type to use
+	Name string
+}
+
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
-	//genesis.Params
 	APIConfig
 	IPCConfig
 	GossipConfig
@@ -124,6 +137,7 @@ type Config struct {
 	genesis.TxFeeConfig
 	genesis.EpochConfig
 	BootstrapConfig
+	DatabaseConfig
 
 	// Genesis information
 	GenesisBytes []byte
@@ -137,14 +151,6 @@ type Config struct {
 
 	// Crypto configuration
 	EnableCrypto bool
-
-	// Path to database
-	DBPath string
-
-	// Name of the database type to use
-	DBName string
-
-	// Staking configuration
 
 	// Health
 	HealthCheckFreq time.Duration
@@ -166,9 +172,6 @@ type Config struct {
 
 	// Consensus configuration
 	ConsensusParams avalanche.Parameters
-
-	// IPC configuration
-	IPCAPIEnabled bool
 
 	// Metrics
 	MeterVMEnabled bool

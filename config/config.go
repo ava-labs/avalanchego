@@ -145,32 +145,43 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	return loggingConfig, nil
 }
 
+func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
+	config := node.APIAuthConfig{
+		APIRequireAuthToken: v.GetBool(APIAuthRequiredKey),
+	}
+	if config.APIRequireAuthToken {
+		passwordFilePath := v.GetString(APIAuthPasswordFileKey)
+		pwBytes, err := ioutil.ReadFile(passwordFilePath)
+		if err != nil {
+			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
+		}
+		config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
+		if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
+			return node.APIAuthConfig{}, errors.New("API auth password is not strong enough")
+		}
+	}
+	return config, nil
+}
+
 func getAPIConfig(v *viper.Viper) (node.APIConfig, error) {
 	config := node.APIConfig{}
+	var err error
+	config.APIAuthConfig, err = getAPIAuthConfig(v)
+	if err != nil {
+		return node.APIConfig{}, err
+	}
 	config.HTTPHost = v.GetString(HTTPHostKey)
 	config.HTTPPort = uint16(v.GetUint(HTTPPortKey))
 	config.HTTPSEnabled = v.GetBool(HTTPSEnabledKey)
 	config.HTTPSKeyFile = os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
 	config.HTTPSCertFile = os.ExpandEnv(v.GetString(HTTPSCertFileKey))
 	config.APIAllowedOrigins = v.GetStringSlice(HTTPAllowedOrigins)
-	config.APIRequireAuthToken = v.GetBool(APIAuthRequiredKey)
-	if config.APIRequireAuthToken {
-		passwordFile := v.GetString(APIAuthPasswordFileKey)
-		pwBytes, err := ioutil.ReadFile(passwordFile)
-		if err != nil {
-			return node.APIConfig{}, fmt.Errorf("api-auth-password-file %q failed to be read with: %w", passwordFile, err)
-		}
-		config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
-		if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
-			return node.APIConfig{}, errors.New("api-auth-password is not strong enough")
-		}
-	}
+
 	config.AdminAPIEnabled = v.GetBool(AdminAPIEnabledKey)
 	config.InfoAPIEnabled = v.GetBool(InfoAPIEnabledKey)
 	config.KeystoreAPIEnabled = v.GetBool(KeystoreAPIEnabledKey)
 	config.MetricsAPIEnabled = v.GetBool(MetricsAPIEnabledKey)
 	config.HealthAPIEnabled = v.GetBool(HealthAPIEnabledKey)
-	config.IPCAPIEnabled = v.GetBool(IpcAPIEnabledKey)
 	config.IndexAPIEnabled = v.GetBool(IndexEnabledKey)
 	return config, nil
 }
@@ -193,7 +204,9 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 }
 
 func getIPCConfig(v *viper.Viper) node.IPCConfig {
-	config := node.IPCConfig{}
+	config := node.IPCConfig{
+		IPCAPIEnabled: v.GetBool(IpcAPIEnabledKey),
+	}
 	if v.IsSet(IpcsChainIDsKey) {
 		config.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
 	}
@@ -397,13 +410,17 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 	return config, nil
 }
 
-func getProfilerConfig(v *viper.Viper) profiler.Config {
-	return profiler.Config{
+func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
+	config := profiler.Config{
 		Dir:         os.ExpandEnv(v.GetString(ProfileDirKey)),
 		Enabled:     v.GetBool(ProfileContinuousEnabledKey),
 		Freq:        v.GetDuration(ProfileContinuousFreqKey),
 		MaxNumFiles: v.GetInt(ProfileContinuousMaxFilesKey),
 	}
+	if config.Freq < 0 {
+		return profiler.Config{}, fmt.Errorf("%s must be >= 0", ProfileContinuousFreqKey)
+	}
+	return config, nil
 }
 
 func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
@@ -437,7 +454,7 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	// Load and parse the staking key/cert
 	cert, err := staking.LoadTLSCert(stakingKeyPath, stakingCertPath)
 	if err != nil {
-		return tls.Certificate{}, fmt.Errorf("problem reading staking certificate: %w", err)
+		return tls.Certificate{}, fmt.Errorf("couldn't read staking certificate: %w", err)
 	}
 	return *cert, nil
 }
@@ -491,175 +508,44 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getEpochConfig(v *viper.Viper, networkID uint32) genesis.EpochConfig {
+func getEpochConfig(v *viper.Viper, networkID uint32) (genesis.EpochConfig, error) {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		return genesis.EpochConfig{
-			EpochFirstTransition: time.Unix(v.GetInt64(SnowEpochFirstTransition), 0),
-			EpochDuration:        v.GetDuration(SnowEpochDuration),
+		config := genesis.EpochConfig{
+			EpochFirstTransition: time.Unix(v.GetInt64(SnowEpochFirstTransitionKey), 0),
+			EpochDuration:        v.GetDuration(SnowEpochDurationKey),
 		}
+		if config.EpochDuration <= 0 {
+			return genesis.EpochConfig{}, fmt.Errorf("%s must be > 0", SnowEpochDurationKey)
+		}
+		return config, nil
 	}
-	return genesis.GetEpochConfig(networkID)
+	return genesis.GetEpochConfig(networkID), nil
 }
 
 func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	whitelistedSubnetIDs := ids.Set{}
 	whitelistedSubnetIDs.Add(constants.PrimaryNetworkID)
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
-		if subnet != "" {
-			subnetID, err := ids.FromString(subnet)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't parse subnetID %qZ: %w", subnet, err)
-			}
-			whitelistedSubnetIDs.Add(subnetID)
+		if subnet == "" {
+			continue
 		}
+		subnetID, err := ids.FromString(subnet)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't parse subnetID %q: %w", subnet, err)
+		}
+		whitelistedSubnetIDs.Add(subnetID)
 	}
 	return whitelistedSubnetIDs, nil
 }
 
-func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
-	nodeConfig := node.Config{}
-
-	// Plugin directory defaults to [buildDir]/[pluginsDirName]
-	nodeConfig.PluginDir = filepath.Join(buildDir, pluginsDirName)
-
-	// Consensus Parameters
-	nodeConfig.ConsensusParams = getConsensusConfig(v)
-	if err := nodeConfig.ConsensusParams.Valid(); err != nil {
-		return node.Config{}, err
+func getDatabaseConfig(v *viper.Viper, networkID uint32) node.DatabaseConfig {
+	return node.DatabaseConfig{
+		Name: v.GetString(DBTypeKey),
+		Path: filepath.Join(
+			os.ExpandEnv(v.GetString(DBPathKey)),
+			constants.NetworkName(networkID),
+		),
 	}
-	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
-	if nodeConfig.ConsensusShutdownTimeout < 0 {
-		return node.Config{}, fmt.Errorf("%q must be >= 0", ConsensusShutdownTimeoutKey)
-	}
-
-	// Gossiping
-	var err error
-	nodeConfig.GossipConfig, err = getGossipConfig(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Logging
-	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Network ID
-	nodeConfig.NetworkID, err = constants.NetworkID(v.GetString(NetworkNameKey))
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Database
-	nodeConfig.DBName = v.GetString(DBTypeKey)
-	nodeConfig.DBPath = filepath.Join(
-		os.ExpandEnv(v.GetString(DBPathKey)),
-		constants.NetworkName(nodeConfig.NetworkID),
-	)
-
-	// IP configuration
-	nodeConfig.IPConfig, err = getIPConfig(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Staking
-	nodeConfig.StakingConfig, err = getStakingConfig(v, nodeConfig.NetworkID)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Whitelisted Subnets
-	nodeConfig.WhitelistedSubnets, err = getWhitelistedSubnets(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// HTTP APIs
-	nodeConfig.APIConfig, err = getAPIConfig(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Health
-	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
-	// Halflife of continuous averager used in health checks
-	healthCheckAveragerHalflife := v.GetDuration(HealthCheckAveragerHalflifeKey)
-	if healthCheckAveragerHalflife <= 0 {
-		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
-	}
-
-	// Router
-	nodeConfig.ConsensusRouter = &router.ChainRouter{}
-	nodeConfig.RouterHealthConfig, err = getRouterHealthConfig(v, healthCheckAveragerHalflife)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// IPCs
-	nodeConfig.IPCConfig = getIPCConfig(v)
-
-	// Metrics
-	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
-
-	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Benchlist
-	nodeConfig.BenchlistConfig = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
-
-	// File Descriptor Limit
-	fdLimit := v.GetUint64(FdLimitKey)
-	if err := ulimit.Set(fdLimit); err != nil {
-		return node.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
-	}
-
-	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
-	nodeConfig.EpochConfig = getEpochConfig(v, nodeConfig.NetworkID)
-
-	// Load genesis data
-	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
-		nodeConfig.NetworkID,
-		os.ExpandEnv(v.GetString(GenesisConfigFileKey)),
-	)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
-	}
-
-	// Assertions
-	nodeConfig.EnableAssertions = v.GetBool(AssertionsEnabledKey)
-
-	// Crypto
-	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
-
-	// Indexer
-	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
-
-	// Bootstrap Configs
-	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Chain Configs
-	nodeConfig.ChainConfigs, err = getChainConfigs(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Profiler
-	nodeConfig.ProfilerConfig = getProfilerConfig(v)
-
-	// VM Aliases
-	nodeConfig.VMAliases, err = getVMAliases(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-	return nodeConfig, nil
 }
 
 func getVMAliases(v *viper.Viper) (map[ids.ID][]string, error) {
@@ -716,7 +602,7 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	if v.IsSet(CorethConfigKey) {
 		// error if C config is already populated
 		if isCChainConfigSet(chainConfigs) {
-			return nil, fmt.Errorf("config for coreth(C) is already provided in chain config files")
+			return nil, errors.New("C-Chain config is already provided in chain config files")
 		}
 		corethConfigValue := v.Get(CorethConfigKey)
 		var corethConfigBytes []byte
@@ -768,7 +654,6 @@ func readChainConfigDirs(chainDirs []string) (map[string]chains.ChainConfig, err
 			Upgrade: upgradeData,
 		}
 	}
-
 	return chainConfigMap, nil
 }
 
@@ -822,4 +707,158 @@ func isCChainConfigSet(chainConfigs map[string]chains.ChainConfig) bool {
 		}
 	}
 	return false
+}
+
+func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
+	nodeConfig := node.Config{}
+
+	// Plugin directory defaults to [buildDir]/[pluginsDirName]
+	nodeConfig.PluginDir = filepath.Join(buildDir, pluginsDirName)
+
+	// Consensus Parameters
+	nodeConfig.ConsensusParams = getConsensusConfig(v)
+	if err := nodeConfig.ConsensusParams.Valid(); err != nil {
+		return node.Config{}, err
+	}
+	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
+	if nodeConfig.ConsensusShutdownTimeout < 0 {
+		return node.Config{}, fmt.Errorf("%q must be >= 0", ConsensusShutdownTimeoutKey)
+	}
+
+	// Gossiping
+	var err error
+	nodeConfig.GossipConfig, err = getGossipConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Logging
+	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Network ID
+	nodeConfig.NetworkID, err = constants.NetworkID(v.GetString(NetworkNameKey))
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Database
+	nodeConfig.DatabaseConfig = getDatabaseConfig(v, nodeConfig.NetworkID)
+
+	// IP configuration
+	nodeConfig.IPConfig, err = getIPConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Staking
+	nodeConfig.StakingConfig, err = getStakingConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Whitelisted Subnets
+	nodeConfig.WhitelistedSubnets, err = getWhitelistedSubnets(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// HTTP APIs
+	nodeConfig.APIConfig, err = getAPIConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Health
+	nodeConfig.HealthCheckFreq = v.GetDuration(HealthCheckFreqKey)
+	if nodeConfig.HealthCheckFreq < 0 {
+		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckFreqKey)
+	}
+	// Halflife of continuous averager used in health checks
+	healthCheckAveragerHalflife := v.GetDuration(HealthCheckAveragerHalflifeKey)
+	if healthCheckAveragerHalflife <= 0 {
+		return node.Config{}, fmt.Errorf("%s must be positive", HealthCheckAveragerHalflifeKey)
+	}
+
+	// Router
+	nodeConfig.ConsensusRouter = &router.ChainRouter{}
+	nodeConfig.RouterHealthConfig, err = getRouterHealthConfig(v, healthCheckAveragerHalflife)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// IPCs
+	nodeConfig.IPCConfig = getIPCConfig(v)
+
+	// Metrics
+	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
+
+	// Network Config
+	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Benchlist
+	nodeConfig.BenchlistConfig = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
+
+	// File Descriptor Limit
+	fdLimit := v.GetUint64(FdLimitKey)
+	if err := ulimit.Set(fdLimit); err != nil {
+		return node.Config{}, fmt.Errorf("failed to set fd limit correctly due to: %w", err)
+	}
+
+	// Tx Fee
+	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
+
+	// Epoch
+	nodeConfig.EpochConfig, err = getEpochConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, fmt.Errorf("couldn't load epoch config: %w", err)
+	}
+
+	// Genesis Data
+	nodeConfig.GenesisBytes, nodeConfig.AvaxAssetID, err = genesis.Genesis(
+		nodeConfig.NetworkID,
+		os.ExpandEnv(v.GetString(GenesisConfigFileKey)),
+	)
+	if err != nil {
+		return node.Config{}, fmt.Errorf("unable to load genesis file: %w", err)
+	}
+
+	// Assertions
+	nodeConfig.EnableAssertions = v.GetBool(AssertionsEnabledKey)
+
+	// Crypto
+	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
+
+	// Indexer
+	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
+
+	// Bootstrap Configs
+	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Chain Configs
+	nodeConfig.ChainConfigs, err = getChainConfigs(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// Profiler
+	nodeConfig.ProfilerConfig, err = getProfilerConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	// VM Aliases
+	nodeConfig.VMAliases, err = getVMAliases(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+	return nodeConfig, nil
 }
