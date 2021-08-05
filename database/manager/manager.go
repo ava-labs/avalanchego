@@ -81,14 +81,12 @@ func NewRocksDB(
 	dbDirPath string,
 	log logging.Logger,
 	currentVersion version.Version,
-	includePreviousVersions bool,
 ) (Manager, error) {
 	return new(
 		rocksdb.New,
 		dbDirPath,
 		log,
 		currentVersion,
-		includePreviousVersions,
 	)
 }
 
@@ -100,14 +98,12 @@ func NewLevelDB(
 	dbDirPath string,
 	log logging.Logger,
 	currentVersion version.Version,
-	includePreviousVersions bool,
 ) (Manager, error) {
 	return new(
 		leveldb.New,
 		dbDirPath,
 		log,
 		currentVersion,
-		includePreviousVersions,
 	)
 }
 
@@ -120,7 +116,6 @@ func new(
 	dbDirPath string,
 	log logging.Logger,
 	currentVersion version.Version,
-	includePreviousVersions bool,
 ) (Manager, error) {
 	parser := version.NewDefaultParser()
 	currentDBPath := filepath.Join(dbDirPath, currentVersion.String())
@@ -136,11 +131,6 @@ func new(
 				Version:  currentVersion,
 			},
 		},
-	}
-
-	// Conditionally ignore old databases
-	if !includePreviousVersions {
-		return manager, nil
 	}
 
 	// Open old database versions and add them to [manager]

@@ -10,7 +10,4 @@ const (
 
 	// AppName exports the name of the avalanche application
 	AppName = "avalanchego"
-
-	// ExitCodeDoneMigrating explicitly sets the exit code returned when the migration is finished
-	ExitCodeDoneMigrating = 42
 )
