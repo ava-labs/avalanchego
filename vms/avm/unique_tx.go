@@ -123,12 +123,10 @@ func (tx *UniqueTx) Accept() error {
 
 	// index input and output UTXOs
 	if err := tx.vm.addressTxsIndexer.Add(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), tx.vm.getUTXO); err != nil {
-		_ = tx.vm.Shutdown()
 		return err
 	}
 
 	if err := tx.vm.addressTxsIndexer.Accept(txID); err != nil {
-		_ = tx.vm.Shutdown()
 		return err
 	}
 
