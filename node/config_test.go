@@ -31,7 +31,7 @@ func TestVMAliasesMarshalJSON(t *testing.T) {
 		v[id1] = []string{"foo", "bar"}
 		bytes, err := v.MarshalJSON()
 		assert.NoError(err)
-		expected := fmt.Sprintf("{\"%s\": [\"foo\", \"bar\"]}", id1)
+		expected := fmt.Sprintf("{\"%s\": [\"foo\",\"bar\"]}", id1)
 		assert.EqualValues(expected, string(bytes))
 	}
 	{
@@ -42,7 +42,7 @@ func TestVMAliasesMarshalJSON(t *testing.T) {
 		v[id2] = []string{"foo2", "bar2"}
 		bytes, err := v.MarshalJSON()
 		assert.NoError(err)
-		expected := fmt.Sprintf("{\"%s\": [\"foo\", \"bar\"], \"%s\": [\"foo2\", \"bar2\"]}", id1, id2)
+		expected := fmt.Sprintf("{\"%s\": [\"foo\",\"bar\"],\"%s\": [\"foo2\",\"bar2\"]}", id1, id2)
 		assert.EqualValues(expected, string(bytes))
 	}
 }

@@ -46,7 +46,8 @@ type Admin struct {
 	profiler profiler.Profiler
 }
 
-// NewService returns a new admin API service
+// NewService returns a new admin API service.
+// All of the fields in [config] must be set.
 func NewService(config Config) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
