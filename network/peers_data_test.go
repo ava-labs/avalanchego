@@ -176,24 +176,28 @@ func TestPeersDataSample(t *testing.T) {
 			(peers[0].nodeID == peer2.nodeID && peers[1].nodeID == peer1.nodeID),
 	)
 
-	// peer with additional subnet sampled
-	testID := ids.GenerateTestID()
+	testSubnetID := ids.GenerateTestID()
 
 	// no peers has this subnet
-	peers, err = data.sample(testID, 3)
+	peers, err = data.sample(testSubnetID, 3)
 	assert.NoError(t, err)
 	assert.Len(t, peers, 0)
 
-	trackedSubnetIDs.Add(testID)
+	// peer with additional subnet sampled
+	newSubnetSet := ids.Set{}
+	newSubnetSet.Add(constants.PrimaryNetworkID, testSubnetID)
+
 	peer3 := peer{
 		nodeID:         ids.ShortID{0x03},
-		trackedSubnets: trackedSubnetIDs,
+		trackedSubnets: newSubnetSet,
 	}
 	peer3.finishedHandshake.SetValue(true)
 	data.add(&peer3)
-	peers, err = data.sample(testID, 3)
+
+	peers, err = data.sample(testSubnetID, 3)
 	assert.NoError(t, err)
-	assert.Len(t, peers, 3)
+	assert.Len(t, peers, 1)
+
 	// Ensure peer is sampled
-	assert.Equal(t, peers[0].nodeID, peer3.nodeID)
+	assert.Equal(t, peer3.nodeID, peers[0].nodeID)
 }
