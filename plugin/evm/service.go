@@ -434,22 +434,6 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem initializing transaction: %w", err)
 	}
 
-	blockIntf := service.vm.LastAcceptedBlockInternal()
-	block, ok := blockIntf.(*Block)
-	if !ok {
-		return fmt.Errorf("last accepted block %s had unexpected type %T", blockIntf.ID(), blockIntf)
-	}
-	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, block, service.vm.currentRules()); err != nil {
-		return err
-	}
-	state, err := service.vm.chain.CurrentState()
-	if err != nil {
-		return fmt.Errorf("problem retrieving current state: %w", err)
-	}
-	if err := tx.UnsignedAtomicTx.EVMStateTransfer(service.vm.ctx, state); err != nil {
-		return err
-	}
-
 	response.TxID = tx.ID()
 	return service.vm.issueTx(tx)
 }
