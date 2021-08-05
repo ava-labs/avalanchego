@@ -249,7 +249,7 @@ func (vm *VM) Initialize(
 		vm.ctx.Log.Info("address transaction indexing is enabled")
 		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, ctx.Namespace, ctx.Metrics, avmConfig.IndexAllowIncomplete)
 		if err != nil {
-			return fmt.Errorf("failed to address transaction initialize indexer: %w", err)
+			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
 		}
 	} else {
 		vm.ctx.Log.Info("address transaction indexing is disabled")
