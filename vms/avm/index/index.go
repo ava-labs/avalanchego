@@ -63,6 +63,10 @@ type AddressTxsIndexer interface {
 	// The length of the returned slice <= [pageSize].
 	// [cursor] is the offset to start reading from.
 	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
+
+	// IndexedTx returns map of [address] and the respective [assetID] slice for a given [txID]
+	// helper function for testing
+	IndexedTx(txID ids.ID) map[ids.ShortID][]ids.ID
 }
 
 // indexer implements AddressTxsIndexer
@@ -140,6 +144,10 @@ func (i *indexer) Add(
 		utxos = append(utxos, utxo)
 	}
 	for _, utxo := range utxos {
+		if utxo.Symbolic() {
+			continue
+		}
+
 		out, ok := utxo.Out.(avax.Addressable)
 		if !ok {
 			i.log.Verbo("skipping UTXO %s for indexing", utxo.InputID())
@@ -286,6 +294,24 @@ func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowInc
 	return nil
 }
 
+// IndexedTx returns map of [address] and the respective [assetID] slice for a given [txID]
+// helper function for testing
+func (i *indexer) IndexedTx(txID ids.ID) map[ids.ShortID][]ids.ID {
+	addressMap := i.balanceChanges[txID]
+	if addressMap == nil {
+		return nil
+	}
+	retMap := make(map[ids.ShortID][]ids.ID, len(addressMap))
+	for address, assetSet := range addressMap {
+		assets := make([]ids.ID, len(addressMap))
+		for assetID := range assetSet {
+			assets = append(assets, assetID)
+		}
+		retMap[address] = assets
+	}
+	return retMap
+}
+
 type noIndexer struct{}
 
 func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer, error) {
@@ -304,4 +330,8 @@ func (i *noIndexer) Clear(ids.ID) {}
 
 func (i *noIndexer) Read(ids.ShortID, ids.ID, uint64, uint64) ([]ids.ID, error) {
 	return nil, nil
+}
+
+func (i *noIndexer) IndexedTx(ids.ID) map[ids.ShortID][]ids.ID {
+	return nil
 }

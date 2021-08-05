@@ -386,6 +386,55 @@ func TestMissingInputUTXOReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), errMissingUTXO.Error())
 }
 
+func TestSymbolicOutputUTXOIsSkipped(t *testing.T) {
+	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
+	ctx := NewContext(t)
+
+	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
+
+	indexer, err := index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
+	assert.NoError(t, err)
+
+	txID := ids.GenerateTestID()
+	inputUTXOIDs := []*avax.UTXOID{
+		{
+			TxID:        txID,
+			OutputIndex: uint32(0),
+			Symbol:      false,
+		},
+	}
+	inputUTXO := avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: uint32(0),
+			Symbol:      false,
+		},
+		Asset: avax.Asset{ID: assetID},
+	}
+
+	outputUTXOs := []*avax.UTXO{
+		{
+			UTXOID: avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: uint32(0),
+				Symbol:      true,
+			},
+			Asset: avax.Asset{ID: assetID},
+		},
+	}
+
+	getUTXOFn := func(utxoID *avax.UTXOID) (*avax.UTXO, error) {
+		assert.Equal(t, utxoID, inputUTXOIDs[0])
+		return &inputUTXO, nil
+	}
+
+	err = indexer.Add(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
+
+	assert.NoError(t, err)
+	addressAssetMap := indexer.IndexedTx(txID)
+	assert.Len(t, addressAssetMap, 0)
+}
+
 func TestIndexer_Read(t *testing.T) {
 	// setup vm, db etc
 	_, vm, _, _, _ := setup(t, true)
