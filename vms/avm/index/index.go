@@ -285,10 +285,7 @@ func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowInc
 type noIndexer struct{}
 
 func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer, error) {
-	if err := checkIndexStatus(db, false, allowIncomplete); err != nil {
-		return nil, err
-	}
-	return &noIndexer{}, nil
+	return &noIndexer{}, checkIndexStatus(db, false, allowIncomplete)
 }
 
 func (i *noIndexer) Add(ids.ID, []*avax.UTXOID, []*avax.UTXO, func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
