@@ -813,16 +813,17 @@ func (n *Node) initMetricsAPI() error {
 // initAdminAPI initializes the Admin API service
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
 func (n *Node) initAdminAPI() error {
-	if !n.Config.AdminAPIEnabled {
-		n.Log.Info("skipping admin API initialization because it has been disabled")
-		return nil
-	}
-	n.Log.Info("initializing admin API")
 	// Convert node config to map
 	configJSON, err := json.Marshal(n.Config)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal config: %w", err)
 	}
+	n.Log.Info("node config:\n%s", configJSON)
+	if !n.Config.AdminAPIEnabled {
+		n.Log.Info("skipping admin API initialization because it has been disabled")
+		return nil
+	}
+	n.Log.Info("initializing admin API")
 	configMap := make(map[string]interface{})
 	if err := json.Unmarshal(configJSON, &configMap); err != nil {
 		return fmt.Errorf("couldn't unmarshal config: %w", err)
