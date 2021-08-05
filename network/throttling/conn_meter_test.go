@@ -16,7 +16,6 @@ const (
 	host2 = "127.0.0.2"
 	host3 = "127.0.0.3"
 	host4 = "127.0.0.4"
-	host5 = "127.0.0.5"
 )
 
 func TestNoInboundConnThrottler(t *testing.T) {
@@ -51,6 +50,8 @@ func TestNoInboundConnThrottler(t *testing.T) {
 }
 
 func TestInboundConnThrottler(t *testing.T) {
+	assert := assert.New(t)
+
 	cooldown := 5 * time.Second
 	throttlerIntf := NewInboundConnThrottler(
 		logging.NoLog{},
@@ -59,27 +60,21 @@ func TestInboundConnThrottler(t *testing.T) {
 			MaxRecentConns: 3,
 		},
 	)
-	go throttlerIntf.Dispatch()
 
 	// Allow should always return true
 	// when called with a given IP for the first time
-	assert.True(t, throttlerIntf.Allow(host1))
-	assert.True(t, throttlerIntf.Allow(host2))
-	assert.True(t, throttlerIntf.Allow(host3))
+	assert.True(throttlerIntf.Allow(host1))
+	assert.True(throttlerIntf.Allow(host2))
+	assert.True(throttlerIntf.Allow(host3))
 
-	// If we didn't do the line below, there would be a race condition
-	// where the number of messages on recentIPsAndTimes could be
-	// MaxRecentConns or MaxRecentConns - 1. We do the line below
-	// to ensure that the number of messages is MaxRecentConns
-	_ = throttlerIntf.Allow(host4)
 	// Shouldn't allow this IP because the number of connections
 	// within the last [cooldown] is at [MaxRecentConns]
-	assert.False(t, throttlerIntf.Allow(host5))
+	assert.False(throttlerIntf.Allow(host4))
 
 	// Shouldn't allow these IPs again until [cooldown] has passed
-	assert.False(t, throttlerIntf.Allow(host1))
-	assert.False(t, throttlerIntf.Allow(host2))
-	assert.False(t, throttlerIntf.Allow(host3))
+	assert.False(throttlerIntf.Allow(host1))
+	assert.False(throttlerIntf.Allow(host2))
+	assert.False(throttlerIntf.Allow(host3))
 
 	// Make sure [throttler.done] isn't closed
 	throttler := throttlerIntf.(*inboundConnThrottler)
@@ -94,7 +89,7 @@ func TestInboundConnThrottler(t *testing.T) {
 	// Make sure [throttler.done] is closed
 	select {
 	case _, chanOpen := <-throttler.done:
-		assert.False(t, chanOpen)
+		assert.False(chanOpen)
 	default:
 		t.Fatal("should be done")
 	}
