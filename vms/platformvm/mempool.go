@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
@@ -21,7 +22,8 @@ const (
 	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
 
-	MaxMempoolByteSize = 3 * units.GiB // TODO: Should be default, configurable by users
+	MaxMempoolByteSize   = 3 * units.GiB // TODO: Should be default, configurable by users
+	rejectedTxsCacheSize = 50
 )
 
 var (
@@ -68,15 +70,18 @@ type Mempool struct {
 	timer *timer.Timer
 
 	// Transactions that have not been put into blocks yet
-	dropIncoming        bool
+	dropIncoming bool
+
 	unissuedProposalTxs *EventHeap
-	rejectedProposalTxs map[ids.ID]struct{}
 	unissuedDecisionTxs []*Tx
-	rejectedDecisionTxs map[ids.ID]struct{}
 	unissuedAtomicTxs   []*Tx
-	rejectedAtomicTxs   map[ids.ID]struct{}
-	unissuedTxs         map[ids.ID]*Tx
-	totalBytesSize      int
+
+	rejectedProposalTxs *cache.LRU
+	rejectedDecisionTxs *cache.LRU
+	rejectedAtomicTxs   *cache.LRU
+
+	unissuedTxs    map[ids.ID]*Tx
+	totalBytesSize int
 }
 
 func (m *Mempool) has(txID ids.ID) bool {
@@ -91,11 +96,11 @@ func (m *Mempool) hasRoomFor(tx *Tx) bool {
 func (m *Mempool) markReject(tx *Tx) error {
 	switch tx.UnsignedTx.(type) {
 	case UnsignedProposalTx:
-		m.rejectedProposalTxs[tx.ID()] = struct{}{}
+		m.rejectedProposalTxs.Put(tx.ID(), struct{}{})
 	case UnsignedDecisionTx:
-		m.rejectedDecisionTxs[tx.ID()] = struct{}{}
+		m.rejectedDecisionTxs.Put(tx.ID(), struct{}{})
 	case UnsignedAtomicTx:
-		m.rejectedAtomicTxs[tx.ID()] = struct{}{}
+		m.rejectedAtomicTxs.Put(tx.ID(), struct{}{})
 	default:
 		return errUnknownTxType
 	}
@@ -104,11 +109,11 @@ func (m *Mempool) markReject(tx *Tx) error {
 
 func (m *Mempool) isAlreadyRejected(txID ids.ID) bool {
 	res := false
-	if _, ok := m.rejectedProposalTxs[txID]; ok {
+	if _, exist := m.rejectedProposalTxs.Get(txID); exist {
 		res = true
-	} else if _, ok := m.rejectedDecisionTxs[txID]; ok {
+	} else if _, exist := m.rejectedDecisionTxs.Get(txID); exist {
 		res = true
-	} else if _, ok := m.rejectedAtomicTxs[txID]; ok {
+	} else if _, exist := m.rejectedAtomicTxs.Get(txID); exist {
 		res = true
 	}
 
@@ -136,9 +141,9 @@ func (m *Mempool) Initialize(vm *VM) {
 	m.unissuedTxs = make(map[ids.ID]*Tx)
 	m.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
 
-	m.rejectedProposalTxs = make(map[ids.ID]struct{})
-	m.rejectedDecisionTxs = make(map[ids.ID]struct{})
-	m.rejectedAtomicTxs = make(map[ids.ID]struct{})
+	m.rejectedProposalTxs = &cache.LRU{Size: rejectedTxsCacheSize}
+	m.rejectedDecisionTxs = &cache.LRU{Size: rejectedTxsCacheSize}
+	m.rejectedAtomicTxs = &cache.LRU{Size: rejectedTxsCacheSize}
 
 	m.timer = timer.NewTimer(func() {
 		m.vm.ctx.Lock.Lock()
