@@ -60,6 +60,10 @@ type Logger interface {
 	SetLogLevel(Level)
 	// Only logged events above or equal to the level set will be logged
 	SetDisplayLevel(Level)
+	// Gets current LogLevel
+	GetLogLevel() Level
+	// Gets current DisplayLevel
+	GetDisplayLevel() Level
 	// Add a prefix to all logged messages
 	SetPrefix(string)
 	// Enable or disable logging

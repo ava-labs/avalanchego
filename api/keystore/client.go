@@ -11,19 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Client ...
 type Client struct {
 	requester rpc.EndpointRequester
 }
 
-// NewClient ...
 func NewClient(uri string, requestTimeout time.Duration) *Client {
 	return &Client{
 		requester: rpc.NewEndpointRequester(uri, "/ext/keystore", "keystore", requestTimeout),
 	}
 }
 
-// CreateUser ...
 func (c *Client) CreateUser(user api.UserPass) (bool, error) {
 	res := &api.SuccessResponse{}
 	err := c.requester.SendRequest("createUser", &user, res)
@@ -51,7 +48,7 @@ func (c *Client) ExportUser(user api.UserPass) ([]byte, error) {
 
 // ImportUser imports the keystore user in [account] under [user]
 func (c *Client) ImportUser(user api.UserPass, account []byte) (bool, error) {
-	accountStr, err := formatting.Encode(formatting.Hex, account)
+	accountStr, err := formatting.EncodeWithChecksum(formatting.Hex, account)
 	if err != nil {
 		return false, err
 	}

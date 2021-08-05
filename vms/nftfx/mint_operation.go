@@ -3,21 +3,29 @@ package nftfx
 import (
 	"errors"
 
+	"github.com/ava-labs/avalanchego/vms/types"
+
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 var errNilMintOperation = errors.New("nil mint operation")
 
-// MintOperation ...
 type MintOperation struct {
 	MintInput secp256k1fx.Input           `serialize:"true" json:"mintInput"`
 	GroupID   uint32                      `serialize:"true" json:"groupID"`
-	Payload   []byte                      `serialize:"true" json:"payload"`
+	Payload   types.JSONByteSlice         `serialize:"true" json:"payload"`
 	Outputs   []*secp256k1fx.OutputOwners `serialize:"true" json:"outputs"`
 }
 
-// Outs ...
+func (op *MintOperation) InitCtx(ctx *snow.Context) {
+	for _, out := range op.Outputs {
+		out.InitCtx(ctx)
+	}
+}
+
+// Outs Returns []TransferOutput as []verify.State
 func (op *MintOperation) Outs() []verify.State {
 	outs := []verify.State{}
 	for _, out := range op.Outputs {
@@ -30,7 +38,6 @@ func (op *MintOperation) Outs() []verify.State {
 	return outs
 }
 
-// Verify ...
 func (op *MintOperation) Verify() error {
 	switch {
 	case op == nil:

@@ -156,8 +156,13 @@ func newPeer(net *network, conn net.Conn, ip utils.IPDesc) *peer {
 
 // assume the [stateLock] is held
 func (p *peer) Start() {
-	go p.ReadMessages()
-	go p.WriteMessages()
+	go func() {
+		// Make sure that the version is the first message sent
+		p.sendVersion()
+
+		go p.ReadMessages()
+		go p.WriteMessages()
+	}()
 }
 
 func (p *peer) StartTicker() {
@@ -306,8 +311,6 @@ func (p *peer) ReadMessages() {
 func (p *peer) WriteMessages() {
 	defer p.Close()
 
-	p.sendVersion()
-
 	var reader bytes.Reader
 	writer := bufio.NewWriter(p.conn)
 	for { // When this loop exits, p.sendQueueCond.L is unlocked
@@ -414,6 +417,10 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 	}
 	msgMetrics.numReceived.Inc()
 	msgMetrics.receivedBytes.Add(float64(msgLen))
+	// assume that if [saved] == 0, [msg] wasn't compressed
+	if saved := msg.BytesSavedCompression(); saved != 0 {
+		msgMetrics.savedReceivedBytes.Observe(float64(saved))
+	}
 
 	switch op { // Network-related message types
 	case message.Version:
@@ -523,6 +530,10 @@ func (p *peer) sendGetVersion() {
 	if sent {
 		p.net.metrics.getVersion.numSent.Inc()
 		p.net.metrics.getVersion.sentBytes.Add(float64(lenMsg))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			p.net.metrics.getVersion.savedSentBytes.Observe(float64(saved))
+		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.metrics.getVersion.numFailed.Inc()
@@ -556,6 +567,10 @@ func (p *peer) sendVersion() {
 	if sent {
 		p.net.metrics.version.numSent.Inc()
 		p.net.metrics.version.sentBytes.Add(float64(lenMsg))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			p.net.metrics.version.savedSentBytes.Observe(float64(saved))
+		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 		p.versionSent.SetValue(true)
 	} else {
@@ -574,6 +589,10 @@ func (p *peer) sendGetPeerList() {
 	if sent {
 		p.net.getPeerlist.numSent.Inc()
 		p.net.getPeerlist.sentBytes.Add(float64(lenMsg))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			p.net.metrics.getPeerlist.savedSentBytes.Observe(float64(saved))
+		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.getPeerlist.numFailed.Inc()
@@ -602,6 +621,10 @@ func (p *peer) sendPeerList() {
 	if sent {
 		p.net.peerList.numSent.Inc()
 		p.net.peerList.sentBytes.Add(float64(lenMsg))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			p.net.metrics.peerList.savedSentBytes.Observe(float64(saved))
+		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 		p.peerListSent.SetValue(true)
 	} else {
@@ -619,6 +642,10 @@ func (p *peer) sendPing() {
 	if sent {
 		p.net.ping.numSent.Inc()
 		p.net.ping.sentBytes.Add(float64(lenMsg))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			p.net.metrics.ping.savedSentBytes.Observe(float64(saved))
+		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.ping.numFailed.Inc()
@@ -635,6 +662,10 @@ func (p *peer) sendPong() {
 	if sent {
 		p.net.pong.numSent.Inc()
 		p.net.pong.sentBytes.Add(float64(lenMsg))
+		// assume that if [saved] == 0, [msg] wasn't compressed
+		if saved := msg.BytesSavedCompression(); saved != 0 {
+			p.net.metrics.pong.savedSentBytes.Observe(float64(saved))
+		}
 		p.net.sendFailRateCalculator.Observe(0, p.net.clock.Time())
 	} else {
 		p.net.pong.numFailed.Inc()
@@ -853,11 +884,6 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 func (p *peer) handlePeerList(msg message.Message) {
 	p.gotPeerList.SetValue(true)
 	p.tryMarkFinishedHandshake()
-
-	if p.net.isFetchOnly {
-		// If the node is in fetch only mode, drop all incoming peers
-		return
-	}
 
 	ips := msg.Get(message.SignedPeers).([]utils.IPCertDesc)
 	for _, ip := range ips {

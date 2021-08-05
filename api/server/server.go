@@ -80,6 +80,7 @@ func (s *Server) Initialize(
 	s.nodeID = nodeID
 
 	s.log.Info("API created with allowed origins: %v", allowedOrigins)
+
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   allowedOrigins,
 		AllowCredentials: true,
@@ -273,7 +274,6 @@ func (s *Server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 	return s.AddAliases(endpoint, aliases...)
 }
 
-// Call ...
 func (s *Server) Call(
 	writer http.ResponseWriter,
 	method,

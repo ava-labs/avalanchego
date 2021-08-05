@@ -11,12 +11,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/database/manager"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 // strongPassword defines a password used for the following tests that
@@ -432,96 +428,5 @@ func TestServiceDeleteUser(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// 1st part -> insert data into 1.0.0
-// 2nd part -> migrate data from 1.0.0 to 1.4.5
-// 3rd part -> check if data from 1.0.0 exists in 1.4.5
-func TestMigrateKeystoreUser(t *testing.T) {
-	testUser := "testUser"
-	password := "passwTest@fake01ord"
-	bID := ids.Empty
-	versionedDBs := []*manager.VersionedDatabase{
-		{
-			Database: memdb.New(),
-			Version:  version.DefaultVersion1_0_0,
-		},
-	}
-
-	dbManager, err := manager.NewManagerFromDBs(versionedDBs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ks, err := New(logging.NoLog{}, dbManager)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := ks.CreateUser(testUser, password); err != nil {
-		t.Fatalf("Failed to create user: %s", err)
-	}
-
-	userDB, err := ks.GetDatabase(bID, testUser, password)
-	if err != nil {
-		t.Fatalf("Failed to get user database: %s", err)
-	}
-	k1 := []byte("Old")
-	v1 := []byte("Dominion")
-	if err := userDB.Put(k1, v1); err != nil {
-		t.Fatalf("Failed to put value in userDB: %s", err)
-	}
-	k2 := []byte("Luke")
-	v2 := []byte("Bryan")
-	if err := userDB.Put(k2, v2); err != nil {
-		t.Fatalf("Failed to put value in userDB: %s", err)
-	}
-
-	versionedDBs = append(versionedDBs, &manager.VersionedDatabase{
-		Database: memdb.New(),
-		Version:  version.DatabaseVersion1_4_5,
-	})
-	upgradedDBManager, err := manager.NewManagerFromDBs(versionedDBs)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	ksUpgraded, err := New(logging.NoLog{}, upgradedDBManager)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	users, err := ksUpgraded.ListUsers()
-	if err != nil {
-		t.Fatalf("Failed to list users: %s", err)
-	}
-
-	if len(users) != 1 {
-		t.Fatalf("Exepcted 1 user, but found: %d", len(users))
-	}
-
-	if users[0] != testUser {
-		t.Fatalf("Expected first user to be %s, but found %s", testUser, users[0])
-	}
-
-	userDB, err = ksUpgraded.GetDatabase(bID, testUser, password)
-	if err != nil {
-		t.Fatalf("Failed to get user database from upgraded DB: %s", err)
-	}
-
-	value, err := userDB.Get(k1)
-	if err != nil {
-		t.Fatalf("Failed to get value from userDB: %s", err)
-	}
-	if !bytes.Equal(value, v1) {
-		t.Fatalf("Expected value: %s, but found %s", value, v1)
-	}
-
-	value, err = userDB.Get(k2)
-	if err != nil {
-		t.Fatalf("Failed to get value from userDB: %s", err)
-	}
-	if !bytes.Equal(value, v2) {
-		t.Fatalf("Expected value: %s, but found %s", value, v2)
 	}
 }

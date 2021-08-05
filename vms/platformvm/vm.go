@@ -273,7 +273,6 @@ func (vm *VM) Bootstrapped() error {
 	errs.Add(
 		vm.updateValidators(false),
 		vm.fx.Bootstrapped(),
-		vm.migrateUptimes(),
 	)
 	if errs.Errored() {
 		return errs.Err

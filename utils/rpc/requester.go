@@ -13,7 +13,6 @@ import (
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
-// Requester ...
 type Requester interface {
 	SendJSONRPCRequest(endpoint string, method string, params interface{}, reply interface{}) error
 }
@@ -23,7 +22,6 @@ type jsonRPCRequester struct {
 	client http.Client
 }
 
-// NewRPCRequester ...
 func NewRPCRequester(uri string, requestTimeout time.Duration) Requester {
 	return &jsonRPCRequester{
 		uri: uri,
@@ -33,7 +31,6 @@ func NewRPCRequester(uri string, requestTimeout time.Duration) Requester {
 	}
 }
 
-// SendJSONRPCRequest ...
 func (requester jsonRPCRequester) SendJSONRPCRequest(endpoint string, method string, params interface{}, reply interface{}) error {
 	// Golang has a nasty & subtle behaviour where duplicated '//' in the URL is treated as GET, even if it's POST
 	// https://stackoverflow.com/questions/23463601/why-golang-treats-my-post-request-as-a-get-one
@@ -64,7 +61,6 @@ func (requester jsonRPCRequester) SendJSONRPCRequest(endpoint string, method str
 	return resp.Body.Close()
 }
 
-// EndpointRequester ...
 type EndpointRequester interface {
 	SendRequest(method string, params interface{}, reply interface{}) error
 }
@@ -74,7 +70,6 @@ type avalancheEndpointRequester struct {
 	endpoint, base string
 }
 
-// NewEndpointRequester ...
 func NewEndpointRequester(uri, endpoint, base string, requestTimeout time.Duration) EndpointRequester {
 	return &avalancheEndpointRequester{
 		requester: NewRPCRequester(uri, requestTimeout),

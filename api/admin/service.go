@@ -37,10 +37,11 @@ type Admin struct {
 	profiler     profiler.Profiler
 	chainManager chains.Manager
 	httpServer   *server.Server
+	logFactory   logging.Factory
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server, profileDir string) (*common.HTTPHandler, error) {
+func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server, profileDir string, logFactory logging.Factory) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -50,6 +51,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 		chainManager: chainManager,
 		httpServer:   httpServer,
 		profiler:     profiler.New(profileDir),
+		logFactory:   logFactory,
 	}, "admin"); err != nil {
 		return nil, err
 	}
@@ -58,14 +60,14 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
 func (service *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: StartCPUProfiler called")
+	service.log.Debug("Admin: StartCPUProfiler called")
 	reply.Success = true
 	return service.profiler.StartCPUProfiler()
 }
 
 // StopCPUProfiler stops the cpu profile
 func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: StopCPUProfiler called")
+	service.log.Debug("Admin: StopCPUProfiler called")
 
 	reply.Success = true
 	return service.profiler.StopCPUProfiler()
@@ -73,7 +75,7 @@ func (service *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, reply *api.S
 
 // MemoryProfile runs a memory profile writing to the specified file
 func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: MemoryProfile called")
+	service.log.Debug("Admin: MemoryProfile called")
 
 	reply.Success = true
 	return service.profiler.MemoryProfile()
@@ -81,7 +83,7 @@ func (service *Admin) MemoryProfile(_ *http.Request, _ *struct{}, reply *api.Suc
 
 // LockProfile runs a mutex profile writing to the specified file
 func (service *Admin) LockProfile(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: LockProfile called")
+	service.log.Debug("Admin: LockProfile called")
 
 	reply.Success = true
 	return service.profiler.LockProfile()
@@ -95,7 +97,7 @@ type AliasArgs struct {
 
 // Alias attempts to alias an HTTP endpoint to a new name
 func (service *Admin) Alias(_ *http.Request, args *AliasArgs, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
+	service.log.Debug("Admin: Alias called with URL: %s, Alias: %s", args.Endpoint, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {
 		return errAliasTooLong
@@ -113,7 +115,7 @@ type AliasChainArgs struct {
 
 // AliasChain attempts to alias a chain to a new name
 func (service *Admin) AliasChain(_ *http.Request, args *AliasChainArgs, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
+	service.log.Debug("Admin: AliasChain called with Chain: %s, Alias: %s", args.Chain, args.Alias)
 
 	if len(args.Alias) > maxAliasLength {
 		return errAliasTooLong
@@ -142,8 +144,8 @@ type GetChainAliasesReply struct {
 }
 
 // GetChainAliases returns the aliases of the chain
-func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
-	service.log.Info("Admin: GetChainAliases called with Chain: %s", args.Chain)
+func (service *Admin) GetChainAliases(_ *http.Request, args *GetChainAliasesArgs, reply *GetChainAliasesReply) error {
+	service.log.Debug("Admin: GetChainAliases called with Chain: %s", args.Chain)
 
 	id, err := ids.FromString(args.Chain)
 	if err != nil {
@@ -156,9 +158,100 @@ func (service *Admin) GetChainAliases(r *http.Request, args *GetChainAliasesArgs
 
 // Stacktrace returns the current global stacktrace
 func (service *Admin) Stacktrace(_ *http.Request, _ *struct{}, reply *api.SuccessResponse) error {
-	service.log.Info("Admin: Stacktrace called")
+	service.log.Debug("Admin: Stacktrace called")
 
 	reply.Success = true
 	stacktrace := []byte(logging.Stacktrace{Global: true}.String())
 	return perms.WriteFile(stacktraceFile, stacktrace, perms.ReadWrite)
+}
+
+// See SetLoggerLevel
+type SetLoggerLevelArgs struct {
+	LoggerName   string         `json:"loggerName"`
+	LogLevel     *logging.Level `json:"logLevel"`
+	DisplayLevel *logging.Level `json:"displayLevel"`
+}
+
+// SetLoggerLevel sets the log level and/or display level for loggers.
+// If len([args.LoggerName]) == 0, sets the log/display level of all loggers.
+// Otherwise, sets the log/display level of the loggers named in that argument.
+// Sets the log level of these loggers to args.LogLevel.
+// If args.LogLevel == nil, doesn't set the log level of these loggers.
+// If args.LogLevel != nil, must be a valid string representation of a log level.
+// Sets the display level of these loggers to args.LogLevel.
+// If args.DisplayLevel == nil, doesn't set the display level of these loggers.
+// If args.DisplayLevel != nil, must be a valid string representation of a log level.
+func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, reply *api.SuccessResponse) error {
+	service.log.Debug("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
+
+	if args.LogLevel == nil && args.DisplayLevel == nil {
+		return errors.New("need to specify either displayLevel or logLevel")
+	}
+
+	var loggerNames []string
+	if len(args.LoggerName) > 0 {
+		loggerNames = []string{args.LoggerName}
+	} else {
+		// Empty name means all loggers
+		loggerNames = service.logFactory.GetLoggerNames()
+	}
+
+	for _, name := range loggerNames {
+		if args.LogLevel != nil {
+			if err := service.logFactory.SetLogLevel(name, *args.LogLevel); err != nil {
+				return err
+			}
+		}
+		if args.DisplayLevel != nil {
+			if err := service.logFactory.SetDisplayLevel(name, *args.DisplayLevel); err != nil {
+				return err
+			}
+		}
+	}
+	reply.Success = true
+	return nil
+}
+
+type LogAndDisplayLevels struct {
+	LogLevel     logging.Level `json:"logLevel"`
+	DisplayLevel logging.Level `json:"displayLevel"`
+}
+
+// See GetLoggerLevel
+type GetLoggerLevelArgs struct {
+	LoggerName string `json:"loggerName"`
+}
+
+// See GetLoggerLevel
+type GetLoggerLevelReply struct {
+	LoggerLevels map[string]LogAndDisplayLevels `json:"loggerLevels"`
+}
+
+// GetLogLevel returns the log level and display level of all loggers.
+func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, reply *GetLoggerLevelReply) error {
+	service.log.Debug("Admin: GetLoggerLevels called with LoggerName: %q", args.LoggerName)
+	reply.LoggerLevels = make(map[string]LogAndDisplayLevels)
+	var loggerNames []string
+	// Empty name means all loggers
+	if len(args.LoggerName) > 0 {
+		loggerNames = []string{args.LoggerName}
+	} else {
+		loggerNames = service.logFactory.GetLoggerNames()
+	}
+
+	for _, name := range loggerNames {
+		logLevel, err := service.logFactory.GetLogLevel(name)
+		if err != nil {
+			return err
+		}
+		displayLevel, err := service.logFactory.GetDisplayLevel(name)
+		if err != nil {
+			return err
+		}
+		reply.LoggerLevels[name] = LogAndDisplayLevels{
+			LogLevel:     logLevel,
+			DisplayLevel: displayLevel,
+		}
+	}
+	return nil
 }

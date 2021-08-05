@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// WalletClient ...
 type WalletClient struct {
 	requester rpc.EndpointRequester
 }
@@ -29,7 +28,7 @@ func NewWalletClient(uri, chain string, requestTimeout time.Duration) *WalletCli
 
 // IssueTx issues a transaction to a node and returns the TxID
 func (c *WalletClient) IssueTx(txBytes []byte) (ids.ID, error) {
-	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}

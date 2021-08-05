@@ -712,6 +712,18 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 	return fx, nil
 }
 
+// getParsedFx returns the parsedFx object for a given TransferableInput
+// or TransferableOutput object
+func (vm *VM) getParsedFx(val interface{}) (*parsedFx, error) {
+	idx, err := vm.getFx(val)
+	if err != nil {
+		return nil, err
+	}
+
+	fx := vm.fxs[idx]
+	return fx, nil
+}
+
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// Check cache to see whether this asset supports this fx
 	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
@@ -734,7 +746,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
-		if state.FxID == uint32(fxID) {
+		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx
 			fxIDs.Add(uint(fxID))
 		}
@@ -838,7 +850,6 @@ func (vm *VM) LoadUser(
 	return utxos, kc, db.Close()
 }
 
-// Spend ...
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -905,7 +916,6 @@ func (vm *VM) Spend(
 	return amountsSpent, ins, keys, nil
 }
 
-// SpendNFT ...
 func (vm *VM) SpendNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -980,7 +990,6 @@ func (vm *VM) SpendNFT(
 	return ops, keys, nil
 }
 
-// SpendAll ...
 func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1030,7 +1039,6 @@ func (vm *VM) SpendAll(
 	return amountsSpent, ins, keys, nil
 }
 
-// Mint ...
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1104,7 +1112,6 @@ func (vm *VM) Mint(
 	return ops, keys, nil
 }
 
-// MintNFT ...
 func (vm *VM) MintNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,

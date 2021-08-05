@@ -34,7 +34,6 @@ var (
 
 	usersPrefix = []byte("users")
 	bcsPrefix   = []byte("bcs")
-	migratedKey = []byte("migrated")
 
 	_ Keystore = &keystore{}
 )
@@ -112,15 +111,14 @@ type keystore struct {
 	//          BID  BID  BID
 }
 
-func New(log logging.Logger, dbManager manager.Manager) (Keystore, error) {
+func New(log logging.Logger, dbManager manager.Manager) Keystore {
 	currentDB := dbManager.Current()
-	keystore := &keystore{
+	return &keystore{
 		log:                log,
 		usernameToPassword: make(map[string]*password.Hash),
 		userDB:             prefixdb.New(usersPrefix, currentDB.Database),
 		bcDB:               prefixdb.New(bcsPrefix, currentDB.Database),
 	}
-	return keystore, keystore.migrate(dbManager)
 }
 
 func (ks *keystore) CreateHandler() (http.Handler, error) {

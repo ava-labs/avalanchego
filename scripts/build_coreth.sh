@@ -16,7 +16,7 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 # check if there's args defining different coreth source and build paths
 if [[ $# -eq 2 ]]; then
     coreth_path=$1
-    latest_evm_path=$2
+    evm_path=$2
 elif [[ $# -eq 0 ]]; then
     if [[ ! -d "$coreth_path" ]]; then
         go get "github.com/ava-labs/coreth@$coreth_version"
@@ -29,7 +29,7 @@ fi
 # Build Coreth
 echo "Building Coreth @ ${coreth_version} ..."
 cd "$coreth_path"
-go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.Version=$coreth_version" -o "$latest_evm_path" "plugin/"*.go
+go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.Version=$coreth_version" -o "$evm_path" "plugin/"*.go
 cd "$AVALANCHE_PATH"
 
 # Building coreth + using go get can mess with the go.mod file.

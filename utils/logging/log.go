@@ -37,7 +37,7 @@ type Log struct {
 }
 
 // New returns a new logger set up according to [config]
-func New(config Config) (*Log, error) {
+func newLog(config Config) (*Log, error) {
 	if err := os.MkdirAll(config.Directory, perms.ReadWriteExecute); err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func (l *Log) format(level Level, format string, args ...interface{}) string {
 	}
 
 	return fmt.Sprintf("%s[%s]%s %s\n",
-		level,
+		level.AlignedString(),
 		time.Now().Format("01-02|15:04:05"),
 		prefix,
 		text)
@@ -292,12 +292,27 @@ func (l *Log) stopAndExit(exit func()) {
 // RecoverAndExit implements the Logger interface
 func (l *Log) RecoverAndExit(f, exit func()) { defer l.stopAndExit(exit); f() }
 
-// SetLogLevel ...
 func (l *Log) SetLogLevel(lvl Level) {
 	l.configLock.Lock()
 	defer l.configLock.Unlock()
 
 	l.config.LogLevel = lvl
+}
+
+// GetLogLevel ...
+func (l *Log) GetLogLevel() Level {
+	l.configLock.Lock()
+	defer l.configLock.Unlock()
+
+	return l.config.LogLevel
+}
+
+// GetDisplayLevel implements the Logger interface
+func (l *Log) GetDisplayLevel() Level {
+	l.configLock.Lock()
+	defer l.configLock.Unlock()
+
+	return l.config.DisplayLevel
 }
 
 // SetDisplayLevel implements the Logger interface
