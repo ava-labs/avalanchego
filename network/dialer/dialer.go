@@ -31,8 +31,8 @@ type dialer struct {
 }
 
 type Config struct {
-	throttleRps       uint32
-	connectionTimeout time.Duration
+	ThrottleRps       uint32        `json:"throttleRps"`
+	ConnectionTimeout time.Duration `json:"connectionTimeout"`
 }
 
 func NewConfig(throttleRps uint32, dialTimeout time.Duration) Config {
@@ -49,21 +49,21 @@ func NewConfig(throttleRps uint32, dialTimeout time.Duration) Config {
 // If [dialerConfig.throttleRps] == 0, outgoing connections aren't rate-limited.
 func NewDialer(network string, dialerConfig Config, log logging.Logger) Dialer {
 	var throttler throttling.DialThrottler
-	if dialerConfig.throttleRps <= 0 {
+	if dialerConfig.ThrottleRps <= 0 {
 		throttler = throttling.NewNoDialThrottler()
 	} else {
-		throttler = throttling.NewDialThrottler(int(dialerConfig.throttleRps))
+		throttler = throttling.NewDialThrottler(int(dialerConfig.ThrottleRps))
 	}
 	log.Debug(
 		"dialer has outgoing connection limit of %d/second and dial timeout %s",
-		dialerConfig.throttleRps,
-		dialerConfig.connectionTimeout,
+		dialerConfig.ThrottleRps,
+		dialerConfig.ConnectionTimeout,
 	)
 	return &dialer{
 		log:               log,
 		network:           network,
 		throttler:         throttler,
-		connectionTimeout: dialerConfig.connectionTimeout,
+		connectionTimeout: dialerConfig.ConnectionTimeout,
 	}
 }
 

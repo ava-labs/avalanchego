@@ -5,6 +5,7 @@ package node
 
 import (
 	"crypto"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -817,7 +818,11 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir, n.LogFactory)
+	configJSON, err := json.Marshal(n.Config)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal config: %w", err)
+	}
+	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir, n.LogFactory, configJSON)
 	if err != nil {
 		return err
 	}

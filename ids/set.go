@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -167,4 +168,19 @@ func (ids *Set) Pop() (ID, bool) {
 		return id, true
 	}
 	return ID{}, false
+}
+
+func (ids *Set) MarshalJSON() ([]byte, error) {
+	idsList := ids.List()
+	SortIDs(idsList)
+	asJSON := strings.Builder{}
+	asJSON.WriteString("[")
+	for i, id := range idsList {
+		asJSON.WriteString(fmt.Sprintf("\"%s\"", id))
+		if i != len(idsList)-1 {
+			asJSON.WriteString(", ")
+		}
+	}
+	asJSON.WriteString("]")
+	return []byte(asJSON.String()), nil
 }

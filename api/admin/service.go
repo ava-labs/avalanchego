@@ -4,6 +4,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -38,10 +39,18 @@ type Admin struct {
 	chainManager chains.Manager
 	httpServer   *server.Server
 	logFactory   logging.Factory
+	config       []byte
 }
 
 // NewService returns a new admin API service
-func NewService(log logging.Logger, chainManager chains.Manager, httpServer *server.Server, profileDir string, logFactory logging.Factory) (*common.HTTPHandler, error) {
+func NewService(
+	log logging.Logger,
+	chainManager chains.Manager,
+	httpServer *server.Server,
+	profileDir string,
+	logFactory logging.Factory,
+	config []byte,
+) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := cjson.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
@@ -52,6 +61,7 @@ func NewService(log logging.Logger, chainManager chains.Manager, httpServer *ser
 		httpServer:   httpServer,
 		profiler:     profiler.New(profileDir),
 		logFactory:   logFactory,
+		config:       config,
 	}, "admin"); err != nil {
 		return nil, err
 	}
@@ -254,4 +264,13 @@ func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, 
 		}
 	}
 	return nil
+}
+
+type GetConfigReply struct {
+	Config map[string]interface{} `json:"config"`
+}
+
+// GetConfig returns the config that the node was started with.
+func (service *Admin) GetConfig(_ *http.Request, args *struct{}, reply *GetConfigReply) error {
+	return json.Unmarshal(service.config, &reply.Config)
 }
