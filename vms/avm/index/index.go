@@ -21,8 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const DatabaseOpErrorExitCode int = 5
-
 var (
 	idxKey         = []byte("idx")
 	idxCompleteKey = []byte("complete")
