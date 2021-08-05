@@ -32,8 +32,14 @@ type APIAuthConfig struct {
 	APIAuthPassword     string
 }
 
+type APIIndexerConfig struct {
+	IndexAPIEnabled      bool
+	IndexAllowIncomplete bool
+}
+
 type APIConfig struct {
 	APIAuthConfig
+	APIIndexerConfig
 
 	HTTPHost string
 	HTTPPort uint16
@@ -50,7 +56,6 @@ type APIConfig struct {
 	KeystoreAPIEnabled bool
 	MetricsAPIEnabled  bool
 	HealthAPIEnabled   bool
-	IndexAPIEnabled    bool
 }
 
 type PeerListGossipConfig struct {
@@ -86,7 +91,6 @@ type IPConfig struct {
 	DynamicPublicIPResolver dynamicip.Resolver
 }
 
-// TODO move fields from genesis.Params here
 type StakingConfig struct {
 	genesis.StakingConfig
 	EnableStaking         bool
@@ -183,8 +187,6 @@ type Config struct {
 
 	// Subnet Whitelist
 	WhitelistedSubnets ids.Set
-
-	IndexAllowIncomplete bool
 
 	// ChainConfigs
 	ChainConfigs map[string]chains.ChainConfig

@@ -477,6 +477,8 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.MinValidatorStake = v.GetUint64(MinValidatorStakeKey)
 		config.MaxValidatorStake = v.GetUint64(MaxValidatorStakeKey)
 		config.MinDelegatorStake = v.GetUint64(MinDelegatorStakeKey)
+		config.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
+		config.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
 		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
 		switch {
 		case config.UptimeRequirement < 0:
@@ -485,8 +487,8 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 			return node.StakingConfig{}, errors.New("minimum validator stake can't be greater than maximum validator stake")
 		case config.MinDelegationFee > 1_000_000:
 			return node.StakingConfig{}, errors.New("delegation fee must be in the range [0, 1,000,000]")
-		case config.MinStakeDuration == 0:
-			return node.StakingConfig{}, errors.New("min stake duration can't be zero")
+		case config.MinStakeDuration <= 0:
+			return node.StakingConfig{}, errors.New("min stake duration must be > 0")
 		case config.MaxStakeDuration < config.MinStakeDuration:
 			return node.StakingConfig{}, errors.New("max stake duration can't be less than min stake duration")
 		case config.StakeMintingPeriod < config.MaxStakeDuration:
