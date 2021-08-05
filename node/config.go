@@ -118,7 +118,7 @@ type Config struct {
 	StakingKeyFile      string   `json:"stakingKeyFile"`  // TODO populate
 	StakingCertFile     string   `json:"stakingCertFile"` // TODO populate
 	APIRequireAuthToken bool     `json:"apiRequireAuthToken"`
-	APIAuthPassword     string   `json:"apiAuthPassword"`
+	APIAuthPassword     string   `json:"-"`
 	APIAllowedOrigins   []string `json:"apiAllowedOrigins"`
 
 	// Enable/Disable APIs
