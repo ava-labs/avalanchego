@@ -164,18 +164,18 @@ func (i *indexer) Accept(txID ids.ID) error {
 
 			var idx uint64
 			idxBytes, err := assetPrefixDB.Get(idxKey)
-			switch {
-			case err != nil && err != database.ErrNotFound:
-				// Unexpected error
-				return fmt.Errorf("unexpected error when indexing txID %s: %s", txID, err)
-			case err == database.ErrNotFound:
+			switch err {
+			case nil:
+				// index is found, parse stored [idxBytes]
+				idx = binary.BigEndian.Uint64(idxBytes)
+			case database.ErrNotFound:
 				// idx not found; this must be the first entry.
 				idx = 0
 				idxBytes = make([]byte, wrappers.LongLen)
 				binary.BigEndian.PutUint64(idxBytes, idx)
 			default:
-				// index is found, parse stored [idxBytes]
-				idx = binary.BigEndian.Uint64(idxBytes)
+				// Unexpected error
+				return fmt.Errorf("unexpected error when indexing txID %s: %s", txID, err)
 			}
 
 			// write the [txID] at the index
