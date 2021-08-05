@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -618,5 +619,70 @@ func TestNewImportTx(t *testing.T) {
 				t.Fatalf("Failed to accept import transaction due to: %s", err)
 			}
 		})
+	}
+}
+
+// Note: this is a brittle test to ensure that the gas cost of a transaction does
+// not change
+func TestImportTxGasCost(t *testing.T) {
+	avaxAssetID := ids.GenerateTestID()
+	chainID := ids.GenerateTestID()
+	xChainID := ids.GenerateTestID()
+	networkID := uint32(5)
+
+	importAmount := uint64(5000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	evmOutput := EVMOutput{
+		Address: testEthAddrs[0],
+		Amount:  importAmount,
+		AssetID: avaxAssetID,
+	}
+	unsignedImportTx := &UnsignedImportTx{
+		NetworkID:    networkID,
+		BlockchainID: chainID,
+		SourceChain:  xChainID,
+		ImportedInputs: []*avax.TransferableInput{{
+			UTXOID: utxoID,
+			Asset:  avax.Asset{ID: avaxAssetID},
+			In: &secp256k1fx.TransferInput{
+				Amt:   importAmount,
+				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+			},
+		}},
+		Outs: []EVMOutput{evmOutput},
+	}
+
+	tx := &Tx{UnsignedAtomicTx: unsignedImportTx}
+
+	// Sign with the correct key
+	if err := tx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
+		t.Fatal(err)
+	}
+
+	gasCost, err := tx.Gas()
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedGasCost := uint64(654)
+	if gasCost != expectedGasCost {
+		t.Fatalf("Expected gasCost to be %d, but found %d", expectedGasCost, gasCost)
+	}
+
+	baseFee := big.NewInt(25_000_000_000)
+	fee, err := calculateDynamicFee(gasCost, baseFee)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectedFee := uint64(16350)
+	if expectedFee != fee {
+		t.Fatalf("Expected fee to be %d, but found %d", expectedFee, fee)
 	}
 }

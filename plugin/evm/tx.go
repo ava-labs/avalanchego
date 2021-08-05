@@ -38,9 +38,9 @@ var (
 
 // Constants for calculating the gas consumed by atomic transactions
 var (
-	SignatureFee uint64 = 21000 // Based on TxGas cost
-	OutputFee    uint64 = 20000 // Based on SSTORE cost
-	TxBytesFee   uint64 = 16    // Based on TxDataNonZeroGasEIP2028 cost
+	SignatureFee uint64 = 20 // Based on TxGas cost
+	OutputFee    uint64 = 20 // Based on SSTORE cost
+	TxBytesFee   uint64 = 2  // Based on TxDataNonZeroGasEIP2028 cost
 )
 
 // EVMOutput defines an output that is added to the EVM state created by import transactions
