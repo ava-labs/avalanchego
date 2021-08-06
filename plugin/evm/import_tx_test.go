@@ -668,7 +668,9 @@ func TestImportTxGasCost(t *testing.T) {
 					AssetID: avaxAssetID,
 				}},
 			},
-			Keys: [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasCost: 20780,
+			ExpectedFee:     519500,
 		},
 		"simple ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -715,7 +717,9 @@ func TestImportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys: [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedGasCost: 33220,
+			ExpectedFee:     830500,
 		},
 		"complex ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -767,7 +771,9 @@ func TestImportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys: [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedGasCost: 38120,
+			ExpectedFee:     953000,
 		},
 		"multisig import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -795,7 +801,9 @@ func TestImportTxGasCost(t *testing.T) {
 					AssetID: avaxAssetID,
 				}},
 			},
-			Keys: [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
+			ExpectedGasCost: 29540,
+			ExpectedFee:     738500,
 		},
 		"large import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -974,6 +982,8 @@ func TestImportTxGasCost(t *testing.T) {
 				{testKeys[0]},
 				{testKeys[0]},
 			},
+			ExpectedGasCost: 132740,
+			ExpectedFee:     3318500,
 		},
 	}
 

@@ -6,6 +6,8 @@ package evm
 import (
 	"math/big"
 	"testing"
+
+	"github.com/ava-labs/coreth/params"
 )
 
 func TestCalculateDynamicFee(t *testing.T) {
@@ -20,6 +22,11 @@ func TestCalculateDynamicFee(t *testing.T) {
 			gas:           1,
 			baseFee:       new(big.Int).Set(x2cRate),
 			expectedValue: 1,
+		},
+		{
+			gas:           21000,
+			baseFee:       big.NewInt(25 * params.GWei),
+			expectedValue: 525000,
 		},
 	}
 
