@@ -544,6 +544,8 @@ func FixedMaxStakeAmount(
 		// when considering later pending delegators that start late
 		toRemoveHeap.Add(&nextPending.Validator)
 	}
+	// [currentStake] is now the amount staked after the last
+	// pending delegator whose start time is before [startTime] starts.
 
 	// If there aren't any delegators that will be added before the end of our
 	// delegation period, we should advance through time until our delegation
