@@ -24,10 +24,10 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
@@ -462,27 +462,8 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 		if !exists {
 			break
 		}
-		if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
-			// Discard the transaction from the mempool on failed verification.
-			vm.mempool.DiscardCurrentTx()
-			state.RevertToSnapshot(snapshot)
-			continue
-		}
 		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-		parentIntf, err := vm.GetBlockInternal(ids.ID(header.ParentHash))
-		if err != nil {
-			// Discard the transaction from the mempool on failed verification.
-			vm.mempool.DiscardCurrentTx()
-			return nil, fmt.Errorf("failed to get parent block: %w", err)
-		}
-		parent, ok := parentIntf.(*Block)
-		if !ok {
-			// Discard the transaction from the mempool on failed verification.
-			vm.mempool.DiscardCurrentTx()
-			return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
-		}
-
-		if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+		if err := vm.verifyTx(tx, header.ParentHash, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			vm.mempool.DiscardCurrentTx()
 			state.RevertToSnapshot(snapshot)
@@ -755,7 +736,7 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 
 // CreateStaticHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) {
-	handler := rpc.NewServer()
+	handler := rpc.NewServer(0)
 	if err := handler.RegisterName("static", &StaticService{}); err != nil {
 		return nil, err
 	}
@@ -1008,11 +989,45 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 	return chainID, addr, nil
 }
 
-// issueTx adds [tx] to the mempool and signals the goroutine waiting on
-// atomic transactions that there is an atomic transaction ready to be
-// put into a block.
+// issueTx verifies [tx] as valid to be issued on top of the currently preferred block
+// and then issues [tx] into the mempool if valid.
 func (vm *VM) issueTx(tx *Tx) error {
+	if err := vm.verifyTxAtTip(tx); err != nil {
+		return err
+	}
 	return vm.mempool.AddTx(tx)
+}
+
+// verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
+func (vm *VM) verifyTxAtTip(tx *Tx) error {
+	preferredBlock := vm.chain.CurrentBlock()
+	preferredState, err := vm.chain.BlockState(preferredBlock)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve block state at tip while verifying atomic tx: %w", err)
+	}
+	rules := vm.currentRules()
+
+	return vm.verifyTx(tx, preferredBlock.Hash(), preferredState, rules)
+}
+
+// verifyTx verifies that [tx] is valid to be issued into a block with parent block [parentHash]
+// and validated at [state] using [rules] as the current rule set.
+// Note: verifyTx may modify [state]. If [state] needs to be properly maintained, the caller is responsible
+// for reverting to the correct snapshot after calling this function. If this function is called with a
+// throwaway state, then this is not necessary.
+func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rules params.Rules) error {
+	parentIntf, err := vm.GetBlockInternal(ids.ID(parentHash))
+	if err != nil {
+		return fmt.Errorf("failed to get parent block: %w", err)
+	}
+	parent, ok := parentIntf.(*Block)
+	if !ok {
+		return fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
+	}
+	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+		return err
+	}
+	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
 }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is
