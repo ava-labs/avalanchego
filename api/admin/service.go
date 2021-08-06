@@ -262,6 +262,7 @@ func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, 
 
 // GetConfig returns the config that the node was started with.
 func (service *Admin) GetConfig(_ *http.Request, args *struct{}, reply *interface{}) error {
+	service.Log.Debug("Admin: GetConfig called")
 	*reply = service.NodeConfig
 	return nil
 }
