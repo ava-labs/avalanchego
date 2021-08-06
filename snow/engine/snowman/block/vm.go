@@ -56,9 +56,9 @@ type ChainVM interface {
 
 type SnowmanPlusPlusVM interface {
 	GetActivationTime() time.Time
-	// Getter defines the functionality for fetching a block by its ID.
 }
 
+// Getter defines the functionality for fetching a block by its ID.
 type Getter interface {
 	// Attempt to load a block.
 	//

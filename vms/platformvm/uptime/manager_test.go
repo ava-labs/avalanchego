@@ -423,6 +423,30 @@ func TestUnrelatedNodeDisconnect(t *testing.T) {
 	assert.Equal(currentTime, lastUpdated)
 }
 
+func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
+	assert := assert.New(t)
+
+	nodeID0 := ids.GenerateTestShortID()
+	startTime := time.Now()
+
+	s := newTestState()
+	s.addNode(nodeID0, startTime)
+
+	up := NewManager(s).(*manager)
+
+	currentTime := startTime.Add(time.Second)
+	up.clock.Set(currentTime)
+
+	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
+	assert.NoError(err)
+	assert.Equal(time.Duration(0), duration)
+	assert.Equal(currentTime, lastUpdated)
+
+	uptime, err := up.CalculateUptimePercent(nodeID0, startTime)
+	assert.NoError(err)
+	assert.Equal(0., uptime)
+}
+
 func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
 	assert := assert.New(t)
 
