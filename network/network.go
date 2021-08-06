@@ -246,7 +246,7 @@ type Config struct {
 	MetricsRegisterer  prometheus.Registerer `json:"-"`
 	CompressionEnabled bool                  `json:"compressionEnabled"`
 	// Peer alias configuration
-	PeerAliasTimeout time.Duration `json:"PeerAliasTimeout"`
+	PeerAliasTimeout time.Duration `json:"peerAliasTimeout"`
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
