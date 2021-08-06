@@ -335,7 +335,7 @@ func (vm *VM) newAddDelegatorTx(
 // of stake on the validator, include the [current] delegators. [maximumStake]
 // is the maximum amount of stake that can be on the validator at any given
 // time. It is assumed that the validator without adding [new] does not violate
-// [maximumStake]. It is assumed that [pending]
+// [maximumStake].
 func CanDelegate(
 	current,
 	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
@@ -349,9 +349,9 @@ func CanDelegate(
 		err      error
 	)
 	if useHeapCorrectly {
-		maxStake, err = FixedMaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+		maxStake, err = fixedMaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
 	} else {
-		maxStake, err = MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+		maxStake, err = maxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
 	}
 	if err != nil {
 		return false, err
@@ -364,7 +364,7 @@ func CanDelegate(
 }
 
 // TODO: this should be removed after AP3 is live
-func MaxStakeAmount(
+func maxStakeAmount(
 	current,
 	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
 	startTime time.Time,
@@ -448,8 +448,8 @@ func MaxStakeAmount(
 	return maxStake, nil
 }
 
-// Return the maximum amount of stake on a node (including delegations) at any given
-// time between [startTime] and [endTime] given that:
+// Return the maximum amount of stake on a node (including delegations) at any
+// given time between [startTime] and [endTime] given that:
 // * The amount of stake on the node right now is [currentStake]
 // * The delegations currently on this node are [current]
 // * [current] is sorted in order of increasing delegation end time.
@@ -458,7 +458,7 @@ func MaxStakeAmount(
 // * The delegations that will be on this node in the future are [pending]
 // * The start time of all delegations in [pending] are in the future
 // * [pending] is sorted in order of increasing delegation start time
-func FixedMaxStakeAmount(
+func fixedMaxStakeAmount(
 	current,
 	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
 	startTime time.Time,
@@ -475,32 +475,34 @@ func FixedMaxStakeAmount(
 	var (
 		err error
 		// [maxStake] is the max stake at any point between now [starTime] and [endTime]
-		maxStake uint64 = 0
+		maxStake uint64
 	)
 
-	// Calculate what the amount staked will be when each pending delegation starts.
+	// Calculate what the amount staked will be when each pending delegation
+	// starts.
 	for _, nextPending := range pending { // Iterates in order of increasing start time
 		// Calculate what the amount staked will be when this delegation starts.
 		nextPendingStartTime := nextPending.StartTime()
 
 		if nextPendingStartTime.After(endTime) {
 			// This delegation starts after [endTime].
-			// Since we're calculating the max amount staked in [startTime, endTime],
-			// we can stop. (Recall that [pending] is sorted in order of increasing end time.)
+			// Since we're calculating the max amount staked in
+			// [startTime, endTime], we can stop. (Recall that [pending] is
+			// sorted in order of increasing end time.)
 			break
 		}
 
-		// Subtract from [currentStake] all of the current delegations that will have
-		// ending by the time that the delegation [nextPending] starts.
-		for len(toRemoveHeap) > 0 {
+		// Subtract from [currentStake] all of the current delegations that will
+		// have ended by the time that the delegation [nextPending] starts.
+		for toRemoveHeap.Len() > 0 {
 			// Get the next current delegation that will end.
 			toRemove := toRemoveHeap.Peek()
 			toRemoveEndTime := toRemove.EndTime()
 			if toRemoveEndTime.After(nextPendingStartTime) {
 				break
 			}
-			// This current delegation ([toRemove]) ends before [nextPending] starts,
-			// so its stake should be subtracted from [currentStake].
+			// This current delegation [toRemove] ends before [nextPending]
+			// starts, so its stake should be subtracted from [currentStake].
 
 			// Changed in AP3:
 			// If the new delegator has started, then this current delegator
@@ -519,11 +521,12 @@ func FixedMaxStakeAmount(
 			// Changed in AP3:
 			// Remove the delegator from the heap and update the heap so that
 			// the top of the heap is the next delegator to remove.
-			toRemoveHeap.Remove()
+			_ = toRemoveHeap.Remove()
 		}
 
-		// Add to [currentStake] the stake of this pending delegator to calculate
-		// what the stake will be when this pending delegation has started.
+		// Add to [currentStake] the stake of this pending delegator to
+		// calculate what the stake will be when this pending delegation has
+		// started.
 		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
 		if err != nil {
 			return 0, err
@@ -544,13 +547,14 @@ func FixedMaxStakeAmount(
 		// when considering later pending delegators that start late
 		toRemoveHeap.Add(&nextPending.Validator)
 	}
-	// [currentStake] is now the amount staked after the last
-	// pending delegator whose start time is before [startTime] starts.
+
+	// [currentStake] is now the amount staked before the next pending delegator
+	// whose start time is after [endTime].
 
 	// If there aren't any delegators that will be added before the end of our
 	// delegation period, we should advance through time until our delegation
 	// period starts.
-	for len(toRemoveHeap) > 0 {
+	for toRemoveHeap.Len() > 0 {
 		toRemove := toRemoveHeap.Peek()
 		toRemoveEndTime := toRemove.EndTime()
 		if toRemoveEndTime.After(startTime) {
@@ -565,7 +569,7 @@ func FixedMaxStakeAmount(
 		// Changed in AP3:
 		// Remove the delegator from the heap and update the heap so that the
 		// top of the heap is the next delegator to remove.
-		toRemoveHeap.Remove()
+		_ = toRemoveHeap.Remove()
 	}
 
 	// We have advanced time to be inside the delegation window.
@@ -660,7 +664,7 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 		if err != nil {
 			return 0, err
 		}
-		return MaxStakeAmount(
+		return maxStakeAmount(
 			currentValidator.Delegators(),
 			pendingValidator.Delegators(),
 			startTime,
@@ -682,7 +686,7 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 			return 0, nil
 		}
 
-		return MaxStakeAmount(
+		return maxStakeAmount(
 			nil,
 			pendingValidator.Delegators(),
 			startTime,
