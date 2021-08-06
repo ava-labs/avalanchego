@@ -670,7 +670,54 @@ func TestImportTxGasCost(t *testing.T) {
 			},
 			Keys: [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
 		},
-		"ANT import": {
+		"simple ANT import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe9,
+							},
+						},
+						Asset: avax.Asset{ID: antAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+				Outs: []EVMOutput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount,
+						AssetID: antAssetID,
+					},
+				},
+			},
+			Keys: [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+		},
+		"complex ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
 				NetworkID:    networkID,
 				BlockchainID: chainID,
