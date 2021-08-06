@@ -36,11 +36,11 @@ func (t *MockTrieDB) Cap(limit common.StorageSize) error {
 	return nil
 }
 
-func TestCappedMemoryTrieWriterRollover(t *testing.T) {
+func TestCappedMemoryTrieWriter(t *testing.T) {
 	m := &MockTrieDB{}
 	w := NewTrieWriter(m, &CacheConfig{Pruning: true})
 	assert := assert.New(t)
-	for i := 0; i < tipBufferSize+1; i++ {
+	for i := 0; i < commitInterval+1; i++ {
 		bigI := big.NewInt(int64(i))
 		block := types.NewBlock(
 			&types.Header{
@@ -57,13 +57,25 @@ func TestCappedMemoryTrieWriterRollover(t *testing.T) {
 		m.LastReference = common.Hash{}
 
 		w.AcceptTrie(block)
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on insert")
-		if i == tipBufferSize {
-			assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on insert")
+		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on accept")
+		if i < tipBufferSize {
+			assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
 		} else {
-			assert.Equal(common.BigToHash(big.NewInt(int64(0))), m.LastDereference, "should have dereferenced frist block on last insert")
+			assert.Equal(common.BigToHash(big.NewInt(int64(i-tipBufferSize))), m.LastDereference, "should have dereferenced old block on last accept")
+			m.LastDereference = common.Hash{}
 		}
-		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
+		if i < commitInterval {
+			assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on accept")
+		} else {
+			assert.Equal(block.Root(), m.LastCommit, "should have committed block after commitInterval")
+			m.LastCommit = common.Hash{}
+		}
+
+		w.RejectTrie(block)
+		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on reject")
+		assert.Equal(block.Root(), m.LastDereference, "should have dereferenced block on reject")
+		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on reject")
+		m.LastDereference = common.Hash{}
 	}
 }
 
@@ -88,8 +100,13 @@ func TestNoPruningTrieWriter(t *testing.T) {
 		m.LastCommit = common.Hash{}
 
 		w.AcceptTrie(block)
-		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on insert")
-		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on insert")
-		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
+		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on accept")
+		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
+		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on accept")
+
+		w.RejectTrie(block)
+		assert.Equal(common.Hash{}, m.LastReference, "should not have referenced block on reject")
+		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on reject")
+		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on reject")
 	}
 }
