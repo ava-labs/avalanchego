@@ -350,7 +350,15 @@ func CanDelegate(
 	maximumStake uint64,
 	useHeapCorrectly bool, // TODO: this should be removed after AP3 is live
 ) (bool, error) {
-	maxStake, err := MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake, useHeapCorrectly)
+	var (
+		maxStake uint64
+		err      error
+	)
+	if useHeapCorrectly {
+		maxStake, err = FixedMaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+	} else {
+		maxStake, err = MaxStakeAmount(current, pending, new.StartTime(), new.EndTime(), currentStake)
+	}
 	if err != nil {
 		return false, err
 	}
@@ -361,13 +369,13 @@ func CanDelegate(
 	return newMaxStake <= maximumStake, nil
 }
 
+// TODO: this should be removed after AP3 is live
 func MaxStakeAmount(
 	current,
 	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
 	startTime time.Time,
 	endTime time.Time,
 	currentStake uint64,
-	useHeapCorrectly bool, // TODO: this should be removed after AP3 is live
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
@@ -401,14 +409,8 @@ func MaxStakeAmount(
 				maxStake = currentStake
 			}
 
-			var toRemove *Validator
-			if useHeapCorrectly {
-				toRemove = toRemoveHeap.Remove()
-			} else {
-				// TODO: this should be removed after AP3 is live
-				toRemove = toRemoveHeap[0]
-				toRemoveHeap = toRemoveHeap[1:]
-			}
+			toRemove := toRemoveHeap[0]
+			toRemoveHeap = toRemoveHeap[1:]
 
 			currentStake, err = math.Sub64(currentStake, toRemove.Wght)
 			if err != nil {
@@ -436,14 +438,8 @@ func MaxStakeAmount(
 			break
 		}
 
-		var toRemove *Validator
-		if useHeapCorrectly {
-			toRemove = toRemoveHeap.Remove()
-		} else {
-			// TODO: this should be removed after AP3 is live
-			toRemove = toRemoveHeap[0]
-			toRemoveHeap = toRemoveHeap[1:]
-		}
+		toRemove := toRemoveHeap[0]
+		toRemoveHeap = toRemoveHeap[1:]
 
 		currentStake, err = math.Sub64(currentStake, toRemove.Wght)
 		if err != nil {
@@ -451,6 +447,113 @@ func MaxStakeAmount(
 		}
 	}
 
+	if currentStake > maxStake {
+		maxStake = currentStake
+	}
+
+	return maxStake, nil
+}
+
+func FixedMaxStakeAmount(
+	current,
+	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
+	startTime time.Time,
+	endTime time.Time,
+	currentStake uint64,
+) (uint64, error) {
+	// Keep track of which delegators should be removed next so that we can
+	// efficiently remove delegators and keep the current stake updated.
+	toRemoveHeap := validatorHeap{}
+	for _, currentDelegator := range current {
+		toRemoveHeap.Add(&currentDelegator.Validator)
+	}
+
+	var (
+		err      error
+		maxStake uint64 = 0
+	)
+
+	// Iterate through time until [endTime].
+	for _, nextPending := range pending { // Iterates in order of increasing start time
+		nextPendingStartTime := nextPending.StartTime()
+
+		// If the new delegator is starting after [endTime], then we don't need
+		// to check the maximum after this point.
+		if nextPendingStartTime.After(endTime) {
+			break
+		}
+
+		// Remove all the delegators that finish before the next delegator will
+		// start.
+		for len(toRemoveHeap) > 0 {
+			toRemove := toRemoveHeap.Peek()
+			toRemoveEndTime := toRemove.EndTime()
+			if toRemoveEndTime.After(nextPendingStartTime) {
+				break
+			}
+
+			// Changed in AP3:
+			// If the new delegator has started, then this current delegator
+			// should have an end time that is > [startTime].
+			newDelegatorHasStartedBeforeFinish := toRemoveEndTime.After(startTime)
+			if newDelegatorHasStartedBeforeFinish && currentStake > maxStake {
+				maxStake = currentStake
+			}
+
+			currentStake, err = math.Sub64(currentStake, toRemove.Wght)
+			if err != nil {
+				return 0, err
+			}
+
+			// Changed in AP3:
+			// Remove the delegator from the heap and update the heap so that
+			// the top of the heap is the next delegator to remove.
+			toRemoveHeap.Remove()
+		}
+
+		// The new delegator hasn't stopped yet, so we should add the pending
+		// delegator to the current set.
+		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
+		if err != nil {
+			return 0, err
+		}
+
+		// Changed in AP3:
+		// If the new delegator has started, then this pending delegator should
+		// have a start time that is >= [startTime]. Otherwise, the delegator
+		// hasn't started yet and the [currentStake] shouldn't count towards the
+		// [maximumStake] during the delegators delegation period.
+		newDelegatorHasStarted := !nextPendingStartTime.Before(startTime)
+		if newDelegatorHasStarted && currentStake > maxStake {
+			maxStake = currentStake
+		}
+
+		toRemoveHeap.Add(&nextPending.Validator)
+	}
+
+	// If there aren't any delegators that will be added before the end of our
+	// delegation period, we should advance through time until our delegation
+	// period starts.
+	for len(toRemoveHeap) > 0 {
+		toRemove := toRemoveHeap.Peek()
+		toRemoveEndTime := toRemove.EndTime()
+		if toRemoveEndTime.After(startTime) {
+			break
+		}
+
+		currentStake, err = math.Sub64(currentStake, toRemove.Wght)
+		if err != nil {
+			return 0, err
+		}
+
+		// Changed in AP3:
+		// Remove the delegator from the heap and update the heap so that the
+		// top of the heap is the next delegator to remove.
+		toRemoveHeap.Remove()
+	}
+
+	// We have advanced time to be inside the delegation window. So, make sure
+	// that the max stake is updated accordingly.
 	if currentStake > maxStake {
 		maxStake = currentStake
 	}
@@ -548,10 +651,6 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 			startTime,
 			endTime,
 			currentWeight,
-			// TODO: this should be removed after AP3 is live
-			// This is only called by the API - so it is safe to be more
-			// restrictive here
-			false,
 		)
 	case database.ErrNotFound:
 		futureValidator, err := pendingStakers.GetValidatorTx(nodeID)
@@ -574,10 +673,6 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 			startTime,
 			endTime,
 			futureValidator.Weight(),
-			// TODO: this should be removed after AP3 is live
-			// This is only called by the API - so it is safe to be more
-			// restrictive here
-			false,
 		)
 	default:
 		return 0, err
