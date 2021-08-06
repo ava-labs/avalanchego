@@ -37,8 +37,8 @@ import (
 )
 
 const (
-	commitInterval    = 4096
-	dereferenceBuffer = 16
+	commitInterval = 4096
+	tipBufferSize  = 16
 )
 
 type TrieWriter interface {
@@ -55,7 +55,7 @@ func NewTrieWriter(db state.Database, config *CacheConfig) TrieWriter {
 			memoryCap:          common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,
 			imageCap:           4 * 1024 * 1024,
 			commitInterval:     commitInterval,
-			dereferenceQueue:   make([]common.Hash, 0, dereferenceBuffer),
+			tipBuffer:          make([]common.Hash, tipBufferSize),
 			randomizedInterval: uint64(rand.Int63n(commitInterval)) + commitInterval,
 		}
 	} else {
@@ -84,8 +84,10 @@ type cappedMemoryTrieWriter struct {
 	state.Database
 	memoryCap                          common.StorageSize
 	imageCap                           common.StorageSize
-	dereferenceQueue                   []common.Hash
 	commitInterval, randomizedInterval uint64
+
+	lastPos   int
+	tipBuffer []common.Hash
 }
 
 func (cm *cappedMemoryTrieWriter) InsertTrie(block *types.Block) error {
@@ -104,16 +106,17 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	triedb := cm.Database.TrieDB()
 	root := block.Root()
 
-	// Attempt to dereference roots at least [tipBuffer] old (so queries at tip
+	// Attempt to dereference roots at least [tipBufferSize] old (so queries at tip
 	// can still be completed).
 	//
 	// Note: It is safe to dereference roots that have been committed to disk
 	// (they are no-ops).
-	if len(cm.dereferenceQueue) == dereferenceBuffer {
-		triedb.Dereference(cm.dereferenceQueue[0])
-		cm.dereferenceQueue = cm.dereferenceQueue[1:]
+	nextPos := (cm.lastPos + 1) % tipBufferSize
+	if cm.tipBuffer[nextPos] != (common.Hash{}) {
+		triedb.Dereference(cm.tipBuffer[nextPos])
 	}
-	cm.dereferenceQueue = append(cm.dereferenceQueue, root)
+	cm.tipBuffer[nextPos] = root
+	cm.lastPos = nextPos
 
 	// Commit this root if we haven't committed an accepted block root within
 	// the desired interval.
@@ -134,14 +137,14 @@ func (cm *cappedMemoryTrieWriter) RejectTrie(block *types.Block) error {
 }
 
 func (cm *cappedMemoryTrieWriter) Shutdown() error {
-	// If [dereferenceQueue] is empty, no need to do any cleanup on
+	// If [tipBuffer] entry is empty, no need to do any cleanup on
 	// shutdown.
-	if len(cm.dereferenceQueue) == 0 {
+	if cm.tipBuffer[cm.lastPos] == (common.Hash{}) {
 		return nil
 	}
 
 	// Attempt to commit last item added to [dereferenceQueue] on shutdown to avoid
 	// re-processing the state on the next startup.
 	triedb := cm.Database.TrieDB()
-	return triedb.Commit(cm.dereferenceQueue[len(cm.dereferenceQueue)-1], true, nil)
+	return triedb.Commit(cm.tipBuffer[cm.lastPos], true, nil)
 }
