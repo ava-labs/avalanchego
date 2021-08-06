@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/coreth/params"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -676,7 +678,7 @@ func TestImportTxGasCost(t *testing.T) {
 		t.Fatalf("Expected gasCost to be %d, but found %d", expectedGasCost, gasCost)
 	}
 
-	baseFee := big.NewInt(25_000_000_000)
+	baseFee := big.NewInt(25 * params.GWei)
 	fee, err := calculateDynamicFee(gasCost, baseFee)
 	if err != nil {
 		t.Fatal(err)
