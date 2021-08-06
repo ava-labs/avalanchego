@@ -582,7 +582,6 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
 
-	// TODO: add test to ensure buffer rolls over correctly
 	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	if ethBlk1Root := ethBlk1.Root(); !vm.chain.BlockChain().HasState(ethBlk1Root) {
 		t.Fatalf("Expected blk1 state root to not yet be pruned after blk2 was accepted because of tip buffer")
