@@ -59,18 +59,13 @@ func (m *Mempool) length() int {
 }
 
 func (m *Mempool) has(txID ids.ID) bool {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	_, dropped, found := m.GetTx(txID)
+	return found && !dropped
+}
 
-	if _, ok := m.txs[txID]; ok {
-		return true
-	}
-
-	if _, ok := m.issuedTxs[txID]; ok {
-		return true
-	}
-
-	return false
+func (m *Mempool) isRejected(txID ids.ID) bool {
+	_, dropped, found := m.GetTx(txID)
+	return found && dropped
 }
 
 // Add attempts to add [tx] to the mempool and returns an error if
