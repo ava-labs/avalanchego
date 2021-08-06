@@ -228,5 +228,5 @@ type Config struct {
 	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 
 	// VM Aliases
-	VMAliases VMAliases `json:"vmAliases"`
+	VMAliases map[ids.ID][]string `json:"vmAliases"`
 }
