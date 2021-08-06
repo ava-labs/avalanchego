@@ -356,7 +356,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	}
 
 	// block timestamp cannot be too much in the future
-	afterSubWinEnd := proVM.Time().Add(syncBound).Add(time.Second)
+	afterSubWinEnd := proVM.Time().Add(maxSkew).Add(time.Second)
 	childSlb, err = statelessblock.Build(
 		prntProBlk.ID(),
 		afterSubWinEnd,

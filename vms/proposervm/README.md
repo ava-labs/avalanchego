@@ -50,7 +50,7 @@ The following validation rules are enforced:
 - A block must have a `PChainHeight` that is less or equal to current P-Chain height.
 - A block must have a `PChainHeight` is larger or equal to its parent's `PChainHeight` (`PChainHeight` is monotonic).
 - A block must have a `Timestamp` larger or equal to its parent's `Timestamp` (`Timestamp` is monotonic)
-- A block received by a node at time `t_local` must have a `Timestamp` such that `Timestamp < t_local + syncBond` (a block too far in the future is invalid). `syncBound` is currently set to `10 seconds`.
+- A block received by a node at time `t_local` must have a `Timestamp` such that `Timestamp < t_local + maxSkew` (a block too far in the future is invalid). `maxSkew` is currently set to `10 seconds`.
 - A block issued by a proposer `p` which has a position `i` in the current proposer list must have its timestamp at least `i × WindowDuration` seconds after its parent block's `Timestamp`. A block issued by a validator not contained in the first `maxWindows` positions in the proposal list must have its timestamp at least `maxWindows × WindowDuration` seconds after its parent block's `Timestamp`.
 
 A block violating any of these rules will be marked as invalid. Note, however, that Snowman++ block invalidity does not imply its inner block invalidity. In fact the same inner block can be wrapped by different Snowman++ blocks.

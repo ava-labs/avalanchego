@@ -113,7 +113,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	}
 
 	// Child timestamp can't be too far in the future
-	maxTimestamp := b.vm.Time().Add(syncBound)
+	maxTimestamp := b.vm.Time().Add(maxSkew)
 	if childTimestamp.After(maxTimestamp) {
 		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; block's timestamp (%s) is after the synchrony bound (%s)",
 			childTimestamp, maxTimestamp)

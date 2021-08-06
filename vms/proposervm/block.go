@@ -14,7 +14,7 @@ import (
 
 const (
 	// allowable block issuance in the future
-	syncBound = 10 * time.Second
+	maxSkew = 10 * time.Second
 )
 
 var (
@@ -99,7 +99,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return errTimeNotMonotonic
 	}
 
-	maxTimestamp := p.vm.Time().Add(syncBound)
+	maxTimestamp := p.vm.Time().Add(maxSkew)
 	if childTimestamp.After(maxTimestamp) {
 		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; block's timestamp (%s) is after the synchrony bound (%s)",
 			childTimestamp, maxTimestamp)
