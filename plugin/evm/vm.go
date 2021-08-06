@@ -935,10 +935,7 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 		}
 
 		// Move up the chain.
-		nextAncestorIntf, err := vm.GetBlockInternal(ancestor.Parent())
-		if err != nil {
-			return err
-		}
+		nextAncestorID := ancestor.Parent()
 		// If the ancestor is unknown, then the parent failed
 		// verification when it was called.
 		// If the ancestor is rejected, then this block shouldn't be
@@ -946,6 +943,11 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 		// will be missing.
 		// If the ancestor is processing, then the block may have
 		// been verified.
+		nextAncestorIntf, err := vm.GetBlockInternal(nextAncestorID)
+		if err != nil {
+			return errRejectedParent
+		}
+
 		if blkStatus := nextAncestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
 			return errRejectedParent
 		}
