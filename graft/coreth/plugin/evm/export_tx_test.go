@@ -4,7 +4,10 @@
 package evm
 
 import (
+	"math/big"
 	"testing"
+
+	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -152,5 +155,93 @@ func TestExportTxVerify(t *testing.T) {
 	// Test non-unique EVM Inputs fails verification after AP1
 	if err := exportTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ExportTx should have failed verification due to non-unique inputs")
+	}
+}
+
+// Note: this is a brittle test to ensure that the gas cost of a transaction does
+// not change
+func TestExportTxGasCost(t *testing.T) {
+	exportAmount := uint64(5000000)
+	baseFee := big.NewInt(25 * params.GWei)
+
+	tests := map[string]struct {
+		UnsignedExportTx *UnsignedExportTx
+		Keys             [][]*crypto.PrivateKeySECP256K1R
+
+		ExpectedGasCost uint64
+		ExpectedFee     uint64
+	}{
+		"simple export": {
+			UnsignedExportTx: &UnsignedExportTx{
+				NetworkID:        testNetworkID,
+				BlockchainID:     testCChainID,
+				DestinationChain: testXChainID,
+				Ins: []EVMInput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  exportAmount,
+						AssetID: testAvaxAssetID,
+						Nonce:   0,
+					},
+					{
+						Address: testEthAddrs[2],
+						Amount:  exportAmount,
+						AssetID: testAvaxAssetID,
+						Nonce:   0,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: testAvaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[0]},
+							},
+						},
+					},
+					{
+						Asset: avax.Asset{ID: testAvaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[1]},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tx := &Tx{UnsignedAtomicTx: test.UnsignedExportTx}
+
+			// Sign with the correct key
+			if err := tx.Sign(Codec, test.Keys); err != nil {
+				t.Fatal(err)
+			}
+
+			gasCost, err := tx.Gas()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if gasCost != test.ExpectedGasCost {
+				t.Fatalf("Expected gasCost to be %d, but found %d", test.ExpectedGasCost, gasCost)
+			}
+
+			fee, err := calculateDynamicFee(gasCost, baseFee)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fee != test.ExpectedFee {
+				t.Fatalf("Expected fee to be %d, but found %d", test.ExpectedFee, fee)
+			}
+		})
 	}
 }
