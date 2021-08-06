@@ -176,7 +176,6 @@ func getAPIConfig(v *viper.Viper) (node.APIConfig, error) {
 	config.HTTPSKeyFile = os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
 	config.HTTPSCertFile = os.ExpandEnv(v.GetString(HTTPSCertFileKey))
 	config.APIAllowedOrigins = v.GetStringSlice(HTTPAllowedOrigins)
-
 	config.AdminAPIEnabled = v.GetBool(AdminAPIEnabledKey)
 	config.InfoAPIEnabled = v.GetBool(InfoAPIEnabledKey)
 	config.KeystoreAPIEnabled = v.GetBool(KeystoreAPIEnabledKey)
@@ -196,9 +195,11 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 	}
 	switch {
 	case config.MaxDropRate < 0 || config.MaxDropRate > 1:
-		return config, fmt.Errorf("%s must be in [0,1]", RouterHealthMaxDropRateKey)
+		return router.HealthConfig{}, fmt.Errorf("%q must be in [0,1]", RouterHealthMaxDropRateKey)
 	case config.MaxOutstandingDuration <= 0:
-		return config, fmt.Errorf("%s must be positive", NetworkHealthMaxOutstandingDurationKey)
+		return router.HealthConfig{}, fmt.Errorf("%q must be positive", NetworkHealthMaxOutstandingDurationKey)
+	case config.MaxRunTimeRequests <= 0:
+		return router.HealthConfig{}, fmt.Errorf("%q must be positive", NetworkMaximumTimeoutKey)
 	}
 	return config, nil
 }
@@ -266,16 +267,15 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	}
 	switch {
 	case config.MinimumTimeout < 1:
-		return network.Config{}, errors.New("minimum timeout must be positive")
+		return network.Config{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
 	case config.MinimumTimeout > config.MaximumTimeout:
-		return network.Config{}, errors.New("maximum timeout can't be less than minimum timeout")
-	case config.InitialTimeout < config.MinimumTimeout ||
-		config.InitialTimeout > config.MaximumTimeout:
-		return network.Config{}, errors.New("initial timeout should be in the range [minimumTimeout, maximumTimeout]")
+		return network.Config{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
+	case config.InitialTimeout < config.MinimumTimeout || config.InitialTimeout > config.MaximumTimeout:
+		return network.Config{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
 	case config.TimeoutHalflife <= 0:
-		return network.Config{}, errors.New("network timeout halflife must be positive")
+		return network.Config{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
 	case config.TimeoutCoefficient < 1:
-		return network.Config{}, errors.New("network timeout coefficient must be >= 1")
+		return network.Config{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
 	}
 
 	// Outbound connection throttling
@@ -283,23 +283,36 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
 		ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
 	}
+	if config.DialerConfig.ConnectionTimeout < 0 {
+		return network.Config{}, fmt.Errorf("%q must be >= 0", OutboundConnectionTimeout)
+	}
 
 	// Compression
 	config.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
 
 	// Peer alias
 	config.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
+	if config.PeerAliasTimeout < 0 {
+		return network.Config{}, fmt.Errorf("%q must be >= 0", PeerAliasTimeoutKey)
+	}
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, alpha, k int) benchlist.Config {
-	config := benchlist.Config{}
-	config.Threshold = v.GetInt(BenchlistFailThresholdKey)
-	config.PeerSummaryEnabled = v.GetBool(BenchlistPeerSummaryEnabledKey)
-	config.Duration = v.GetDuration(BenchlistDurationKey)
-	config.MinimumFailingDuration = v.GetDuration(BenchlistMinFailingDurationKey)
-	config.MaxPortion = (1.0 - (float64(alpha) / float64(k))) / 3.0
-	return config
+func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) {
+	config := benchlist.Config{
+		Threshold:              v.GetInt(BenchlistFailThresholdKey),
+		PeerSummaryEnabled:     v.GetBool(BenchlistPeerSummaryEnabledKey),
+		Duration:               v.GetDuration(BenchlistDurationKey),
+		MinimumFailingDuration: v.GetDuration(BenchlistMinFailingDurationKey),
+		MaxPortion:             (1.0 - (float64(alpha) / float64(k))) / 3.0,
+	}
+	switch {
+	case config.Duration < 0:
+		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistDurationKey)
+	case config.MinimumFailingDuration < 0:
+		return benchlist.Config{}, fmt.Errorf("%q must be >= 0", BenchlistMinFailingDurationKey)
+	}
+	return config, nil
 }
 
 func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
@@ -807,7 +820,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Benchlist
-	nodeConfig.BenchlistConfig = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
+	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, nodeConfig.ConsensusParams.Alpha, nodeConfig.ConsensusParams.K)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// File Descriptor Limit
 	fdLimit := v.GetUint64(FdLimitKey)
