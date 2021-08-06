@@ -495,6 +495,7 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.MinDelegatorStake = v.GetUint64(MinDelegatorStakeKey)
 		config.MinStakeDuration = v.GetDuration(MinStakeDurationKey)
 		config.MaxStakeDuration = v.GetDuration(MaxStakeDurationKey)
+		config.StakeMintingPeriod = v.GetDuration(StakeMintingPeriodKey)
 		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
 		switch {
 		case config.UptimeRequirement < 0:
