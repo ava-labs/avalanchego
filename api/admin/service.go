@@ -35,7 +35,7 @@ type Config struct {
 	Log          logging.Logger
 	ProfileDir   string
 	LogFactory   logging.Factory
-	NodeConfig   map[string]interface{}
+	NodeConfig   interface{}
 	ChainManager chains.Manager
 	HTTPServer   *server.Server
 }
@@ -260,12 +260,8 @@ func (service *Admin) GetLoggerLevel(_ *http.Request, args *GetLoggerLevelArgs, 
 	return nil
 }
 
-type GetConfigReply struct {
-	Config map[string]interface{} `json:"config"`
-}
-
 // GetConfig returns the config that the node was started with.
-func (service *Admin) GetConfig(_ *http.Request, args *struct{}, reply *GetConfigReply) error {
-	reply.Config = service.NodeConfig
+func (service *Admin) GetConfig(_ *http.Request, args *struct{}, reply *interface{}) error {
+	*reply = service.NodeConfig
 	return nil
 }

@@ -824,10 +824,6 @@ func (n *Node) initAdminAPI() error {
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	configMap := make(map[string]interface{})
-	if err := json.Unmarshal(configJSON, &configMap); err != nil {
-		return fmt.Errorf("couldn't unmarshal config: %w", err)
-	}
 	service, err := admin.NewService(
 		admin.Config{
 			Log:          n.Log,
@@ -835,7 +831,7 @@ func (n *Node) initAdminAPI() error {
 			HTTPServer:   &n.APIServer,
 			ProfileDir:   n.Config.ProfilerConfig.Dir,
 			LogFactory:   n.LogFactory,
-			NodeConfig:   configMap,
+			NodeConfig:   n.Config,
 		},
 	)
 	if err != nil {
