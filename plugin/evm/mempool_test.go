@@ -2,6 +2,7 @@ package evm
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -198,6 +199,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	// create tx to be gossiped
@@ -257,6 +259,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	// add a tx to it
@@ -312,6 +315,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 // 			t.Fatal(err)
 // 		}
 // 	}()
+// vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 // 	mempool := vm.mempool
 
 // 	// create candidate tx
@@ -343,6 +347,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	isTxReGossiped := false
@@ -409,6 +414,7 @@ func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	isTxReGossiped := false
@@ -448,6 +454,7 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	isTxRequested := false
@@ -510,6 +517,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	isTxRequested := false
@@ -553,6 +561,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	isResponseIssued := false
@@ -609,6 +618,7 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 
 	isResponseIssued := false
 	sender.CantSendAppResponse = true
@@ -642,6 +652,7 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 
 	gossipedBytes := make([]byte, 0)
 	sender.CantSendAppGossip = true
