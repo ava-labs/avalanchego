@@ -98,6 +98,8 @@ type StakingConfig struct {
 	EnableStaking         bool            `json:"enableStaking"`
 	StakingTLSCert        tls.Certificate `json:"-"`
 	DisabledStakingWeight uint64          `json:"disabledStakingWeight"`
+	StakingKeyPath        string          `json:"stakingKeyPath"`
+	StakingCertPath       string          `json:"stakingCertPath"`
 }
 
 type BootstrapConfig struct {

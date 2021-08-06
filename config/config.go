@@ -437,9 +437,6 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	// Parse the staking key/cert paths and expand environment variables
 	stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
 	stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
-	// TODO add the below
-	//	nodeConfig.StakingKeyFile = stakingKeyPath
-	//	nodeConfig.StakingCertFile = stakingCertPath
 
 	// If staking key/cert locations are specified but not found, error
 	if v.IsSet(StakingKeyPathKey) || v.IsSet(StakingCertPathKey) {
@@ -467,10 +464,13 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	config := node.StakingConfig{
 		EnableStaking:         v.GetBool(StakingEnabledKey),
 		DisabledStakingWeight: v.GetUint64(StakingDisabledWeightKey),
+		StakingKeyPath:        os.ExpandEnv(v.GetString(StakingKeyPathKey)),
+		StakingCertPath:       os.ExpandEnv(v.GetString(StakingCertPathKey)),
 	}
 	if !config.EnableStaking && config.DisabledStakingWeight == 0 {
 		return node.StakingConfig{}, errInvalidStakerWeights
 	}
+
 	var err error
 	config.StakingTLSCert, err = getStakingTLSCert(v)
 	if err != nil {
