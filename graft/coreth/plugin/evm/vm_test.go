@@ -582,9 +582,10 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk2.ID(), lastAcceptedID)
 	}
 
+	// TODO: add test to ensure buffer rolls over correctly
 	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk1Root := ethBlk1.Root(); vm.chain.BlockChain().HasState(ethBlk1Root) {
-		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	if ethBlk1Root := ethBlk1.Root(); !vm.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to not yet be pruned after blk2 was accepted because of tip buffer")
 	}
 
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
@@ -623,6 +624,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		[]*engCommon.Fx{},
 	); err != nil {
 		t.Fatal(err)
+	}
+
+	// State root should not have been committed and discarded on restart
+	if ethBlk1Root := ethBlk1.Root(); restartedVM.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
 	}
 }
 
