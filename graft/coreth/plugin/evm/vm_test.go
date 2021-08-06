@@ -630,6 +630,12 @@ func TestBuildEthTxBlock(t *testing.T) {
 	if ethBlk1Root := ethBlk1.Root(); restartedVM.chain.BlockChain().HasState(ethBlk1Root) {
 		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
 	}
+
+	// State root should be committed when accepted tip on shutdown
+	ethBlk2 := blk2.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk2Root := ethBlk2.Root(); !restartedVM.chain.BlockChain().HasState(ethBlk2Root) {
+		t.Fatalf("Expected blk2 state root to not be pruned after shutdown (last accepted tip should be committed)")
+	}
 }
 
 func TestConflictingImportTxs(t *testing.T) {
