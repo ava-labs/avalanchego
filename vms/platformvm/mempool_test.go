@@ -2,11 +2,29 @@ package platformvm
 
 import (
 	"testing"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/avm"
 )
+
+func getTheValidTx(vm *VM, t *testing.T) *Tx {
+	res, err := vm.newCreateChainTx(
+		testSubnet1.ID(),
+		nil,
+		avm.ID,
+		nil,
+		"chain name",
+		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
+		ids.ShortEmpty, // change addr
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return res
+}
 
 func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	// shows that a locally generated CreateChainTx can be added to mempool
@@ -20,21 +38,11 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.mempool
 
 	// add a tx to it
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := getTheValidTx(vm, t)
 	if err := mempool.IssueTx(tx); err != nil {
 		t.Fatal("Could not add tx to mempool")
 	}
@@ -43,7 +51,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	}
 
 	// show that build block include that tx and removes it from mempool
-	blk, err := mempool.BuildBlock()
+	blk, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build block out of mempool")
 	}
@@ -76,21 +84,11 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.mempool
 
 	// create tx to be gossiped
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := getTheValidTx(vm, t)
 
 	// gossip tx and check it is accepted
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
@@ -102,7 +100,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	}
 
 	// show that build block include that tx and removes it from mempool
-	blk, err := mempool.BuildBlock()
+	blk, err := vm.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build block out of mempool")
 	}
@@ -134,21 +132,11 @@ func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.mempool
 
 	// create candidate tx
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := getTheValidTx(vm, t)
 
 	// shortcut to simulated almost filled mempool
 	mempool.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes()) + 1
@@ -170,6 +158,16 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	// only if duly added to mempool
 
 	vm, _, sender := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	mempool := &vm.mempool
+
 	isTxReGossiped := false
 	var gossipedBytes []byte
 	sender.CantSendAppGossip = true
@@ -178,28 +176,9 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 		gossipedBytes = b
 		return nil
 	}
-	vm.ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
-	mempool := &vm.mempool
 
 	// create tx to be received from AppGossipResponse
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := getTheValidTx(vm, t)
 
 	// responses with unknown requestID are rejected
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
@@ -270,12 +249,6 @@ func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 	// show that invalid txes are not accepted to mempool, nor rejected
 
 	vm, _, sender := defaultVM()
-	isTxReGossiped := false
-	sender.CantSendAppGossip = true
-	sender.SendAppGossipF = func([]byte) error {
-		isTxReGossiped = true
-		return nil
-	}
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -283,7 +256,15 @@ func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.mempool
+
+	isTxReGossiped := false
+	sender.CantSendAppGossip = true
+	sender.SendAppGossipF = func([]byte) error {
+		isTxReGossiped = true
+		return nil
+	}
 
 	// create an invalid tx
 	illFormedTx, err := vm.newCreateChainTx(
@@ -321,6 +302,16 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 	// only if the txID is unknown
 
 	vm, _, sender := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	mempool := &vm.mempool
+
 	isTxRequested := false
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	IsRightNodeRequested := false
@@ -334,28 +325,9 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 		requestedBytes = resp
 		return nil
 	}
-	vm.ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
-	mempool := &vm.mempool
 
 	// create a tx
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := getTheValidTx(vm, t)
 	txID, err := vm.codec.Marshal(codecVersion, tx.ID())
 	if err != nil {
 		t.Fatal(err)
@@ -395,12 +367,6 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	// show that txes already marked as invalid are not re-requested on gossiping
 
 	vm, _, sender := defaultVM()
-	isTxRequested := false
-	sender.CantSendAppRequest = true
-	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
-		isTxRequested = true
-		return nil
-	}
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -408,21 +374,18 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.mempool
 
-	// create a tx and mark as invalid
-	rejectedTx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
+	isTxRequested := false
+	sender.CantSendAppRequest = true
+	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
+		isTxRequested = true
+		return nil
 	}
+
+	// create a tx and mark as invalid
+	rejectedTx := getTheValidTx(vm, t)
 	if err := mempool.markReject(rejectedTx); err != nil {
 		t.Fatal("could not mark tx as rejected")
 	}
@@ -447,6 +410,16 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	// only if it has the requested tx
 
 	vm, _, sender := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	mempool := &vm.mempool
+
 	isResponseIssued := false
 	var respondedBytes []byte
 	sender.CantSendAppResponse = true
@@ -455,28 +428,9 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 		respondedBytes = resp
 		return nil
 	}
-	vm.ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
-	mempool := &vm.mempool
 
 	// create a tx
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	tx := getTheValidTx(vm, t)
 	txID, err := vm.codec.Marshal(codecVersion, tx.ID())
 	if err != nil {
 		t.Fatal(err)
@@ -515,12 +469,6 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 	// no response is sent
 
 	vm, _, sender := defaultVM()
-	isResponseIssued := false
-	sender.CantSendAppResponse = true
-	sender.SendAppResponseF = func(ids.ShortID, uint32, []byte) error {
-		isResponseIssued = true
-		return nil
-	}
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -528,20 +476,17 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+
+	isResponseIssued := false
+	sender.CantSendAppResponse = true
+	sender.SendAppResponseF = func(ids.ShortID, uint32, []byte) error {
+		isResponseIssued = true
+		return nil
+	}
 
 	// create a tx
-	rejectedTx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	rejectedTx := getTheValidTx(vm, t)
 	rejectedTxID, err := vm.codec.Marshal(codecVersion, rejectedTx.ID())
 	if err != nil {
 		t.Fatal(err)
@@ -560,12 +505,6 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 func TestMempool_IssueTxAndGossiping(t *testing.T) {
 	// show that locally generated txes are gossiped
 	vm, _, sender := defaultVM()
-	gossipedBytes := make([]byte, 0)
-	sender.CantSendAppGossip = true
-	sender.SendAppGossipF = func(b []byte) error {
-		gossipedBytes = b
-		return nil
-	}
 	vm.ctx.Lock.Lock()
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -573,21 +512,18 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 		}
 		vm.ctx.Lock.Unlock()
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 	mempool := &vm.mempool
 
-	// add a tx to it
-	tx, err := vm.newCreateChainTx(
-		testSubnet1.ID(),
-		nil,
-		avm.ID,
-		nil,
-		"chain name",
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
+	gossipedBytes := make([]byte, 0)
+	sender.CantSendAppGossip = true
+	sender.SendAppGossipF = func(b []byte) error {
+		gossipedBytes = b
+		return nil
 	}
+
+	// add a tx to it
+	tx := getTheValidTx(vm, t)
 	if err := mempool.IssueTx(tx); err != nil {
 		t.Fatal("Could not add tx to mempool")
 	}

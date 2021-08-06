@@ -55,6 +55,7 @@ type ChainVM interface {
 }
 
 type SnowmanPlusPlusVM interface {
+	ChainVM
 	GetActivationTime() time.Time
 }
 
