@@ -448,6 +448,16 @@ func MaxStakeAmount(
 	return maxStake, nil
 }
 
+// Return the maximum amount of stake on a node (including delegations) at any given
+// time between [startTime] and [endTime] given that:
+// * The amount of stake on the node right now is [currentStake]
+// * The delegations currently on this node are [current]
+// * [current] is sorted in order of increasing delegation end time.
+// * The stake delegated in [current] are already included in [currentStake]
+// * [startTime] is in the future, and [endTime] > [startTime]
+// * The delegations that will be on this node in the future are [pending]
+// * The start time of all delegations in [pending] are in the future
+// * [pending] is sorted in order of increasing delegation start time
 func FixedMaxStakeAmount(
 	current,
 	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
@@ -463,34 +473,41 @@ func FixedMaxStakeAmount(
 	}
 
 	var (
-		err      error
+		err error
+		// [maxStake] is the max stake at any point between now [starTime] and [endTime]
 		maxStake uint64 = 0
 	)
 
-	// Iterate through time until [endTime].
+	// Calculate what the amount staked will be when each pending delegation starts.
 	for _, nextPending := range pending { // Iterates in order of increasing start time
+		// Calculate what the amount staked will be when this delegation starts.
 		nextPendingStartTime := nextPending.StartTime()
 
-		// If the new delegator is starting after [endTime], then we don't need
-		// to check the maximum after this point.
 		if nextPendingStartTime.After(endTime) {
+			// This delegation starts after [endTime].
+			// Since we're calculating the max amount staked in [startTime, endTime],
+			// we can stop. (Recall that [pending] is sorted in order of increasing end time.)
 			break
 		}
 
-		// Remove all the delegators that finish before the next delegator will
-		// start.
+		// Subtract from [currentStake] all of the current delegations that will have
+		// ending by the time that the delegation [nextPending] starts.
 		for len(toRemoveHeap) > 0 {
+			// Get the next current delegation that will end.
 			toRemove := toRemoveHeap.Peek()
 			toRemoveEndTime := toRemove.EndTime()
 			if toRemoveEndTime.After(nextPendingStartTime) {
 				break
 			}
+			// This current delegation ([toRemove]) ends before [nextPending] starts,
+			// so its stake should be subtracted from [currentStake].
 
 			// Changed in AP3:
 			// If the new delegator has started, then this current delegator
 			// should have an end time that is > [startTime].
 			newDelegatorHasStartedBeforeFinish := toRemoveEndTime.After(startTime)
 			if newDelegatorHasStartedBeforeFinish && currentStake > maxStake {
+				// Only update [maxStake] if it's after [startTime]
 				maxStake = currentStake
 			}
 
@@ -505,8 +522,8 @@ func FixedMaxStakeAmount(
 			toRemoveHeap.Remove()
 		}
 
-		// The new delegator hasn't stopped yet, so we should add the pending
-		// delegator to the current set.
+		// Add to [currentStake] the stake of this pending delegator to calculate
+		// what the stake will be when this pending delegation has started.
 		currentStake, err = math.Add64(currentStake, nextPending.Validator.Wght)
 		if err != nil {
 			return 0, err
@@ -519,9 +536,12 @@ func FixedMaxStakeAmount(
 		// [maximumStake] during the delegators delegation period.
 		newDelegatorHasStarted := !nextPendingStartTime.Before(startTime)
 		if newDelegatorHasStarted && currentStake > maxStake {
+			// Only update [maxStake] if it's after [startTime]
 			maxStake = currentStake
 		}
 
+		// This pending delegator is a current delegator relative
+		// when considering later pending delegators that start late
 		toRemoveHeap.Add(&nextPending.Validator)
 	}
 
@@ -546,12 +566,11 @@ func FixedMaxStakeAmount(
 		toRemoveHeap.Remove()
 	}
 
-	// We have advanced time to be inside the delegation window. So, make sure
-	// that the max stake is updated accordingly.
+	// We have advanced time to be inside the delegation window.
+	// Make sure that the max stake is updated accordingly.
 	if currentStake > maxStake {
 		maxStake = currentStake
 	}
-
 	return maxStake, nil
 }
 
