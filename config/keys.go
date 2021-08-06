@@ -45,8 +45,6 @@ const (
 	StakingKeyPathKey                         = "staking-tls-key-file"
 	StakingCertPathKey                        = "staking-tls-cert-file"
 	StakingDisabledWeightKey                  = "staking-disabled-weight"
-	MaxNonStakerPendingMsgsKey                = "max-non-staker-pending-msgs"
-	StakerCPUReservedKey                      = "staker-cpu-reserved"
 	NetworkInitialTimeoutKey                  = "network-initial-timeout"
 	NetworkMinimumTimeoutKey                  = "network-minimum-timeout"
 	NetworkMaximumTimeoutKey                  = "network-maximum-timeout"

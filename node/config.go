@@ -31,7 +31,7 @@ type IPCConfig struct {
 
 type APIAuthConfig struct {
 	APIRequireAuthToken bool   `json:"apiRequireAuthToken"`
-	APIAuthPassword     string `json:"apiAuthPassword"`
+	APIAuthPassword     string `json:"-"`
 }
 
 type APIIndexerConfig struct {
@@ -223,7 +223,7 @@ type Config struct {
 	WhitelistedSubnets ids.Set `json:"whitelistedSubnets"`
 
 	// ChainConfigs
-	ChainConfigs map[string]chains.ChainConfig `json:"chainConfigs"`
+	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 
 	// VM Aliases
 	VMAliases VMAliases `json:"vmAliases"`
