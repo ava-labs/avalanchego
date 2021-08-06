@@ -5,8 +5,6 @@ package node
 
 import (
 	"crypto/tls"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -22,38 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 )
-
-type VMAliases map[ids.ID][]string
-
-func (v *VMAliases) MarshalJSON() ([]byte, error) {
-	// Sort so we have deterministic ordering
-	vmIDs := make([]ids.ID, len(*v))
-	i := 0
-	for vmID := range *v {
-		vmIDs[i] = vmID
-		i++
-	}
-	ids.SortIDs(vmIDs)
-
-	b := strings.Builder{}
-	b.WriteString("{")
-	for i, vmID := range vmIDs {
-		b.WriteString(fmt.Sprintf("\"%s\": [", vmID))
-		aliases := (*v)[vmID]
-		for i, alias := range aliases {
-			b.WriteString(fmt.Sprintf("\"%s\"", alias))
-			if i != len(aliases)-1 {
-				b.WriteString(",")
-			}
-		}
-		b.WriteString("]")
-		if i != len(vmIDs)-1 {
-			b.WriteString(",")
-		}
-	}
-	b.WriteString("}")
-	return []byte(b.String()), nil
-}
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
@@ -196,5 +162,5 @@ type Config struct {
 	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
 
 	// VM Aliases
-	VMAliases VMAliases `json:"vmAliases"`
+	VMAliases map[ids.ID][]string `json:"vmAliases"`
 }
