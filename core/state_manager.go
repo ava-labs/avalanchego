@@ -30,7 +30,6 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
@@ -48,10 +47,18 @@ type TrieWriter interface {
 	Shutdown() error
 }
 
-func NewTrieWriter(db state.Database, config *CacheConfig) TrieWriter {
+type TrieDB interface {
+	Reference(child common.Hash, parent common.Hash)
+	Dereference(root common.Hash)
+	Commit(root common.Hash, report bool, callback func(common.Hash)) error
+	Size() (common.StorageSize, common.StorageSize)
+	Cap(limit common.StorageSize) error
+}
+
+func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 	if config.Pruning {
 		return &cappedMemoryTrieWriter{
-			Database:           db,
+			TrieDB:             db,
 			memoryCap:          common.StorageSize(config.TrieDirtyLimit) * 1024 * 1024,
 			imageCap:           4 * 1024 * 1024,
 			commitInterval:     commitInterval,
@@ -60,18 +67,17 @@ func NewTrieWriter(db state.Database, config *CacheConfig) TrieWriter {
 		}
 	} else {
 		return &noPruningTrieWriter{
-			Database: db,
+			TrieDB: db,
 		}
 	}
 }
 
 type noPruningTrieWriter struct {
-	state.Database
+	TrieDB
 }
 
 func (np *noPruningTrieWriter) InsertTrie(block *types.Block) error {
-	triedb := np.Database.TrieDB()
-	return triedb.Commit(block.Root(), false, nil)
+	return np.TrieDB.Commit(block.Root(), false, nil)
 }
 
 func (np *noPruningTrieWriter) AcceptTrie(block *types.Block) error { return nil }
@@ -81,7 +87,7 @@ func (np *noPruningTrieWriter) RejectTrie(block *types.Block) error { return nil
 func (np *noPruningTrieWriter) Shutdown() error { return nil }
 
 type cappedMemoryTrieWriter struct {
-	state.Database
+	TrieDB
 	memoryCap                          common.StorageSize
 	imageCap                           common.StorageSize
 	commitInterval, randomizedInterval uint64
@@ -91,19 +97,17 @@ type cappedMemoryTrieWriter struct {
 }
 
 func (cm *cappedMemoryTrieWriter) InsertTrie(block *types.Block) error {
-	triedb := cm.Database.TrieDB()
-	triedb.Reference(block.Root(), common.Hash{})
+	cm.TrieDB.Reference(block.Root(), common.Hash{})
 
-	nodes, imgs := triedb.Size()
+	nodes, imgs := cm.TrieDB.Size()
 	if nodes > cm.memoryCap || imgs > cm.imageCap {
-		return triedb.Cap(cm.memoryCap - ethdb.IdealBatchSize)
+		return cm.TrieDB.Cap(cm.memoryCap - ethdb.IdealBatchSize)
 	}
 
 	return nil
 }
 
 func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
-	triedb := cm.Database.TrieDB()
 	root := block.Root()
 
 	// Attempt to dereference roots at least [tipBufferSize] old (so queries at tip
@@ -113,7 +117,7 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	// (they are no-ops).
 	nextPos := (cm.lastPos + 1) % tipBufferSize
 	if cm.tipBuffer[nextPos] != (common.Hash{}) {
-		triedb.Dereference(cm.tipBuffer[nextPos])
+		cm.TrieDB.Dereference(cm.tipBuffer[nextPos])
 	}
 	cm.tipBuffer[nextPos] = root
 	cm.lastPos = nextPos
@@ -123,7 +127,7 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 	// Note: a randomized interval is added here to ensure that pruning nodes
 	// do not all only commit at the exact same heights.
 	if height := block.NumberU64(); height%cm.commitInterval == 0 || height%cm.randomizedInterval == 0 {
-		if err := triedb.Commit(root, true, nil); err != nil {
+		if err := cm.TrieDB.Commit(root, true, nil); err != nil {
 			return fmt.Errorf("failed to commit trie for block %s: %w", block.Hash().Hex(), err)
 		}
 	}
@@ -131,8 +135,7 @@ func (cm *cappedMemoryTrieWriter) AcceptTrie(block *types.Block) error {
 }
 
 func (cm *cappedMemoryTrieWriter) RejectTrie(block *types.Block) error {
-	triedb := cm.Database.TrieDB()
-	triedb.Dereference(block.Root())
+	cm.TrieDB.Dereference(block.Root())
 	return nil
 }
 
@@ -145,6 +148,5 @@ func (cm *cappedMemoryTrieWriter) Shutdown() error {
 
 	// Attempt to commit last item added to [dereferenceQueue] on shutdown to avoid
 	// re-processing the state on the next startup.
-	triedb := cm.Database.TrieDB()
-	return triedb.Commit(cm.tipBuffer[cm.lastPos], true, nil)
+	return cm.TrieDB.Commit(cm.tipBuffer[cm.lastPos], true, nil)
 }
