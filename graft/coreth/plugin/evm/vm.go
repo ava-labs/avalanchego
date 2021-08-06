@@ -677,6 +677,7 @@ func (vm *VM) Version() (string, error) {
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	vm.ctx.Log.Warn("Failed AppRequest to node %v, reqID %v", nodeID, requestID)
 	return nil
 }
 
@@ -745,13 +746,17 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 
 	// Note: we currently do not check whether nodes send us exactly the tx matching
 	// the txID we asked for. At least we should check we do not receive total garbage
-	switch {
-	case vm.mempool.has(tx.ID()):
-		return nil
-		// TODO: handle rejected txes
+
+	// check if  tx is already known
+	if _, dropped, found := vm.mempool.GetTx(tx.ID()); found || dropped {
+		return nil // nothing to do
 	}
 
-	// TODO: validate tx
+	// verify tx
+	if err := vm.verifyTxAtTip(tx); err != nil {
+		vm.mempool.discardedTxs.Put(tx.ID(), tx)
+		return nil
+	}
 
 	// add to mempool and possibly re-gossip
 	switch err := vm.mempool.AddTx(tx); err {
@@ -764,11 +769,14 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		}
 
 		return vm.appSender.SendAppGossip(txIDBytes)
-	// TODO: add max mempool size
+	case errTooManyAtomicTx:
+		// tx has not been accepted to mempool due to size
+		// do not gossip since we cannot serve it
+		return nil
 	default:
 		vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
-		// TODO: mark rejected
+		vm.mempool.discardedTxs.Put(tx.ID(), tx)
 		return err
 	}
 }
@@ -786,10 +794,12 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	}
 	vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
 
+	_, dropped, found := vm.mempool.GetTx(txID)
 	switch {
-	case vm.mempool.has(txID):
-		return nil
-		// TODO: handle rejected txes
+	case found && !dropped:
+		return nil // already known and valid tx
+	case found && dropped:
+		return nil // already known and invalid tx
 	}
 
 	nodesSet := ids.NewShortSet(1)
