@@ -219,12 +219,13 @@ type VM struct {
 	// [building] indicates the VM has sent a request to the engine to build a block.
 	buildStatus buildingBlkStatus
 
-	baseCodec codec.Registry
-	codec     codec.Manager
-	clock     timer.Clock
-	txFee     uint64
-	mempool   *Mempool
-	appSender commonEng.AppSender
+	baseCodec            codec.Registry
+	codec                codec.Manager
+	clock                timer.Clock
+	txFee                uint64
+	mempool              *Mempool
+	gossipActivationTime time.Time
+	appSender            commonEng.AppSender
 	gossipReq.Handler
 
 	shutdownChan chan struct{}
@@ -262,6 +263,11 @@ func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
  ********************************* Snowman API ********************************
  ******************************************************************************
  */
+
+// implements SnowmanPlusPlusVM interface
+func (vm *VM) GetActivationTime() time.Time {
+	return time.Unix(0, 0) // TODO: setup upon deploy
+}
 
 // Initialize implements the snowman.ChainVM interface
 
@@ -374,8 +380,9 @@ func (vm *VM) Initialize(
 	}
 
 	vm.codec = Codec
-	// TODO: read size from settings
-	vm.mempool = NewMempool(defaultMempoolSize)
+
+	vm.mempool = NewMempool(defaultMempoolSize) // TODO: read size from settings
+	vm.gossipActivationTime = timer.MaxTime     // TODO: setup upon deploy
 	vm.appSender = appSender
 	vm.Handler = gossipReq.NewHandler()
 
@@ -677,13 +684,25 @@ func (vm *VM) Version() (string, error) {
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	vm.ctx.Log.Warn("Failed AppRequest to node %v, reqID %v", nodeID, requestID)
+	vm.ctx.Log.Verbo("called AppRequestFailed")
+
+	if time.Now().Before(vm.gossipActivationTime) {
+		vm.ctx.Log.Verbo("called AppRequestFailed before activation time. Doing nothing")
+		return nil
+	}
+
+	vm.ctx.Log.Warn("AppRequestFailed to node %v, reqID %v", nodeID, requestID)
 	return nil
 }
 
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
 	vm.ctx.Log.Verbo("called AppRequest")
+
+	if time.Now().Before(vm.gossipActivationTime) {
+		vm.ctx.Log.Verbo("called AppRequest before activation time. Doing nothing")
+		return nil
+	}
 
 	// decode single id
 	txID := ids.ID{}
@@ -719,6 +738,11 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	vm.ctx.Log.Verbo("called AppResponse")
+
+	if time.Now().Before(vm.gossipActivationTime) {
+		vm.ctx.Log.Verbo("called AppResponse before activation time. Doing nothing")
+		return nil
+	}
 
 	// check requestID
 	if err := vm.ReclaimID(requestID); err != nil {
@@ -784,6 +808,11 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 // This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	vm.ctx.Log.Verbo("called AppGossip")
+
+	if time.Now().Before(vm.gossipActivationTime) {
+		vm.ctx.Log.Verbo("called AppGossip before activation time. Doing nothing")
+		return nil
+	}
 
 	// decode single id
 	txID := ids.ID{}
