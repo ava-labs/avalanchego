@@ -161,6 +161,10 @@ func TestExportTxVerify(t *testing.T) {
 // Note: this is a brittle test to ensure that the gas cost of a transaction does
 // not change
 func TestExportTxGasCost(t *testing.T) {
+	avaxAssetID := ids.GenerateTestID()
+	chainID := ids.GenerateTestID()
+	xChainID := ids.GenerateTestID()
+	networkID := uint32(5)
 	exportAmount := uint64(5000000)
 	baseFee := big.NewInt(25 * params.GWei)
 
@@ -173,26 +177,20 @@ func TestExportTxGasCost(t *testing.T) {
 	}{
 		"simple export": {
 			UnsignedExportTx: &UnsignedExportTx{
-				NetworkID:        testNetworkID,
-				BlockchainID:     testCChainID,
-				DestinationChain: testXChainID,
+				NetworkID:        networkID,
+				BlockchainID:     chainID,
+				DestinationChain: xChainID,
 				Ins: []EVMInput{
 					{
 						Address: testEthAddrs[0],
 						Amount:  exportAmount,
-						AssetID: testAvaxAssetID,
-						Nonce:   0,
-					},
-					{
-						Address: testEthAddrs[2],
-						Amount:  exportAmount,
-						AssetID: testAvaxAssetID,
+						AssetID: avaxAssetID,
 						Nonce:   0,
 					},
 				},
 				ExportedOutputs: []*avax.TransferableOutput{
 					{
-						Asset: avax.Asset{ID: testAvaxAssetID},
+						Asset: avax.Asset{ID: avaxAssetID},
 						Out: &secp256k1fx.TransferOutput{
 							Amt: exportAmount,
 							OutputOwners: secp256k1fx.OutputOwners{
@@ -202,19 +200,11 @@ func TestExportTxGasCost(t *testing.T) {
 							},
 						},
 					},
-					{
-						Asset: avax.Asset{ID: testAvaxAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: exportAmount,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Locktime:  0,
-								Threshold: 1,
-								Addrs:     []ids.ShortID{testShortIDAddrs[1]},
-							},
-						},
-					},
 				},
 			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasCost: 20780,
+			ExpectedFee:     519500,
 		},
 	}
 
