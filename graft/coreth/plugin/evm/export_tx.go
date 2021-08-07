@@ -110,7 +110,7 @@ func (tx *UnsignedExportTx) Burned(assetID ids.ID) (uint64, error) {
 
 // Gas returns the amount of gas consumed by producing the outputs in the
 // export transaction.
-func (tx *UnsignedExportTx) Gas() uint64 {
+func (tx *UnsignedExportTx) Cost() uint64 {
 	return OutputGas*uint64(len(tx.ExportedOutputs)) + TxBytesGas*uint64(len(tx.Bytes()))
 }
 
@@ -130,11 +130,11 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	fc := avax.NewFlowChecker()
 	switch {
 	case rules.IsApricotPhase3:
-		txGas, err := stx.Gas()
+		cost, err := stx.Cost()
 		if err != nil {
 			return err
 		}
-		txFee, err := calculateDynamicFee(txGas, baseFee)
+		txFee, err := calculateDynamicFee(cost, baseFee)
 		if err != nil {
 			return err
 		}

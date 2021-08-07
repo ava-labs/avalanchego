@@ -172,8 +172,8 @@ func TestExportTxGasCost(t *testing.T) {
 		UnsignedExportTx *UnsignedExportTx
 		Keys             [][]*crypto.PrivateKeySECP256K1R
 
-		ExpectedGasCost uint64
-		ExpectedFee     uint64
+		ExpectedCost uint64
+		ExpectedFee  uint64
 	}{
 		"simple export": {
 			UnsignedExportTx: &UnsignedExportTx{
@@ -202,9 +202,9 @@ func TestExportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedGasCost: 20780,
-			ExpectedFee:     519500,
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedCost: 20780,
+			ExpectedFee:  519500,
 		},
 	}
 
@@ -217,15 +217,15 @@ func TestExportTxGasCost(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			gasCost, err := tx.Gas()
+			cost, err := tx.Cost()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if gasCost != test.ExpectedGasCost {
-				t.Fatalf("Expected gasCost to be %d, but found %d", test.ExpectedGasCost, gasCost)
+			if cost != test.ExpectedCost {
+				t.Fatalf("Expected cost to be %d, but found %d", test.ExpectedCost, cost)
 			}
 
-			fee, err := calculateDynamicFee(gasCost, baseFee)
+			fee, err := calculateDynamicFee(cost, baseFee)
 			if err != nil {
 				t.Fatal(err)
 			}

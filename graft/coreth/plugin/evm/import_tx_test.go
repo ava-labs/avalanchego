@@ -639,8 +639,8 @@ func TestImportTxGasCost(t *testing.T) {
 		UnsignedImportTx *UnsignedImportTx
 		Keys             [][]*crypto.PrivateKeySECP256K1R
 
-		ExpectedGasCost uint64
-		ExpectedFee     uint64
+		ExpectedCost uint64
+		ExpectedFee  uint64
 	}{
 		"simple import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -668,9 +668,9 @@ func TestImportTxGasCost(t *testing.T) {
 					AssetID: avaxAssetID,
 				}},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedGasCost: 20780,
-			ExpectedFee:     519500,
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedCost: 20780,
+			ExpectedFee:  519500,
 		},
 		"simple ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -717,9 +717,9 @@ func TestImportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
-			ExpectedGasCost: 33220,
-			ExpectedFee:     830500,
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedCost: 33220,
+			ExpectedFee:  830500,
 		},
 		"complex ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -771,9 +771,9 @@ func TestImportTxGasCost(t *testing.T) {
 					},
 				},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
-			ExpectedGasCost: 38120,
-			ExpectedFee:     953000,
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedCost: 38120,
+			ExpectedFee:  953000,
 		},
 		"multisig import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -801,9 +801,9 @@ func TestImportTxGasCost(t *testing.T) {
 					AssetID: avaxAssetID,
 				}},
 			},
-			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
-			ExpectedGasCost: 29540,
-			ExpectedFee:     738500,
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
+			ExpectedCost: 29540,
+			ExpectedFee:  738500,
 		},
 		"large import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -982,8 +982,8 @@ func TestImportTxGasCost(t *testing.T) {
 				{testKeys[0]},
 				{testKeys[0]},
 			},
-			ExpectedGasCost: 132740,
-			ExpectedFee:     3318500,
+			ExpectedCost: 132740,
+			ExpectedFee:  3318500,
 		},
 	}
 
@@ -996,15 +996,15 @@ func TestImportTxGasCost(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			gasCost, err := tx.Gas()
+			cost, err := tx.Cost()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if gasCost != test.ExpectedGasCost {
-				t.Fatalf("Expected gasCost to be %d, but found %d", test.ExpectedGasCost, gasCost)
+			if cost != test.ExpectedCost {
+				t.Fatalf("Expected cost to be %d, but found %d", test.ExpectedCost, cost)
 			}
 
-			fee, err := calculateDynamicFee(gasCost, baseFee)
+			fee, err := calculateDynamicFee(cost, baseFee)
 			if err != nil {
 				t.Fatal(err)
 			}
