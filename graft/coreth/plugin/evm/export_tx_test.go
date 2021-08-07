@@ -166,16 +166,16 @@ func TestExportTxGasCost(t *testing.T) {
 	xChainID := ids.GenerateTestID()
 	networkID := uint32(5)
 	exportAmount := uint64(5000000)
-	baseFee := big.NewInt(25 * params.GWei)
 
 	tests := map[string]struct {
 		UnsignedExportTx *UnsignedExportTx
 		Keys             [][]*crypto.PrivateKeySECP256K1R
 
+		BaseFee      *big.Int
 		ExpectedCost uint64
 		ExpectedFee  uint64
 	}{
-		"simple export": {
+		"simple export 25Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
 				NetworkID:        networkID,
 				BlockchainID:     chainID,
@@ -203,8 +203,129 @@ func TestExportTxGasCost(t *testing.T) {
 				},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 20780,
-			ExpectedFee:  519500,
+			ExpectedCost: 1307,
+			ExpectedFee:  32675,
+			BaseFee:      big.NewInt(25 * params.GWei),
+		},
+		"simple export 225Gwei BaseFee": {
+			UnsignedExportTx: &UnsignedExportTx{
+				NetworkID:        networkID,
+				BlockchainID:     chainID,
+				DestinationChain: xChainID,
+				Ins: []EVMInput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[0]},
+							},
+						},
+					},
+				},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedCost: 1307,
+			ExpectedFee:  294075,
+			BaseFee:      big.NewInt(225 * params.GWei),
+		},
+		"complex export 25Gwei BaseFee": {
+			UnsignedExportTx: &UnsignedExportTx{
+				NetworkID:        networkID,
+				BlockchainID:     chainID,
+				DestinationChain: xChainID,
+				Ins: []EVMInput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+					{
+						Address: testEthAddrs[1],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+					{
+						Address: testEthAddrs[2],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount * 3,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[0]},
+							},
+						},
+					},
+				},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
+			ExpectedCost: 3573,
+			ExpectedFee:  89325,
+			BaseFee:      big.NewInt(25 * params.GWei),
+		},
+		"complex export 225Gwei BaseFee": {
+			UnsignedExportTx: &UnsignedExportTx{
+				NetworkID:        networkID,
+				BlockchainID:     chainID,
+				DestinationChain: xChainID,
+				Ins: []EVMInput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+					{
+						Address: testEthAddrs[1],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+					{
+						Address: testEthAddrs[2],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount * 3,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[0]},
+							},
+						},
+					},
+				},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
+			ExpectedCost: 3573,
+			ExpectedFee:  803925,
+			BaseFee:      big.NewInt(225 * params.GWei),
 		},
 	}
 
@@ -225,7 +346,7 @@ func TestExportTxGasCost(t *testing.T) {
 				t.Fatalf("Expected cost to be %d, but found %d", test.ExpectedCost, cost)
 			}
 
-			fee, err := calculateDynamicFee(cost, baseFee)
+			fee, err := calculateDynamicFee(cost, test.BaseFee)
 			if err != nil {
 				t.Fatal(err)
 			}
