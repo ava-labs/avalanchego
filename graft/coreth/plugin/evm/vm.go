@@ -366,6 +366,7 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
+	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
 	vm.notifyBuildBlockChan = toEngine
@@ -376,8 +377,6 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
 
 	vm.chain.Start()
-
-	// Start goroutines to handle required gasprice updates for the given chain config
 
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))

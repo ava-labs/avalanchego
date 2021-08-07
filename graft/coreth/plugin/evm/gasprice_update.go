@@ -36,11 +36,11 @@ func (gpu *gasPriceUpdater) start() {
 	// Sets the initial gas price to the launch minimum gas price
 	gpu.txPool.SetGasPrice(params.LaunchMinGasPrice)
 
-	// Updates to the minimum gas price as of ApricotPhase1 or starts a goroutine to enable it at the right time
+	// Updates to the minimum gas price as of ApricotPhase1 if it's already in effect or starts a goroutine to enable it at the correct time
 	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase1BlockTimestamp, params.ApricotPhase1MinGasPrice); disabled {
 		return
 	}
-	// Updates to the minimum gas price as of ApricotPhase3 or starts a goroutine to enable it at the right time
+	// Updates to the minimum gas price as of ApricotPhase3 if it's already in effect or starts a goroutine to enable it at the correct time
 	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(params.ApricotPhase3MinBaseFee)); disabled {
 		return
 	}
@@ -48,7 +48,7 @@ func (gpu *gasPriceUpdater) start() {
 
 // handleGasPriceUpdate handles the gas price update to occur at [timestamp]
 // to update to [gasPrice]
-// returns true, if the update is not enabled and further forks can be skipped
+// returns true, if the update is disabled and further forks can be skipped
 func (gpu *gasPriceUpdater) handleGasPriceUpdate(timestamp *big.Int, gasPrice *big.Int) bool {
 	if timestamp == nil {
 		return true
