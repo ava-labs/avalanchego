@@ -27,13 +27,11 @@
 package ethconfig
 
 import (
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/miner"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -59,16 +57,11 @@ func NewDefaultConfig() Config {
 		TrieDirtyCache:          256,
 		TrieTimeout:             60 * time.Minute,
 		SnapshotCache:           128,
-		Miner: miner.Config{
-			GasFloor:              8000000,
-			GasCeil:               8000000,
-			ApricotPhase1GasLimit: params.ApricotPhase1GasLimit,
-			GasPrice:              big.NewInt(params.GWei),
-		},
-		TxPool:      core.DefaultTxPoolConfig,
-		RPCGasCap:   25000000,
-		GPO:         DefaultFullGPOConfig,
-		RPCTxFeeCap: 1, // 1 ether
+		Miner:                   miner.Config{},
+		TxPool:                  core.DefaultTxPoolConfig,
+		RPCGasCap:               25000000,
+		GPO:                     DefaultFullGPOConfig,
+		RPCTxFeeCap:             1, // 1 ether
 	}
 }
 

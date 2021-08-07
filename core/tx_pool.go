@@ -333,7 +333,8 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	pool.wg.Add(1)
 	go pool.loop()
 
-	pool.startPeriodicFeeUpdate()
+	pool.wg.Add(1)
+	go pool.startPeriodicFeeUpdate()
 
 	return pool
 }
@@ -1574,20 +1575,19 @@ func (pool *TxPool) demoteUnexecutables() {
 }
 
 func (pool *TxPool) startPeriodicFeeUpdate() {
+	defer pool.wg.Done()
+
 	if pool.chainconfig.ApricotPhase3BlockTimestamp == nil {
 		return
 	}
 
-	pool.wg.Add(1)
-	defer pool.wg.Done()
-	go func() {
-		select {
-		case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
-			pool.periodicBaseFeeUpdate()
-		case <-pool.generalShutdownChan:
-			return
-		}
-	}()
+	select {
+	case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
+		pool.updateBaseFee() // Update immediately on the first iteration and then start looping on the ticker
+		pool.periodicBaseFeeUpdate()
+	case <-pool.generalShutdownChan:
+		return
+	}
 }
 
 func (pool *TxPool) periodicBaseFeeUpdate() {
