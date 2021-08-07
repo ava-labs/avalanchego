@@ -333,6 +333,8 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	pool.wg.Add(1)
 	go pool.loop()
 
+	pool.updateBaseFee() // Update base fee prior to startin goroutine to update
+	// at a regular interval.
 	pool.wg.Add(1)
 	go pool.startPeriodicFeeUpdate()
 
@@ -1583,7 +1585,6 @@ func (pool *TxPool) startPeriodicFeeUpdate() {
 
 	select {
 	case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
-		pool.updateBaseFee() // Update immediately on the first iteration and then start looping on the ticker
 		pool.periodicBaseFeeUpdate()
 	case <-pool.generalShutdownChan:
 		return
