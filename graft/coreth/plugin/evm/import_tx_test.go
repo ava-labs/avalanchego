@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/coreth/params"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
@@ -626,63 +628,389 @@ func TestNewImportTx(t *testing.T) {
 // not change
 func TestImportTxGasCost(t *testing.T) {
 	avaxAssetID := ids.GenerateTestID()
+	antAssetID := ids.GenerateTestID()
 	chainID := ids.GenerateTestID()
 	xChainID := ids.GenerateTestID()
 	networkID := uint32(5)
-
 	importAmount := uint64(5000000)
-	utxoID := avax.UTXOID{
-		TxID: ids.ID{
-			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+	baseFee := big.NewInt(25 * params.GWei)
+
+	tests := map[string]struct {
+		UnsignedImportTx *UnsignedImportTx
+		Keys             [][]*crypto.PrivateKeySECP256K1R
+
+		ExpectedGasCost uint64
+		ExpectedFee     uint64
+	}{
+		"simple import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID: ids.ID{
+							0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+							0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+							0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+							0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+						},
+					},
+					Asset: avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   importAmount,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+				Outs: []EVMOutput{{
+					Address: testEthAddrs[0],
+					Amount:  importAmount,
+					AssetID: avaxAssetID,
+				}},
+			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedGasCost: 20780,
+			ExpectedFee:     519500,
+		},
+		"simple ANT import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe9,
+							},
+						},
+						Asset: avax.Asset{ID: antAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+				Outs: []EVMOutput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount,
+						AssetID: antAssetID,
+					},
+				},
+			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedGasCost: 33220,
+			ExpectedFee:     830500,
+		},
+		"complex ANT import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe9,
+							},
+						},
+						Asset: avax.Asset{ID: antAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+				Outs: []EVMOutput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount,
+						AssetID: antAssetID,
+					},
+				},
+			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedGasCost: 38120,
+			ExpectedFee:     953000,
+		},
+		"multisig import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID: ids.ID{
+							0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+							0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+							0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+							0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+						},
+					},
+					Asset: avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   importAmount,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0, 1}},
+					},
+				}},
+				Outs: []EVMOutput{{
+					Address: testEthAddrs[0],
+					Amount:  importAmount,
+					AssetID: avaxAssetID,
+				}},
+			},
+			Keys:            [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
+			ExpectedGasCost: 29540,
+			ExpectedFee:     738500,
+		},
+		"large import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa0,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa1,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa2,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa3,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa4,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa5,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa6,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa7,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa8,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa9,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+				Outs: []EVMOutput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount * 10,
+						AssetID: avaxAssetID,
+					},
+				},
+			},
+			Keys: [][]*crypto.PrivateKeySECP256K1R{
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+			},
+			ExpectedGasCost: 132740,
+			ExpectedFee:     3318500,
 		},
 	}
 
-	evmOutput := EVMOutput{
-		Address: testEthAddrs[0],
-		Amount:  importAmount,
-		AssetID: avaxAssetID,
-	}
-	unsignedImportTx := &UnsignedImportTx{
-		NetworkID:    networkID,
-		BlockchainID: chainID,
-		SourceChain:  xChainID,
-		ImportedInputs: []*avax.TransferableInput{{
-			UTXOID: utxoID,
-			Asset:  avax.Asset{ID: avaxAssetID},
-			In: &secp256k1fx.TransferInput{
-				Amt:   importAmount,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
-			},
-		}},
-		Outs: []EVMOutput{evmOutput},
-	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tx := &Tx{UnsignedAtomicTx: test.UnsignedImportTx}
 
-	tx := &Tx{UnsignedAtomicTx: unsignedImportTx}
+			// Sign with the correct key
+			if err := tx.Sign(Codec, test.Keys); err != nil {
+				t.Fatal(err)
+			}
 
-	// Sign with the correct key
-	if err := tx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
-		t.Fatal(err)
-	}
+			gasCost, err := tx.Gas()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if gasCost != test.ExpectedGasCost {
+				t.Fatalf("Expected gasCost to be %d, but found %d", test.ExpectedGasCost, gasCost)
+			}
 
-	gasCost, err := tx.Gas()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedGasCost := uint64(654)
-	if gasCost != expectedGasCost {
-		t.Fatalf("Expected gasCost to be %d, but found %d", expectedGasCost, gasCost)
-	}
-
-	baseFee := big.NewInt(25_000_000_000)
-	fee, err := calculateDynamicFee(gasCost, baseFee)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expectedFee := uint64(16350)
-	if expectedFee != fee {
-		t.Fatalf("Expected fee to be %d, but found %d", expectedFee, fee)
+			fee, err := calculateDynamicFee(gasCost, baseFee)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fee != test.ExpectedFee {
+				t.Fatalf("Expected fee to be %d, but found %d", test.ExpectedFee, fee)
+			}
+		})
 	}
 }

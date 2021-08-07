@@ -38,9 +38,9 @@ var (
 
 // Constants for calculating the gas consumed by atomic transactions
 var (
-	SignatureFee uint64 = 20 // Based on TxGas cost
-	OutputFee    uint64 = 20 // Based on SSTORE cost
-	TxBytesFee   uint64 = 2  // Based on TxDataNonZeroGasEIP2028 cost
+	SignatureGas uint64 = 6000
+	OutputGas    uint64 = 2500
+	TxBytesGas   uint64 = 40
 )
 
 // EVMOutput defines an output that is added to the EVM state created by import transactions
@@ -133,7 +133,7 @@ func (tx *Tx) Gas() (uint64, error) {
 		}
 		totalSignatures += uint64(len(secpCred.Sigs))
 	}
-	return unsignedTxGas + totalSignatures*SignatureFee, nil
+	return unsignedTxGas + totalSignatures*SignatureGas, nil
 }
 
 // Sign this transaction with the provided signers
