@@ -1592,9 +1592,8 @@ func (pool *TxPool) periodicBaseFeeUpdate() {
 	// Sleep until its time to start the periodic base fee update or the tx pool is shutting down
 	select {
 	case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
-		pool.periodicBaseFeeUpdate()
 	case <-pool.generalShutdownChan:
-		return
+		return // Return early if shutting down
 	}
 
 	// Update the base fee every [baseFeeUpdateInterval]
