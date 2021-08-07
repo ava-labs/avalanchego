@@ -124,7 +124,7 @@ func (tx *UnsignedImportTx) Burned(assetID ids.ID) (uint64, error) {
 
 // Gas returns the amount of gas consumed by producing the outputs in the
 // import transaction.
-func (tx *UnsignedImportTx) Gas() uint64 {
+func (tx *UnsignedImportTx) Cost() uint64 {
 	return OutputGas*uint64(len(tx.Outs)) + TxBytesGas*uint64(len(tx.Bytes()))
 }
 
@@ -145,11 +145,11 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	// Apply transaction fee to import transactions as of Apricot Phase 2
 	switch {
 	case rules.IsApricotPhase3:
-		txGas, err := stx.Gas()
+		cost, err := stx.Cost()
 		if err != nil {
 			return err
 		}
-		txFee, err := calculateDynamicFee(txGas, baseFee)
+		txFee, err := calculateDynamicFee(cost, baseFee)
 		if err != nil {
 			return err
 		}

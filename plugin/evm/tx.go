@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
@@ -111,7 +112,7 @@ type UnsignedAtomicTx interface {
 
 	// Gas returns the amount of gas consumed by the atomic transaction
 	// Note: this does not include the gas cost of the credentials.
-	Gas() uint64
+	Cost() uint64
 }
 
 // Tx is a signed transaction
@@ -123,8 +124,8 @@ type Tx struct {
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 }
 
-func (tx *Tx) Gas() (uint64, error) {
-	unsignedTxGas := tx.UnsignedAtomicTx.Gas()
+func (tx *Tx) Cost() (uint64, error) {
+	unsignedTxGas := tx.UnsignedAtomicTx.Cost()
 	totalSignatures := uint64(0)
 	for _, cred := range tx.Creds {
 		secpCred, ok := cred.(*secp256k1fx.Credential)
@@ -237,18 +238,11 @@ func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
 }
 
 // calculates the amount of AVAX that must be burned by an atomic transaction
-// that consumes [gas] at [baseFee].
-// TODO(aaronbuchwald) thoroughly check this and make sure it's not broken
-func calculateDynamicFee(gas uint64, baseFee *big.Int) (uint64, error) {
-	// Calculate the amount of C-Chain AVAX to be consumed
-	// Note: [big.Int] math operations assign to the caller, but we do the
-	// assignment here as a style choice to make the math being performed
-	// more readable.
-	txGas := new(big.Int).SetUint64(gas)
-	txGas = txGas.Mul(txGas, baseFee)
-
-	// Transform [txGas] from denomination base 18 to base 9 to be
-	// used in atomic transaction flow checker.
-	txGas = txGas.Div(txGas, x2cRate)
-	return txGas.Uint64(), nil
+// that consumes [cost] at [baseFee].
+func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
+	if baseFee == nil {
+		return 0, errors.New("cannot calculate dynamic fee with nil baseFee")
+	}
+	multiplier := new(big.Int).Div(baseFee, x2cRate).Uint64()
+	return math.Mul64(multiplier, cost)
 }
