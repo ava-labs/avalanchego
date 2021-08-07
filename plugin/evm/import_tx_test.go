@@ -633,7 +633,6 @@ func TestImportTxGasCost(t *testing.T) {
 	xChainID := ids.GenerateTestID()
 	networkID := uint32(5)
 	importAmount := uint64(5000000)
-	baseFee := big.NewInt(25 * params.GWei)
 
 	tests := map[string]struct {
 		UnsignedImportTx *UnsignedImportTx
@@ -641,6 +640,7 @@ func TestImportTxGasCost(t *testing.T) {
 
 		ExpectedCost uint64
 		ExpectedFee  uint64
+		BaseFee      *big.Int
 	}{
 		"simple import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -669,8 +669,9 @@ func TestImportTxGasCost(t *testing.T) {
 				}},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 20780,
-			ExpectedFee:  519500,
+			ExpectedCost: 1307,
+			ExpectedFee:  32675,
+			BaseFee:      big.NewInt(25 * params.GWei),
 		},
 		"simple ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -718,8 +719,9 @@ func TestImportTxGasCost(t *testing.T) {
 				},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
-			ExpectedCost: 33220,
-			ExpectedFee:  830500,
+			ExpectedCost: 2468,
+			ExpectedFee:  61700,
+			BaseFee:      big.NewInt(25 * params.GWei),
 		},
 		"complex ANT import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -772,8 +774,9 @@ func TestImportTxGasCost(t *testing.T) {
 				},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
-			ExpectedCost: 38120,
-			ExpectedFee:  953000,
+			ExpectedCost: 2528,
+			ExpectedFee:  63200,
+			BaseFee:      big.NewInt(25 * params.GWei),
 		},
 		"multisig import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -802,8 +805,9 @@ func TestImportTxGasCost(t *testing.T) {
 				}},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
-			ExpectedCost: 29540,
-			ExpectedFee:  738500,
+			ExpectedCost: 2376,
+			ExpectedFee:  59400,
+			BaseFee:      big.NewInt(25 * params.GWei),
 		},
 		"large import": {
 			UnsignedImportTx: &UnsignedImportTx{
@@ -982,8 +986,9 @@ func TestImportTxGasCost(t *testing.T) {
 				{testKeys[0]},
 				{testKeys[0]},
 			},
-			ExpectedCost: 132740,
-			ExpectedFee:  3318500,
+			ExpectedCost: 11756,
+			ExpectedFee:  293900,
+			BaseFee:      big.NewInt(25 * params.GWei),
 		},
 	}
 
@@ -1004,7 +1009,7 @@ func TestImportTxGasCost(t *testing.T) {
 				t.Fatalf("Expected cost to be %d, but found %d", test.ExpectedCost, cost)
 			}
 
-			fee, err := calculateDynamicFee(cost, baseFee)
+			fee, err := calculateDynamicFee(cost, test.BaseFee)
 			if err != nil {
 				t.Fatal(err)
 			}

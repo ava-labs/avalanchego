@@ -39,9 +39,8 @@ var (
 
 // Constants for calculating the gas consumed by atomic transactions
 var (
-	SignatureGas uint64 = 6000
-	OutputGas    uint64 = 2500
-	TxBytesGas   uint64 = 40
+	SignatureGas uint64 = 1000
+	TxBytesGas   uint64 = 1
 )
 
 // EVMOutput defines an output that is added to the EVM state created by import transactions
@@ -109,10 +108,6 @@ type UnsignedAtomicTx interface {
 	Accept(ctx *snow.Context, batch database.Batch) error
 
 	EVMStateTransfer(ctx *snow.Context, state *state.StateDB) error
-
-	// Gas returns the amount of gas consumed by the atomic transaction
-	// Note: this does not include the gas cost of the credentials.
-	Cost() uint64
 }
 
 // Tx is a signed transaction
@@ -125,7 +120,7 @@ type Tx struct {
 }
 
 func (tx *Tx) Cost() (uint64, error) {
-	unsignedTxGas := tx.UnsignedAtomicTx.Cost()
+	cost := calcBytesCost(len(tx.UnsignedAtomicTx.Bytes()))
 	totalSignatures := uint64(0)
 	for _, cred := range tx.Creds {
 		secpCred, ok := cred.(*secp256k1fx.Credential)
@@ -134,7 +129,7 @@ func (tx *Tx) Cost() (uint64, error) {
 		}
 		totalSignatures += uint64(len(secpCred.Sigs))
 	}
-	return unsignedTxGas + totalSignatures*SignatureGas, nil
+	return cost + totalSignatures*SignatureGas, nil
 }
 
 // Sign this transaction with the provided signers
@@ -245,4 +240,8 @@ func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	}
 	multiplier := new(big.Int).Div(baseFee, x2cRate).Uint64()
 	return math.Mul64(multiplier, cost)
+}
+
+func calcBytesCost(len int) uint64 {
+	return uint64(len) * TxBytesGas
 }

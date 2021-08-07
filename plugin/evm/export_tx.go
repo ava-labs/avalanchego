@@ -108,12 +108,6 @@ func (tx *UnsignedExportTx) Burned(assetID ids.ID) (uint64, error) {
 	return math.Sub64(input, spent)
 }
 
-// Gas returns the amount of gas consumed by producing the outputs in the
-// export transaction.
-func (tx *UnsignedExportTx) Cost() uint64 {
-	return OutputGas*uint64(len(tx.ExportedOutputs)) + TxBytesGas*uint64(len(tx.Bytes()))
-}
-
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
