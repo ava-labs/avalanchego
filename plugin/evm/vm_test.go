@@ -229,30 +229,38 @@ func TestVMContinuosProfiler(t *testing.T) {
 
 func TestVMGenesis(t *testing.T) {
 	genesisTests := []struct {
-		name    string
-		genesis string
+		name             string
+		genesis          string
+		expectedGasPrice *big.Int
 	}{
 		{
-			name:    "Apricot Phase 0",
-			genesis: genesisJSONApricotPhase0,
+			name:             "Apricot Phase 0",
+			genesis:          genesisJSONApricotPhase0,
+			expectedGasPrice: params.LaunchMinGasPrice,
 		},
 		{
-			name:    "Apricot Phase 1",
-			genesis: genesisJSONApricotPhase1,
+			name:             "Apricot Phase 1",
+			genesis:          genesisJSONApricotPhase1,
+			expectedGasPrice: params.ApricotPhase1MinGasPrice,
 		},
 		{
-			name:    "Apricot Phase 2",
-			genesis: genesisJSONApricotPhase2,
+			name:             "Apricot Phase 2",
+			genesis:          genesisJSONApricotPhase2,
+			expectedGasPrice: params.ApricotPhase1MinGasPrice,
 		},
 		{
-			name:    "Apricot Phase 3",
-			genesis: genesisJSONApricotPhase3,
+			name:             "Apricot Phase 3",
+			genesis:          genesisJSONApricotPhase3,
+			expectedGasPrice: big.NewInt(params.ApricotPhase3MinBaseFee),
 		},
 	}
 	for _, test := range genesisTests {
 		t.Run(test.name, func(t *testing.T) {
 			_, vm, _, _ := GenesisVM(t, true, test.genesis, "", "")
 
+			if gasPrice := vm.chain.GetTxPool().GasPrice(); gasPrice.Cmp(test.expectedGasPrice) != 0 {
+				t.Fatalf("Expected pool gas price to be %d but found %d", test.expectedGasPrice, gasPrice)
+			}
 			defer func() {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {

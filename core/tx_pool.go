@@ -333,10 +333,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	pool.wg.Add(1)
 	go pool.loop()
 
-	pool.updateBaseFee() // Update base fee prior to startin goroutine to update
-	// at a regular interval.
-	pool.wg.Add(1)
-	go pool.startPeriodicFeeUpdate()
+	pool.startPeriodicFeeUpdate()
 
 	return pool
 }
@@ -1577,21 +1574,31 @@ func (pool *TxPool) demoteUnexecutables() {
 }
 
 func (pool *TxPool) startPeriodicFeeUpdate() {
-	defer pool.wg.Done()
-
 	if pool.chainconfig.ApricotPhase3BlockTimestamp == nil {
 		return
 	}
 
+	if time.Now().After(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0)) {
+		pool.updateBaseFee()
+	}
+
+	pool.wg.Add(1)
+	go pool.periodicBaseFeeUpdate()
+}
+
+func (pool *TxPool) periodicBaseFeeUpdate() {
+	defer pool.wg.Done()
+
+	// Sleep until its time to start the periodic base fee update or the tx pool is shutting down
 	select {
 	case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
 		pool.periodicBaseFeeUpdate()
 	case <-pool.generalShutdownChan:
 		return
 	}
-}
 
-func (pool *TxPool) periodicBaseFeeUpdate() {
+	// Update the base fee every [baseFeeUpdateInterval]
+	// and shutdown when [generalShutdownChan] is closed by Stop()
 	for {
 		select {
 		case <-time.After(baseFeeUpdateInterval):
