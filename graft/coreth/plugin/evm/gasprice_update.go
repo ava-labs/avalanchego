@@ -8,22 +8,25 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
 )
 
 type gasPriceUpdater struct {
-	txPool       *core.TxPool
+	setter       gasPriceSetter
 	chainConfig  *params.ChainConfig
 	shutdownChan <-chan struct{}
 
 	wg *sync.WaitGroup
 }
 
+type gasPriceSetter interface {
+	SetGasPrice(price *big.Int)
+}
+
 // handleGasPriceUpdates creates and runs an instance of
 func (vm *VM) handleGasPriceUpdates() {
 	gpu := &gasPriceUpdater{
-		txPool:       vm.chain.GetTxPool(),
+		setter:       vm.chain.GetTxPool(),
 		chainConfig:  vm.chainConfig,
 		shutdownChan: vm.shutdownChan,
 		wg:           &vm.shutdownWg,
@@ -34,7 +37,7 @@ func (vm *VM) handleGasPriceUpdates() {
 
 func (gpu *gasPriceUpdater) start() {
 	// Sets the initial gas price to the launch minimum gas price
-	gpu.txPool.SetGasPrice(params.LaunchMinGasPrice)
+	gpu.setter.SetGasPrice(params.LaunchMinGasPrice)
 
 	// Updates to the minimum gas price as of ApricotPhase1 if it's already in effect or starts a goroutine to enable it at the correct time
 	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase1BlockTimestamp, params.ApricotPhase1MinGasPrice); disabled {
@@ -57,7 +60,7 @@ func (gpu *gasPriceUpdater) handleGasPriceUpdate(timestamp *big.Int, gasPrice *b
 	currentTime := time.Now()
 	upgradeTime := time.Unix(gpu.chainConfig.ApricotPhase1BlockTimestamp.Int64(), 0)
 	if currentTime.After(upgradeTime) {
-		gpu.txPool.SetGasPrice(gasPrice)
+		gpu.setter.SetGasPrice(gasPrice)
 	} else {
 		gpu.wg.Add(1)
 		go gpu.updateGasPrice(time.Until(upgradeTime), gasPrice)
@@ -69,7 +72,7 @@ func (gpu *gasPriceUpdater) updateGasPrice(duration time.Duration, updatedPrice 
 	defer gpu.wg.Done()
 	select {
 	case <-time.After(duration):
-		gpu.txPool.SetGasPrice(updatedPrice)
+		gpu.setter.SetGasPrice(updatedPrice)
 	case <-gpu.shutdownChan:
 	}
 }
