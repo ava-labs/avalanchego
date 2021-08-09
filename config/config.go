@@ -139,9 +139,6 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 		return loggingConfig, err
 	}
 	loggingConfig.DisplayHighlight, err = logging.ToHighlight(v.GetString(LogDisplayHighlightKey), os.Stdout.Fd())
-	if err != nil {
-		return loggingConfig, err
-	}
 	return loggingConfig, err
 }
 
