@@ -24,11 +24,11 @@ import (
 var (
 	basicTxGasLimit       = 21000
 	fundedKey, bob, alice *keystore.Key
-	initialBalance        = big.NewInt(100000000000000000)
+	initialBalance        = big.NewInt(1000000000000000000)
 	chainID               = big.NewInt(1)
 	value                 = big.NewInt(1000000000000)
-	gasLimit              = 10000000
-	gasPrice              = big.NewInt(1000000000)
+	gasLimit              = 1000000
+	gasPrice              = big.NewInt(params.LaunchMinGasPrice)
 )
 
 func init() {

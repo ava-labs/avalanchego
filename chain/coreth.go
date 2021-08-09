@@ -5,7 +5,6 @@ package chain
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -184,9 +183,4 @@ func (self *ETHChain) GetTxAcceptedSubmitCh() <-chan core.NewTxsEvent {
 
 func (self *ETHChain) GetTxPool() *core.TxPool {
 	return self.backend.TxPool()
-}
-
-// SetGasPrice sets the gas price on the backend
-func (self *ETHChain) SetGasPrice(newGasPrice *big.Int) {
-	self.backend.SetGasPrice(newGasPrice)
 }

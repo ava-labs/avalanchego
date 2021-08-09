@@ -238,6 +238,7 @@ type TxPool struct {
 	chainconfig *params.ChainConfig
 	chain       blockChain
 	gasPrice    *big.Int
+	minimumFee  *big.Int
 	txFeed      event.Feed
 	headFeed    event.Feed
 	reorgFeed   event.Feed
@@ -479,6 +480,13 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 	log.Info("Transaction pool price threshold updated", "price", price)
 }
 
+func (pool *TxPool) SetMinFee(minFee *big.Int) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
+	pool.minimumFee = minFee
+}
+
 // Nonce returns the next nonce of an account, with all transactions executable
 // by the pool already applied on top.
 func (pool *TxPool) Nonce(addr common.Address) uint64 {
@@ -643,6 +651,10 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	// Drop non-local transactions under our own minimal accepted gas price or tip
 	if !local && tx.GasTipCapIntCmp(pool.gasPrice) < 0 {
 		return fmt.Errorf("%w: address %s have gas tip cap (%d) < pool gas tip cap (%d)", ErrUnderpriced, from.Hex(), tx.GasTipCap(), pool.gasPrice)
+	}
+	// Drop the transaction if the gas fee cap is below the pool's minimum fee
+	if pool.minimumFee != nil && tx.GasFeeCapIntCmp(pool.minimumFee) < 0 {
+		return fmt.Errorf("%w: address %s have gas fee cap (%d) < pool minimum fee cap (%d)", ErrUnderpriced, from.Hex(), tx.GasFeeCap(), pool.minimumFee)
 	}
 	// Ensure the transaction adheres to nonce ordering
 	if currentNonce, txNonce := pool.currentState.GetNonce(from), tx.Nonce(); currentNonce > txNonce {
@@ -1578,19 +1590,28 @@ func (pool *TxPool) startPeriodicFeeUpdate() {
 		return
 	}
 
+	// Call updateBaseFee here to ensure that there is not a [baseFeeUpdateInterval] delay
+	// when starting up in ApricotPhase3 before the base fee is updated.
+	if time.Now().After(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0)) {
+		pool.updateBaseFee()
+	}
+
 	pool.wg.Add(1)
-	defer pool.wg.Done()
-	go func() {
-		select {
-		case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
-			pool.periodicBaseFeeUpdate()
-		case <-pool.generalShutdownChan:
-			return
-		}
-	}()
+	go pool.periodicBaseFeeUpdate()
 }
 
 func (pool *TxPool) periodicBaseFeeUpdate() {
+	defer pool.wg.Done()
+
+	// Sleep until its time to start the periodic base fee update or the tx pool is shutting down
+	select {
+	case <-time.After(time.Until(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0))):
+	case <-pool.generalShutdownChan:
+		return // Return early if shutting down
+	}
+
+	// Update the base fee every [baseFeeUpdateInterval]
+	// and shutdown when [generalShutdownChan] is closed by Stop()
 	for {
 		select {
 		case <-time.After(baseFeeUpdateInterval):
