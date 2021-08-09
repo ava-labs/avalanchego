@@ -13,8 +13,8 @@ import (
 )
 
 type mockGasPriceSetter struct {
-	lock  sync.Mutex
-	price *big.Int
+	lock          sync.Mutex
+	price, minFee *big.Int
 }
 
 func (m *mockGasPriceSetter) SetGasPrice(price *big.Int) {
@@ -22,6 +22,13 @@ func (m *mockGasPriceSetter) SetGasPrice(price *big.Int) {
 	defer m.lock.Unlock()
 
 	m.price = price
+}
+
+func (m *mockGasPriceSetter) SetMinFee(minFee *big.Int) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
+	m.minFee = minFee
 }
 
 func TestUpdateGasPriceShutsDown(t *testing.T) {
@@ -58,7 +65,7 @@ func TestUpdateGasPriceInitializesPrice(t *testing.T) {
 	// should be created when all prices should be set from the start
 	wg.Wait()
 
-	if gpu.setter.(*mockGasPriceSetter).price.Cmp(big.NewInt(params.ApricotPhase3MinBaseFee)) != 0 {
+	if gpu.setter.(*mockGasPriceSetter).price.Cmp(big.NewInt(0)) != 0 {
 		t.Fatalf("Expected price to match minimum base fee for apricot phase3")
 	}
 }
@@ -83,7 +90,7 @@ func TestUpdateGasPriceUpdatesPrice(t *testing.T) {
 	// completed the update.
 	wg.Wait()
 
-	if gpu.setter.(*mockGasPriceSetter).price.Cmp(big.NewInt(params.ApricotPhase3MinBaseFee)) != 0 {
+	if gpu.setter.(*mockGasPriceSetter).price.Cmp(big.NewInt(0)) != 0 {
 		t.Fatalf("Expected price to match minimum base fee for apricot phase3")
 	}
 }

@@ -253,7 +253,7 @@ func TestVMGenesis(t *testing.T) {
 		{
 			name:             "Apricot Phase 3",
 			genesis:          genesisJSONApricotPhase3,
-			expectedGasPrice: big.NewInt(params.ApricotPhase3MinBaseFee),
+			expectedGasPrice: big.NewInt(0),
 		},
 	}
 	for _, test := range genesisTests {
