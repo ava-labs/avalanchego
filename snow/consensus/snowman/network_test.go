@@ -41,7 +41,7 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 			IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
 			StatusV: choices.Processing,
 		},
-		ParentV: Genesis,
+		ParentV: Genesis.IDV,
 		HeightV: 0,
 	})
 
@@ -53,7 +53,7 @@ func (n *Network) Initialize(params snowball.Parameters, numColors int) {
 				IDV:     ids.Empty.Prefix(uint64(rand.Int63())),
 				StatusV: choices.Processing,
 			},
-			ParentV: dependency,
+			ParentV: dependency.IDV,
 			HeightV: dependency.HeightV + 1,
 		})
 	}
@@ -66,9 +66,9 @@ func (n *Network) AddNode(sm Consensus) error {
 	}
 
 	n.shuffleColors()
-	deps := map[ids.ID]Block{}
+	deps := map[ids.ID]ids.ID{}
 	for _, blk := range n.colors {
-		myDep, found := deps[blk.ParentV.ID()]
+		myDep, found := deps[blk.ParentV]
 		if !found {
 			myDep = blk.Parent()
 		}

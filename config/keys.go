@@ -4,7 +4,6 @@
 package config
 
 const (
-	FetchOnlyKey                              = "fetch-only"
 	ConfigFileKey                             = "config-file"
 	VersionKey                                = "version"
 	GenesisConfigFileKey                      = "genesis"
@@ -26,8 +25,8 @@ const (
 	PublicIPKey                               = "public-ip"
 	DynamicUpdateDurationKey                  = "dynamic-update-duration"
 	DynamicPublicIPResolverKey                = "dynamic-public-ip"
-	ConnMeterResetDurationKey                 = "conn-meter-reset-duration"
-	ConnMeterMaxConnsKey                      = "conn-meter-max-conns"
+	InboundConnThrottlerCooldownKey           = "inbound-connection-throtting-cooldown"
+	InboundConnThrottlerMaxRecentConnsKey     = "inbound-connection-throttling-max-recent"
 	OutboundConnectionThrottlingRps           = "outbound-connection-throttling-rps"
 	OutboundConnectionTimeout                 = "outbound-connection-timeout"
 	HTTPHostKey                               = "http-host"
@@ -62,7 +61,7 @@ const (
 	NetworkPeerListSizeKey                    = "network-peer-list-size"
 	NetworkPeerListGossipSizeKey              = "network-peer-list-gossip-size"
 	NetworkPeerListGossipFreqKey              = "network-peer-list-gossip-frequency"
-	SendQueueSizeKey                          = "send-queue-size"
+	NetworkCompressionEnabledKey              = "network-compression-enabled"
 	BenchlistFailThresholdKey                 = "benchlist-fail-threshold"
 	BenchlistPeerSummaryEnabledKey            = "benchlist-peer-summary-enabled"
 	BenchlistDurationKey                      = "benchlist-duration"
@@ -119,8 +118,11 @@ const (
 	ProfileContinuousEnabledKey               = "profile-continuous-enabled"
 	ProfileContinuousFreqKey                  = "profile-continuous-freq"
 	ProfileContinuousMaxFilesKey              = "profile-continuous-max-files"
-	ThrottlingAtLargeAllocSizeKey             = "throttling-at-large-alloc-size"
-	ThrottlingVdrAllocSizeKey                 = "throttling-validator-alloc-size"
-	ThrottlingNodeMaxAtLargeBytesKey          = "throttling-node-max-at-large-bytes"
+	InboundThrottlerAtLargeAllocSizeKey       = "throttler-inbound-at-large-alloc-size"
+	InboundThrottlerVdrAllocSizeKey           = "throttler-inbound-validator-alloc-size"
+	InboundThrottlerNodeMaxAtLargeBytesKey    = "throttler-inbound-node-max-at-large-bytes"
+	OutboundThrottlerAtLargeAllocSizeKey      = "throttler-outbound-at-large-alloc-size"
+	OutboundThrottlerVdrAllocSizeKey          = "throttler-outbound-validator-alloc-size"
+	OutboundThrottlerNodeMaxAtLargeBytesKey   = "throttler-outbound-node-max-at-large-bytes"
 	VMAliasesFileKey                          = "vm-aliases-file"
 )

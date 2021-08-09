@@ -1,6 +1,6 @@
-// +build linux
-// +build amd64
+// +build linux,amd64,rocksdballowed
 
+// ^ Only build this file if this computer runs Linux AND is AMD64 AND rocksdb is allowed
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
@@ -33,7 +33,7 @@ func TestNewSingleRocksDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewRocksDB(dir, logging.NoLog{}, v1, true)
+	manager, err := NewRocksDB(dir, logging.NoLog{}, v1)
 	if err != nil {
 		t.Fatal(err)
 	}

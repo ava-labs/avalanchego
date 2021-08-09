@@ -30,4 +30,5 @@ WORKDIR /avalanchego/build
 
 # Copy the executables into the container
 COPY --from=builder /build/build/ .
+
 CMD [ "./avalanchego" ]

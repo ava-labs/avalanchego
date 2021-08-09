@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/golang-jwt/jwt"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"

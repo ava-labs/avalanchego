@@ -98,7 +98,7 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 			IDV:     blkID1,
 			StatusV: choices.Processing,
 		},
-		ParentV: blk0,
+		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
@@ -188,7 +188,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 			IDV:     blkID1,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk0,
+		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
@@ -197,7 +197,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 			IDV:     blkID2,
 			StatusV: choices.Processing,
 		},
-		ParentV: blk1,
+		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
@@ -336,7 +336,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 			IDV:     blkID1,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk0,
+		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
@@ -345,7 +345,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 			IDV:     blkID2,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk1,
+		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
@@ -354,7 +354,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 			IDV:     blkID3,
 			StatusV: choices.Processing,
 		},
-		ParentV: blk2,
+		ParentV: blk2.IDV,
 		HeightV: 3,
 		BytesV:  blkBytes3,
 	}
@@ -496,7 +496,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 			IDV:     blkID1,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk0,
+		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
@@ -505,7 +505,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 			IDV:     blkID2,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk1,
+		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
@@ -514,7 +514,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 			IDV:     blkID3,
 			StatusV: choices.Processing,
 		},
-		ParentV: blk2,
+		ParentV: blk2.IDV,
 		HeightV: 3,
 		BytesV:  blkBytes3,
 	}
@@ -755,7 +755,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			IDV:     blkID1,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk0,
+		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
@@ -764,7 +764,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 			IDV:     blkID2,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk1,
+		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
@@ -890,7 +890,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			IDV:     blkID1,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk0,
+		ParentV: blk0.IDV,
 		HeightV: 1,
 		BytesV:  blkBytes1,
 	}
@@ -899,7 +899,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			IDV:     blkID2,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk1,
+		ParentV: blk1.IDV,
 		HeightV: 2,
 		BytesV:  blkBytes2,
 	}
@@ -908,7 +908,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			IDV:     blkID3,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk2,
+		ParentV: blk2.IDV,
 		HeightV: 3,
 		BytesV:  blkBytes3,
 	}
@@ -917,7 +917,7 @@ func TestRestartBootstrapping(t *testing.T) {
 			IDV:     blkID4,
 			StatusV: choices.Unknown,
 		},
-		ParentV: blk3,
+		ParentV: blk3.IDV,
 		HeightV: 4,
 		BytesV:  blkBytes4,
 	}

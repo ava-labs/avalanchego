@@ -39,10 +39,9 @@ import (
 )
 
 const (
-	avalanchegoLatest     = "avalanchego-latest"
-	avalanchegoPreupgrade = "avalanchego-preupgrade"
-	chainConfigFileName   = "config"
-	chainUpgradeFileName  = "upgrade"
+	pluginsDirName       = "plugins"
+	chainConfigFileName  = "config"
+	chainUpgradeFileName = "upgrade"
 )
 
 var (
@@ -61,28 +60,20 @@ func GetProcessConfig(v *viper.Viper) (process.Config, error) {
 	}
 
 	// Build directory should have this structure:
+	//
 	// build
-	// |_avalanchego-latest
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
-	// |_avalanchego-preupgrade
-	//   |_avalanchego-process (the binary from compiling the app directory)
-	//   |_plugins
-	//     |_evm
+	// ├── avalanchego (the binary from compiling the app directory)
+	// └── plugins
+	//     └── evm
 	validBuildDir := func(dir string) bool {
 		info, err := os.Stat(dir)
 		if err != nil || !info.IsDir() {
 			return false
 		}
-		// make sure both expected subdirectories exist
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoLatest)); err != nil {
-			return false
-		}
-		if _, err := os.Stat(filepath.Join(dir, avalanchegoPreupgrade)); err != nil {
-			return false
-		}
-		return true
+
+		// make sure the expected subdirectory exists
+		_, err = os.Stat(filepath.Join(dir, pluginsDirName))
+		return err == nil
 	}
 	if validBuildDir(config.BuildDir) {
 		return config, nil
@@ -110,10 +101,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	// First, get the process config
 	nodeConfig := node.Config{}
 
-	// Plugin directory defaults to [buildDirectory]/avalanchego-latest/plugins
-	nodeConfig.PluginDir = filepath.Join(buildDir, avalanchegoLatest, "plugins")
-
-	nodeConfig.FetchOnly = v.GetBool(FetchOnlyKey)
+	// Plugin directory defaults to [buildDir]/[pluginsDirName]
+	nodeConfig.PluginDir = filepath.Join(buildDir, pluginsDirName)
 
 	// Consensus Parameters
 	nodeConfig.ConsensusParams.K = v.GetInt(SnowSampleSizeKey)
@@ -212,8 +201,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.StakingIP = utils.NewDynamicIPDesc(ip, stakingPort)
 
 	nodeConfig.DynamicUpdateDuration = v.GetDuration(DynamicUpdateDurationKey)
-	nodeConfig.ConnMeterResetDuration = v.GetDuration(ConnMeterResetDurationKey)
-	nodeConfig.ConnMeterMaxConns = v.GetInt(ConnMeterMaxConnsKey)
 
 	// Staking:
 	nodeConfig.EnableStaking = v.GetBool(StakingEnabledKey)
@@ -225,7 +212,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, errInvalidStakerWeights
 	}
 
-	if nodeConfig.FetchOnly || v.GetBool(StakingEphemeralCertEnabledKey) {
+	if v.GetBool(StakingEphemeralCertEnabledKey) {
 		// In fetch only mode or if explicitly set, use an ephemeral staking key/cert
 		cert, err := staking.NewTLSCert()
 		if err != nil {
@@ -236,6 +223,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		// Parse the staking key/cert paths
 		stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
 		stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
+		nodeConfig.StakingKeyFile = stakingKeyPath
+		nodeConfig.StakingCertFile = stakingCertPath
 
 		switch {
 		// If staking key/cert locations are specified but not found, error
@@ -341,11 +330,19 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
 
 	// Throttling
-	nodeConfig.SendQueueSize = v.GetUint32(SendQueueSizeKey)
-	nodeConfig.NetworkConfig.MsgThrottlerConfig = throttling.MsgThrottlerConfig{
-		AtLargeAllocSize:    v.GetUint64(ThrottlingAtLargeAllocSizeKey),
-		VdrAllocSize:        v.GetUint64(ThrottlingVdrAllocSizeKey),
-		NodeMaxAtLargeBytes: v.GetUint64(ThrottlingNodeMaxAtLargeBytesKey),
+	nodeConfig.NetworkConfig.InboundConnThrottlerConfig = throttling.InboundConnThrottlerConfig{
+		AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
+		MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
+	}
+	nodeConfig.NetworkConfig.InboundThrottlerConfig = throttling.MsgThrottlerConfig{
+		AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
+		VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
+		NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
+	}
+	nodeConfig.NetworkConfig.OutboundThrottlerConfig = throttling.MsgThrottlerConfig{
+		AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
+		VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
+		NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
 	}
 
 	// Health
@@ -392,8 +389,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		return node.Config{}, errors.New("network timeout coefficient must be >= 1")
 	}
 
-	// Metrics Namespace
-	nodeConfig.NetworkConfig.MetricsNamespace = constants.PlatformName
+	nodeConfig.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
 
 	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every
 	// [PeerListGossipFreq]
@@ -402,10 +398,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Outbound connection throttling
-	nodeConfig.NetworkConfig.DialerConfig = dialer.NewConfig(
-		v.GetUint32(OutboundConnectionThrottlingRps),
-		v.GetDuration(OutboundConnectionTimeout),
-	)
+	nodeConfig.NetworkConfig.DialerConfig = dialer.Config{
+		ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
+		ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
+	}
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)
@@ -448,7 +444,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		nodeConfig.MaxValidatorStake = maxValidatorStake
 		nodeConfig.MinDelegatorStake = minDelegatorStake
 
-		if minDelegationFee > 1000000 {
+		if minDelegationFee > 1_000_000 {
 			return node.Config{}, errors.New("delegation fee must be in the range [0, 1000000]")
 		}
 		nodeConfig.MinDelegationFee = uint32(minDelegationFee)

@@ -5,15 +5,18 @@ package secp256k1fx
 
 import (
 	"errors"
+
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 var errNoValueInput = errors.New("input has no value")
 
-// TransferInput ...
 type TransferInput struct {
 	Amt   uint64 `serialize:"true" json:"amount"`
 	Input `serialize:"true"`
 }
+
+func (in *TransferInput) InitCtx(*snow.Context) {}
 
 // Amount returns the quantity of the asset this input produces
 func (in *TransferInput) Amount() uint64 { return in.Amt }

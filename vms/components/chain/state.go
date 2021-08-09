@@ -44,14 +44,16 @@ type State struct {
 	unverifiedBlocks cache.Cacher
 	// missingBlocks is an LRU cache of missing blocks
 	// Every value in [missingBlocks] is an empty struct.
-	missingBlocks     cache.Cacher
+	missingBlocks cache.Cacher
+	// string([byte repr. of block]) --> the block's ID
+	bytesToIDCache    cache.Cacher
 	lastAcceptedBlock *BlockWrapper
 }
 
 // Config defines all of the parameters necessary to initialize State
 type Config struct {
 	// Cache configuration:
-	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize int
+	DecidedCacheSize, MissingCacheSize, UnverifiedCacheSize, BytesToIDCacheSize int
 
 	LastAcceptedBlock  snowman.Block
 	GetBlock           func(ids.ID) (snowman.Block, error)
@@ -122,6 +124,7 @@ func NewState(config *Config) *State {
 		decidedBlocks:    &cache.LRU{Size: config.DecidedCacheSize},
 		missingBlocks:    &cache.LRU{Size: config.MissingCacheSize},
 		unverifiedBlocks: &cache.LRU{Size: config.UnverifiedCacheSize},
+		bytesToIDCache:   &cache.LRU{Size: config.BytesToIDCacheSize},
 	}
 	c.initialize(config)
 	return c
@@ -156,11 +159,20 @@ func NewMeteredState(
 	if err != nil {
 		return nil, err
 	}
+	bytesToIDCache, err := metercacher.New(
+		fmt.Sprintf("%s_bytes_to_id_cache", namespace),
+		registerer,
+		&cache.LRU{Size: config.BytesToIDCacheSize},
+	)
+	if err != nil {
+		return nil, err
+	}
 	c := &State{
 		verifiedBlocks:   make(map[ids.ID]*BlockWrapper),
 		decidedBlocks:    decidedCache,
 		missingBlocks:    missingCache,
 		unverifiedBlocks: unverifiedCache,
+		bytesToIDCache:   bytesToIDCache,
 	}
 	c.initialize(config)
 	return c, nil
@@ -229,17 +241,33 @@ func (s *State) GetBlockInternal(blkID ids.ID) (snowman.Block, error) {
 // ParseBlock attempts to parse [b] into an internal Block and adds it to the appropriate
 // caching layer if successful.
 func (s *State) ParseBlock(b []byte) (snowman.Block, error) {
+	// See if we've cached this block's ID by its byte repr.
+	blkIDIntf, blkIDCached := s.bytesToIDCache.Get(string(b))
+	if blkIDCached {
+		blkID := blkIDIntf.(ids.ID)
+		// See if we have this block cached
+		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+			return cachedBlk, nil
+		}
+	}
+
+	// We don't have this block cached by its byte repr.
+	// Parse the block from bytes
 	blk, err := s.unmarshalBlock(b)
 	if err != nil {
 		return nil, err
 	}
-
 	blkID := blk.ID()
-	// Check for an existing block, so we can return a unique block
-	// if processing or simply allow this block to be immediately
-	// garbage collected if it is already cached.
-	if cachedBlk, ok := s.getCachedBlock(blkID); ok {
-		return cachedBlk, nil
+	s.bytesToIDCache.Put(string(b), blkID)
+
+	// Only check the caches if we didn't do so above
+	if !blkIDCached {
+		// Check for an existing block, so we can return a unique block
+		// if processing or simply allow this block to be immediately
+		// garbage collected if it is already cached.
+		if cachedBlk, ok := s.getCachedBlock(blkID); ok {
+			return cachedBlk, nil
+		}
 	}
 
 	s.missingBlocks.Evict(blkID)
@@ -299,7 +327,6 @@ func (s *State) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, erro
 	return wrappedBlk, nil
 }
 
-// LastAccepted ...
 func (s *State) LastAccepted() (ids.ID, error) {
 	return s.lastAcceptedBlock.ID(), nil
 }

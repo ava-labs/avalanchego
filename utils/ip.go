@@ -35,19 +35,20 @@ func init() {
 
 var errBadIP = errors.New("bad ip format")
 
-// IPDesc ...
 type IPDesc struct {
 	IP   net.IP
 	Port uint16
 }
 
-// Equal ...
+func (ipDesc *IPDesc) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%s\"", ipDesc.IP)), nil
+}
+
 func (ipDesc IPDesc) Equal(otherIPDesc IPDesc) bool {
 	return ipDesc.Port == otherIPDesc.Port &&
 		ipDesc.IP.Equal(otherIPDesc.IP)
 }
 
-// PortString ...
 func (ipDesc IPDesc) PortString() string {
 	return fmt.Sprintf(":%d", ipDesc.Port)
 }
@@ -82,7 +83,6 @@ func (ipDesc IPDesc) IsZero() bool {
 		ip.Equal(net.IPv6zero)
 }
 
-// ToIPDesc ...
 func ToIPDesc(str string) (IPDesc, error) {
 	host, portStr, err := net.SplitHostPort(str)
 	if err != nil {

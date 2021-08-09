@@ -4,7 +4,7 @@
 
 ---
 
-Official node implementation of the [Avalanche](https://avax.network) network -
+Node implementation for the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
 
 ## Installation
@@ -140,7 +140,20 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/), protoc-gen-go and protoc-gen-go-grpc installed. protoc must be on your $PATH.
+To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) (v3.17.3), protoc-gen-go (v1.26.0) and protoc-gen-go-grpc (v1.1.0) installed. protoc must be on your $PATH.
+
+To install the protoc dependencies:
+
+```sh
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+```
+
+If you have not already, you may need to add `$GOPATH/bin` to your `$PATH`:
+
+```sh
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
 
 If you extract protoc to ~/software/protobuf/, the following should work:
 
@@ -149,4 +162,13 @@ export PATH=$PATH:~/software/protobuf/bin/:~/go/bin
 go get google.golang.org/protobuf/cmd/protoc-gen-go
 go get google.golang.org/protobuf/cmd/protoc-gen-go-grpc
 scripts/protobuf_codegen.sh
+```
+
+For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).
+
+### Running protobuf codegen from docker
+
+```sh
+docker build -t avalanche:protobuf_codegen -f Dockerfile.protoc .
+docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
 ```

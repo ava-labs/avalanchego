@@ -39,7 +39,7 @@ jobs:
         sudo installer -pkg AWSCLIV2.pkg -target /
 
     - name: Create zip file
-      run: 7z a avalanchego-macos-${VERSION}.zip build/avalanchego build/avalanchego-latest build/avalanchego-preupgrade
+      run: 7z a avalanchego-macos-${VERSION}.zip build/avalanchego build/plugins
       env:
         VERSION: ${{ steps.get_version.outputs.VERSION }}
 

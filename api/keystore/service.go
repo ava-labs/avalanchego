@@ -20,14 +20,14 @@ type service struct {
 }
 
 func (s *service) CreateUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
-	s.ks.log.Info("Keystore: CreateUser called with %.*s", maxUserLen, args.Username)
+	s.ks.log.Debug("Keystore: CreateUser called with %.*s", maxUserLen, args.Username)
 
 	reply.Success = true
 	return s.ks.CreateUser(args.Username, args.Password)
 }
 
 func (s *service) DeleteUser(_ *http.Request, args *api.UserPass, reply *api.SuccessResponse) error {
-	s.ks.log.Info("Keystore: DeleteUser called with %s", args.Username)
+	s.ks.log.Debug("Keystore: DeleteUser called with %s", args.Username)
 
 	reply.Success = true
 	return s.ks.DeleteUser(args.Username, args.Password)
@@ -38,7 +38,7 @@ type ListUsersReply struct {
 }
 
 func (s *service) ListUsers(_ *http.Request, args *struct{}, reply *ListUsersReply) error {
-	s.ks.log.Info("Keystore: ListUsers called")
+	s.ks.log.Debug("Keystore: ListUsers called")
 
 	var err error
 	reply.Users, err = s.ks.ListUsers()
@@ -55,7 +55,7 @@ type ImportUserArgs struct {
 }
 
 func (s *service) ImportUser(r *http.Request, args *ImportUserArgs, reply *api.SuccessResponse) error {
-	s.ks.log.Info("Keystore: ImportUser called for %s", args.Username)
+	s.ks.log.Debug("Keystore: ImportUser called for %s", args.Username)
 
 	// Decode the user from string to bytes
 	user, err := formatting.Decode(args.Encoding, args.User)
@@ -82,7 +82,7 @@ type ExportUserReply struct {
 }
 
 func (s *service) ExportUser(_ *http.Request, args *ExportUserArgs, reply *ExportUserReply) error {
-	s.ks.log.Info("Keystore: ExportUser called for %s", args.Username)
+	s.ks.log.Debug("Keystore: ExportUser called for %s", args.Username)
 
 	userBytes, err := s.ks.ExportUser(args.Username, args.Password)
 	if err != nil {
@@ -90,7 +90,7 @@ func (s *service) ExportUser(_ *http.Request, args *ExportUserArgs, reply *Expor
 	}
 
 	// Encode the user from bytes to string
-	reply.User, err = formatting.Encode(args.Encoding, userBytes)
+	reply.User, err = formatting.EncodeWithChecksum(args.Encoding, userBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't encode user to string: %w", err)
 	}
@@ -109,5 +109,5 @@ func CreateTestKeystore() (Keystore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(logging.NoLog{}, dbManager)
+	return New(logging.NoLog{}, dbManager), nil
 }

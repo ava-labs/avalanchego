@@ -67,13 +67,10 @@ func addProcessFlags(fs *flag.FlagSet) {
 	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Plugin
-	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin")
+	fs.Bool(PluginModeKey, false, "Whether the app should run as a plugin")
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
-	// Fetch only mode
-	fs.Bool(FetchOnlyKey, false, "If true, bootstrap the current database version then stop")
-
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
@@ -125,17 +122,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(DynamicUpdateDurationKey, 5*time.Minute, "Dynamic IP and NAT Traversal update duration")
 	fs.String(DynamicPublicIPResolverKey, "", "'ifconfigco' (alias 'ifconfig') or 'opendns' or 'ifconfigme'. By default does not do dynamic public IP updates. If non-empty, ignores public-ip argument.")
 
-	// Incoming Connection Throttling
-	// Upgrade at most [conn-meter-max-conns] incoming connections from a given
-	// IP in the last [conn-meter-reset-duration].
-	fs.Duration(ConnMeterResetDurationKey, 0*time.Second,
-		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If either is 0, incoming connections are not rate-limited.")
-	// TODO: Use Uint rather than Int when negative arguments are invalid
-	fs.Int(ConnMeterMaxConnsKey, 5,
-		"Upgrade at most [conn-meter-max-conns] connections from a given IP per [conn-meter-reset-duration]. "+
-			"If either is 0, incoming connections are not rate-limited.")
-	// Outgoing Connection Throttling
+	// Inbound Connection Throttling
+	fs.Duration(InboundConnThrottlerCooldownKey, 2*time.Second, "Allow an inbound connection from a given IP at most once per this duration. If 0, don't rate-limit inbound connections.")
+	fs.Int(InboundConnThrottlerMaxRecentConnsKey, 1024, fmt.Sprintf("Allow at most this many inbound connection per [--%s]", InboundConnThrottlerCooldownKey))
+	// Outbound Connection Throttling
 	fs.Uint(OutboundConnectionThrottlingRps, 50, "Make at most this number of outgoing peer connection attempts per second.")
 	fs.Duration(OutboundConnectionTimeout, 30*time.Second, "Timeout when dialing a peer.")
 	// Timeouts
@@ -144,7 +134,7 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Duration(NetworkMaximumTimeoutKey, 10*time.Second, "Maximum timeout value of the adaptive timeout manager.")
 	fs.Duration(NetworkTimeoutHalflifeKey, 5*time.Minute, "Halflife of average network response time. Higher value --> network timeout is less volatile. Can't be 0.")
 	fs.Float64(NetworkTimeoutCoefficientKey, 2, "Multiplied by average network response time to get the network timeout. Must be >= 1.")
-	fs.Uint(SendQueueSizeKey, 512, "Max number of messages waiting to be sent to a given peer.")
+	fs.Bool(NetworkCompressionEnabledKey, true, "If true, compress Put, PushQuery, PeerList and Multiput messages sent to peers that support compression")
 
 	// Peer alias configuration
 	fs.Duration(PeerAliasTimeoutKey, 10*time.Minute, "How often the node will attempt to connect "+
@@ -162,10 +152,15 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Uint(ConsensusGossipAcceptedFrontierSizeKey, 35, "Number of peers to gossip to when gossiping accepted frontier")
 	fs.Uint(ConsensusGossipOnAcceptSizeKey, 20, "Number of peers to gossip to each accepted container to")
 
-	// Throttling
-	fs.Uint64(ThrottlingAtLargeAllocSizeKey, 64*units.MiB, "Size, in bytes, of at-large byte allocation in message throttler.")
-	fs.Uint64(ThrottlingVdrAllocSizeKey, 64*units.MiB, "Size, in bytes, of validator byte allocation in message throttler.")
-	fs.Uint64(ThrottlingNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the message throttler's at-large allocation.")
+	// Inbound Throttling
+	fs.Uint64(InboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in inbound message throttler.")
+	fs.Uint64(InboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in inbound message throttler.")
+	fs.Uint64(InboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the inbound message throttler's at-large allocation.")
+
+	// Outbound Throttling
+	fs.Uint64(OutboundThrottlerAtLargeAllocSizeKey, 32*units.MiB, "Size, in bytes, of at-large byte allocation in outbound message throttler.")
+	fs.Uint64(OutboundThrottlerVdrAllocSizeKey, 32*units.MiB, "Size, in bytes, of validator byte allocation in outbound message throttler.")
+	fs.Uint64(OutboundThrottlerNodeMaxAtLargeBytesKey, 2*uint64(network.DefaultMaxMessageSize), "Max number of bytes a node can take from the outbound message throttler's at-large allocation.")
 
 	// HTTP APIs
 	fs.String(HTTPHostKey, "127.0.0.1", "Address of the HTTP server")
