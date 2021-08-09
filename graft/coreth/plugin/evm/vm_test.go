@@ -134,10 +134,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 	// The caller of this function is responsible for unlocking.
 	ctx.Lock.Lock()
 
-	userKeystore, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.NewDefaultVersion(1, 4, 5)))
-	if err != nil {
-		t.Fatal(err)
-	}
+	userKeystore := keystore.New(logging.NoLog{}, manager.NewMemDB(version.NewDefaultVersion(1, 4, 5)))
 	if err := userKeystore.CreateUser(username, password); err != nil {
 		t.Fatal(err)
 	}
@@ -598,8 +595,8 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk1Root := ethBlk1.Root(); vm.chain.BlockChain().HasState(ethBlk1Root) {
-		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	if ethBlk1Root := ethBlk1.Root(); !vm.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to not yet be pruned after blk2 was accepted because of tip buffer")
 	}
 
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
@@ -612,7 +609,11 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Expected refreshed blk2 to be Accepted, but found status: %s", status)
 	}
 
-	blk1Refreshed := blk2Refreshed.Parent()
+	blk1RefreshedID := blk2Refreshed.Parent()
+	blk1Refreshed, err := vm.GetBlockInternal(blk1RefreshedID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if status := blk1Refreshed.Status(); status != choices.Accepted {
 		t.Fatalf("Expected refreshed blk1 to be Accepted, but found status: %s", status)
 	}
@@ -632,6 +633,17 @@ func TestBuildEthTxBlock(t *testing.T) {
 		[]*engCommon.Fx{},
 	); err != nil {
 		t.Fatal(err)
+	}
+
+	// State root should not have been committed and discarded on restart
+	if ethBlk1Root := ethBlk1.Root(); restartedVM.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	}
+
+	// State root should be committed when accepted tip on shutdown
+	ethBlk2 := blk2.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk2Root := ethBlk2.Root(); !restartedVM.chain.BlockChain().HasState(ethBlk2Root) {
+		t.Fatalf("Expected blk2 state root to not be pruned after shutdown (last accepted tip should be committed)")
 	}
 }
 
@@ -722,7 +734,7 @@ func TestConflictingImportTxs(t *testing.T) {
 			t.Fatalf("Expected status of built block %d to be %s, but found %s", i, choices.Processing, status)
 		}
 
-		if parentID := blk.Parent().ID(); parentID != expectedParentBlkID {
+		if parentID := blk.Parent(); parentID != expectedParentBlkID {
 			t.Fatalf("Expected parent to have blockID %s, but found %s", expectedParentBlkID, parentID)
 		}
 
@@ -733,10 +745,13 @@ func TestConflictingImportTxs(t *testing.T) {
 	}
 
 	for i, tx := range conflictTxs {
-		if err := vm.issueTx(tx); err != nil {
+		if err := vm.issueTx(tx); err == nil {
+			t.Fatal("Expected issueTx to fail due to conflicting transaction")
+		}
+		// Force issue transaction directly to the mempool
+		if err := vm.mempool.AddTx(tx); err != nil {
 			t.Fatal(err)
 		}
-
 		<-issuer
 
 		_, err := vm.BuildBlock()
@@ -1217,8 +1232,12 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx0B); err != nil {
-		t.Fatalf("Failed to issue importTx0B due to: %s", err)
+	if err := vm.issueTx(importTx0B); err == nil {
+		t.Fatalf("Should not have been able to issue import tx with conflict")
+	}
+	// Force issue transaction directly into the mempool
+	if err := vm.mempool.AddTx(importTx0B); err != nil {
+		t.Fatal(err)
 	}
 
 	<-issuer
@@ -3627,7 +3646,12 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(exportTx2); err != nil {
+	if err := vm.issueTx(exportTx2); err == nil {
+		t.Fatal("Should have failed to issue due to an invalid export tx")
+	}
+	// Force add transaction directly to the mempool to ensure it fails during build block
+	// as well.
+	if err := vm.mempool.AddTx(exportTx2); err != nil {
 		t.Fatal(err)
 	}
 	<-issuer
@@ -3679,7 +3703,13 @@ func TestBuildInvalidBlockHead(t *testing.T) {
 
 	currentBlock := vm.chain.BlockChain().CurrentBlock()
 
-	if err := vm.issueTx(tx); err != nil {
+	// Verify that the transaction fails verification when attempting to issue
+	// it into the atomic mempool.
+	if err := vm.issueTx(tx); err == nil {
+		t.Fatal("Should have failed to issue invalid transaction")
+	}
+	// Force issue the transaction directly to the mempool
+	if err := vm.mempool.AddTx(tx); err != nil {
 		t.Fatal(err)
 	}
 
