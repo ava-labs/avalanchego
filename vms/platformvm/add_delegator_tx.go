@@ -226,13 +226,19 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		if err != nil {
 			return nil, nil, nil, nil, permError{errStakeOverflow}
 		}
+
+		isAP3 := !currentTimestamp.Before(vm.ApricotPhase3Time)
+		if isAP3 {
+			maximumWeight = math.Min64(maximumWeight, vm.MaxValidatorStake)
+		}
+
 		canDelegate, err := CanDelegate(
 			currentDelegators,
 			pendingDelegators,
 			tx,
 			currentWeight,
 			maximumWeight,
-			!currentTimestamp.Before(vm.ApricotPhase3Time),
+			isAP3,
 		)
 		if err != nil {
 			return nil, nil, nil, nil, permError{err}

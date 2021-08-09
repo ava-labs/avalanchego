@@ -180,10 +180,38 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 	newValidatorStartTime := uint64(defaultValidateStartTime.Add(5 * time.Second).Unix())
 	newValidatorEndTime := uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix())
 
-	// [addValidator] adds a new validator to the primary network's pending validator set
-	addValidator := func(vm *VM) {
+	// [addMinStakeValidator] adds a new validator to the primary network's
+	// pending validator set with the minimum staking amount
+	addMinStakeValidator := func(vm *VM) {
 		tx, err := vm.newAddValidatorTx(
 			vm.MinValidatorStake,                    // stake amount
+			newValidatorStartTime,                   // start time
+			newValidatorEndTime,                     // end time
+			newValidatorID,                          // node ID
+			rewardAddress,                           // Reward Address
+			PercentDenominator,                      // subnet
+			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
+			ids.ShortEmpty,                          // change addr
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		vm.internalState.AddCurrentStaker(tx, 0)
+		vm.internalState.AddTx(tx, Committed)
+		if err := vm.internalState.Commit(); err != nil {
+			t.Fatal(err)
+		}
+		if err := vm.internalState.(*internalStateImpl).loadCurrentValidators(); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// [addMaxStakeValidator] adds a new validator to the primary network's
+	// pending validator set with the maximum staking amount
+	addMaxStakeValidator := func(vm *VM) {
+		tx, err := vm.newAddValidatorTx(
+			vm.MaxValidatorStake,                    // stake amount
 			newValidatorStartTime,                   // start time
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
@@ -217,107 +245,116 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 		rewardAddress ids.ShortID
 		feeKeys       []*crypto.PrivateKeySECP256K1R
 		setup         func(vm *VM)
+		AP3Time       time.Time
 		shouldErr     bool
 		description   string
 	}
 
 	tests := []test{
 		{
-			freshVM.MinDelegatorStake,
-			uint64(defaultValidateStartTime.Unix()),
-			uint64(defaultValidateEndTime.Unix()) + 1,
-			nodeID,
-			rewardAddress,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
-			nil,
-			true,
-			"validator stops validating primary network earlier than subnet",
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     uint64(defaultValidateStartTime.Unix()),
+			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
+			nodeID:        nodeID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         nil,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   "validator stops validating primary network earlier than subnet",
 		},
 		{
-			freshVM.MinDelegatorStake,
-			uint64(currentTimestamp.Add(maxFutureStartTime + time.Second).Unix()),
-			uint64(currentTimestamp.Add(maxFutureStartTime * 2).Unix()),
-			nodeID,
-			rewardAddress,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
-			nil,
-			true,
-			fmt.Sprintf("validator should not be added more than (%s) in the future", maxFutureStartTime),
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     uint64(currentTimestamp.Add(maxFutureStartTime + time.Second).Unix()),
+			endTime:       uint64(currentTimestamp.Add(maxFutureStartTime * 2).Unix()),
+			nodeID:        nodeID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         nil,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   fmt.Sprintf("validator should not be added more than (%s) in the future", maxFutureStartTime),
 		},
 		{
-			freshVM.MinDelegatorStake,
-			uint64(defaultValidateStartTime.Unix()),
-			uint64(defaultValidateEndTime.Unix()) + 1,
-			nodeID,
-			rewardAddress,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
-			nil,
-			true,
-			"end time is after the primary network end time",
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     uint64(defaultValidateStartTime.Unix()),
+			endTime:       uint64(defaultValidateEndTime.Unix()) + 1,
+			nodeID:        nodeID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         nil,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   "end time is after the primary network end time",
 		},
 		{
-			freshVM.MinDelegatorStake,
-			uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
-			uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
-			newValidatorID,
-			rewardAddress,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
-			nil,
-			true,
-			"validator not in the current or pending validator sets of the subnet",
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     uint64(defaultValidateStartTime.Add(5 * time.Second).Unix()),
+			endTime:       uint64(defaultValidateEndTime.Add(-5 * time.Second).Unix()),
+			nodeID:        newValidatorID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         nil,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   "validator not in the current or pending validator sets of the subnet",
 		},
 		{
-			freshVM.MinDelegatorStake,
-			newValidatorStartTime - 1, // start validating subnet before primary network
-			newValidatorEndTime,
-			newValidatorID,
-			rewardAddress,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
-			addValidator,
-			true,
-			"validator starts validating subnet before primary network",
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     newValidatorStartTime - 1, // start validating subnet before primary network
+			endTime:       newValidatorEndTime,
+			nodeID:        newValidatorID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         addMinStakeValidator,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   "validator starts validating subnet before primary network",
 		},
 		{
-			freshVM.MinDelegatorStake,
-			newValidatorStartTime,
-			newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
-			newValidatorID,
-			rewardAddress,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
-			addValidator,
-			true,
-			"validator stops validating primary network before subnet",
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     newValidatorStartTime,
+			endTime:       newValidatorEndTime + 1, // stop validating subnet after stopping validating primary network
+			nodeID:        newValidatorID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         addMinStakeValidator,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   "validator stops validating primary network before subnet",
 		},
 		{
-			freshVM.MinDelegatorStake,
-			newValidatorStartTime, // same start time as for primary network
-			newValidatorEndTime,   // same end time as for primary network
-			newValidatorID,
-			rewardAddress,
-			[]*crypto.PrivateKeySECP256K1R{keys[0]},
-			addValidator,
-			false,
-			"valid",
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     newValidatorStartTime, // same start time as for primary network
+			endTime:       newValidatorEndTime,   // same end time as for primary network
+			nodeID:        newValidatorID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         addMinStakeValidator,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     false,
+			description:   "valid",
 		},
 		{
-			freshVM.MinDelegatorStake, // weight
-			uint64(currentTimestamp.Unix()),
-			uint64(defaultValidateEndTime.Unix()),
-			nodeID,                                  // node ID
-			rewardAddress,                           // Reward Address
-			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // tx fee payer
-			nil,
-			true,
-			"starts validating at current timestamp",
+			stakeAmount:   freshVM.MinDelegatorStake, // weight
+			startTime:     uint64(currentTimestamp.Unix()),
+			endTime:       uint64(defaultValidateEndTime.Unix()),
+			nodeID:        nodeID,                                  // node ID
+			rewardAddress: rewardAddress,                           // Reward Address
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]}, // tx fee payer
+			setup:         nil,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   "starts validating at current timestamp",
 		},
 		{
-			freshVM.MinDelegatorStake,               // weight
-			uint64(defaultValidateStartTime.Unix()), // start time
-			uint64(defaultValidateEndTime.Unix()),   // end time
-			nodeID,                                  // node ID
-			rewardAddress,                           // Reward Address
-			[]*crypto.PrivateKeySECP256K1R{keys[1]}, // tx fee payer
-			func(vm *VM) { // Remove all UTXOs owned by keys[1]
+			stakeAmount:   freshVM.MinDelegatorStake,               // weight
+			startTime:     uint64(defaultValidateStartTime.Unix()), // start time
+			endTime:       uint64(defaultValidateEndTime.Unix()),   // end time
+			nodeID:        nodeID,                                  // node ID
+			rewardAddress: rewardAddress,                           // Reward Address
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[1]}, // tx fee payer
+			setup: func(vm *VM) { // Remove all UTXOs owned by keys[1]
 				utxoIDs, err := vm.internalState.UTXOIDs(keys[1].PublicKey().Address().Bytes(), ids.Empty, math.MaxInt32)
 				if err != nil {
 					t.Fatal(err)
@@ -329,14 +366,41 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 					t.Fatal(err)
 				}
 			},
-			true,
-			"tx fee paying key has no funds",
+			AP3Time:     defaultGenesisTime,
+			shouldErr:   true,
+			description: "tx fee paying key has no funds",
+		},
+		{
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     newValidatorStartTime, // same start time as for primary network
+			endTime:       newValidatorEndTime,   // same end time as for primary network
+			nodeID:        newValidatorID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         addMaxStakeValidator,
+			AP3Time:       defaultValidateEndTime,
+			shouldErr:     false,
+			description:   "over delegation before AP3",
+		},
+		{
+			stakeAmount:   freshVM.MinDelegatorStake,
+			startTime:     newValidatorStartTime, // same start time as for primary network
+			endTime:       newValidatorEndTime,   // same end time as for primary network
+			nodeID:        newValidatorID,
+			rewardAddress: rewardAddress,
+			feeKeys:       []*crypto.PrivateKeySECP256K1R{keys[0]},
+			setup:         addMaxStakeValidator,
+			AP3Time:       defaultGenesisTime,
+			shouldErr:     true,
+			description:   "over delegation after AP3",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			vm, _ := defaultVM()
+			vm.ApricotPhase3Time = tt.AP3Time
+
 			vm.ctx.Lock.Lock()
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
