@@ -21,6 +21,7 @@ type gasPriceUpdater struct {
 
 type gasPriceSetter interface {
 	SetGasPrice(price *big.Int)
+	SetMinFee(price *big.Int)
 }
 
 // handleGasPriceUpdates creates and runs an instance of
@@ -47,6 +48,7 @@ func (gpu *gasPriceUpdater) start() {
 	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(0)); disabled {
 		return
 	}
+	gpu.handleMinFeeUpdate(gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(params.ApricotPhase3MinBaseFee))
 }
 
 // handleGasPriceUpdate handles the gas price update to occur at [timestamp]
@@ -73,6 +75,34 @@ func (gpu *gasPriceUpdater) updateGasPrice(duration time.Duration, updatedPrice 
 	select {
 	case <-time.After(duration):
 		gpu.setter.SetGasPrice(updatedPrice)
+	case <-gpu.shutdownChan:
+	}
+}
+
+// handleMinFeeeUpdate handles the min fee update to occur at [timestamp]
+// to update to [minFee]
+// returns true, if the update is disabled and further forks can be skipped
+func (gpu *gasPriceUpdater) handleMinFeeUpdate(timestamp *big.Int, minFee *big.Int) bool {
+	if timestamp == nil {
+		return true
+	}
+
+	currentTime := time.Now()
+	upgradeTime := time.Unix(timestamp.Int64(), 0)
+	if currentTime.After(upgradeTime) {
+		gpu.setter.SetMinFee(minFee)
+	} else {
+		gpu.wg.Add(1)
+		go gpu.updateMinFee(time.Until(upgradeTime), minFee)
+	}
+	return false
+}
+
+func (gpu *gasPriceUpdater) updateMinFee(duration time.Duration, updatedPrice *big.Int) {
+	defer gpu.wg.Done()
+	select {
+	case <-time.After(duration):
+		gpu.setter.SetMinFee(updatedPrice)
 	case <-gpu.shutdownChan:
 	}
 }

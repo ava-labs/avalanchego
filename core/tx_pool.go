@@ -480,6 +480,13 @@ func (pool *TxPool) SetGasPrice(price *big.Int) {
 	log.Info("Transaction pool price threshold updated", "price", price)
 }
 
+func (pool *TxPool) SetMinFee(minFee *big.Int) {
+	pool.mu.Lock()
+	defer pool.mu.Unlock()
+
+	pool.minimumFee = minFee
+}
+
 // Nonce returns the next nonce of an account, with all transactions executable
 // by the pool already applied on top.
 func (pool *TxPool) Nonce(addr common.Address) uint64 {
@@ -1586,7 +1593,6 @@ func (pool *TxPool) startPeriodicFeeUpdate() {
 	// Call updateBaseFee here to ensure that there is not a [baseFeeUpdateInterval] delay
 	// when starting up in ApricotPhase3 before the base fee is updated.
 	if time.Now().After(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0)) {
-		pool.minimumFee = big.NewInt(params.ApricotPhase3MinBaseFee)
 		pool.updateBaseFee()
 	}
 
