@@ -432,7 +432,7 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			break
 		}
 		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-		if err := vm.verifyTx(tx, header.ParentHash, state, rules); err != nil {
+		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			vm.mempool.DiscardCurrentTx()
 			state.RevertToSnapshot(snapshot)
@@ -975,8 +975,18 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 		return fmt.Errorf("failed to retrieve block state at tip while verifying atomic tx: %w", err)
 	}
 	rules := vm.currentRules()
+	parentHeader := preferredBlock.Header()
+	var nextBaseFee *big.Int
+	timestamp := time.Now().Unix()
+	bigTimestamp := big.NewInt(timestamp)
+	if vm.chainConfig.IsApricotPhase3(bigTimestamp) {
+		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(time.Now().Unix()))
+		if err != nil {
+			return fmt.Errorf("failed to calculate base fee: %w", err)
+		}
+	}
 
-	return vm.verifyTx(tx, preferredBlock.Hash(), preferredState, rules)
+	return vm.verifyTx(tx, parentHeader.Hash(), nextBaseFee, preferredState, rules)
 }
 
 // verifyTx verifies that [tx] is valid to be issued into a block with parent block [parentHash]
@@ -984,7 +994,7 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 // Note: verifyTx may modify [state]. If [state] needs to be properly maintained, the caller is responsible
 // for reverting to the correct snapshot after calling this function. If this function is called with a
 // throwaway state, then this is not necessary.
-func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rules params.Rules) error {
+func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *state.StateDB, rules params.Rules) error {
 	parentIntf, err := vm.GetBlockInternal(ids.ID(parentHash))
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
@@ -993,7 +1003,7 @@ func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rul
 	if !ok {
 		return fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
 	}
-	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, baseFee, rules); err != nil {
 		return err
 	}
 	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
