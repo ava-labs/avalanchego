@@ -30,7 +30,6 @@ package eth
 import (
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 	"time"
 
@@ -92,7 +91,6 @@ type Ethereum struct {
 	APIBackend *EthAPIBackend
 
 	miner     *miner.Miner
-	gasPrice  *big.Int
 	etherbase common.Address
 
 	networkID     uint64
@@ -113,10 +111,6 @@ func New(stack *node.Node, config *Config,
 ) (*Ethereum, error) {
 	if chainDb == nil {
 		return nil, errors.New("chainDb cannot be nil")
-	}
-	if config.Miner.GasPrice == nil || config.Miner.GasPrice.Cmp(common.Big0) <= 0 {
-		log.Warn("Sanitizing invalid miner gas price", "provided", config.Miner.GasPrice, "updated", ethconfig.DefaultConfig.Miner.GasPrice)
-		config.Miner.GasPrice = new(big.Int).Set(ethconfig.DefaultConfig.Miner.GasPrice)
 	}
 	if !config.Pruning && config.TrieDirtyCache > 0 {
 		// If snapshots are enabled, allocate 2/5 of the TrieDirtyCache memory cap to the snapshot cache
@@ -150,7 +144,6 @@ func New(stack *node.Node, config *Config,
 		engine:            dummy.NewDummyEngine(cb),
 		closeBloomHandler: make(chan struct{}),
 		networkID:         config.NetworkId,
-		gasPrice:          config.Miner.GasPrice,
 		etherbase:         config.Miner.Etherbase,
 		bloomRequests:     make(chan chan *bloombits.Retrieval),
 		bloomIndexer:      core.NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
@@ -211,9 +204,6 @@ func New(stack *node.Node, config *Config,
 		log.Info("Unprotected transactions allowed")
 	}
 	gpoParams := config.GPO
-	if gpoParams.Default == nil {
-		gpoParams.Default = config.Miner.GasPrice
-	}
 	eth.APIBackend.gpo = gasprice.NewOracle(eth.APIBackend, gpoParams)
 
 	if err != nil {
@@ -346,14 +336,4 @@ func (s *Ethereum) Stop() error {
 
 func (s *Ethereum) LastAcceptedBlock() *types.Block {
 	return s.blockchain.LastAcceptedBlock()
-}
-
-// SetGasPrice sets the minimum gas price to [newGasPrice]
-// sets the price on [s], [txPool], and the gas price oracle
-func (s *Ethereum) SetGasPrice(newGasPrice *big.Int) {
-	s.lock.Lock()
-	s.gasPrice = newGasPrice
-	s.lock.Unlock()
-	s.txPool.SetGasPrice(newGasPrice)
-	s.APIBackend.gpo.SetGasPrice(newGasPrice)
 }

@@ -31,6 +31,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
@@ -233,7 +234,10 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, _ := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts)
+			block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts)
+			if err != nil {
+				panic(fmt.Sprintf("Failed to finalize and assemble block at index %d: %s", i, err))
+			}
 
 			// Write state changes to db
 			root, err := statedb.Commit(config.IsEIP158(b.header.Number))
@@ -290,17 +294,12 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 		Number:   new(big.Int).Add(parent.Number(), common.Big1),
 		Time:     time,
 	}
-	if chain.Config().IsApricotPhase4(timestamp) {
-		// TODO(aaronbuchwald) include base fee calculation
-		// header.BaseFee = misc.CalcBaseFee(chain.Config(), parent.Header())
-		header.BaseFee = big.NewInt(0)
-
-		// Exclude gas limit change from Apricot Phase 4
-		// parentGasLimit := parent.GasLimit()
-		// if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(parent.Time())) {
-		// 	parentGasLimit = parent.GasLimit() * params.ElasticityMultiplier
-		// }
-		// header.GasLimit = CalcGasLimit1559(parentGasLimit, parentGasLimit)
+	if chain.Config().IsApricotPhase3(timestamp) {
+		var err error
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(chain.Config(), parent.Header(), time)
+		if err != nil {
+			panic(err)
+		}
 	}
 	return header
 }

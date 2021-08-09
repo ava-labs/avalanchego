@@ -79,7 +79,6 @@ func setDefaults(cfg *Config) {
 			ApricotPhase1BlockTimestamp: new(big.Int),
 			ApricotPhase2BlockTimestamp: new(big.Int),
 			ApricotPhase3BlockTimestamp: new(big.Int),
-			ApricotPhase4BlockTimestamp: new(big.Int),
 		}
 	}
 
@@ -107,7 +106,7 @@ func setDefaults(cfg *Config) {
 		}
 	}
 	if cfg.BaseFee == nil {
-		cfg.BaseFee = big.NewInt(params.InitialBaseFee)
+		cfg.BaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 	}
 }
 
