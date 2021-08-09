@@ -36,25 +36,29 @@ func (vm *VM) handleGasPriceUpdates() {
 	gpu.start()
 }
 
+// start handles the appropriate gas price and minimum fee updates required by [gpu.chainConfig]
 func (gpu *gasPriceUpdater) start() {
 	// Sets the initial gas price to the launch minimum gas price
 	gpu.setter.SetGasPrice(big.NewInt(params.LaunchMinGasPrice))
 
 	// Updates to the minimum gas price as of ApricotPhase1 if it's already in effect or starts a goroutine to enable it at the correct time
-	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase1BlockTimestamp, big.NewInt(params.ApricotPhase1MinGasPrice)); disabled {
+	if disabled := gpu.handleUpdate(gpu.setter.SetGasPrice, gpu.chainConfig.ApricotPhase1BlockTimestamp, big.NewInt(params.ApricotPhase1MinGasPrice)); disabled {
 		return
 	}
 	// Updates to the minimum gas price as of ApricotPhase3 if it's already in effect or starts a goroutine to enable it at the correct time
-	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(0)); disabled {
+	if disabled := gpu.handleUpdate(gpu.setter.SetGasPrice, gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(0)); disabled {
 		return
 	}
-	gpu.handleMinFeeUpdate(gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(params.ApricotPhase3MinBaseFee))
+	gpu.handleUpdate(gpu.setter.SetMinFee, gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(params.ApricotPhase3MinBaseFee))
 }
 
-// handleGasPriceUpdate handles the gas price update to occur at [timestamp]
-// to update to [gasPrice]
-// returns true, if the update is disabled and further forks can be skipped
-func (gpu *gasPriceUpdater) handleGasPriceUpdate(timestamp *big.Int, gasPrice *big.Int) bool {
+// handleUpdate handles calling update(price) at the appropriate time based on
+// the value of [timestamp].
+// 1) If [timestamp] is nil, update is never called
+// 2) If [timestamp] has already passed, update is called immediately
+// 3) [timestamp] is some time in the future, starts a goroutine that will call update(price) at the time
+// given by [timestamp].
+func (gpu *gasPriceUpdater) handleUpdate(update func(price *big.Int), timestamp *big.Int, price *big.Int) bool {
 	if timestamp == nil {
 		return true
 	}
@@ -62,47 +66,21 @@ func (gpu *gasPriceUpdater) handleGasPriceUpdate(timestamp *big.Int, gasPrice *b
 	currentTime := time.Now()
 	upgradeTime := time.Unix(timestamp.Int64(), 0)
 	if currentTime.After(upgradeTime) {
-		gpu.setter.SetGasPrice(gasPrice)
+		update(price)
 	} else {
 		gpu.wg.Add(1)
-		go gpu.updateGasPrice(time.Until(upgradeTime), gasPrice)
+		go gpu.updatePrice(update, time.Until(upgradeTime), price)
 	}
 	return false
 }
 
-func (gpu *gasPriceUpdater) updateGasPrice(duration time.Duration, updatedPrice *big.Int) {
+// updatePrice calls update(updatedPrice) after waiting for [duration] or shuts down early
+// if the [shutdownChan] is closed.
+func (gpu *gasPriceUpdater) updatePrice(update func(price *big.Int), duration time.Duration, updatedPrice *big.Int) {
 	defer gpu.wg.Done()
 	select {
 	case <-time.After(duration):
-		gpu.setter.SetGasPrice(updatedPrice)
-	case <-gpu.shutdownChan:
-	}
-}
-
-// handleMinFeeeUpdate handles the min fee update to occur at [timestamp]
-// to update to [minFee]
-// returns true, if the update is disabled and further forks can be skipped
-func (gpu *gasPriceUpdater) handleMinFeeUpdate(timestamp *big.Int, minFee *big.Int) bool {
-	if timestamp == nil {
-		return true
-	}
-
-	currentTime := time.Now()
-	upgradeTime := time.Unix(timestamp.Int64(), 0)
-	if currentTime.After(upgradeTime) {
-		gpu.setter.SetMinFee(minFee)
-	} else {
-		gpu.wg.Add(1)
-		go gpu.updateMinFee(time.Until(upgradeTime), minFee)
-	}
-	return false
-}
-
-func (gpu *gasPriceUpdater) updateMinFee(duration time.Duration, updatedPrice *big.Int) {
-	defer gpu.wg.Done()
-	select {
-	case <-time.After(duration):
-		gpu.setter.SetMinFee(updatedPrice)
+		update(updatedPrice)
 	case <-gpu.shutdownChan:
 	}
 }
