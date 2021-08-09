@@ -79,7 +79,6 @@ type GossipConfig struct {
 	ConsensusGossipConfig
 }
 
-// TODO do we need all these fields?
 type IPConfig struct {
 	IP utils.DynamicIPDesc `json:"ip"`
 	// True if we attempted NAT Traversal
