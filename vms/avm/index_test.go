@@ -5,6 +5,7 @@ package avm
 
 import (
 	"encoding/binary"
+	"fmt"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/avm/index"
@@ -390,6 +391,8 @@ func TestSymbolicOutputUTXOIsSkipped(t *testing.T) {
 			Symbol:      false,
 		},
 	}
+
+	inputAddress := ids.GenerateTestShortID()
 	inputUTXO := avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        txID,
@@ -397,8 +400,14 @@ func TestSymbolicOutputUTXOIsSkipped(t *testing.T) {
 			Symbol:      false,
 		},
 		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			OutputOwners: secp256k1fx.OutputOwners{
+				Addrs: []ids.ShortID{inputAddress},
+			},
+		},
 	}
 
+	outputAddress := ids.GenerateTestShortID()
 	outputUTXOs := []*avax.UTXO{
 		{
 			UTXOID: avax.UTXOID{
@@ -407,6 +416,11 @@ func TestSymbolicOutputUTXOIsSkipped(t *testing.T) {
 				Symbol:      true,
 			},
 			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				OutputOwners: secp256k1fx.OutputOwners{
+					Addrs: []ids.ShortID{outputAddress},
+				},
+			},
 		},
 	}
 
@@ -416,10 +430,15 @@ func TestSymbolicOutputUTXOIsSkipped(t *testing.T) {
 	}
 
 	err = indexer.Accept(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
-
 	assert.NoError(t, err)
-	addressAssetMap := indexer.IndexedTx(txID)
-	assert.Len(t, addressAssetMap, 0)
+
+	// expect input to have been indexed
+	assertIndexedTX(t, db, 0, inputAddress, assetID, txID)
+
+	// expect output to not have been indexed
+	err = checkIndexedTX(db, 0, outputAddress, assetID, txID)
+	assert.Error(t, err)
+	assert.Equal(t, "not found", err.Error())
 }
 
 func TestIndexer_Read(t *testing.T) {
@@ -598,20 +617,29 @@ func assertLatestIdx(t *testing.T, db database.Database, sourceAddress ids.Short
 	assert.EqualValues(t, expectedIdxBytes, idxBytes)
 }
 
-func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
+func checkIndexedTX(db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) error {
 	addressDB := prefixdb.New(sourceAddress[:], db)
 	assetDB := prefixdb.New(assetID[:], addressDB)
 
 	idxBytes := make([]byte, wrappers.LongLen)
 	binary.BigEndian.PutUint64(idxBytes, index)
 	tx1Bytes, err := assetDB.Get(idxBytes)
-	assert.NoError(t, err)
+	if err != nil {
+		return err
+	}
 
 	var txID ids.ID
 	copy(txID[:], tx1Bytes)
 
 	if txID != transactionID {
-		t.Fatalf("txID %s not same as %s", txID, transactionID)
+		return fmt.Errorf("txID %s not same as %s", txID, transactionID)
+	}
+	return nil
+}
+
+func assertIndexedTX(t *testing.T, db database.Database, index uint64, sourceAddress ids.ShortID, assetID ids.ID, transactionID ids.ID) {
+	if err := checkIndexedTX(db, index, sourceAddress, assetID, transactionID); err != nil {
+		t.Fatal(err)
 	}
 }
 

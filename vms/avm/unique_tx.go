@@ -190,7 +190,6 @@ func (tx *UniqueTx) Reject() error {
 
 	tx.deps = nil // Needed to prevent a memory leak
 
-	tx.vm.addressTxsIndexer.Clear(tx.ID())
 	return nil
 }
 
@@ -293,7 +292,6 @@ func (tx *UniqueTx) verifyWithoutCacheWrites() error {
 // Verify the validity of this transaction
 func (tx *UniqueTx) Verify() error {
 	if err := tx.verifyWithoutCacheWrites(); err != nil {
-		tx.vm.addressTxsIndexer.Clear(tx.ID())
 		return err
 	}
 

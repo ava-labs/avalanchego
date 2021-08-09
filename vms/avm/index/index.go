@@ -48,19 +48,11 @@ type AddressTxsIndexer interface {
 		getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
 	) error
 
-	// Clear is called when [txID] is rejected or fails verification.
-	// Clears unwritten state about the tx.
-	Clear(ids.ID)
-
 	// Read returns the IDs of transactions that changed [address]'s balance of [assetID].
 	// The returned transactions are in order of increasing acceptance time.
 	// The length of the returned slice <= [pageSize].
 	// [cursor] is the offset to start reading from.
 	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
-
-	// IndexedTx returns map of [address] and the respective [assetID] slice for a given [txID]
-	// helper function for testing
-	IndexedTx(txID ids.ID) map[ids.ShortID][]ids.ID
 }
 
 // indexer implements AddressTxsIndexer
@@ -98,66 +90,6 @@ func NewIndexer(
 	return i, nil
 }
 
-// add marks that [txID] changes the balance of [assetID] for [addrs]
-// This data is either written in Accept() or cleared in Clear()
-func (i *indexer) add(txID, assetID ids.ID, addrs [][]byte) error {
-	for _, addressBytes := range addrs {
-		address, err := ids.ToShortID(addressBytes)
-		if err != nil {
-			// should never happen
-			return err
-		}
-		if _, exists := i.balanceChanges[txID]; !exists {
-			i.balanceChanges[txID] = make(map[ids.ShortID]map[ids.ID]struct{})
-		}
-		if _, exists := i.balanceChanges[txID][address]; !exists {
-			i.balanceChanges[txID][address] = make(map[ids.ID]struct{})
-		}
-		i.balanceChanges[txID][address][assetID] = struct{}{}
-	}
-	return nil
-}
-
-// indexUTXOs indexes given input and output UTXOs
-// [inputUTXOIDs] are the IDs of UTXOs [txID] consumes.
-// [outputUTXOs] are the UTXOs [txID] creates.
-// [getUTXOF] can be used to look up UTXOs by ID.
-// If the error is non-nil, do not persist [txID] to disk as accepted in the VM
-func (i *indexer) indexUTXOs(
-	txID ids.ID,
-	inputUTXOIDs []*avax.UTXOID,
-	outputUTXOs []*avax.UTXO,
-	getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
-) error {
-	utxos := outputUTXOs
-	for _, utxoID := range inputUTXOIDs {
-		if utxoID.Symbolic() {
-			continue
-		}
-
-		utxo, err := getUTXOF(utxoID)
-		if err != nil { // should never happen
-			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
-		}
-		utxos = append(utxos, utxo)
-	}
-	for _, utxo := range utxos {
-		if utxo.Symbolic() {
-			continue
-		}
-
-		out, ok := utxo.Out.(avax.Addressable)
-		if !ok {
-			i.log.Verbo("skipping UTXO %s for indexing", utxo.InputID())
-			continue
-		}
-		if err := i.add(txID, utxo.AssetID(), out.Addresses()); err != nil {
-			return fmt.Errorf("error adding to index: %s", err)
-		}
-	}
-	return nil
-}
-
 // Accept persists which balances [txID] changed.
 // Associates all UTXOs in [i.balanceChanges] with transaction [txID].
 // The database structure is:
@@ -170,11 +102,54 @@ func (i *indexer) indexUTXOs(
 // See interface documentation AddressTxsIndexer.Accept
 func (i *indexer) Accept(txID ids.ID, inputUTXOIDs []*avax.UTXOID,
 	outputUTXOs []*avax.UTXO, getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
-	if err := i.indexUTXOs(txID, inputUTXOIDs, outputUTXOs, getUTXOF); err != nil {
-		return err
+	utxos := outputUTXOs
+	// Fetch and add the input UTXOs
+	for _, utxoID := range inputUTXOIDs {
+		// Don't bother fetching the input UTXO if its symbolic
+		if utxoID.Symbolic() {
+			continue
+		}
+
+		utxo, err := getUTXOF(utxoID)
+		if err != nil {
+			// should never happen
+			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
+		}
+		utxos = append(utxos, utxo)
 	}
 
-	for address, assetIDs := range i.balanceChanges[txID] {
+	// convert UTXOs into balance changes
+	// Address -> AssetID --> exists if the address's balance
+	// of the asset is changed by processing tx [txID]
+	// we do this step separately to simplify the write process later
+	balanceChanges := make(map[ids.ShortID]map[ids.ID]struct{})
+	for _, utxo := range utxos {
+		if utxo.Symbolic() {
+			continue
+		}
+
+		out, ok := utxo.Out.(avax.Addressable)
+		if !ok {
+			i.log.Verbo("skipping UTXO %s for indexing", utxo.InputID())
+			continue
+		}
+
+		for _, addressBytes := range out.Addresses() {
+			address, err := ids.ToShortID(addressBytes)
+			if err != nil {
+				// should never happen
+				return fmt.Errorf("invalid address bytes, must be ShortID type: %s", err)
+			}
+
+			if _, exists := balanceChanges[address]; !exists {
+				balanceChanges[address] = make(map[ids.ID]struct{})
+			}
+			balanceChanges[address][utxo.AssetID()] = struct{}{}
+		}
+	}
+
+	// Process the balance changes
+	for address, assetIDs := range balanceChanges {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
 		for assetID := range assetIDs {
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
@@ -210,8 +185,6 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOIDs []*avax.UTXOID,
 			}
 		}
 	}
-	// delete already written [txID] from the map
-	delete(i.balanceChanges, txID)
 	i.metrics.numTxsIndexed.Observe(1)
 	return nil
 }
@@ -255,11 +228,6 @@ func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uin
 	return txIDs, nil
 }
 
-// Clear clears data about which balances [txID] changed.
-func (i *indexer) Clear(txID ids.ID) {
-	i.balanceChanges[txID] = make(map[ids.ShortID]map[ids.ID]struct{})
-}
-
 // checkIndexStatus checks the indexing status in the database, returning error if the state
 // with respect to provided parameters is invalid
 func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowIncomplete bool) error {
@@ -297,24 +265,6 @@ func checkIndexStatus(db database.KeyValueReaderWriter, enableIndexing, allowInc
 	return nil
 }
 
-// IndexedTx returns map of [address] and the respective [assetID] slice for a given [txID]
-// helper function for testing
-func (i *indexer) IndexedTx(txID ids.ID) map[ids.ShortID][]ids.ID {
-	addressMap := i.balanceChanges[txID]
-	if addressMap == nil {
-		return nil
-	}
-	retMap := make(map[ids.ShortID][]ids.ID, len(addressMap))
-	for address, assetSet := range addressMap {
-		assets := make([]ids.ID, len(addressMap))
-		for assetID := range assetSet {
-			assets = append(assets, assetID)
-		}
-		retMap[address] = assets
-	}
-	return retMap
-}
-
 type noIndexer struct{}
 
 func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer, error) {
@@ -325,12 +275,6 @@ func (i *noIndexer) Accept(ids.ID, []*avax.UTXOID, []*avax.UTXO, func(utxoID *av
 	return nil
 }
 
-func (i *noIndexer) Clear(ids.ID) {}
-
 func (i *noIndexer) Read(ids.ShortID, ids.ID, uint64, uint64) ([]ids.ID, error) {
 	return nil, nil
-}
-
-func (i *noIndexer) IndexedTx(ids.ID) map[ids.ShortID][]ids.ID {
-	return nil
 }
