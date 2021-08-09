@@ -94,8 +94,8 @@ func NewEVMInterpreter(evm *EVM, cfg Config) *EVMInterpreter {
 	if cfg.JumpTable[STOP] == nil {
 		var jt JumpTable
 		switch {
-		case evm.chainRules.IsApricotPhase4:
-			jt = apricotPhase4InstructionSet
+		case evm.chainRules.IsApricotPhase3:
+			jt = apricotPhase3InstructionSet
 		case evm.chainRules.IsApricotPhase2:
 			jt = apricotPhase2InstructionSet
 		case evm.chainRules.IsApricotPhase1:

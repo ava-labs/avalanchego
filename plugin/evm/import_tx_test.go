@@ -4,7 +4,10 @@
 package evm
 
 import (
+	"math/big"
 	"testing"
+
+	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
@@ -15,7 +18,7 @@ import (
 
 func TestImportTxVerifyNil(t *testing.T) {
 	var importTx *UnsignedImportTx
-	if err := importTx.Verify(testXChainID, NewContext(), testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, NewContext(), apricotRulesPhase1); err == nil {
 		t.Fatal("Verify should have failed due to nil transaction")
 	}
 }
@@ -58,7 +61,7 @@ func TestImportTxVerify(t *testing.T) {
 		Outs: []EVMOutput{
 			{
 				Address: testEthAddrs[0],
-				Amount:  importAmount - txFee,
+				Amount:  importAmount - params.AvalancheAtomicTxFee,
 				AssetID: testAvaxAssetID,
 			},
 			{
@@ -76,28 +79,28 @@ func TestImportTxVerify(t *testing.T) {
 	SortEVMOutputs(importTx.Outs)
 
 	// Test Valid ImportTx
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err != nil {
 		t.Fatalf("Failed to verify ImportTx: %s", err)
 	}
 
 	importTx.NetworkID = testNetworkID + 1
 
 	// // Test Incorrect Network ID Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to incorrect network ID")
 	}
 
 	importTx.NetworkID = testNetworkID
 	importTx.BlockchainID = nonExistentID
 	// // Test Incorrect Blockchain ID Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to incorrect blockchain ID")
 	}
 
 	importTx.BlockchainID = testCChainID
 	importTx.SourceChain = nonExistentID
 	// // Test Incorrect Destination Chain ID Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to incorrect source chain")
 	}
 
@@ -106,29 +109,29 @@ func TestImportTxVerify(t *testing.T) {
 	evmOutputs := importTx.Outs
 	importTx.ImportedInputs = nil
 	// // Test No Imported Inputs Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to no imported inputs")
 	}
 
 	importTx.ImportedInputs = []*avax.TransferableInput{importedIns[1], importedIns[0]}
 	// // Test Unsorted Imported Inputs Errors
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to unsorted import inputs")
 	}
 
 	importTx.ImportedInputs = []*avax.TransferableInput{importedIns[0], nil}
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to invalid input")
 	}
 
 	importTx.ImportedInputs = []*avax.TransferableInput{importedIns[0], importedIns[1]}
 	importTx.Outs = []EVMOutput{evmOutputs[1], evmOutputs[0]}
 	// Test unsorted EVM Outputs pass verification prior to AP1
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase0); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase0); err != nil {
 		t.Fatalf("ImportTx should have passed verification prior to AP1, but failed due to %s", err)
 	}
 	// Test unsorted EVM Outputs fails verification after AP1
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to unsorted EVM Outputs in AP1")
 	}
 	importTx.Outs = []EVMOutput{
@@ -139,19 +142,19 @@ func TestImportTxVerify(t *testing.T) {
 		},
 	}
 	// Test ImportTx with invalid EVM Output Amount 0 fails verification
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err == nil {
 		t.Fatal("ImportTx should have failed verification due to 0 value amount")
 	}
 	importTx.Outs = []EVMOutput{evmOutputs[0], evmOutputs[0]}
 	// Test non-unique EVM Outputs passes verification for AP0 and AP1
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase0); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase1); err != nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase1); err != nil {
 		t.Fatal(err)
 	}
 	// Test non-unique EVM Outputs fails verification for AP2
-	if err := importTx.Verify(testXChainID, ctx, testTxFee, testAvaxAssetID, apricotRulesPhase2); err == nil {
+	if err := importTx.Verify(testXChainID, ctx, apricotRulesPhase2); err == nil {
 		t.Fatal("ImportTx should have failed verification due to non-unique outputs in AP2")
 	}
 }
@@ -223,7 +226,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 		t.Fatal("Expected ethereum address to have empty starting balance.")
 	}
 
-	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -235,7 +238,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes without the UTXO being present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
@@ -250,7 +253,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -265,7 +268,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase0); err == nil {
 		t.Fatal("Semantic verification should have failed due to insufficient funds")
 	}
 
@@ -288,7 +291,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 
 	// Remove the signature
 	tx.Creds = nil
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase0); err == nil {
 		t.Fatal("SemanticVerify should have failed due to no signatures")
 	}
 
@@ -296,7 +299,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[1]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase0); err == nil {
 		t.Fatal("SemanticVerify should have failed due to an invalid signature")
 	}
 
@@ -307,7 +310,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -331,7 +334,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 	}
 
 	// Check that SemanticVerify fails when the UTXO is not present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase0); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase0); err == nil {
 		t.Fatal("Semantic verification should have failed after the UTXO removed from shared memory")
 	}
 }
@@ -376,7 +379,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 
 	evmOutput := EVMOutput{
 		Address: testEthAddrs[0],
-		Amount:  importAmount - txFee,
+		Amount:  importAmount - params.AvalancheAtomicTxFee,
 		AssetID: vm.ctx.AVAXAssetID,
 	}
 	unsignedImportTx := &UnsignedImportTx{
@@ -403,7 +406,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 		t.Fatal("Expected ethereum address to have empty starting balance.")
 	}
 
-	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.Verify(vm.ctx.XChainID, vm.ctx, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -415,7 +418,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes without the UTXO being present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
@@ -430,7 +433,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present during bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -445,7 +448,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err == nil {
 		t.Fatal("Semantic verification should have failed due to insufficient funds")
 	}
 
@@ -461,7 +464,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err == nil {
 		t.Fatal("Semantic verification should have failed due to not paying the transaction fee")
 	}
 
@@ -484,7 +487,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 
 	// Remove the signature
 	tx.Creds = nil
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err == nil {
 		t.Fatal("SemanticVerify should have failed due to no signatures")
 	}
 
@@ -492,7 +495,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{testKeys[1]}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err == nil {
 		t.Fatal("SemanticVerify should have failed due to an invalid signature")
 	}
 
@@ -503,7 +506,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	}
 
 	// Check that SemanticVerify passes when the UTXO is present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -522,12 +525,12 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	balance := state.GetBalance(testEthAddrs[0])
 	if balance == nil {
 		t.Fatal("Found nil balance for address receiving imported funds")
-	} else if balance.Uint64() != (importAmount-vm.txFee)*x2cRate.Uint64() {
+	} else if balance.Uint64() != (importAmount-params.AvalancheAtomicTxFee)*x2cRate.Uint64() {
 		t.Fatalf("Balance was %d, but expected balance of: %d", balance.Uint64(), importAmount*x2cRate.Uint64())
 	}
 
 	// Check that SemanticVerify fails when the UTXO is not present after bootstrapping
-	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err == nil {
+	if err := unsignedImportTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err == nil {
 		t.Fatal("Semantic verification should have failed after the UTXO removed from shared memory")
 	}
 }
@@ -606,7 +609,7 @@ func TestNewImportTx(t *testing.T) {
 
 			importTx := tx.UnsignedAtomicTx
 
-			if err := importTx.SemanticVerify(vm, tx, parent, apricotRulesPhase2); err != nil {
+			if err := importTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err != nil {
 				t.Fatal("newImportTx created an invalid transaction")
 			}
 
@@ -616,6 +619,402 @@ func TestNewImportTx(t *testing.T) {
 			}
 			if err := importTx.Accept(vm.ctx, commitBatch); err != nil {
 				t.Fatalf("Failed to accept import transaction due to: %s", err)
+			}
+		})
+	}
+}
+
+// Note: this is a brittle test to ensure that the gas cost of a transaction does
+// not change
+func TestImportTxGasCost(t *testing.T) {
+	avaxAssetID := ids.GenerateTestID()
+	antAssetID := ids.GenerateTestID()
+	chainID := ids.GenerateTestID()
+	xChainID := ids.GenerateTestID()
+	networkID := uint32(5)
+	importAmount := uint64(5000000)
+
+	tests := map[string]struct {
+		UnsignedImportTx *UnsignedImportTx
+		Keys             [][]*crypto.PrivateKeySECP256K1R
+
+		ExpectedCost uint64
+		ExpectedFee  uint64
+		BaseFee      *big.Int
+	}{
+		"simple import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID: ids.ID{
+							0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+							0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+							0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+							0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+						},
+					},
+					Asset: avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   importAmount,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}},
+				Outs: []EVMOutput{{
+					Address: testEthAddrs[0],
+					Amount:  importAmount,
+					AssetID: avaxAssetID,
+				}},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedCost: 1307,
+			ExpectedFee:  32675,
+			BaseFee:      big.NewInt(25 * params.GWei),
+		},
+		"simple ANT import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe9,
+							},
+						},
+						Asset: avax.Asset{ID: antAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+				Outs: []EVMOutput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount,
+						AssetID: antAssetID,
+					},
+				},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedCost: 2468,
+			ExpectedFee:  61700,
+			BaseFee:      big.NewInt(25 * params.GWei),
+		},
+		"complex ANT import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe9,
+							},
+						},
+						Asset: avax.Asset{ID: antAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+				Outs: []EVMOutput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount,
+						AssetID: avaxAssetID,
+					},
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount,
+						AssetID: antAssetID,
+					},
+				},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}, {testKeys[0]}},
+			ExpectedCost: 2528,
+			ExpectedFee:  63200,
+			BaseFee:      big.NewInt(25 * params.GWei),
+		},
+		"multisig import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{
+						TxID: ids.ID{
+							0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+							0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+							0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+							0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+						},
+					},
+					Asset: avax.Asset{ID: avaxAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   importAmount,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0, 1}},
+					},
+				}},
+				Outs: []EVMOutput{{
+					Address: testEthAddrs[0],
+					Amount:  importAmount,
+					AssetID: avaxAssetID,
+				}},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[1]}},
+			ExpectedCost: 2376,
+			ExpectedFee:  59400,
+			BaseFee:      big.NewInt(25 * params.GWei),
+		},
+		"large import": {
+			UnsignedImportTx: &UnsignedImportTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				SourceChain:  xChainID,
+				ImportedInputs: []*avax.TransferableInput{
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa0,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa1,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa2,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa3,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa4,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa5,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa6,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa7,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa8,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+					{
+						UTXOID: avax.UTXOID{
+							TxID: ids.ID{
+								0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+								0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+								0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+								0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xa9,
+							},
+						},
+						Asset: avax.Asset{ID: avaxAssetID},
+						In: &secp256k1fx.TransferInput{
+							Amt:   importAmount,
+							Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+						},
+					},
+				},
+				Outs: []EVMOutput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  importAmount * 10,
+						AssetID: avaxAssetID,
+					},
+				},
+			},
+			Keys: [][]*crypto.PrivateKeySECP256K1R{
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+				{testKeys[0]},
+			},
+			ExpectedCost: 11756,
+			ExpectedFee:  293900,
+			BaseFee:      big.NewInt(25 * params.GWei),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tx := &Tx{UnsignedAtomicTx: test.UnsignedImportTx}
+
+			// Sign with the correct key
+			if err := tx.Sign(Codec, test.Keys); err != nil {
+				t.Fatal(err)
+			}
+
+			cost, err := tx.Cost()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cost != test.ExpectedCost {
+				t.Fatalf("Expected cost to be %d, but found %d", test.ExpectedCost, cost)
+			}
+
+			fee, err := calculateDynamicFee(cost, test.BaseFee)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if fee != test.ExpectedFee {
+				t.Fatalf("Expected fee to be %d, but found %d", test.ExpectedFee, fee)
 			}
 		})
 	}

@@ -352,13 +352,16 @@ func (b *EthAPIBackend) Downloader() *downloader.Downloader {
 	return b.eth.Downloader()
 }
 
+func (b *EthAPIBackend) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
+	return b.gpo.EstimateBaseFee(ctx)
+}
+
 func (b *EthAPIBackend) SuggestPrice(ctx context.Context) (*big.Int, error) {
 	return b.gpo.SuggestPrice(ctx)
 }
 
-// TODO(aaronbuchwald) migrate to use SuggestedTipCap once implemented in gpo
 func (b *EthAPIBackend) SuggestGasTipCap(ctx context.Context) (*big.Int, error) {
-	return b.gpo.SuggestPrice(ctx)
+	return b.gpo.SuggestTipCap(ctx)
 }
 
 // TODO(aaronbuchwald) uncomment after migrating gasprice changes from v1.10.6

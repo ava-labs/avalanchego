@@ -5,6 +5,7 @@ package evm
 
 import (
 	"fmt"
+	"math/big"
 
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/core/types"
@@ -134,7 +135,7 @@ func (v blockValidatorPhase0) SyntacticVerify(b *Block) error {
 
 	// Make sure that all the txs have the correct fee set.
 	for _, tx := range txs {
-		if tx.GasPrice().Cmp(params.LaunchMinGasPrice) < 0 {
+		if tx.GasPrice().Cmp(big.NewInt(params.LaunchMinGasPrice)) < 0 {
 			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.LaunchMinGasPrice)
 		}
 	}
@@ -239,7 +240,7 @@ func (blockValidatorPhase1) SyntacticVerify(b *Block) error {
 
 	// Make sure that all the txs have the correct fee set.
 	for _, tx := range txs {
-		if tx.GasPrice().Cmp(params.ApricotPhase1MinGasPrice) < 0 {
+		if tx.GasPrice().Cmp(big.NewInt(params.ApricotPhase1MinGasPrice)) < 0 {
 			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.ApricotPhase1MinGasPrice)
 		}
 	}
@@ -298,14 +299,12 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 	if hash := types.CalcExtDataHash(b.ethBlock.ExtData()); ethHeader.ExtDataHash != hash {
 		return fmt.Errorf("extra data hash mismatch: have %x, want %x", ethHeader.ExtDataHash, hash)
 	}
-	// TODO(aaronbuchwald) require ExtraData is the correct size
-	// headerExtraDataSize := uint64(len(ethHeader.Extra))
-	// if headerExtraDataSize != 0 {
-	// 	return fmt.Errorf(
-	// 		"expected header ExtraData to be <= 0 but got %d: %w",
-	// 		headerExtraDataSize, errHeaderExtraDataTooBig,
-	// 	)
-	// }
+	if headerExtraDataSize := len(ethHeader.Extra); headerExtraDataSize != params.ApricotPhase3ExtraDataSize {
+		return fmt.Errorf(
+			"expected header ExtraData to be %d but got %d: %w",
+			params.ApricotPhase3ExtraDataSize, headerExtraDataSize, errHeaderExtraDataTooBig,
+		)
+	}
 	if ethHeader.BaseFee == nil {
 		return fmt.Errorf("base fee is not set with apricot phase 3 enabled for block: %s", ethHeader.Hash())
 	}
@@ -347,13 +346,6 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 	txs := b.ethBlock.Transactions()
 	if len(txs) == 0 && atomicTx == nil {
 		return errEmptyBlock
-	}
-
-	// Make sure that all the txs have the correct fee set.
-	for _, tx := range txs {
-		if tx.GasPrice().Cmp(params.ApricotPhase1MinGasPrice) < 0 {
-			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.ApricotPhase1MinGasPrice)
-		}
 	}
 
 	// Make sure the block isn't too far in the future

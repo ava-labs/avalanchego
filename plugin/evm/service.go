@@ -439,7 +439,7 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	if !ok {
 		return fmt.Errorf("last accepted block %s had unexpected type %T", blockIntf.ID(), blockIntf)
 	}
-	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, block, service.vm.currentRules()); err != nil {
+	if err := tx.UnsignedAtomicTx.SemanticVerify(service.vm, tx, block, block.ethBlock.BaseFee(), service.vm.currentRules()); err != nil {
 		return err
 	}
 	state, err := service.vm.chain.CurrentState()

@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -118,9 +119,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 
 	var gasLimit uint64
 	if w.chainConfig.IsApricotPhase1(big.NewInt(timestamp)) {
-		gasLimit = w.config.ApricotPhase1GasLimit
+		gasLimit = params.ApricotPhase1GasLimit
 	} else {
-		gasLimit = core.CalcGasLimit(parent.GasUsed(), parent.GasLimit(), w.config.GasFloor, w.config.GasCeil)
+		// The gas limit is set in phase1 to ApricotPhase1GasLimit because the ceiling and floor were set to the same value
+		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
+		gasLimit = core.CalcGasLimit(parent.GasUsed(), parent.GasLimit(), params.ApricotPhase1GasLimit, params.ApricotPhase1GasLimit)
 	}
 	num := parent.Number()
 	header := &types.Header{
@@ -130,18 +133,15 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		Extra:      nil,
 		Time:       uint64(timestamp),
 	}
-	// TODO(aaronbuchwald) handle gas limit and base fee creation if enabled in miner
-	// bigTimestamp := new(big.Int).SetUint64(timestamp)
-	// Set baseFee and GasLimit if we are on an EIP-1559 chain
-	// if w.chainConfig.IsApricotPhase4(bigTimestamp) {
-	// 	header.BaseFee = misc.CalcBaseFee(w.chainConfig, parent.Header())
-	// 	parentGasLimit := parent.GasLimit()
-	// 	if !w.chainConfig.IsLondon(parent.Number) {
-	// 		// Bump by 2x
-	// 		parentGasLimit = parent.GasLimit() * params.ElasticityMultiplier
-	// 	}
-	// 	header.GasLimit = core.CalcGasLimit1559(parentGasLimit, w.config.GasCeil)
-	// }
+	// Set BaseFee and Extra data field if we are post ApricotPhase3
+	bigTimestamp := big.NewInt(timestamp)
+	if w.chainConfig.IsApricotPhase3(bigTimestamp) {
+		var err error
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+		}
+	}
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
 	}
