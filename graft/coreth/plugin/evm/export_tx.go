@@ -45,8 +45,6 @@ func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 func (tx *UnsignedExportTx) Verify(
 	avmID ids.ID,
 	ctx *snow.Context,
-	feeAmount uint64,
-	feeAssetID ids.ID,
 	rules params.Rules,
 ) error {
 	switch {
@@ -117,44 +115,27 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	_ *Block,
 	baseFee *big.Int,
 	rules params.Rules,
-) TxError {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, rules); err != nil {
-		return permError{err}
+) error {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, rules); err != nil {
+		return err
 	}
 
-	if len(tx.Ins) != len(stx.Creds) {
-		return permError{errSignatureInputsMismatch}
-	}
-
-	for i, input := range tx.Ins {
-		cred, ok := stx.Creds[i].(*secp256k1fx.Credential)
-		if !ok {
-			return permError{fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)}
-		}
-		if err := cred.Verify(); err != nil {
-			return permError{err}
-		}
-
-		if len(cred.Sigs) != 1 {
-			return permError{fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))}
-		}
-		pubKeyIntf, err := vm.secpFactory.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
-		if err != nil {
-			return permError{err}
-		}
-		pubKey, ok := pubKeyIntf.(*crypto.PublicKeySECP256K1R)
-		if !ok {
-			// This should never happen
-			return permError{fmt.Errorf("expected *crypto.PublicKeySECP256K1R but got %T", pubKeyIntf)}
-		}
-		if input.Address != PublicKeyToEthAddress(pubKey) {
-			return permError{errPublicKeySignatureMismatch}
-		}
-	}
-
-	// do flow-checking
+	// Check the transaction consumes and produces the right amounts
 	fc := avax.NewFlowChecker()
-	fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
+	switch {
+	case rules.IsApricotPhase3:
+		cost, err := stx.Cost()
+		if err != nil {
+			return err
+		}
+		txFee, err := calculateDynamicFee(cost, baseFee)
+		if err != nil {
+			return err
+		}
+		fc.Produce(vm.ctx.AVAXAssetID, txFee)
+	default:
+		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
+	}
 
 	for _, out := range tx.ExportedOutputs {
 		fc.Produce(out.AssetID(), out.Output().Amount())
@@ -165,8 +146,39 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	}
 
 	if err := fc.Verify(); err != nil {
-		return permError{err}
+		return err
 	}
+
+	if len(tx.Ins) != len(stx.Creds) {
+		return errSignatureInputsMismatch
+	}
+
+	for i, input := range tx.Ins {
+		cred, ok := stx.Creds[i].(*secp256k1fx.Credential)
+		if !ok {
+			return fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)
+		}
+		if err := cred.Verify(); err != nil {
+			return err
+		}
+
+		if len(cred.Sigs) != 1 {
+			return fmt.Errorf("expected one signature for EVM Input Credential, but found: %d", len(cred.Sigs))
+		}
+		pubKeyIntf, err := vm.secpFactory.RecoverPublicKey(tx.UnsignedBytes(), cred.Sigs[0][:])
+		if err != nil {
+			return err
+		}
+		pubKey, ok := pubKeyIntf.(*crypto.PublicKeySECP256K1R)
+		if !ok {
+			// This should never happen
+			return fmt.Errorf("expected *crypto.PublicKeySECP256K1R but got %T", pubKeyIntf)
+		}
+		if input.Address != PublicKeyToEthAddress(pubKey) {
+			return errPublicKeySignatureMismatch
+		}
+	}
+
 	return nil
 }
 
@@ -219,12 +231,12 @@ func (vm *VM) newExportTx(
 	var toBurn uint64
 	var err error
 	if assetID == vm.ctx.AVAXAssetID {
-		toBurn, err = safemath.Add64(amount, vm.txFee)
+		toBurn, err = safemath.Add64(amount, params.AvalancheAtomicTxFee)
 		if err != nil {
 			return nil, errOverflowExport
 		}
 	} else {
-		toBurn = vm.txFee
+		toBurn = params.AvalancheAtomicTxFee
 	}
 	// burn AVAX
 	ins, signers, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, toBurn)
@@ -269,7 +281,7 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.txFee, vm.ctx.AVAXAssetID, vm.currentRules())
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.currentRules())
 }
 
 // EVMStateTransfer executes the state update from the atomic export transaction

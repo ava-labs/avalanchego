@@ -49,7 +49,6 @@ var (
 	testCChainID            = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
 	testXChainID            = ids.ID{'t', 'e', 's', 't', 'x'}
 	nonExistentID           = ids.ID{'F'}
-	testTxFee               = uint64(1000)
 	testKeys         []*crypto.PrivateKeySECP256K1R
 	testEthAddrs     []common.Address // testEthAddrs[i] corresponds to testKeys[i]
 	testShortIDAddrs []ids.ShortID
@@ -145,9 +144,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan engCommon.Message, 1)
-	vm := &VM{
-		txFee: testTxFee,
-	}
+	vm := &VM{}
 	prefixedDBManager := baseDBManager.NewPrefixDBManager([]byte{1})
 	return vm, ctx, prefixedDBManager, genesisBytes, issuer, m
 }
@@ -404,7 +401,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 
-	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-(2*vm.txFee), vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-(2*params.AvalancheAtomicTxFee), vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -624,9 +621,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Found unexpected blkID for parent of blk2")
 	}
 
-	restartedVM := &VM{
-		txFee: testTxFee,
-	}
+	restartedVM := &VM{}
 	if err := restartedVM.Initialize(
 		NewContext(),
 		dbManager,
@@ -3607,11 +3602,11 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 
-	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*vm.txFee, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*params.AvalancheAtomicTxFee, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
-	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*vm.txFee, vm.ctx.XChainID, testShortIDAddrs[1], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*params.AvalancheAtomicTxFee, vm.ctx.XChainID, testShortIDAddrs[1], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
