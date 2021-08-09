@@ -44,7 +44,7 @@ func (gpu *gasPriceUpdater) start() {
 		return
 	}
 	// Updates to the minimum gas price as of ApricotPhase3 if it's already in effect or starts a goroutine to enable it at the correct time
-	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(params.ApricotPhase3MinBaseFee)); disabled {
+	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase3BlockTimestamp, big.NewInt(0)); disabled {
 		return
 	}
 }
