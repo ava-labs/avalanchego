@@ -295,7 +295,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Set the ApricotPhase1BlockTimestamp for mainnet/fuji
+	// Set the chain config for mainnet/fuji chain IDs
 	switch {
 	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
 		g.Config = params.AvalancheMainnetChainConfig
@@ -303,6 +303,8 @@ func (vm *VM) Initialize(
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
 		g.Config = params.AvalancheFujiChainConfig
 		phase0BlockValidator.extDataHashes = fujiExtDataHashes
+		// case g.Config.ChainID.Cmp(params.AvalancheLocalChainID) == 0:
+		// g.Config = params.AvalancheLocalChainConfig
 	}
 
 	// Allow ExtDataHashes to be garbage collected as soon as freed from block
@@ -314,33 +316,6 @@ func (vm *VM) Initialize(
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
-
-	// Set minimum gas price and launch goroutine to sleep until
-	// network upgrade when the gas price must be changed
-	var gasPriceUpdate func() // must call after coreth.NewETHChain to avoid race
-	if g.Config.ApricotPhase1BlockTimestamp == nil {
-		ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
-		ethConfig.GPO.Default = params.LaunchMinGasPrice
-		ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
-	} else {
-		apricotTime := time.Unix(g.Config.ApricotPhase1BlockTimestamp.Int64(), 0)
-		log.Info(fmt.Sprintf("Apricot Upgrade Time %v.", apricotTime))
-		if time.Now().Before(apricotTime) {
-			untilApricot := time.Until(apricotTime)
-			log.Info(fmt.Sprintf("Upgrade will occur in %v", untilApricot))
-			ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
-			ethConfig.GPO.Default = params.LaunchMinGasPrice
-			ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
-			gasPriceUpdate = func() {
-				time.Sleep(untilApricot)
-				vm.chain.SetGasPrice(params.ApricotPhase1MinGasPrice)
-			}
-		} else {
-			ethConfig.Miner.GasPrice = params.ApricotPhase1MinGasPrice
-			ethConfig.GPO.Default = params.ApricotPhase1MinGasPrice
-			ethConfig.TxPool.PriceLimit = params.ApricotPhase1MinGasPrice.Uint64()
-		}
-	}
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -389,11 +364,9 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
-	// Kickoff gasPriceUpdate goroutine once the backend is initialized, if it
-	// exists
-	if gasPriceUpdate != nil {
-		go gasPriceUpdate()
-	}
+	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
+	vm.handleGasPriceUpdates()
+
 	vm.notifyBuildBlockChan = toEngine
 
 	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.

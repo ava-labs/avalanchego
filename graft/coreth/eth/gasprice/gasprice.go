@@ -51,7 +51,6 @@ var (
 type Config struct {
 	Blocks      int
 	Percentile  int
-	Default     *big.Int `toml:",omitempty"`
 	MaxPrice    *big.Int `toml:",omitempty"`
 	IgnorePrice *big.Int `toml:",omitempty"`
 }
@@ -82,36 +81,36 @@ type Oracle struct {
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
 // gasprice for newly created transaction.
-func NewOracle(backend OracleBackend, params Config) *Oracle {
-	blocks := params.Blocks
+func NewOracle(backend OracleBackend, config Config) *Oracle {
+	blocks := config.Blocks
 	if blocks < 1 {
 		blocks = 1
-		log.Warn("Sanitizing invalid gasprice oracle sample blocks", "provided", params.Blocks, "updated", blocks)
+		log.Warn("Sanitizing invalid gasprice oracle sample blocks", "provided", config.Blocks, "updated", blocks)
 	}
-	percent := params.Percentile
+	percent := config.Percentile
 	if percent < 0 {
 		percent = 0
-		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent)
+		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", config.Percentile, "updated", percent)
 	}
 	if percent > 100 {
 		percent = 100
-		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", params.Percentile, "updated", percent)
+		log.Warn("Sanitizing invalid gasprice oracle sample percentile", "provided", config.Percentile, "updated", percent)
 	}
-	maxPrice := params.MaxPrice
+	maxPrice := config.MaxPrice
 	if maxPrice == nil || maxPrice.Int64() <= 0 {
 		maxPrice = DefaultMaxPrice
-		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", params.MaxPrice, "updated", maxPrice)
+		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", config.MaxPrice, "updated", maxPrice)
 	}
-	ignorePrice := params.IgnorePrice
+	ignorePrice := config.IgnorePrice
 	if ignorePrice == nil || ignorePrice.Int64() <= 0 {
 		ignorePrice = DefaultIgnorePrice
-		log.Warn("Sanitizing invalid gasprice oracle ignore price", "provided", params.IgnorePrice, "updated", ignorePrice)
+		log.Warn("Sanitizing invalid gasprice oracle ignore price", "provided", config.IgnorePrice, "updated", ignorePrice)
 	} else if ignorePrice.Int64() > 0 {
 		log.Info("Gasprice oracle is ignoring threshold set", "threshold", ignorePrice)
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   params.Default,
+		lastPrice:   big.NewInt(0),
 		maxPrice:    maxPrice,
 		ignorePrice: ignorePrice,
 		checkBlocks: blocks,
@@ -178,9 +177,9 @@ func (oracle *Oracle) suggestTipCap(ctx context.Context) (*big.Int, error) {
 	case oracle.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
 		return oracle.suggestDynamicTipCap(ctx)
 	case oracle.backend.ChainConfig().IsApricotPhase1(bigTimestamp):
-		return params.ApricotPhase1MinGasPrice, nil
+		return big.NewInt(params.ApricotPhase1MinGasPrice), nil
 	default:
-		return params.LaunchMinGasPrice, nil
+		return big.NewInt(params.LaunchMinGasPrice), nil
 	}
 }
 

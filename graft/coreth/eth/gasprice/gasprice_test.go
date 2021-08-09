@@ -141,7 +141,6 @@ func TestSuggestTipCap(t *testing.T) {
 	config := Config{
 		Blocks:     3,
 		Percentile: 60,
-		Default:    big.NewInt(params.GWei),
 	}
 	// TODO(aaronbuchwald) review modified test cases
 	var cases = []struct {

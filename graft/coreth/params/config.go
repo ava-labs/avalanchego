@@ -40,6 +40,8 @@ var (
 	AvalancheMainnetChainID = big.NewInt(43114)
 	// AvalancheFujiChainID ...
 	AvalancheFujiChainID = big.NewInt(43113)
+	// AvalancheLocalChainID ...
+	AvalancheLocalChainID = big.NewInt(43112)
 
 	errNonGenesisForkByHeight = errors.New("coreth only supports forking by height at the genesis block")
 )
@@ -83,6 +85,26 @@ var (
 		ApricotPhase1BlockTimestamp: big.NewInt(1616767200), // 10am EST 3/26/2021
 		ApricotPhase2BlockTimestamp: big.NewInt(1620223200), // 10am EST 5/5/2021
 		// TODO(aaronbuchwald) schedule Apricot Phase 3
+	}
+
+	// AvalancheLocalChainConfig is the configuration for the Avalanche Local Network
+	AvalancheLocalChainConfig = &ChainConfig{
+		ChainID:                     AvalancheLocalChainID,
+		HomesteadBlock:              big.NewInt(0),
+		DAOForkBlock:                big.NewInt(0),
+		DAOForkSupport:              true,
+		EIP150Block:                 big.NewInt(0),
+		EIP150Hash:                  common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
+		EIP155Block:                 big.NewInt(0),
+		EIP158Block:                 big.NewInt(0),
+		ByzantiumBlock:              big.NewInt(0),
+		ConstantinopleBlock:         big.NewInt(0),
+		PetersburgBlock:             big.NewInt(0),
+		IstanbulBlock:               big.NewInt(0),
+		MuirGlacierBlock:            big.NewInt(0),
+		ApricotPhase1BlockTimestamp: big.NewInt(0),
+		ApricotPhase2BlockTimestamp: big.NewInt(0),
+		ApricotPhase3BlockTimestamp: big.NewInt(0),
 	}
 
 	TestChainConfig            = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
