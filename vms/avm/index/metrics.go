@@ -8,11 +8,11 @@ import (
 )
 
 type metrics struct {
-	numTxsIndexed prometheus.Histogram
+	numTxsIndexed prometheus.Counter
 }
 
 func (m *metrics) initialize(namespace string, registerer prometheus.Registerer) error {
-	m.numTxsIndexed = prometheus.NewHistogram(prometheus.HistogramOpts{
+	m.numTxsIndexed = prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      "txs_indexed",
 		Help:      "Number of transactions indexed",

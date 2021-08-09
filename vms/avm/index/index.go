@@ -185,7 +185,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOIDs []*avax.UTXOID,
 			}
 		}
 	}
-	i.metrics.numTxsIndexed.Observe(1)
+	i.metrics.numTxsIndexed.Add(1)
 	return nil
 }
 
