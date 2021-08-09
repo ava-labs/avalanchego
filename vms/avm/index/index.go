@@ -35,24 +35,18 @@ var (
 // 1) A UTXO that the transaction consumes was at least partially owned by the address.
 // 2) A UTXO that the transaction produces is at least partially owned by the address.
 type AddressTxsIndexer interface {
-	// Add is called during [txID]'s SemanticVerify.
+	// Accept is called when [txID] is accepted.
+	// Persists data about [txID] and what balances it changed.
 	// [inputUTXOIDs] are the IDs of UTXOs [txID] consumes.
 	// [outputUTXOs] are the UTXOs [txID] creates.
 	// [getUTXOF] can be used to look up UTXOs by ID.
-	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM,
-	// and shut down this chain.
-	Add(
+	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM
+	Accept(
 		txID ids.ID,
 		inputUTXOIDs []*avax.UTXOID,
 		outputUTXOs []*avax.UTXO,
 		getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
 	) error
-
-	// Accept is called when [txID] is accepted.
-	// Persists data about [txID] and what balances it changed.
-	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM,
-	// and shut down this chain.
-	Accept(txID ids.ID) error
 
 	// Clear is called when [txID] is rejected or fails verification.
 	// Clears unwritten state about the tx.
@@ -124,8 +118,12 @@ func (i *indexer) add(txID, assetID ids.ID, addrs [][]byte) error {
 	return nil
 }
 
-// See AddressTxsIndexer
-func (i *indexer) Add(
+// indexUTXOs indexes given input and output UTXOs
+// [inputUTXOIDs] are the IDs of UTXOs [txID] consumes.
+// [outputUTXOs] are the UTXOs [txID] creates.
+// [getUTXOF] can be used to look up UTXOs by ID.
+// If the error is non-nil, do not persist [txID] to disk as accepted in the VM
+func (i *indexer) indexUTXOs(
 	txID ids.ID,
 	inputUTXOIDs []*avax.UTXOID,
 	outputUTXOs []*avax.UTXO,
@@ -169,8 +167,13 @@ func (i *indexer) Add(
 // |  | "idx" => 2 		Running transaction index key, represents the next index
 // |  | "0"   => txID1
 // |  | "1"   => txID1
-// See AddressTxsIndexer
-func (i *indexer) Accept(txID ids.ID) error {
+// See interface documentation AddressTxsIndexer.Accept
+func (i *indexer) Accept(txID ids.ID, inputUTXOIDs []*avax.UTXOID,
+	outputUTXOs []*avax.UTXO, getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
+	if err := i.indexUTXOs(txID, inputUTXOIDs, outputUTXOs, getUTXOF); err != nil {
+		return err
+	}
+
 	for address, assetIDs := range i.balanceChanges[txID] {
 		addressPrefixDB := prefixdb.New(address[:], i.db)
 		for assetID := range assetIDs {
@@ -318,11 +321,7 @@ func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer
 	return &noIndexer{}, checkIndexStatus(db, false, allowIncomplete)
 }
 
-func (i *noIndexer) Add(ids.ID, []*avax.UTXOID, []*avax.UTXO, func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
-	return nil
-}
-
-func (i *noIndexer) Accept(ids.ID) error {
+func (i *noIndexer) Accept(ids.ID, []*avax.UTXOID, []*avax.UTXO, func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
 	return nil
 }
 

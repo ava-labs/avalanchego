@@ -122,12 +122,8 @@ func (tx *UniqueTx) Accept() error {
 	defer tx.vm.db.Abort()
 
 	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Add(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), tx.vm.getUTXO); err != nil {
-		return fmt.Errorf("error processing utxos for indexing: %s", err)
-	}
-
-	if err := tx.vm.addressTxsIndexer.Accept(txID); err != nil {
-		return fmt.Errorf("error committing index: %s", err)
+	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), tx.vm.getUTXO); err != nil {
+		return fmt.Errorf("error indexing tx: %s", err)
 	}
 
 	// Remove spent utxos

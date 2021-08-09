@@ -107,9 +107,7 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
 		// index the transaction
-		err := vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs, uniqueParsedTX.UTXOs(), vm.getUTXO)
-		assert.NoError(t, err)
-		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs, uniqueParsedTX.UTXOs(), vm.getUTXO)
 		assert.NoError(t, err)
 	}
 
@@ -192,9 +190,7 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		addressTxMap[addr] = uniqueParsedTX
 
 		// index the transaction
-		err := vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
-		assert.NoError(t, err)
-		err = vm.addressTxsIndexer.Accept(uniqueParsedTX.ID())
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
 		assert.NoError(t, err)
 	}
 
@@ -257,9 +253,8 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 	}
 
 	// index the transaction
-	err := vm.addressTxsIndexer.Add(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), vm.getUTXO)
+	err := vm.addressTxsIndexer.Accept(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), vm.getUTXO)
 	assert.NoError(t, err)
-	err = vm.addressTxsIndexer.Accept(tx.ID())
 	assert.NoError(t, err)
 
 	assertIndexedTX(t, vm.db, uint64(0), addr, txAssetID.ID, tx.ID())
@@ -335,17 +330,9 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		addressTxMap[addr] = uniqueParsedTX
 
 		// index the transaction, NOT calling Accept(ids.ID) method
-		err := vm.addressTxsIndexer.Add(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
 		assert.NoError(t, err)
 		txIDs = append(txIDs, uniqueParsedTX.ID())
-	}
-
-	// Call Accept(ids.ID) method to flush the transactions
-	// Reverse the order of writes to ensure overall order is still correct
-	for i := len(txIDs) - 1; i >= 0; i-- {
-		txID := txIDs[i]
-		err := vm.addressTxsIndexer.Accept(txID)
-		assert.NoError(t, err)
 	}
 
 	// ensure length is same as keys length
@@ -381,7 +368,7 @@ func TestMissingInputUTXOReturnsError(t *testing.T) {
 		return nil, errMissingUTXO
 	}
 
-	err = indexer.Add(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
+	err = indexer.Accept(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), errMissingUTXO.Error())
 }
@@ -428,7 +415,7 @@ func TestSymbolicOutputUTXOIsSkipped(t *testing.T) {
 		return &inputUTXO, nil
 	}
 
-	err = indexer.Add(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
+	err = indexer.Accept(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
 
 	assert.NoError(t, err)
 	addressAssetMap := indexer.IndexedTx(txID)
