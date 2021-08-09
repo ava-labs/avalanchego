@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -59,13 +60,15 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
+	timestamp := vs.GetTimestamp()
+	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	// Make sure this transaction is well formed.
-	if err := tx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx, vm.codec, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
@@ -88,7 +91,9 @@ func (vm *VM) newCreateSubnetTx(
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
+	timestamp := vm.internalState.GetTimestamp()
+	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
+	ins, outs, _, signers, err := vm.stake(keys, 0, createSubnetTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -113,5 +118,12 @@ func (vm *VM) newCreateSubnetTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx, vm.codec, createSubnetTxFee, vm.ctx.AVAXAssetID)
+}
+
+func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {
+	if t.Before(vm.ApricotPhase3Time) {
+		return vm.CreateAssetTxFee
+	}
+	return vm.CreateSubnetTxFee
 }

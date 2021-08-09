@@ -65,6 +65,7 @@ var (
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
+	Factory
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
@@ -90,10 +91,6 @@ type VM struct {
 
 	// asset id that will be used for fees
 	feeAssetID ids.ID
-	// fee that must be burned by every state creating transaction
-	creationTxFee uint64
-	// fee that must be burned by every non-state creating transaction
-	txFee uint64
 
 	// Asset ID --> Bit set with fx IDs the asset supports
 	assetToFxCache *cache.LRU

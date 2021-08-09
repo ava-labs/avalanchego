@@ -12,8 +12,12 @@ import (
 type Params struct {
 	// Transaction fee
 	TxFee uint64
-	// Transaction fee for transactions that create new state
-	CreationTxFee uint64
+	// Transaction fee for create asset transactions
+	CreateAssetTxFee uint64
+	// Transaction fee for create subnet transactions
+	CreateSubnetTxFee uint64
+	// Transaction fee for create blockchain transactions
+	CreateBlockchainTxFee uint64
 	// Staking uptime requirements
 	UptimeRequirement float64
 	// Minimum stake, in nAVAX, required to validate the primary network

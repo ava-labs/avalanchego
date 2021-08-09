@@ -423,25 +423,23 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Network Parameters
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
-		txFee := v.GetUint64(TxFeeKey)
-		creationTxFee := v.GetUint64(CreationTxFeeKey)
-		uptimeRequirement := v.GetFloat64(UptimeRequirementKey)
-		nodeConfig.TxFee = txFee
-		nodeConfig.CreationTxFee = creationTxFee
-		nodeConfig.UptimeRequirement = uptimeRequirement
+		nodeConfig.TxFee = v.GetUint64(TxFeeKey)
+		nodeConfig.CreateAssetTxFee = v.GetUint64(CreateAssetTxFeeKey)
+		nodeConfig.CreateSubnetTxFee = v.GetUint64(CreateSubnetTxFeeKey)
+		nodeConfig.CreateBlockchainTxFee = v.GetUint64(CreateBlockchainTxFeeKey)
+		nodeConfig.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
 
 		minValidatorStake := v.GetUint64(MinValidatorStakeKey)
 		maxValidatorStake := v.GetUint64(MaxValidatorStakeKey)
-		minDelegatorStake := v.GetUint64(MinDelegatorStakeKey)
-		minDelegationFee := v.GetUint64(MinDelegatorFeeKey)
 		if minValidatorStake > maxValidatorStake {
 			return node.Config{}, errors.New("minimum validator stake can't be greater than maximum validator stake")
 		}
 
 		nodeConfig.MinValidatorStake = minValidatorStake
 		nodeConfig.MaxValidatorStake = maxValidatorStake
-		nodeConfig.MinDelegatorStake = minDelegatorStake
+		nodeConfig.MinDelegatorStake = v.GetUint64(MinDelegatorStakeKey)
 
+		minDelegationFee := v.GetUint64(MinDelegatorFeeKey)
 		if minDelegationFee > 1_000_000 {
 			return node.Config{}, errors.New("delegation fee must be in the range [0, 1000000]")
 		}
