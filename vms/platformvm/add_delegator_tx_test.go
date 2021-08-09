@@ -9,7 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 )
 
@@ -367,21 +370,23 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 }
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
+	assert := assert.New(t)
+
 	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
+		err := vm.Shutdown()
+		assert.NoError(err)
+
 		vm.ctx.Lock.Unlock()
 	}()
 
 	validatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
+
 	key, err := vm.factory.NewPrivateKey()
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
+
 	id := key.PublicKey().Address()
 
 	// create valid tx
@@ -395,77 +400,23 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(addValidatorTx); err != nil {
-		t.Fatal(err)
-	}
-	addValidatorBlockIntf, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = vm.mempool.IssueTx(addValidatorTx)
+	assert.NoError(err)
 
-	// Verify the proposed block
-	if err := addValidatorBlockIntf.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	addValidatorBlock, err := vm.BuildBlock()
+	assert.NoError(err)
 
-	// Assert preferences are correct
-	addValidatorBlock := addValidatorBlockIntf.(*ProposalBlock)
-	options, err := addValidatorBlock.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// verify the commit block
-	commit := options[0].(*CommitBlock)
-	if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Accept the proposal block and the commit block
-	if err := addValidatorBlock.Accept(); err != nil {
-		t.Fatal(err)
-	}
-	if err := commit.Accept(); err != nil {
-		t.Fatal(err)
-	}
+	verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
 
 	vm.clock.Set(validatorStartTime)
 
-	firstAdvanceTimeBlockIntf, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	firstAdvanceTimeBlock, err := vm.BuildBlock()
+	assert.NoError(err)
 
-	// Verify the proposed block
-	if err := firstAdvanceTimeBlockIntf.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert preferences are correct
-	firstAdvanceTimeBlock := firstAdvanceTimeBlockIntf.(*ProposalBlock)
-	options, err = firstAdvanceTimeBlock.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// verify the commit block
-	commit = options[0].(*CommitBlock)
-	if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Accept the proposal block and the commit block
-	if err := firstAdvanceTimeBlock.Accept(); err != nil {
-		t.Fatal(err)
-	}
-	if err := commit.Accept(); err != nil {
-		t.Fatal(err)
-	}
+	verifyAndAcceptProposalCommitment(assert, firstAdvanceTimeBlock)
 
 	firstDelegatorStartTime := validatorStartTime.Add(syncBound).Add(1 * time.Second)
 	firstDelegatorEndTime := firstDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -480,77 +431,23 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(addFirstDelegatorTx); err != nil {
-		t.Fatal(err)
-	}
-	addFirstDelegatorBlockIntf, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = vm.mempool.IssueTx(addFirstDelegatorTx)
+	assert.NoError(err)
 
-	// Verify the proposed block
-	if err := addFirstDelegatorBlockIntf.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	addFirstDelegatorBlock, err := vm.BuildBlock()
+	assert.NoError(err)
 
-	// Assert preferences are correct
-	addFirstDelegatorBlock := addFirstDelegatorBlockIntf.(*ProposalBlock)
-	options, err = addFirstDelegatorBlock.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// verify the commit block
-	commit = options[0].(*CommitBlock)
-	if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Accept the proposal block and the commit block
-	if err := addFirstDelegatorBlock.Accept(); err != nil {
-		t.Fatal(err)
-	}
-	if err := commit.Accept(); err != nil {
-		t.Fatal(err)
-	}
+	verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
 
 	vm.clock.Set(firstDelegatorStartTime)
 
-	secondAdvanceTimeBlockIntf, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	secondAdvanceTimeBlock, err := vm.BuildBlock()
+	assert.NoError(err)
 
-	// Verify the proposed block
-	if err := secondAdvanceTimeBlockIntf.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Assert preferences are correct
-	secondAdvanceTimeBlock := secondAdvanceTimeBlockIntf.(*ProposalBlock)
-	options, err = secondAdvanceTimeBlock.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// verify the commit block
-	commit = options[0].(*CommitBlock)
-	if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Accept the proposal block and the commit block
-	if err := secondAdvanceTimeBlock.Accept(); err != nil {
-		t.Fatal(err)
-	}
-	if err := commit.Accept(); err != nil {
-		t.Fatal(err)
-	}
+	verifyAndAcceptProposalCommitment(assert, secondAdvanceTimeBlock)
 
 	secondDelegatorStartTime := firstDelegatorEndTime.Add(2 * time.Second)
 	secondDelegatorEndTime := secondDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -567,44 +464,16 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[3]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(addSecondDelegatorTx); err != nil {
-		t.Fatal(err)
-	}
-	addSecondDelegatorBlockIntf, err := vm.BuildBlock()
-	if err != nil {
-		t.Fatal(err)
-	}
+	err = vm.mempool.IssueTx(addSecondDelegatorTx)
+	assert.NoError(err)
 
-	// Verify the proposed block
-	if err := addSecondDelegatorBlockIntf.Verify(); err != nil {
-		t.Fatal(err)
-	}
+	addSecondDelegatorBlock, err := vm.BuildBlock()
+	assert.NoError(err)
 
-	// Assert preferences are correct
-	addSecondDelegatorBlock := addSecondDelegatorBlockIntf.(*ProposalBlock)
-	options, err = addSecondDelegatorBlock.Options()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// verify the commit block
-	commit = options[0].(*CommitBlock)
-	if err := commit.Verify(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Accept the proposal block and the commit block
-	if err := addSecondDelegatorBlock.Accept(); err != nil {
-		t.Fatal(err)
-	}
-	if err := commit.Accept(); err != nil {
-		t.Fatal(err)
-	}
+	verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
 
 	thirdDelegatorStartTime := firstDelegatorEndTime.Add(-time.Second)
 	thirdDelegatorEndTime := thirdDelegatorStartTime.Add(vm.MinStakeDuration)
@@ -619,17 +488,226 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1], keys[4]},
 		ids.ShortEmpty, // change addr
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	assert.NoError(err)
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(addThirdDelegatorTx); err != nil {
-		t.Fatal(err)
-	}
+	err = vm.mempool.IssueTx(addThirdDelegatorTx)
+	assert.NoError(err)
 
 	// Verify the proposed tx is invalid
-	if _, err := vm.BuildBlock(); err == nil {
-		t.Fatalf("should have marked the delegator as being over delegated")
+	_, err = vm.BuildBlock()
+	assert.Error(err, "should have marked the delegator as being over delegated")
+}
+
+func TestAddDelegatorTxHeapCorruption(t *testing.T) {
+	validatorStartTime := defaultGenesisTime.Add(syncBound).Add(1 * time.Second)
+	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
+	validatorStake := defaultMaxValidatorStake / 5
+
+	delegator1StartTime := validatorStartTime
+	delegator1EndTime := delegator1StartTime.Add(3 * defaultMinStakingDuration)
+	delegator1Stake := defaultMinValidatorStake
+
+	delegator2StartTime := validatorStartTime.Add(1 * defaultMinStakingDuration)
+	delegator2EndTime := delegator1StartTime.Add(6 * defaultMinStakingDuration)
+	delegator2Stake := defaultMinValidatorStake
+
+	delegator3StartTime := validatorStartTime.Add(2 * defaultMinStakingDuration)
+	delegator3EndTime := delegator1StartTime.Add(4 * defaultMinStakingDuration)
+	delegator3Stake := defaultMaxValidatorStake - validatorStake - 2*defaultMinValidatorStake
+
+	delegator4StartTime := validatorStartTime.Add(5 * defaultMinStakingDuration)
+	delegator4EndTime := delegator1StartTime.Add(7 * defaultMinStakingDuration)
+	delegator4Stake := defaultMaxValidatorStake - validatorStake - defaultMinValidatorStake
+
+	tests := []struct {
+		name       string
+		ap3Time    time.Time
+		shouldFail bool
+	}{
+		{
+			name:       "pre-upgrade fail too aggressively",
+			ap3Time:    validatorEndTime,
+			shouldFail: true,
+		},
+		{
+			name:       "post-upgrade calculate max stake correctly",
+			ap3Time:    defaultGenesisTime,
+			shouldFail: false,
+		},
 	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert := assert.New(t)
+
+			vm, _ := defaultVM()
+			vm.ApricotPhase3Time = test.ap3Time
+
+			vm.ctx.Lock.Lock()
+			defer func() {
+				err := vm.Shutdown()
+				assert.NoError(err)
+
+				vm.ctx.Lock.Unlock()
+			}()
+
+			key, err := vm.factory.NewPrivateKey()
+			assert.NoError(err)
+
+			id := key.PublicKey().Address()
+			changeAddr := keys[0].PublicKey().Address()
+
+			// create valid tx
+			addValidatorTx, err := vm.newAddValidatorTx(
+				validatorStake,
+				uint64(validatorStartTime.Unix()),
+				uint64(validatorEndTime.Unix()),
+				id,
+				id,
+				PercentDenominator,
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
+
+			// issue the add validator tx
+			err = vm.mempool.IssueTx(addValidatorTx)
+			assert.NoError(err)
+
+			// trigger block creation for the validator tx
+			addValidatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
+
+			verifyAndAcceptProposalCommitment(assert, addValidatorBlock)
+
+			// create valid tx
+			addFirstDelegatorTx, err := vm.newAddDelegatorTx(
+				delegator1Stake,
+				uint64(delegator1StartTime.Unix()),
+				uint64(delegator1EndTime.Unix()),
+				id,
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
+
+			// issue the first add delegator tx
+			err = vm.mempool.IssueTx(addFirstDelegatorTx)
+			assert.NoError(err)
+
+			// trigger block creation for the first add delegator tx
+			addFirstDelegatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
+
+			verifyAndAcceptProposalCommitment(assert, addFirstDelegatorBlock)
+
+			// create valid tx
+			addSecondDelegatorTx, err := vm.newAddDelegatorTx(
+				delegator2Stake,
+				uint64(delegator2StartTime.Unix()),
+				uint64(delegator2EndTime.Unix()),
+				id,
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
+
+			// issue the second add delegator tx
+			err = vm.mempool.IssueTx(addSecondDelegatorTx)
+			assert.NoError(err)
+
+			// trigger block creation for the second add delegator tx
+			addSecondDelegatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
+
+			verifyAndAcceptProposalCommitment(assert, addSecondDelegatorBlock)
+
+			// create valid tx
+			addThirdDelegatorTx, err := vm.newAddDelegatorTx(
+				delegator3Stake,
+				uint64(delegator3StartTime.Unix()),
+				uint64(delegator3EndTime.Unix()),
+				id,
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
+
+			// issue the third add delegator tx
+			err = vm.mempool.IssueTx(addThirdDelegatorTx)
+			assert.NoError(err)
+
+			// trigger block creation for the third add delegator tx
+			addThirdDelegatorBlock, err := vm.BuildBlock()
+			assert.NoError(err)
+
+			verifyAndAcceptProposalCommitment(assert, addThirdDelegatorBlock)
+
+			// create valid tx
+			addFourthDelegatorTx, err := vm.newAddDelegatorTx(
+				delegator4Stake,
+				uint64(delegator4StartTime.Unix()),
+				uint64(delegator4EndTime.Unix()),
+				id,
+				keys[0].PublicKey().Address(),
+				[]*crypto.PrivateKeySECP256K1R{keys[0], keys[1]},
+				changeAddr,
+			)
+			assert.NoError(err)
+
+			// issue the fourth add delegator tx
+			err = vm.mempool.IssueTx(addFourthDelegatorTx)
+			assert.NoError(err)
+
+			// trigger block creation for the fourth add delegator tx
+			addFourthDelegatorBlock, err := vm.BuildBlock()
+
+			if test.shouldFail {
+				assert.Error(err, "should have failed to allow new delegator")
+				return
+			}
+
+			assert.NoError(err)
+
+			verifyAndAcceptProposalCommitment(assert, addFourthDelegatorBlock)
+		})
+	}
+}
+
+func verifyAndAcceptProposalCommitment(assert *assert.Assertions, blk snowman.Block) {
+	// Verify the proposed block
+	err := blk.Verify()
+	assert.NoError(err)
+
+	// Assert preferences are correct
+	proposalBlk := blk.(*ProposalBlock)
+	options, err := proposalBlk.Options()
+	assert.NoError(err)
+
+	// verify the preferences
+	commit, ok := options[0].(*CommitBlock)
+	assert.True(ok, "expected commit block to be preferred")
+
+	abort, ok := options[1].(*AbortBlock)
+	assert.True(ok, "expected abort block to be issued")
+
+	err = commit.Verify()
+	assert.NoError(err)
+
+	err = abort.Verify()
+	assert.NoError(err)
+
+	// Accept the proposal block and the commit block
+	err = proposalBlk.Accept()
+	assert.NoError(err)
+
+	err = commit.Accept()
+	assert.NoError(err)
+
+	err = abort.Reject()
+	assert.NoError(err)
 }
