@@ -4,6 +4,7 @@
 package logging
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -33,5 +34,16 @@ func ToHighlight(h string, fd uintptr) (Highlight, error) {
 		return Colors, nil
 	default:
 		return Plain, fmt.Errorf("unknown highlight mode: %s", h)
+	}
+}
+
+func (h *Highlight) MarshalJSON() ([]byte, error) {
+	switch *h {
+	case Plain:
+		return []byte("\"PLAIN\""), nil
+	case Colors:
+		return []byte("\"COLORS\""), nil
+	default:
+		return nil, errors.New("unknown highlight")
 	}
 }

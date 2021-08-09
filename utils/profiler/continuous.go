@@ -14,10 +14,10 @@ import (
 
 // Config that is used to describe the options of the continuous profiler.
 type Config struct {
-	Dir         string
-	Enabled     bool
-	Freq        time.Duration
-	MaxNumFiles int
+	Dir         string        `json:"dir"`
+	Enabled     bool          `json:"enabled"`
+	Freq        time.Duration `json:"freq"`
+	MaxNumFiles int           `json:"maxNumFiles"`
 }
 
 // ContinuousProfiler periodically captures CPU, memory, and lock profiles

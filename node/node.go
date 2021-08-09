@@ -5,6 +5,7 @@ package node
 
 import (
 	"crypto"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -815,12 +816,27 @@ func (n *Node) initMetricsAPI() error {
 // initAdminAPI initializes the Admin API service
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
 func (n *Node) initAdminAPI() error {
+	// Convert node config to map
+	configJSON, err := json.Marshal(n.Config)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal config: %w", err)
+	}
+	n.Log.Info("node config:\n%s", configJSON)
 	if !n.Config.AdminAPIEnabled {
 		n.Log.Info("skipping admin API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir, n.LogFactory)
+	service, err := admin.NewService(
+		admin.Config{
+			Log:          n.Log,
+			ChainManager: n.chainManager,
+			HTTPServer:   &n.APIServer,
+			ProfileDir:   n.Config.ProfilerConfig.Dir,
+			LogFactory:   n.LogFactory,
+			NodeConfig:   n.Config,
+		},
+	)
 	if err != nil {
 		return err
 	}
