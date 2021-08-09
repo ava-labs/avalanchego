@@ -134,7 +134,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 		}
 		fc.Produce(vm.ctx.AVAXAssetID, txFee)
 	default:
-		fc.Produce(vm.ctx.AVAXAssetID, vm.txFee)
+		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
 	}
 
 	for _, out := range tx.ExportedOutputs {
@@ -231,12 +231,12 @@ func (vm *VM) newExportTx(
 	var toBurn uint64
 	var err error
 	if assetID == vm.ctx.AVAXAssetID {
-		toBurn, err = safemath.Add64(amount, vm.txFee)
+		toBurn, err = safemath.Add64(amount, params.AvalancheAtomicTxFee)
 		if err != nil {
 			return nil, errOverflowExport
 		}
 	} else {
-		toBurn = vm.txFee
+		toBurn = params.AvalancheAtomicTxFee
 	}
 	// burn AVAX
 	ins, signers, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, toBurn)

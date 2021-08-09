@@ -3,7 +3,11 @@
 
 package params
 
-import "math/big"
+import (
+	"math/big"
+
+	"github.com/ava-labs/avalanchego/utils/units"
+)
 
 // Minimum Gas Price
 var (
@@ -11,6 +15,8 @@ var (
 	// transaction to be valid, measured in wei
 	LaunchMinGasPrice        = big.NewInt(470 * GWei)
 	ApricotPhase1MinGasPrice = big.NewInt(225 * GWei)
+
+	AvalancheAtomicTxFee = units.MilliAvax
 
 	ApricotPhase1GasLimit uint64 = 8_000_000
 

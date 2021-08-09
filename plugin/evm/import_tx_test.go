@@ -61,7 +61,7 @@ func TestImportTxVerify(t *testing.T) {
 		Outs: []EVMOutput{
 			{
 				Address: testEthAddrs[0],
-				Amount:  importAmount - txFee,
+				Amount:  importAmount - params.AvalancheAtomicTxFee,
 				AssetID: testAvaxAssetID,
 			},
 			{
@@ -379,7 +379,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 
 	evmOutput := EVMOutput{
 		Address: testEthAddrs[0],
-		Amount:  importAmount - txFee,
+		Amount:  importAmount - params.AvalancheAtomicTxFee,
 		AssetID: vm.ctx.AVAXAssetID,
 	}
 	unsignedImportTx := &UnsignedImportTx{
@@ -525,7 +525,7 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 	balance := state.GetBalance(testEthAddrs[0])
 	if balance == nil {
 		t.Fatal("Found nil balance for address receiving imported funds")
-	} else if balance.Uint64() != (importAmount-vm.txFee)*x2cRate.Uint64() {
+	} else if balance.Uint64() != (importAmount-params.AvalancheAtomicTxFee)*x2cRate.Uint64() {
 		t.Fatalf("Balance was %d, but expected balance of: %d", balance.Uint64(), importAmount*x2cRate.Uint64())
 	}
 
