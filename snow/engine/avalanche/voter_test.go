@@ -152,8 +152,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 	vote3 := ids.GenerateTestID()
 
 	// vote on request 3 first
-
-	voter2 := &voter{
+	req3Voter1 := &voter{
 		t:         transitive,
 		requestID: 3,
 		response:  []ids.ID{vote3},
@@ -161,7 +160,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		vdr:       vdr1,
 	}
 
-	voter3 := &voter{
+	req3Voter2 := &voter{
 		t:         transitive,
 		requestID: 3,
 		response:  []ids.ID{vote3},
@@ -169,19 +168,19 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		vdr:       vdr2,
 	}
 
-	voter2.Update()
-	voter3.Update()
+	req3Voter1.Update()
+	req3Voter2.Update()
 
 	// expect 3 pending polls since 2 and 1 are still pending
 	assert.Equal(t, 3, transitive.polls.Len())
 
 	// vote on request 2
-	// add dependency to voter3's vote which has to be fulfilled prior to finishing
-	voter3Dep := ids.GenerateTestID()
-	voter3DepSet := ids.NewSet(1)
-	voter3DepSet.Add(voter3Dep)
+	// add dependency to req2/voter3's vote which has to be fulfilled prior to finishing
+	req2Voter2Dep := ids.GenerateTestID()
+	req2Voter2DepSet := ids.NewSet(1)
+	req2Voter2DepSet.Add(req2Voter2Dep)
 
-	voter1 := &voter{
+	req2Voter1 := &voter{
 		t:         transitive,
 		requestID: 2,
 		response:  []ids.ID{vote2},
@@ -189,34 +188,34 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		vdr:       vdr1,
 	}
 
-	voter3 = &voter{
+	req2Voter2 := &voter{
 		t:         transitive,
 		requestID: 2,
 		response:  []ids.ID{vote2},
-		deps:      voter3DepSet,
+		deps:      req2Voter2DepSet,
 		vdr:       vdr3,
 	}
 
-	voter1.Update() // does nothing because dep is unfulfilled
-	voter3.Update()
+	req2Voter1.Update() // does nothing because dep is unfulfilled
+	req2Voter2.Update()
 
 	// still expect 3 pending polls since request 1 voting is still pending
 	assert.Equal(t, 3, transitive.polls.Len())
 
 	// vote on request 1
 	// add dependency to voter1's vote which has to be fulfilled prior to finishing
-	voter1Dep := ids.GenerateTestID()
-	voter1DepSet := ids.NewSet(1)
-	voter1DepSet.Add(voter1Dep)
-	voter1 = &voter{
+	req1Voter1Dep := ids.GenerateTestID()
+	req1Voter1DepSet := ids.NewSet(1)
+	req1Voter1DepSet.Add(req1Voter1Dep)
+	req1Voter1 := &voter{
 		t:         transitive,
 		requestID: 1,
 		response:  []ids.ID{vote1},
-		deps:      voter1DepSet,
+		deps:      req1Voter1DepSet,
 		vdr:       vdr1,
 	}
 
-	voter2 = &voter{
+	req1Voter2 := &voter{
 		t:         transitive,
 		requestID: 1,
 		response:  []ids.ID{vote1},
@@ -224,12 +223,12 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		vdr:       vdr2,
 	}
 
-	voter1.Update() // does nothing because the req2/voter1 dependency is still pending
-	voter2.Update() // voter1 is still remaining with the pending dependency
+	req1Voter1.Update() // does nothing because the req2/voter1 dependency is still pending
+	req1Voter2.Update() // voter1 is still remaining with the pending dependency
 
 	// abandon dep on voter3
-	voter3.Abandon(voter3Dep) // voter3 abandons dep1
-	voter1.Fulfill(voter1Dep)
+	req2Voter2.Abandon(req2Voter2Dep) // voter3 abandons dep1
+	req1Voter1.Fulfill(req1Voter1Dep)
 
 	// expect all polls to have finished
 	assert.Equal(t, 0, transitive.polls.Len())
