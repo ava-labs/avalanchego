@@ -100,7 +100,7 @@ type GetAddressTxsReply struct {
 
 // GetAddressTxs returns list of transactions for a given address
 func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
-	service.vm.ctx.Log.Info("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
+	service.vm.ctx.Log.Debug("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
 	pageSize := uint64(args.PageSize)
 	if pageSize > maxPageSize {
 		return fmt.Errorf("pageSize > maximum allowed (%d)", maxPageSize)
