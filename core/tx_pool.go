@@ -1578,6 +1578,8 @@ func (pool *TxPool) startPeriodicFeeUpdate() {
 		return
 	}
 
+	// Call updateBaseFee here to ensure that there is not a [baseFeeUpdateInterval] delay
+	// when starting up in ApricotPhase3 before the base fee is updated.
 	if time.Now().After(time.Unix(pool.chainconfig.ApricotPhase3BlockTimestamp.Int64(), 0)) {
 		pool.updateBaseFee()
 	}
