@@ -109,9 +109,8 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		log.Info("Gasprice oracle is ignoring threshold set", "threshold", ignorePrice)
 	}
 	return &Oracle{
-		backend:   backend,
-		lastPrice: big.NewInt(params.ApricotPhase3InitialBaseFee), // lastPrice is initialized to the initial base fee at the start of ApricotPhase3
-		// since this will be the "lastPrice" the first time suggestDynamicTipCap runs.
+		backend:     backend,
+		lastPrice:   big.NewInt(0),
 		maxPrice:    maxPrice,
 		ignorePrice: ignorePrice,
 		checkBlocks: blocks,
