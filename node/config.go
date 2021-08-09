@@ -37,19 +37,22 @@ type APIIndexerConfig struct {
 	IndexAllowIncomplete bool `json:"indexAllowIncomplete"`
 }
 
-type APIConfig struct {
-	APIAuthConfig    `json:"apiAuthConfig"`
-	APIIndexerConfig `json:"apiIndexerConfig"`
-	IPCConfig        `json:"ipcConfig"`
-
-	HTTPHost string `json:"httpHost"`
-	HTTPPort uint16 `json:"httpPort"`
+type HTTPConfig struct {
+	APIConfig `json:"apiConfig"`
+	HTTPHost  string `json:"httpHost"`
+	HTTPPort  uint16 `json:"httpPort"`
 
 	HTTPSEnabled  bool   `json:"httpsEnabled"`
 	HTTPSKeyFile  string `json:"httpsKeyFile"`
 	HTTPSCertFile string `json:"httpsCertFile"`
 
 	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
+}
+
+type APIConfig struct {
+	APIAuthConfig    `json:"authConfig"`
+	APIIndexerConfig `json:"indexerConfig"`
+	IPCConfig        `json:"ipcConfig"`
 
 	// Enable/Disable APIs
 	AdminAPIEnabled    bool `json:"adminAPIEnabled"`
@@ -135,7 +138,7 @@ type DatabaseConfig struct {
 
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
-	APIConfig           `json:"apiConfig"`
+	HTTPConfig          `json:"httpConfig"`
 	GossipConfig        `json:"gossipConfig"`
 	IPConfig            `json:"ipConfig"`
 	StakingConfig       `json:"stakingConfig"`

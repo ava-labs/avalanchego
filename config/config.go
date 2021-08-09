@@ -167,40 +167,41 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 func getIPCConfig(v *viper.Viper) node.IPCConfig {
 	config := node.IPCConfig{
 		IPCAPIEnabled: v.GetBool(IpcAPIEnabledKey),
+		IPCPath:       ipcs.DefaultBaseURL,
 	}
 	if v.IsSet(IpcsChainIDsKey) {
 		config.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
 	}
 	if v.IsSet(IpcsPathKey) {
 		config.IPCPath = os.ExpandEnv(v.GetString(IpcsPathKey))
-	} else {
-		config.IPCPath = ipcs.DefaultBaseURL
 	}
 	return config
 }
 
-func getAPIConfig(v *viper.Viper) (node.APIConfig, error) {
-	config := node.APIConfig{
-		APIIndexerConfig: node.APIIndexerConfig{
-			IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
-			IndexAllowIncomplete: v.GetBool(IndexAllowIncompleteKey),
+func getHTTPConfig(v *viper.Viper) (node.HTTPConfig, error) {
+	config := node.HTTPConfig{
+		APIConfig: node.APIConfig{
+			APIIndexerConfig: node.APIIndexerConfig{
+				IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
+				IndexAllowIncomplete: v.GetBool(IndexAllowIncompleteKey),
+			},
+			AdminAPIEnabled:    v.GetBool(AdminAPIEnabledKey),
+			InfoAPIEnabled:     v.GetBool(InfoAPIEnabledKey),
+			KeystoreAPIEnabled: v.GetBool(KeystoreAPIEnabledKey),
+			MetricsAPIEnabled:  v.GetBool(MetricsAPIEnabledKey),
+			HealthAPIEnabled:   v.GetBool(HealthAPIEnabledKey),
 		},
-		HTTPHost:           v.GetString(HTTPHostKey),
-		HTTPPort:           uint16(v.GetUint(HTTPPortKey)),
-		HTTPSEnabled:       v.GetBool(HTTPSEnabledKey),
-		HTTPSKeyFile:       os.ExpandEnv(v.GetString(HTTPSKeyFileKey)),
-		HTTPSCertFile:      os.ExpandEnv(v.GetString(HTTPSCertFileKey)),
-		APIAllowedOrigins:  v.GetStringSlice(HTTPAllowedOrigins),
-		AdminAPIEnabled:    v.GetBool(AdminAPIEnabledKey),
-		InfoAPIEnabled:     v.GetBool(InfoAPIEnabledKey),
-		KeystoreAPIEnabled: v.GetBool(KeystoreAPIEnabledKey),
-		MetricsAPIEnabled:  v.GetBool(MetricsAPIEnabledKey),
-		HealthAPIEnabled:   v.GetBool(HealthAPIEnabledKey),
+		HTTPHost:          v.GetString(HTTPHostKey),
+		HTTPPort:          uint16(v.GetUint(HTTPPortKey)),
+		HTTPSEnabled:      v.GetBool(HTTPSEnabledKey),
+		HTTPSKeyFile:      os.ExpandEnv(v.GetString(HTTPSKeyFileKey)),
+		HTTPSCertFile:     os.ExpandEnv(v.GetString(HTTPSCertFileKey)),
+		APIAllowedOrigins: v.GetStringSlice(HTTPAllowedOrigins),
 	}
 	var err error
 	config.APIAuthConfig, err = getAPIAuthConfig(v)
 	if err != nil {
-		return node.APIConfig{}, err
+		return node.HTTPConfig{}, err
 	}
 	config.IPCConfig = getIPCConfig(v)
 	return config, nil
@@ -779,7 +780,7 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// HTTP APIs
-	nodeConfig.APIConfig, err = getAPIConfig(v)
+	nodeConfig.HTTPConfig, err = getHTTPConfig(v)
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -801,9 +802,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
-
-	// IPCs
-	nodeConfig.IPCConfig = getIPCConfig(v)
 
 	// Metrics
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
