@@ -28,7 +28,7 @@ var (
 	chainID               = big.NewInt(1)
 	value                 = big.NewInt(1000000000000)
 	gasLimit              = 1000000
-	gasPrice              = new(big.Int).Set(params.LaunchMinGasPrice)
+	gasPrice              = big.NewInt(params.LaunchMinGasPrice)
 )
 
 func init() {

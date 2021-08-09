@@ -37,10 +37,10 @@ func (vm *VM) handleGasPriceUpdates() {
 
 func (gpu *gasPriceUpdater) start() {
 	// Sets the initial gas price to the launch minimum gas price
-	gpu.setter.SetGasPrice(params.LaunchMinGasPrice)
+	gpu.setter.SetGasPrice(big.NewInt(params.LaunchMinGasPrice))
 
 	// Updates to the minimum gas price as of ApricotPhase1 if it's already in effect or starts a goroutine to enable it at the correct time
-	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase1BlockTimestamp, params.ApricotPhase1MinGasPrice); disabled {
+	if disabled := gpu.handleGasPriceUpdate(gpu.chainConfig.ApricotPhase1BlockTimestamp, big.NewInt(params.ApricotPhase1MinGasPrice)); disabled {
 		return
 	}
 	// Updates to the minimum gas price as of ApricotPhase3 if it's already in effect or starts a goroutine to enable it at the correct time

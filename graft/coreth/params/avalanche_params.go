@@ -3,14 +3,12 @@
 
 package params
 
-import "math/big"
-
 // Minimum Gas Price
 var (
 	// MinGasPrice is the number of nAVAX required per gas unit for a
 	// transaction to be valid, measured in wei
-	LaunchMinGasPrice        = big.NewInt(470 * GWei)
-	ApricotPhase1MinGasPrice = big.NewInt(225 * GWei)
+	LaunchMinGasPrice        int64 = 470_000_000_000
+	ApricotPhase1MinGasPrice int64 = 225_000_000_000
 
 	ApricotPhase1GasLimit uint64 = 8_000_000
 

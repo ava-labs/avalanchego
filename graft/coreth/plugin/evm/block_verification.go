@@ -5,6 +5,7 @@ package evm
 
 import (
 	"fmt"
+	"math/big"
 
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/core/types"
@@ -134,7 +135,7 @@ func (v blockValidatorPhase0) SyntacticVerify(b *Block) error {
 
 	// Make sure that all the txs have the correct fee set.
 	for _, tx := range txs {
-		if tx.GasPrice().Cmp(params.LaunchMinGasPrice) < 0 {
+		if tx.GasPrice().Cmp(big.NewInt(params.LaunchMinGasPrice)) < 0 {
 			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.LaunchMinGasPrice)
 		}
 	}
@@ -239,7 +240,7 @@ func (blockValidatorPhase1) SyntacticVerify(b *Block) error {
 
 	// Make sure that all the txs have the correct fee set.
 	for _, tx := range txs {
-		if tx.GasPrice().Cmp(params.ApricotPhase1MinGasPrice) < 0 {
+		if tx.GasPrice().Cmp(big.NewInt(params.ApricotPhase1MinGasPrice)) < 0 {
 			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.ApricotPhase1MinGasPrice)
 		}
 	}
