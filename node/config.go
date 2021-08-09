@@ -5,8 +5,6 @@ package node
 
 import (
 	"crypto/tls"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -42,13 +40,14 @@ type APIIndexerConfig struct {
 type APIConfig struct {
 	APIAuthConfig    `json:"apiAuthConfig"`
 	APIIndexerConfig `json:"apiIndexerConfig"`
+	IPCConfig        `json:"ipcConfig"`
 
 	HTTPHost string `json:"httpHost"`
 	HTTPPort uint16 `json:"httpPort"`
 
 	HTTPSEnabled  bool   `json:"httpsEnabled"`
 	HTTPSKeyFile  string `json:"httpsKeyFile"`
-	HTTPSCertFile string `json:"httpsCertFileAuthConfig"`
+	HTTPSCertFile string `json:"httpsCertFile"`
 
 	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
 
@@ -135,42 +134,9 @@ type DatabaseConfig struct {
 	Name string `json:"name"`
 }
 
-type VMAliases map[ids.ID][]string
-
-func (v *VMAliases) MarshalJSON() ([]byte, error) {
-	// Sort so we have deterministic ordering
-	vmIDs := make([]ids.ID, len(*v))
-	i := 0
-	for vmID := range *v {
-		vmIDs[i] = vmID
-		i++
-	}
-	ids.SortIDs(vmIDs)
-
-	b := strings.Builder{}
-	b.WriteString("{")
-	for i, vmID := range vmIDs {
-		b.WriteString(fmt.Sprintf("\"%s\": [", vmID))
-		aliases := (*v)[vmID]
-		for i, alias := range aliases {
-			b.WriteString(fmt.Sprintf("\"%s\"", alias))
-			if i != len(aliases)-1 {
-				b.WriteString(",")
-			}
-		}
-		b.WriteString("]")
-		if i != len(vmIDs)-1 {
-			b.WriteString(",")
-		}
-	}
-	b.WriteString("}")
-	return []byte(b.String()), nil
-}
-
 // Config contains all of the configurations of an Avalanche node.
 type Config struct {
 	APIConfig           `json:"apiConfig"`
-	IPCConfig           `json:"ipcConfig"`
 	GossipConfig        `json:"gossipConfig"`
 	IPConfig            `json:"ipConfig"`
 	StakingConfig       `json:"stakingConfig"`

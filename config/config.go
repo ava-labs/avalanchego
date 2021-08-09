@@ -142,46 +142,67 @@ func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	if err != nil {
 		return loggingConfig, err
 	}
-	return loggingConfig, nil
+	return loggingConfig, err
 }
 
 func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 	config := node.APIAuthConfig{
 		APIRequireAuthToken: v.GetBool(APIAuthRequiredKey),
 	}
-	if config.APIRequireAuthToken {
-		passwordFilePath := v.GetString(APIAuthPasswordFileKey)
-		pwBytes, err := ioutil.ReadFile(passwordFilePath)
-		if err != nil {
-			return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
-		}
-		config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
-		if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
-			return node.APIAuthConfig{}, errors.New("API auth password is not strong enough")
-		}
+	if !config.APIRequireAuthToken {
+		return config, nil
+	}
+	passwordFilePath := v.GetString(APIAuthPasswordFileKey)
+	pwBytes, err := ioutil.ReadFile(passwordFilePath)
+	if err != nil {
+		return node.APIAuthConfig{}, fmt.Errorf("API auth password file %q failed to be read: %w", passwordFilePath, err)
+	}
+	config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
+	if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
+		return node.APIAuthConfig{}, errors.New("API auth password is not strong enough")
 	}
 	return config, nil
 }
 
+func getIPCConfig(v *viper.Viper) node.IPCConfig {
+	config := node.IPCConfig{
+		IPCAPIEnabled: v.GetBool(IpcAPIEnabledKey),
+	}
+	if v.IsSet(IpcsChainIDsKey) {
+		config.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
+	}
+	if v.IsSet(IpcsPathKey) {
+		config.IPCPath = os.ExpandEnv(v.GetString(IpcsPathKey))
+	} else {
+		config.IPCPath = ipcs.DefaultBaseURL
+	}
+	return config
+}
+
 func getAPIConfig(v *viper.Viper) (node.APIConfig, error) {
-	config := node.APIConfig{}
+	config := node.APIConfig{
+		APIIndexerConfig: node.APIIndexerConfig{
+			IndexAPIEnabled:      v.GetBool(IndexEnabledKey),
+			IndexAllowIncomplete: v.GetBool(IndexAllowIncompleteKey),
+		},
+		HTTPHost:           v.GetString(HTTPHostKey),
+		HTTPPort:           uint16(v.GetUint(HTTPPortKey)),
+		HTTPSEnabled:       v.GetBool(HTTPSEnabledKey),
+		HTTPSKeyFile:       os.ExpandEnv(v.GetString(HTTPSKeyFileKey)),
+		HTTPSCertFile:      os.ExpandEnv(v.GetString(HTTPSCertFileKey)),
+		APIAllowedOrigins:  v.GetStringSlice(HTTPAllowedOrigins),
+		AdminAPIEnabled:    v.GetBool(AdminAPIEnabledKey),
+		InfoAPIEnabled:     v.GetBool(InfoAPIEnabledKey),
+		KeystoreAPIEnabled: v.GetBool(KeystoreAPIEnabledKey),
+		MetricsAPIEnabled:  v.GetBool(MetricsAPIEnabledKey),
+		HealthAPIEnabled:   v.GetBool(HealthAPIEnabledKey),
+	}
 	var err error
 	config.APIAuthConfig, err = getAPIAuthConfig(v)
 	if err != nil {
 		return node.APIConfig{}, err
 	}
-	config.HTTPHost = v.GetString(HTTPHostKey)
-	config.HTTPPort = uint16(v.GetUint(HTTPPortKey))
-	config.HTTPSEnabled = v.GetBool(HTTPSEnabledKey)
-	config.HTTPSKeyFile = os.ExpandEnv(v.GetString(HTTPSKeyFileKey))
-	config.HTTPSCertFile = os.ExpandEnv(v.GetString(HTTPSCertFileKey))
-	config.APIAllowedOrigins = v.GetStringSlice(HTTPAllowedOrigins)
-	config.AdminAPIEnabled = v.GetBool(AdminAPIEnabledKey)
-	config.InfoAPIEnabled = v.GetBool(InfoAPIEnabledKey)
-	config.KeystoreAPIEnabled = v.GetBool(KeystoreAPIEnabledKey)
-	config.MetricsAPIEnabled = v.GetBool(MetricsAPIEnabledKey)
-	config.HealthAPIEnabled = v.GetBool(HealthAPIEnabledKey)
-	config.IndexAPIEnabled = v.GetBool(IndexEnabledKey)
+	config.IPCConfig = getIPCConfig(v)
 	return config, nil
 }
 
@@ -202,21 +223,6 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 		return router.HealthConfig{}, fmt.Errorf("%q must be positive", NetworkMaximumTimeoutKey)
 	}
 	return config, nil
-}
-
-func getIPCConfig(v *viper.Viper) node.IPCConfig {
-	config := node.IPCConfig{
-		IPCAPIEnabled: v.GetBool(IpcAPIEnabledKey),
-	}
-	if v.IsSet(IpcsChainIDsKey) {
-		config.IPCDefaultChainIDs = strings.Split(v.GetString(IpcsChainIDsKey), ",")
-	}
-	if v.IsSet(IpcsPathKey) {
-		config.IPCPath = os.ExpandEnv(v.GetString(IpcsPathKey))
-	} else {
-		config.IPCPath = ipcs.DefaultBaseURL
-	}
-	return config
 }
 
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
@@ -843,9 +849,6 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Crypto
 	nodeConfig.EnableCrypto = v.GetBool(SignatureVerificationEnabledKey)
-
-	// Indexer
-	nodeConfig.IndexAllowIncomplete = v.GetBool(IndexAllowIncompleteKey)
 
 	// Bootstrap Configs
 	nodeConfig.BootstrapConfig, err = getBootstrapConfig(v, nodeConfig.NetworkID)
