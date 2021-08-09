@@ -61,7 +61,7 @@ func NewDefaultConfig() Config {
 		TxPool:                  core.DefaultTxPoolConfig,
 		RPCGasCap:               25000000,
 		GPO:                     DefaultFullGPOConfig,
-		RPCTxFeeCap:             1, // 1 ether
+		RPCTxFeeCap:             1, // 1 AVAX
 	}
 }
 
