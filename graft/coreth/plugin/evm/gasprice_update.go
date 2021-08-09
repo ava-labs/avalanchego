@@ -58,7 +58,7 @@ func (gpu *gasPriceUpdater) handleGasPriceUpdate(timestamp *big.Int, gasPrice *b
 	}
 
 	currentTime := time.Now()
-	upgradeTime := time.Unix(gpu.chainConfig.ApricotPhase1BlockTimestamp.Int64(), 0)
+	upgradeTime := time.Unix(timestamp.Int64(), 0)
 	if currentTime.After(upgradeTime) {
 		gpu.setter.SetGasPrice(gasPrice)
 	} else {
