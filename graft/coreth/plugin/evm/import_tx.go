@@ -149,7 +149,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 		}
 		fc.Produce(vm.ctx.AVAXAssetID, txFee)
 	case rules.IsApricotPhase2:
-		fc.Produce(vm.ctx.AVAXAssetID, vm.txFee) // TODO(aaronbuchwald) - replace vm.txFee with a constant in Avalanche params
+		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
 	}
 	for _, out := range tx.Outs {
 		fc.Produce(out.AssetID, out.Amount)
@@ -271,12 +271,12 @@ func (vm *VM) newImportTx(
 	outs := []EVMOutput{}
 
 	// AVAX output
-	if importedAVAXAmount < vm.txFee { // imported amount goes toward paying tx fee
+	if importedAVAXAmount < params.AvalancheAtomicTxFee { // imported amount goes toward paying tx fee
 		return nil, errInsufficientFundsForFee
-	} else if importedAVAXAmount > vm.txFee {
+	} else if importedAVAXAmount > params.AvalancheAtomicTxFee {
 		outs = append(outs, EVMOutput{
 			Address: to,
-			Amount:  importedAVAXAmount - vm.txFee,
+			Amount:  importedAVAXAmount - params.AvalancheAtomicTxFee,
 			AssetID: vm.ctx.AVAXAssetID,
 		})
 	}
