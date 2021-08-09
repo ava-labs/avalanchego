@@ -229,7 +229,7 @@ func NewBlockChain(
 		return nil, err
 	}
 	// Create the state manager
-	bc.stateManager = NewTrieWriter(bc.stateCache, cacheConfig)
+	bc.stateManager = NewTrieWriter(bc.stateCache.TrieDB(), cacheConfig)
 
 	// Make sure the state associated with the block is available
 	head := bc.CurrentBlock()
@@ -467,7 +467,6 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	// Add the block to the canonical chain number scheme and mark as the head
 	batch := bc.db.NewBatch()
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
-	rawdb.WriteTxLookupEntriesByBlock(batch, block)
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 
 	// If the block is better than our head or is on a different chain, force update heads
