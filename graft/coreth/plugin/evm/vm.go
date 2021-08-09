@@ -50,7 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -84,7 +83,6 @@ const (
 	maxUTXOsToFetch      = 1024
 	defaultMempoolSize   = 1024
 	codecVersion         = uint16(0)
-	txFee                = units.MilliAvax
 	secpFactoryCacheSize = 1024
 
 	decidedCacheSize    = 100
@@ -220,7 +218,6 @@ type VM struct {
 	baseCodec codec.Registry
 	codec     codec.Manager
 	clock     timer.Clock
-	txFee     uint64
 	mempool   *Mempool
 
 	shutdownChan chan struct{}
@@ -314,7 +311,6 @@ func (vm *VM) Initialize(
 	mainnetExtDataHashes = nil
 
 	vm.chainID = g.Config.ChainID
-	vm.txFee = txFee
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g

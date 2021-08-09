@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
@@ -34,6 +35,12 @@ var (
 	errNilOutput         = errors.New("nil output")
 	errNilInput          = errors.New("nil input")
 	errEmptyAssetID      = errors.New("empty asset ID is not valid")
+)
+
+// Constants for calculating the gas consumed by atomic transactions
+var (
+	SignatureGas uint64 = 1000
+	TxBytesGas   uint64 = 1
 )
 
 // EVMOutput defines an output that is added to the EVM state created by import transactions
@@ -92,7 +99,7 @@ type UnsignedAtomicTx interface {
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
-	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) TxError
+	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
 
 	// Fee amount denominated in base 10^9.
 	Burned(assetID ids.ID) (uint64, error)
@@ -112,7 +119,18 @@ type Tx struct {
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
 }
 
-// (*secp256k1fx.Credential)
+func (tx *Tx) Cost() (uint64, error) {
+	cost := calcBytesCost(len(tx.UnsignedAtomicTx.Bytes()))
+	totalSignatures := uint64(0)
+	for _, cred := range tx.Creds {
+		secpCred, ok := cred.(*secp256k1fx.Credential)
+		if !ok {
+			return 0, fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)
+		}
+		totalSignatures += uint64(len(secpCred.Sigs))
+	}
+	return cost + totalSignatures*SignatureGas, nil
+}
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
@@ -212,4 +230,18 @@ func IsSortedEVMOutputs(outputs []EVMOutput) bool {
 // and unique based on the account addresses and assetIDs
 func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
 	return utils.IsSortedAndUnique(&innerSortEVMOutputs{outputs: outputs})
+}
+
+// calculates the amount of AVAX that must be burned by an atomic transaction
+// that consumes [cost] at [baseFee].
+func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
+	if baseFee == nil {
+		return 0, errors.New("cannot calculate dynamic fee with nil baseFee")
+	}
+	multiplier := new(big.Int).Div(baseFee, x2cRate).Uint64()
+	return math.Mul64(multiplier, cost)
+}
+
+func calcBytesCost(len int) uint64 {
+	return uint64(len) * TxBytesGas
 }
