@@ -127,6 +127,10 @@ func (id ID) String() string {
 	return s
 }
 
+func (id ID) MarshalText() ([]byte, error) {
+	return []byte(id.String()), nil
+}
+
 type sortIDData []ID
 
 func (ids sortIDData) Less(i, j int) bool {

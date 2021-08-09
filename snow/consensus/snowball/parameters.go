@@ -30,16 +30,21 @@ const (
 
 // Parameters required for snowball consensus
 type Parameters struct {
-	Namespace                                                               string
-	Metrics                                                                 prometheus.Registerer
-	K, Alpha, BetaVirtuous, BetaRogue, ConcurrentRepolls, OptimalProcessing int
+	Namespace         string                `json:"-"`
+	Metrics           prometheus.Registerer `json:"-"`
+	K                 int                   `json:"k"`
+	Alpha             int                   `json:"alpha"`
+	BetaVirtuous      int                   `json:"betaVirtuous"`
+	BetaRogue         int                   `json:"betaRogue"`
+	ConcurrentRepolls int                   `json:"concurrentRepolls"`
+	OptimalProcessing int                   `json:"optimalProcessing"`
 
 	// Reports unhealthy if more than this number of items are outstanding.
-	MaxOutstandingItems int
+	MaxOutstandingItems int `json:"maxOutstandingItems"`
 
 	// Reports unhealthy if there is an item processing for longer than this
 	// duration.
-	MaxItemProcessingTime time.Duration
+	MaxItemProcessingTime time.Duration `json:"maxItemProcessingTime"`
 }
 
 // Verify returns nil if the parameters describe a valid initialization.
