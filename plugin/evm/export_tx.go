@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/gecko/utils/math"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
@@ -80,6 +81,43 @@ func (tx *UnsignedExportTx) Verify(
 	return nil
 }
 
+func (tx *UnsignedExportTx) Cost() (uint64, error) {
+	byteCost := calcBytesCost(len(tx.UnsignedBytes()))
+	numSigs := uint64(len(tx.Ins))
+	sigCost, err := math.Mul64(numSigs, secp256k1fx.CostPerSignature)
+	if err != nil {
+		return 0, err
+	}
+	return math.Add64(byteCost, sigCost)
+}
+
+// Amount of [assetID] burned by this transaction
+func (tx *UnsignedExportTx) Burned(assetID ids.ID) (uint64, error) {
+	var (
+		spent uint64
+		input uint64
+		err   error
+	)
+	for _, out := range tx.ExportedOutputs {
+		if out.AssetID() == assetID {
+			spent, err = math.Add64(spent, out.Output().Amount())
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	for _, in := range tx.Ins {
+		if in.AssetID == assetID {
+			input, err = math.Add64(input, in.Amount)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	return math.Sub64(input, spent)
+}
+
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
@@ -95,6 +133,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	// Check the transaction consumes and produces the right amounts
 	fc := avax.NewFlowChecker()
 	switch {
+	// Apply dynamic fees to export transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
 		cost, err := stx.Cost()
 		if err != nil {
@@ -105,14 +144,14 @@ func (tx *UnsignedExportTx) SemanticVerify(
 			return err
 		}
 		fc.Produce(vm.ctx.AVAXAssetID, txFee)
+
+	// Apply fees to export transactions before Apricot Phase 3
 	default:
 		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
 	}
-
 	for _, out := range tx.ExportedOutputs {
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-
 	for _, in := range tx.Ins {
 		fc.Consume(in.AssetID, in.Amount)
 	}
