@@ -224,6 +224,8 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 		// Parse the staking key/cert paths
 		stakingKeyPath := os.ExpandEnv(v.GetString(StakingKeyPathKey))
 		stakingCertPath := os.ExpandEnv(v.GetString(StakingCertPathKey))
+		nodeConfig.StakingKeyFile = stakingKeyPath
+		nodeConfig.StakingCertFile = stakingCertPath
 
 		switch {
 		// If staking key/cert locations are specified but not found, error
@@ -397,10 +399,10 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	nodeConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
 
 	// Outbound connection throttling
-	nodeConfig.NetworkConfig.DialerConfig = dialer.NewConfig(
-		v.GetUint32(OutboundConnectionThrottlingRps),
-		v.GetDuration(OutboundConnectionTimeout),
-	)
+	nodeConfig.NetworkConfig.DialerConfig = dialer.Config{
+		ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
+		ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
+	}
 
 	// Benchlist
 	nodeConfig.BenchlistConfig.Threshold = v.GetInt(BenchlistFailThresholdKey)

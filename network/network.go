@@ -237,14 +237,14 @@ type network struct {
 }
 
 type Config struct {
-	HealthConfig
-	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig
-	InboundThrottlerConfig     throttling.MsgThrottlerConfig
-	OutboundThrottlerConfig    throttling.MsgThrottlerConfig
-	timer.AdaptiveTimeoutConfig
-	DialerConfig dialer.Config
+	HealthConfig                `json:"healthConfig"`
+	timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
+	InboundConnThrottlerConfig  throttling.InboundConnThrottlerConfig `json:"inboundConnThrottlerConfig"`
+	InboundThrottlerConfig      throttling.MsgThrottlerConfig         `json:"inboundThrottlerConfig"`
+	OutboundThrottlerConfig     throttling.MsgThrottlerConfig         `json:"outboundThrottlerConfig"`
+	DialerConfig                dialer.Config                         `json:"dialerConfig"`
 	// [Registerer] is set in node's initMetricsAPI method
-	MetricsRegisterer prometheus.Registerer
+	MetricsRegisterer prometheus.Registerer `json:"-"`
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided

@@ -40,6 +40,10 @@ type IPDesc struct {
 	Port uint16
 }
 
+func (ipDesc *IPDesc) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("\"%s\"", ipDesc.IP)), nil
+}
+
 func (ipDesc IPDesc) Equal(otherIPDesc IPDesc) bool {
 	return ipDesc.Port == otherIPDesc.Port &&
 		ipDesc.IP.Equal(otherIPDesc.IP)
