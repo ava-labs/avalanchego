@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"path/filepath"
 	"strings"
@@ -59,12 +60,20 @@ import (
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
+const (
+	x2cRateInt64       int64 = 1000000000
+	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
+)
+
 var (
 	// x2cRate is the conversion rate between the smallest denomination on the X-Chain
 	// 1 nAVAX and the smallest denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
 	// This is only required for AVAX because the denomination of 1 AVAX is 9 decimal
 	// places on the X and P chains, but is 18 decimal places within the EVM.
-	x2cRate = big.NewInt(1000000000)
+	x2cRate       = big.NewInt(x2cRateInt64)
+	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
+	maxUint64     = new(big.Int).SetUint64(math.MaxUint64)
+
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
