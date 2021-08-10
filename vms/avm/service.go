@@ -124,7 +124,7 @@ func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, 
 
 	service.vm.ctx.Log.Debug("Fetching up to %d transactions for address %s, assetID %s, cursor %d", pageSize, address, assetID, cursor)
 	// Read transactions from the indexer
-	reply.TxIDs, err = service.vm.addressTxsIndexer.Read(address, assetID, cursor, pageSize)
+	reply.TxIDs, err = service.vm.addressTxsIndexer.Read(address[:], assetID, cursor, pageSize)
 	if err != nil {
 		return err
 	}

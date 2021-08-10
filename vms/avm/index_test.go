@@ -410,7 +410,7 @@ func TestIndexer_Read(t *testing.T) {
 	var cursor uint64 = 0
 	var pageSize uint64 = 5
 	for cursor < 25 {
-		txIDs, err := vm.addressTxsIndexer.Read(addr, assetID, cursor, pageSize)
+		txIDs, err := vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
 		assert.NoError(t, err)
 		assert.Len(t, txIDs, 5)
 		assert.Equal(t, txIDs, testTxs[cursor:cursor+pageSize])

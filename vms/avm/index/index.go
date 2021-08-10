@@ -49,7 +49,7 @@ type AddressTxsIndexer interface {
 	// The returned transactions are in order of increasing acceptance time.
 	// The length of the returned slice <= [pageSize].
 	// [cursor] is the offset to start reading from.
-	Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
+	Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error)
 }
 
 // indexer implements AddressTxsIndexer
@@ -106,7 +106,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 	// Address -> AssetID --> exists if the address's balance
 	// of the asset is changed by processing tx [txID]
 	// we do this step separately to simplify the write process later
-	balanceChanges := make(map[ids.ShortID]map[ids.ID]struct{})
+	balanceChanges := make(map[string]map[ids.ID]struct{})
 	for _, utxo := range utxos {
 		out, ok := utxo.Out.(avax.Addressable)
 		if !ok {
@@ -115,11 +115,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 		}
 
 		for _, addressBytes := range out.Addresses() {
-			address, err := ids.ToShortID(addressBytes)
-			if err != nil {
-				// should never happen
-				return fmt.Errorf("invalid address bytes, must be ShortID type: %s", err)
-			}
+			address := string(addressBytes)
 
 			if _, exists := balanceChanges[address]; !exists {
 				balanceChanges[address] = make(map[ids.ID]struct{})
@@ -130,7 +126,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 
 	// Process the balance changes
 	for address, assetIDs := range balanceChanges {
-		addressPrefixDB := prefixdb.New(address[:], i.db)
+		addressPrefixDB := prefixdb.New([]byte(address), i.db)
 		for assetID := range assetIDs {
 			assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
 
@@ -174,7 +170,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 // not return the first transaction that changed the balance. (This is for for pagination.)
 // Returns at most [pageSize] elements.
 // See AddressTxsIndexer
-func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
+func (i *indexer) Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
 	// setup prefix DBs
 	addressTxDB := prefixdb.New(address[:], i.db)
 	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
@@ -253,6 +249,6 @@ func (i *noIndexer) Accept(ids.ID, []*avax.UTXO, []*avax.UTXO) error {
 	return nil
 }
 
-func (i *noIndexer) Read(ids.ShortID, ids.ID, uint64, uint64) ([]ids.ID, error) {
+func (i *noIndexer) Read([]byte, ids.ID, uint64, uint64) ([]ids.ID, error) {
 	return nil, nil
 }
