@@ -485,7 +485,7 @@ func TestNewExportTx(t *testing.T) {
 			exportTx := tx.UnsignedAtomicTx
 
 			if err := exportTx.SemanticVerify(vm, tx, parent, parent.ethBlock.BaseFee(), test.rules); err != nil {
-				t.Fatal("newImportTx created an invalid transaction", err)
+				t.Fatal("newExportTx created an invalid transaction", err)
 			}
 
 			commitBatch, err := vm.db.CommitBatch()
@@ -493,7 +493,7 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatalf("Failed to create commit batch for VM due to %s", err)
 			}
 			if err := exportTx.Accept(vm.ctx, commitBatch); err != nil {
-				t.Fatalf("Failed to accept import transaction due to: %s", err)
+				t.Fatalf("Failed to accept export transaction due to: %s", err)
 			}
 
 			stdb, err := vm.chain.CurrentState()
