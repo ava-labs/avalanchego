@@ -60,6 +60,7 @@ func (i *issuer) Update() {
 	for _, tx := range txs {
 		if err := tx.Verify(); err != nil {
 			i.t.Ctx.Log.Debug("Transaction %s failed verification due to %s", tx.ID(), err)
+			i.t.txBlocked.Abandon(tx.ID())
 		} else {
 			validTxs = append(validTxs, tx)
 		}

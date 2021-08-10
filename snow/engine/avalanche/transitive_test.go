@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -4222,4 +4223,146 @@ func TestEngineIssue(t *testing.T) {
 	if numBuilt != 2 {
 		t.Fatalf("Should have issued txs differently")
 	}
+}
+
+// Test that a transaction is abandoned if a dependency fails verification,
+// even if there are outstanding requests for vertices when the
+// dependency fails verification.
+func TestAbandonTx(t *testing.T) {
+	assert := assert.New(t)
+	config := DefaultConfig()
+	config.Params.BatchSize = 1
+	config.Params.BetaVirtuous = 1
+	config.Params.BetaRogue = 1
+	config.Params.OptimalProcessing = 1
+
+	sender := &common.SenderTest{
+		T:                       t,
+		CantGetAcceptedFrontier: false,
+	}
+	sender.Default(true)
+	config.Sender = sender
+
+	config.Validators = validators.NewSet()
+	vdr := ids.GenerateTestShortID()
+	if err := config.Validators.AddWeight(vdr, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	manager := vertex.NewTestManager(t)
+	config.Manager = manager
+	manager.Default(true)
+	manager.CantEdge = false
+	manager.CantGetVtx = false
+
+	vm := &vertex.TestVM{}
+	vm.T = t
+	config.VM = vm
+
+	vm.Default(true)
+	vm.CantBootstrapping = false
+	vm.CantBootstrapped = false
+
+	te := &Transitive{}
+	if err := te.Initialize(config); err != nil {
+		t.Fatal(err)
+	}
+
+	gVtx := &avalanche.TestVertex{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	gTx := &snowstorm.TestTx{TestDecidable: choices.TestDecidable{
+		IDV:     ids.GenerateTestID(),
+		StatusV: choices.Accepted,
+	}}
+
+	tx0 := &snowstorm.TestTx{ // Fails verification
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []snowstorm.Tx{gTx},
+		InputIDsV:     []ids.ID{gTx.ID()},
+		BytesV:        utils.RandomBytes(32),
+		VerifyV:       errors.New(""),
+	}
+
+	tx1 := &snowstorm.TestTx{ // Depends on tx0
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		DependenciesV: []snowstorm.Tx{tx0},
+		InputIDsV:     []ids.ID{gTx.ID()},
+		BytesV:        utils.RandomBytes(32),
+	}
+
+	vtx0 := &avalanche.TestVertex{ // Contains tx0, which will fail verification
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentsV: []avalanche.Vertex{gVtx},
+		HeightV:  gVtx.HeightV + 1,
+		TxsV:     []snowstorm.Tx{tx0},
+	}
+
+	// Contains tx1, which depends on tx0.
+	// vtx0 and vtx1 are siblings.
+	vtx1 := &avalanche.TestVertex{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Unknown,
+		},
+		ParentsV: []avalanche.Vertex{gVtx},
+		HeightV:  gVtx.HeightV + 1,
+		TxsV:     []snowstorm.Tx{tx1},
+	}
+
+	// Cause the engine to send a Get request for vtx1, vtx0, and some other vtx that doesn't exist
+	sender.CantGet = false
+	err := te.PullQuery(vdr, 0, vtx1.ID())
+	assert.NoError(err)
+	err = te.PullQuery(vdr, 0, vtx0.ID())
+	assert.NoError(err)
+	err = te.PullQuery(vdr, 0, ids.GenerateTestID())
+	assert.NoError(err)
+
+	// Give the engine vtx1. It should wait to issue vtx1
+	// until tx0 is issued, because tx1 depends on tx0.
+	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
+		if bytes.Equal(b, vtx1.BytesV) {
+			vtx1.StatusV = choices.Processing
+			return vtx1, nil
+		}
+		assert.FailNow("should have asked to parse vtx1")
+		return nil, errors.New("should have asked to parse vtx1")
+	}
+	err = te.Put(vdr, 0, vtx1.ID(), vtx1.Bytes())
+	assert.NoError(err)
+
+	// Verify that vtx1 is waiting to be issued.
+	assert.True(te.pending.Contains(vtx1.ID()))
+
+	// Give the engine vtx0. It should try to issue vtx0
+	// but then abandon it because tx0 fails verification.
+	manager.ParseVtxF = func(b []byte) (avalanche.Vertex, error) {
+		if bytes.Equal(b, vtx0.BytesV) {
+			vtx0.StatusV = choices.Processing
+			return vtx0, nil
+		}
+		assert.FailNow("should have asked to parse vtx0")
+		return nil, errors.New("should have asked to parse vtx0")
+	}
+	sender.CantChits = false // Engine will respond to the PullQuerys since the vertices were abandoned
+	err = te.Put(vdr, 0, vtx0.ID(), vtx0.Bytes())
+	assert.NoError(err)
+
+	// Despite the fact that there is still an outstanding vertex request,
+	// vtx1 should have been abandoned because tx0 failed verification
+	assert.False(te.pending.Contains(vtx1.ID()))
+	// sanity check that there is indeed an outstanding vertex request
+	assert.True(te.outstandingVtxReqs.Len() == 1)
 }
