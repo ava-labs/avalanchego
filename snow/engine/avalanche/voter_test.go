@@ -157,7 +157,7 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 		requestID: 3,
 		response:  []ids.ID{vote3},
 		deps:      ids.NewSet(0),
-		vdr:       vdr1,
+		vdr:       vdr3,
 	}
 
 	req3Voter2 := &voter{
