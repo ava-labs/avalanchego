@@ -303,8 +303,8 @@ func (vm *VM) Initialize(
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
 		g.Config = params.AvalancheFujiChainConfig
 		phase0BlockValidator.extDataHashes = fujiExtDataHashes
-		// case g.Config.ChainID.Cmp(params.AvalancheLocalChainID) == 0:
-		// g.Config = params.AvalancheLocalChainConfig
+	case g.Config.ChainID.Cmp(params.AvalancheLocalChainID) == 0:
+		g.Config = params.AvalancheLocalChainConfig
 	}
 
 	// Allow ExtDataHashes to be garbage collected as soon as freed from block
