@@ -228,7 +228,11 @@ func TestVotingFinishesWithAbandonDepMiddleRequest(t *testing.T) {
 
 	// abandon dep on voter3
 	req2Voter2.Abandon(req2Voter2Dep) // voter3 abandons dep1
-	req1Voter1.Fulfill(req1Voter1Dep)
+
+	// expect polls to be pending as req1/voter1's dep is still unfulfilled
+	assert.Equal(t, 3, transitive.polls.Len())
+
+	req1Voter1.Abandon(req1Voter1Dep)
 
 	// expect all polls to have finished
 	assert.Equal(t, 0, transitive.polls.Len())
