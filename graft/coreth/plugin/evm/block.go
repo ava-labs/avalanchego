@@ -8,20 +8,18 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
-var (
-	bonusBlocks = ids.Set{}
-)
+var bonusBlocks = ids.Set{}
 
 func init() {
 	blockIDStrs := []string{
@@ -172,11 +170,8 @@ func (b *Block) Status() choices.Status {
 }
 
 // Parent implements the snowman.Block interface
-func (b *Block) Parent() ids.ID { return ids.ID(b.ethBlock.ParentHash()) }
-
-func (b *Block) parentBlock() (snowman.Block, error) {
-	parentID := b.Parent()
-	return b.vm.GetBlockInternal(parentID)
+func (b *Block) Parent() ids.ID {
+	return ids.ID(b.ethBlock.ParentHash())
 }
 
 // Height implements the snowman.Block interface
@@ -227,28 +222,28 @@ func (b *Block) verify(writes bool) error {
 		return err
 	}
 	if atomicTx != nil {
-		ancestor, err := b.parentBlock()
-		if err != nil {
-			return err
-		}
-
 		// If the ancestor is unknown, then the parent failed verification when
 		// it was called.
 		// If the ancestor is rejected, then this block shouldn't be inserted
 		// into the canonical chain because the parent is will be missing.
-		if blkStatus := ancestor.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+		ancestorInf, err := vm.GetBlockInternal(ancestorID)
+		if err != nil {
 			return errRejectedParent
 		}
-		ancestorBlock, ok := ancestor.(*Block)
+
+		if blkStatus := ancestorInf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
+			return errRejectedParent
+		}
+		ancestor, ok := ancestorInf.(*Block)
 		if !ok {
-			return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestor)
+			return fmt.Errorf("expected %s, parent of %s, to be *Block but is %T", ancestor.ID(), b.ID(), ancestorInf)
 		}
 
 		if bonusBlocks.Contains(b.id) {
 			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		} else {
 			utx := atomicTx.UnsignedAtomicTx
-			if err := utx.SemanticVerify(vm, atomicTx, ancestorBlock, b.ethBlock.BaseFee(), rules); err != nil {
+			if err := utx.SemanticVerify(vm, atomicTx, ancestor, b.ethBlock.BaseFee(), rules); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 			}
 		}
