@@ -124,10 +124,6 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOIDs []*avax.UTXOID,
 	// we do this step separately to simplify the write process later
 	balanceChanges := make(map[ids.ShortID]map[ids.ID]struct{})
 	for _, utxo := range utxos {
-		if utxo.Symbolic() {
-			continue
-		}
-
 		out, ok := utxo.Out.(avax.Addressable)
 		if !ok {
 			i.log.Verbo("skipping UTXO %s for indexing", utxo.InputID())
