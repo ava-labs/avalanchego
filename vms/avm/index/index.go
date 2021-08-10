@@ -138,7 +138,6 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 				idx = binary.BigEndian.Uint64(idxBytes)
 			case database.ErrNotFound:
 				// idx not found; this must be the first entry.
-				idx = 0
 				idxBytes = make([]byte, wrappers.LongLen)
 				binary.BigEndian.PutUint64(idxBytes, idx)
 			default:
