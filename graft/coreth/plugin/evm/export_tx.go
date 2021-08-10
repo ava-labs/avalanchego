@@ -239,20 +239,71 @@ func (vm *VM) newExportTx(
 		return nil, errWrongChainID
 	}
 
-	// rules := vm.currentRules()
+	exportOuts := []*avax.TransferableOutput{{ // Exported to X-Chain
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{to},
+			},
+		},
+	}}
+
+	rules := vm.currentRules()
+
 	var toBurn uint64
 	var err error
 
 	switch {
-	// case rules.IsApricotPhase3:
-	// 	if assetID == vm.ctx.AVAXAssetID {
-	// 		toBurn, err = safemath.Add64(amount, uint64(params.ApricotPhase3InitialBaseFee))
-	// 		if err != nil {
-	// 			return nil, errOverflowExport
-	// 		}
-	// 	} else {
-	// 		toBurn = uint64(params.ApricotPhase3InitialBaseFee)
-	// 	}
+	case rules.IsApricotPhase3:
+		var amountNeeded uint64 = 0
+		if assetID == vm.ctx.AVAXAssetID {
+			amountNeeded = amount
+		}
+
+		ins, _, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, amountNeeded)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+		}
+
+		// burn non-AVAX
+		if assetID != vm.ctx.AVAXAssetID {
+			ins2, _, err := vm.GetSpendableFunds(keys, assetID, amount)
+			if err != nil {
+				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+			}
+			ins = append(ins, ins2...)
+		}
+		utx := &UnsignedExportTx{
+			NetworkID:        vm.ctx.NetworkID,
+			BlockchainID:     vm.ctx.ChainID,
+			DestinationChain: chainID,
+			Ins:              ins,
+			ExportedOutputs:  exportOuts,
+		}
+		tx := &Tx{UnsignedAtomicTx: utx}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return nil, err
+		}
+
+		cost, err := tx.Cost()
+		if err != nil {
+			return nil, err
+		}
+		txFee, err := calculateDynamicFee(cost, big.NewInt(params.ApricotPhase3InitialBaseFee))
+		if err != nil {
+			return nil, err
+		}
+		if assetID == vm.ctx.AVAXAssetID {
+			toBurn, err = safemath.Add64(amount, txFee)
+			if err != nil {
+				return nil, errOverflowExport
+			}
+		} else {
+			toBurn = txFee
+		}
 	default:
 		if assetID == vm.ctx.AVAXAssetID {
 			toBurn, err = safemath.Add64(amount, params.AvalancheAtomicTxFee)
@@ -279,18 +330,6 @@ func (vm *VM) newExportTx(
 		ins = append(ins, ins2...)
 		signers = append(signers, signers2...)
 	}
-
-	exportOuts := []*avax.TransferableOutput{{ // Exported to X-Chain
-		Asset: avax.Asset{ID: assetID},
-		Out: &secp256k1fx.TransferOutput{
-			Amt: amount,
-			OutputOwners: secp256k1fx.OutputOwners{
-				Locktime:  0,
-				Threshold: 1,
-				Addrs:     []ids.ShortID{to},
-			},
-		},
-	}}
 
 	avax.SortTransferableOutputs(exportOuts, vm.codec)
 	SortEVMInputsAndSigners(ins, signers)
