@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -195,15 +194,13 @@ func (i *indexer) Read(address ids.ShortID, assetID ids.ID, cursor, pageSize uin
 			continue
 		}
 
-		// get the value, make sure its in the right format
+		// get the value and try to convert it to ID
 		txIDBytes := iter.Value()
-		if len(txIDBytes) != hashing.HashLen {
-			return nil, fmt.Errorf("invalid tx ID %s", txIDBytes)
+		txID, err := ids.ToID(txIDBytes)
+		if err != nil {
+			return nil, err
 		}
 
-		// get the  txID and append to our list
-		var txID ids.ID
-		copy(txID[:], txIDBytes)
 		txIDs = append(txIDs, txID)
 	}
 	return txIDs, nil
