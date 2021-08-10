@@ -45,20 +45,22 @@ import (
 )
 
 var (
-	testNetworkID            uint32 = 10
-	testCChainID                    = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
-	testXChainID                    = ids.ID{'t', 'e', 's', 't', 'x'}
-	nonExistentID                   = ids.ID{'F'}
-	testTxFee                       = uint64(1000)
-	testKeys                 []*crypto.PrivateKeySECP256K1R
-	testEthAddrs             []common.Address // testEthAddrs[i] corresponds to testKeys[i]
-	testShortIDAddrs         []ids.ShortID
-	testAvaxAssetID          = ids.ID{1, 2, 3}
-	username                 = "Johns"
-	password                 = "CjasdjhiPeirbSenfeI13" // #nosec G101
-	genesisJSONApricotPhase0 = "{\"config\":{\"chainId\":43112,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	genesisJSONApricotPhase1 = "{\"config\":{\"chainId\":43112,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
-	genesisJSONApricotPhase2 = "{\"config\":{\"chainId\":43112,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	testNetworkID    uint32 = 10
+	testCChainID            = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
+	testXChainID            = ids.ID{'t', 'e', 's', 't', 'x'}
+	nonExistentID           = ids.ID{'F'}
+	testKeys         []*crypto.PrivateKeySECP256K1R
+	testEthAddrs     []common.Address // testEthAddrs[i] corresponds to testKeys[i]
+	testShortIDAddrs []ids.ShortID
+	testAvaxAssetID  = ids.ID{1, 2, 3}
+	username         = "Johns"
+	password         = "CjasdjhiPeirbSenfeI13" // #nosec G101
+	// Use chainId: 43111, so that it does not overlap with any Avalanche ChainIDs, which may have their
+	// config overridden in vm.Initialize.
+	genesisJSONApricotPhase0 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONApricotPhase1 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONApricotPhase2 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
+	genesisJSONApricotPhase3 = "{\"config\":{\"chainId\":43111,\"homesteadBlock\":0,\"daoForkBlock\":0,\"daoForkSupport\":true,\"eip150Block\":0,\"eip150Hash\":\"0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0\",\"eip155Block\":0,\"eip158Block\":0,\"byzantiumBlock\":0,\"constantinopleBlock\":0,\"petersburgBlock\":0,\"istanbulBlock\":0,\"muirGlacierBlock\":0,\"apricotPhase1BlockTimestamp\":0,\"apricotPhase2BlockTimestamp\":0,\"apricotPhase3BlockTimestamp\":0},\"nonce\":\"0x0\",\"timestamp\":\"0x0\",\"extraData\":\"0x00\",\"gasLimit\":\"0x5f5e100\",\"difficulty\":\"0x0\",\"mixHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\",\"coinbase\":\"0x0000000000000000000000000000000000000000\",\"alloc\":{\"0100000000000000000000000000000000000000\":{\"code\":\"0x7300000000000000000000000000000000000000003014608060405260043610603d5760003560e01c80631e010439146042578063b6510bb314606e575b600080fd5b605c60048036036020811015605657600080fd5b503560b1565b60408051918252519081900360200190f35b818015607957600080fd5b5060af60048036036080811015608e57600080fd5b506001600160a01b03813516906020810135906040810135906060013560b6565b005b30cd90565b836001600160a01b031681836108fc8690811502906040516000604051808303818888878c8acf9550505050505015801560f4573d6000803e3d6000fd5b505050505056fea26469706673582212201eebce970fe3f5cb96bf8ac6ba5f5c133fc2908ae3dcd51082cfee8f583429d064736f6c634300060a0033\",\"balance\":\"0x0\"}},\"number\":\"0x0\",\"gasUsed\":\"0x0\",\"parentHash\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}"
 
 	apricotRulesPhase0 = params.Rules{}
 	apricotRulesPhase1 = params.Rules{IsApricotPhase1: true}
@@ -139,9 +141,7 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan engCommon.Message, 1)
-	vm := &VM{
-		txFee: testTxFee,
-	}
+	vm := &VM{}
 	prefixedDBManager := baseDBManager.NewPrefixDBManager([]byte{1})
 	return vm, ctx, prefixedDBManager, genesisBytes, issuer, m
 }
@@ -225,26 +225,38 @@ func TestVMContinuosProfiler(t *testing.T) {
 
 func TestVMGenesis(t *testing.T) {
 	genesisTests := []struct {
-		name    string
-		genesis string
+		name             string
+		genesis          string
+		expectedGasPrice *big.Int
 	}{
 		{
-			name:    "Apricot Phase 0",
-			genesis: genesisJSONApricotPhase0,
+			name:             "Apricot Phase 0",
+			genesis:          genesisJSONApricotPhase0,
+			expectedGasPrice: big.NewInt(params.LaunchMinGasPrice),
 		},
 		{
-			name:    "Apricot Phase 1",
-			genesis: genesisJSONApricotPhase1,
+			name:             "Apricot Phase 1",
+			genesis:          genesisJSONApricotPhase1,
+			expectedGasPrice: big.NewInt(params.ApricotPhase1MinGasPrice),
 		},
 		{
-			name:    "Apricot Phase 2",
-			genesis: genesisJSONApricotPhase2,
+			name:             "Apricot Phase 2",
+			genesis:          genesisJSONApricotPhase2,
+			expectedGasPrice: big.NewInt(params.ApricotPhase1MinGasPrice),
+		},
+		{
+			name:             "Apricot Phase 3",
+			genesis:          genesisJSONApricotPhase3,
+			expectedGasPrice: big.NewInt(0),
 		},
 	}
 	for _, test := range genesisTests {
 		t.Run(test.name, func(t *testing.T) {
 			_, vm, _, _ := GenesisVM(t, true, test.genesis, "", "")
 
+			if gasPrice := vm.chain.GetTxPool().GasPrice(); gasPrice.Cmp(test.expectedGasPrice) != 0 {
+				t.Fatalf("Expected pool gas price to be %d but found %d", test.expectedGasPrice, gasPrice)
+			}
 			defer func() {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {
@@ -386,7 +398,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 
-	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-(2*vm.txFee), vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-(2*params.AvalancheAtomicTxFee), vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +544,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -610,9 +622,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatalf("Found unexpected blkID for parent of blk2")
 	}
 
-	restartedVM := &VM{
-		txFee: testTxFee,
-	}
+	restartedVM := &VM{}
 	if err := restartedVM.Initialize(
 		NewContext(),
 		dbManager,
@@ -900,7 +910,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -1169,7 +1179,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+	tx := types.NewTransaction(0, key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
 	if err != nil {
 		t.Fatal(err)
@@ -1484,7 +1494,7 @@ func TestReorgProtection(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -1711,7 +1721,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -1931,7 +1941,7 @@ func TestStickyPreference(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -2247,7 +2257,7 @@ func TestUncleBlock(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -2601,7 +2611,7 @@ func TestAcceptReorg(t *testing.T) {
 	// and to be split into two separate blocks on VM2
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -2921,7 +2931,7 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 5; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -2929,7 +2939,7 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		txs[i] = signedTx
 	}
 	for i := 5; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.ApricotPhase1MinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.ApricotPhase1MinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -3095,7 +3105,7 @@ func TestApricotPhase1Transition(t *testing.T) {
 
 	txs := make([]*types.Transaction, 10)
 	for i := 0; i < 5; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.LaunchMinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -3103,7 +3113,7 @@ func TestApricotPhase1Transition(t *testing.T) {
 		txs[i] = signedTx
 	}
 	for i := 5; i < 10; i++ {
-		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, params.ApricotPhase1MinGasPrice, nil)
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.ApricotPhase1MinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm1.chainID), key.PrivateKey)
 		if err != nil {
 			t.Fatal(err)
@@ -3611,11 +3621,11 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
 	}
 
-	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*vm.txFee, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx1, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*params.AvalancheAtomicTxFee, vm.ctx.XChainID, testShortIDAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
-	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*vm.txFee, vm.ctx.XChainID, testShortIDAddrs[1], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	exportTx2, err := vm.newExportTx(vm.ctx.AVAXAssetID, importAmount-2*params.AvalancheAtomicTxFee, vm.ctx.XChainID, testShortIDAddrs[1], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}

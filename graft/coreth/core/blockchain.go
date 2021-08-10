@@ -108,7 +108,7 @@ type CacheConfig struct {
 	Preimages      bool // Whether to store preimage of trie key to the disk
 }
 
-var defaultCacheConfig = &CacheConfig{
+var DefaultCacheConfig = &CacheConfig{
 	TrieCleanLimit: 256,
 	TrieDirtyLimit: 256,
 	SnapshotLimit:  256,

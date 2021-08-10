@@ -92,6 +92,9 @@ type Header struct {
 	MixDigest   common.Hash    `json:"mixHash"`
 	Nonce       BlockNonce     `json:"nonce"`
 	ExtDataHash common.Hash    `json:"extDataHash"      gencodec:"required"`
+
+	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
+	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -102,6 +105,7 @@ type headerMarshaling struct {
 	GasUsed    hexutil.Uint64
 	Time       hexutil.Uint64
 	Extra      hexutil.Bytes
+	BaseFee    *hexutil.Big
 	Hash       common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
 }
 
@@ -118,27 +122,6 @@ var headerSize = common.StorageSize(reflect.TypeOf(Header{}).Size())
 func (h *Header) Size() common.StorageSize {
 	return headerSize + common.StorageSize(len(h.Extra)+(h.Difficulty.BitLen()+h.Number.BitLen())/8)
 }
-
-// Orignal code: (has been moved to syntacticVerify in plugin/evm/block.go)
-// // SanityCheck checks a few basic things -- these checks are way beyond what
-// // any 'sane' production values should hold, and can mainly be used to prevent
-// // that the unbounded fields are stuffed with junk data to add processing
-// // overhead
-// func (h *Header) SanityCheck() error {
-// 	if h.Number != nil && !h.Number.IsUint64() {
-// 		return fmt.Errorf("too large block number: bitlen %d", h.Number.BitLen())
-// 	}
-// 	if h.Difficulty != nil {
-// 		if diffLen := h.Difficulty.BitLen(); diffLen > 80 {
-// 			return fmt.Errorf("too large block difficulty: bitlen %d", diffLen)
-// 		}
-// 	}
-// 	// TODO: should assert Difficulty != nil
-// 	if eLen := len(h.Extra); eLen > 100*1024 {
-// 		return fmt.Errorf("too large block extradata: size %d", eLen)
-// 	}
-// 	return nil
-// }
 
 // EmptyBody returns true if there is no additional 'body' to complete the header
 // that is: no transactions and no uncles.
@@ -248,6 +231,9 @@ func CopyHeader(h *Header) *Header {
 	if cpy.Number = new(big.Int); h.Number != nil {
 		cpy.Number.Set(h.Number)
 	}
+	if h.BaseFee != nil {
+		cpy.BaseFee = new(big.Int).Set(h.BaseFee)
+	}
 	if len(h.Extra) > 0 {
 		cpy.Extra = make([]byte, len(h.Extra))
 		copy(cpy.Extra, h.Extra)
@@ -299,7 +285,7 @@ func (b *Block) Version() uint32 {
 	return b.version
 }
 
-// EncodeRLP serializes b into an extended format.
+// EncodeRLP serializes b into the Ethereum RLP block format.
 func (b *Block) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, extblock{
 		Header:  b.header,
@@ -341,6 +327,13 @@ func (b *Block) TxHash() common.Hash      { return b.header.TxHash }
 func (b *Block) ReceiptHash() common.Hash { return b.header.ReceiptHash }
 func (b *Block) UncleHash() common.Hash   { return b.header.UncleHash }
 func (b *Block) Extra() []byte            { return common.CopyBytes(b.header.Extra) }
+
+func (b *Block) BaseFee() *big.Int {
+	if b.header.BaseFee == nil {
+		return nil
+	}
+	return new(big.Int).Set(b.header.BaseFee)
+}
 
 func (b *Block) Header() *Header { return CopyHeader(b.header) }
 

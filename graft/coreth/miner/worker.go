@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -118,9 +119,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 
 	var gasLimit uint64
 	if w.chainConfig.IsApricotPhase1(big.NewInt(timestamp)) {
-		gasLimit = w.config.ApricotPhase1GasLimit
+		gasLimit = params.ApricotPhase1GasLimit
 	} else {
-		gasLimit = core.CalcGasLimit(parent, w.config.GasFloor, w.config.GasCeil)
+		// The gas limit is set in phase1 to ApricotPhase1GasLimit because the ceiling and floor were set to the same value
+		// such that the gas limit converged to it. Since this is hardbaked now, we remove the ability to configure it.
+		gasLimit = core.CalcGasLimit(parent.GasUsed(), parent.GasLimit(), params.ApricotPhase1GasLimit, params.ApricotPhase1GasLimit)
 	}
 	num := parent.Number()
 	header := &types.Header{
@@ -129,6 +132,15 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		GasLimit:   gasLimit,
 		Extra:      nil,
 		Time:       uint64(timestamp),
+	}
+	// Set BaseFee and Extra data field if we are post ApricotPhase3
+	bigTimestamp := big.NewInt(timestamp)
+	if w.chainConfig.IsApricotPhase3(bigTimestamp) {
+		var err error
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
+		}
 	}
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
@@ -147,7 +159,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	}
 
 	// Fill the block with all available pending transactions.
-	pending, err := w.eth.TxPool().Pending()
+	pending, err := w.eth.TxPool().Pending(true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch pending transactions: %w", err)
 	}
@@ -162,11 +174,11 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 		}
 	}
 	if len(localTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(env.signer, localTxs)
+		txs := types.NewTransactionsByPriceAndNonce(env.signer, localTxs, header.BaseFee)
 		w.commitTransactions(env, txs, w.coinbase)
 	}
 	if len(remoteTxs) > 0 {
-		txs := types.NewTransactionsByPriceAndNonce(env.signer, remoteTxs)
+		txs := types.NewTransactionsByPriceAndNonce(env.signer, remoteTxs, header.BaseFee)
 		w.commitTransactions(env, txs, w.coinbase)
 	}
 
@@ -228,7 +240,7 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 			continue
 		}
 		// Start executing the transaction
-		env.state.Prepare(tx.Hash(), common.Hash{}, env.tcount)
+		env.state.Prepare(tx.Hash(), env.tcount)
 
 		_, err := w.commitTransaction(env, tx, coinbase)
 		switch {

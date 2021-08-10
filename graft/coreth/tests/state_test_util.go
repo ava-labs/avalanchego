@@ -89,19 +89,22 @@ type stEnv struct {
 	GasLimit   uint64         `json:"currentGasLimit"   gencodec:"required"`
 	Number     uint64         `json:"currentNumber"     gencodec:"required"`
 	Timestamp  uint64         `json:"currentTimestamp"  gencodec:"required"`
+	BaseFee    *big.Int       `json:"currentBaseFee"  gencodec:"optional"`
 }
 
 //go:generate gencodec -type stTransaction -field-override stTransactionMarshaling -out gen_sttransaction.go
 
 type stTransaction struct {
-	GasPrice    *big.Int            `json:"gasPrice"`
-	Nonce       uint64              `json:"nonce"`
-	To          string              `json:"to"`
-	Data        []string            `json:"data"`
-	AccessLists []*types.AccessList `json:"accessLists,omitempty"`
-	GasLimit    []uint64            `json:"gasLimit"`
-	Value       []string            `json:"value"`
-	PrivateKey  []byte              `json:"secretKey"`
+	GasPrice             *big.Int            `json:"gasPrice"`
+	MaxFeePerGas         *big.Int            `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas *big.Int            `json:"maxPriorityFeePerGas"`
+	Nonce                uint64              `json:"nonce"`
+	To                   string              `json:"to"`
+	Data                 []string            `json:"data"`
+	AccessLists          []*types.AccessList `json:"accessLists,omitempty"`
+	GasLimit             []uint64            `json:"gasLimit"`
+	Value                []string            `json:"value"`
+	PrivateKey           []byte              `json:"secretKey"`
 }
 
 // GetChainConfig takes a fork definition and returns a chain config.
@@ -179,7 +182,7 @@ func (t *StateTest) genesis(config *params.ChainConfig) *core.Genesis {
 	}
 }
 
-func (tx *stTransaction) toMessage(ps stPostState) (core.Message, error) {
+func (tx *stTransaction) toMessage(ps stPostState, baseFee *big.Int) (core.Message, error) {
 	// Derive sender from private key if present.
 	var from common.Address
 	if len(tx.PrivateKey) > 0 {
@@ -228,6 +231,26 @@ func (tx *stTransaction) toMessage(ps stPostState) (core.Message, error) {
 	if tx.AccessLists != nil && tx.AccessLists[ps.Indexes.Data] != nil {
 		accessList = *tx.AccessLists[ps.Indexes.Data]
 	}
-	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, tx.GasPrice, data, accessList, true)
+	// If baseFee provided, set gasPrice to effectiveGasPrice.
+	gasPrice := tx.GasPrice
+	if baseFee != nil {
+		if tx.MaxFeePerGas == nil {
+			tx.MaxFeePerGas = gasPrice
+		}
+		if tx.MaxFeePerGas == nil {
+			tx.MaxFeePerGas = new(big.Int)
+		}
+		if tx.MaxPriorityFeePerGas == nil {
+			tx.MaxPriorityFeePerGas = tx.MaxFeePerGas
+		}
+		gasPrice = math.BigMin(new(big.Int).Add(tx.MaxPriorityFeePerGas, baseFee),
+			tx.MaxFeePerGas)
+	}
+	if gasPrice == nil {
+		return nil, fmt.Errorf("no gas price provided")
+	}
+
+	msg := types.NewMessage(from, to, tx.Nonce, value, gasLimit, gasPrice,
+		tx.MaxFeePerGas, tx.MaxPriorityFeePerGas, data, accessList, true)
 	return msg, nil
 }
