@@ -95,6 +95,21 @@ func (tx *UnsignedImportTx) Verify(
 	return nil
 }
 
+func (tx *UnsignedImportTx) Cost() (uint64, error) {
+	cost := calcBytesCost(len(tx.UnsignedBytes()))
+	for _, in := range tx.ImportedInputs {
+		inCost, err := in.In.Cost()
+		if err != nil {
+			return 0, err
+		}
+		cost, err = math.Add64(cost, inCost)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return cost, nil
+}
+
 // Amount of [assetID] burned by this transaction
 func (tx *UnsignedImportTx) Burned(assetID ids.ID) (uint64, error) {
 	var (
@@ -136,8 +151,8 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 	// Check the transaction consumes and produces the right amounts
 	fc := avax.NewFlowChecker()
-	// Apply transaction fee to import transactions as of Apricot Phase 2
 	switch {
+	// Apply dynamic fees to import transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
 		cost, err := stx.Cost()
 		if err != nil {
@@ -148,6 +163,8 @@ func (tx *UnsignedImportTx) SemanticVerify(
 			return err
 		}
 		fc.Produce(vm.ctx.AVAXAssetID, txFee)
+
+	// Apply fees to import transactions as of Apricot Phase 2
 	case rules.IsApricotPhase2:
 		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
 	}
@@ -273,7 +290,9 @@ func (vm *VM) newImportTx(
 	// AVAX output
 	if importedAVAXAmount < params.AvalancheAtomicTxFee { // imported amount goes toward paying tx fee
 		return nil, errInsufficientFundsForFee
-	} else if importedAVAXAmount > params.AvalancheAtomicTxFee {
+	}
+
+	if importedAVAXAmount > params.AvalancheAtomicTxFee {
 		outs = append(outs, EVMOutput{
 			Address: to,
 			Amount:  importedAVAXAmount - params.AvalancheAtomicTxFee,
