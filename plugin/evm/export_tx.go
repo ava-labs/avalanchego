@@ -81,6 +81,16 @@ func (tx *UnsignedExportTx) Verify(
 	return nil
 }
 
+func (tx *UnsignedExportTx) Cost() (uint64, error) {
+	byteCost := calcBytesCost(len(tx.UnsignedBytes()))
+	numSigs := uint64(len(tx.Ins))
+	sigCost, err := math.Mul64(numSigs, secp256k1fx.CostPerSignature)
+	if err != nil {
+		return 0, err
+	}
+	return math.Add64(byteCost, sigCost)
+}
+
 // Amount of [assetID] burned by this transaction
 func (tx *UnsignedExportTx) Burned(assetID ids.ID) (uint64, error) {
 	var (

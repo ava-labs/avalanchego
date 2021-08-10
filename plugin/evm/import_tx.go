@@ -95,6 +95,21 @@ func (tx *UnsignedImportTx) Verify(
 	return nil
 }
 
+func (tx *UnsignedImportTx) Cost() (uint64, error) {
+	cost := calcBytesCost(len(tx.UnsignedBytes()))
+	for _, in := range tx.ImportedInputs {
+		inCost, err := in.In.Cost()
+		if err != nil {
+			return 0, err
+		}
+		cost, err = math.Add64(cost, inCost)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return cost, nil
+}
+
 // Amount of [assetID] burned by this transaction
 func (tx *UnsignedImportTx) Burned(assetID ids.ID) (uint64, error) {
 	var (
