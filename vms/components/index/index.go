@@ -57,9 +57,6 @@ type indexer struct {
 	log     logging.Logger
 	metrics metrics
 	db      database.Database
-	// txID -> Address -> AssetID --> exists if the address's balance
-	// of the asset is changed by processing tx [txID]
-	balanceChanges map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}
 }
 
 // NewIndexer Returns a new AddressTxsIndexer.
@@ -72,9 +69,8 @@ func NewIndexer(
 	allowIncompleteIndices bool,
 ) (AddressTxsIndexer, error) {
 	i := &indexer{
-		balanceChanges: make(map[ids.ID]map[ids.ShortID]map[ids.ID]struct{}),
-		db:             db,
-		log:            log,
+		db:  db,
+		log: log,
 	}
 	// initialize the indexer
 	if err := checkIndexStatus(i.db, true, allowIncompleteIndices); err != nil {
