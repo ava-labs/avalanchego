@@ -6,7 +6,6 @@ package dummy
 import (
 	"encoding/binary"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -15,12 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func enableLogging() {
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
-}
-
 func init() {
-	enableLogging()
+	// log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
 }
 
 func testRollup(t *testing.T, longs []uint64, roll int) {

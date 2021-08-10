@@ -28,6 +28,7 @@ var (
 // CalcBaseFee takes the previous header and the timestamp of its child block
 // and calculates the expected base fee as well as the encoding of the past
 // pricing information for the child block.
+// CalcBaseFee should only be called if [timestamp] >= [config.ApricotPhase3Timestamp]
 func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.

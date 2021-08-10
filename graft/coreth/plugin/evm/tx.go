@@ -101,9 +101,6 @@ type UnsignedAtomicTx interface {
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
 
-	// Fee amount denominated in base 10^9.
-	Burned(assetID ids.ID) (uint64, error)
-
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
 
