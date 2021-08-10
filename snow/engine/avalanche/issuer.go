@@ -36,6 +36,7 @@ func (i *issuer) Abandon() {
 		i.t.pending.Remove(vtxID)
 		i.abandoned = true
 		i.t.vtxBlocked.Abandon(vtxID) // Inform vertices waiting on this vtx that it won't be issued
+		i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 	}
 }
 
@@ -73,6 +74,7 @@ func (i *issuer) Update() {
 			i.t.errs.Add(err)
 		}
 		i.t.vtxBlocked.Abandon(vtxID)
+		i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 		return
 	}
 
@@ -109,6 +111,8 @@ func (i *issuer) Update() {
 	for _, tx := range txs {
 		i.t.txBlocked.Fulfill(tx.ID())
 	}
+	i.t.metrics.blockerTxs.Set(float64(i.t.txBlocked.Len()))
+	i.t.metrics.blockerVtxs.Set(float64(i.t.vtxBlocked.Len()))
 
 	// Issue a repoll
 	i.t.repoll()
