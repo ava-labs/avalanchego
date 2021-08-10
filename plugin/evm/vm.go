@@ -50,7 +50,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -84,7 +83,6 @@ const (
 	maxUTXOsToFetch      = 1024
 	defaultMempoolSize   = 1024
 	codecVersion         = uint16(0)
-	txFee                = units.MilliAvax
 	secpFactoryCacheSize = 1024
 
 	decidedCacheSize    = 100
@@ -220,7 +218,6 @@ type VM struct {
 	baseCodec codec.Registry
 	codec     codec.Manager
 	clock     timer.Clock
-	txFee     uint64
 	mempool   *Mempool
 
 	shutdownChan chan struct{}
@@ -298,7 +295,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Set the ApricotPhase1BlockTimestamp for mainnet/fuji
+	// Set the chain config for mainnet/fuji chain IDs
 	switch {
 	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
 		g.Config = params.AvalancheMainnetChainConfig
@@ -306,6 +303,8 @@ func (vm *VM) Initialize(
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
 		g.Config = params.AvalancheFujiChainConfig
 		phase0BlockValidator.extDataHashes = fujiExtDataHashes
+		// case g.Config.ChainID.Cmp(params.AvalancheLocalChainID) == 0:
+		// g.Config = params.AvalancheLocalChainConfig
 	}
 
 	// Allow ExtDataHashes to be garbage collected as soon as freed from block
@@ -314,37 +313,9 @@ func (vm *VM) Initialize(
 	mainnetExtDataHashes = nil
 
 	vm.chainID = g.Config.ChainID
-	vm.txFee = txFee
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
-
-	// Set minimum gas price and launch goroutine to sleep until
-	// network upgrade when the gas price must be changed
-	var gasPriceUpdate func() // must call after coreth.NewETHChain to avoid race
-	if g.Config.ApricotPhase1BlockTimestamp == nil {
-		ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
-		ethConfig.GPO.Default = params.LaunchMinGasPrice
-		ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
-	} else {
-		apricotTime := time.Unix(g.Config.ApricotPhase1BlockTimestamp.Int64(), 0)
-		log.Info(fmt.Sprintf("Apricot Upgrade Time %v.", apricotTime))
-		if time.Now().Before(apricotTime) {
-			untilApricot := time.Until(apricotTime)
-			log.Info(fmt.Sprintf("Upgrade will occur in %v", untilApricot))
-			ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
-			ethConfig.GPO.Default = params.LaunchMinGasPrice
-			ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
-			gasPriceUpdate = func() {
-				time.Sleep(untilApricot)
-				vm.chain.SetGasPrice(params.ApricotPhase1MinGasPrice)
-			}
-		} else {
-			ethConfig.Miner.GasPrice = params.ApricotPhase1MinGasPrice
-			ethConfig.GPO.Default = params.ApricotPhase1MinGasPrice
-			ethConfig.TxPool.PriceLimit = params.ApricotPhase1MinGasPrice.Uint64()
-		}
-	}
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -393,11 +364,9 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
-	// Kickoff gasPriceUpdate goroutine once the backend is initialized, if it
-	// exists
-	if gasPriceUpdate != nil {
-		go gasPriceUpdate()
-	}
+	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
+	vm.handleGasPriceUpdates()
+
 	vm.notifyBuildBlockChan = toEngine
 
 	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
@@ -463,7 +432,7 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			break
 		}
 		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-		if err := vm.verifyTx(tx, header.ParentHash, state, rules); err != nil {
+		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			vm.mempool.DiscardCurrentTx()
 			state.RevertToSnapshot(snapshot)
@@ -1006,8 +975,18 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 		return fmt.Errorf("failed to retrieve block state at tip while verifying atomic tx: %w", err)
 	}
 	rules := vm.currentRules()
+	parentHeader := preferredBlock.Header()
+	var nextBaseFee *big.Int
+	timestamp := time.Now().Unix()
+	bigTimestamp := big.NewInt(timestamp)
+	if vm.chainConfig.IsApricotPhase3(bigTimestamp) {
+		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(time.Now().Unix()))
+		if err != nil {
+			return fmt.Errorf("failed to calculate base fee: %w", err)
+		}
+	}
 
-	return vm.verifyTx(tx, preferredBlock.Hash(), preferredState, rules)
+	return vm.verifyTx(tx, parentHeader.Hash(), nextBaseFee, preferredState, rules)
 }
 
 // verifyTx verifies that [tx] is valid to be issued into a block with parent block [parentHash]
@@ -1015,7 +994,7 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 // Note: verifyTx may modify [state]. If [state] needs to be properly maintained, the caller is responsible
 // for reverting to the correct snapshot after calling this function. If this function is called with a
 // throwaway state, then this is not necessary.
-func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rules params.Rules) error {
+func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *state.StateDB, rules params.Rules) error {
 	parentIntf, err := vm.GetBlockInternal(ids.ID(parentHash))
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
@@ -1024,7 +1003,7 @@ func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rul
 	if !ok {
 		return fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
 	}
-	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, baseFee, rules); err != nil {
 		return err
 	}
 	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
@@ -1155,10 +1134,10 @@ func (vm *VM) currentRules() params.Rules {
 // follows the ruleset defined by [rules]
 func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
 	switch {
-	case rules.IsApricotPhase2:
+	case rules.IsApricotPhase3:
+		return phase3BlockValidator
+	case rules.IsApricotPhase2, rules.IsApricotPhase1:
 		// Note: the phase1BlockValidator is used in both apricot phase1 and phase2
-		return phase1BlockValidator
-	case rules.IsApricotPhase1:
 		return phase1BlockValidator
 	default:
 		return phase0BlockValidator
