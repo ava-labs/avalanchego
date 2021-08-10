@@ -37,15 +37,13 @@ var (
 type AddressTxsIndexer interface {
 	// Accept is called when [txID] is accepted.
 	// Persists data about [txID] and what balances it changed.
-	// [inputUTXOIDs] are the IDs of UTXOs [txID] consumes.
+	// [inputUTXOs] are the UTXOs [txID] consumes.
 	// [outputUTXOs] are the UTXOs [txID] creates.
-	// [getUTXOF] can be used to look up UTXOs by ID.
 	// If the error is non-nil, do not persist [txID] to disk as accepted in the VM
 	Accept(
 		txID ids.ID,
-		inputUTXOIDs []*avax.UTXOID,
+		inputUTXOs []*avax.UTXO,
 		outputUTXOs []*avax.UTXO,
-		getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error),
 	) error
 
 	// Read returns the IDs of transactions that changed [address]'s balance of [assetID].
@@ -100,23 +98,10 @@ func NewIndexer(
 // |  | "0"   => txID1
 // |  | "1"   => txID1
 // See interface documentation AddressTxsIndexer.Accept
-func (i *indexer) Accept(txID ids.ID, inputUTXOIDs []*avax.UTXOID,
-	outputUTXOs []*avax.UTXO, getUTXOF func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
-	utxos := outputUTXOs
-	// Fetch and add the input UTXOs
-	for _, utxoID := range inputUTXOIDs {
-		// Don't bother fetching the input UTXO if its symbolic
-		if utxoID.Symbolic() {
-			continue
-		}
-
-		utxo, err := getUTXOF(utxoID)
-		if err != nil {
-			// should never happen
-			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
-		}
-		utxos = append(utxos, utxo)
-	}
+func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*avax.UTXO) error {
+	utxos := inputUTXOs
+	// Fetch and add the output UTXOs
+	utxos = append(utxos, outputUTXOs...)
 
 	// convert UTXOs into balance changes
 	// Address -> AssetID --> exists if the address's balance
@@ -267,7 +252,7 @@ func NewNoIndexer(db database.Database, allowIncomplete bool) (AddressTxsIndexer
 	return &noIndexer{}, checkIndexStatus(db, false, allowIncomplete)
 }
 
-func (i *noIndexer) Accept(ids.ID, []*avax.UTXOID, []*avax.UTXO, func(utxoID *avax.UTXOID) (*avax.UTXO, error)) error {
+func (i *noIndexer) Accept(ids.ID, []*avax.UTXO, []*avax.UTXO) error {
 	return nil
 }
 

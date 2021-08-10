@@ -121,8 +121,24 @@ func (tx *UniqueTx) Accept() error {
 	txID := tx.ID()
 	defer tx.vm.db.Abort()
 
+	var inputUTXOs []*avax.UTXO //nolint:prealloc
+	// Fetch the input UTXOs
+	for _, utxoID := range tx.InputUTXOs() {
+		// Don't bother fetching the input UTXO if its symbolic
+		if utxoID.Symbolic() {
+			continue
+		}
+
+		utxo, err := tx.vm.getUTXO(utxoID)
+		if err != nil {
+			// should never happen
+			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
+		}
+		inputUTXOs = append(inputUTXOs, utxo)
+	}
+
 	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), tx.vm.getUTXO); err != nil {
+	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, tx.UTXOs()); err != nil {
 		return fmt.Errorf("error indexing tx: %s", err)
 	}
 

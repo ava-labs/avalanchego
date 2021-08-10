@@ -107,8 +107,18 @@ func TestIndexTransaction_Ordered(t *testing.T) {
 		uniqueParsedTX := parsedTx.(*UniqueTx)
 		uniqueTxs = append(uniqueTxs, uniqueParsedTX)
 
+		var inputUTXOs []*avax.UTXO
+		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
+			utxo, err := vm.getUTXO(utxoID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			inputUTXOs = append(inputUTXOs, utxo)
+		}
+
 		// index the transaction
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), uniqueParsedTX.inputUTXOs, uniqueParsedTX.UTXOs(), vm.getUTXO)
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
 		assert.NoError(t, err)
 	}
 
@@ -190,8 +200,18 @@ func TestIndexTransaction_MultipleTransactions(t *testing.T) {
 		uniqueParsedTX := parsedTx.(*UniqueTx)
 		addressTxMap[addr] = uniqueParsedTX
 
+		var inputUTXOs []*avax.UTXO
+		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
+			utxo, err := vm.getUTXO(utxoID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			inputUTXOs = append(inputUTXOs, utxo)
+		}
+
 		// index the transaction
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
 		assert.NoError(t, err)
 	}
 
@@ -253,8 +273,18 @@ func TestIndexTransaction_MultipleAddresses(t *testing.T) {
 		t.Fatal("Error saving utxo", err)
 	}
 
+	var inputUTXOs []*avax.UTXO //nolint:prealloc
+	for _, utxoID := range tx.InputUTXOs() {
+		utxo, err := vm.getUTXO(utxoID)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		inputUTXOs = append(inputUTXOs, utxo)
+	}
+
 	// index the transaction
-	err := vm.addressTxsIndexer.Accept(tx.ID(), tx.InputUTXOs(), tx.UTXOs(), vm.getUTXO)
+	err := vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, tx.UTXOs())
 	assert.NoError(t, err)
 	assert.NoError(t, err)
 
@@ -330,8 +360,18 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		uniqueParsedTX := parsedTx.(*UniqueTx)
 		addressTxMap[addr] = uniqueParsedTX
 
+		var inputUTXOs []*avax.UTXO
+		for _, utxoID := range uniqueParsedTX.InputUTXOs() {
+			utxo, err := vm.getUTXO(utxoID)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			inputUTXOs = append(inputUTXOs, utxo)
+		}
+
 		// index the transaction, NOT calling Accept(ids.ID) method
-		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), uniqueParsedTX.InputUTXOs(), uniqueParsedTX.UTXOs(), vm.getUTXO)
+		err := vm.addressTxsIndexer.Accept(uniqueParsedTX.ID(), inputUTXOs, uniqueParsedTX.UTXOs())
 		assert.NoError(t, err)
 		txIDs = append(txIDs, uniqueParsedTX.ID())
 	}
@@ -344,34 +384,6 @@ func TestIndexTransaction_UnorderedWrites(t *testing.T) {
 		assertIndexedTX(t, vm.db, uint64(0), key, txAssetID.ID, tx.ID())
 		assertLatestIdx(t, vm.db, key, txAssetID.ID, 1)
 	}
-}
-
-func TestMissingInputUTXOReturnsError(t *testing.T) {
-	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
-	ctx := NewContext(t)
-
-	db := baseDBManager.NewPrefixDBManager([]byte{1}).Current().Database
-
-	indexer, err := index.NewIndexer(db, ctx.Log, "", prometheus.NewRegistry(), true)
-	assert.NoError(t, err)
-
-	txID := ids.GenerateTestID()
-	inputUTXOIDs := []*avax.UTXOID{
-		{
-			TxID:        txID,
-			OutputIndex: uint32(0),
-			Symbol:      false,
-		},
-	}
-	var outputUTXOs []*avax.UTXO
-	getUTXOFn := func(utxoID *avax.UTXOID) (*avax.UTXO, error) {
-		assert.Equal(t, utxoID, inputUTXOIDs[0])
-		return nil, errMissingUTXO
-	}
-
-	err = indexer.Accept(txID, inputUTXOIDs, outputUTXOs, getUTXOFn)
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), errMissingUTXO.Error())
 }
 
 func TestIndexer_Read(t *testing.T) {
