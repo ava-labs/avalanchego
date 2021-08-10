@@ -253,6 +253,7 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 
 	// Because the get request was dropped, we no longer expect blkID to be issued.
 	t.blocked.Abandon(blkID)
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
@@ -286,6 +287,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, blkID ids.ID) 
 	}
 
 	t.blocked.Register(c)
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
@@ -356,6 +358,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	}
 
 	t.blocked.Register(v)
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
@@ -372,6 +375,7 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 		vdr:       vdr,
 		requestID: requestID,
 	})
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
 }
 
@@ -499,7 +503,8 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	}
 
 	// Tracks performance statistics
-	t.numRequests.Set(float64(t.blkReqs.Len()))
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return issued, t.errs.Err
 }
 
@@ -537,6 +542,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	// We don't have this block and have no reason to expect that we will get it.
 	// Abandon the block to avoid a memory leak.
 	t.blocked.Abandon(blkID)
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return false, t.errs.Err
 }
 
@@ -566,8 +572,9 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	t.blocked.Register(i)
 
 	// Tracks performance statistics
-	t.numRequests.Set(float64(t.blkReqs.Len()))
-	t.numBlocked.Set(float64(t.pending.Len()))
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
+	t.metrics.numBlocked.Set(float64(t.pending.Len()))
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.errs.Err
 }
 
@@ -584,7 +591,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 	t.Sender.Get(vdr, t.RequestID, blkID)
 
 	// Tracks performance statistics
-	t.numRequests.Set(float64(t.blkReqs.Len()))
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
 }
 
 // send a pull query for this block ID
@@ -648,7 +655,8 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(blkID)
-		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.metrics.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
 	}
 
@@ -662,7 +670,8 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 		// if verify fails, then all descendants are also invalid
 		t.blocked.Abandon(blkID)
-		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.metrics.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 		return t.errs.Err
 	}
 
@@ -726,8 +735,9 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	t.repoll()
 
 	// Tracks performance statistics
-	t.numRequests.Set(float64(t.blkReqs.Len()))
-	t.numBlocked.Set(float64(t.pending.Len()))
+	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
+	t.metrics.numBlocked.Set(float64(t.pending.Len()))
+	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.errs.Err
 }
 
