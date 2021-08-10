@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"path/filepath"
 	"strings"
@@ -72,7 +71,6 @@ var (
 	// places on the X and P chains, but is 18 decimal places within the EVM.
 	x2cRate       = big.NewInt(x2cRateInt64)
 	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
-	maxUint64     = new(big.Int).SetUint64(math.MaxUint64)
 
 	// GitCommit is set by the build script
 	GitCommit string
