@@ -13,13 +13,12 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
 	InitialBaseFee        = big.NewInt(params.ApricotPhase3InitialBaseFee)
-	MaxGasPrice           = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	MinGasPrice           = big.NewInt(params.ApricotPhase3MinBaseFee)
+	MaxBaseFee            = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	MinBaseFee            = big.NewInt(params.ApricotPhase3MinBaseFee)
 	TargetGas             = uint64(12_000_000)
 	BlockGasFee           = uint64(500_000)
 	rollupWindow   uint64 = 10
@@ -92,7 +91,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 
 		// Gas price is increasing, so ensure it does not increase past the maximum
 		baseFee.Add(baseFee, baseFeeDelta)
-		baseFee = math.BigMin(baseFee, new(big.Int).Set(MaxGasPrice))
+		baseFee = selectBigWithinBounds(MinBaseFee, baseFee, MaxBaseFee)
 	} else {
 		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
 		gasUsedDelta := new(big.Int).SetUint64(parentGasTarget - totalGas)
@@ -107,12 +106,27 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		if roll > rollupWindow {
 			// TODO(aaronbuchwald) add something to dampen this here to make high prices a little stickier
 			// in the case of a quiescent network.
+			// Note: roll/rollupWindow must be greater than 1 since we've checked that roll > rollupWindow
 			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/rollupWindow))
 		}
-		baseFee = math.BigMax(baseFee.Sub(baseFee, baseFeeDelta), MinGasPrice)
+		baseFee = selectBigWithinBounds(MinBaseFee, baseFee.Sub(baseFee, baseFeeDelta), MaxBaseFee)
 	}
 
 	return newRollupWindow, baseFee, nil
+}
+
+// selectBigWithinBounds returns [value] if it is within the bounds:
+// lowerBound <= value <= upperBound or the bound at either end if [value]
+// is outside of the defined boundaries.
+func selectBigWithinBounds(lowerBound, value, upperBound *big.Int) *big.Int {
+	switch {
+	case value.Cmp(lowerBound) < 0:
+		return new(big.Int).Set(lowerBound)
+	case value.Cmp(upperBound) > 0:
+		return new(big.Int).Set(upperBound)
+	default:
+		return value
+	}
 }
 
 // rollWindow rolls the longs within [consumptionWindow] over by [roll] places.
@@ -162,6 +176,8 @@ func sumLongWindow(window []byte, numLongs int) uint64 {
 		overflow bool
 	)
 	for i := 0; i < numLongs; i++ {
+		// If an overflow occurs while summing the elements of the window, return the maximum
+		// uint64 value immediately.
 		sum, overflow = math.SafeAdd(sum, binary.BigEndian.Uint64(window[wrappers.LongLen*i:]))
 		if overflow {
 			return math.MaxUint64
@@ -181,6 +197,4 @@ func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
 		totalGasConsumed = math.MaxUint64
 	}
 	binary.BigEndian.PutUint64(window[start:], totalGasConsumed)
-	// TODO(aaronbuchwald) remove overly verbose log
-	log.Info("stats", "prevGasConsumed", prevGasConsumed, "parentGasConsumed", gasConsumed, "BlockGasFee", BlockGasFee, "totalGasConsumed", totalGasConsumed)
 }
