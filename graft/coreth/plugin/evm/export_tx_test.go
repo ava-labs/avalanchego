@@ -9,8 +9,10 @@ import (
 
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -352,6 +354,160 @@ func TestExportTxGasCost(t *testing.T) {
 			}
 			if fee != test.ExpectedFee {
 				t.Fatalf("Expected fee to be %d, but found %d", test.ExpectedFee, fee)
+			}
+		})
+	}
+}
+
+func TestNewExportTx(t *testing.T) {
+	tests := []struct {
+		name    string
+		genesis string
+		rules   params.Rules
+		bal     uint64
+	}{
+		{
+			name:    "apricot phase 0",
+			genesis: genesisJSONApricotPhase0,
+			rules:   apricotRulesPhase0,
+			bal:     44000000,
+		},
+		{
+			name:    "apricot phase 1",
+			genesis: genesisJSONApricotPhase1,
+			rules:   apricotRulesPhase1,
+			bal:     44000000,
+		},
+		{
+			name:    "apricot phase 2",
+			genesis: genesisJSONApricotPhase2,
+			rules:   apricotRulesPhase2,
+			bal:     43000000,
+		},
+		{
+			name:    "apricot phase 3",
+			genesis: genesisJSONApricotPhase3,
+			rules:   apricotRulesPhase3,
+			bal:     43723250,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			issuer, vm, _, sharedMemory := GenesisVM(t, true, test.genesis, "", "")
+
+			defer func() {
+				if err := vm.Shutdown(); err != nil {
+					t.Fatal(err)
+				}
+			}()
+
+			parent := vm.LastAcceptedBlockInternal().(*Block)
+			importAmount := uint64(5000000 * 10)
+			utxoID := avax.UTXOID{
+				TxID: ids.ID{
+					0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+					0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+					0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+					0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+				},
+			}
+
+			utxo := &avax.UTXO{
+				UTXOID: utxoID,
+				Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: importAmount,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+					},
+				},
+			}
+			utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+			inputID := utxo.InputID()
+			if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+				Key:   inputID[:],
+				Value: utxoBytes,
+				Traits: [][]byte{
+					testKeys[0].PublicKey().Address().Bytes(),
+				},
+			}}}}); err != nil {
+				t.Fatal(err)
+			}
+
+			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := vm.issueTx(tx); err != nil {
+				t.Fatal(err)
+			}
+
+			<-issuer
+
+			blk, err := vm.BuildBlock()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if err := blk.Verify(); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := vm.SetPreference(blk.ID()); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := blk.Accept(); err != nil {
+				t.Fatal(err)
+			}
+
+			parent = vm.LastAcceptedBlockInternal().(*Block)
+			exportAmount := uint64(5000000)
+
+			testKeys0Addr := GetEthAddress(testKeys[0])
+			exportId, err := ids.ToShortID(testKeys0Addr[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			tx, err = vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, exportId, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			exportTx := tx.UnsignedAtomicTx
+
+			if err := exportTx.SemanticVerify(vm, tx, parent, parent.ethBlock.BaseFee(), test.rules); err != nil {
+				t.Fatal("newImportTx created an invalid transaction", err)
+			}
+
+			commitBatch, err := vm.db.CommitBatch()
+			if err != nil {
+				t.Fatalf("Failed to create commit batch for VM due to %s", err)
+			}
+			if err := exportTx.Accept(vm.ctx, commitBatch); err != nil {
+				t.Fatalf("Failed to accept import transaction due to: %s", err)
+			}
+
+			stdb, err := vm.chain.CurrentState()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = exportTx.EVMStateTransfer(vm.ctx, stdb)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			addr := GetEthAddress(testKeys[0])
+			if stdb.GetBalance(addr).Cmp(new(big.Int).SetUint64(test.bal*units.Avax)) != 0 {
+				t.Fatalf("address balance %s equal %s not %s", addr.String(), stdb.GetBalance(addr), new(big.Int).SetUint64(test.bal*units.Avax))
 			}
 		})
 	}

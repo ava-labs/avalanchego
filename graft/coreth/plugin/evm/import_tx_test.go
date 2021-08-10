@@ -7,6 +7,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/units"
+
 	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -539,23 +541,37 @@ func TestNewImportTx(t *testing.T) {
 	tests := []struct {
 		name    string
 		genesis string
+		rules   params.Rules
+		bal     uint64
 	}{
 		{
 			name:    "apricot phase 0",
 			genesis: genesisJSONApricotPhase0,
+			rules:   apricotRulesPhase0,
+			bal:     5000000,
 		},
 		{
 			name:    "apricot phase 1",
 			genesis: genesisJSONApricotPhase1,
+			rules:   apricotRulesPhase1,
+			bal:     5000000,
 		},
 		{
 			name:    "apricot phase 2",
 			genesis: genesisJSONApricotPhase2,
+			rules:   apricotRulesPhase2,
+			bal:     4000000,
+		},
+		{
+			name:    "apricot phase 3",
+			genesis: genesisJSONApricotPhase3,
+			rules:   apricotRulesPhase3,
+			bal:     4723250,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase2, "", "")
+			_, vm, _, sharedMemory := GenesisVM(t, true, test.genesis, "", "")
 
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -609,8 +625,8 @@ func TestNewImportTx(t *testing.T) {
 
 			importTx := tx.UnsignedAtomicTx
 
-			if err := importTx.SemanticVerify(vm, tx, parent, nil, apricotRulesPhase2); err != nil {
-				t.Fatal("newImportTx created an invalid transaction")
+			if err := importTx.SemanticVerify(vm, tx, parent, parent.ethBlock.BaseFee(), test.rules); err != nil {
+				t.Fatal("newImportTx created an invalid transaction", err)
 			}
 
 			commitBatch, err := vm.db.CommitBatch()
@@ -619,6 +635,20 @@ func TestNewImportTx(t *testing.T) {
 			}
 			if err := importTx.Accept(vm.ctx, commitBatch); err != nil {
 				t.Fatalf("Failed to accept import transaction due to: %s", err)
+			}
+
+			stdb, err := vm.chain.CurrentState()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = importTx.EVMStateTransfer(vm.ctx, stdb)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			addr := GetEthAddress(testKeys[0])
+			if stdb.GetBalance(addr).Cmp(new(big.Int).SetUint64(test.bal*units.Avax)) != 0 {
+				t.Fatalf("address balance %s equal %s not %s", addr.String(), stdb.GetBalance(addr), new(big.Int).SetUint64(test.bal*units.Avax))
 			}
 		})
 	}
