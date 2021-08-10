@@ -239,16 +239,31 @@ func (vm *VM) newExportTx(
 		return nil, errWrongChainID
 	}
 
+	// rules := vm.currentRules()
 	var toBurn uint64
 	var err error
-	if assetID == vm.ctx.AVAXAssetID {
-		toBurn, err = safemath.Add64(amount, params.AvalancheAtomicTxFee)
-		if err != nil {
-			return nil, errOverflowExport
+
+	switch {
+	// case rules.IsApricotPhase3:
+	// 	if assetID == vm.ctx.AVAXAssetID {
+	// 		toBurn, err = safemath.Add64(amount, uint64(params.ApricotPhase3InitialBaseFee))
+	// 		if err != nil {
+	// 			return nil, errOverflowExport
+	// 		}
+	// 	} else {
+	// 		toBurn = uint64(params.ApricotPhase3InitialBaseFee)
+	// 	}
+	default:
+		if assetID == vm.ctx.AVAXAssetID {
+			toBurn, err = safemath.Add64(amount, params.AvalancheAtomicTxFee)
+			if err != nil {
+				return nil, errOverflowExport
+			}
+		} else {
+			toBurn = params.AvalancheAtomicTxFee
 		}
-	} else {
-		toBurn = params.AvalancheAtomicTxFee
 	}
+
 	// burn AVAX
 	ins, signers, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, toBurn)
 	if err != nil {

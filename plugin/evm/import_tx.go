@@ -285,35 +285,83 @@ func (vm *VM) newImportTx(
 	}
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
 	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID]
-	outs := []EVMOutput{}
+
+	rules := vm.currentRules()
+
+	computeOutputs := func(outs []EVMOutput) []EVMOutput {
+		// This will create unique outputs (in the context of sorting)
+		// since each output will have a unique assetID
+		for assetID, amount := range importedAmount {
+			// Skip the AVAX amount since it has already been included
+			// and skip any input with an amount of 0
+			if assetID == vm.ctx.AVAXAssetID || amount == 0 {
+				continue
+			}
+			outs = append(outs, EVMOutput{
+				Address: to,
+				Amount:  amount,
+				AssetID: assetID,
+			})
+		}
+		return outs
+	}
+
+	var txFee uint64
+	switch {
+	case rules.IsApricotPhase3:
+
+		// build out placeholders..
+		outs := []EVMOutput{}
+		outs = append(outs, EVMOutput{
+			Address: to,
+			Amount:  importedAVAXAmount - txFee,
+			AssetID: vm.ctx.AVAXAssetID,
+		})
+
+		outs = computeOutputs(outs)
+
+		// we just need placeholders, so no sorting is required
+
+		utx := &UnsignedImportTx{
+			NetworkID:      vm.ctx.NetworkID,
+			BlockchainID:   vm.ctx.ChainID,
+			Outs:           outs,
+			ImportedInputs: importedInputs,
+			SourceChain:    chainID,
+		}
+		tx := &Tx{UnsignedAtomicTx: utx}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return nil, err
+		}
+
+		cost, err := tx.Cost()
+		if err != nil {
+			return nil, err
+		}
+		txFee, err = calculateDynamicFee(cost, big.NewInt(params.ApricotPhase3InitialBaseFee))
+		if err != nil {
+			return nil, err
+		}
+	case rules.IsApricotPhase2:
+		txFee = params.AvalancheAtomicTxFee
+	}
 
 	// AVAX output
-	if importedAVAXAmount < params.AvalancheAtomicTxFee { // imported amount goes toward paying tx fee
+	if importedAVAXAmount < txFee { // imported amount goes toward paying tx fee
 		return nil, errInsufficientFundsForFee
 	}
 
-	if importedAVAXAmount > params.AvalancheAtomicTxFee {
+	outs := []EVMOutput{}
+
+	if importedAVAXAmount > txFee {
 		outs = append(outs, EVMOutput{
 			Address: to,
-			Amount:  importedAVAXAmount - params.AvalancheAtomicTxFee,
+			Amount:  importedAVAXAmount - txFee,
 			AssetID: vm.ctx.AVAXAssetID,
 		})
 	}
 
-	// This will create unique outputs (in the context of sorting)
-	// since each output will have a unique assetID
-	for assetID, amount := range importedAmount {
-		// Skip the AVAX amount since it has already been included
-		// and skip any input with an amount of 0
-		if assetID == vm.ctx.AVAXAssetID || amount == 0 {
-			continue
-		}
-		outs = append(outs, EVMOutput{
-			Address: to,
-			Amount:  amount,
-			AssetID: assetID,
-		})
-	}
+	outs = computeOutputs(outs)
 
 	// If no outputs are produced, return an error.
 	// Note: this can happen if there is exactly enough AVAX to pay the
