@@ -13,7 +13,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/avm/index"
+	"github.com/ava-labs/avalanchego/vms/components/index"
 
 	"github.com/gorilla/rpc/v2"
 

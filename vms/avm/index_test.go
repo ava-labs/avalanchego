@@ -8,7 +8,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/avm/index"
+	"github.com/ava-labs/avalanchego/vms/components/index"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/version"
