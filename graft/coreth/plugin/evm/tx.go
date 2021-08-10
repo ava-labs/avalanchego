@@ -88,6 +88,7 @@ func (in *EVMInput) Verify() error {
 type UnsignedTx interface {
 	Initialize(unsignedBytes, signedBytes []byte)
 	ID() ids.ID
+	Cost() (uint64, error)
 	UnsignedBytes() []byte
 	Bytes() []byte
 }
@@ -117,19 +118,6 @@ type Tx struct {
 
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
-}
-
-func (tx *Tx) Cost() (uint64, error) {
-	cost := calcBytesCost(len(tx.UnsignedAtomicTx.Bytes()))
-	totalSignatures := uint64(0)
-	for _, cred := range tx.Creds {
-		secpCred, ok := cred.(*secp256k1fx.Credential)
-		if !ok {
-			return 0, fmt.Errorf("expected *secp256k1fx.Credential but got %T", cred)
-		}
-		totalSignatures += uint64(len(secpCred.Sigs))
-	}
-	return cost + totalSignatures*SignatureGas, nil
 }
 
 // Sign this transaction with the provided signers

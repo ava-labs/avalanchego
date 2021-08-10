@@ -203,8 +203,8 @@ func TestExportTxGasCost(t *testing.T) {
 				},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 1307,
-			ExpectedFee:  32675,
+			ExpectedCost: 1230,
+			ExpectedFee:  30750,
 			BaseFee:      big.NewInt(25 * params.GWei),
 		},
 		"simple export 225Gwei BaseFee": {
@@ -235,8 +235,8 @@ func TestExportTxGasCost(t *testing.T) {
 				},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
-			ExpectedCost: 1307,
-			ExpectedFee:  294075,
+			ExpectedCost: 1230,
+			ExpectedFee:  276750,
 			BaseFee:      big.NewInt(225 * params.GWei),
 		},
 		"complex export 25Gwei BaseFee": {
@@ -279,8 +279,8 @@ func TestExportTxGasCost(t *testing.T) {
 				},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
-			ExpectedCost: 3573,
-			ExpectedFee:  89325,
+			ExpectedCost: 3366,
+			ExpectedFee:  84150,
 			BaseFee:      big.NewInt(25 * params.GWei),
 		},
 		"complex export 225Gwei BaseFee": {
@@ -323,8 +323,8 @@ func TestExportTxGasCost(t *testing.T) {
 				},
 			},
 			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0], testKeys[0], testKeys[0]}},
-			ExpectedCost: 3573,
-			ExpectedFee:  803925,
+			ExpectedCost: 3366,
+			ExpectedFee:  757350,
 			BaseFee:      big.NewInt(225 * params.GWei),
 		},
 	}
