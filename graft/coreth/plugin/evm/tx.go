@@ -228,7 +228,7 @@ func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	fee := new(big.Int).Mul(bigCost, baseFee)
 	feeToRoundUp := new(big.Int).Add(fee, x2cRateMinus1)
 	feeInNAVAX := new(big.Int).Div(feeToRoundUp, x2cRate)
-	if feeInNAVAX.Cmp(maxUint64) == 1 {
+	if !feeInNAVAX.IsUint64() {
 		// the fee is more than can fit in a uint64
 		return 0, errFeeOverflow
 	}
