@@ -120,7 +120,7 @@ type Tx struct {
 }
 
 func (tx *Tx) Cost() (uint64, error) {
-	cost := calcBytesCost(len(tx.UnsignedAtomicTx.Bytes()))
+	cost := calcBytesCost(len(tx.UnsignedAtomicTx.UnsignedBytes()))
 	totalSignatures := uint64(0)
 	for _, cred := range tx.Creds {
 		secpCred, ok := cred.(*secp256k1fx.Credential)

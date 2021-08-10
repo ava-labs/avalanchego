@@ -123,6 +123,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	// Check the transaction consumes and produces the right amounts
 	fc := avax.NewFlowChecker()
 	switch {
+	// Apply dynamic fees to export transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
 		cost, err := stx.Cost()
 		if err != nil {
@@ -133,14 +134,14 @@ func (tx *UnsignedExportTx) SemanticVerify(
 			return err
 		}
 		fc.Produce(vm.ctx.AVAXAssetID, txFee)
+
+	// Apply fees to export transactions before Apricot Phase 3
 	default:
 		fc.Produce(vm.ctx.AVAXAssetID, params.AvalancheAtomicTxFee)
 	}
-
 	for _, out := range tx.ExportedOutputs {
 		fc.Produce(out.AssetID(), out.Output().Amount())
 	}
-
 	for _, in := range tx.Ins {
 		fc.Consume(in.AssetID, in.Amount)
 	}
