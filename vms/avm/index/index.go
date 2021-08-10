@@ -172,7 +172,7 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 // See AddressTxsIndexer
 func (i *indexer) Read(address []byte, assetID ids.ID, cursor, pageSize uint64) ([]ids.ID, error) {
 	// setup prefix DBs
-	addressTxDB := prefixdb.New(address[:], i.db)
+	addressTxDB := prefixdb.New(address, i.db)
 	assetPrefixDB := prefixdb.New(assetID[:], addressTxDB)
 
 	// get cursor in bytes
