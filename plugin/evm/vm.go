@@ -109,7 +109,6 @@ var (
 	errNoImportInputs             = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errSignatureInputsMismatch    = errors.New("number of inputs does not match number of signatures")
 	errWrongChainID               = errors.New("tx has wrong chain ID")
 	errInsufficientFunds          = errors.New("insufficient funds")
 	errNoExportOutputs            = errors.New("tx has no export outputs")
@@ -980,9 +979,10 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 	timestamp := time.Now().Unix()
 	bigTimestamp := big.NewInt(timestamp)
 	if vm.chainConfig.IsApricotPhase3(bigTimestamp) {
-		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(time.Now().Unix()))
+		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(timestamp))
 		if err != nil {
-			return fmt.Errorf("failed to calculate base fee: %w", err)
+			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
+			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
 		}
 	}
 
