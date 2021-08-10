@@ -388,7 +388,7 @@ func TestNewExportTx(t *testing.T) {
 			name:    "apricot phase 3",
 			genesis: genesisJSONApricotPhase3,
 			rules:   apricotRulesPhase3,
-			bal:     43723250,
+			bal:     44446500,
 		},
 	}
 	for _, test := range tests {
