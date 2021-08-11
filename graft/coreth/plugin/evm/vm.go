@@ -1108,6 +1108,18 @@ func (vm *VM) GetSpendableAVAXWithFee(
 	if err != nil {
 		return nil, nil, err
 	}
+
+	initialFee, err := calculateDynamicFee(cost, baseFee)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newAmount, err := math.Add64(amount, initialFee)
+	if err != nil {
+		return nil, nil, err
+	}
+	amount = newAmount
+
 	inputs := []EVMInput{}
 	signers := [][]*crypto.PrivateKeySECP256K1R{}
 	// Note: we assume that each key in [keys] is unique, so that iterating over
