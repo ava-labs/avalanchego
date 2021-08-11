@@ -21,7 +21,7 @@ var (
 	MaxGasPrice           = big.NewInt(params.ApricotPhase3MaxBaseFee)
 	MinGasPrice           = big.NewInt(params.ApricotPhase3MinBaseFee)
 	TargetGas             = uint64(12_000_000)
-	BlockGasFee           = uint64(500_000)
+	BlockGasFee           = uint64(1_000_000)
 	rollupWindow   uint64 = 10
 )
 
