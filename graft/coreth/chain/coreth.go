@@ -85,6 +85,10 @@ func (self *ETHChain) AddLocalTxs(txs []*types.Transaction) []error {
 	return self.backend.TxPool().AddLocals(txs)
 }
 
+func (self *ETHChain) CurrentBlock() *types.Block {
+	return self.backend.BlockChain().CurrentBlock()
+}
+
 // Returns a new mutable state based on the current HEAD block.
 func (self *ETHChain) CurrentState() (*state.StateDB, error) {
 	return self.backend.BlockChain().State()
