@@ -75,7 +75,7 @@ var (
 type JumpTable [256]*operation
 
 // newApricotPhase3InstructionSet returns the frontier, homestead, byzantium,
-// contantinople, istanbul, petersburg, apricotPhase1, 2, and 4 instructions.
+// contantinople, istanbul, petersburg, apricotPhase1, 2, and 3 instructions.
 func newApricotPhase3InstructionSet() JumpTable {
 	instructionSet := newApricotPhase2InstructionSet()
 	enable3198(&instructionSet) // Base fee opcode https://eips.ethereum.org/EIPS/eip-3198
