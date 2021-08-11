@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -61,7 +63,7 @@ func (tx *UnsignedExportTx) Verify(
 		return errNoExportOutputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
 		return err
 	}
 
@@ -73,7 +75,7 @@ func (tx *UnsignedExportTx) Verify(
 			return errWrongLocktime
 		}
 	}
-	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, Codec) {
+	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, platformcodec.Codec) {
 		return errOutputsNotSorted
 	}
 
@@ -85,9 +87,9 @@ func (tx *UnsignedExportTx) Verify(
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (VersionedState, TxError) {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -138,7 +140,7 @@ func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+		utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
@@ -164,7 +166,7 @@ func (vm *VM) newExportTx(
 	to ids.ShortID, // Address of chain recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*transaction.SignedTx, error) {
 	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
@@ -199,9 +201,9 @@ func (vm *VM) newExportTx(
 			},
 		}},
 	}
-	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	tx := &transaction.SignedTx{UnsignedTx: utx}
+	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID)
 }

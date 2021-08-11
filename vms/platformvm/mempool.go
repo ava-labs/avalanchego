@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 const (
@@ -33,7 +35,7 @@ type Mempool struct {
 
 	// TODO: factor out VM into separable interfaces
 
-	// vm.codec
+	// platformcodec.Codec
 	// vm.ctx.Log
 	// vm.ctx.Lock
 
@@ -66,8 +68,8 @@ type Mempool struct {
 	// Transactions that have not been put into blocks yet
 	dropIncoming        bool
 	unissuedProposalTxs *EventHeap
-	unissuedDecisionTxs []*Tx
-	unissuedAtomicTxs   []*Tx
+	unissuedDecisionTxs []*transaction.SignedTx
+	unissuedAtomicTxs   []*transaction.SignedTx
 	unissuedTxIDs       ids.Set
 }
 
@@ -91,13 +93,13 @@ func (m *Mempool) Initialize(vm *VM) {
 }
 
 // IssueTx enqueues the [tx] to be put into a block
-func (m *Mempool) IssueTx(tx *Tx) error {
+func (m *Mempool) IssueTx(tx *transaction.SignedTx) error {
 	if m.dropIncoming {
 		return nil
 	}
 
 	// Initialize the transaction
-	if err := tx.Sign(m.vm.codec, nil); err != nil {
+	if err := tx.Sign(platformcodec.Codec, nil); err != nil {
 		return err
 	}
 	txID := tx.ID()
@@ -149,7 +151,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if numTxs > len(m.unissuedDecisionTxs) {
 			numTxs = len(m.unissuedDecisionTxs)
 		}
-		var txs []*Tx
+		var txs []*transaction.SignedTx
 		txs, m.unissuedDecisionTxs = m.unissuedDecisionTxs[:numTxs], m.unissuedDecisionTxs[numTxs:]
 		for _, tx := range txs {
 			m.unissuedTxIDs.Remove(tx.ID())

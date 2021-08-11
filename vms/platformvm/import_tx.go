@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -67,7 +69,7 @@ func (tx *UnsignedImportTx) Verify(
 		return errNoImportInputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
 		return err
 	}
 
@@ -88,9 +90,9 @@ func (tx *UnsignedImportTx) Verify(
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (VersionedState, TxError) {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -120,7 +122,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 		for i, utxoBytes := range allUTXOBytes {
 			utxo := &avax.UTXO{}
-			if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			if _, err := platformcodec.Codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return nil, tempError{
 					fmt.Errorf("failed to unmarshal UTXO: %w", err),
 				}
@@ -171,7 +173,7 @@ func (vm *VM) newImportTx(
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*transaction.SignedTx, error) {
 	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
@@ -254,9 +256,9 @@ func (vm *VM) newImportTx(
 		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
 	}
-	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	tx := &transaction.SignedTx{UnsignedTx: utx}
+	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID)
 }

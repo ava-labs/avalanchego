@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var _ Block = &ProposalBlock{}
@@ -26,7 +28,7 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx Tx `serialize:"true" json:"tx"`
+	Tx transaction.SignedTx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState VersionedState
@@ -85,11 +87,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx.UnsignedTx)
+	unsignedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &pb.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx)
+	signedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -247,7 +249,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 // The parent of this block has ID [parentID].
 //
 // The parent must be a decision block.
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx transaction.SignedTx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -259,7 +261,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*Proposal
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(codecVersion, &block)
+	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

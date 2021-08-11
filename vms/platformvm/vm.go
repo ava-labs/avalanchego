@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -31,6 +33,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -77,6 +81,58 @@ var (
 	_ Fx                   = &secp256k1fx.Fx{}
 )
 
+func init() {
+	c := linearcodec.NewDefault()
+	platformcodec.Codec = codec.NewDefaultManager()
+	gc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
+	platformcodec.GenesisCodec = codec.NewManager(math.MaxUint32)
+
+	errs := wrappers.Errs{}
+	for _, c := range []codec.Registry{c, gc} {
+		errs.Add(
+			c.RegisterType(&ProposalBlock{}),
+			c.RegisterType(&AbortBlock{}),
+			c.RegisterType(&CommitBlock{}),
+			c.RegisterType(&StandardBlock{}),
+			c.RegisterType(&AtomicBlock{}),
+
+			// The Fx is registered here because this is the same place it is
+			// registered in the AVM. This ensures that the typeIDs match up for
+			// utxos in shared memory.
+			c.RegisterType(&secp256k1fx.TransferInput{}),
+			c.RegisterType(&secp256k1fx.MintOutput{}),
+			c.RegisterType(&secp256k1fx.TransferOutput{}),
+			c.RegisterType(&secp256k1fx.MintOperation{}),
+			c.RegisterType(&secp256k1fx.Credential{}),
+			c.RegisterType(&secp256k1fx.Input{}),
+			c.RegisterType(&secp256k1fx.OutputOwners{}),
+
+			c.RegisterType(&UnsignedAddValidatorTx{}),
+			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
+			c.RegisterType(&UnsignedAddDelegatorTx{}),
+
+			c.RegisterType(&UnsignedCreateChainTx{}),
+			c.RegisterType(&UnsignedCreateSubnetTx{}),
+
+			c.RegisterType(&UnsignedImportTx{}),
+			c.RegisterType(&UnsignedExportTx{}),
+
+			c.RegisterType(&UnsignedAdvanceTimeTx{}),
+			c.RegisterType(&UnsignedRewardValidatorTx{}),
+
+			c.RegisterType(&StakeableLockIn{}),
+			c.RegisterType(&StakeableLockOut{}),
+		)
+	}
+	errs.Add(
+		platformcodec.Codec.RegisterCodec(platformcodec.Version, c),
+		platformcodec.GenesisCodec.RegisterCodec(platformcodec.Version, gc),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
+	}
+}
+
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	Factory
@@ -109,7 +165,6 @@ type VM struct {
 	lastAcceptedID ids.ID
 
 	fx            Fx
-	codec         codec.Manager
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
@@ -151,7 +206,7 @@ func (vm *VM) Initialize(
 	vm.AddressManager = avax.NewAddressManager(ctx)
 
 	// Initialize the utility to fetch atomic UTXOs
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, platformcodec.Codec)
 
 	vm.fx = &secp256k1fx.Fx{}
 
@@ -159,9 +214,7 @@ func (vm *VM) Initialize(
 	vm.dbManager = dbManager
 	vm.toEngine = msgs
 
-	vm.codec = Codec
 	vm.codecRegistry = linearcodec.NewDefault()
-
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
@@ -231,7 +284,7 @@ func (vm *VM) initBlockchains() error {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func (vm *VM) createChain(tx *Tx) error {
+func (vm *VM) createChain(tx *transaction.SignedTx) error {
 	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
 	if !ok {
 		return errWrongTxType
@@ -337,7 +390,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.mempool.BuildBlock
 // ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	var blk Block
-	if _, err := GenesisCodec.Unmarshal(b, &blk); err != nil {
+	if _, err := platformcodec.GenesisCodec.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
 	if err := blk.initialize(vm, b, choices.Processing, blk); err != nil {
@@ -520,7 +573,7 @@ func (vm *VM) nextStakerChangeTime(vs MutableState) (time.Time, error) {
 	return earliest, nil
 }
 
-func (vm *VM) Codec() codec.Manager { return vm.codec }
+func (vm *VM) Codec() codec.Manager { return platformcodec.Codec }
 
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 

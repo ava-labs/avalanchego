@@ -8,6 +8,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var (
@@ -20,7 +22,7 @@ var (
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
 
-	Txs []*Tx `serialize:"true" json:"txs"`
+	Txs []*transaction.SignedTx `serialize:"true" json:"txs"`
 }
 
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
@@ -28,7 +30,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
-		if err := tx.Sign(vm.codec, nil); err != nil {
+		if err := tx.Sign(platformcodec.Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
@@ -145,7 +147,7 @@ func (sb *StandardBlock) Reject() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*transaction.SignedTx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		SingleDecisionBlock: SingleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
@@ -161,7 +163,7 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(sb)
-	bytes, err := vm.codec.Marshal(codecVersion, &blk)
+	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var (
@@ -74,7 +76,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.SubnetAuth); err != nil {
@@ -90,7 +92,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -100,7 +102,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 ) {
 	if err := tx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		vm.MinStakeDuration,
@@ -274,7 +276,7 @@ func (vm *VM) newAddSubnetValidatorTx(
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*transaction.SignedTx, error) {
 	ins, outs, _, signers, err := vm.stake(keys, 0, vm.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -305,13 +307,13 @@ func (vm *VM) newAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	tx := &transaction.SignedTx{UnsignedTx: utx}
+	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
 	return tx, utx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		vm.MinStakeDuration,

@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -445,7 +447,7 @@ func (service *Service) GetUTXOs(_ *http.Request, args *GetUTXOsArgs, response *
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := service.vm.codec.Marshal(codecVersion, utxo)
+		bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -2030,8 +2032,8 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	tx := &Tx{}
-	if _, err := service.vm.codec.Unmarshal(txBytes, tx); err != nil {
+	tx := &transaction.SignedTx{}
+	if _, err := platformcodec.Codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
 	if err := service.vm.mempool.IssueTx(tx); err != nil {
@@ -2165,7 +2167,7 @@ type GetStakeReply struct {
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
-func (service *Service) getStakeHelper(tx *Tx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
+func (service *Service) getStakeHelper(tx *transaction.SignedTx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
 	var outs []*avax.TransferableOutput
 	switch staker := tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
@@ -2283,7 +2285,7 @@ func (service *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *
 	response.Staked = json.Uint64(totalStake)
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
-		bytes, err := service.vm.codec.Marshal(codecVersion, output)
+		bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, output)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
@@ -2384,7 +2386,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.NumFetched = json.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+		utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to encode UTXO to bytes: %w", err)
 		}

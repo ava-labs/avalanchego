@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -139,7 +140,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.UnsignedTx.(*UnsignedCreateChainTx).syntacticallyVerified = false
 		tx.UnsignedTx = test.setup(tx.UnsignedTx.(*UnsignedCreateChainTx))
-		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).Verify(vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil && !test.shouldErr {
+		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).Verify(vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -34,7 +35,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	var unsignedTx *UnsignedAddValidatorTx
 	if err := unsignedTx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -64,7 +65,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -104,7 +105,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -138,7 +139,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -168,7 +169,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -198,7 +199,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -228,7 +229,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -258,7 +259,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -288,7 +289,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,
@@ -313,7 +314,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		defaultMinStakingDuration,

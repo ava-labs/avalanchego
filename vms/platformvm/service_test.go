@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
@@ -215,7 +217,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -231,7 +233,7 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
-	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
+	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, platformcodec.Codec)
 
 	service.vm.AtomicUTXOManager = newAtomicUTXOManager
 	tx, err := service.vm.newImportTx(avmID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
@@ -336,13 +338,13 @@ func TestGetTx(t *testing.T) {
 
 	type test struct {
 		description string
-		createTx    func() (*Tx, error)
+		createTx    func() (*transaction.SignedTx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func() (*Tx, error) {
+			func() (*transaction.SignedTx, error) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
@@ -356,7 +358,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func() (*Tx, error) {
+			func() (*transaction.SignedTx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
@@ -371,7 +373,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func() (*Tx, error) {
+			func() (*transaction.SignedTx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.ctx.XChainID,
@@ -497,7 +499,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		_, err = platformcodec.Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -524,7 +526,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		_, err = platformcodec.Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -570,7 +572,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = platformcodec.Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
@@ -612,7 +614,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = platformcodec.Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected

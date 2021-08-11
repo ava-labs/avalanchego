@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var (
@@ -23,7 +25,7 @@ var (
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx Tx `serialize:"true" json:"tx"`
+	Tx transaction.SignedTx `serialize:"true" json:"tx"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
@@ -34,11 +36,11 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := vm.codec.Marshal(codecVersion, &ab.Tx.UnsignedTx)
+	unsignedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &ab.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := ab.vm.codec.Marshal(codecVersion, &ab.Tx)
+	signedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &ab.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -199,7 +201,7 @@ func (ab *AtomicBlock) Reject() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx transaction.SignedTx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{
@@ -213,7 +215,7 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(ab)
-	bytes, err := Codec.Marshal(codecVersion, &blk)
+	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

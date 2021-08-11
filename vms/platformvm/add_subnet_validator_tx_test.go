@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -29,7 +31,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	var unsignedTx *UnsignedAddSubnetValidatorTx
 	if err := unsignedTx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -56,7 +58,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -83,7 +85,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -110,7 +112,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -138,7 +140,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -165,7 +167,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -192,7 +194,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -214,7 +216,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,
@@ -547,7 +549,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	var unmarshaledTx Tx
+	var unmarshaledTx transaction.SignedTx
 
 	// valid tx
 	tx, err := vm.newAddSubnetValidatorTx(
@@ -562,22 +564,22 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	txBytes, err := Codec.Marshal(codecVersion, tx)
+	txBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if _, err := Codec.Unmarshal(txBytes, &unmarshaledTx); err != nil {
+	if _, err := platformcodec.Codec.Unmarshal(txBytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := unmarshaledTx.Sign(vm.codec, nil); err != nil {
+	if err := unmarshaledTx.Sign(platformcodec.Codec, nil); err != nil {
 		t.Fatal(err)
 	}
 
 	if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.TxFee,
 		vm.ctx.AVAXAssetID,
 		defaultMinStakingDuration,

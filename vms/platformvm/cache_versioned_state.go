@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var _ VersionedState = &versionedStateImpl{}
@@ -43,14 +44,14 @@ type MutableState interface {
 	GetCurrentSupply() uint64
 	SetCurrentSupply(uint64)
 
-	GetSubnets() ([]*Tx, error)
-	AddSubnet(createSubnetTx *Tx)
+	GetSubnets() ([]*transaction.SignedTx, error)
+	AddSubnet(createSubnetTx *transaction.SignedTx)
 
-	GetChains(subnetID ids.ID) ([]*Tx, error)
-	AddChain(createChainTx *Tx)
+	GetChains(subnetID ids.ID) ([]*transaction.SignedTx, error)
+	AddChain(createChainTx *transaction.SignedTx)
 
-	GetTx(txID ids.ID) (*Tx, Status, error)
-	AddTx(tx *Tx, status Status)
+	GetTx(txID ids.ID) (*transaction.SignedTx, Status, error)
+	AddTx(tx *transaction.SignedTx, status Status)
 
 	CurrentStakerChainState() currentStakerChainState
 	PendingStakerChainState() pendingStakerChainState
@@ -73,16 +74,16 @@ type versionedStateImpl struct {
 
 	currentSupply uint64
 
-	addedSubnets  []*Tx
-	cachedSubnets []*Tx
+	addedSubnets  []*transaction.SignedTx
+	cachedSubnets []*transaction.SignedTx
 
-	addedChains  map[ids.ID][]*Tx
-	cachedChains map[ids.ID][]*Tx
+	addedChains  map[ids.ID][]*transaction.SignedTx
+	cachedChains map[ids.ID][]*transaction.SignedTx
 
 	// map of txID -> []*UTXO
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO
 
-	// map of txID -> {*Tx, Status}
+	// map of txID -> {*transaction.Tx, Status}
 	addedTxs map[ids.ID]*txStatusImpl
 
 	// map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
@@ -90,7 +91,7 @@ type versionedStateImpl struct {
 }
 
 type txStatusImpl struct {
-	tx     *Tx
+	tx     *transaction.SignedTx
 	status Status
 }
 
@@ -129,7 +130,7 @@ func (vs *versionedStateImpl) SetCurrentSupply(currentSupply uint64) {
 	vs.currentSupply = currentSupply
 }
 
-func (vs *versionedStateImpl) GetSubnets() ([]*Tx, error) {
+func (vs *versionedStateImpl) GetSubnets() ([]*transaction.SignedTx, error) {
 	if len(vs.addedSubnets) == 0 {
 		return vs.parentState.GetSubnets()
 	}
@@ -140,7 +141,7 @@ func (vs *versionedStateImpl) GetSubnets() ([]*Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	newSubnets := make([]*Tx, len(subnets)+len(vs.addedSubnets))
+	newSubnets := make([]*transaction.SignedTx, len(subnets)+len(vs.addedSubnets))
 	copy(newSubnets, subnets)
 	for i, subnet := range vs.addedSubnets {
 		newSubnets[i+len(subnets)] = subnet
@@ -149,14 +150,14 @@ func (vs *versionedStateImpl) GetSubnets() ([]*Tx, error) {
 	return newSubnets, nil
 }
 
-func (vs *versionedStateImpl) AddSubnet(createSubnetTx *Tx) {
+func (vs *versionedStateImpl) AddSubnet(createSubnetTx *transaction.SignedTx) {
 	vs.addedSubnets = append(vs.addedSubnets, createSubnetTx)
 	if vs.cachedSubnets != nil {
 		vs.cachedSubnets = append(vs.cachedSubnets, createSubnetTx)
 	}
 }
 
-func (vs *versionedStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
+func (vs *versionedStateImpl) GetChains(subnetID ids.ID) ([]*transaction.SignedTx, error) {
 	if len(vs.addedChains) == 0 {
 		// No chains have been added
 		return vs.parentState.GetChains(subnetID)
@@ -171,7 +172,7 @@ func (vs *versionedStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
 
 	if vs.cachedChains == nil {
 		// This is the first time we are going to be caching the subnet chains
-		vs.cachedChains = make(map[ids.ID][]*Tx)
+		vs.cachedChains = make(map[ids.ID][]*transaction.SignedTx)
 	}
 
 	cachedChains, cached := vs.cachedChains[subnetID]
@@ -185,7 +186,7 @@ func (vs *versionedStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
 		return nil, err
 	}
 
-	newChains := make([]*Tx, len(chains)+len(addedChains))
+	newChains := make([]*transaction.SignedTx, len(chains)+len(addedChains))
 	copy(newChains, chains)
 	for i, chain := range addedChains {
 		newChains[i+len(chains)] = chain
@@ -194,10 +195,10 @@ func (vs *versionedStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
 	return newChains, nil
 }
 
-func (vs *versionedStateImpl) AddChain(createChainTx *Tx) {
+func (vs *versionedStateImpl) AddChain(createChainTx *transaction.SignedTx) {
 	tx := createChainTx.UnsignedTx.(*UnsignedCreateChainTx)
 	if vs.addedChains == nil {
-		vs.addedChains = map[ids.ID][]*Tx{
+		vs.addedChains = map[ids.ID][]*transaction.SignedTx{
 			tx.SubnetID: {createChainTx},
 		}
 	} else {
@@ -211,7 +212,7 @@ func (vs *versionedStateImpl) AddChain(createChainTx *Tx) {
 	vs.cachedChains[tx.SubnetID] = append(cachedChains, createChainTx)
 }
 
-func (vs *versionedStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
+func (vs *versionedStateImpl) GetTx(txID ids.ID) (*transaction.SignedTx, Status, error) {
 	tx, exists := vs.addedTxs[txID]
 	if !exists {
 		return vs.parentState.GetTx(txID)
@@ -219,7 +220,7 @@ func (vs *versionedStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
 	return tx.tx, tx.status, nil
 }
 
-func (vs *versionedStateImpl) AddTx(tx *Tx, status Status) {
+func (vs *versionedStateImpl) AddTx(tx *transaction.SignedTx, status Status) {
 	txID := tx.ID()
 	txStatus := &txStatusImpl{
 		tx:     tx,

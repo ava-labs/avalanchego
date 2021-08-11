@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
@@ -30,7 +31,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	var unsignedTx *UnsignedAddDelegatorTx
 	if err := unsignedTx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -56,7 +57,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -82,7 +83,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -108,7 +109,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -133,7 +134,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,
@@ -154,7 +155,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		t.Fatal(err)
 	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		defaultMinStakingDuration,
 		defaultMaxStakingDuration,

@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 // Ensure semantic verification fails when proposed timestamp is at or before current timestamp
@@ -499,13 +501,13 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := Codec.Marshal(codecVersion, tx)
+	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	var unmarshaledTx Tx
-	if _, err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
+	var unmarshaledTx transaction.SignedTx
+	if _, err := platformcodec.Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
 	} else if tx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")

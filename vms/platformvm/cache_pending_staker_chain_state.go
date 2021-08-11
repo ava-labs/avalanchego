@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var _ pendingStakerChainState = &pendingStakerChainStateImpl{}
@@ -21,12 +22,12 @@ type pendingStakerChainState interface {
 	GetValidatorTx(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error)
 	GetValidator(nodeID ids.ShortID) validator
 
-	AddStaker(addStakerTx *Tx) pendingStakerChainState
+	AddStaker(addStakerTx *transaction.SignedTx) pendingStakerChainState
 	DeleteStakers(numToRemove int) pendingStakerChainState
 
 	// Stakers returns the list of pending validators in order of their removal
 	// from the pending staker set
-	Stakers() []*Tx
+	Stakers() []*transaction.SignedTx
 
 	Apply(InternalState)
 }
@@ -41,10 +42,10 @@ type pendingStakerChainStateImpl struct {
 
 	// list of pending validators in order of their removal from the pending
 	// staker set
-	validators []*Tx
+	validators []*transaction.SignedTx
 
-	addedStakers   []*Tx
-	deletedStakers []*Tx
+	addedStakers   []*transaction.SignedTx
+	deletedStakers []*transaction.SignedTx
 }
 
 func (ps *pendingStakerChainStateImpl) GetValidatorTx(nodeID ids.ShortID) (addStakerTx *UnsignedAddValidatorTx, err error) {
@@ -62,10 +63,10 @@ func (ps *pendingStakerChainStateImpl) GetValidator(nodeID ids.ShortID) validato
 	return &validatorImpl{}
 }
 
-func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *Tx) pendingStakerChainState {
+func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *transaction.SignedTx) pendingStakerChainState {
 	newPS := &pendingStakerChainStateImpl{
-		validators:   make([]*Tx, len(ps.validators)+1),
-		addedStakers: []*Tx{addStakerTx},
+		validators:   make([]*transaction.SignedTx, len(ps.validators)+1),
+		addedStakers: []*transaction.SignedTx{addStakerTx},
 	}
 	copy(newPS.validators, ps.validators)
 	newPS.validators[len(ps.validators)] = addStakerTx
@@ -194,7 +195,7 @@ func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingSta
 	return newPS
 }
 
-func (ps *pendingStakerChainStateImpl) Stakers() []*Tx {
+func (ps *pendingStakerChainStateImpl) Stakers() []*transaction.SignedTx {
 	return ps.validators
 }
 
@@ -212,7 +213,7 @@ func (ps *pendingStakerChainStateImpl) Apply(is InternalState) {
 	ps.deletedStakers = nil
 }
 
-type innerSortValidatorsByAddition []*Tx
+type innerSortValidatorsByAddition []*transaction.SignedTx
 
 func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 	iDel := s[i]
@@ -286,7 +287,7 @@ func (s innerSortValidatorsByAddition) Swap(i, j int) {
 	s[j], s[i] = s[i], s[j]
 }
 
-func sortValidatorsByAddition(s []*Tx) {
+func sortValidatorsByAddition(s []*transaction.SignedTx) {
 	sort.Sort(innerSortValidatorsByAddition(s))
 }
 

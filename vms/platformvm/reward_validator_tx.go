@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -52,7 +54,7 @@ type UnsignedRewardValidatorTx struct {
 func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -300,9 +302,9 @@ func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
 
 // RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.
-func (vm *VM) newRewardValidatorTx(txID ids.ID) (*Tx, error) {
-	tx := &Tx{UnsignedTx: &UnsignedRewardValidatorTx{
+func (vm *VM) newRewardValidatorTx(txID ids.ID) (*transaction.SignedTx, error) {
+	tx := &transaction.SignedTx{UnsignedTx: &UnsignedRewardValidatorTx{
 		TxID: txID,
 	}}
-	return tx, tx.Sign(vm.codec, nil)
+	return tx, tx.Sign(platformcodec.Codec, nil)
 }

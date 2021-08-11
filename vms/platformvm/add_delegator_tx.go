@@ -18,6 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -80,7 +82,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -100,7 +102,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, c):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, platformcodec.Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
@@ -118,7 +120,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -129,7 +131,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	// Verify the tx is well-formed
 	if err := tx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		vm.MinStakeDuration,
 		vm.MaxStakeDuration,
@@ -284,7 +286,7 @@ func (vm *VM) newAddDelegatorTx(
 	rewardAddress ids.ShortID, // Address to send reward to, if applicable
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*transaction.SignedTx, error) {
 	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -310,13 +312,13 @@ func (vm *VM) newAddDelegatorTx(
 			Addrs:     []ids.ShortID{rewardAddress},
 		},
 	}
-	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	tx := &transaction.SignedTx{UnsignedTx: utx}
+	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
 	return tx, utx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinDelegatorStake,
 		vm.MinStakeDuration,
 		vm.MaxStakeDuration,

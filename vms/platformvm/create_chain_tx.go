@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var (
@@ -82,7 +84,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 		}
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
 		return err
 	}
 	if err := tx.SubnetAuth.Verify(); err != nil {
@@ -97,7 +99,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 func (tx *UnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (
 	func() error,
 	TxError,
@@ -106,7 +108,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := tx.Verify(vm.ctx, platformcodec.Codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -165,7 +167,7 @@ func (vm *VM) newCreateChainTx(
 	chainName string, // Name of the chain
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*transaction.SignedTx, error) {
 	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -195,9 +197,9 @@ func (vm *VM) newCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	tx := &transaction.SignedTx{UnsignedTx: utx}
+	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx, platformcodec.Codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 )
 
 var errUnknownBlockType = errors.New("unknown block type")
@@ -140,7 +141,7 @@ func (m *metrics) AcceptBlock(b snowman.Block) error {
 	return nil
 }
 
-func (m *metrics) AcceptTx(tx *Tx) error {
+func (m *metrics) AcceptTx(tx *transaction.SignedTx) error {
 	switch tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
 		m.numAddDelegatorTxs.Inc()

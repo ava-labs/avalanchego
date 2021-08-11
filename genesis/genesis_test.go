@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 func TestAliases(t *testing.T) {
@@ -326,7 +327,7 @@ func TestGenesis(t *testing.T) {
 			assert.Equal(test.expected, genesisHash, "genesis hash mismatch")
 
 			genesis := platformvm.Genesis{}
-			_, err = platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis)
+			_, err = platformcodec.GenesisCodec.Unmarshal(genesisBytes, &genesis)
 			assert.NoError(err)
 		})
 	}

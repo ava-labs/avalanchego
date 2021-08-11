@@ -9,6 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -269,9 +271,9 @@ func (vm *VM) stake(
 			amountBurned, amountStaked, fee, amount)
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, vm.codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, vm.codec)   // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers)            // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, platformcodec.Codec) // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, platformcodec.Codec)   // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
@@ -330,7 +332,7 @@ func (vm *VM) authorize(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	utxoDB UTXOGetter,
-	tx UnsignedTx,
+	tx transaction.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -362,7 +364,7 @@ func (vm *VM) semanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
-	tx UnsignedTx,
+	tx transaction.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -451,7 +453,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
+		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),
@@ -499,7 +501,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
+		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),

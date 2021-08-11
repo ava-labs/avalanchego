@@ -41,6 +41,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -1618,7 +1620,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, platformcodec.Codec)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	if _, err := vm.newImportTx(
@@ -1643,7 +1645,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1698,7 +1700,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := Tx{UnsignedTx: &UnsignedImportTx{
+	tx := transaction.SignedTx{UnsignedTx: &UnsignedImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
@@ -1715,7 +1717,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	if err := tx.Sign(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
+	if err := tx.Sign(platformcodec.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2428,15 +2430,15 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*Tx{addSubnetTx0})
+	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*transaction.SignedTx{addSubnetTx0})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*Tx{addSubnetTx1})
+	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*transaction.SignedTx{addSubnetTx1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*Tx{addSubnetTx2})
+	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*transaction.SignedTx{addSubnetTx2})
 	if err != nil {
 		t.Fatal(err)
 	}

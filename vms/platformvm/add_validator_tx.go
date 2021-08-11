@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -97,7 +99,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -117,7 +119,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, platformcodec.Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
@@ -132,7 +134,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -143,7 +145,7 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	// Verify the tx is well-formed
 	if err := tx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		vm.MinStakeDuration,
@@ -272,7 +274,7 @@ func (vm *VM) newAddValidatorTx(
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*Tx, error) {
+) (*transaction.SignedTx, error) {
 	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -299,13 +301,13 @@ func (vm *VM) newAddValidatorTx(
 		},
 		Shares: shares,
 	}
-	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	tx := &transaction.SignedTx{UnsignedTx: utx}
+	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
 	return tx, utx.Verify(
 		vm.ctx,
-		vm.codec,
+		platformcodec.Codec,
 		vm.MinValidatorStake,
 		vm.MaxValidatorStake,
 		vm.MinStakeDuration,

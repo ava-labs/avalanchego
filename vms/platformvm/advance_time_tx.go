@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -36,7 +38,7 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *Tx,
+	stx *transaction.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -95,7 +97,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	pendingStakers := parentState.PendingStakerChainState()
 	toAddValidatorsWithRewardToCurrent := []*validatorReward(nil)
 	toAddDelegatorsWithRewardToCurrent := []*validatorReward(nil)
-	toAddWithoutRewardToCurrent := []*Tx(nil)
+	toAddWithoutRewardToCurrent := []*transaction.SignedTx(nil)
 	numToRemoveFromPending := 0
 
 	// Add to the staker set any pending stakers whose start time is at or
@@ -222,9 +224,9 @@ func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
 
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 // Commit block, will set the chain's timestamp to [timestamp].
-func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*Tx, error) {
-	tx := &Tx{UnsignedTx: &UnsignedAdvanceTimeTx{
+func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*transaction.SignedTx, error) {
+	tx := &transaction.SignedTx{UnsignedTx: &UnsignedAdvanceTimeTx{
 		Time: uint64(timestamp.Unix()),
 	}}
-	return tx, tx.Sign(vm.codec, nil)
+	return tx, tx.Sign(platformcodec.Codec, nil)
 }
