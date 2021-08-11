@@ -434,12 +434,12 @@ func (c *Client) GetTxStatus(txID ids.ID, includeReason bool) (*GetTxStatusRespo
 
 // GetStake returns the amount of nAVAX that [addresses] have cumulatively
 // staked on the Primary Network.
-func (c *Client) GetStake(addrs []string) (uint64, error) {
+func (c *Client) GetStake(addrs []string) (*GetStakeReply, error) {
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest("getStake", &api.JSONAddresses{
 		Addresses: addrs,
 	}, res)
-	return uint64(res.Staked), err
+	return res, err
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX for validators
