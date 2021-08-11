@@ -262,7 +262,7 @@ func (vm *VM) newExportTx(
 	if assetID != vm.ctx.AVAXAssetID {
 		ins, signers, err = vm.GetSpendableFunds(keys, assetID, amount)
 		if err != nil {
-			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+			return nil, fmt.Errorf("couldn't generate tx inputs/signers: %w", err)
 		}
 	} else {
 		avaxNeeded = amount
@@ -299,7 +299,7 @@ func (vm *VM) newExportTx(
 		avaxIns, avaxSigners, err = vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, newAvaxNeeded)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+		return nil, fmt.Errorf("couldn't generate tx inputs/signers: %w", err)
 	}
 	ins = append(ins, avaxIns...)
 	signers = append(signers, avaxSigners...)

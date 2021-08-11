@@ -259,16 +259,9 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 	var baseFee *big.Int
 	if args.BaseFee == nil {
 		// Get the base fee to use
-		baseFee, err = service.vm.chain.APIBackend().EstimateBaseFee(context.Background())
+		baseFee, err = service.vm.estimateBaseFee(context.Background())
 		if err != nil {
 			return err
-		}
-		if baseFee == nil {
-			baseFee = initialBaseFee
-		} else {
-			// give some breathing room
-			baseFee.Mul(baseFee, big.NewInt(11))
-			baseFee.Div(baseFee, big.NewInt(10))
 		}
 	} else {
 		baseFee = args.BaseFee.ToInt()
@@ -352,16 +345,9 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 	var baseFee *big.Int
 	if args.BaseFee == nil {
 		// Get the base fee to use
-		baseFee, err = service.vm.chain.APIBackend().EstimateBaseFee(context.Background())
+		baseFee, err = service.vm.estimateBaseFee(context.Background())
 		if err != nil {
 			return err
-		}
-		if baseFee == nil {
-			baseFee = initialBaseFee
-		} else {
-			// give some breathing room
-			baseFee.Mul(baseFee, big.NewInt(11))
-			baseFee.Div(baseFee, big.NewInt(10))
 		}
 	} else {
 		baseFee = args.BaseFee.ToInt()

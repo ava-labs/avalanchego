@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -28,8 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
@@ -1092,8 +1091,11 @@ func (vm *VM) GetSpendableFunds(
 	return inputs, signers, nil
 }
 
-// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding
+// GetSpendableAVAXWithFee returns a list of EVMInputs and keys (in corresponding
 // order) to total [amount] + [fee] of [AVAX] owned by [keys].
+// This function accounts for the added cost of the additional inputs needed to
+// create the transaction and makes sure to skip any keys with a balance that is
+// insufficient to cover the additional fee.
 // Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input
 // corresponds to a single key, so that the signers can be passed in to
 // [tx.Sign] which supports multiple keys on a single input.
@@ -1146,9 +1148,9 @@ func (vm *VM) GetSpendableAVAXWithFee(
 		// Since the asset is AVAX, we divide by the x2cRate to convert back to
 		// the correct denomination of AVAX that can be exported.
 		balance := new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		// If the balance for [addr] is insufficient to cover the additional cost
+		// of adding an input to the transaction, skip adding the input altogether
 		if balance <= additionalFee {
-			// This address doesn't have sufficient balance to cover its
-			// expenses.
 			continue
 		}
 
@@ -1161,8 +1163,12 @@ func (vm *VM) GetSpendableAVAXWithFee(
 		}
 		amount = newAmount
 
+		// Use the entire [balance] as an input, but if the required [amount]
+		// is less than the balance, update the [inputAmount] to spend the
+		// minimum amount to finish the transaction.
+		inputAmount := balance
 		if amount < balance {
-			balance = amount
+			inputAmount = amount
 		}
 		nonce, err := vm.GetCurrentNonce(addr)
 		if err != nil {
@@ -1170,7 +1176,7 @@ func (vm *VM) GetSpendableAVAXWithFee(
 		}
 		inputs = append(inputs, EVMInput{
 			Address: addr,
-			Amount:  balance,
+			Amount:  inputAmount,
 			AssetID: vm.ctx.AVAXAssetID,
 			Nonce:   nonce,
 		})
@@ -1242,54 +1248,19 @@ func (vm *VM) startContinuousProfiler() {
 	<-vm.shutdownChan
 }
 
-// ParseLocalAddress takes in an address for this chain and produces the ID
-func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
-	chainID, addr, err := vm.ParseAddress(addrStr)
+func (vm *VM) estimateBaseFee(ctx context.Context) (*big.Int, error) {
+	// Get the base fee to use
+	baseFee, err := vm.chain.APIBackend().EstimateBaseFee(ctx)
 	if err != nil {
-		return ids.ShortID{}, err
+		return nil, err
 	}
-	if chainID != vm.ctx.ChainID {
-		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
-			vm.ctx.ChainID, chainID)
+	if baseFee == nil {
+		baseFee = initialBaseFee
+	} else {
+		// give some breathing room
+		baseFee.Mul(baseFee, big.NewInt(11))
+		baseFee.Div(baseFee, big.NewInt(10))
 	}
-	return addr, nil
-}
 
-// FormatLocalAddress takes in a raw address and produces the formatted address
-func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
-	return vm.FormatAddress(vm.ctx.ChainID, addr)
-}
-
-// FormatAddress takes in a chainID and a raw address and produces the formatted
-// address
-func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
-	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
-	if err != nil {
-		return "", err
-	}
-	hrp := constants.GetHRP(vm.ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
-}
-
-// ParseEthAddress parses [addrStr] and returns an Ethereum address
-func ParseEthAddress(addrStr string) (common.Address, error) {
-	if !common.IsHexAddress(addrStr) {
-		return common.Address{}, errInvalidAddr
-	}
-	return common.HexToAddress(addrStr), nil
-}
-
-// FormatEthAddress formats [addr] into a string
-func FormatEthAddress(addr common.Address) string {
-	return addr.Hex()
-}
-
-// GetEthAddress returns the ethereum address derived from [privKey]
-func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
-	return PublicKeyToEthAddress(privKey.PublicKey().(*crypto.PublicKeySECP256K1R))
-}
-
-// PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
-func PublicKeyToEthAddress(pubKey *crypto.PublicKeySECP256K1R) common.Address {
-	return ethcrypto.PubkeyToAddress(*(pubKey.ToECDSA()))
+	return baseFee, nil
 }
