@@ -29,6 +29,11 @@ type KeyValueWriter interface {
 	Delete(key []byte) error
 }
 
+type KeyValueReaderWriter interface {
+	KeyValueReader
+	KeyValueWriter
+}
+
 // Stater wraps the Stat method of a backing data store.
 type Stater interface {
 	// Stat returns a particular internal stat of the database.

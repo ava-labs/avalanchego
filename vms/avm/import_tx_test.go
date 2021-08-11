@@ -7,6 +7,8 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -237,13 +239,20 @@ func TestIssueImportTx(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
+
+	avmConfig := Config{
+		IndexTransactions: true,
+	}
+
+	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
+	assert.NoError(t, err)
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		avmConfigBytes,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,
@@ -276,18 +285,31 @@ func TestIssueImportTx(t *testing.T) {
 		},
 	}
 
+	txAssetID := avax.Asset{ID: avaxID}
 	tx := &Tx{UnsignedTx: &ImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
 			BlockchainID: chainID,
+			Outs: []*avax.TransferableOutput{{
+				Asset: txAssetID,
+				Out: &secp256k1fx.TransferOutput{
+					Amt: 1000,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
+					},
+				},
+			}},
 		}},
 		SourceChain: platformChainID,
 		ImportedIns: []*avax.TransferableInput{{
 			UTXOID: utxoID,
-			Asset:  avax.Asset{ID: avaxID},
+			Asset:  txAssetID,
 			In: &secp256k1fx.TransferInput{
-				Amt:   1000,
-				Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+				Amt: 1010,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{0},
+				},
 			},
 		}},
 	}}
@@ -303,21 +325,23 @@ func TestIssueImportTx(t *testing.T) {
 
 	utxo := &avax.UTXO{
 		UTXOID: utxoID,
-		Asset:  avax.Asset{ID: avaxID},
+		Asset:  txAssetID,
 		Out: &secp256k1fx.TransferOutput{
-			Amt: 1000,
+			Amt: 1010,
 			OutputOwners: secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{key.PublicKey().Address()},
 			},
 		},
 	}
+
 	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	inputID := utxo.InputID()
+
 	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
@@ -352,9 +376,17 @@ func TestIssueImportTx(t *testing.T) {
 	}
 
 	parsedTx := txs[0]
+	if err := parsedTx.Verify(); err != nil {
+		t.Fatal("Failed verify", err)
+	}
+
 	if err := parsedTx.Accept(); err != nil {
 		t.Fatal(err)
 	}
+
+	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), txAssetID.AssetID(), parsedTx.ID())
+	assertLatestIdx(t, vm.db, key.PublicKey().Address(), avaxID, 1)
+
 	id := utxoID.InputID()
 	if _, err := vm.ctx.SharedMemory.Get(platformID, [][]byte{id[:]}); err == nil {
 		t.Fatalf("shouldn't have been able to read the utxo")
@@ -387,7 +419,6 @@ func TestForceAcceptImportTx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
@@ -443,6 +474,7 @@ func TestForceAcceptImportTx(t *testing.T) {
 			},
 		}},
 	}}
+
 	if err := tx.SignSECP256K1Fx(vm.codec, [][]*crypto.PrivateKeySECP256K1R{{key}}); err != nil {
 		t.Fatal(err)
 	}
