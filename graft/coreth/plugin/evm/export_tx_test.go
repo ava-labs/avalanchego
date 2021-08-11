@@ -434,7 +434,7 @@ func TestNewExportTx(t *testing.T) {
 			}()
 
 			parent := vm.LastAcceptedBlockInternal().(*Block)
-			importAmount := uint64(5000000 * 10)
+			importAmount := uint64(50000000)
 			utxoID := avax.UTXOID{
 				TxID: ids.ID{
 					0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
