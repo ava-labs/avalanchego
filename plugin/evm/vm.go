@@ -25,10 +25,10 @@ import (
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/rpc"
 
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
@@ -59,12 +59,19 @@ import (
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
+const (
+	x2cRateInt64       int64 = 1000000000
+	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
+)
+
 var (
 	// x2cRate is the conversion rate between the smallest denomination on the X-Chain
 	// 1 nAVAX and the smallest denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
 	// This is only required for AVAX because the denomination of 1 AVAX is 9 decimal
 	// places on the X and P chains, but is 18 decimal places within the EVM.
-	x2cRate = big.NewInt(1000000000)
+	x2cRate       = big.NewInt(x2cRateInt64)
+	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
+
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
@@ -109,7 +116,6 @@ var (
 	errNoImportInputs             = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errSignatureInputsMismatch    = errors.New("number of inputs does not match number of signatures")
 	errWrongChainID               = errors.New("tx has wrong chain ID")
 	errInsufficientFunds          = errors.New("insufficient funds")
 	errNoExportOutputs            = errors.New("tx has no export outputs")
@@ -431,27 +437,8 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 		if !exists {
 			break
 		}
-		if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
-			// Discard the transaction from the mempool on failed verification.
-			vm.mempool.DiscardCurrentTx()
-			state.RevertToSnapshot(snapshot)
-			continue
-		}
 		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-		parentIntf, err := vm.GetBlockInternal(ids.ID(header.ParentHash))
-		if err != nil {
-			// Discard the transaction from the mempool on failed verification.
-			vm.mempool.DiscardCurrentTx()
-			return nil, fmt.Errorf("failed to get parent block: %w", err)
-		}
-		parent, ok := parentIntf.(*Block)
-		if !ok {
-			// Discard the transaction from the mempool on failed verification.
-			vm.mempool.DiscardCurrentTx()
-			return nil, fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
-		}
-
-		if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, header.BaseFee, rules); err != nil {
+		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			vm.mempool.DiscardCurrentTx()
 			state.RevertToSnapshot(snapshot)
@@ -724,7 +711,7 @@ func (vm *VM) CreateHandlers() (map[string]*commonEng.HTTPHandler, error) {
 
 // CreateStaticHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateStaticHandlers() (map[string]*commonEng.HTTPHandler, error) {
-	handler := rpc.NewServer()
+	handler := rpc.NewServer(0)
 	if err := handler.RegisterName("static", &StaticService{}); err != nil {
 		return nil, err
 	}
@@ -774,11 +761,7 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 		}
 
 		// Move up the chain.
-		nextAncestorIntf, err := ancestor.parentBlock()
-		if err != nil {
-			return err
-		}
-
+		nextAncestorID := ancestor.Parent()
 		// If the ancestor is unknown, then the parent failed
 		// verification when it was called.
 		// If the ancestor is rejected, then this block shouldn't be
@@ -786,6 +769,11 @@ func (vm *VM) conflicts(inputs ids.Set, ancestor *Block) error {
 		// will be missing.
 		// If the ancestor is processing, then the block may have
 		// been verified.
+		nextAncestorIntf, err := vm.GetBlockInternal(nextAncestorID)
+		if err != nil {
+			return errRejectedParent
+		}
+
 		if blkStatus := nextAncestorIntf.Status(); blkStatus == choices.Unknown || blkStatus == choices.Rejected {
 			return errRejectedParent
 		}
@@ -976,11 +964,56 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 	return chainID, addr, nil
 }
 
-// issueTx adds [tx] to the mempool and signals the goroutine waiting on
-// atomic transactions that there is an atomic transaction ready to be
-// put into a block.
+// issueTx verifies [tx] as valid to be issued on top of the currently preferred block
+// and then issues [tx] into the mempool if valid.
 func (vm *VM) issueTx(tx *Tx) error {
+	if err := vm.verifyTxAtTip(tx); err != nil {
+		return err
+	}
 	return vm.mempool.AddTx(tx)
+}
+
+// verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
+func (vm *VM) verifyTxAtTip(tx *Tx) error {
+	preferredBlock := vm.chain.CurrentBlock()
+	preferredState, err := vm.chain.BlockState(preferredBlock)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve block state at tip while verifying atomic tx: %w", err)
+	}
+	rules := vm.currentRules()
+	parentHeader := preferredBlock.Header()
+	var nextBaseFee *big.Int
+	timestamp := time.Now().Unix()
+	bigTimestamp := big.NewInt(timestamp)
+	if vm.chainConfig.IsApricotPhase3(bigTimestamp) {
+		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(timestamp))
+		if err != nil {
+			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
+			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
+		}
+	}
+
+	return vm.verifyTx(tx, parentHeader.Hash(), nextBaseFee, preferredState, rules)
+}
+
+// verifyTx verifies that [tx] is valid to be issued into a block with parent block [parentHash]
+// and validated at [state] using [rules] as the current rule set.
+// Note: verifyTx may modify [state]. If [state] needs to be properly maintained, the caller is responsible
+// for reverting to the correct snapshot after calling this function. If this function is called with a
+// throwaway state, then this is not necessary.
+func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *state.StateDB, rules params.Rules) error {
+	parentIntf, err := vm.GetBlockInternal(ids.ID(parentHash))
+	if err != nil {
+		return fmt.Errorf("failed to get parent block: %w", err)
+	}
+	parent, ok := parentIntf.(*Block)
+	if !ok {
+		return fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
+	}
+	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, baseFee, rules); err != nil {
+		return err
+	}
+	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
 }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is

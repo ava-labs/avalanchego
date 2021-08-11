@@ -64,9 +64,15 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *trie.Database, cache int, 
 	if baseBlockHash == (common.Hash{}) {
 		return nil, false, fmt.Errorf("missing or corrupted snapshot, no snapshot block hash")
 	}
+	if baseBlockHash != blockHash {
+		return nil, false, fmt.Errorf("block hash stored on disk (%#x) does not match last accepted (%#x)", baseBlockHash, blockHash)
+	}
 	baseRoot := rawdb.ReadSnapshotRoot(diskdb)
 	if baseRoot == (common.Hash{}) {
 		return nil, false, errors.New("missing or corrupted snapshot, no snapshot root")
+	}
+	if baseRoot != root {
+		return nil, false, fmt.Errorf("root stored on disk (%#x) does not match last accepted (%#x)", baseRoot, root)
 	}
 
 	// Retrieve the disk layer generator. It must exist, no matter the
