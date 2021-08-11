@@ -90,7 +90,6 @@ func (t *BaseTx) SemanticVerify(vm *VM, tx UnsignedTx, creds []verify.Verifiable
 			return errIncompatibleFx
 		}
 	}
-
 	return nil
 }
 

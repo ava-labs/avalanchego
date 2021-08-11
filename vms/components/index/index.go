@@ -11,13 +11,12 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
 var (
@@ -113,10 +112,12 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 		for _, addressBytes := range out.Addresses() {
 			address := string(addressBytes)
 
-			if _, exists := balanceChanges[address]; !exists {
-				balanceChanges[address] = make(map[ids.ID]struct{})
+			addressChanges, exists := balanceChanges[address]
+			if !exists {
+				addressChanges = make(map[ids.ID]struct{})
+				balanceChanges[address] = addressChanges
 			}
-			balanceChanges[address][utxo.AssetID()] = struct{}{}
+			addressChanges[utxo.AssetID()] = struct{}{}
 		}
 	}
 
@@ -135,7 +136,6 @@ func (i *indexer) Accept(txID ids.ID, inputUTXOs []*avax.UTXO, outputUTXOs []*av
 			case database.ErrNotFound:
 				// idx not found; this must be the first entry.
 				idxBytes = make([]byte, wrappers.LongLen)
-				binary.BigEndian.PutUint64(idxBytes, idx)
 			default:
 				// Unexpected error
 				return fmt.Errorf("unexpected error when indexing txID %s: %s", txID, err)

@@ -118,12 +118,14 @@ func (tx *UniqueTx) Accept() error {
 	if s := tx.Status(); s != choices.Processing {
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
+
 	txID := tx.ID()
 	defer tx.vm.db.Abort()
 
-	var inputUTXOs []*avax.UTXO //nolint:prealloc
 	// Fetch the input UTXOs
-	for _, utxoID := range tx.InputUTXOs() {
+	inputUTXOIDs := tx.InputUTXOs()
+	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
+	for _, utxoID := range inputUTXOIDs {
 		// Don't bother fetching the input UTXO if its symbolic
 		if utxoID.Symbolic() {
 			continue
@@ -131,19 +133,21 @@ func (tx *UniqueTx) Accept() error {
 
 		utxo, err := tx.vm.getUTXO(utxoID)
 		if err != nil {
-			// should never happen
+			// should never happen because the UTXO was previously verified to
+			// exist
 			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
 		}
 		inputUTXOs = append(inputUTXOs, utxo)
 	}
 
+	outputUTXOs := tx.UTXOs()
 	// index input and output UTXOs
-	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, tx.UTXOs()); err != nil {
+	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, outputUTXOs); err != nil {
 		return fmt.Errorf("error indexing tx: %s", err)
 	}
 
 	// Remove spent utxos
-	for _, utxo := range tx.InputUTXOs() {
+	for _, utxo := range inputUTXOIDs {
 		if utxo.Symbolic() {
 			// If the UTXO is symbolic, it can't be spent
 			continue
@@ -154,7 +158,7 @@ func (tx *UniqueTx) Accept() error {
 		}
 	}
 	// Add new utxos
-	for _, utxo := range tx.UTXOs() {
+	for _, utxo := range outputUTXOs {
 		utxoID := utxo.InputID()
 		if err := tx.vm.state.PutUTXO(utxoID, utxo); err != nil {
 			return fmt.Errorf("couldn't put UTXO %s: %w", utxoID, err)
@@ -162,7 +166,6 @@ func (tx *UniqueTx) Accept() error {
 	}
 
 	if err := tx.setStatus(choices.Accepted); err != nil {
-		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", txID, err)
 		return fmt.Errorf("couldn't set status of tx %s: %w", txID, err)
 	}
 
@@ -174,8 +177,6 @@ func (tx *UniqueTx) Accept() error {
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
 		return fmt.Errorf("ExecuteWithSideEffects errored while processing tx %s: %w", txID, err)
 	}
-
-	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)
