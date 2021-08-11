@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -36,6 +37,8 @@ var (
 	errNoAddresses   = errors.New("no addresses provided")
 	errNoSourceChain = errors.New("no source chain provided")
 	errNilTxID       = errors.New("nil transaction ID")
+
+	initialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 )
 
 // SnowmanAPI introduces snowman specific functionality to the evm
@@ -207,6 +210,9 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 type ImportArgs struct {
 	api.UserPass
 
+	// Fee that should be used when creating the tx
+	BaseFee *hexutil.Big `json:"baseFee"`
+
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
 
@@ -250,7 +256,25 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
 	}
 
-	tx, err := service.vm.newImportTx(chainID, to, privKeys)
+	var baseFee *big.Int
+	if args.BaseFee == nil {
+		// Get the base fee to use
+		baseFee, err = service.vm.chain.APIBackend().EstimateBaseFee(context.Background())
+		if err != nil {
+			return err
+		}
+		if baseFee == nil {
+			baseFee = initialBaseFee
+		} else {
+			// give some breathing room
+			baseFee.Mul(baseFee, big.NewInt(11))
+			baseFee.Div(baseFee, big.NewInt(10))
+		}
+	} else {
+		baseFee = args.BaseFee.ToInt()
+	}
+
+	tx, err := service.vm.newImportTx(chainID, to, baseFee, privKeys)
 	if err != nil {
 		return err
 	}
