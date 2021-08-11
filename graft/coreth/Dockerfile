@@ -27,4 +27,4 @@ RUN export CORETH_COMMIT=$CORETH_COMMIT && export CURRENT_BRANCH=$CURRENT_BRANCH
 FROM avaplatform/avalanchego:$AVALANCHE_VERSION AS builtImage
 
 # Copy the evm binary into the correct location in the container
-COPY --from=builder /build/evm /avalanchego/build/avalanchego-latest/plugins/evm
+COPY --from=builder /build/evm /avalanchego/build/plugins/evm

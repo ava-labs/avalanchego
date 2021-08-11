@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
@@ -35,6 +34,8 @@ var (
 	errNilOutput         = errors.New("nil output")
 	errNilInput          = errors.New("nil input")
 	errEmptyAssetID      = errors.New("empty asset ID is not valid")
+	errNilBaseFee        = errors.New("cannot calculate dynamic fee with nil baseFee")
+	errFeeOverflow       = errors.New("overflow occurred while calculating the fee")
 )
 
 // Constants for calculating the gas consumed by atomic transactions
@@ -101,9 +102,6 @@ type UnsignedAtomicTx interface {
 	InputUTXOs() ids.Set
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, stx *Tx, parent *Block, baseFee *big.Int, rules params.Rules) error
-
-	// Fee amount denominated in base 10^9.
-	Burned(assetID ids.ID) (uint64, error)
 
 	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
@@ -224,10 +222,17 @@ func IsSortedAndUniqueEVMOutputs(outputs []EVMOutput) bool {
 // that consumes [cost] at [baseFee].
 func calculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	if baseFee == nil {
-		return 0, errors.New("cannot calculate dynamic fee with nil baseFee")
+		return 0, errNilBaseFee
 	}
-	multiplier := new(big.Int).Div(baseFee, x2cRate).Uint64()
-	return math.Mul64(multiplier, cost)
+	bigCost := new(big.Int).SetUint64(cost)
+	fee := new(big.Int).Mul(bigCost, baseFee)
+	feeToRoundUp := new(big.Int).Add(fee, x2cRateMinus1)
+	feeInNAVAX := new(big.Int).Div(feeToRoundUp, x2cRate)
+	if !feeInNAVAX.IsUint64() {
+		// the fee is more than can fit in a uint64
+		return 0, errFeeOverflow
+	}
+	return feeInNAVAX.Uint64(), nil
 }
 
 func calcBytesCost(len int) uint64 {
