@@ -1214,7 +1214,7 @@ func (vm *VM) GetSpendableAVAXWithFee(
 			Nonce:   nonce,
 		})
 		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
-		amount -= balance
+		amount -= inputAmount
 	}
 
 	if amount > 0 {
