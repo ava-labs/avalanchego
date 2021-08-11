@@ -249,8 +249,10 @@ func (t *Transitive) GetFailed(vdr ids.ShortID, requestID uint32) error {
 	}
 
 	// Track performance statistics
-	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
+	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
+	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.attemptToIssueTxs()
 }
 
@@ -285,6 +287,7 @@ func (t *Transitive) PullQuery(vdr ids.ShortID, requestID uint32, vtxID ids.ID) 
 
 	// Wait until [vtxID] and its dependencies have been added to consensus before sending chits
 	t.vtxBlocked.Register(c)
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	return t.attemptToIssueTxs()
 }
 
@@ -332,6 +335,7 @@ func (t *Transitive) Chits(vdr ids.ShortID, requestID uint32, votes []ids.ID) er
 	}
 
 	t.vtxBlocked.Register(v)
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
 	return t.attemptToIssueTxs()
 }
 
@@ -350,6 +354,7 @@ func (t *Transitive) Notify(msg common.Message) error {
 	switch msg {
 	case common.PendingTxs:
 		t.pendingTxs = append(t.pendingTxs, t.VM.PendingTxs()...)
+		t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 		return t.attemptToIssueTxs()
 	default:
 		t.Ctx.Log.Warn("unexpected message from the VM: %s", msg)
@@ -364,6 +369,7 @@ func (t *Transitive) attemptToIssueTxs() error {
 	}
 
 	t.pendingTxs, err = t.batch(t.pendingTxs, false /*=force*/, false /*=empty*/, true /*=limit*/)
+	t.metrics.pendingTxs.Set(float64(len(t.pendingTxs)))
 	return err
 }
 
@@ -500,9 +506,11 @@ func (t *Transitive) issue(vtx avalanche.Vertex) error {
 	}
 
 	// Track performance statistics
-	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
-	t.numMissingTxs.Set(float64(t.missingTxs.Len()))
-	t.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len()))
+	t.metrics.numMissingTxs.Set(float64(t.missingTxs.Len()))
+	t.metrics.numPendingVts.Set(float64(t.pending.Len()))
+	t.metrics.blockerVtxs.Set(float64(t.vtxBlocked.Len()))
+	t.metrics.blockerTxs.Set(float64(t.txBlocked.Len()))
 	return t.errs.Err
 }
 
@@ -629,7 +637,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, vtxID ids.ID) {
 	t.RequestID++
 	t.outstandingVtxReqs.Add(vdr, t.RequestID, vtxID) // Mark that there is an outstanding request for this vertex
 	t.Sender.Get(vdr, t.RequestID, vtxID)
-	t.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
+	t.metrics.numVtxRequests.Set(float64(t.outstandingVtxReqs.Len())) // Tracks performance statistics
 }
 
 // Health implements the common.Engine interface
