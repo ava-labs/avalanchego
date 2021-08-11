@@ -229,7 +229,7 @@ func NewBlockChain(
 		return nil, err
 	}
 	// Create the state manager
-	bc.stateManager = NewTrieWriter(bc.stateCache, cacheConfig)
+	bc.stateManager = NewTrieWriter(bc.stateCache.TrieDB(), cacheConfig)
 
 	// Make sure the state associated with the block is available
 	head := bc.CurrentBlock()
