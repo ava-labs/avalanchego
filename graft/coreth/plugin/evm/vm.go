@@ -1197,9 +1197,6 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 // for reverting to the correct snapshot after calling this function. If this function is called with a
 // throwaway state, then this is not necessary.
 func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rules params.Rules) error {
-	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
-		return err
-	}
 	parentIntf, err := vm.GetBlockInternal(ids.ID(parentHash))
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
@@ -1211,7 +1208,7 @@ func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rul
 	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
 		return err
 	}
-	return nil
+	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
 }
 
 // GetAtomicUTXOs returns the utxos that at least one of the provided addresses is

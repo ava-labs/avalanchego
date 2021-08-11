@@ -587,8 +587,8 @@ func TestBuildEthTxBlock(t *testing.T) {
 	}
 
 	ethBlk1 := blk1.(*chain.BlockWrapper).Block.(*Block).ethBlock
-	if ethBlk1Root := ethBlk1.Root(); vm.chain.BlockChain().HasState(ethBlk1Root) {
-		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	if ethBlk1Root := ethBlk1.Root(); !vm.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to not yet be pruned after blk2 was accepted because of tip buffer")
 	}
 
 	// Clear the cache and ensure that GetBlock returns internal blocks with the correct status
@@ -628,6 +628,17 @@ func TestBuildEthTxBlock(t *testing.T) {
 		nil,
 	); err != nil {
 		t.Fatal(err)
+	}
+
+	// State root should not have been committed and discarded on restart
+	if ethBlk1Root := ethBlk1.Root(); restartedVM.chain.BlockChain().HasState(ethBlk1Root) {
+		t.Fatalf("Expected blk1 state root to be pruned after blk2 was accepted on top of it in pruning mode")
+	}
+
+	// State root should be committed when accepted tip on shutdown
+	ethBlk2 := blk2.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk2Root := ethBlk2.Root(); !restartedVM.chain.BlockChain().HasState(ethBlk2Root) {
+		t.Fatalf("Expected blk2 state root to not be pruned after shutdown (last accepted tip should be committed)")
 	}
 }
 
