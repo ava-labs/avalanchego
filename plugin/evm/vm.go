@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -1032,12 +1033,16 @@ func (vm *VM) GetAtomicUTXOs(
 	return utxos, lastAddrID, lastUTXOID, nil
 }
 
-// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding order)
-// to total [amount] of [assetID] owned by [keys]
-// Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input corresponds
-// to a single key, so that the signers can be passed in to [tx.Sign] which supports
-// multiple keys on a single input.
-func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding
+// order) to total [amount] of [assetID] owned by [keys].
+// Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input
+// corresponds to a single key, so that the signers can be passed in to
+// [tx.Sign] which supports multiple keys on a single input.
+func (vm *VM) GetSpendableFunds(
+	keys []*crypto.PrivateKeySECP256K1R,
+	assetID ids.ID,
+	amount uint64,
+) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
 	// Note: current state uses the state of the preferred block.
 	state, err := vm.chain.CurrentState()
 	if err != nil {
@@ -1074,6 +1079,87 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 			Address: addr,
 			Amount:  balance,
 			AssetID: assetID,
+			Nonce:   nonce,
+		})
+		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
+		amount -= balance
+	}
+
+	if amount > 0 {
+		return nil, nil, errInsufficientFunds
+	}
+
+	return inputs, signers, nil
+}
+
+// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding
+// order) to total [amount] + [fee] of [AVAX] owned by [keys].
+// Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input
+// corresponds to a single key, so that the signers can be passed in to
+// [tx.Sign] which supports multiple keys on a single input.
+func (vm *VM) GetSpendableAVAXWithFee(
+	keys []*crypto.PrivateKeySECP256K1R,
+	amount uint64,
+	cost uint64,
+	baseFee *big.Int,
+) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+	// Note: current state uses the state of the preferred block.
+	state, err := vm.chain.CurrentState()
+	if err != nil {
+		return nil, nil, err
+	}
+	inputs := []EVMInput{}
+	signers := [][]*crypto.PrivateKeySECP256K1R{}
+	// Note: we assume that each key in [keys] is unique, so that iterating over
+	// the keys will not produce duplicated nonces in the returned EVMInput slice.
+	for _, key := range keys {
+		if amount == 0 {
+			break
+		}
+
+		prevFee, err := calculateDynamicFee(cost, baseFee)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		newCost := cost + EVMInputGas
+		newFee, err := calculateDynamicFee(newCost, baseFee)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		additionalFee := newFee - prevFee
+
+		addr := GetEthAddress(key)
+		// Since the asset is AVAX, we divide by the x2cRate to convert back to
+		// the correct denomination of AVAX that can be exported.
+		balance := new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		if balance <= additionalFee {
+			// This address doesn't have sufficient balance to cover its
+			// expenses.
+			continue
+		}
+
+		// Update the cost for the next iteration
+		cost = newCost
+
+		newAmount, err := math.Add64(amount, additionalFee)
+		if err != nil {
+			return nil, nil, err
+		}
+		amount = newAmount
+
+		if amount < balance {
+			balance = amount
+		}
+		nonce, err := vm.GetCurrentNonce(addr)
+		if err != nil {
+			return nil, nil, err
+		}
+		inputs = append(inputs, EVMInput{
+			Address: addr,
+			Amount:  balance,
+			AssetID: vm.ctx.AVAXAssetID,
 			Nonce:   nonce,
 		})
 		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
