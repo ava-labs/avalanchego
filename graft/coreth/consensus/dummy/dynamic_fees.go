@@ -20,7 +20,7 @@ var (
 	InitialBaseFee        = big.NewInt(params.ApricotPhase3InitialBaseFee)
 	MaxGasPrice           = big.NewInt(params.ApricotPhase3MaxBaseFee)
 	MinGasPrice           = big.NewInt(params.ApricotPhase3MinBaseFee)
-	TargetGas             = uint64(12_000_000)
+	TargetGas             = uint64(5_000_000)
 	BlockGasFee           = uint64(1_000_000)
 	rollupWindow   uint64 = 10
 )
@@ -53,7 +53,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	}
 
 	var (
-		parentGasTarget          = TargetGas / params.ElasticityMultiplier
+		parentGasTarget          = TargetGas
 		parentGasTargetBig       = new(big.Int).SetUint64(parentGasTarget)
 		baseFeeChangeDenominator = new(big.Int).SetUint64(params.BaseFeeChangeDenominator)
 		baseFee                  = new(big.Int).Set(parent.BaseFee)
@@ -75,7 +75,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// Calculate the amount of gas consumed within the rollup window.
 	totalGas := sumLongWindow(newRollupWindow, int(rollupWindow))
 
-	if totalGas == TargetGas {
+	if totalGas == parentGasTarget {
 		return newRollupWindow, baseFee, nil
 	}
 
@@ -97,7 +97,10 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		gasUsedDelta := new(big.Int).SetUint64(parentGasTarget - totalGas)
 		x := new(big.Int).Mul(parent.BaseFee, gasUsedDelta)
 		y := x.Div(x, parentGasTargetBig)
-		baseFeeDelta := x.Div(y, baseFeeChangeDenominator)
+		baseFeeDelta := math.BigMax(
+			x.Div(y, baseFeeChangeDenominator),
+			common.Big1,
+		)
 
 		// If [roll] is greater than [rollupWindow], apply the state transition to the base fee to account
 		// for the interval during which no blocks were produced.
