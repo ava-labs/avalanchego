@@ -241,7 +241,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
 	to common.Address, // Address of recipient
-	baseFee *big.Int,
+	baseFee *big.Int, // fee to use post-AP3
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
 	if vm.ctx.XChainID != chainID {

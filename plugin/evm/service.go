@@ -259,16 +259,9 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 	var baseFee *big.Int
 	if args.BaseFee == nil {
 		// Get the base fee to use
-		baseFee, err = service.vm.chain.APIBackend().EstimateBaseFee(context.Background())
+		baseFee, err = service.vm.estimateBaseFee(context.Background())
 		if err != nil {
 			return err
-		}
-		if baseFee == nil {
-			baseFee = initialBaseFee
-		} else {
-			// give some breathing room
-			baseFee.Mul(baseFee, big.NewInt(11))
-			baseFee.Div(baseFee, big.NewInt(10))
 		}
 	} else {
 		baseFee = args.BaseFee.ToInt()
@@ -286,6 +279,9 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
 	api.UserPass
+
+	// Fee that should be used when creating the tx
+	BaseFee *hexutil.Big `json:"baseFee"`
 
 	// Amount of asset to send
 	Amount json.Uint64 `json:"amount"`
@@ -346,13 +342,25 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	var baseFee *big.Int
+	if args.BaseFee == nil {
+		// Get the base fee to use
+		baseFee, err = service.vm.estimateBaseFee(context.Background())
+		if err != nil {
+			return err
+		}
+	} else {
+		baseFee = args.BaseFee.ToInt()
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		assetID,             // AssetID
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
-		privKeys,            // Private keys
+		baseFee,
+		privKeys, // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)
