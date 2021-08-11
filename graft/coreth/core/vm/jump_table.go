@@ -78,7 +78,6 @@ type JumpTable [256]*operation
 // contantinople, istanbul, petersburg, apricotPhase1, 2, and 3 instructions.
 func newApricotPhase3InstructionSet() JumpTable {
 	instructionSet := newApricotPhase2InstructionSet()
-	// eip3541 is enabled in ApricotPhase3 as well although it does not change the instruction set
 	enable3198(&instructionSet) // Base fee opcode https://eips.ethereum.org/EIPS/eip-3198
 	return instructionSet
 }
