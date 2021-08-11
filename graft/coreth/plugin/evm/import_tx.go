@@ -176,11 +176,11 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	}
 
 	if err := fc.Verify(); err != nil {
-		return err
+		return fmt.Errorf("import tx flow check failed due to: %w", err)
 	}
 
 	if len(stx.Creds) != len(tx.ImportedInputs) {
-		return errSignatureInputsMismatch
+		return fmt.Errorf("export tx contained mismatched number of inputs/credentials (%d vs. %d)", len(tx.ImportedInputs), len(stx.Creds))
 	}
 
 	if !vm.ctx.IsBootstrapped() {
