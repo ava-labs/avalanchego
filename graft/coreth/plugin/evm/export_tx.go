@@ -283,14 +283,16 @@ func (vm *VM) newExportTx(
 			return nil, err
 		}
 
-		cost, err := tx.Cost()
+		var cost uint64
+		cost, err = tx.Cost()
 		if err != nil {
 			return nil, err
 		}
 
 		avaxIns, avaxSigners, err = vm.GetSpendableAVAXWithFee(keys, avaxNeeded, cost, baseFee)
 	default:
-		newAvaxNeeded, err := math.Add64(avaxNeeded, params.AvalancheAtomicTxFee)
+		var newAvaxNeeded uint64
+		newAvaxNeeded, err = math.Add64(avaxNeeded, params.AvalancheAtomicTxFee)
 		if err != nil {
 			return nil, errOverflowExport
 		}
