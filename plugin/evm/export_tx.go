@@ -252,20 +252,19 @@ func (vm *VM) newExportTx(
 	}}
 
 	var (
-		ins     []EVMInput
-		signers [][]*crypto.PrivateKeySECP256K1R
-		err     error
+		avaxNeeded uint64 = 0
+		ins        []EVMInput
+		signers    [][]*crypto.PrivateKeySECP256K1R
+		err        error
 	)
+
 	// consume non-AVAX
 	if assetID != vm.ctx.AVAXAssetID {
 		ins, signers, err = vm.GetSpendableFunds(keys, assetID, amount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
-	}
-
-	var avaxNeeded uint64 = 0
-	if assetID == vm.ctx.AVAXAssetID {
+	} else {
 		avaxNeeded = amount
 	}
 
