@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/math"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -157,11 +157,11 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	}
 
 	if err := fc.Verify(); err != nil {
-		return err
+		return fmt.Errorf("export tx flow check failed due to: %w", err)
 	}
 
 	if len(tx.Ins) != len(stx.Creds) {
-		return errSignatureInputsMismatch
+		return fmt.Errorf("export tx contained mismatched number of inputs/credentials (%d vs. %d)", len(tx.Ins), len(stx.Creds))
 	}
 
 	for i, input := range tx.Ins {

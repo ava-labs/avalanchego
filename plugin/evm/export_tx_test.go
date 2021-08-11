@@ -175,6 +175,38 @@ func TestExportTxGasCost(t *testing.T) {
 		ExpectedCost uint64
 		ExpectedFee  uint64
 	}{
+		"simple export 1wei BaseFee": {
+			UnsignedExportTx: &UnsignedExportTx{
+				NetworkID:        networkID,
+				BlockchainID:     chainID,
+				DestinationChain: xChainID,
+				Ins: []EVMInput{
+					{
+						Address: testEthAddrs[0],
+						Amount:  exportAmount,
+						AssetID: avaxAssetID,
+						Nonce:   0,
+					},
+				},
+				ExportedOutputs: []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: avaxAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: exportAmount,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Locktime:  0,
+								Threshold: 1,
+								Addrs:     []ids.ShortID{testShortIDAddrs[0]},
+							},
+						},
+					},
+				},
+			},
+			Keys:         [][]*crypto.PrivateKeySECP256K1R{{testKeys[0]}},
+			ExpectedCost: 1230,
+			ExpectedFee:  1,
+			BaseFee:      big.NewInt(1),
+		},
 		"simple export 25Gwei BaseFee": {
 			UnsignedExportTx: &UnsignedExportTx{
 				NetworkID:        networkID,
