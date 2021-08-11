@@ -6,6 +6,7 @@ package avm
 import (
 	"bytes"
 	"container/list"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -34,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -111,6 +113,8 @@ type VM struct {
 	fxs           []*parsedFx
 
 	walletService WalletService
+
+	addressTxsIndexer index.AddressTxsIndexer
 }
 
 func (vm *VM) Connected(id ids.ShortID) error {
@@ -127,6 +131,11 @@ func (vm *VM) Disconnected(id ids.ShortID) error {
  ******************************************************************************
  */
 
+type Config struct {
+	IndexTransactions    bool `json:"index-transactions"`
+	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
+}
+
 // Initialize implements the avalanche.DAGVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
@@ -137,6 +146,14 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	avmConfig := Config{}
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &avmConfig); err != nil {
+			return err
+		}
+		ctx.Log.Info("VM config initialized %+v", avmConfig)
+	}
+
 	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
 		return err
 	}
@@ -226,6 +243,20 @@ func (vm *VM) Initialize(
 	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
 
+	// use no op impl when disabled in config
+	if avmConfig.IndexTransactions {
+		vm.ctx.Log.Info("address transaction indexing is enabled")
+		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, ctx.Namespace, ctx.Metrics, avmConfig.IndexAllowIncomplete)
+		if err != nil {
+			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
+		}
+	} else {
+		vm.ctx.Log.Info("address transaction indexing is disabled")
+		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
+		if err != nil {
+			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
+		}
+	}
 	return vm.db.Commit()
 }
 
