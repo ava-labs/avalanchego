@@ -252,10 +252,10 @@ func (vm *VM) newExportTx(
 	}}
 
 	var (
-		avaxNeeded uint64 = 0
-		ins        []EVMInput
-		signers    [][]*crypto.PrivateKeySECP256K1R
-		err        error
+		avaxNeeded           uint64 = 0
+		ins, avaxIns         []EVMInput
+		signers, avaxSigners [][]*crypto.PrivateKeySECP256K1R
+		err                  error
 	)
 
 	// consume non-AVAX
@@ -288,24 +288,19 @@ func (vm *VM) newExportTx(
 			return nil, err
 		}
 
-		newIns, newSigners, err := vm.GetSpendableAVAXWithFee(keys, avaxNeeded, cost, baseFee)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-		}
-		ins = append(ins, newIns...)
-		signers = append(signers, newSigners...)
+		avaxIns, avaxSigners, err = vm.GetSpendableAVAXWithFee(keys, avaxNeeded, cost, baseFee)
 	default:
 		newAvaxNeeded, err := math.Add64(avaxNeeded, params.AvalancheAtomicTxFee)
 		if err != nil {
 			return nil, errOverflowExport
 		}
-		newIns, newSigners, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, newAvaxNeeded)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-		}
-		ins = append(ins, newIns...)
-		signers = append(signers, newSigners...)
+		avaxIns, avaxSigners, err = vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, newAvaxNeeded)
 	}
+	if err != nil {
+		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+	}
+	ins = append(ins, avaxIns...)
+	signers = append(signers, avaxSigners...)
 
 	SortEVMInputsAndSigners(ins, signers)
 
