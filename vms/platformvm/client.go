@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -128,19 +129,29 @@ func (c *Client) GetStakingAssetID(subnetID ids.ID) (ids.ID, error) {
 }
 
 // GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-func (c *Client) GetCurrentValidators(subnetID ids.ID) ([]interface{}, error) {
+func (c *Client) GetCurrentValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, error) {
+	nodeIDsStr := []string{}
+	for _, nodeID := range nodeIDs {
+		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
+	}
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest("getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
+		NodeIDs:  nodeIDsStr,
 	}, res)
 	return res.Validators, err
 }
 
 // GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
-func (c *Client) GetPendingValidators(subnetID ids.ID) ([]interface{}, []interface{}, error) {
+func (c *Client) GetPendingValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, []interface{}, error) {
+	nodeIDsStr := []string{}
+	for _, nodeID := range nodeIDs {
+		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
+	}
 	res := &GetPendingValidatorsReply{}
 	err := c.requester.SendRequest("getPendingValidators", &GetPendingValidatorsArgs{
 		SubnetID: subnetID,
+		NodeIDs:  nodeIDsStr,
 	}, res)
 	return res.Validators, res.Delegators, err
 }
