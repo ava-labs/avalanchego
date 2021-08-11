@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ethereum/go-ethereum/common"
@@ -233,13 +232,14 @@ func (vm *VM) newExportTx(
 	amount uint64, // Amount of tokens to export
 	chainID ids.ID, // Chain to send the UTXOs to
 	to ids.ShortID, // Address of chain recipient
+	baseFee *big.Int, // fee to use post-AP3
 	keys []*crypto.PrivateKeySECP256K1R, // Pay the fee and provide the tokens
 ) (*Tx, error) {
 	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
 
-	exportOuts := []*avax.TransferableOutput{{ // Exported to X-Chain
+	outs := []*avax.TransferableOutput{{ // Exported to X-Chain
 		Asset: avax.Asset{ID: assetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
@@ -251,37 +251,33 @@ func (vm *VM) newExportTx(
 		},
 	}}
 
-	rules := vm.currentRules()
-
-	var toBurn uint64
-	var err error
-
-	switch {
-	case rules.IsApricotPhase3:
-		var amountNeeded uint64 = 0
-		if assetID == vm.ctx.AVAXAssetID {
-			amountNeeded = amount
-		}
-
-		ins, _, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, amountNeeded)
+	var (
+		ins     []EVMInput
+		signers [][]*crypto.PrivateKeySECP256K1R
+		err     error
+	)
+	// consume non-AVAX
+	if assetID != vm.ctx.AVAXAssetID {
+		ins, signers, err = vm.GetSpendableFunds(keys, assetID, amount)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
+	}
 
-		// burn non-AVAX
-		if assetID != vm.ctx.AVAXAssetID {
-			ins2, _, err := vm.GetSpendableFunds(keys, assetID, amount)
-			if err != nil {
-				return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-			}
-			ins = append(ins, ins2...)
-		}
+	var avaxNeeded uint64 = 0
+	if assetID == vm.ctx.AVAXAssetID {
+		avaxNeeded = amount
+	}
+
+	rules := vm.currentRules()
+	switch {
+	case rules.IsApricotPhase3:
 		utx := &UnsignedExportTx{
 			NetworkID:        vm.ctx.NetworkID,
 			BlockchainID:     vm.ctx.ChainID,
 			DestinationChain: chainID,
 			Ins:              ins,
-			ExportedOutputs:  exportOuts,
+			ExportedOutputs:  outs,
 		}
 		tx := &Tx{UnsignedAtomicTx: utx}
 		if err := tx.Sign(vm.codec, nil); err != nil {
@@ -292,46 +288,26 @@ func (vm *VM) newExportTx(
 		if err != nil {
 			return nil, err
 		}
-		txFee, err := calculateDynamicFee(cost, big.NewInt(params.ApricotPhase3InitialBaseFee))
-		if err != nil {
-			return nil, err
-		}
-		if assetID == vm.ctx.AVAXAssetID {
-			toBurn, err = safemath.Add64(amount, txFee)
-			if err != nil {
-				return nil, errOverflowExport
-			}
-		} else {
-			toBurn = txFee
-		}
-	default:
-		if assetID == vm.ctx.AVAXAssetID {
-			toBurn, err = safemath.Add64(amount, params.AvalancheAtomicTxFee)
-			if err != nil {
-				return nil, errOverflowExport
-			}
-		} else {
-			toBurn = params.AvalancheAtomicTxFee
-		}
-	}
 
-	// burn AVAX
-	ins, signers, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, toBurn)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
-	}
-
-	// burn non-AVAX
-	if assetID != vm.ctx.AVAXAssetID {
-		ins2, signers2, err := vm.GetSpendableFunds(keys, assetID, amount)
+		newIns, newSigners, err := vm.GetSpendableAVAXWithFee(keys, avaxNeeded, cost, baseFee)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 		}
-		ins = append(ins, ins2...)
-		signers = append(signers, signers2...)
+		ins = append(ins, newIns...)
+		signers = append(signers, newSigners...)
+	default:
+		newAvaxNeeded, err := math.Add64(avaxNeeded, params.AvalancheAtomicTxFee)
+		if err != nil {
+			return nil, errOverflowExport
+		}
+		newIns, newSigners, err := vm.GetSpendableFunds(keys, vm.ctx.AVAXAssetID, newAvaxNeeded)
+		if err != nil {
+			return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
+		}
+		ins = append(ins, newIns...)
+		signers = append(signers, newSigners...)
 	}
 
-	avax.SortTransferableOutputs(exportOuts, vm.codec)
 	SortEVMInputsAndSigners(ins, signers)
 
 	// Create the transaction
@@ -340,7 +316,7 @@ func (vm *VM) newExportTx(
 		BlockchainID:     vm.ctx.ChainID,
 		DestinationChain: chainID,
 		Ins:              ins,
-		ExportedOutputs:  exportOuts,
+		ExportedOutputs:  outs,
 	}
 	tx := &Tx{UnsignedAtomicTx: utx}
 	if err := tx.Sign(vm.codec, signers); err != nil {
