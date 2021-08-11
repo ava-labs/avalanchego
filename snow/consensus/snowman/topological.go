@@ -180,7 +180,6 @@ func (ts *Topological) DecidedOrProcessing(blk Block) bool {
 	return ts.processing(blk.ID())
 }
 
-// Processing implements the Snowman interface
 func (ts *Topological) processing(blkID ids.ID) bool {
 	// If the block is in the map of current blocks, then the block is currently
 	// processing.

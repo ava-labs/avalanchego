@@ -45,7 +45,7 @@ type Transitive struct {
 	blkReqs common.Requests
 
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
-	pending ids.Set
+	pending map[ids.ID]snowman.Block
 
 	// operations that are blocked on a block being issued. This could be
 	// issuing another block, responding to a query, or applying votes to consensus
@@ -65,6 +65,7 @@ func (t *Transitive) Initialize(config Config) error {
 
 	t.Params = config.Params
 	t.Consensus = config.Consensus
+	t.pending = make(map[ids.ID]snowman.Block)
 
 	factory := poll.NewEarlyTermNoTraversalFactory(config.Params.Alpha)
 	t.polls = poll.NewSet(factory,
@@ -471,7 +472,7 @@ func (t *Transitive) issueFrom(vdr ids.ShortID, blk snowman.Block) (bool, error)
 	// If the block has been decided, we don't need to issue it.
 	// If the block is processing, we don't need to issue it.
 	// If the block is queued to be issued, we don't need to issue it.
-	for !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+	for !t.Consensus.DecidedOrProcessing(blk) && !t.pendingContains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -510,7 +511,7 @@ func (t *Transitive) issueWithAncestors(blk snowman.Block) (bool, error) {
 	blkID := blk.ID()
 	// issue [blk] and its ancestors into consensus
 	status := blk.Status()
-	for status.Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pending.Contains(blkID) {
+	for status.Fetched() && !t.Consensus.DecidedOrProcessing(blk) && !t.pendingContains(blkID) {
 		if err := t.issue(blk); err != nil {
 			return false, err
 		}
@@ -545,7 +546,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 	blkID := blk.ID()
 
 	// mark that the block is queued to be added to consensus once its ancestors have been
-	t.pending.Add(blkID)
+	t.pending[blkID] = blk
 
 	// Remove any outstanding requests for this block
 	t.blkReqs.RemoveAny(blkID)
@@ -567,7 +568,7 @@ func (t *Transitive) issue(blk snowman.Block) error {
 
 	// Tracks performance statistics
 	t.numRequests.Set(float64(t.blkReqs.Len()))
-	t.numBlocked.Set(float64(t.pending.Len()))
+	t.numBlocked.Set(float64(len(t.pending)))
 	return t.errs.Err
 }
 
@@ -638,7 +639,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 	// we are no longer waiting on adding the block to consensus, so it is no
 	// longer pending
 	blkID := blk.ID()
-	t.pending.Remove(blkID)
+	delete(t.pending, blkID)
 	parentID := blk.Parent()
 	parent, err := t.GetBlock(parentID)
 	// Because the dependency must have been fulfilled by the time this function
@@ -648,7 +649,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		// if the parent isn't processing or the last accepted block, then this
 		// block is effectively rejected
 		t.blocked.Abandon(blkID)
-		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		return t.errs.Err
 	}
 
@@ -662,7 +663,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 		// if verify fails, then all descendants are also invalid
 		t.blocked.Abandon(blkID)
-		t.numBlocked.Set(float64(t.pending.Len())) // Tracks performance statistics
+		t.numBlocked.Set(float64(len(t.pending))) // Tracks performance statistics
 		return t.errs.Err
 	}
 
@@ -711,13 +712,13 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 		}
 
 		blkID := blk.ID()
-		t.pending.Remove(blkID)
+		delete(t.pending, blkID)
 		t.blocked.Fulfill(blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
 	for _, blk := range dropped {
 		blkID := blk.ID()
-		t.pending.Remove(blkID)
+		delete(t.pending, blkID)
 		t.blocked.Abandon(blkID)
 		t.blkReqs.RemoveAny(blkID)
 	}
@@ -727,7 +728,7 @@ func (t *Transitive) deliver(blk snowman.Block) error {
 
 	// Tracks performance statistics
 	t.numRequests.Set(float64(t.blkReqs.Len()))
-	t.numBlocked.Set(float64(t.pending.Len()))
+	t.numBlocked.Set(float64(len(t.pending)))
 	return t.errs.Err
 }
 
@@ -761,10 +762,19 @@ func (t *Transitive) HealthCheck() (interface{}, error) {
 
 // GetBlock implements the snowman.Engine interface
 func (t *Transitive) GetBlock(blkID ids.ID) (snowman.Block, error) {
+	blk, ok := t.pending[blkID]
+	if ok {
+		return blk, nil
+	}
 	return t.VM.GetBlock(blkID)
 }
 
 // GetVM implements the snowman.Engine interface
 func (t *Transitive) GetVM() common.VM {
 	return t.VM
+}
+
+func (t *Transitive) pendingContains(blkID ids.ID) bool {
+	_, ok := t.pending[blkID]
+	return ok
 }
