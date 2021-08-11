@@ -28,12 +28,12 @@ func (i *issuer) Fulfill(id ids.ID) {
 func (i *issuer) Abandon(ids.ID) {
 	if !i.abandoned {
 		blkID := i.blk.ID()
-		i.t.pending.Remove(blkID)
+		delete(i.t.pending, blkID)
 		i.t.blocked.Abandon(blkID)
 
 		// Tracks performance statistics
 		i.t.numRequests.Set(float64(i.t.blkReqs.Len()))
-		i.t.numBlocked.Set(float64(i.t.pending.Len()))
+		i.t.numBlocked.Set(float64(len(i.t.pending)))
 	}
 	i.abandoned = true
 }

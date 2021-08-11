@@ -2442,7 +2442,7 @@ func TestEngineTransitiveRejectionAmplificationDueToRejectedParent(t *testing.T)
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if te.pending.Len() != 0 {
+	if len(te.pending) != 0 {
 		t.Fatalf("Shouldn't have any pending blocks")
 	}
 }
@@ -2551,7 +2551,7 @@ func TestEngineTransitiveRejectionAmplificationDueToInvalidParent(t *testing.T) 
 		t.Fatalf("Should have finalized the consensus instance")
 	}
 
-	if te.pending.Len() != 0 {
+	if len(te.pending) != 0 {
 		t.Fatalf("Shouldn't have any pending blocks")
 	}
 }
