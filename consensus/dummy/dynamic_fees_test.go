@@ -6,7 +6,6 @@ package dummy
 import (
 	"encoding/binary"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/coreth/core/types"
@@ -15,12 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func enableLogging() {
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
-}
-
 func init() {
-	enableLogging()
+	// log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
 }
 
 func testRollup(t *testing.T, longs []uint64, roll int) {
@@ -299,5 +294,53 @@ func TestLongWindowOverflow(t *testing.T) {
 		if sum != math.MaxUint64 {
 			t.Fatalf("Expected sum to be maxUint64 (%d), but found %d", uint64(math.MaxUint64), sum)
 		}
+	}
+}
+
+func TestSelectBigWithinBounds(t *testing.T) {
+	type test struct {
+		lower, value, upper, expected *big.Int
+	}
+
+	var tests = map[string]test{
+		"value within bounds": {
+			lower:    big.NewInt(0),
+			value:    big.NewInt(5),
+			upper:    big.NewInt(10),
+			expected: big.NewInt(5),
+		},
+		"value below lower bound": {
+			lower:    big.NewInt(0),
+			value:    big.NewInt(-1),
+			upper:    big.NewInt(10),
+			expected: big.NewInt(0),
+		},
+		"value above upper bound": {
+			lower:    big.NewInt(0),
+			value:    big.NewInt(11),
+			upper:    big.NewInt(10),
+			expected: big.NewInt(10),
+		},
+		"value matches lower bound": {
+			lower:    big.NewInt(0),
+			value:    big.NewInt(0),
+			upper:    big.NewInt(10),
+			expected: big.NewInt(0),
+		},
+		"value matches upper bound": {
+			lower:    big.NewInt(0),
+			value:    big.NewInt(10),
+			upper:    big.NewInt(10),
+			expected: big.NewInt(10),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			v := selectBigWithinBounds(test.lower, test.value, test.upper)
+			if v.Cmp(test.expected) != 0 {
+				t.Fatalf("Expected (%d), found (%d)", test.expected, v)
+			}
+		})
 	}
 }
