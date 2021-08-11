@@ -241,6 +241,7 @@ func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) erro
 func (vm *VM) newImportTx(
 	chainID ids.ID, // chain to import from
 	to common.Address, // Address of recipient
+	baseFee *big.Int, // fee to use post-AP3
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 ) (*Tx, error) {
 	if vm.ctx.XChainID != chainID {
@@ -285,26 +286,13 @@ func (vm *VM) newImportTx(
 	}
 	avax.SortTransferableInputsWithSigners(importedInputs, signers)
 	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID]
-	outs := []EVMOutput{}
 
-	// AVAX output
-	if importedAVAXAmount < params.AvalancheAtomicTxFee { // imported amount goes toward paying tx fee
-		return nil, errInsufficientFundsForFee
-	}
-
-	if importedAVAXAmount > params.AvalancheAtomicTxFee {
-		outs = append(outs, EVMOutput{
-			Address: to,
-			Amount:  importedAVAXAmount - params.AvalancheAtomicTxFee,
-			AssetID: vm.ctx.AVAXAssetID,
-		})
-	}
-
+	outs := make([]EVMOutput, 0, len(importedAmount))
 	// This will create unique outputs (in the context of sorting)
 	// since each output will have a unique assetID
 	for assetID, amount := range importedAmount {
-		// Skip the AVAX amount since it has already been included
-		// and skip any input with an amount of 0
+		// Skip the AVAX amount since it is included separately to account for
+		// the fee
 		if assetID == vm.ctx.AVAXAssetID || amount == 0 {
 			continue
 		}
@@ -312,6 +300,58 @@ func (vm *VM) newImportTx(
 			Address: to,
 			Amount:  amount,
 			AssetID: assetID,
+		})
+	}
+
+	rules := vm.currentRules()
+
+	var (
+		txFeeWithoutChange uint64
+		txFeeWithChange    uint64
+	)
+	switch {
+	case rules.IsApricotPhase3:
+		utx := &UnsignedImportTx{
+			NetworkID:      vm.ctx.NetworkID,
+			BlockchainID:   vm.ctx.ChainID,
+			Outs:           outs,
+			ImportedInputs: importedInputs,
+			SourceChain:    chainID,
+		}
+		tx := &Tx{UnsignedAtomicTx: utx}
+		if err := tx.Sign(vm.codec, nil); err != nil {
+			return nil, err
+		}
+
+		costWithoutChange, err := tx.Cost()
+		if err != nil {
+			return nil, err
+		}
+		costWithChange := costWithoutChange + EVMOutputGas
+
+		txFeeWithoutChange, err = calculateDynamicFee(costWithoutChange, baseFee)
+		if err != nil {
+			return nil, err
+		}
+		txFeeWithChange, err = calculateDynamicFee(costWithChange, baseFee)
+		if err != nil {
+			return nil, err
+		}
+	case rules.IsApricotPhase2:
+		txFeeWithoutChange = params.AvalancheAtomicTxFee
+		txFeeWithChange = params.AvalancheAtomicTxFee
+	}
+
+	// AVAX output
+	if importedAVAXAmount < txFeeWithoutChange { // imported amount goes toward paying tx fee
+		return nil, errInsufficientFundsForFee
+	}
+
+	if importedAVAXAmount > txFeeWithChange {
+		outs = append(outs, EVMOutput{
+			Address: to,
+			Amount:  importedAVAXAmount - txFeeWithChange,
+			AssetID: vm.ctx.AVAXAssetID,
 		})
 	}
 
