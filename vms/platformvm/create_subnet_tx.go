@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -27,7 +27,7 @@ type UnsignedCreateSubnetTx struct {
 	Owner verify.Verifiable `serialize:"true" json:"owner"`
 }
 
-// Verify this transaction is well-formed
+// Verify this transactions.is well-formed
 func (tx *UnsignedCreateSubnetTx) Verify(
 	ctx *snow.Context,
 	c codec.Manager,
@@ -56,12 +56,12 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
-	stx *transaction.SignedTx,
+	stx *transactions.SignedTx,
 ) (
 	func() error,
 	TxError,
 ) {
-	// Make sure this transaction is well formed.
+	// Make sure this transactions.is well formed.
 	if err := tx.Verify(vm.ctx, platformcodec.Codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
@@ -89,7 +89,7 @@ func (vm *VM) newCreateSubnetTx(
 	ownerAddrs []ids.ShortID, // control addresses for the new subnet
 	keys []*crypto.PrivateKeySECP256K1R, // pay the fee
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*transaction.SignedTx, error) {
+) (*transactions.SignedTx, error) {
 	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -111,7 +111,7 @@ func (vm *VM) newCreateSubnetTx(
 			Addrs:     ownerAddrs,
 		},
 	}
-	tx := &transaction.SignedTx{UnsignedTx: utx}
+	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}

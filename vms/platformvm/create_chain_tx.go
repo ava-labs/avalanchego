@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var (
@@ -54,7 +54,7 @@ type UnsignedCreateChainTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-// Verify this transaction is well-formed
+// Verify this transactions.is well-formed
 func (tx *UnsignedCreateChainTx) Verify(
 	ctx *snow.Context,
 	c codec.Manager,
@@ -95,16 +95,16 @@ func (tx *UnsignedCreateChainTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
+// SemanticVerify this transactions.is valid.
 func (tx *UnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
-	stx *transaction.SignedTx,
+	stx *transactions.SignedTx,
 ) (
 	func() error,
 	TxError,
 ) {
-	// Make sure this transaction is well formed.
+	// Make sure this transactions.is well formed.
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
@@ -167,7 +167,7 @@ func (vm *VM) newCreateChainTx(
 	chainName string, // Name of the chain
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*transaction.SignedTx, error) {
+) (*transactions.SignedTx, error) {
 	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -197,7 +197,7 @@ func (vm *VM) newCreateChainTx(
 		GenesisData: genesisData,
 		SubnetAuth:  subnetAuth,
 	}
-	tx := &transaction.SignedTx{UnsignedTx: utx}
+	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}

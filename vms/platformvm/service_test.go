@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cjson "github.com/ava-labs/avalanchego/utils/json"
@@ -338,13 +338,13 @@ func TestGetTx(t *testing.T) {
 
 	type test struct {
 		description string
-		createTx    func() (*transaction.SignedTx, error)
+		createTx    func() (*transactions.SignedTx, error)
 	}
 
 	tests := []test{
 		{
 			"standard block",
-			func() (*transaction.SignedTx, error) {
+			func() (*transactions.SignedTx, error) {
 				return service.vm.newCreateChainTx( // Test GetTx works for standard blocks
 					testSubnet1.ID(),
 					nil,
@@ -358,7 +358,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"proposal block",
-			func() (*transaction.SignedTx, error) {
+			func() (*transactions.SignedTx, error) {
 				return service.vm.newAddValidatorTx( // Test GetTx works for proposal blocks
 					service.vm.MinValidatorStake,
 					uint64(service.vm.clock.Time().Add(syncBound).Unix()),
@@ -373,7 +373,7 @@ func TestGetTx(t *testing.T) {
 		},
 		{
 			"atomic block",
-			func() (*transaction.SignedTx, error) {
+			func() (*transactions.SignedTx, error) {
 				return service.vm.newExportTx( // Test GetTx works for proposal blocks
 					100,
 					service.vm.ctx.XChainID,

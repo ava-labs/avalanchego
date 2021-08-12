@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var (
@@ -17,12 +17,12 @@ var (
 	_ decision = &StandardBlock{}
 )
 
-// StandardBlock being accepted results in the transactions contained in the
+// StandardBlock being accepted results in the transactions. contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
 
-	Txs []*transaction.SignedTx `serialize:"true" json:"txs"`
+	Txs []*transactions.SignedTx `serialize:"true" json:"txs"`
 }
 
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
@@ -147,7 +147,7 @@ func (sb *StandardBlock) Reject() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*transaction.SignedTx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*transactions.SignedTx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		SingleDecisionBlock: SingleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{

@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -72,11 +72,11 @@ type InternalState interface {
 	MutableState
 	uptime.State
 
-	AddCurrentStaker(tx *transaction.SignedTx, potentialReward uint64)
-	DeleteCurrentStaker(tx *transaction.SignedTx)
+	AddCurrentStaker(tx *transactions.SignedTx, potentialReward uint64)
+	DeleteCurrentStaker(tx *transactions.SignedTx)
 
-	AddPendingStaker(tx *transaction.SignedTx)
-	DeletePendingStaker(tx *transaction.SignedTx)
+	AddPendingStaker(tx *transactions.SignedTx)
+	DeletePendingStaker(tx *transactions.SignedTx)
 
 	SetCurrentStakerChainState(currentStakerChainState)
 	SetPendingStakerChainState(pendingStakerChainState)
@@ -150,9 +150,9 @@ type internalStateImpl struct {
 	pendingStakerChainState pendingStakerChainState
 
 	addedCurrentStakers   []*validatorReward
-	deletedCurrentStakers []*transaction.SignedTx
-	addedPendingStakers   []*transaction.SignedTx
-	deletedPendingStakers []*transaction.SignedTx
+	deletedCurrentStakers []*transactions.SignedTx
+	addedPendingStakers   []*transactions.SignedTx
+	deletedPendingStakers []*transactions.SignedTx
 	uptimes               map[ids.ShortID]*currentValidatorState // nodeID -> uptimes
 	updatedUptimes        map[ids.ShortID]struct{}               // nodeID -> nil
 
@@ -176,8 +176,8 @@ type internalStateImpl struct {
 	blockCache  cache.Cacher     // cache of blockID -> Block, if the entry is nil, it is not in the database
 	blockDB     database.Database
 
-	addedTxs map[ids.ID]*txStatusImpl // map of txID -> {*transaction.Tx, Status}
-	txCache  cache.Cacher             // cache of txID -> {*transaction.Tx, Status} if the entry is nil, it is not in the database
+	addedTxs map[ids.ID]*txStatusImpl // map of txID -> {*transactions.Tx, Status}
+	txCache  cache.Cacher             // cache of txID -> {*transactions.Tx, Status} if the entry is nil, it is not in the database
 	txDB     database.Database
 
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
@@ -188,13 +188,13 @@ type internalStateImpl struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
-	cachedSubnets []*transaction.SignedTx // nil if the subnets haven't been loaded
-	addedSubnets  []*transaction.SignedTx
+	cachedSubnets []*transactions.SignedTx // nil if the subnets haven't been loaded
+	addedSubnets  []*transactions.SignedTx
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
 
-	addedChains  map[ids.ID][]*transaction.SignedTx // maps subnetID -> the newly added chains to the subnet
-	chainCache   cache.Cacher                       // cache of subnetID -> the chains after all local modifications []*transaction.Tx
+	addedChains  map[ids.ID][]*transactions.SignedTx // maps subnetID -> the newly added chains to the subnet
+	chainCache   cache.Cacher                       // cache of subnetID -> the chains after all local modifications []*transactions.Tx
 	chainDBCache cache.Cacher                       // cache of subnetID -> linkedDB
 	chainDB      database.Database
 
@@ -271,7 +271,7 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		addedChains: make(map[ids.ID][]*transaction.SignedTx),
+		addedChains: make(map[ids.ID][]*transactions.SignedTx),
 		chainDB:     prefixdb.New(chainPrefix, baseDB),
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
@@ -412,7 +412,7 @@ func (st *internalStateImpl) SetCurrentSupply(currentSupply uint64) { st.current
 func (st *internalStateImpl) GetLastAccepted() ids.ID             { return st.lastAccepted }
 func (st *internalStateImpl) SetLastAccepted(lastAccepted ids.ID) { st.lastAccepted = lastAccepted }
 
-func (st *internalStateImpl) GetSubnets() ([]*transaction.SignedTx, error) {
+func (st *internalStateImpl) GetSubnets() ([]*transactions.SignedTx, error) {
 	if st.cachedSubnets != nil {
 		return st.cachedSubnets, nil
 	}
@@ -420,7 +420,7 @@ func (st *internalStateImpl) GetSubnets() ([]*transaction.SignedTx, error) {
 	subnetDBIt := st.subnetDB.NewIterator()
 	defer subnetDBIt.Release()
 
-	txs := []*transaction.SignedTx(nil)
+	txs := []*transactions.SignedTx(nil)
 	for subnetDBIt.Next() {
 		subnetIDBytes := subnetDBIt.Key()
 		subnetID, err := ids.ToID(subnetIDBytes)
@@ -441,22 +441,22 @@ func (st *internalStateImpl) GetSubnets() ([]*transaction.SignedTx, error) {
 	return txs, nil
 }
 
-func (st *internalStateImpl) AddSubnet(createSubnetTx *transaction.SignedTx) {
+func (st *internalStateImpl) AddSubnet(createSubnetTx *transactions.SignedTx) {
 	st.addedSubnets = append(st.addedSubnets, createSubnetTx)
 	if st.cachedSubnets != nil {
 		st.cachedSubnets = append(st.cachedSubnets, createSubnetTx)
 	}
 }
 
-func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*transaction.SignedTx, error) {
+func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*transactions.SignedTx, error) {
 	if chainsIntf, cached := st.chainCache.Get(subnetID); cached {
-		return chainsIntf.([]*transaction.SignedTx), nil
+		return chainsIntf.([]*transactions.SignedTx), nil
 	}
 	chainDB := st.getChainDB(subnetID)
 	chainDBIt := chainDB.NewIterator()
 	defer chainDBIt.Release()
 
-	txs := []*transaction.SignedTx(nil)
+	txs := []*transactions.SignedTx(nil)
 	for chainDBIt.Next() {
 		chainIDBytes := chainDBIt.Key()
 		chainID, err := ids.ToID(chainIDBytes)
@@ -477,12 +477,12 @@ func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*transaction.SignedTx
 	return txs, nil
 }
 
-func (st *internalStateImpl) AddChain(createChainTxIntf *transaction.SignedTx) {
+func (st *internalStateImpl) AddChain(createChainTxIntf *transactions.SignedTx) {
 	createChainTx := createChainTxIntf.UnsignedTx.(*UnsignedCreateChainTx)
 	subnetID := createChainTx.SubnetID
 	st.addedChains[subnetID] = append(st.addedChains[subnetID], createChainTxIntf)
 	if chainsIntf, cached := st.chainCache.Get(subnetID); cached {
-		chains := chainsIntf.([]*transaction.SignedTx)
+		chains := chainsIntf.([]*transactions.SignedTx)
 		chains = append(chains, createChainTxIntf)
 		st.chainCache.Put(subnetID, chains)
 	}
@@ -498,7 +498,7 @@ func (st *internalStateImpl) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	return chainDB
 }
 
-func (st *internalStateImpl) GetTx(txID ids.ID) (*transaction.SignedTx, Status, error) {
+func (st *internalStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, Status, error) {
 	if tx, exists := st.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
@@ -522,7 +522,7 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*transaction.SignedTx, Status, 
 		return nil, Unknown, err
 	}
 
-	tx := transaction.SignedTx{}
+	tx := transactions.SignedTx{}
 	if _, err := platformcodec.GenesisCodec.Unmarshal(stx.Tx, &tx); err != nil {
 		return nil, Unknown, err
 	}
@@ -539,7 +539,7 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*transaction.SignedTx, Status, 
 	return ptx.tx, ptx.status, nil
 }
 
-func (st *internalStateImpl) AddTx(tx *transaction.SignedTx, status Status) {
+func (st *internalStateImpl) AddTx(tx *transactions.SignedTx, status Status) {
 	st.addedTxs[tx.ID()] = &txStatusImpl{
 		tx:     tx,
 		status: status,
@@ -676,22 +676,22 @@ func (st *internalStateImpl) SetUptime(nodeID ids.ShortID, upDuration time.Durat
 	return nil
 }
 
-func (st *internalStateImpl) AddCurrentStaker(tx *transaction.SignedTx, potentialReward uint64) {
+func (st *internalStateImpl) AddCurrentStaker(tx *transactions.SignedTx, potentialReward uint64) {
 	st.addedCurrentStakers = append(st.addedCurrentStakers, &validatorReward{
 		addStakerTx:     tx,
 		potentialReward: potentialReward,
 	})
 }
 
-func (st *internalStateImpl) DeleteCurrentStaker(tx *transaction.SignedTx) {
+func (st *internalStateImpl) DeleteCurrentStaker(tx *transactions.SignedTx) {
 	st.deletedCurrentStakers = append(st.deletedCurrentStakers, tx)
 }
 
-func (st *internalStateImpl) AddPendingStaker(tx *transaction.SignedTx) {
+func (st *internalStateImpl) AddPendingStaker(tx *transactions.SignedTx) {
 	st.addedPendingStakers = append(st.addedPendingStakers, tx)
 }
 
-func (st *internalStateImpl) DeletePendingStaker(tx *transaction.SignedTx) {
+func (st *internalStateImpl) DeletePendingStaker(tx *transactions.SignedTx) {
 	st.deletedPendingStakers = append(st.deletedPendingStakers, tx)
 }
 

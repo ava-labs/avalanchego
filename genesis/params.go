@@ -35,7 +35,7 @@ type StakingConfig struct {
 type TxFeeConfig struct {
 	// Transaction fee
 	TxFee uint64 `json:"txFee"`
-	// Transaction fee for transactions that create new state
+	// Transaction fee for transactions. that create new state
 	CreationTxFee uint64 `json:"creationTxFee"`
 }
 

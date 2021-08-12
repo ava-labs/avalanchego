@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -36,7 +36,7 @@ const (
 	// Max number of addresses allowed for a single keystore user
 	maxKeystoreAddresses = 5000
 
-	// Minimum amount of delay to allow a transaction to be issued through the
+	// Minimum amount of delay to allow a transactions.to be issued through the
 	// API
 	minAddStakerDelay = 2 * syncBound
 )
@@ -481,7 +481,7 @@ type APISubnet struct {
 	ID ids.ID `json:"id"`
 
 	// Each element of [ControlKeys] the address of a public key.
-	// A transaction to add a validator to this subnet requires
+	// A transactions.to add a validator to this subnet requires
 	// signatures from [Threshold] of these keys to be valid.
 	ControlKeys []string    `json:"controlKeys"`
 	Threshold   json.Uint32 `json:"threshold"`
@@ -974,7 +974,7 @@ type AddValidatorArgs struct {
 	DelegationFeeRate json.Float32 `json:"delegationFeeRate"`
 }
 
-// AddValidator creates and signs and issues a transaction to add a
+// AddValidator creates and signs and issues a transactions.to add a
 // validator to the primary network
 func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: AddValidator called")
@@ -1101,7 +1101,7 @@ type AddDelegatorArgs struct {
 	RewardAddress string `json:"rewardAddress"`
 }
 
-// AddDelegator creates and signs and issues a transaction to add a
+// AddDelegator creates and signs and issues a transactions.to add a
 // delegator to the primary network
 func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, reply *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: AddDelegator called")
@@ -1226,7 +1226,7 @@ type AddSubnetValidatorArgs struct {
 	SubnetID string `json:"subnetID"`
 }
 
-// AddSubnetValidator creates and signs and issues a transaction to
+// AddSubnetValidator creates and signs and issues a transactions.to
 // add a validator to a subnet other than the primary network
 func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValidatorArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: AddSubnetValidator called")
@@ -1346,7 +1346,7 @@ type CreateSubnetArgs struct {
 	APISubnet
 }
 
-// CreateSubnet creates and signs and issues a transaction to create a new
+// CreateSubnet creates and signs and issues a transactions.to create a new
 // subnet
 func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: CreateSubnet called")
@@ -1544,7 +1544,7 @@ type ImportAVAXArgs struct {
 	To string `json:"to"`
 }
 
-// ImportAVAX issues a transaction to import AVAX from the X-chain. The AVAX
+// ImportAVAX issues a transactions.to import AVAX from the X-chain. The AVAX
 // must have already been exported from the X-Chain.
 func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: ImportAVAX called")
@@ -1650,7 +1650,7 @@ type CreateBlockchainArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// CreateBlockchain issues a transaction to create a new blockchain
+// CreateBlockchain issues a transactions.to create a new blockchain
 func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchainArgs, response *api.JSONTxIDChangeAddr) error {
 	service.vm.ctx.Log.Debug("Platform: CreateBlockchain called")
 
@@ -2030,9 +2030,9 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 
 	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
-		return fmt.Errorf("problem decoding transaction: %w", err)
+		return fmt.Errorf("problem decoding transactions. %w", err)
 	}
-	tx := &transaction.SignedTx{}
+	tx := &transactions.SignedTx{}
 	if _, err := platformcodec.Codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
@@ -2103,7 +2103,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	// The status of this transaction is not in the database - check if the tx
+	// The status of this transactions.is not in the database - check if the tx
 	// is in the preferred block's db. If so, return that it's processing.
 	preferred, err := service.vm.Preferred()
 	if err != nil {
@@ -2167,7 +2167,7 @@ type GetStakeReply struct {
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
-func (service *Service) getStakeHelper(tx *transaction.SignedTx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
+func (service *Service) getStakeHelper(tx *transactions.SignedTx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
 	var outs []*avax.TransferableOutput
 	switch staker := tx.UnsignedTx.(type) {
 	case *UnsignedAddDelegatorTx:
@@ -2374,7 +2374,7 @@ type GetRewardUTXOsReply struct {
 }
 
 // GetRewardUTXOs returns the UTXOs that were rewarded after the provided
-// transaction's staking period ended.
+// transactions.s staking period ended.
 func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *GetRewardUTXOsReply) error {
 	service.vm.ctx.Log.Debug("Platform: GetRewardUTXOs called")
 

@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -549,7 +549,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	var unmarshaledTx transaction.SignedTx
+	var unmarshaledTx transactions.SignedTx
 
 	// valid tx
 	tx, err := vm.newAddSubnetValidatorTx(

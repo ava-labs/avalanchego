@@ -42,7 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -851,7 +851,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	if vm.mempool.unissuedProposalTxs.Len() > 0 {
-		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
+		t.Fatalf("Expected there to be 0 unissued proposal transactions. after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
 	}
 }
 
@@ -1700,7 +1700,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := transaction.SignedTx{UnsignedTx: &UnsignedImportTx{
+	tx := transactions.SignedTx{UnsignedTx: &UnsignedImportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
@@ -2430,15 +2430,15 @@ func TestUnverifiedParentPanic(t *testing.T) {
 	preferredID := preferred.ID()
 	preferredHeight := preferred.Height()
 
-	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*transaction.SignedTx{addSubnetTx0})
+	addSubnetBlk0, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*transactions.SignedTx{addSubnetTx0})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*transaction.SignedTx{addSubnetTx1})
+	addSubnetBlk1, err := vm.newStandardBlock(preferredID, preferredHeight+1, []*transactions.SignedTx{addSubnetTx1})
 	if err != nil {
 		t.Fatal(err)
 	}
-	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*transaction.SignedTx{addSubnetTx2})
+	addSubnetBlk2, err := vm.newStandardBlock(addSubnetBlk1.ID(), preferredHeight+2, []*transactions.SignedTx{addSubnetTx2})
 	if err != nil {
 		t.Fatal(err)
 	}

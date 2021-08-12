@@ -34,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -170,7 +170,7 @@ type VM struct {
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped bool
 
-	// Contains the IDs of transactions recently dropped because they failed verification.
+	// Contains the IDs of transactions. recently dropped because they failed verification.
 	// These txs may be re-issued and put into accepted blocks, so check the database
 	// to see if it was later committed/aborted before reporting that it's dropped.
 	// Key: Tx ID
@@ -284,7 +284,7 @@ func (vm *VM) initBlockchains() error {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func (vm *VM) createChain(tx *transaction.SignedTx) error {
+func (vm *VM) createChain(tx *transactions.SignedTx) error {
 	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
 	if !ok {
 		return errWrongTxType

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var (
@@ -88,11 +88,11 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
+// SemanticVerify this transactions.is valid.
 func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *transaction.SignedTx,
+	stx *transactions.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -157,7 +157,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			// validing node.
 			vdrTx = currentValidator.AddValidatorTx()
 
-			// Ensure that this transaction isn't a duplicate add validator tx.
+			// Ensure that this transactions.isn't a duplicate add validator tx.
 			subnets := currentValidator.SubnetValidators()
 			if _, validates := subnets[tx.Validator.Subnet]; validates {
 				return nil, nil, nil, nil, permError{
@@ -191,7 +191,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
 
-		// Ensure that this transaction isn't a duplicate add validator tx.
+		// Ensure that this transactions.isn't a duplicate add validator tx.
 		pendingValidator := pendingStakers.GetValidator(tx.Validator.NodeID)
 		subnets := pendingValidator.SubnetValidators()
 		if _, validates := subnets[tx.Validator.Subnet]; validates {
@@ -276,7 +276,7 @@ func (vm *VM) newAddSubnetValidatorTx(
 	subnetID ids.ID, // ID of the subnet the validator will validate
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to use for adding the validator
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*transaction.SignedTx, error) {
+) (*transactions.SignedTx, error) {
 	ins, outs, _, signers, err := vm.stake(keys, 0, vm.TxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -307,7 +307,7 @@ func (vm *VM) newAddSubnetValidatorTx(
 		},
 		SubnetAuth: subnetAuth,
 	}
-	tx := &transaction.SignedTx{UnsignedTx: utx}
+	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}

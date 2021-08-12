@@ -13,26 +13,26 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
-	errWrongTxType         = errors.New("wrong transaction type")
+	errWrongTxType         = errors.New("wrong transactions.type")
 
 	_ UnsignedProposalTx = &UnsignedRewardValidatorTx{}
 )
 
-// UnsignedRewardValidatorTx is a transaction that represents a proposal to
+// UnsignedRewardValidatorTx is a transactions.that represents a proposal to
 // remove a validator that is currently validating from the validator set.
 //
-// If this transaction is accepted and the next block accepted is a Commit
+// If this transactions.is accepted and the next block accepted is a Commit
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX as well as a validating reward.
 //
-// If this transaction is accepted and the next block accepted is an Abort
+// If this transactions.is accepted and the next block accepted is an Abort
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX but no reward.
 type UnsignedRewardValidatorTx struct {
@@ -45,7 +45,7 @@ type UnsignedRewardValidatorTx struct {
 	shouldPreferCommit bool
 }
 
-// SemanticVerify this transaction performs a valid state transition.
+// SemanticVerify this transactions.performs a valid state transition.
 //
 // The current validating set must have at least one member.
 // The next validator to be removed must be the validator specified in this block.
@@ -54,7 +54,7 @@ type UnsignedRewardValidatorTx struct {
 func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *transaction.SignedTx,
+	stx *transactions.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -300,10 +300,10 @@ func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
 	return tx.shouldPreferCommit
 }
 
-// RewardStakerTx creates a new transaction that proposes to remove the staker
+// RewardStakerTx creates a new transactions.that proposes to remove the staker
 // [validatorID] from the default validator set.
-func (vm *VM) newRewardValidatorTx(txID ids.ID) (*transaction.SignedTx, error) {
-	tx := &transaction.SignedTx{UnsignedTx: &UnsignedRewardValidatorTx{
+func (vm *VM) newRewardValidatorTx(txID ids.ID) (*transactions.SignedTx, error) {
+	tx := &transactions.SignedTx{UnsignedTx: &UnsignedRewardValidatorTx{
 		TxID: txID,
 	}}
 	return tx, tx.Sign(platformcodec.Codec, nil)

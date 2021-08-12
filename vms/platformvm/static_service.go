@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -46,7 +46,7 @@ type APIUTXO struct {
 }
 
 // APIStaker is the representation of a staker sent via APIs.
-// [TxID] is the txID of the transaction that added this staker.
+// [TxID] is the txID of the transactions.that added this staker.
 // [Amount] is the amount of tokens being staked.
 // [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
@@ -149,8 +149,8 @@ type GenesisUTXO struct {
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
 	UTXOs         []*GenesisUTXO          `serialize:"true"`
-	Validators    []*transaction.SignedTx `serialize:"true"`
-	Chains        []*transaction.SignedTx `serialize:"true"`
+	Validators    []*transactions.SignedTx `serialize:"true"`
+	Chains        []*transactions.SignedTx `serialize:"true"`
 	Timestamp     uint64                  `serialize:"true"`
 	InitialSupply uint64                  `serialize:"true"`
 	Message       string                  `serialize:"true"`
@@ -290,7 +290,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			delegationFee = uint32(*validator.ExactDelegationFee)
 		}
 
-		tx := &transaction.SignedTx{UnsignedTx: &UnsignedAddValidatorTx{
+		tx := &transactions.SignedTx{UnsignedTx: &UnsignedAddValidatorTx{
 			BaseTx: BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
@@ -313,13 +313,13 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the chains that exist at genesis.
-	chains := []*transaction.SignedTx{}
+	chains := []*transactions.SignedTx{}
 	for _, chain := range args.Chains {
 		genesisBytes, err := formatting.Decode(args.Encoding, chain.GenesisData)
 		if err != nil {
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
-		tx := &transaction.SignedTx{UnsignedTx: &UnsignedCreateChainTx{
+		tx := &transactions.SignedTx{UnsignedTx: &UnsignedCreateChainTx{
 			BaseTx: BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,

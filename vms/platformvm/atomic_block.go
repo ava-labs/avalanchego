@@ -10,22 +10,22 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var (
-	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
+	errConflictingParentTxs = errors.New("block contains a transactions.that conflicts with a transactions.in a parent block")
 
 	_ Block    = &AtomicBlock{}
 	_ decision = &AtomicBlock{}
 )
 
-// AtomicBlock being accepted results in the atomic transaction contained in the
+// AtomicBlock being accepted results in the atomic transactions.contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
 
-	Tx transaction.SignedTx `serialize:"true" json:"tx"`
+	Tx transactions.SignedTx `serialize:"true" json:"tx"`
 
 	// inputs are the atomic inputs that are consumed by this block's atomic
 	// transaction
@@ -201,7 +201,7 @@ func (ab *AtomicBlock) Reject() error {
 
 // newAtomicBlock returns a new *AtomicBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx transaction.SignedTx) (*AtomicBlock, error) {
+func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx transactions.SignedTx) (*AtomicBlock, error) {
 	ab := &AtomicBlock{
 		CommonDecisionBlock: CommonDecisionBlock{
 			CommonBlock: CommonBlock{

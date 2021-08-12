@@ -16,7 +16,7 @@ type Status uint32
 // [Committed] Reached finality
 // [Aborted] Block proposal was aborted
 // [Processing] Not found in the db but is in the preferred blocks db
-// [Dropped] The transaction was dropped most likely because it was invalid
+// [Dropped] The transactions.was dropped most likely because it was invalid
 const (
 	Unknown    Status = 0
 	Committed  Status = 4

@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -49,7 +49,7 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	return set
 }
 
-// Verify this transaction is well-formed
+// Verify this transactions.is well-formed
 func (tx *UnsignedImportTx) Verify(
 	avmID ids.ID,
 	ctx *snow.Context,
@@ -86,11 +86,11 @@ func (tx *UnsignedImportTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
+// SemanticVerify this transactions.is valid.
 func (tx *UnsignedImportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *transaction.SignedTx,
+	stx *transactions.SignedTx,
 ) (VersionedState, TxError) {
 	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
@@ -153,10 +153,10 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	return newState, nil
 }
 
-// Accept this transaction and spend imported inputs
+// Accept this transactions.and spend imported inputs
 // We spend imported UTXOs here rather than in semanticVerify because
 // we don't want to remove an imported UTXO in semanticVerify
-// only to have the transaction not be Accepted. This would be inconsistent.
+// only to have the transactions.not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
 func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
@@ -173,7 +173,7 @@ func (vm *VM) newImportTx(
 	to ids.ShortID, // Address of recipient
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to import the funds
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*transaction.SignedTx, error) {
+) (*transactions.SignedTx, error) {
 	if vm.ctx.XChainID != chainID {
 		return nil, errWrongChainID
 	}
@@ -256,7 +256,7 @@ func (vm *VM) newImportTx(
 		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
 	}
-	tx := &transaction.SignedTx{UnsignedTx: utx}
+	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -62,7 +62,7 @@ func (vm *VM) stake(
 		kc.Add(key)
 	}
 
-	// Minimum time this transaction will be issued at
+	// Minimum time this transactions.will be issued at
 	now := uint64(vm.clock.Time().Unix())
 
 	ins := []*avax.TransferableInput{}
@@ -332,7 +332,7 @@ func (vm *VM) authorize(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	utxoDB UTXOGetter,
-	tx transaction.UnsignedTx,
+	tx transactions.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -364,7 +364,7 @@ func (vm *VM) semanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
-	tx transaction.UnsignedTx,
+	tx transactions.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -386,7 +386,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 	}
 
-	// Time this transaction is being verified
+	// Time this transactions.is being verified
 	now := uint64(vm.clock.Time().Unix())
 
 	// Track the amount of unlocked transfers

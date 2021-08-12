@@ -9,14 +9,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var _ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
 
-// UnsignedAdvanceTimeTx is a transaction to increase the chain's timestamp.
+// UnsignedAdvanceTimeTx is a transactions.to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
 // followed by a commit block) the staker set is also updated accordingly.
 // It must be that:
@@ -34,11 +34,11 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-// SemanticVerify this transaction is valid.
+// SemanticVerify this transactions.is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *transaction.SignedTx,
+	stx *transactions.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -97,7 +97,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	pendingStakers := parentState.PendingStakerChainState()
 	toAddValidatorsWithRewardToCurrent := []*validatorReward(nil)
 	toAddDelegatorsWithRewardToCurrent := []*validatorReward(nil)
-	toAddWithoutRewardToCurrent := []*transaction.SignedTx(nil)
+	toAddWithoutRewardToCurrent := []*transactions.SignedTx(nil)
 	numToRemoveFromPending := 0
 
 	// Add to the staker set any pending stakers whose start time is at or
@@ -224,8 +224,8 @@ func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
 
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 // Commit block, will set the chain's timestamp to [timestamp].
-func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*transaction.SignedTx, error) {
-	tx := &transaction.SignedTx{UnsignedTx: &UnsignedAdvanceTimeTx{
+func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*transactions.SignedTx, error) {
+	tx := &transactions.SignedTx{UnsignedTx: &UnsignedAdvanceTimeTx{
 		Time: uint64(timestamp.Unix()),
 	}}
 	return tx, tx.Sign(platformcodec.Codec, nil)

@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transaction"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -130,11 +130,11 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transaction is valid.
+// SemanticVerify this transactions.is valid.
 func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
-	stx *transaction.SignedTx,
+	stx *transactions.SignedTx,
 ) (
 	VersionedState,
 	VersionedState,
@@ -274,7 +274,7 @@ func (vm *VM) newAddValidatorTx(
 	shares uint32, // 10,000 times percentage of reward taken from delegators
 	keys []*crypto.PrivateKeySECP256K1R, // Keys providing the staked tokens
 	changeAddr ids.ShortID, // Address to send change to, if there is any
-) (*transaction.SignedTx, error) {
+) (*transactions.SignedTx, error) {
 	ins, unlockedOuts, lockedOuts, signers, err := vm.stake(keys, stakeAmt, vm.AddStakerTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
@@ -301,7 +301,7 @@ func (vm *VM) newAddValidatorTx(
 		},
 		Shares: shares,
 	}
-	tx := &transaction.SignedTx{UnsignedTx: utx}
+	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
