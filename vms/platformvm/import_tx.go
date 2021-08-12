@@ -24,14 +24,13 @@ var (
 	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
 	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
 	errNoImportInputs           = errors.New("tx has no imported inputs")
-	errInputsNotSortedUnique    = errors.New("inputs not sorted and unique")
 
 	_ UnsignedAtomicTx = &UnsignedImportTx{}
 )
 
 // UnsignedImportTx is an unsigned ImportTx
 type UnsignedImportTx struct {
-	BaseTx `serialize:"true"`
+	transactions.BaseTx `serialize:"true"`
 
 	// Which chain to consume the funds from
 	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
@@ -59,8 +58,8 @@ func (tx *UnsignedImportTx) Verify(
 ) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return transactions.ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.SourceChain != avmID:
 		// TODO: remove this check if we allow for P->C swaps
@@ -79,10 +78,10 @@ func (tx *UnsignedImportTx) Verify(
 		}
 	}
 	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
-		return errInputsNotSortedUnique
+		return transactions.ErrInputsNotSortedUnique
 	}
 
-	tx.syntacticallyVerified = true
+	tx.SyntacticallyVerified = true
 	return nil
 }
 
@@ -247,7 +246,7 @@ func (vm *VM) newImportTx(
 
 	// Create the transaction
 	utx := &UnsignedImportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Outs:         outs,

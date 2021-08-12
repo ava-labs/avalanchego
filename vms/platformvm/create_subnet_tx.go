@@ -22,7 +22,7 @@ var _ UnsignedDecisionTx = &UnsignedCreateSubnetTx{}
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
 type UnsignedCreateSubnetTx struct {
 	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
+	transactions.BaseTx `serialize:"true"`
 	// Who is authorized to manage this subnet
 	Owner verify.Verifiable `serialize:"true" json:"owner"`
 }
@@ -36,8 +36,8 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 ) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return transactions.ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}
 
@@ -48,7 +48,7 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 		return err
 	}
 
-	tx.syntacticallyVerified = true
+	tx.SyntacticallyVerified = true
 	return nil
 }
 
@@ -100,7 +100,7 @@ func (vm *VM) newCreateSubnetTx(
 
 	// Create the tx
 	utx := &UnsignedCreateSubnetTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,

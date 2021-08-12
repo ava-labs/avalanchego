@@ -30,7 +30,7 @@ var (
 // UnsignedAddSubnetValidatorTx is an unsigned addSubnetValidatorTx
 type UnsignedAddSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
+	transactions.BaseTx `serialize:"true"`
 	// The validator
 	Validator SubnetValidator `serialize:"true" json:"validator"`
 	// Auth that will be allowing this validator into the network
@@ -63,8 +63,8 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 ) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return transactions.ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}
 
@@ -84,7 +84,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	}
 
 	// cache that this is valid
-	tx.syntacticallyVerified = true
+	tx.SyntacticallyVerified = true
 	return nil
 }
 
@@ -290,7 +290,7 @@ func (vm *VM) newAddSubnetValidatorTx(
 
 	// Create the tx
 	utx := &UnsignedAddSubnetValidatorTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,

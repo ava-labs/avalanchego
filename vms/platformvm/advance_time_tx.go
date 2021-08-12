@@ -48,7 +48,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 ) {
 	switch {
 	case tx == nil:
-		return nil, nil, nil, nil, tempError{errNilTx}
+		return nil, nil, nil, nil, tempError{transactions.ErrNilTx}
 	case len(stx.Creds) != 0:
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}

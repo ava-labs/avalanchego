@@ -64,7 +64,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 ) {
 	switch {
 	case tx == nil:
-		return nil, nil, nil, nil, tempError{errNilTx}
+		return nil, nil, nil, nil, tempError{transactions.ErrNilTx}
 	case tx.TxID == ids.Empty:
 		return nil, nil, nil, nil, tempError{errInvalidID}
 	case len(stx.Creds) != 0:

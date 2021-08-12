@@ -30,7 +30,7 @@ type TimedTx interface {
 // Transactions must be syntactically verified before adding to EventHeap to
 // ensure that EventHeap can always by marshalled.
 type EventHeap struct {
-	SortByStartTime bool                    `serialize:"true"`
+	SortByStartTime bool                     `serialize:"true"`
 	Txs             []*transactions.SignedTx `serialize:"true"`
 }
 

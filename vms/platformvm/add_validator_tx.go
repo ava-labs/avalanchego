@@ -24,7 +24,6 @@ import (
 )
 
 var (
-	errNilTx                     = errors.New("tx is nil")
 	errWeightTooSmall            = errors.New("weight of this validator is too low")
 	errWeightTooLarge            = errors.New("weight of this validator is too large")
 	errStakeTooShort             = errors.New("staking period is too short")
@@ -39,7 +38,7 @@ var (
 // UnsignedAddValidatorTx is an unsigned addValidatorTx
 type UnsignedAddValidatorTx struct {
 	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
+	transactions.BaseTx `serialize:"true"`
 	// Describes the delegatee
 	Validator Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
@@ -78,8 +77,8 @@ func (tx *UnsignedAddValidatorTx) Verify(
 ) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return transactions.ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
 		return errWeightTooSmall
@@ -120,13 +119,13 @@ func (tx *UnsignedAddValidatorTx) Verify(
 
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Stake, platformcodec.Codec):
-		return errOutputsNotSorted
+		return transactions.ErrOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
 	}
 
 	// cache that this is valid
-	tx.syntacticallyVerified = true
+	tx.SyntacticallyVerified = true
 	return nil
 }
 
@@ -281,7 +280,7 @@ func (vm *VM) newAddValidatorTx(
 	}
 	// Create the tx
 	utx := &UnsignedAddValidatorTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,

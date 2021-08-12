@@ -520,7 +520,7 @@ func AVAXAssetID(avmGenesisBytes []byte) (ids.ID, error) {
 	}
 
 	if len(genesis.Txs) == 0 {
-		return ids.ID{}, errors.New("genesis creates no transactions.")
+		return ids.ID{}, errors.New("genesis creates no transactions")
 	}
 	genesisTx := genesis.Txs[0]
 

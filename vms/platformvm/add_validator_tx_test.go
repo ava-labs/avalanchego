@@ -62,7 +62,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -102,7 +102,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		},
 	}}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -136,7 +136,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		Addrs:     nil,
 	}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -166,7 +166,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.Wght-- // 1 less than minimum amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -196,7 +196,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).Shares++ // 1 more than max amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -226,7 +226,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End-- // 1 less than min duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -256,7 +256,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End = tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.Start - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -286,7 +286,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End++ // 1 more than maximum duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,

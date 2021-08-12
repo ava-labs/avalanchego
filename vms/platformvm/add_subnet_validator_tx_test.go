@@ -55,7 +55,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -82,7 +82,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Subnet = ids.ID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -109,7 +109,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Wght = 0
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -137,7 +137,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
 		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -164,7 +164,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End-- // 1 less than min duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -191,7 +191,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End++ // 1 more than max duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -481,7 +481,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
 		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
+	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because not enough control sigs")
 	}

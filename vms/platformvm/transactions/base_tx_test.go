@@ -1,4 +1,4 @@
-package platformvm
+package transactions
 
 import (
 	"encoding/json"
@@ -11,15 +11,6 @@ import (
 )
 
 func TestBaseTxMarshalJSON(t *testing.T) {
-	vm, _ := defaultVM()
-	vm.ctx.Lock.Lock()
-	defer func() {
-		if err := vm.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-		vm.ctx.Lock.Unlock()
-	}()
-
 	blockchainID := ids.ID{1}
 	utxoTxID := ids.ID{2}
 	assetID := ids.ID{3}

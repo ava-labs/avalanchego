@@ -35,7 +35,7 @@ var (
 // UnsignedAddDelegatorTx is an unsigned addDelegatorTx
 type UnsignedAddDelegatorTx struct {
 	// Metadata, inputs and outputs
-	BaseTx `serialize:"true"`
+	transactions.BaseTx `serialize:"true"`
 	// Describes the delegatee
 	Validator Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
@@ -69,8 +69,8 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 ) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return transactions.ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	}
 
@@ -103,7 +103,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 
 	switch {
 	case !avax.IsSortedTransferableOutputs(tx.Stake, platformcodec.Codec):
-		return errOutputsNotSorted
+		return transactions.ErrOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
 	case tx.Validator.Wght < minDelegatorStake:
@@ -112,7 +112,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	}
 
 	// cache that this is valid
-	tx.syntacticallyVerified = true
+	tx.SyntacticallyVerified = true
 	return nil
 }
 
@@ -293,7 +293,7 @@ func (vm *VM) newAddDelegatorTx(
 	}
 	// Create the tx
 	utx := &UnsignedAddDelegatorTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,

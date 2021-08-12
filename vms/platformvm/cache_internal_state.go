@@ -194,8 +194,8 @@ type internalStateImpl struct {
 	subnetDB      linkeddb.LinkedDB
 
 	addedChains  map[ids.ID][]*transactions.SignedTx // maps subnetID -> the newly added chains to the subnet
-	chainCache   cache.Cacher                       // cache of subnetID -> the chains after all local modifications []*transactions.Tx
-	chainDBCache cache.Cacher                       // cache of subnetID -> linkedDB
+	chainCache   cache.Cacher                        // cache of subnetID -> the chains after all local modifications []*transactions.Tx
+	chainDBCache cache.Cacher                        // cache of subnetID -> linkedDB
 	chainDB      database.Database
 
 	originalTimestamp, timestamp         time.Time

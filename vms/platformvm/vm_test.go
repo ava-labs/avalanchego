@@ -1701,7 +1701,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	}()
 
 	tx := transactions.SignedTx{UnsignedTx: &UnsignedImportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},

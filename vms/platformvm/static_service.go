@@ -148,12 +148,12 @@ type GenesisUTXO struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs         []*GenesisUTXO          `serialize:"true"`
+	UTXOs         []*GenesisUTXO           `serialize:"true"`
 	Validators    []*transactions.SignedTx `serialize:"true"`
 	Chains        []*transactions.SignedTx `serialize:"true"`
-	Timestamp     uint64                  `serialize:"true"`
-	InitialSupply uint64                  `serialize:"true"`
-	Message       string                  `serialize:"true"`
+	Timestamp     uint64                   `serialize:"true"`
+	InitialSupply uint64                   `serialize:"true"`
+	Message       string                   `serialize:"true"`
 }
 
 func (g *Genesis) Initialize() error {
@@ -291,7 +291,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		}
 
 		tx := &transactions.SignedTx{UnsignedTx: &UnsignedAddValidatorTx{
-			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
 			}},
@@ -320,7 +320,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
 		tx := &transactions.SignedTx{UnsignedTx: &UnsignedCreateChainTx{
-			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 				NetworkID:    uint32(args.NetworkID),
 				BlockchainID: ids.Empty,
 			}},

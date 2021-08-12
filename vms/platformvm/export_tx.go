@@ -21,17 +21,16 @@ import (
 )
 
 var (
-	errNoExportOutputs  = errors.New("no export outputs")
-	errOutputsNotSorted = errors.New("outputs not sorted")
-	errOverflowExport   = errors.New("overflow when computing export amount + txFee")
-	errWrongChainID     = errors.New("tx has wrong chain ID")
+	errNoExportOutputs = errors.New("no export outputs")
+	errOverflowExport  = errors.New("overflow when computing export amount + txFee")
+	errWrongChainID    = errors.New("tx has wrong chain ID")
 
 	_ UnsignedAtomicTx = &UnsignedExportTx{}
 )
 
 // UnsignedExportTx is an unsigned ExportTx
 type UnsignedExportTx struct {
-	BaseTx `serialize:"true"`
+	transactions.BaseTx `serialize:"true"`
 
 	// Which chain to send the funds to
 	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
@@ -53,8 +52,8 @@ func (tx *UnsignedExportTx) Verify(
 ) error {
 	switch {
 	case tx == nil:
-		return errNilTx
-	case tx.syntacticallyVerified: // already passed syntactic verification
+		return transactions.ErrNilTx
+	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.DestinationChain != avmID:
 		// TODO: remove this check if we allow for P->C swaps
@@ -76,10 +75,10 @@ func (tx *UnsignedExportTx) Verify(
 		}
 	}
 	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, platformcodec.Codec) {
-		return errOutputsNotSorted
+		return transactions.ErrOutputsNotSorted
 	}
 
-	tx.syntacticallyVerified = true
+	tx.SyntacticallyVerified = true
 	return nil
 }
 
@@ -182,7 +181,7 @@ func (vm *VM) newExportTx(
 
 	// Create the transaction
 	utx := &UnsignedExportTx{
-		BaseTx: BaseTx{BaseTx: avax.BaseTx{
+		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 			Ins:          ins,
