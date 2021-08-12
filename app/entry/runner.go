@@ -24,7 +24,7 @@ import (
 // the daemon (see avalanchego/main).
 func Run(processConfig process.Config, nodeConfig node.Config) {
 	// Set the data directory permissions to be read write.
-	if err := perms.ChmodR(nodeConfig.DBPath, true, perms.ReadWriteExecute); err != nil {
+	if err := perms.ChmodR(nodeConfig.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
 		fmt.Printf("failed to restrict the permissions of the database directory with error %s\n", err)
 		os.Exit(1)
 	}
