@@ -31,6 +31,9 @@ const (
 
 	// Max number of addresses allowed for a single keystore user
 	maxKeystoreAddresses = 5000
+
+	// Max number of items allowed in a page
+	maxPageSize uint64 = 1024
 )
 
 var (
@@ -77,6 +80,61 @@ func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *a
 // GetTxStatusReply defines the GetTxStatus replies returned from the API
 type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
+}
+
+type GetAddressTxsArgs struct {
+	api.JSONAddress
+	// Cursor used as a page index / offset
+	Cursor json.Uint64 `json:"cursor"`
+	// PageSize num of items per page
+	PageSize json.Uint64 `json:"pageSize"`
+	// AssetID defaulted to AVAX if omitted or left blank
+	AssetID string `json:"assetID"`
+}
+
+type GetAddressTxsReply struct {
+	TxIDs []ids.ID `json:"txIDs"`
+	// Cursor used as a page index / offset
+	Cursor json.Uint64 `json:"cursor"`
+}
+
+// GetAddressTxs returns list of transactions for a given address
+func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
+	service.vm.ctx.Log.Debug("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
+	pageSize := uint64(args.PageSize)
+	if pageSize > maxPageSize {
+		return fmt.Errorf("pageSize > maximum allowed (%d)", maxPageSize)
+	} else if pageSize == 0 {
+		pageSize = maxPageSize
+	}
+
+	// Parse to address
+	address, err := service.vm.ParseLocalAddress(args.Address)
+	if err != nil {
+		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
+	}
+
+	// Lookup assetID
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
+	if err != nil {
+		return fmt.Errorf("specified `assetID` is invalid: %w", err)
+	}
+
+	cursor := uint64(args.Cursor)
+
+	service.vm.ctx.Log.Debug("Fetching up to %d transactions for address %s, assetID %s, cursor %d", pageSize, address, assetID, cursor)
+	// Read transactions from the indexer
+	reply.TxIDs, err = service.vm.addressTxsIndexer.Read(address[:], assetID, cursor, pageSize)
+	if err != nil {
+		return err
+	}
+	service.vm.ctx.Log.Debug("Fetched %d transactions for address %s, assetID %s, cursor %d", len(reply.TxIDs), address, assetID, cursor)
+
+	// To get the next set of tx IDs, the user should provide this cursor.
+	// e.g. if they provided cursor 5, and read 6 tx IDs, they should start
+	// next time from index (cursor) 11.
+	reply.Cursor = json.Uint64(cursor + uint64(len(reply.TxIDs)))
+	return nil
 }
 
 // GetTxStatus returns the status of the specified transaction

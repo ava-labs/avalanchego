@@ -276,12 +276,16 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 		TxFee:            testTxFee,
 		CreateAssetTxFee: testTxFee,
 	}}
+	configBytes, err := BuildAvmConfigBytes(Config{IndexTransactions: true})
+	if err != nil {
+		tb.Fatal("should not have caused error in creating avm config bytes")
+	}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		configBytes,
 		issuer,
 		[]*common.Fx{
 			{

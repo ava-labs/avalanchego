@@ -65,25 +65,25 @@ func (a *App) Start() int {
 
 	// start the db manager
 	var dbManager manager.Manager
-	switch a.config.DBName {
+	switch a.config.DatabaseConfig.Name {
 	case rocksdb.Name:
-		path := filepath.Join(a.config.DBPath, rocksdb.Name)
+		path := filepath.Join(a.config.DatabaseConfig.Path, rocksdb.Name)
 		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase)
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase)
+		dbManager, err = manager.NewLevelDB(a.config.DatabaseConfig.Path, a.log, version.CurrentDatabase)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:
 		err = fmt.Errorf(
 			"db-type was %q but should have been one of {%s, %s, %s}",
-			a.config.DBName,
+			a.config.DatabaseConfig.Name,
 			leveldb.Name,
 			rocksdb.Name,
 			memdb.Name,
 		)
 	}
 	if err != nil {
-		a.log.Fatal("couldn't create %q db manager at %s: %s", a.config.DBName, a.config.DBPath, err)
+		a.log.Fatal("couldn't create %q db manager at %s: %s", a.config.DatabaseConfig.Name, a.config.DatabaseConfig.Path, err)
 		return 1
 	}
 
@@ -112,16 +112,12 @@ func (a *App) Start() int {
 	}
 	// TODO: disable crypto verification
 
-	if err := a.config.ConsensusParams.Valid(); err != nil {
-		a.log.Fatal("consensus parameters are invalid: %s", err)
-		return 1
-	}
-
 	// Track if assertions should be executed
 	if a.config.LoggingConfig.Assertions {
 		a.log.Debug("assertions are enabled. This may slow down execution")
 	}
 
+	// TODO move this to config
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
 	if a.config.AttemptedNATTraversal && !a.config.Nat.SupportsNAT() {
@@ -133,15 +129,15 @@ func (a *App) Start() int {
 	defer mapper.UnmapAllPorts()
 
 	// Open staking port we want for NAT Traversal to have the external port
-	// (config.StakingIP.Port) to connect to our internal listening port
+	// (config.IP.Port) to connect to our internal listening port
 	// (config.InternalStakingPort) which should be the same in most cases.
-	if a.config.StakingIP.IP().Port != 0 {
+	if a.config.IP.IP().Port != 0 {
 		mapper.Map(
 			"TCP",
-			a.config.StakingIP.IP().Port,
-			a.config.StakingIP.IP().Port,
+			a.config.IP.IP().Port,
+			a.config.IP.IP().Port,
 			stakingPortName,
-			&a.config.StakingIP,
+			&a.config.IP,
 			a.config.DynamicUpdateDuration,
 		)
 	}
@@ -165,7 +161,7 @@ func (a *App) Start() int {
 		a.config.DynamicPublicIPResolver,
 		a.config.DynamicUpdateDuration,
 		a.log,
-		&a.config.StakingIP,
+		&a.config.IP,
 	)
 	defer externalIPUpdater.Stop()
 

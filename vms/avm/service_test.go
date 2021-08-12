@@ -13,6 +13,8 @@ import (
 
 	json2 "encoding/json"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -28,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
@@ -421,6 +424,49 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 	// The balance should not include the UTXO since it is only partly owned by [addr]
 	assert.Equal(t, uint64(0), uint64(balanceReply.Balance))
 	assert.Len(t, balanceReply.UTXOIDs, 0, "should have returned 0 utxoIDs")
+}
+
+func TestServiceGetTxs(t *testing.T) {
+	_, vm, s, _, _ := setup(t, true)
+	var err error
+	vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, "", prometheus.NewRegistry(), false)
+	assert.NoError(t, err)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+		vm.ctx.Lock.Unlock()
+	}()
+
+	assetID := ids.GenerateTestID()
+	addr := ids.GenerateTestShortID()
+	addrStr, err := vm.FormatLocalAddress(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testTxCount := 25
+	testTxs := setupTestTxsInDB(t, vm.db, addr, assetID, testTxCount)
+
+	// get the first page
+	getTxsArgs := &GetAddressTxsArgs{
+		PageSize:    10,
+		JSONAddress: api.JSONAddress{Address: addrStr},
+		AssetID:     assetID.String(),
+	}
+	getTxsReply := &GetAddressTxsReply{}
+	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
+	assert.NoError(t, err)
+	assert.Len(t, getTxsReply.TxIDs, 10)
+	assert.Equal(t, getTxsReply.TxIDs, testTxs[:10])
+
+	// get the second page
+	getTxsArgs.Cursor = getTxsReply.Cursor
+	getTxsReply = &GetAddressTxsReply{}
+	err = s.GetAddressTxs(nil, getTxsArgs, getTxsReply)
+	assert.NoError(t, err)
+	assert.Len(t, getTxsReply.TxIDs, 10)
+	assert.Equal(t, getTxsReply.TxIDs, testTxs[10:20])
 }
 
 func TestServiceGetAllBalances(t *testing.T) {
