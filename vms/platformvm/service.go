@@ -1688,7 +1688,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	}
 
 	if args.SubnetID == constants.PrimaryNetworkID {
-		return errDSCantValidate
+		return transactions.ErrDSCantValidate
 	}
 
 	// Get the keys controlled by the user
@@ -1831,7 +1831,7 @@ func (service *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
+	chain, ok := chainTx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 	if !ok {
 		return false
 	}
@@ -1870,7 +1870,7 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 	if err != nil {
 		return false, err
 	}
-	_, ok = tx.UnsignedTx.(*UnsignedCreateChainTx)
+	_, ok = tx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 	return ok, nil
 }
 
@@ -1898,7 +1898,7 @@ func (service *Service) ValidatedBy(_ *http.Request, args *ValidatedByArgs, resp
 			err,
 		)
 	}
-	chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
+	chain, ok := chainTx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 	if !ok {
 		return fmt.Errorf("%q is not a blockchain", args.BlockchainID)
 	}
@@ -1991,7 +1991,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		}
 
 		for _, chainTx := range chains {
-			chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
+			chain, ok := chainTx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 			if !ok {
 				return errWrongTxType
 			}
@@ -2009,7 +2009,7 @@ func (service *Service) GetBlockchains(_ *http.Request, args *struct{}, response
 		return fmt.Errorf("couldn't retrieve subnets: %w", err)
 	}
 	for _, chainTx := range chains {
-		chain, ok := chainTx.UnsignedTx.(*UnsignedCreateChainTx)
+		chain, ok := chainTx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 		if !ok {
 			return errWrongTxType
 		}

@@ -71,7 +71,6 @@ const (
 
 var (
 	errInvalidID         = errors.New("invalid ID")
-	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
 	errStartTimeTooEarly = errors.New("start time is before the current chain time")
 	errStartAfterEndTime = errors.New("start time is after the end time")
 
@@ -111,7 +110,7 @@ func init() {
 			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
 			c.RegisterType(&UnsignedAddDelegatorTx{}),
 
-			c.RegisterType(&UnsignedCreateChainTx{}),
+			c.RegisterType(VerifiableUnsignedCreateChainTx{}),
 			c.RegisterType(&UnsignedCreateSubnetTx{}),
 
 			c.RegisterType(&UnsignedImportTx{}),
@@ -285,7 +284,7 @@ func (vm *VM) initBlockchains() error {
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
 func (vm *VM) createChain(tx *transactions.SignedTx) error {
-	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
+	unsignedTx, ok := tx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 	if !ok {
 		return errWrongTxType
 	}

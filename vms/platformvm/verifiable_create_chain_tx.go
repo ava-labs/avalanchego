@@ -4,99 +4,25 @@
 package platformvm
 
 import (
-	"errors"
 	"fmt"
-	"unicode"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
-var (
-	errInvalidVMID             = errors.New("invalid VM ID")
-	errFxIDsNotSortedAndUnique = errors.New("feature extensions IDs must be sorted and unique")
-	errNameTooLong             = errors.New("name too long")
-	errGenesisTooLong          = errors.New("genesis too long")
-	errIllegalNameCharacter    = errors.New("illegal name character")
+var _ UnsignedDecisionTx = VerifiableUnsignedCreateChainTx{}
 
-	_ UnsignedDecisionTx = &UnsignedCreateChainTx{}
-)
-
-const (
-	maxNameLen    = 128
-	maxGenesisLen = units.MiB
-)
-
-// UnsignedCreateChainTx is an unsigned CreateChainTx
-type UnsignedCreateChainTx struct {
-	// Metadata, inputs and outputs
-	transactions.BaseTx `serialize:"true"`
-	// ID of the Subnet that validates this blockchain
-	SubnetID ids.ID `serialize:"true" json:"subnetID"`
-	// A human readable name for the chain; need not be unique
-	ChainName string `serialize:"true" json:"chainName"`
-	// ID of the VM running on the new chain
-	VMID ids.ID `serialize:"true" json:"vmID"`
-	// IDs of the feature extensions running on the new chain
-	FxIDs []ids.ID `serialize:"true" json:"fxIDs"`
-	// Byte representation of genesis state of the new chain
-	GenesisData []byte `serialize:"true" json:"genesisData"`
-	// Auth that will be allowing this validator into the network
-	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
-}
-
-// Verify this transactions.is well-formed
-func (tx *UnsignedCreateChainTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
-	switch {
-	case tx == nil:
-		return transactions.ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
-		return nil
-	case tx.SubnetID == constants.PrimaryNetworkID:
-		return errDSCantValidate
-	case len(tx.ChainName) > maxNameLen:
-		return errNameTooLong
-	case tx.VMID == ids.Empty:
-		return errInvalidVMID
-	case !ids.IsSortedAndUniqueIDs(tx.FxIDs):
-		return errFxIDsNotSortedAndUnique
-	case len(tx.GenesisData) > maxGenesisLen:
-		return errGenesisTooLong
-	}
-
-	for _, r := range tx.ChainName {
-		if r > unicode.MaxASCII || !(unicode.IsLetter(r) || unicode.IsNumber(r) || r == ' ') {
-			return errIllegalNameCharacter
-		}
-	}
-
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
-		return err
-	}
-	if err := tx.SubnetAuth.Verify(); err != nil {
-		return err
-	}
-
-	tx.SyntacticallyVerified = true
-	return nil
+// VerifiableUnsignedCreateChainTx is an unsigned CreateChainTx
+type VerifiableUnsignedCreateChainTx struct {
+	*transactions.UnsignedCreateChainTx `serialize:"true"`
 }
 
 // SemanticVerify this transactions.is valid.
-func (tx *UnsignedCreateChainTx) SemanticVerify(
+func (tx VerifiableUnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
 	stx *transactions.SignedTx,
@@ -183,19 +109,21 @@ func (vm *VM) newCreateChainTx(
 	ids.SortIDs(fxIDs)
 
 	// Create the tx
-	utx := &UnsignedCreateChainTx{
-		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-		}},
-		SubnetID:    subnetID,
-		ChainName:   chainName,
-		VMID:        vmID,
-		FxIDs:       fxIDs,
-		GenesisData: genesisData,
-		SubnetAuth:  subnetAuth,
+	utx := VerifiableUnsignedCreateChainTx{
+		UnsignedCreateChainTx: &transactions.UnsignedCreateChainTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+				Ins:          ins,
+				Outs:         outs,
+			}},
+			SubnetID:    subnetID,
+			ChainName:   chainName,
+			VMID:        vmID,
+			FxIDs:       fxIDs,
+			GenesisData: genesisData,
+			SubnetAuth:  subnetAuth,
+		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {

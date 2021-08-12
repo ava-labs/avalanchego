@@ -196,7 +196,7 @@ func (vs *versionedStateImpl) GetChains(subnetID ids.ID) ([]*transactions.Signed
 }
 
 func (vs *versionedStateImpl) AddChain(createChainTx *transactions.SignedTx) {
-	tx := createChainTx.UnsignedTx.(*UnsignedCreateChainTx)
+	tx := createChainTx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 	if vs.addedChains == nil {
 		vs.addedChains = map[ids.ID][]*transactions.SignedTx{
 			tx.SubnetID: {createChainTx},

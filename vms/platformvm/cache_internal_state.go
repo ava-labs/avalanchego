@@ -478,7 +478,7 @@ func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*transactions.SignedT
 }
 
 func (st *internalStateImpl) AddChain(createChainTxIntf *transactions.SignedTx) {
-	createChainTx := createChainTxIntf.UnsignedTx.(*UnsignedCreateChainTx)
+	createChainTx := createChainTxIntf.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 	subnetID := createChainTx.SubnetID
 	st.addedChains[subnetID] = append(st.addedChains[subnetID], createChainTxIntf)
 	if chainsIntf, cached := st.chainCache.Get(subnetID); cached {
@@ -1364,7 +1364,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 	}
 
 	for _, chain := range genesis.Chains {
-		unsignedChain, ok := chain.UnsignedTx.(*UnsignedCreateChainTx)
+		unsignedChain, ok := chain.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 		if !ok {
 			return errWrongTxType
 		}

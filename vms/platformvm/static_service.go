@@ -319,17 +319,19 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 		if err != nil {
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
-		tx := &transactions.SignedTx{UnsignedTx: &UnsignedCreateChainTx{
-			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    uint32(args.NetworkID),
-				BlockchainID: ids.Empty,
-			}},
-			SubnetID:    chain.SubnetID,
-			ChainName:   chain.Name,
-			VMID:        chain.VMID,
-			FxIDs:       chain.FxIDs,
-			GenesisData: genesisBytes,
-			SubnetAuth:  &secp256k1fx.Input{},
+		tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedCreateChainTx{
+			UnsignedCreateChainTx: &transactions.UnsignedCreateChainTx{
+				BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    uint32(args.NetworkID),
+					BlockchainID: ids.Empty,
+				}},
+				SubnetID:    chain.SubnetID,
+				ChainName:   chain.Name,
+				VMID:        chain.VMID,
+				FxIDs:       chain.FxIDs,
+				GenesisData: genesisBytes,
+				SubnetAuth:  &secp256k1fx.Input{},
+			},
 		}}
 		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
 			return err

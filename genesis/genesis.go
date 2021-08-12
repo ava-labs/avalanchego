@@ -485,7 +485,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*transactions.SignedTx, error)
 		return nil, err
 	}
 	for _, chain := range genesis.Chains {
-		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
+		uChain := chain.UnsignedTx.(platformvm.VerifiableUnsignedCreateChainTx)
 		if uChain.VMID == vmID {
 			return chain, nil
 		}
