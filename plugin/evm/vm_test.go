@@ -176,6 +176,44 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, confi
 	return issuer, vm, dbManager, m
 }
 
+// GenesisVMWithUTXOs creates a GenesisVM and generates UTXOs in the X-Chain Shared Memory containing AVAX based on the [utxos] map
+func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string, utxos map[ids.ShortID]uint64) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory) {
+	issuer, vm, dbManager, sharedMemory := GenesisVM(t, finishBootstrapping, genesisJSON, configJSON, upgradeJSON)
+	for addr, avaxAmount := range utxos {
+		utxo := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID: ids.GenerateTestID(),
+			},
+			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: avaxAmount,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+			},
+		}
+		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+		inputID := utxo.InputID()
+		if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+			Key:   inputID[:],
+			Value: utxoBytes,
+			Traits: [][]byte{
+				addr.Bytes(),
+			},
+		}}}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	return issuer, vm, dbManager, sharedMemory
+}
+
 func TestVMConfig(t *testing.T) {
 	txFeeCap := float64(11)
 	netApiEnabled := true

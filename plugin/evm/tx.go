@@ -93,6 +93,7 @@ type UnsignedTx interface {
 	Initialize(unsignedBytes, signedBytes []byte)
 	ID() ids.ID
 	Cost() (uint64, error)
+	Burned(assetID ids.ID) (uint64, error)
 	UnsignedBytes() []byte
 	Bytes() []byte
 }
