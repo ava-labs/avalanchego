@@ -15,9 +15,11 @@ import (
 )
 
 var (
-	phase0BlockValidator = blockValidatorPhase0{}
-	phase1BlockValidator = blockValidatorPhase1{}
-	phase3BlockValidator = blockValidatorPhase3{}
+	phase0BlockValidator     = blockValidatorPhase0{}
+	apricotPhase0MinGasPrice = big.NewInt(params.LaunchMinGasPrice)
+	phase1BlockValidator     = blockValidatorPhase1{}
+	apricotPhase1MinGasPrice = big.NewInt(params.ApricotPhase1MinGasPrice)
+	phase3BlockValidator     = blockValidatorPhase3{}
 )
 
 type BlockValidator interface {
@@ -135,7 +137,7 @@ func (v blockValidatorPhase0) SyntacticVerify(b *Block) error {
 
 	// Make sure that all the txs have the correct fee set.
 	for _, tx := range txs {
-		if tx.GasPrice().Cmp(big.NewInt(params.LaunchMinGasPrice)) < 0 {
+		if tx.GasPrice().Cmp(apricotPhase0MinGasPrice) < 0 {
 			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.LaunchMinGasPrice)
 		}
 	}
@@ -240,7 +242,7 @@ func (blockValidatorPhase1) SyntacticVerify(b *Block) error {
 
 	// Make sure that all the txs have the correct fee set.
 	for _, tx := range txs {
-		if tx.GasPrice().Cmp(big.NewInt(params.ApricotPhase1MinGasPrice)) < 0 {
+		if tx.GasPrice().Cmp(apricotPhase1MinGasPrice) < 0 {
 			return fmt.Errorf("block contains tx %s with gas price too low (%d < %d)", tx.Hash(), tx.GasPrice(), params.ApricotPhase1MinGasPrice)
 		}
 	}
