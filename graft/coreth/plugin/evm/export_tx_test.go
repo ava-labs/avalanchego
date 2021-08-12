@@ -36,6 +36,331 @@ import (
 // Decreases balances by the correct amounts
 // catch incorrect nonce for EVM Input and increases the nonce correctly
 
+func TestExportTxSemanticVerify(t *testing.T) {
+	_, vm, _, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	key := testKeys[0]
+	addr := key.PublicKey().Address()
+	ethAddr := testEthAddrs[0]
+
+	var (
+		avaxBalance           = 10 * units.Avax
+		custom0Balance uint64 = 100
+		custom0AssetID        = ids.ID{1, 2, 3, 4, 5}
+		custom1Balance uint64 = 1000
+		custom1AssetID        = ids.ID{1, 2, 3, 4, 5, 6}
+	)
+
+	validExportTx := &UnsignedExportTx{
+		NetworkID:        vm.ctx.NetworkID,
+		BlockchainID:     vm.ctx.ChainID,
+		DestinationChain: vm.ctx.XChainID,
+		Ins: []EVMInput{
+			{
+				Address: ethAddr,
+				Amount:  avaxBalance,
+				AssetID: vm.ctx.AVAXAssetID,
+				Nonce:   0,
+			},
+			{
+				Address: ethAddr,
+				Amount:  custom0Balance,
+				AssetID: custom0AssetID,
+				Nonce:   0,
+			},
+			{
+				Address: ethAddr,
+				Amount:  custom1Balance,
+				AssetID: custom1AssetID,
+				Nonce:   0,
+			},
+		},
+		ExportedOutputs: []*avax.TransferableOutput{
+			{
+				Asset: avax.Asset{ID: custom0AssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: custom0Balance,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Threshold: 1,
+						Addrs:     []ids.ShortID{addr},
+					},
+				},
+			},
+		},
+	}
+	validTx := &Tx{UnsignedAtomicTx: validExportTx}
+
+	tests := []struct {
+		name      string
+		tx        *Tx
+		signers   [][]*crypto.PrivateKeySECP256K1R
+		baseFee   *big.Int
+		rules     params.Rules
+		shouldErr bool
+	}{
+		{
+			name: "validTx",
+			tx:   validTx,
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: false,
+		},
+		{
+			name: "wrong destination",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.DestinationChain = ids.GenerateTestID()
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "no outputs",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.ExportedOutputs = nil
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "wrong networkID",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.NetworkID++
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "wrong chainID",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.BlockchainID = ids.GenerateTestID()
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "invalid input",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.Ins = append([]EVMInput{}, validExportTx.Ins...)
+				validExportTx.Ins[2].Amount = 0
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "invalid output",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.ExportedOutputs = []*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: custom0AssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: custom0Balance,
+						OutputOwners: secp256k1fx.OutputOwners{
+							Threshold: 0,
+							Addrs:     []ids.ShortID{addr},
+						},
+					},
+				}}
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "unsorted outputs",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.ExportedOutputs = []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: custom0AssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: custom0Balance/2 + 1,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{addr},
+							},
+						},
+					},
+					{
+						Asset: avax.Asset{ID: custom0AssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: custom0Balance/2 - 1,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{addr},
+							},
+						},
+					},
+				}
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "not unique inputs",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.Ins = append([]EVMInput{}, validExportTx.Ins...)
+				validExportTx.Ins[2] = validExportTx.Ins[1]
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "custom asset insufficient funds",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.ExportedOutputs = []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: custom0AssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: custom0Balance + 1,
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{addr},
+							},
+						},
+					},
+				}
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name: "avax insufficient funds",
+			tx: func() *Tx {
+				validExportTx := *validExportTx
+				validExportTx.ExportedOutputs = []*avax.TransferableOutput{
+					{
+						Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt: avaxBalance, // after fees this should be too much
+							OutputOwners: secp256k1fx.OutputOwners{
+								Threshold: 1,
+								Addrs:     []ids.ShortID{addr},
+							},
+						},
+					},
+				}
+				return &Tx{UnsignedAtomicTx: &validExportTx}
+			}(),
+			signers: [][]*crypto.PrivateKeySECP256K1R{
+				{key},
+				{key},
+				{key},
+			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+	}
+	for _, test := range tests {
+		lastAccepted, err := vm.LastAccepted()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := vm.SetPreference(lastAccepted); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := test.tx.Sign(vm.codec, test.signers); err != nil {
+			t.Fatal(err)
+		}
+
+		t.Run(test.name, func(t *testing.T) {
+			tx := test.tx
+			exportTx := tx.UnsignedAtomicTx
+
+			parent := vm.LastAcceptedBlockInternal().(*Block)
+			err := exportTx.SemanticVerify(vm, tx, parent, test.baseFee, test.rules)
+			if test.shouldErr && err == nil {
+				t.Fatalf("should have errored but returned valid")
+			}
+			if !test.shouldErr && err != nil {
+				t.Fatalf("shouldn't have errored but returned %s", err)
+			}
+		})
+	}
+}
+
 func TestExportTxVerifyNil(t *testing.T) {
 	var exportTx *UnsignedExportTx
 	if err := exportTx.Verify(testXChainID, NewContext(), apricotRulesPhase0); err == nil {
