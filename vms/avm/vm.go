@@ -422,8 +422,7 @@ func (vm *VM) getPaginatedUTXOs(
 	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	for _, addr := range addrsList {
 		start := ids.Empty
