@@ -311,6 +311,9 @@ func (vm *VM) newImportTx(
 	)
 	switch {
 	case rules.IsApricotPhase3:
+		if baseFee == nil {
+			return nil, errNilBaseFeeApricotPhase3
+		}
 		utx := &UnsignedImportTx{
 			NetworkID:      vm.ctx.NetworkID,
 			BlockchainID:   vm.ctx.ChainID,
