@@ -88,8 +88,7 @@ func (vm *VM) getAllUTXOs(
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	// iterate over the addresses and get all the utxos
 	for _, addr := range addrsList {
