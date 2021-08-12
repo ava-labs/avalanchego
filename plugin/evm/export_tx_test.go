@@ -17,6 +17,25 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// SemanticVerify
+// SemanticVerify calls Verify - if any of those checks fail then SemanticVerify should fail as well
+// catch flow check for AVAX and non-AVAX assets
+// incorrect number of credentials
+// catch incorrect type for verifiable - or change the type to just be the correct credential type (make sure it can't be nil either)
+// ensure that the number of signatures in a credential must be exactly 1
+// input Address does not match signature
+
+// Accept
+// ensure that the state transition adds the correct UTXOs with both AVAX and non-AVAX assets
+
+// newExportTx
+// Verify that newExportTx burns the correct amount for each of the tests
+
+// EVMStateTransfer
+// catches insufficient funds for both AVAX and non-AVAX assets
+// Decreases balances by the correct amounts
+// catch incorrect nonce for EVM Input and increases the nonce correctly
+
 func TestExportTxVerifyNil(t *testing.T) {
 	var exportTx *UnsignedExportTx
 	if err := exportTx.Verify(testXChainID, NewContext(), apricotRulesPhase0); err == nil {

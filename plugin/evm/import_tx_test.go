@@ -16,6 +16,18 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// Unit test TODOs for import transactions
+// ensure ApricotPhase3 Verify catches import tx with no outputs
+// Cost overflow??
+// UTXO AssetID mismatch
+// UTXO cannot be marshalled
+// UTXO is not present
+// Import non-AVAX UTXO and ensure that EVMStateTransfer updates it correctly
+// Ensure flow check catches insufficient funds for AVAX and non-AVAX assets
+
+// TODO import_tx.go
+// move avax amount insufficient to pay for fee check higher up within newImportTx
+
 func TestImportTxVerifyNil(t *testing.T) {
 	var importTx *UnsignedImportTx
 	if err := importTx.Verify(testXChainID, NewContext(), apricotRulesPhase1); err == nil {
