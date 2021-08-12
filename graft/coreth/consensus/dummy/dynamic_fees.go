@@ -16,12 +16,11 @@ import (
 )
 
 var (
-	InitialBaseFee        = big.NewInt(params.ApricotPhase3InitialBaseFee)
-	MaxBaseFee            = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	MinBaseFee            = big.NewInt(params.ApricotPhase3MinBaseFee)
-	TargetGas             = uint64(5_000_000)
-	BlockGasFee           = uint64(1_000_000)
-	rollupWindow   uint64 = 10
+	MaxBaseFee          = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	MinBaseFee          = big.NewInt(params.ApricotPhase3MinBaseFee)
+	TargetGas    uint64 = 5_000_000
+	BlockGasFee  uint64 = 1_000_000
+	rollupWindow uint64 = 10
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block

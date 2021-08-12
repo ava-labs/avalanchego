@@ -14,10 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-func init() {
-	// log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
-}
-
 func testRollup(t *testing.T, longs []uint64, roll int) {
 	slice := make([]byte, len(longs)*8)
 	numLongs := len(longs)
@@ -95,19 +91,20 @@ func TestRollupWindow(t *testing.T) {
 	}
 }
 
+type blockDefinition struct {
+	timestamp uint64
+	gasUsed   uint64
+}
+
+type test struct {
+	extraData      []byte
+	baseFee        *big.Int
+	genBlocks      func() []blockDefinition
+	minFee, maxFee *big.Int
+}
+
 func TestDynamicFees(t *testing.T) {
-	type blockDefinition struct {
-		timestamp uint64
-		gasUsed   uint64
-	}
-
-	type test struct {
-		extraData      []byte
-		baseFee        *big.Int
-		blocks         []blockDefinition
-		minFee, maxFee *big.Int
-	}
-
+	spacedTimestamps := []uint64{1, 1, 2, 5, 15, 120}
 	var tests []test = []test{
 		// Test minimal gas usage
 		{
@@ -115,31 +112,15 @@ func TestDynamicFees(t *testing.T) {
 			baseFee:   nil,
 			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
 			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
-			blocks: []blockDefinition{
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 2,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 15,
-					gasUsed:   21000,
-				},
-				{
-					timestamp: 120,
-					gasUsed:   21000,
-				},
+			genBlocks: func() []blockDefinition {
+				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
+				for _, timestamp := range spacedTimestamps {
+					blocks = append(blocks, blockDefinition{
+						timestamp: timestamp,
+						gasUsed:   21000,
+					})
+				}
+				return blocks
 			},
 		},
 		// Test overflow handling
@@ -148,31 +129,15 @@ func TestDynamicFees(t *testing.T) {
 			baseFee:   nil,
 			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
 			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
-			blocks: []blockDefinition{
-				{
-					timestamp: 1,
-					gasUsed:   math.MaxUint64,
-				},
-				{
-					timestamp: 1,
-					gasUsed:   math.MaxUint64,
-				},
-				{
-					timestamp: 2,
-					gasUsed:   math.MaxUint64,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   math.MaxUint64,
-				},
-				{
-					timestamp: 15,
-					gasUsed:   math.MaxUint64,
-				},
-				{
-					timestamp: 120,
-					gasUsed:   math.MaxUint64,
-				},
+			genBlocks: func() []blockDefinition {
+				blocks := make([]blockDefinition, 0, len(spacedTimestamps))
+				for _, timestamp := range spacedTimestamps {
+					blocks = append(blocks, blockDefinition{
+						timestamp: timestamp,
+						gasUsed:   math.MaxUint64,
+					})
+				}
+				return blocks
 			},
 		},
 		{
@@ -180,72 +145,79 @@ func TestDynamicFees(t *testing.T) {
 			baseFee:   nil,
 			minFee:    big.NewInt(params.ApricotPhase3MinBaseFee),
 			maxFee:    big.NewInt(params.ApricotPhase3MaxBaseFee),
-			blocks: []blockDefinition{
-				{
-					timestamp: 1,
-					gasUsed:   1_000_000,
-				},
-				{
-					timestamp: 3,
-					gasUsed:   1_000_000,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   2_000_000,
-				},
-				{
-					timestamp: 5,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 7,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1000,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1001,
-					gasUsed:   6_000_000,
-				},
-				{
-					timestamp: 1002,
-					gasUsed:   6_000_000,
-				},
+			genBlocks: func() []blockDefinition {
+				return []blockDefinition{
+					{
+						timestamp: 1,
+						gasUsed:   1_000_000,
+					},
+					{
+						timestamp: 3,
+						gasUsed:   1_000_000,
+					},
+					{
+						timestamp: 5,
+						gasUsed:   2_000_000,
+					},
+					{
+						timestamp: 5,
+						gasUsed:   6_000_000,
+					},
+					{
+						timestamp: 7,
+						gasUsed:   6_000_000,
+					},
+					{
+						timestamp: 1000,
+						gasUsed:   6_000_000,
+					},
+					{
+						timestamp: 1001,
+						gasUsed:   6_000_000,
+					},
+					{
+						timestamp: 1002,
+						gasUsed:   6_000_000,
+					},
+				}
 			},
 		},
 	}
 
 	for _, test := range tests {
-		initialBlock := test.blocks[0]
-		header := &types.Header{
-			Time:    initialBlock.timestamp,
-			GasUsed: initialBlock.gasUsed,
-			Number:  big.NewInt(0),
-			BaseFee: test.baseFee,
-			Extra:   test.extraData,
-		}
+		testDynamicFeesStaysWithinRange(t, test)
+	}
+}
 
-		for index, block := range test.blocks[1:] {
-			nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestChainConfig, header, block.timestamp)
-			if err != nil {
-				t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
-			}
-			if nextBaseFee.Cmp(test.maxFee) > 0 {
-				t.Fatalf("Expected fee to stay less than %d, but found %d", test.maxFee, nextBaseFee)
-			}
-			if nextBaseFee.Cmp(test.minFee) < 0 {
-				t.Fatalf("Expected fee to stay greater than %d, but found %d", test.minFee, nextBaseFee)
-			}
-			log.Info("Update", "baseFee", nextBaseFee)
-			header = &types.Header{
-				Time:    block.timestamp,
-				GasUsed: block.gasUsed,
-				Number:  big.NewInt(int64(index) + 1),
-				BaseFee: nextBaseFee,
-				Extra:   nextExtraData,
-			}
+func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
+	blocks := test.genBlocks()
+	initialBlock := blocks[0]
+	header := &types.Header{
+		Time:    initialBlock.timestamp,
+		GasUsed: initialBlock.gasUsed,
+		Number:  big.NewInt(0),
+		BaseFee: test.baseFee,
+		Extra:   test.extraData,
+	}
+
+	for index, block := range blocks[1:] {
+		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestChainConfig, header, block.timestamp)
+		if err != nil {
+			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
+		}
+		if nextBaseFee.Cmp(test.maxFee) > 0 {
+			t.Fatalf("Expected fee to stay less than %d, but found %d", test.maxFee, nextBaseFee)
+		}
+		if nextBaseFee.Cmp(test.minFee) < 0 {
+			t.Fatalf("Expected fee to stay greater than %d, but found %d", test.minFee, nextBaseFee)
+		}
+		log.Info("Update", "baseFee", nextBaseFee)
+		header = &types.Header{
+			Time:    block.timestamp,
+			GasUsed: block.gasUsed,
+			Number:  big.NewInt(int64(index) + 1),
+			BaseFee: nextBaseFee,
+			Extra:   nextExtraData,
 		}
 	}
 }
