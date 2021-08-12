@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -538,39 +537,42 @@ func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
 
 func TestNewImportTx(t *testing.T) {
 	tests := []struct {
-		name    string
-		genesis string
-		rules   params.Rules
-		bal     uint64
+		name        string
+		genesis     string
+		rules       params.Rules
+		expectedFee uint64
 	}{
 		{
-			name:    "apricot phase 0",
-			genesis: genesisJSONApricotPhase0,
-			rules:   apricotRulesPhase0,
-			bal:     5000000,
+			name:        "apricot phase 0",
+			genesis:     genesisJSONApricotPhase0,
+			rules:       apricotRulesPhase0,
+			expectedFee: 0,
 		},
 		{
-			name:    "apricot phase 1",
-			genesis: genesisJSONApricotPhase1,
-			rules:   apricotRulesPhase1,
-			bal:     5000000,
+			name:        "apricot phase 1",
+			genesis:     genesisJSONApricotPhase1,
+			rules:       apricotRulesPhase1,
+			expectedFee: 0,
 		},
 		{
-			name:    "apricot phase 2",
-			genesis: genesisJSONApricotPhase2,
-			rules:   apricotRulesPhase2,
-			bal:     4000000,
+			name:        "apricot phase 2",
+			genesis:     genesisJSONApricotPhase2,
+			rules:       apricotRulesPhase2,
+			expectedFee: 1000000,
 		},
 		{
-			name:    "apricot phase 3",
-			genesis: genesisJSONApricotPhase3,
-			rules:   apricotRulesPhase3,
-			bal:     4723250,
+			name:        "apricot phase 3",
+			genesis:     genesisJSONApricotPhase3,
+			rules:       apricotRulesPhase3,
+			expectedFee: 276750,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, vm, _, sharedMemory := GenesisVM(t, true, test.genesis, "", "")
+			importAmount := uint64(5000000)
+			_, vm, _, _ := GenesisVMWithUTXOs(t, true, test.genesis, "", "", map[ids.ShortID]uint64{
+				testShortIDAddrs[0]: importAmount,
+			})
 
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
@@ -579,44 +581,6 @@ func TestNewImportTx(t *testing.T) {
 			}()
 
 			parent := vm.LastAcceptedBlockInternal().(*Block)
-			importAmount := uint64(5000000)
-			utxoID := avax.UTXOID{
-				TxID: ids.ID{
-					0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
-					0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
-					0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
-					0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
-				},
-			}
-
-			utxo := &avax.UTXO{
-				UTXOID: utxoID,
-				Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
-				Out: &secp256k1fx.TransferOutput{
-					Amt: importAmount,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
-					},
-				},
-			}
-			utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
-			inputID := utxo.InputID()
-			if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
-				Key:   inputID[:],
-				Value: utxoBytes,
-				Traits: [][]byte{
-					testKeys[0].PublicKey().Address().Bytes(),
-				},
-			}}}}); err != nil {
-				t.Fatal(err)
-			}
-
 			tx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
@@ -624,7 +588,33 @@ func TestNewImportTx(t *testing.T) {
 
 			importTx := tx.UnsignedAtomicTx
 
-			if err := importTx.SemanticVerify(vm, tx, parent, parent.ethBlock.BaseFee(), test.rules); err != nil {
+			var actualFee uint64
+			actualAVAXBurned, err := importTx.Burned(vm.ctx.AVAXAssetID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch {
+			case test.rules.IsApricotPhase3:
+				actualCost, err := importTx.Cost()
+				if err != nil {
+					t.Fatal(err)
+				}
+				actualFee, err = calculateDynamicFee(actualCost, initialBaseFee)
+				if err != nil {
+					t.Fatal(err)
+				}
+			case test.rules.IsApricotPhase2:
+				actualFee = 1000000
+			default:
+				actualFee = 0
+			}
+
+			// Note: expect this to fail since actualAVAXBurned should burn slightly more to give it some buffer space
+			if actualAVAXBurned != actualFee {
+				t.Fatalf("Expected actual AVAX burned (%d) == actual fee (%d)", actualAVAXBurned, actualFee)
+			}
+
+			if err := importTx.SemanticVerify(vm, tx, parent, initialBaseFee, test.rules); err != nil {
 				t.Fatal("newImportTx created an invalid transaction", err)
 			}
 
@@ -636,18 +626,31 @@ func TestNewImportTx(t *testing.T) {
 				t.Fatalf("Failed to accept import transaction due to: %s", err)
 			}
 
-			stdb, err := vm.chain.CurrentState()
+			// Ensure that the UTXO has been removed from shared memory within Accept
+			addrSet := ids.ShortSet{}
+			addrSet.Add(testShortIDAddrs[0])
+			utxos, _, _, err := vm.GetAtomicUTXOs(vm.ctx.XChainID, addrSet, ids.ShortEmpty, ids.Empty, -1)
 			if err != nil {
 				t.Fatal(err)
 			}
-			err = importTx.EVMStateTransfer(vm.ctx, stdb)
+			if len(utxos) != 0 {
+				t.Fatalf("Expected to find 0 UTXOs after accepting import transaction, but found %d", len(utxos))
+			}
+
+			// Ensure that the call to EVMStateTransfer correctly updates the balance of [addr]
+			sdb, err := vm.chain.CurrentState()
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = importTx.EVMStateTransfer(vm.ctx, sdb)
 			if err != nil {
 				t.Fatal(err)
 			}
 
+			expectedRemainingBalance := new(big.Int).Mul(new(big.Int).SetUint64(importAmount-actualAVAXBurned), x2cRate)
 			addr := GetEthAddress(testKeys[0])
-			if stdb.GetBalance(addr).Cmp(new(big.Int).SetUint64(test.bal*units.Avax)) != 0 {
-				t.Fatalf("address balance %s equal %s not %s", addr.String(), stdb.GetBalance(addr), new(big.Int).SetUint64(test.bal*units.Avax))
+			if actualBalance := sdb.GetBalance(addr); actualBalance.Cmp(expectedRemainingBalance) != 0 {
+				t.Fatalf("address remaining balance %s equal %s not %s", addr.String(), actualBalance, expectedRemainingBalance)
 			}
 		})
 	}
