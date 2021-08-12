@@ -212,6 +212,7 @@ func (b *CommonBlock) Reject() error {
 	defer b.free()
 
 	b.status = choices.Rejected
+	// remove this one too? (no rejected in db)
 	b.vm.internalState.AddBlock(b.self)
 	return b.vm.internalState.Commit()
 }
@@ -257,6 +258,7 @@ func (cdb *CommonDecisionBlock) Reject() error {
 	defer cdb.free()
 
 	cdb.status = choices.Rejected
+	// remove this one too? (no rejected in db)
 	cdb.vm.internalState.AddBlock(cdb.self)
 	return cdb.vm.internalState.Commit()
 }

@@ -184,8 +184,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return blk, nil
 	}
 
 	// The state if the preferred block were to be accepted
@@ -221,8 +220,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return blk, nil
 	}
 
 	// If local time is >= time of the next staker set change,
@@ -244,8 +242,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return blk, nil
 	}
 
 	// Propose adding a new validator but only if their start time is in the
@@ -292,8 +289,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 				return nil, err
 			}
 
-			m.vm.internalState.AddBlock(blk)
-			return blk, m.vm.internalState.Commit()
+			return blk, nil
 		}
 
 		// Attempt to issue the transaction
@@ -310,8 +306,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return blk, nil
 	}
 
 	m.vm.ctx.Log.Debug("BuildBlock returning error (no blocks)")
