@@ -42,8 +42,7 @@ func (vm *VM) getPaginatedUTXOs(
 	searchSize := limit          // the limit diminishes which can impact the expected return
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	for _, addr := range addrsList {
 		start := ids.Empty

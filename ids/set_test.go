@@ -181,3 +181,28 @@ func TestSetMarshalJSON(t *testing.T) {
 		assert.Equal(fmt.Sprintf("[\"%s\",\"%s\"]", id1, id2), string(asJSON))
 	}
 }
+
+func TestSortedList(t *testing.T) {
+	assert := assert.New(t)
+
+	set := Set{}
+	assert.Len(set.SortedList(), 0)
+
+	set.Add(ID{0})
+	sorted := set.SortedList()
+	assert.Len(sorted, 1)
+	assert.Equal(ID{0}, sorted[0])
+
+	set.Add(ID{1})
+	sorted = set.SortedList()
+	assert.Len(sorted, 2)
+	assert.Equal(ID{0}, sorted[0])
+	assert.Equal(ID{1}, sorted[1])
+
+	set.Add(ID{2})
+	sorted = set.SortedList()
+	assert.Len(sorted, 3)
+	assert.Equal(ID{0}, sorted[0])
+	assert.Equal(ID{1}, sorted[1])
+	assert.Equal(ID{2}, sorted[2])
+}
