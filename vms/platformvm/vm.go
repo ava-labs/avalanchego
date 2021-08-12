@@ -344,14 +344,14 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return nil, err
 	}
 
+	// TODO: remove this to make ParseBlock stateless
 	if block, err := vm.GetBlock(blk.ID()); err == nil {
 		// If we have seen this block before, return it with the most up-to-date
 		// info
 		return block, nil
 	}
 
-	vm.internalState.AddBlock(blk)
-	return blk, vm.internalState.Commit()
+	return blk, nil
 }
 
 // GetBlock implements the snowman.ChainVM interface

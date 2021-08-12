@@ -165,8 +165,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			return nil, err
 		}
 
-		m.vm.internalState.AddBlock(blk)
-		return blk, m.vm.internalState.Commit()
+		return blk, nil
 	}
 
 	// If there is a pending atomic tx, build a block with it
