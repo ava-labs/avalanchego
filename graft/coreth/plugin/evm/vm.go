@@ -135,6 +135,7 @@ var (
 	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
 	errInsufficientFundsForFee    = errors.New("insufficient AVAX funds to pay transaction fee")
 	errNoEVMOutputs               = errors.New("tx has no EVM outputs")
+	errNilBaseFeeApricotPhase3    = errors.New("nil base fee is invalid in apricotPhase3")
 )
 
 // buildingBlkStatus denotes the current status of the VM in block production.
