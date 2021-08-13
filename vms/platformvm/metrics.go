@@ -153,7 +153,7 @@ func (m *metrics) AcceptTx(tx *transactions.SignedTx) error {
 		m.numAdvanceTimeTxs.Inc()
 	case VerifiableUnsignedCreateChainTx:
 		m.numCreateChainTxs.Inc()
-	case *UnsignedCreateSubnetTx:
+	case VerifiableUnsignedCreateSubnetTx:
 		m.numCreateSubnetTxs.Inc()
 	case *UnsignedImportTx:
 		m.numImportTxs.Inc()

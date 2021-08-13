@@ -111,7 +111,7 @@ func init() {
 			c.RegisterType(&UnsignedAddDelegatorTx{}),
 
 			c.RegisterType(VerifiableUnsignedCreateChainTx{}),
-			c.RegisterType(&UnsignedCreateSubnetTx{}),
+			c.RegisterType(VerifiableUnsignedCreateSubnetTx{}),
 
 			c.RegisterType(&UnsignedImportTx{}),
 			c.RegisterType(&UnsignedExportTx{}),

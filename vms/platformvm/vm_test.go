@@ -81,7 +81,7 @@ var (
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
 	// Its threshold is 2
-	testSubnet1            *UnsignedCreateSubnetTx
+	testSubnet1            VerifiableUnsignedCreateSubnetTx
 	testSubnet1ControlKeys []*crypto.PrivateKeySECP256K1R
 
 	avmID = ids.Empty.Prefix(0)
@@ -341,7 +341,7 @@ func defaultVM() (*VM, database.Database) {
 	} else if err := blk.Accept(); err != nil {
 		panic(err)
 	} else {
-		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
+		testSubnet1 = tx.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 	}
 
 	return vm, baseDBManager.Current().Database
@@ -411,7 +411,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 	} else if err := blk.Accept(); err != nil {
 		panic(err)
 	} else {
-		testSubnet1 = tx.UnsignedTx.(*UnsignedCreateSubnetTx)
+		testSubnet1 = tx.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 	}
 
 	return genesisBytes, msgChan, vm, m

@@ -58,7 +58,7 @@ func (tx VerifiableUnsignedCreateChainTx) SemanticVerify(
 		return nil, tempError{err}
 	}
 
-	subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
+	subnet, ok := subnetIntf.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 	if !ok {
 		return nil, permError{
 			fmt.Errorf("%s isn't a subnet", tx.SubnetID),

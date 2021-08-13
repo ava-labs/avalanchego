@@ -6,54 +6,23 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedDecisionTx = &UnsignedCreateSubnetTx{}
+var _ UnsignedDecisionTx = VerifiableUnsignedCreateSubnetTx{}
 
-// UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
-type UnsignedCreateSubnetTx struct {
-	// Metadata, inputs and outputs
-	transactions.BaseTx `serialize:"true"`
-	// Who is authorized to manage this subnet
-	Owner verify.Verifiable `serialize:"true" json:"owner"`
-}
-
-// Verify this transactions.is well-formed
-func (tx *UnsignedCreateSubnetTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
-	switch {
-	case tx == nil:
-		return transactions.ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
-		return nil
-	}
-
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
-		return err
-	}
-	if err := tx.Owner.Verify(); err != nil {
-		return err
-	}
-
-	tx.SyntacticallyVerified = true
-	return nil
+// VerifiableUnsignedCreateSubnetTx is an unsigned CreateChainTx
+type VerifiableUnsignedCreateSubnetTx struct {
+	*transactions.UnsignedCreateSubnetTx `serialize:"true"`
 }
 
 // SemanticVerify returns nil if [tx] is valid given the state in [db]
-func (tx *UnsignedCreateSubnetTx) SemanticVerify(
+func (tx VerifiableUnsignedCreateSubnetTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
 	stx *transactions.SignedTx,
@@ -99,18 +68,21 @@ func (vm *VM) newCreateSubnetTx(
 	ids.SortShortIDs(ownerAddrs)
 
 	// Create the tx
-	utx := &UnsignedCreateSubnetTx{
-		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-		}},
-		Owner: &secp256k1fx.OutputOwners{
-			Threshold: threshold,
-			Addrs:     ownerAddrs,
+	utx := VerifiableUnsignedCreateSubnetTx{
+		UnsignedCreateSubnetTx: &transactions.UnsignedCreateSubnetTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+				Ins:          ins,
+				Outs:         outs,
+			}},
+			Owner: &secp256k1fx.OutputOwners{
+				Threshold: threshold,
+				Addrs:     ownerAddrs,
+			},
 		},
 	}
+
 	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err

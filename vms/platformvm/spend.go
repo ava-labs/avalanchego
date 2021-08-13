@@ -296,7 +296,7 @@ func (vm *VM) authorize(
 			err,
 		)
 	}
-	subnet, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+	subnet, ok := subnetTx.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 	if !ok {
 		return nil, nil, errWrongTxType
 	}

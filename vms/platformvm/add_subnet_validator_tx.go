@@ -221,7 +221,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			}
 		}
 
-		subnet, ok := subnetIntf.UnsignedTx.(*UnsignedCreateSubnetTx)
+		subnet, ok := subnetIntf.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 		if !ok {
 			return nil, nil, nil, nil, permError{
 				fmt.Errorf(

@@ -515,7 +515,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 
 		response.Subnets = make([]APISubnet, len(subnets)+1)
 		for i, subnet := range subnets {
-			unsignedTx := subnet.UnsignedTx.(*UnsignedCreateSubnetTx)
+			unsignedTx := subnet.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 			owner := unsignedTx.Owner.(*secp256k1fx.OutputOwners)
 			controlAddrs := []string{}
 			for _, controlKeyID := range owner.Addrs {
@@ -566,7 +566,7 @@ func (service *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, respon
 			return err
 		}
 
-		subnet, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+		subnet, ok := subnetTx.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1929,7 +1929,7 @@ func (service *Service) Validates(_ *http.Request, args *ValidatesArgs, response
 				err,
 			)
 		}
-		_, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+		_, ok := subnetTx.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 		if !ok {
 			return fmt.Errorf("%q is not a subnet", args.SubnetID)
 		}
