@@ -419,8 +419,7 @@ func (vm *VM) getPaginatedUTXOs(
 	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	for _, addr := range addrsList {
 		start := ids.Empty
@@ -465,8 +464,7 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, error) {
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	// iterate over the addresses and get all the utxos
 	for _, addr := range addrsList {
