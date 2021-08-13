@@ -22,7 +22,7 @@ import (
 var (
 	errOverflowExport = errors.New("overflow when computing export amount + txFee")
 
-	_ UnsignedAtomicTx = VerifiableUnsignedExportTx{}
+	_ VerifiableUnsignedAtomicTx = VerifiableUnsignedExportTx{}
 )
 
 type VerifiableUnsignedExportTx struct {

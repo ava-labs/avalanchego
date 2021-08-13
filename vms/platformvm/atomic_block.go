@@ -85,7 +85,7 @@ func (ab *AtomicBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	tx, ok := ab.Tx.UnsignedTx.(VerifiableUnsignedAtomicTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -139,7 +139,7 @@ func (ab *AtomicBlock) Accept() error {
 		return fmt.Errorf("failed to accept CommonBlock of %s: %w", blkID, err)
 	}
 
-	tx, ok := ab.Tx.UnsignedTx.(UnsignedAtomicTx)
+	tx, ok := ab.Tx.UnsignedTx.(VerifiableUnsignedAtomicTx)
 	if !ok {
 		return errWrongTxType
 	}

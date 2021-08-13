@@ -356,7 +356,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too early")
 	}
 
@@ -372,7 +372,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because start time too far in the future")
 	}
 
@@ -388,7 +388,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should've errored because validator already validating")
 	}
 
@@ -421,7 +421,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator in pending validator set")
 	}
 
@@ -447,7 +447,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		vm.internalState.DeleteUTXO(utxoID)
 	}
 	// Now keys[0] has no funds
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because tx fee paying key has no funds")
 	}
 }

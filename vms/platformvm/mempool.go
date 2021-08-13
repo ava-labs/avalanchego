@@ -109,9 +109,9 @@ func (m *Mempool) IssueTx(tx *transactions.SignedTx) error {
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.unissuedProposalTxs.Add(tx)
-	case UnsignedDecisionTx:
+	case VerifiableUnsignedDecisionTx:
 		m.unissuedDecisionTxs = append(m.unissuedDecisionTxs, tx)
-	case UnsignedAtomicTx:
+	case VerifiableUnsignedAtomicTx:
 		m.unissuedAtomicTxs = append(m.unissuedAtomicTxs, tx)
 	default:
 		return errUnknownTxType

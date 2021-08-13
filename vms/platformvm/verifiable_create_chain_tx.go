@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
-var _ UnsignedDecisionTx = VerifiableUnsignedCreateChainTx{}
+var _ VerifiableUnsignedDecisionTx = VerifiableUnsignedCreateChainTx{}
 
 // VerifiableUnsignedCreateChainTx is an unsigned CreateChainTx
 type VerifiableUnsignedCreateChainTx struct {

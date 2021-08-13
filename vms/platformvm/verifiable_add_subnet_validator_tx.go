@@ -21,8 +21,8 @@ import (
 var (
 	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
 
-	_ UnsignedProposalTx = VerifiableUnsignedAddSubnetValidatorTx{}
-	_ TimedTx            = VerifiableUnsignedAddSubnetValidatorTx{}
+	_ VerifiableUnsignedProposalTx = VerifiableUnsignedAddSubnetValidatorTx{}
+	_ TimedTx                      = VerifiableUnsignedAddSubnetValidatorTx{}
 )
 
 type VerifiableUnsignedAddSubnetValidatorTx struct {

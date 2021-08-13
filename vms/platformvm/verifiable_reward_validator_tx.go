@@ -22,7 +22,7 @@ var (
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
 	errWrongTxType         = errors.New("wrong transactions.type")
 
-	_ UnsignedProposalTx = VerifiableUnsignedRewardValidatorTx{}
+	_ VerifiableUnsignedProposalTx = VerifiableUnsignedRewardValidatorTx{}
 )
 
 type VerifiableUnsignedRewardValidatorTx struct {

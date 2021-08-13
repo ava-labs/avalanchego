@@ -25,8 +25,8 @@ var (
 	errInvalidState    = errors.New("generated output isn't valid state")
 	errOverDelegated   = errors.New("validator would be over delegated")
 
-	_ UnsignedProposalTx = VerifiableUnsignedAddDelegatorTx{}
-	_ TimedTx            = VerifiableUnsignedAddDelegatorTx{}
+	_ VerifiableUnsignedProposalTx = VerifiableUnsignedAddDelegatorTx{}
+	_ TimedTx                      = VerifiableUnsignedAddDelegatorTx{}
 )
 
 // VerifiableUnsignedCreateSubnetTx is an unsigned CreateChainTx

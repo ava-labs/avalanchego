@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
-// UnsignedDecisionTx is an unsigned operation that can be immediately decided
-type UnsignedDecisionTx interface {
+// VerifiableUnsignedDecisionTx is an unsigned operation that can be immediately decided
+type VerifiableUnsignedDecisionTx interface {
 	transactions.UnsignedTx
 
 	// Attempts to verify this transactions.with the provided state.
@@ -21,8 +21,8 @@ type UnsignedDecisionTx interface {
 	)
 }
 
-// UnsignedProposalTx is an unsigned operation that can be proposed
-type UnsignedProposalTx interface {
+// VerifiableUnsignedProposalTx is an unsigned operation that can be proposed
+type VerifiableUnsignedProposalTx interface {
 	transactions.UnsignedTx
 
 	// Attempts to verify this transactions.with the provided state.
@@ -36,8 +36,8 @@ type UnsignedProposalTx interface {
 	InitiallyPrefersCommit(vm *VM) bool
 }
 
-// UnsignedAtomicTx is an unsigned operation that can be atomically accepted
-type UnsignedAtomicTx interface {
+// VerifiableUnsignedAtomicTx is an unsigned operation that can be atomically accepted
+type VerifiableUnsignedAtomicTx interface {
 	transactions.UnsignedTx
 
 	// UTXOs this tx consumes

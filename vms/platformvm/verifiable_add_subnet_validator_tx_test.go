@@ -252,7 +252,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator stops validating primary network earlier than subnet")
 	}
 
@@ -270,7 +270,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -311,7 +311,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator not in the current or pending validator sets of the primary network")
 	}
 
@@ -338,7 +338,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator starts validating primary " +
 			"network before starting to validate primary network")
 	}
@@ -355,7 +355,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err = tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed because validator stops validating primary " +
 			"network after stops validating primary network")
 	}
@@ -372,7 +372,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil {
 		t.Fatalf("should have passed verification")
 	}
 
@@ -391,7 +391,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	} else if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because starts validating at current timestamp")
 	}
 
@@ -436,7 +436,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, _, _, err := duplicateSubnetTx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, duplicateSubnetTx); err == nil {
+	if _, _, _, _, err := duplicateSubnetTx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, duplicateSubnetTx); err == nil {
 		t.Fatal("should have failed verification because validator already validating the specified subnet")
 	}
 
@@ -461,7 +461,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because tx has 3 signatures but only 2 needed")
 	}
 
@@ -483,7 +483,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
-	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err = tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because not enough control sigs")
 	}
 
@@ -506,7 +506,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err = tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because a control sig is invalid")
 	}
 
@@ -534,7 +534,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
+	if _, _, _, _, err = tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because validator already in pending validator set of the specified subnet")
 	}
 }

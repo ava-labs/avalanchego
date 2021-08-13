@@ -63,7 +63,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	_, onAbortState, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	onCommitState, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	onCommitState, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}
@@ -340,7 +340,7 @@ func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 	tx, err := vm.newRewardValidatorTx(delTx.ID())
 	assert.NoError(err)
 
-	_, onAbortState, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
+	_, onAbortState, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx)
 	assert.NoError(err)
 
 	vdrDestSet := ids.ShortSet{}

@@ -23,7 +23,7 @@ var (
 	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
 	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
 
-	_ UnsignedAtomicTx = VerifiableUnsignedImportTx{}
+	_ VerifiableUnsignedAtomicTx = VerifiableUnsignedImportTx{}
 )
 
 type VerifiableUnsignedImportTx struct {

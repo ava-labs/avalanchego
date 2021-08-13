@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	_ UnsignedProposalTx = VerifiableUnsignedAddValidatorTx{}
-	_ TimedTx            = VerifiableUnsignedAddValidatorTx{}
+	_ VerifiableUnsignedProposalTx = VerifiableUnsignedAddValidatorTx{}
+	_ TimedTx                      = VerifiableUnsignedAddValidatorTx{}
 )
 
 type VerifiableUnsignedAddValidatorTx struct {

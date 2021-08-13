@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-var _ UnsignedDecisionTx = VerifiableUnsignedCreateSubnetTx{}
+var _ VerifiableUnsignedDecisionTx = VerifiableUnsignedCreateSubnetTx{}
 
 // VerifiableUnsignedCreateSubnetTx is an unsigned CreateChainTx
 type VerifiableUnsignedCreateSubnetTx struct {

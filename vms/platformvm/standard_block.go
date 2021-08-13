@@ -85,7 +85,7 @@ func (sb *StandardBlock) Verify() error {
 
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
+		utx, ok := tx.UnsignedTx.(VerifiableUnsignedDecisionTx)
 		if !ok {
 			return errWrongTxType
 		}

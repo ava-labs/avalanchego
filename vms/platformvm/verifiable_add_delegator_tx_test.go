@@ -360,7 +360,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			if tt.setup != nil {
 				tt.setup(vm)
 			}
-			if _, _, _, _, err := tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
+			if _, _, _, _, err := tx.UnsignedTx.(VerifiableUnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err != nil && !tt.shouldErr {
 				t.Fatalf("shouldn't have errored but got %s", err)
 			} else if err == nil && tt.shouldErr {
 				t.Fatalf("expected test to error but got none")

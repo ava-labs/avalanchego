@@ -149,7 +149,7 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
+	tx, ok := pb.Tx.UnsignedTx.(VerifiableUnsignedProposalTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -234,7 +234,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
+	tx, ok := pb.Tx.UnsignedTx.(VerifiableUnsignedProposalTx)
 	if !ok {
 		return [2]snowman.Block{}, errWrongTxType
 	}

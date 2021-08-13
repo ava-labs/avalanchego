@@ -13,7 +13,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ UnsignedProposalTx = &VerifiableUnsignedAdvanceTimeTx{}
+var _ VerifiableUnsignedProposalTx = &VerifiableUnsignedAdvanceTimeTx{}
 
 type VerifiableUnsignedAdvanceTimeTx struct {
 	*transactions.UnsignedAdvanceTimeTx `serialize:"true"`

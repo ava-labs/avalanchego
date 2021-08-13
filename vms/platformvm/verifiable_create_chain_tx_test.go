@@ -192,7 +192,7 @@ func TestCreateChainTxInsufficientControlSigs(t *testing.T) {
 
 	// Remove a signature
 	tx.Creds[0].(*secp256k1fx.Credential).Sigs = tx.Creds[0].(*secp256k1fx.Credential).Sigs[1:]
-	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
+	if _, err := tx.UnsignedTx.(VerifiableUnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
 		t.Fatal("should have errored because a sig is missing")
 	}
 }
@@ -240,7 +240,7 @@ func TestCreateChainTxWrongControlSig(t *testing.T) {
 		t.Fatal(err)
 	}
 	copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
-	if _, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
+	if _, err = tx.UnsignedTx.(VerifiableUnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
 		t.Fatal("should have failed verification because a sig is invalid")
 	}
 }
@@ -277,7 +277,7 @@ func TestCreateChainTxNoSuchSubnet(t *testing.T) {
 	)
 
 	tx.UnsignedTx.(VerifiableUnsignedCreateChainTx).SubnetID = ids.GenerateTestID()
-	if _, err := tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
+	if _, err := tx.UnsignedTx.(VerifiableUnsignedDecisionTx).SemanticVerify(vm, vs, tx); err == nil {
 		t.Fatal("should have failed because subent doesn't exist")
 	}
 }
@@ -313,7 +313,7 @@ func TestCreateChainTxValid(t *testing.T) {
 		vm.internalState.PendingStakerChainState(),
 	)
 
-	_, err = tx.UnsignedTx.(UnsignedDecisionTx).SemanticVerify(vm, vs, tx)
+	_, err = tx.UnsignedTx.(VerifiableUnsignedDecisionTx).SemanticVerify(vm, vs, tx)
 	if err != nil {
 		t.Fatalf("expected tx to pass verification but got error: %v", err)
 	}
