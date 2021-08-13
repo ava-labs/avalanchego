@@ -84,7 +84,7 @@ var (
 		MuirGlacierBlock:            big.NewInt(0),
 		ApricotPhase1BlockTimestamp: big.NewInt(1616767200), // 10am EST 3/26/2021
 		ApricotPhase2BlockTimestamp: big.NewInt(1620223200), // 10am EST 5/5/2021
-		// TODO(aaronbuchwald) schedule Apricot Phase 3
+		ApricotPhase3BlockTimestamp: big.NewInt(1629140400), // 3pm EST 8/16/2021
 	}
 
 	// AvalancheLocalChainConfig is the configuration for the Avalanche Local Network
