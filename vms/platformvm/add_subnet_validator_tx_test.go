@@ -290,7 +290,7 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		uint64(DSEndTime.Unix()),                // end time
 		pendingDSValidatorID,                    // node ID
 		nodeID,                                  // reward address
-		PercentDenominator,                      // shares
+		transactions.PercentDenominator,         // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 		ids.ShortEmpty,                          // change addr
 

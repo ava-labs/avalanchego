@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -32,7 +33,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	nodeID := key.PublicKey().Address()
 
 	// Case: tx is nil
-	var unsignedTx *UnsignedAddValidatorTx
+	var unsignedTx VerifiableUnsignedAddValidatorTx
 	if err := unsignedTx.Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -52,7 +53,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -60,10 +61,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).NetworkID++
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -82,7 +83,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -90,7 +91,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Stake = []*avax.TransferableOutput{{
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Stake = []*avax.TransferableOutput{{
 		Asset: avax.Asset{ID: avaxAssetID},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: vm.MinValidatorStake,
@@ -102,8 +103,8 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		},
 	}}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -122,7 +123,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -130,14 +131,14 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).RewardsOwner = &secp256k1fx.OutputOwners{
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).RewardsOwner = &secp256k1fx.OutputOwners{
 		Locktime:  0,
 		Threshold: 1,
 		Addrs:     nil,
 	}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -156,7 +157,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -164,10 +165,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.Wght-- // 1 less than minimum amount
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.Wght-- // 1 less than minimum amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -186,7 +187,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -194,10 +195,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Shares++ // 1 more than max amount
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Shares++ // 1 more than max amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -216,7 +217,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -224,10 +225,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End-- // 1 less than min duration
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.End-- // 1 less than min duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -246,7 +247,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -254,10 +255,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End = tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.Start - 1
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.End = tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.Start - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -276,7 +277,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(defaultMaxStakingDuration).Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
@@ -284,10 +285,10 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).Validator.End++ // 1 more than maximum duration
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.End++ // 1 more than maximum duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -306,13 +307,13 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddValidatorTx).Verify(
+	} else if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinValidatorStake,
@@ -349,7 +350,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {
@@ -365,7 +366,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateStartTime.Add(maxFutureStartTime).Add(defaultMinStakingDuration).Unix()+1),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {
@@ -381,7 +382,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID, // node ID
 		nodeID, // reward address
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {
@@ -400,9 +401,9 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		vm.MinValidatorStake,     // stake amount
 		uint64(startTime.Unix()), // start time
 		uint64(startTime.Add(defaultMinStakingDuration).Unix()), // end time
-		nodeID,                     // node ID
-		key2.PublicKey().Address(), // reward address
-		PercentDenominator,         // shares
+		nodeID,                          // node ID
+		key2.PublicKey().Address(),      // reward address
+		transactions.PercentDenominator, // shares
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr // key
 	)
@@ -430,7 +431,7 @@ func TestAddValidatorTxSemanticVerify(t *testing.T) {
 		uint64(defaultValidateEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	); err != nil {

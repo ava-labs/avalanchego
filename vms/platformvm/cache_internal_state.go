@@ -781,7 +781,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 		potentialReward := currentStaker.potentialReward
 
 		switch tx := currentStaker.addStakerTx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			startTime := tx.StartTime()
 			vdr := &currentValidatorState{
 				txID:        txID,
@@ -818,7 +818,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 	for _, tx := range st.deletedCurrentStakers {
 		var db database.KeyValueWriter
 		switch tx := tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			db = st.currentValidatorList
 			delete(st.uptimes, tx.Validator.NodeID)
 			delete(st.updatedUptimes, tx.Validator.NodeID)
@@ -843,7 +843,7 @@ func (st *internalStateImpl) writePendingStakers() error {
 	for _, tx := range st.addedPendingStakers {
 		var db database.KeyValueWriter
 		switch tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			db = st.pendingValidatorList
 		case VerifiableUnsignedAddDelegatorTx:
 			db = st.pendingDelegatorList
@@ -863,7 +863,7 @@ func (st *internalStateImpl) writePendingStakers() error {
 	for _, tx := range st.deletedPendingStakers {
 		var db database.KeyValueWriter
 		switch tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			db = st.pendingValidatorList
 		case VerifiableUnsignedAddDelegatorTx:
 			db = st.pendingDelegatorList
@@ -1100,7 +1100,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		}
 		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
 
-		addValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddValidatorTx)
+		addValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1209,7 +1209,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 
 func (st *internalStateImpl) loadPendingValidators() error {
 	ps := &pendingStakerChainStateImpl{
-		validatorsByNodeID:      make(map[ids.ShortID]*UnsignedAddValidatorTx),
+		validatorsByNodeID:      make(map[ids.ShortID]VerifiableUnsignedAddValidatorTx),
 		validatorExtrasByNodeID: make(map[ids.ShortID]*validatorImpl),
 	}
 
@@ -1226,7 +1226,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			return err
 		}
 
-		addValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddValidatorTx)
+		addValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1338,7 +1338,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		tx, ok := vdrTx.UnsignedTx.(*UnsignedAddValidatorTx)
+		tx, ok := vdrTx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}

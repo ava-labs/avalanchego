@@ -177,7 +177,7 @@ func defaultGenesis() (*BuildGenesisArgs, []byte) {
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
-			DelegationFee: PercentDenominator,
+			DelegationFee: transactions.PercentDenominator,
 		}
 	}
 
@@ -252,7 +252,7 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 				Amount:  json.Uint64(defaultWeight),
 				Address: addr,
 			}},
-			DelegationFee: PercentDenominator,
+			DelegationFee: transactions.PercentDenominator,
 		}
 	}
 
@@ -610,7 +610,7 @@ func TestAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -687,7 +687,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -757,7 +757,7 @@ func TestAddValidatorReject(t *testing.T) {
 		uint64(endTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -833,7 +833,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		uint64(endTime.Unix()),
 		repeatNodeID,
 		repeatNodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)

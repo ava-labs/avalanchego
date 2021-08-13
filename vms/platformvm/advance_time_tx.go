@@ -127,7 +127,7 @@ pendingStakerLoop:
 				potentialReward: r,
 			})
 			numToRemoveFromPending++
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
@@ -181,7 +181,7 @@ currentStakerLoop:
 			}
 
 			numToRemoveFromCurrent++
-		case *UnsignedAddValidatorTx, VerifiableUnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddValidatorTx, VerifiableUnsignedAddDelegatorTx:
 			// We shouldn't be removing any primary network validators here
 			break currentStakerLoop
 		default:

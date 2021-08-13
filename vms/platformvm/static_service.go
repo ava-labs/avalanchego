@@ -291,20 +291,22 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			delegationFee = uint32(*validator.ExactDelegationFee)
 		}
 
-		tx := &transactions.SignedTx{UnsignedTx: &UnsignedAddValidatorTx{
-			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    uint32(args.NetworkID),
-				BlockchainID: ids.Empty,
-			}},
-			Validator: entities.Validator{
-				NodeID: nodeID,
-				Start:  uint64(args.Time),
-				End:    uint64(validator.EndTime),
-				Wght:   weight,
+		tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedAddValidatorTx{
+			UnsignedAddValidatorTx: &transactions.UnsignedAddValidatorTx{
+				BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    uint32(args.NetworkID),
+					BlockchainID: ids.Empty,
+				}},
+				Validator: entities.Validator{
+					NodeID: nodeID,
+					Start:  uint64(args.Time),
+					End:    uint64(validator.EndTime),
+					Wght:   weight,
+				},
+				Stake:        stake,
+				RewardsOwner: owner,
+				Shares:       delegationFee,
 			},
-			Stake:        stake,
-			RewardsOwner: owner,
-			Shares:       delegationFee,
 		}}
 		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
 			return err

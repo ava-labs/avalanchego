@@ -10,19 +10,23 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
+
+const PercentDenominator = 1000000
 
 var (
-	ErrStakeTooShort = errors.New("staking period is too short")
-	ErrStakeTooLong  = errors.New("staking period is too long")
+	errWeightTooLarge            = errors.New("weight of this validator is too large")
+	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
+	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 )
 
-// UnsignedAddDelegatorTx is an unsigned addDelegatorTx
-type UnsignedAddDelegatorTx struct {
+// UnsignedAddValidatorTx is an unsigned addValidatorTx
+type UnsignedAddValidatorTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Describes the delegatee
@@ -31,21 +35,34 @@ type UnsignedAddDelegatorTx struct {
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
 	RewardsOwner verify.Verifiable `serialize:"true" json:"rewardsOwner"`
+	// Fee this validator charges delegators as a percentage, times 10,000
+	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
+	Shares uint32 `serialize:"true" json:"shares"`
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddDelegatorTx) Verify(
+func (tx *UnsignedAddValidatorTx) Verify(
 	ctx *snow.Context,
 	c codec.Manager,
-	minDelegatorStake uint64,
+	minStake uint64,
+	maxStake uint64,
 	minStakeDuration time.Duration,
 	maxStakeDuration time.Duration,
+	minDelegationFee uint32,
 ) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
+	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
+		return entities.ErrWeightTooSmall
+	case tx.Validator.Wght > maxStake: // Ensure validator isn't staking too much
+		return errWeightTooLarge
+	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
+		return errTooManyShares
+	case tx.Shares < minDelegationFee:
+		return errInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
@@ -57,7 +74,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
-		return err
+		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
 		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
@@ -66,9 +83,9 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	totalStakeWeight := uint64(0)
 	for _, out := range tx.Stake {
 		if err := out.Verify(); err != nil {
-			return fmt.Errorf("output verification failed: %w", err)
+			return fmt.Errorf("failed to verify output: %w", err)
 		}
-		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
+		newWeight, err := safemath.Add64(totalStakeWeight, out.Output().Amount())
 		if err != nil {
 			return err
 		}
@@ -79,10 +96,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	case !avax.IsSortedTransferableOutputs(tx.Stake, c):
 		return ErrOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
-		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
-	case tx.Validator.Wght < minDelegatorStake:
-		// Ensure validator is staking at least the minimum amount
-		return entities.ErrWeightTooSmall
+		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
 	}
 
 	// cache that this is valid

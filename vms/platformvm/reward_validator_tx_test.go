@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -36,7 +37,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnCommit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	toRemove := toRemoveTx.UnsignedTx.(*UnsignedAddValidatorTx)
+	toRemove := toRemoveTx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
@@ -119,7 +120,7 @@ func TestUnsignedRewardValidatorTxSemanticVerifyOnAbort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	toRemove := toRemoveTx.UnsignedTx.(*UnsignedAddValidatorTx)
+	toRemove := toRemoveTx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 
 	// Case 1: Chain timestamp is wrong
 	if tx, err := vm.newRewardValidatorTx(toRemove.ID()); err != nil {
@@ -211,7 +212,7 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 		vdrEndTime,
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
-		PercentDenominator/4,
+		transactions.PercentDenominator/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 		ids.ShortEmpty,                          // change addr
 	)
@@ -306,7 +307,7 @@ func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 		vdrEndTime,
 		vdrNodeID,        // node ID
 		vdrRewardAddress, // reward address
-		PercentDenominator/4,
+		transactions.PercentDenominator/4,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]}, // fee payer
 		ids.ShortEmpty,                          // change addr
 	)

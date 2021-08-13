@@ -115,7 +115,7 @@ func (tx VerifiableUnsignedAddDelegatorTx) SemanticVerify(
 		pendingDelegators := pendingValidator.Delegators()
 
 		var (
-			vdrTx                  *UnsignedAddValidatorTx
+			vdrTx                  VerifiableUnsignedAddValidatorTx
 			currentDelegatorWeight uint64
 			currentDelegators      []VerifiableUnsignedAddDelegatorTx
 		)

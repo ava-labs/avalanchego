@@ -710,7 +710,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				PotentialReward: &potentialReward,
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -722,7 +722,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			startTime := staker.StartTime()
 			weight := json.Uint64(staker.Validator.Weight())
 			potentialReward := json.Uint64(reward)
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(transactions.PercentDenominator))
 			rawUptime, err := service.vm.CalculateUptimePercent(nodeID, startTime)
 			if err != nil {
 				return err
@@ -853,7 +853,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				EndTime:     json.Uint64(staker.EndTime().Unix()),
 				StakeAmount: &weight,
 			})
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -863,7 +863,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 			nodeID := staker.Validator.ID()
 			weight := json.Uint64(staker.Validator.Weight())
-			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(PercentDenominator))
+			delegationFee := json.Float32(100 * float32(staker.Shares) / float32(transactions.PercentDenominator))
 
 			connected := service.vm.IsConnected(nodeID)
 			reply.Validators = append(reply.Validators, APIPrimaryValidator{
@@ -2172,12 +2172,12 @@ func (service *Service) getStakeHelper(tx *transactions.SignedTx, addrs ids.Shor
 	switch staker := tx.UnsignedTx.(type) {
 	case VerifiableUnsignedAddDelegatorTx:
 		outs = staker.Stake
-	case *UnsignedAddValidatorTx:
+	case VerifiableUnsignedAddValidatorTx:
 		outs = staker.Stake
 	case *UnsignedAddSubnetValidatorTx:
 		return 0, nil, nil
 	default:
-		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, *UnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
+		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, VerifiableUnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
 		service.vm.ctx.Log.Error("invalid tx type provided from validator set %s", err)
 		return 0, nil, err
 	}

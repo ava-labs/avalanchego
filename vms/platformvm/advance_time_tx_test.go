@@ -48,7 +48,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -121,7 +121,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 		uint64(pendingValidatorEndTime.Unix()),
 		nodeID,
 		nodeID,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
@@ -311,7 +311,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers2(t *testing.T) {
 				uint64(staker.endTime.Unix()),
 				staker.nodeID,  // validator ID
 				ids.ShortEmpty, // reward address
-				PercentDenominator,
+				transactions.PercentDenominator,
 				[]*crypto.PrivateKeySECP256K1R{keys[0]},
 				ids.ShortEmpty, // change addr
 			)

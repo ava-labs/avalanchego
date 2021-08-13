@@ -131,7 +131,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		startTime time.Time
 	)
 	switch uStakerTx := stakerTx.UnsignedTx.(type) {
-	case *UnsignedAddValidatorTx:
+	case VerifiableUnsignedAddValidatorTx:
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{
@@ -206,11 +206,11 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 		// Calculate split of reward between delegator/delegatee
 		// The delegator gives stake to the validatee
-		delegatorShares := PercentDenominator - uint64(vdrTx.Shares)             // parentTx.Shares <= PercentDenominator so no underflow
-		delegatorReward := delegatorShares * (stakerReward / PercentDenominator) // delegatorShares <= PercentDenominator so no overflow
+		delegatorShares := transactions.PercentDenominator - uint64(vdrTx.Shares)             // parentTx.Shares <= transactions.PercentDenominator so no underflow
+		delegatorReward := delegatorShares * (stakerReward / transactions.PercentDenominator) // delegatorShares <= transactions.PercentDenominator so no overflow
 		// Delay rounding as long as possible for small numbers
 		if optimisticReward, err := safemath.Mul64(delegatorShares, stakerReward); err == nil {
-			delegatorReward = optimisticReward / PercentDenominator
+			delegatorReward = optimisticReward / transactions.PercentDenominator
 		}
 		delegateeReward := stakerReward - delegatorReward // delegatorReward <= reward so no underflow
 

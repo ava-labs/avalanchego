@@ -43,7 +43,6 @@ import (
 
 const (
 	// PercentDenominator is the denominator used to calculate percentages
-	PercentDenominator = 1000000
 
 	droppedTxCacheSize = 50
 
@@ -106,7 +105,7 @@ func init() {
 			c.RegisterType(&secp256k1fx.Input{}),
 			c.RegisterType(&secp256k1fx.OutputOwners{}),
 
-			c.RegisterType(&UnsignedAddValidatorTx{}),
+			c.RegisterType(VerifiableUnsignedAddValidatorTx{}),
 			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
 			c.RegisterType(VerifiableUnsignedAddDelegatorTx{}),
 

@@ -6,6 +6,8 @@ package platformvm
 import (
 	"math/big"
 	"time"
+
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var (
@@ -19,7 +21,7 @@ var (
 
 	// consumptionRateDenominator is the magnitude offset used to emulate
 	// floating point fractions.
-	consumptionRateDenominator = new(big.Int).SetUint64(PercentDenominator)
+	consumptionRateDenominator = new(big.Int).SetUint64(transactions.PercentDenominator)
 )
 
 // reward returns the amount of tokens to reward the staker with.

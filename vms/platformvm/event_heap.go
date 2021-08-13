@@ -50,8 +50,8 @@ func (h *EventHeap) Less(i, j int) bool {
 	case iTime.Unix() < jTime.Unix():
 		return true
 	case iTime == jTime:
-		_, iOk := iTx.(*UnsignedAddValidatorTx)
-		_, jOk := jTx.(*UnsignedAddValidatorTx)
+		_, iOk := iTx.(VerifiableUnsignedAddValidatorTx)
+		_, jOk := jTx.(VerifiableUnsignedAddValidatorTx)
 
 		if iOk != jOk {
 			return iOk == h.SortByStartTime

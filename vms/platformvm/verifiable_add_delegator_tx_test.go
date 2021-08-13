@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
@@ -186,7 +187,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 			newValidatorEndTime,                     // end time
 			newValidatorID,                          // node ID
 			rewardAddress,                           // Reward Address
-			PercentDenominator,                      // subnet
+			transactions.PercentDenominator,         // subnet
 			[]*crypto.PrivateKeySECP256K1R{keys[0]}, // key
 			ids.ShortEmpty,                          // change addr
 		)
@@ -392,7 +393,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 		uint64(validatorEndTime.Unix()),
 		id,
 		id,
-		PercentDenominator,
+		transactions.PercentDenominator,
 		[]*crypto.PrivateKeySECP256K1R{keys[0]},
 		ids.ShortEmpty, // change addr
 	)
