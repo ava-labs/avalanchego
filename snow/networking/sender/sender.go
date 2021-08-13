@@ -82,7 +82,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		// Tell the router to expect a reply message from this validator
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
-		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), nil)
+		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), func() {})
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -121,7 +121,7 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 
 func (s *Sender) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
-		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
+		go s.router.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs, func() {})
 	} else {
 		s.sender.AcceptedFrontier(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
@@ -136,7 +136,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 		timeoutDuration := s.timeouts.TimeoutDuration()
 		// Tell the router to expect a reply message from this validator
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
-		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerIDs, nil)
+		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerIDs, func() {})
 	}
 
 	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
@@ -173,7 +173,7 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 
 func (s *Sender) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) {
 	if validatorID == s.ctx.NodeID {
-		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs, nil)
+		go s.router.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs, func() {})
 	} else {
 		s.sender.Accepted(validatorID, s.ctx.ChainID, requestID, containerIDs)
 	}
@@ -285,7 +285,7 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 			time.Now().Add(timeoutDuration),
 			containerID,
 			container,
-			nil,
+			func() {},
 		)
 	}
 
@@ -342,7 +342,7 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 			requestID,
 			time.Now().Add(timeoutDuration),
 			containerID,
-			nil,
+			func() {},
 		)
 	}
 
@@ -382,7 +382,7 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID
 	// If [validatorID] is myself, send this message directly
 	// to my own router rather than sending it over the network
 	if validatorID == s.ctx.NodeID {
-		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes, nil)
+		go s.router.Chits(validatorID, s.ctx.ChainID, requestID, votes, func() {})
 	} else {
 		s.sender.Chits(validatorID, s.ctx.ChainID, requestID, votes)
 	}
