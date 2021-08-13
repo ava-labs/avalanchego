@@ -118,7 +118,7 @@ func TestNewImportTx(t *testing.T) {
 		} else if tt.shouldErr {
 			t.Fatalf("test '%s' didn't error but it should have", tt.description)
 		}
-		unsignedTx := tx.UnsignedTx.(*UnsignedImportTx)
+		unsignedTx := tx.UnsignedTx.(VerifiableUnsignedImportTx)
 		if len(unsignedTx.ImportedInputs) == 0 {
 			t.Fatalf("in test '%s', tx has no imported inputs", tt.description)
 		} else if len(tx.Creds) != len(unsignedTx.Ins)+len(unsignedTx.ImportedInputs) {

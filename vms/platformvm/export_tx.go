@@ -23,7 +23,6 @@ import (
 var (
 	errNoExportOutputs = errors.New("no export outputs")
 	errOverflowExport  = errors.New("overflow when computing export amount + txFee")
-	errWrongChainID    = errors.New("tx has wrong chain ID")
 
 	_ UnsignedAtomicTx = &UnsignedExportTx{}
 )
@@ -57,7 +56,7 @@ func (tx *UnsignedExportTx) Verify(
 		return nil
 	case tx.DestinationChain != avmID:
 		// TODO: remove this check if we allow for P->C swaps
-		return errWrongChainID
+		return transactions.ErrWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	}
@@ -167,7 +166,7 @@ func (vm *VM) newExportTx(
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*transactions.SignedTx, error) {
 	if vm.ctx.XChainID != chainID {
-		return nil, errWrongChainID
+		return nil, transactions.ErrWrongChainID
 	}
 
 	toBurn, err := safemath.Add64(amount, vm.TxFee)

@@ -112,7 +112,7 @@ func init() {
 			c.RegisterType(VerifiableUnsignedCreateChainTx{}),
 			c.RegisterType(VerifiableUnsignedCreateSubnetTx{}),
 
-			c.RegisterType(&UnsignedImportTx{}),
+			c.RegisterType(VerifiableUnsignedImportTx{}),
 			c.RegisterType(&UnsignedExportTx{}),
 
 			c.RegisterType(&UnsignedAdvanceTimeTx{}),

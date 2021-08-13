@@ -1700,22 +1700,24 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 
-	tx := transactions.SignedTx{UnsignedTx: &UnsignedImportTx{
-		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-		}},
-		SourceChain: vm.ctx.XChainID,
-		ImportedInputs: []*avax.TransferableInput{{
-			UTXOID: avax.UTXOID{
-				TxID:        ids.Empty.Prefix(1),
-				OutputIndex: 1,
-			},
-			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-			In: &secp256k1fx.TransferInput{
-				Amt: 50000,
-			},
-		}},
+	tx := transactions.SignedTx{UnsignedTx: VerifiableUnsignedImportTx{
+		UnsignedImportTx: &transactions.UnsignedImportTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+			}},
+			SourceChain: vm.ctx.XChainID,
+			ImportedInputs: []*avax.TransferableInput{{
+				UTXOID: avax.UTXOID{
+					TxID:        ids.Empty.Prefix(1),
+					OutputIndex: 1,
+				},
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: 50000,
+				},
+			}},
+		},
 	}}
 	if err := tx.Sign(platformcodec.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
 		t.Fatal(err)

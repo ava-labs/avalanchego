@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -25,22 +24,15 @@ var (
 	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
 	errNoImportInputs           = errors.New("tx has no imported inputs")
 
-	_ UnsignedAtomicTx = &UnsignedImportTx{}
+	_ UnsignedAtomicTx = VerifiableUnsignedImportTx{}
 )
 
-// UnsignedImportTx is an unsigned ImportTx
-type UnsignedImportTx struct {
-	transactions.BaseTx `serialize:"true"`
-
-	// Which chain to consume the funds from
-	SourceChain ids.ID `serialize:"true" json:"sourceChain"`
-
-	// Inputs that consume UTXOs produced on the chain
-	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
+type VerifiableUnsignedImportTx struct {
+	*transactions.UnsignedImportTx `serialize:"true"`
 }
 
 // InputUTXOs returns the UTXOIDs of the imported funds
-func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
+func (tx VerifiableUnsignedImportTx) InputUTXOs() ids.Set {
 	set := ids.NewSet(len(tx.ImportedInputs))
 	for _, in := range tx.ImportedInputs {
 		set.Add(in.InputID())
@@ -48,45 +40,8 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	return set
 }
 
-// Verify this transactions.is well-formed
-func (tx *UnsignedImportTx) Verify(
-	avmID ids.ID,
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
-	switch {
-	case tx == nil:
-		return transactions.ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
-		return nil
-	case tx.SourceChain != avmID:
-		// TODO: remove this check if we allow for P->C swaps
-		return errWrongChainID
-	case len(tx.ImportedInputs) == 0:
-		return errNoImportInputs
-	}
-
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
-		return err
-	}
-
-	for _, in := range tx.ImportedInputs {
-		if err := in.Verify(); err != nil {
-			return fmt.Errorf("input failed verification: %w", err)
-		}
-	}
-	if !avax.IsSortedAndUniqueTransferableInputs(tx.ImportedInputs) {
-		return transactions.ErrInputsNotSortedUnique
-	}
-
-	tx.SyntacticallyVerified = true
-	return nil
-}
-
 // SemanticVerify this transactions.is valid.
-func (tx *UnsignedImportTx) SemanticVerify(
+func (tx VerifiableUnsignedImportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
 	stx *transactions.SignedTx,
@@ -157,7 +112,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 // we don't want to remove an imported UTXO in semanticVerify
 // only to have the transactions.not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
-func (tx *UnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+func (tx VerifiableUnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
 		utxoID := in.InputID()
@@ -174,7 +129,7 @@ func (vm *VM) newImportTx(
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*transactions.SignedTx, error) {
 	if vm.ctx.XChainID != chainID {
-		return nil, errWrongChainID
+		return nil, transactions.ErrWrongChainID
 	}
 
 	kc := secp256k1fx.NewKeychain()
@@ -245,15 +200,17 @@ func (vm *VM) newImportTx(
 	}
 
 	// Create the transaction
-	utx := &UnsignedImportTx{
-		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Outs:         outs,
-			Ins:          ins,
-		}},
-		SourceChain:    chainID,
-		ImportedInputs: importedInputs,
+	utx := VerifiableUnsignedImportTx{
+		UnsignedImportTx: &transactions.UnsignedImportTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+				Outs:         outs,
+				Ins:          ins,
+			}},
+			SourceChain:    chainID,
+			ImportedInputs: importedInputs,
+		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
