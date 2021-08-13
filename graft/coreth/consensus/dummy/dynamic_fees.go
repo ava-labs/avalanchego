@@ -18,7 +18,7 @@ import (
 var (
 	MaxBaseFee          = big.NewInt(params.ApricotPhase3MaxBaseFee)
 	MinBaseFee          = big.NewInt(params.ApricotPhase3MinBaseFee)
-	TargetGas    uint64 = 5_000_000
+	TargetGas    uint64 = 6_000_000
 	BlockGasFee  uint64 = 1_000_000
 	rollupWindow uint64 = 10
 )
@@ -106,8 +106,6 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		// We use roll/rollupWindow, so that the transition is applied for every [rollupWindow] seconds
 		// that has elapsed between the parent and this block.
 		if roll > rollupWindow {
-			// TODO(aaronbuchwald) add something to dampen this here to make high prices a little stickier
-			// in the case of a quiescent network.
 			// Note: roll/rollupWindow must be greater than 1 since we've checked that roll > rollupWindow
 			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/rollupWindow))
 		}
