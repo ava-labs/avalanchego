@@ -1,4 +1,4 @@
-package platformvm
+package entities
 
 import (
 	"errors"

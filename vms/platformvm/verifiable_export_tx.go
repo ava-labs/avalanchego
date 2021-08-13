@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -21,68 +20,17 @@ import (
 )
 
 var (
-	errNoExportOutputs = errors.New("no export outputs")
-	errOverflowExport  = errors.New("overflow when computing export amount + txFee")
+	errOverflowExport = errors.New("overflow when computing export amount + txFee")
 
-	_ UnsignedAtomicTx = &UnsignedExportTx{}
+	_ UnsignedAtomicTx = VerifiableUnsignedExportTx{}
 )
 
-// UnsignedExportTx is an unsigned ExportTx
-type UnsignedExportTx struct {
-	transactions.BaseTx `serialize:"true"`
-
-	// Which chain to send the funds to
-	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
-
-	// Outputs that are exported to the chain
-	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
-}
-
-// InputUTXOs returns an empty set
-func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
-
-// Verify this transactions.is well-formed
-func (tx *UnsignedExportTx) Verify(
-	avmID ids.ID,
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-) error {
-	switch {
-	case tx == nil:
-		return transactions.ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
-		return nil
-	case tx.DestinationChain != avmID:
-		// TODO: remove this check if we allow for P->C swaps
-		return transactions.ErrWrongChainID
-	case len(tx.ExportedOutputs) == 0:
-		return errNoExportOutputs
-	}
-
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
-		return err
-	}
-
-	for _, out := range tx.ExportedOutputs {
-		if err := out.Verify(); err != nil {
-			return fmt.Errorf("output failed verification: %w", err)
-		}
-		if _, ok := out.Output().(*StakeableLockOut); ok {
-			return errWrongLocktime
-		}
-	}
-	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, platformcodec.Codec) {
-		return transactions.ErrOutputsNotSorted
-	}
-
-	tx.SyntacticallyVerified = true
-	return nil
+type VerifiableUnsignedExportTx struct {
+	*transactions.UnsignedExportTx `serialize:"true"`
 }
 
 // SemanticVerify this transactions.is valid.
-func (tx *UnsignedExportTx) SemanticVerify(
+func (tx VerifiableUnsignedExportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
 	stx *transactions.SignedTx,
@@ -124,7 +72,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 }
 
 // Accept this transactions.
-func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
+func (tx VerifiableUnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	txID := tx.ID()
 
 	elems := make([]*atomic.Element, len(tx.ExportedOutputs))
@@ -179,25 +127,27 @@ func (vm *VM) newExportTx(
 	}
 
 	// Create the transaction
-	utx := &UnsignedExportTx{
-		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs, // Non-exported outputs
-		}},
-		DestinationChain: chainID,
-		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
-			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: amount,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Locktime:  0,
-					Threshold: 1,
-					Addrs:     []ids.ShortID{to},
+	utx := VerifiableUnsignedExportTx{
+		UnsignedExportTx: &transactions.UnsignedExportTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+				Ins:          ins,
+				Outs:         outs, // Non-exported outputs
+			}},
+			DestinationChain: chainID,
+			ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
+				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
+				Out: &secp256k1fx.TransferOutput{
+					Amt: amount,
+					OutputOwners: secp256k1fx.OutputOwners{
+						Locktime:  0,
+						Threshold: 1,
+						Addrs:     []ids.ShortID{to},
+					},
 				},
-			},
-		}},
+			}},
+		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {

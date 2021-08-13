@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
@@ -113,13 +114,13 @@ func init() {
 			c.RegisterType(VerifiableUnsignedCreateSubnetTx{}),
 
 			c.RegisterType(VerifiableUnsignedImportTx{}),
-			c.RegisterType(&UnsignedExportTx{}),
+			c.RegisterType(VerifiableUnsignedExportTx{}),
 
 			c.RegisterType(&UnsignedAdvanceTimeTx{}),
 			c.RegisterType(&UnsignedRewardValidatorTx{}),
 
-			c.RegisterType(&StakeableLockIn{}),
-			c.RegisterType(&StakeableLockOut{}),
+			c.RegisterType(&entities.StakeableLockIn{}),
+			c.RegisterType(&entities.StakeableLockOut{}),
 		)
 	}
 	errs.Add(

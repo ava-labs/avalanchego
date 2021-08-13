@@ -157,7 +157,7 @@ func (m *metrics) AcceptTx(tx *transactions.SignedTx) error {
 		m.numCreateSubnetTxs.Inc()
 	case VerifiableUnsignedImportTx:
 		m.numImportTxs.Inc()
-	case *UnsignedExportTx:
+	case VerifiableUnsignedExportTx:
 		m.numExportTxs.Inc()
 	case *UnsignedRewardValidatorTx:
 		m.numRewardValidatorTxs.Inc()

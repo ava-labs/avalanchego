@@ -22,7 +22,6 @@ import (
 var (
 	errAssetIDMismatch          = errors.New("asset IDs in the input don't match the utxo")
 	errWrongNumberOfCredentials = errors.New("should have the same number of credentials as inputs")
-	errNoImportInputs           = errors.New("tx has no imported inputs")
 
 	_ UnsignedAtomicTx = VerifiableUnsignedImportTx{}
 )
