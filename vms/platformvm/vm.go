@@ -116,7 +116,7 @@ func init() {
 			c.RegisterType(VerifiableUnsignedImportTx{}),
 			c.RegisterType(VerifiableUnsignedExportTx{}),
 
-			c.RegisterType(&UnsignedAdvanceTimeTx{}),
+			c.RegisterType(VerifiableUnsignedAdvanceTimeTx{}),
 			c.RegisterType(VerifiableUnsignedRewardValidatorTx{}),
 
 			c.RegisterType(&entities.StakeableLockIn{}),

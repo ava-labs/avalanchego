@@ -7,35 +7,25 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var _ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
+var _ UnsignedProposalTx = &VerifiableUnsignedAdvanceTimeTx{}
 
-// UnsignedAdvanceTimeTx is a transactions.to increase the chain's timestamp.
-// When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
-// followed by a commit block) the staker set is also updated accordingly.
-// It must be that:
-//   * proposed timestamp > [current chain time]
-//   * proposed timestamp <= [time for next staker set change]
-type UnsignedAdvanceTimeTx struct {
-	avax.Metadata
-
-	// Unix time this block proposes increasing the timestamp to
-	Time uint64 `serialize:"true" json:"time"`
+type VerifiableUnsignedAdvanceTimeTx struct {
+	*transactions.UnsignedAdvanceTimeTx `serialize:"true"`
 }
 
 // Timestamp returns the time this block is proposing the chain should be set to
-func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
-	return time.Unix(int64(tx.Time), 0)
+func (tx VerifiableUnsignedAdvanceTimeTx) Timestamp() time.Time {
+	return time.Unix(int64(tx.UnsignedAdvanceTimeTx.Time), 0)
 }
 
 // SemanticVerify this transactions.is valid.
-func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
+func (tx VerifiableUnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
 	stx *transactions.SignedTx,
@@ -47,7 +37,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	TxError,
 ) {
 	switch {
-	case tx == nil:
+	case tx.UnsignedAdvanceTimeTx == nil:
 		return nil, nil, nil, nil, tempError{transactions.ErrNilTx}
 	case len(stx.Creds) != 0:
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
@@ -218,15 +208,17 @@ currentStakerLoop:
 
 // InitiallyPrefersCommit returns true if the proposed time is at
 // or before the current time plus the synchrony bound
-func (tx *UnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx VerifiableUnsignedAdvanceTimeTx) InitiallyPrefersCommit(vm *VM) bool {
 	return !tx.Timestamp().After(vm.clock.Time().Add(syncBound))
 }
 
 // newAdvanceTimeTx creates a new tx that, if it is accepted and followed by a
 // Commit block, will set the chain's timestamp to [timestamp].
 func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*transactions.SignedTx, error) {
-	tx := &transactions.SignedTx{UnsignedTx: &UnsignedAdvanceTimeTx{
-		Time: uint64(timestamp.Unix()),
+	tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedAdvanceTimeTx{
+		UnsignedAdvanceTimeTx: &transactions.UnsignedAdvanceTimeTx{
+			Time: uint64(timestamp.Unix()),
+		},
 	}}
 	return tx, tx.Sign(platformcodec.Codec, nil)
 }

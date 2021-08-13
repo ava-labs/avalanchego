@@ -509,7 +509,7 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	var unmarshaledTx transactions.SignedTx
 	if _, err := platformcodec.Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
-	} else if tx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedTx.(*UnsignedAdvanceTimeTx).Time {
+	} else if tx.UnsignedTx.(VerifiableUnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedTx.(VerifiableUnsignedAdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")
 	}
 }
