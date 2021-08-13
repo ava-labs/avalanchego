@@ -26,7 +26,7 @@ import (
 var (
 	defaultNetworkName     = constants.MainnetName
 	homeDir                = os.ExpandEnv("$HOME")
-	prefixedAppName        = fmt.Sprintf(".%s", constants.AppName)
+	prefixedAppName        = fmt.Sprintf(".%s", "avalanchego_dev")
 	defaultDataDir         = filepath.Join(homeDir, prefixedAppName)
 	defaultDBDir           = filepath.Join(defaultDataDir, "db")
 	defaultProfileDir      = filepath.Join(defaultDataDir, "profiles")

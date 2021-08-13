@@ -23,6 +23,6 @@ evm_path="$plugin_dir/evm"
 avalanchego_dockerhub_repo=${DOCKER_REPO:-"local"}
 
 # Current branch
-current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
+# current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 
 git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
