@@ -159,7 +159,7 @@ func (m *metrics) AcceptTx(tx *transactions.SignedTx) error {
 		m.numImportTxs.Inc()
 	case VerifiableUnsignedExportTx:
 		m.numExportTxs.Inc()
-	case *UnsignedRewardValidatorTx:
+	case VerifiableUnsignedRewardValidatorTx:
 		m.numRewardValidatorTxs.Inc()
 	default:
 		return errUnknownTxType

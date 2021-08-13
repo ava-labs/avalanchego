@@ -22,27 +22,11 @@ var (
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
 	errWrongTxType         = errors.New("wrong transactions.type")
 
-	_ UnsignedProposalTx = &UnsignedRewardValidatorTx{}
+	_ UnsignedProposalTx = VerifiableUnsignedRewardValidatorTx{}
 )
 
-// UnsignedRewardValidatorTx is a transactions.that represents a proposal to
-// remove a validator that is currently validating from the validator set.
-//
-// If this transactions.is accepted and the next block accepted is a Commit
-// block, the validator is removed and the address that the validator specified
-// receives the staked AVAX as well as a validating reward.
-//
-// If this transactions.is accepted and the next block accepted is an Abort
-// block, the validator is removed and the address that the validator specified
-// receives the staked AVAX but no reward.
-type UnsignedRewardValidatorTx struct {
-	avax.Metadata
-
-	// ID of the tx that created the delegator/validator being removed/rewarded
-	TxID ids.ID `serialize:"true" json:"txID"`
-
-	// Marks if this validator should be rewarded according to this node.
-	shouldPreferCommit bool
+type VerifiableUnsignedRewardValidatorTx struct {
+	*transactions.UnsignedRewardValidatorTx `serialize:"true"`
 }
 
 // SemanticVerify this transactions.performs a valid state transition.
@@ -51,7 +35,7 @@ type UnsignedRewardValidatorTx struct {
 // The next validator to be removed must be the validator specified in this block.
 // The next validator to be removed must be have an end time equal to the current
 //   chain timestamp.
-func (tx *UnsignedRewardValidatorTx) SemanticVerify(
+func (tx VerifiableUnsignedRewardValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
 	stx *transactions.SignedTx,
@@ -63,7 +47,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	switch {
-	case tx == nil:
+	case tx.UnsignedRewardValidatorTx == nil:
 		return nil, nil, nil, nil, tempError{transactions.ErrNilTx}
 	case tx.TxID == ids.Empty:
 		return nil, nil, nil, nil, tempError{errInvalidID}
@@ -280,7 +264,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 			fmt.Errorf("failed to calculate uptime: %w", err),
 		}
 	}
-	tx.shouldPreferCommit = uptime >= vm.UptimePercentage
+	tx.ShouldPreferCommit = uptime >= vm.UptimePercentage
 
 	// Regardless of whether this tx is committed or aborted, update the
 	// validator set to remove the staker. onAbortDB or onCommitDB should commit
@@ -296,15 +280,17 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 // responsive and correct during the time they are validating.
 // Right now they receive a reward if they're up (but not necessarily
 // correct and responsive) for a sufficient amount of time
-func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
-	return tx.shouldPreferCommit
+func (tx VerifiableUnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
+	return tx.ShouldPreferCommit
 }
 
 // RewardStakerTx creates a new transactions.that proposes to remove the staker
 // [validatorID] from the default validator set.
 func (vm *VM) newRewardValidatorTx(txID ids.ID) (*transactions.SignedTx, error) {
-	tx := &transactions.SignedTx{UnsignedTx: &UnsignedRewardValidatorTx{
-		TxID: txID,
+	tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedRewardValidatorTx{
+		UnsignedRewardValidatorTx: &transactions.UnsignedRewardValidatorTx{
+			TxID: txID,
+		},
 	}}
 	return tx, tx.Sign(platformcodec.Codec, nil)
 }
