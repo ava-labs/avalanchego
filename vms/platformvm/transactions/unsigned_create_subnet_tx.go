@@ -8,7 +8,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 // UnsignedCreateSubnetTx is an unsigned proposal to create a new subnet
@@ -33,7 +32,7 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 		return nil
 	}
 
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
 		return err
 	}
 	if err := tx.Owner.Verify(); err != nil {

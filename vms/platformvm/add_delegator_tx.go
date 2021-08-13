@@ -82,7 +82,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -102,7 +102,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, platformcodec.Codec):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, c):
 		return transactions.ErrOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
@@ -116,7 +116,7 @@ func (tx *UnsignedAddDelegatorTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transactions.is valid.
+// Verify that this transaction is semantically valid.
 func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,

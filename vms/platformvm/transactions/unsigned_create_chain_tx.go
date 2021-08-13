@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 var (
@@ -78,7 +77,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 		}
 	}
 
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
 		return err
 	}
 	if err := tx.SubnetAuth.Verify(); err != nil {
