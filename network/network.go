@@ -1194,7 +1194,7 @@ func (n *network) gossipPeerList() {
 			return
 		}
 
-		allPeers := n.getAllPeers(constants.PrimaryNetworkID)
+		allPeers := n.getAllPeers()
 		if len(allPeers) == 0 {
 			continue
 		}
@@ -1690,7 +1690,7 @@ func (n *network) getPeers(nodeIDs ids.ShortSet) []*PeerElement {
 // Returns a copy of the peer set.
 // Only includes peers that have finished the handshake.
 // Assumes [n.stateLock] is not held.
-func (n *network) getAllPeers(subnetID ids.ID) []*peer {
+func (n *network) getAllPeers() []*peer {
 	n.stateLock.RLock()
 	defer n.stateLock.RUnlock()
 
@@ -1700,7 +1700,7 @@ func (n *network) getAllPeers(subnetID ids.ID) []*peer {
 
 	peers := make([]*peer, 0, n.peers.size())
 	for _, peer := range n.peers.peersList {
-		if peer.finishedHandshake.GetValue() && peer.trackedSubnets.Contains(subnetID) {
+		if peer.finishedHandshake.GetValue() {
 			peers = append(peers, peer)
 		}
 	}
