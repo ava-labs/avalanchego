@@ -18,7 +18,7 @@ import (
 var (
 	MaxBaseFee          = big.NewInt(params.ApricotPhase3MaxBaseFee)
 	MinBaseFee          = big.NewInt(params.ApricotPhase3MinBaseFee)
-	TargetGas    uint64 = 6_000_000
+	TargetGas    uint64 = 10_000_000
 	BlockGasFee  uint64 = 1_000_000
 	rollupWindow uint64 = 10
 )
