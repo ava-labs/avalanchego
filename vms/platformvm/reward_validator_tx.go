@@ -175,7 +175,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		// Handle reward preferences
 		nodeID = uStakerTx.Validator.ID()
 		startTime = uStakerTx.StartTime()
-	case *UnsignedAddDelegatorTx:
+	case VerifiableUnsignedAddDelegatorTx:
 		// Refund the stake here
 		for i, out := range uStakerTx.Stake {
 			utxo := &avax.UTXO{

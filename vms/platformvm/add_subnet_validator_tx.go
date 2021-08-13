@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
@@ -32,7 +33,7 @@ type UnsignedAddSubnetValidatorTx struct {
 	// Metadata, inputs and outputs
 	transactions.BaseTx `serialize:"true"`
 	// The validator
-	Validator SubnetValidator `serialize:"true" json:"validator"`
+	Validator entities.SubnetValidator `serialize:"true" json:"validator"`
 	// Auth that will be allowing this validator into the network
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
@@ -71,9 +72,9 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	duration := tx.Validator.Duration()
 	switch {
 	case duration < minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
+		return transactions.ErrStakeTooShort
 	case duration > maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
+		return transactions.ErrStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -296,8 +297,8 @@ func (vm *VM) newAddSubnetValidatorTx(
 			Ins:          ins,
 			Outs:         outs,
 		}},
-		Validator: SubnetValidator{
-			Validator: Validator{
+		Validator: entities.SubnetValidator{
+			Validator: entities.Validator{
 				NodeID: nodeID,
 				Start:  startTime,
 				End:    endTime,

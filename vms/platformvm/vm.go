@@ -108,7 +108,7 @@ func init() {
 
 			c.RegisterType(&UnsignedAddValidatorTx{}),
 			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
-			c.RegisterType(&UnsignedAddDelegatorTx{}),
+			c.RegisterType(VerifiableUnsignedAddDelegatorTx{}),
 
 			c.RegisterType(VerifiableUnsignedCreateChainTx{}),
 			c.RegisterType(VerifiableUnsignedCreateSubnetTx{}),

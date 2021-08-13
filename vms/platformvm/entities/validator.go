@@ -1,9 +1,10 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package entities
 
 import (
+	"container/heap"
 	"errors"
 	"time"
 
@@ -11,7 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-var errBadSubnetID = errors.New("subnet ID can't be primary network ID")
+var (
+	ErrWeightTooSmall = errors.New("weight of this validator is too low")
+	errBadSubnetID    = errors.New("subnet ID can't be primary network ID")
+)
 
 // Validator is a validator.
 type Validator struct {
@@ -47,7 +51,7 @@ func (v *Validator) Weight() uint64 { return v.Wght }
 func (v *Validator) Verify() error {
 	switch {
 	case v.Wght == 0: // Ensure the validator has some weight
-		return errWeightTooSmall
+		return ErrWeightTooSmall
 	default:
 		return nil
 	}
@@ -79,4 +83,20 @@ func (v *SubnetValidator) Verify() error {
 	default:
 		return v.Validator.Verify()
 	}
+}
+
+type ValidatorHeap []*Validator
+
+func (h *ValidatorHeap) Len() int                 { return len(*h) }
+func (h *ValidatorHeap) Less(i, j int) bool       { return (*h)[i].EndTime().Before((*h)[j].EndTime()) }
+func (h *ValidatorHeap) Swap(i, j int)            { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
+func (h *ValidatorHeap) Add(validator *Validator) { heap.Push(h, validator) }
+func (h *ValidatorHeap) Peek() *Validator         { return (*h)[0] }
+func (h *ValidatorHeap) Remove() *Validator       { return heap.Pop(h).(*Validator) }
+func (h *ValidatorHeap) Push(x interface{})       { *h = append(*h, x.(*Validator)) }
+func (h *ValidatorHeap) Pop() interface{} {
+	newLen := len(*h) - 1
+	val := (*h)[newLen]
+	*h = (*h)[:newLen]
+	return val
 }

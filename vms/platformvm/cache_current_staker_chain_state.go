@@ -152,10 +152,10 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 
 		for _, vdr := range addDelegatorTxs {
 			switch tx := vdr.addStakerTx.UnsignedTx.(type) {
-			case *UnsignedAddDelegatorTx:
+			case VerifiableUnsignedAddDelegatorTx:
 				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 				newVdr := *oldVdr
-				newVdr.delegators = make([]*UnsignedAddDelegatorTx, len(oldVdr.delegators)+1)
+				newVdr.delegators = make([]VerifiableUnsignedAddDelegatorTx, len(oldVdr.delegators)+1)
 				copy(newVdr.delegators, oldVdr.delegators)
 				newVdr.delegators[len(oldVdr.delegators)] = tx
 				sortDelegatorsByRemoval(newVdr.delegators)
@@ -237,7 +237,7 @@ func (cs *currentStakerChainStateImpl) DeleteNextStaker() (currentStakerChainSta
 				newCS.validatorsByNodeID[nodeID] = vdr
 			}
 		}
-	case *UnsignedAddDelegatorTx:
+	case VerifiableUnsignedAddDelegatorTx:
 		for nodeID, vdr := range cs.validatorsByNodeID {
 			if nodeID != tx.Validator.NodeID {
 				newCS.validatorsByNodeID[nodeID] = vdr
@@ -339,7 +339,7 @@ func (cs *currentStakerChainStateImpl) GetStaker(txID ids.ID) (tx *transactions.
 func (cs *currentStakerChainStateImpl) setNextStaker() {
 	for _, tx := range cs.validators {
 		switch tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
+		case *UnsignedAddValidatorTx, VerifiableUnsignedAddDelegatorTx:
 			cs.nextStaker = cs.validatorsByTxID[tx.ID()]
 			return
 		}
@@ -360,7 +360,7 @@ func (s innerSortValidatorsByRemoval) Less(i, j int) bool {
 	case *UnsignedAddValidatorTx:
 		iEndTime = tx.EndTime()
 		iPriority = lowPriority
-	case *UnsignedAddDelegatorTx:
+	case VerifiableUnsignedAddDelegatorTx:
 		iEndTime = tx.EndTime()
 		iPriority = mediumPriority
 	case *UnsignedAddSubnetValidatorTx:
@@ -378,7 +378,7 @@ func (s innerSortValidatorsByRemoval) Less(i, j int) bool {
 	case *UnsignedAddValidatorTx:
 		jEndTime = tx.EndTime()
 		jPriority = lowPriority
-	case *UnsignedAddDelegatorTx:
+	case VerifiableUnsignedAddDelegatorTx:
 		jEndTime = tx.EndTime()
 		jPriority = mediumPriority
 	case *UnsignedAddSubnetValidatorTx:
@@ -424,7 +424,7 @@ func sortValidatorsByRemoval(s []*transactions.SignedTx) {
 	sort.Sort(innerSortValidatorsByRemoval(s))
 }
 
-type innerSortDelegatorsByRemoval []*UnsignedAddDelegatorTx
+type innerSortDelegatorsByRemoval []VerifiableUnsignedAddDelegatorTx
 
 func (s innerSortDelegatorsByRemoval) Less(i, j int) bool {
 	iDel := s[i]
@@ -453,6 +453,6 @@ func (s innerSortDelegatorsByRemoval) Swap(i, j int) {
 	s[j], s[i] = s[i], s[j]
 }
 
-func sortDelegatorsByRemoval(s []*UnsignedAddDelegatorTx) {
+func sortDelegatorsByRemoval(s []VerifiableUnsignedAddDelegatorTx) {
 	sort.Sort(innerSortDelegatorsByRemoval(s))
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -24,10 +25,7 @@ import (
 )
 
 var (
-	errWeightTooSmall            = errors.New("weight of this validator is too low")
 	errWeightTooLarge            = errors.New("weight of this validator is too large")
-	errStakeTooShort             = errors.New("staking period is too short")
-	errStakeTooLong              = errors.New("staking period is too long")
 	errInsufficientDelegationFee = errors.New("staker charges an insufficient delegation fee")
 	errTooManyShares             = fmt.Errorf("a staker can only require at most %d shares from delegators", PercentDenominator)
 
@@ -40,7 +38,7 @@ type UnsignedAddValidatorTx struct {
 	// Metadata, inputs and outputs
 	transactions.BaseTx `serialize:"true"`
 	// Describes the delegatee
-	Validator Validator `serialize:"true" json:"validator"`
+	Validator entities.Validator `serialize:"true" json:"validator"`
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
@@ -81,7 +79,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
+		return entities.ErrWeightTooSmall
 	case tx.Validator.Wght > maxStake: // Ensure validator isn't staking too much
 		return errWeightTooLarge
 	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
@@ -93,9 +91,9 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	duration := tx.Validator.Duration()
 	switch {
 	case duration < minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
+		return transactions.ErrStakeTooShort
 	case duration > maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
+		return transactions.ErrStakeTooLong
 	}
 
 	if err := tx.BaseTx.Verify(ctx, c); err != nil {
@@ -286,7 +284,7 @@ func (vm *VM) newAddValidatorTx(
 			Ins:          ins,
 			Outs:         unlockedOuts,
 		}},
-		Validator: Validator{
+		Validator: entities.Validator{
 			NodeID: nodeID,
 			Start:  startTime,
 			End:    endTime,

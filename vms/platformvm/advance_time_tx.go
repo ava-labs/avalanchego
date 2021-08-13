@@ -106,7 +106,7 @@ func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 pendingStakerLoop:
 	for _, tx := range pendingStakers.Stakers() {
 		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddDelegatorTx:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
@@ -181,7 +181,7 @@ currentStakerLoop:
 			}
 
 			numToRemoveFromCurrent++
-		case *UnsignedAddValidatorTx, *UnsignedAddDelegatorTx:
+		case *UnsignedAddValidatorTx, VerifiableUnsignedAddDelegatorTx:
 			// We shouldn't be removing any primary network validators here
 			break currentStakerLoop
 		default:

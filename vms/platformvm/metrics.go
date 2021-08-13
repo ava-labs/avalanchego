@@ -143,7 +143,7 @@ func (m *metrics) AcceptBlock(b snowman.Block) error {
 
 func (m *metrics) AcceptTx(tx *transactions.SignedTx) error {
 	switch tx.UnsignedTx.(type) {
-	case *UnsignedAddDelegatorTx:
+	case VerifiableUnsignedAddDelegatorTx:
 		m.numAddDelegatorTxs.Inc()
 	case *UnsignedAddSubnetValidatorTx:
 		m.numAddSubnetValidatorTxs.Inc()

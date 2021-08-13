@@ -28,7 +28,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	rewardAddress := nodeID
 
 	// Case : tx is nil
-	var unsignedTx *UnsignedAddDelegatorTx
+	var unsignedTx VerifiableUnsignedAddDelegatorTx
 	if err := unsignedTx.Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -52,10 +52,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).NetworkID++
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinDelegatorStake,
@@ -78,10 +78,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.Wght = vm.MinDelegatorStake - 1
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Validator.Wght = vm.MinDelegatorStake - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinDelegatorStake,
@@ -104,10 +104,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End-- // 1 shorter than minimum stake time
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Validator.End-- // 1 shorter than minimum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
+	if err = tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinDelegatorStake,
@@ -129,10 +129,10 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End++ // 1 longer than maximum stake time
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Validator.End++ // 1 longer than maximum stake time
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinDelegatorStake,
@@ -153,7 +153,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).Verify(
+	} else if err := tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.MinDelegatorStake,

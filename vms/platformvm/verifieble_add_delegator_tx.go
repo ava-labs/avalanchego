@@ -4,20 +4,17 @@
 package platformvm
 
 import (
-	"container/heap"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -28,96 +25,32 @@ var (
 	errInvalidState    = errors.New("generated output isn't valid state")
 	errOverDelegated   = errors.New("validator would be over delegated")
 
-	_ UnsignedProposalTx = &UnsignedAddDelegatorTx{}
-	_ TimedTx            = &UnsignedAddDelegatorTx{}
+	_ UnsignedProposalTx = VerifiableUnsignedAddDelegatorTx{}
+	_ TimedTx            = VerifiableUnsignedAddDelegatorTx{}
 )
 
-// UnsignedAddDelegatorTx is an unsigned addDelegatorTx
-type UnsignedAddDelegatorTx struct {
-	// Metadata, inputs and outputs
-	transactions.BaseTx `serialize:"true"`
-	// Describes the delegatee
-	Validator Validator `serialize:"true" json:"validator"`
-	// Where to send staked tokens when done validating
-	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
-	// Where to send staking rewards when done validating
-	RewardsOwner verify.Verifiable `serialize:"true" json:"rewardsOwner"`
+// VerifiableUnsignedCreateSubnetTx is an unsigned CreateChainTx
+type VerifiableUnsignedAddDelegatorTx struct {
+	*transactions.UnsignedAddDelegatorTx `serialize:"true"`
 }
 
 // StartTime of this validator
-func (tx *UnsignedAddDelegatorTx) StartTime() time.Time {
+func (tx VerifiableUnsignedAddDelegatorTx) StartTime() time.Time {
 	return tx.Validator.StartTime()
 }
 
 // EndTime of this validator
-func (tx *UnsignedAddDelegatorTx) EndTime() time.Time {
+func (tx VerifiableUnsignedAddDelegatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
 // Weight of this validator
-func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
+func (tx VerifiableUnsignedAddDelegatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// Verify return nil iff [tx] is valid
-func (tx *UnsignedAddDelegatorTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	minDelegatorStake uint64,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
-) error {
-	switch {
-	case tx == nil:
-		return transactions.ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
-		return nil
-	}
-
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case duration > maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
-	}
-
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
-		return err
-	}
-	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
-		return fmt.Errorf("failed to verify validator or rewards owner: %w", err)
-	}
-
-	totalStakeWeight := uint64(0)
-	for _, out := range tx.Stake {
-		if err := out.Verify(); err != nil {
-			return fmt.Errorf("output verification failed: %w", err)
-		}
-		newWeight, err := math.Add64(totalStakeWeight, out.Output().Amount())
-		if err != nil {
-			return err
-		}
-		totalStakeWeight = newWeight
-	}
-
-	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, c):
-		return transactions.ErrOutputsNotSorted
-	case totalStakeWeight != tx.Validator.Wght:
-		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
-	case tx.Validator.Wght < minDelegatorStake:
-		// Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-	}
-
-	// cache that this is valid
-	tx.SyntacticallyVerified = true
-	return nil
-}
-
 // Verify that this transaction is semantically valid.
-func (tx *UnsignedAddDelegatorTx) SemanticVerify(
+func (tx VerifiableUnsignedAddDelegatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
 	stx *transactions.SignedTx,
@@ -184,7 +117,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 		var (
 			vdrTx                  *UnsignedAddValidatorTx
 			currentDelegatorWeight uint64
-			currentDelegators      []*UnsignedAddDelegatorTx
+			currentDelegators      []VerifiableUnsignedAddDelegatorTx
 		)
 		if err == nil {
 			// This delegator is attempting to delegate to a currently validing
@@ -273,7 +206,7 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *UnsignedAddDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx VerifiableUnsignedAddDelegatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
@@ -292,24 +225,26 @@ func (vm *VM) newAddDelegatorTx(
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
 	// Create the tx
-	utx := &UnsignedAddDelegatorTx{
-		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         unlockedOuts,
-		}},
-		Validator: Validator{
-			NodeID: nodeID,
-			Start:  startTime,
-			End:    endTime,
-			Wght:   stakeAmt,
-		},
-		Stake: lockedOuts,
-		RewardsOwner: &secp256k1fx.OutputOwners{
-			Locktime:  0,
-			Threshold: 1,
-			Addrs:     []ids.ShortID{rewardAddress},
+	utx := VerifiableUnsignedAddDelegatorTx{
+		UnsignedAddDelegatorTx: &transactions.UnsignedAddDelegatorTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+				Ins:          ins,
+				Outs:         unlockedOuts,
+			}},
+			Validator: entities.Validator{
+				NodeID: nodeID,
+				Start:  startTime,
+				End:    endTime,
+				Wght:   stakeAmt,
+			},
+			Stake: lockedOuts,
+			RewardsOwner: &secp256k1fx.OutputOwners{
+				Locktime:  0,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{rewardAddress},
+			},
 		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
@@ -333,8 +268,8 @@ func (vm *VM) newAddDelegatorTx(
 // [maximumStake]. It is assumed that [pending]
 func CanDelegate(
 	current,
-	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
-	new *UnsignedAddDelegatorTx,
+	pending []VerifiableUnsignedAddDelegatorTx, // sorted by next start time first
+	new VerifiableUnsignedAddDelegatorTx,
 	currentStake,
 	maximumStake uint64,
 ) (bool, error) {
@@ -351,14 +286,14 @@ func CanDelegate(
 
 func MaxStakeAmount(
 	current,
-	pending []*UnsignedAddDelegatorTx, // sorted by next start time first
+	pending []VerifiableUnsignedAddDelegatorTx, // sorted by next start time first
 	startTime time.Time,
 	endTime time.Time,
 	currentStake uint64,
 ) (uint64, error) {
 	// Keep track of which delegators should be removed next so that we can
 	// efficiently remove delegators and keep the current stake updated.
-	toRemoveHeap := validatorHeap{}
+	toRemoveHeap := entities.ValidatorHeap{}
 	for _, currentDelegator := range current {
 		toRemoveHeap.Add(&currentDelegator.Validator)
 	}
@@ -555,20 +490,4 @@ func (vm *VM) maxPrimarySubnetStakeAmount(
 	default:
 		return 0, err
 	}
-}
-
-type validatorHeap []*Validator
-
-func (h *validatorHeap) Len() int                 { return len(*h) }
-func (h *validatorHeap) Less(i, j int) bool       { return (*h)[i].EndTime().Before((*h)[j].EndTime()) }
-func (h *validatorHeap) Swap(i, j int)            { (*h)[i], (*h)[j] = (*h)[j], (*h)[i] }
-func (h *validatorHeap) Add(validator *Validator) { heap.Push(h, validator) }
-func (h *validatorHeap) Peek() *Validator         { return (*h)[0] }
-func (h *validatorHeap) Remove() *Validator       { return heap.Pop(h).(*Validator) }
-func (h *validatorHeap) Push(x interface{})       { *h = append(*h, x.(*Validator)) }
-func (h *validatorHeap) Pop() interface{} {
-	newLen := len(*h) - 1
-	val := (*h)[newLen]
-	*h = (*h)[:newLen]
-	return val
 }

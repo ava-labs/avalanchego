@@ -671,7 +671,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 			return err
 		}
 		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddDelegatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -837,7 +837,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 
 	for _, tx := range pendingValidators.Stakers() { // Iterates in order of increasing start time
 		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddDelegatorTx:
 			if args.SubnetID != constants.PrimaryNetworkID {
 				continue
 			}
@@ -2170,7 +2170,7 @@ type GetStakeReply struct {
 func (service *Service) getStakeHelper(tx *transactions.SignedTx, addrs ids.ShortSet) (uint64, []avax.TransferableOutput, error) {
 	var outs []*avax.TransferableOutput
 	switch staker := tx.UnsignedTx.(type) {
-	case *UnsignedAddDelegatorTx:
+	case VerifiableUnsignedAddDelegatorTx:
 		outs = staker.Stake
 	case *UnsignedAddValidatorTx:
 		outs = staker.Stake
