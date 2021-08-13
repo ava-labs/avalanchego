@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math"
 	"net"
@@ -863,7 +864,12 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 				p.trackedSubnets.Add(subnetID)
 			}
 		}
+	} else {
+		// this peer has old Version, we don't know what its interested in.
+		// so assume that it tracks all available subnets
+		p.trackedSubnets.Add(p.net.whitelistedSubnets.List()...)
 	}
+	fmt.Println(p.trackedSubnets)
 
 	if ip := p.getIP(); ip.IsZero() {
 		addr := p.conn.RemoteAddr()

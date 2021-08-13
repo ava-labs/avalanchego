@@ -73,8 +73,8 @@ func (p *peersData) size() int {
 	return len(p.peersList)
 }
 
-// Randomly sample [n] peers that have finished the handshake.
-// If < [n] peers have finished the handshake, returns < [n] peers.
+// Randomly sample [n] peers that have finished the handshake and tracks the subnetID.
+// If < [n] peers have finished the handshake and tracks the subnetID, returns < [n] peers.
 // If [n] > [p.size()], returns <= [p.size()] peers.
 // [n] must be >= 0.
 // [p] must not be modified while this method is executing.
