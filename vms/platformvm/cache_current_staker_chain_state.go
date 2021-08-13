@@ -169,10 +169,10 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 
 		for _, vdr := range addSubnetValidatorTxs {
 			switch tx := vdr.UnsignedTx.(type) {
-			case *UnsignedAddSubnetValidatorTx:
+			case VerifiableUnsignedAddSubnetValidatorTx:
 				oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 				newVdr := *oldVdr
-				newVdr.subnets = make(map[ids.ID]*UnsignedAddSubnetValidatorTx, len(oldVdr.subnets)+1)
+				newVdr.subnets = make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx, len(oldVdr.subnets)+1)
 				for subnetID, addTx := range oldVdr.subnets {
 					newVdr.subnets[subnetID] = addTx
 				}
@@ -196,10 +196,10 @@ func (cs *currentStakerChainStateImpl) UpdateStakers(
 		delete(newCS.validatorsByTxID, removedID)
 
 		switch tx := removed.UnsignedTx.(type) {
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			oldVdr := newCS.validatorsByNodeID[tx.Validator.NodeID]
 			newVdr := *oldVdr
-			newVdr.subnets = make(map[ids.ID]*UnsignedAddSubnetValidatorTx, len(oldVdr.subnets)-1)
+			newVdr.subnets = make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx, len(oldVdr.subnets)-1)
 			for subnetID, addTx := range oldVdr.subnets {
 				if removedID != addTx.ID() {
 					newVdr.subnets[subnetID] = addTx
@@ -363,7 +363,7 @@ func (s innerSortValidatorsByRemoval) Less(i, j int) bool {
 	case VerifiableUnsignedAddDelegatorTx:
 		iEndTime = tx.EndTime()
 		iPriority = mediumPriority
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		iEndTime = tx.EndTime()
 		iPriority = topPriority
 	default:
@@ -381,7 +381,7 @@ func (s innerSortValidatorsByRemoval) Less(i, j int) bool {
 	case VerifiableUnsignedAddDelegatorTx:
 		jEndTime = tx.EndTime()
 		jPriority = mediumPriority
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		jEndTime = tx.EndTime()
 		jPriority = topPriority
 	default:

@@ -148,7 +148,7 @@ pendingStakerLoop:
 				potentialReward: r,
 			})
 			numToRemoveFromPending++
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			if staker.StartTime().After(timestamp) {
 				break pendingStakerLoop
 			}
@@ -175,7 +175,7 @@ pendingStakerLoop:
 currentStakerLoop:
 	for _, tx := range currentStakers.Stakers() {
 		switch staker := tx.UnsignedTx.(type) {
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			if staker.EndTime().After(timestamp) {
 				break currentStakerLoop
 			}

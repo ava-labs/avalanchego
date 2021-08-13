@@ -399,7 +399,7 @@ func (vm *VM) maxSubnetStakeAmount(
 	endTime time.Time,
 ) (uint64, error) {
 	var (
-		vdrTx  *UnsignedAddSubnetValidatorTx
+		vdrTx  VerifiableUnsignedAddSubnetValidatorTx
 		exists bool
 	)
 
@@ -420,7 +420,7 @@ func (vm *VM) maxSubnetStakeAmount(
 		return 0, err
 	}
 
-	if vdrTx == nil {
+	if vdrTx.UnsignedAddSubnetValidatorTx == nil {
 		return 0, nil
 	}
 	if vdrTx.StartTime().After(endTime) {

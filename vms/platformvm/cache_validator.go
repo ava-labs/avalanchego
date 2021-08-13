@@ -11,20 +11,20 @@ var _ validator = &validatorImpl{}
 
 type validator interface {
 	Delegators() []VerifiableUnsignedAddDelegatorTx
-	SubnetValidators() map[ids.ID]*UnsignedAddSubnetValidatorTx
+	SubnetValidators() map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx
 }
 
 type validatorImpl struct {
 	// sorted in order of next operation, either addition or removal.
 	delegators []VerifiableUnsignedAddDelegatorTx
 	// maps subnetID to tx
-	subnets map[ids.ID]*UnsignedAddSubnetValidatorTx
+	subnets map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx
 }
 
 func (v *validatorImpl) Delegators() []VerifiableUnsignedAddDelegatorTx {
 	return v.delegators
 }
 
-func (v *validatorImpl) SubnetValidators() map[ids.ID]*UnsignedAddSubnetValidatorTx {
+func (v *validatorImpl) SubnetValidators() map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx {
 	return v.subnets
 }

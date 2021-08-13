@@ -106,7 +106,7 @@ func init() {
 			c.RegisterType(&secp256k1fx.OutputOwners{}),
 
 			c.RegisterType(VerifiableUnsignedAddValidatorTx{}),
-			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
+			c.RegisterType(VerifiableUnsignedAddSubnetValidatorTx{}),
 			c.RegisterType(VerifiableUnsignedAddDelegatorTx{}),
 
 			c.RegisterType(VerifiableUnsignedCreateChainTx{}),

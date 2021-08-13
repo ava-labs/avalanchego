@@ -805,7 +805,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			if err := database.PutUInt64(st.currentDelegatorList, txID[:], potentialReward); err != nil {
 				return err
 			}
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			if err := st.currentSubnetValidatorList.Put(txID[:], nil); err != nil {
 				return err
 			}
@@ -824,7 +824,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			delete(st.updatedUptimes, tx.Validator.NodeID)
 		case VerifiableUnsignedAddDelegatorTx:
 			db = st.currentDelegatorList
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			db = st.currentSubnetValidatorList
 		default:
 			return errWrongTxType
@@ -847,7 +847,7 @@ func (st *internalStateImpl) writePendingStakers() error {
 			db = st.pendingValidatorList
 		case VerifiableUnsignedAddDelegatorTx:
 			db = st.pendingDelegatorList
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			db = st.pendingSubnetValidatorList
 		default:
 			return errWrongTxType
@@ -867,7 +867,7 @@ func (st *internalStateImpl) writePendingStakers() error {
 			db = st.pendingValidatorList
 		case VerifiableUnsignedAddDelegatorTx:
 			db = st.pendingDelegatorList
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			db = st.pendingSubnetValidatorList
 		default:
 			return errWrongTxType
@@ -1108,7 +1108,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		cs.validators = append(cs.validators, tx)
 		cs.validatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
 			validatorImpl: validatorImpl{
-				subnets: make(map[ids.ID]*UnsignedAddSubnetValidatorTx),
+				subnets: make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx),
 			},
 			addValidatorTx:  addValidatorTx,
 			potentialReward: uptime.PotentialReward,
@@ -1178,7 +1178,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			return err
 		}
 
-		addSubnetValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
+		addSubnetValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1262,7 +1262,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 		} else {
 			ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID] = &validatorImpl{
 				delegators: []VerifiableUnsignedAddDelegatorTx{addDelegatorTx},
-				subnets:    make(map[ids.ID]*UnsignedAddSubnetValidatorTx),
+				subnets:    make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx),
 			}
 		}
 	}
@@ -1283,7 +1283,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			return err
 		}
 
-		addSubnetValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
+		addSubnetValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1293,7 +1293,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = addSubnetValidatorTx
 		} else {
 			ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+				subnets: map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx{
 					addSubnetValidatorTx.Validator.Subnet: addSubnetValidatorTx,
 				},
 			}

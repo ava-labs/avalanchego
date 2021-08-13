@@ -761,7 +761,7 @@ func (service *Service) GetCurrentValidators(_ *http.Request, args *GetCurrentVa
 				RewardOwner:     rewardOwner,
 				DelegationFee:   delegationFee,
 			})
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			if args.SubnetID != staker.Validator.Subnet {
 				continue
 			}
@@ -877,7 +877,7 @@ func (service *Service) GetPendingValidators(_ *http.Request, args *GetPendingVa
 				DelegationFee: delegationFee,
 				Connected:     &connected,
 			})
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			if args.SubnetID != staker.Validator.Subnet {
 				continue
 			}
@@ -2174,10 +2174,10 @@ func (service *Service) getStakeHelper(tx *transactions.SignedTx, addrs ids.Shor
 		outs = staker.Stake
 	case VerifiableUnsignedAddValidatorTx:
 		outs = staker.Stake
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		return 0, nil, nil
 	default:
-		err := fmt.Errorf("expected *UnsignedAddDelegatorTx, VerifiableUnsignedAddValidatorTx or *UnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
+		err := fmt.Errorf("expected VerifiableUnsignedAddDelegatorTx, VerifiableUnsignedAddValidatorTx or VerifiableUnsignedAddSubnetValidatorTx but got %T", tx.UnsignedTx)
 		service.vm.ctx.Log.Error("invalid tx type provided from validator set %s", err)
 		return 0, nil, err
 	}

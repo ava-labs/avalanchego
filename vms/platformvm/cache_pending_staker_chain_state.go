@@ -108,7 +108,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *transactions.Signe
 				},
 			}
 		}
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		newPS.validatorsByNodeID = ps.validatorsByNodeID
 
 		newPS.validatorExtrasByNodeID = make(map[ids.ShortID]*validatorImpl, len(ps.validatorExtrasByNodeID)+1)
@@ -118,7 +118,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *transactions.Signe
 			}
 		}
 		if vdr, exists := ps.validatorExtrasByNodeID[tx.Validator.NodeID]; exists {
-			newSubnets := make(map[ids.ID]*UnsignedAddSubnetValidatorTx, len(vdr.subnets)+1)
+			newSubnets := make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx, len(vdr.subnets)+1)
 			for subnet, subnetTx := range vdr.subnets {
 				newSubnets[subnet] = subnetTx
 			}
@@ -130,7 +130,7 @@ func (ps *pendingStakerChainStateImpl) AddStaker(addStakerTx *transactions.Signe
 			}
 		} else {
 			newPS.validatorExtrasByNodeID[tx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+				subnets: map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx{
 					tx.Validator.Subnet: tx,
 				},
 			}
@@ -172,13 +172,13 @@ func (ps *pendingStakerChainStateImpl) DeleteStakers(numToRemove int) pendingSta
 				delegators: vdr.delegators[1:], // sorted in order of removal
 				subnets:    vdr.subnets,
 			}
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			vdr := newPS.validatorExtrasByNodeID[tx.Validator.NodeID]
 			if len(vdr.delegators) == 0 && len(vdr.subnets) == 1 {
 				delete(newPS.validatorExtrasByNodeID, tx.Validator.NodeID)
 				break
 			}
-			newSubnets := make(map[ids.ID]*UnsignedAddSubnetValidatorTx, len(vdr.subnets)-1)
+			newSubnets := make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx, len(vdr.subnets)-1)
 			for subnetID, subnetTx := range vdr.subnets {
 				if subnetID != tx.Validator.Subnet {
 					newSubnets[subnetID] = subnetTx
@@ -231,7 +231,7 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 	case VerifiableUnsignedAddDelegatorTx:
 		iStartTime = tx.StartTime()
 		iPriority = topPriority
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		iStartTime = tx.StartTime()
 		iPriority = lowPriority
 	default:
@@ -249,7 +249,7 @@ func (s innerSortValidatorsByAddition) Less(i, j int) bool {
 	case VerifiableUnsignedAddDelegatorTx:
 		jStartTime = tx.StartTime()
 		jPriority = topPriority
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		jStartTime = tx.StartTime()
 		jPriority = lowPriority
 	default:

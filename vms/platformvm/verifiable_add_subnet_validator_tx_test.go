@@ -28,7 +28,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	nodeID := keys[0].PublicKey().Address()
 
 	// Case: tx is nil
-	var unsignedTx *UnsignedAddSubnetValidatorTx
+	var unsignedTx VerifiableUnsignedAddSubnetValidatorTx
 	if err := unsignedTx.Verify(
 		vm.ctx,
 		platformcodec.Codec,
@@ -53,10 +53,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).NetworkID++
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,
@@ -80,10 +80,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Subnet = ids.ID{}
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Validator.Subnet = ids.ID{}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,
@@ -107,10 +107,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.Wght = 0
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Validator.Wght = 0
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,
@@ -134,11 +134,11 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
-		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[0] =
+		tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1]
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
-	if err = tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
+	if err = tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,
@@ -162,10 +162,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End-- // 1 less than min duration
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Validator.End-- // 1 less than min duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,
@@ -189,10 +189,10 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End++ // 1 more than max duration
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Validator.End++ // 1 more than max duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,
@@ -214,7 +214,7 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	} else if err := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,
@@ -478,10 +478,10 @@ func TestAddSubnetValidatorTxSemanticVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Remove a signature
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
-		tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices =
+		tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input).SigIndices[1:]
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
+	tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).SyntacticallyVerified = false
 	if _, _, _, _, err = tx.UnsignedTx.(UnsignedProposalTx).SemanticVerify(vm, vm.internalState, tx); err == nil {
 		t.Fatal("should have failed verification because not enough control sigs")
 	}
@@ -577,7 +577,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Verify(
+	if err := unmarshaledTx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx).Verify(
 		vm.ctx,
 		platformcodec.Codec,
 		vm.TxFee,

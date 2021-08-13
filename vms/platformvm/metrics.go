@@ -145,7 +145,7 @@ func (m *metrics) AcceptTx(tx *transactions.SignedTx) error {
 	switch tx.UnsignedTx.(type) {
 	case VerifiableUnsignedAddDelegatorTx:
 		m.numAddDelegatorTxs.Inc()
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		m.numAddSubnetValidatorTxs.Inc()
 	case VerifiableUnsignedAddValidatorTx:
 		m.numAddValidatorTxs.Inc()

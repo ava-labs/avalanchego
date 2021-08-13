@@ -8,14 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
@@ -24,73 +21,31 @@ import (
 var (
 	errDSValidatorSubset = errors.New("all subnets' staking period must be a subset of the primary network")
 
-	_ UnsignedProposalTx = &UnsignedAddSubnetValidatorTx{}
-	_ TimedTx            = &UnsignedAddSubnetValidatorTx{}
+	_ UnsignedProposalTx = VerifiableUnsignedAddSubnetValidatorTx{}
+	_ TimedTx            = VerifiableUnsignedAddSubnetValidatorTx{}
 )
 
-// UnsignedAddSubnetValidatorTx is an unsigned addSubnetValidatorTx
-type UnsignedAddSubnetValidatorTx struct {
-	// Metadata, inputs and outputs
-	transactions.BaseTx `serialize:"true"`
-	// The validator
-	Validator entities.SubnetValidator `serialize:"true" json:"validator"`
-	// Auth that will be allowing this validator into the network
-	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
+type VerifiableUnsignedAddSubnetValidatorTx struct {
+	*transactions.UnsignedAddSubnetValidatorTx `serialize:"true"`
 }
 
 // StartTime of this validator
-func (tx *UnsignedAddSubnetValidatorTx) StartTime() time.Time {
+func (tx VerifiableUnsignedAddSubnetValidatorTx) StartTime() time.Time {
 	return tx.Validator.StartTime()
 }
 
 // EndTime of this validator
-func (tx *UnsignedAddSubnetValidatorTx) EndTime() time.Time {
+func (tx VerifiableUnsignedAddSubnetValidatorTx) EndTime() time.Time {
 	return tx.Validator.EndTime()
 }
 
 // Weight of this validator
-func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
+func (tx VerifiableUnsignedAddSubnetValidatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// Verify return nil iff [tx] is valid
-func (tx *UnsignedAddSubnetValidatorTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
-) error {
-	switch {
-	case tx == nil:
-		return transactions.ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
-		return nil
-	}
-
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < minStakeDuration: // Ensure staking length is not too short
-		return transactions.ErrStakeTooShort
-	case duration > maxStakeDuration: // Ensure staking length is not too long
-		return transactions.ErrStakeTooLong
-	}
-
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
-		return err
-	}
-	if err := verify.All(&tx.Validator, tx.SubnetAuth); err != nil {
-		return err
-	}
-
-	// cache that this is valid
-	tx.SyntacticallyVerified = true
-	return nil
-}
-
 // Verify that this transaction is semantically valid.
-func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
+func (tx VerifiableUnsignedAddSubnetValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
 	stx *transactions.SignedTx,
@@ -264,7 +219,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 
 // InitiallyPrefersCommit returns true if the proposed validators start time is
 // after the current wall clock time,
-func (tx *UnsignedAddSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
+func (tx VerifiableUnsignedAddSubnetValidatorTx) InitiallyPrefersCommit(vm *VM) bool {
 	return tx.StartTime().After(vm.clock.Time())
 }
 
@@ -290,24 +245,27 @@ func (vm *VM) newAddSubnetValidatorTx(
 	signers = append(signers, subnetSigners)
 
 	// Create the tx
-	utx := &UnsignedAddSubnetValidatorTx{
-		BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-			NetworkID:    vm.ctx.NetworkID,
-			BlockchainID: vm.ctx.ChainID,
-			Ins:          ins,
-			Outs:         outs,
-		}},
-		Validator: entities.SubnetValidator{
-			Validator: entities.Validator{
-				NodeID: nodeID,
-				Start:  startTime,
-				End:    endTime,
-				Wght:   weight,
+	utx := VerifiableUnsignedAddSubnetValidatorTx{
+		UnsignedAddSubnetValidatorTx: &transactions.UnsignedAddSubnetValidatorTx{
+			BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    vm.ctx.NetworkID,
+				BlockchainID: vm.ctx.ChainID,
+				Ins:          ins,
+				Outs:         outs,
+			}},
+			Validator: entities.SubnetValidator{
+				Validator: entities.Validator{
+					NodeID: nodeID,
+					Start:  startTime,
+					End:    endTime,
+					Wght:   weight,
+				},
+				Subnet: subnetID,
 			},
-			Subnet: subnetID,
+			SubnetAuth: subnetAuth,
 		},
-		SubnetAuth: subnetAuth,
 	}
+
 	tx := &transactions.SignedTx{UnsignedTx: utx}
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
