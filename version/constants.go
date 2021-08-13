@@ -45,8 +45,10 @@ var (
 	}
 	ApricotPhase2DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
-	ApricotPhase3Times       = map[uint32]time.Time{}
-	ApricotPhase3DefaultTime = time.Date(2022, time.December, 5, 5, 0, 0, 0, time.UTC)
+	ApricotPhase3Times = map[uint32]time.Time{
+		constants.FujiID: time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
+	}
+	ApricotPhase3DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 )
 
 func init() {
