@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/version"
+	sts "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -232,9 +233,9 @@ func TestRewardDelegatorTxSemanticVerifyOnCommit(t *testing.T) {
 	assert.NoError(err)
 
 	vm.internalState.AddCurrentStaker(vdrTx, 0)
-	vm.internalState.AddTx(vdrTx, Committed)
+	vm.internalState.AddTx(vdrTx, sts.Committed)
 	vm.internalState.AddCurrentStaker(delTx, 1000000)
-	vm.internalState.AddTx(delTx, Committed)
+	vm.internalState.AddTx(delTx, sts.Committed)
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
@@ -327,9 +328,9 @@ func TestRewardDelegatorTxSemanticVerifyOnAbort(t *testing.T) {
 	assert.NoError(err)
 
 	vm.internalState.AddCurrentStaker(vdrTx, 0)
-	vm.internalState.AddTx(vdrTx, Committed)
+	vm.internalState.AddTx(vdrTx, sts.Committed)
 	vm.internalState.AddCurrentStaker(delTx, 1000000)
-	vm.internalState.AddTx(delTx, Committed)
+	vm.internalState.AddTx(delTx, sts.Committed)
 	vm.internalState.SetTimestamp(time.Unix(int64(delEndTime), 0))
 	err = vm.internalState.Commit()
 	assert.NoError(err)
@@ -488,7 +489,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Aborted {
+	if status != sts.Aborted {
 		t.Fatalf("status should be Aborted but is %s", status)
 	}
 
@@ -500,7 +501,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Committed {
+	if status != sts.Committed {
 		t.Fatalf("status should be Committed but is %s", status)
 	}
 
@@ -546,7 +547,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Committed {
+	if status != sts.Committed {
 		t.Fatalf("status should be Committed but is %s", status)
 	}
 
@@ -561,7 +562,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status != Aborted {
+	if status != sts.Aborted {
 		t.Fatalf("status should be Aborted but is %s", status)
 	}
 

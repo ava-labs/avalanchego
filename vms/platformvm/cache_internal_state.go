@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 
@@ -205,8 +206,8 @@ type internalStateImpl struct {
 }
 
 type stateTx struct {
-	Tx     []byte `serialize:"true"`
-	Status Status `serialize:"true"`
+	Tx     []byte        `serialize:"true"`
+	Status status.Status `serialize:"true"`
 }
 
 type stateBlk struct {
@@ -498,13 +499,13 @@ func (st *internalStateImpl) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	return chainDB
 }
 
-func (st *internalStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, Status, error) {
+func (st *internalStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, status.Status, error) {
 	if tx, exists := st.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
 	if txIntf, cached := st.txCache.Get(txID); cached {
 		if txIntf == nil {
-			return nil, Unknown, database.ErrNotFound
+			return nil, status.Unknown, database.ErrNotFound
 		}
 		tx := txIntf.(*txStatusImpl)
 		return tx.tx, tx.status, nil
@@ -512,22 +513,22 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, Status,
 	txBytes, err := st.txDB.Get(txID[:])
 	if err == database.ErrNotFound {
 		st.txCache.Put(txID, nil)
-		return nil, Unknown, database.ErrNotFound
+		return nil, status.Unknown, database.ErrNotFound
 	} else if err != nil {
-		return nil, Unknown, err
+		return nil, status.Unknown, err
 	}
 
 	stx := stateTx{}
 	if _, err := platformcodec.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
-		return nil, Unknown, err
+		return nil, status.Unknown, err
 	}
 
 	tx := transactions.SignedTx{}
 	if _, err := platformcodec.GenesisCodec.Unmarshal(stx.Tx, &tx); err != nil {
-		return nil, Unknown, err
+		return nil, status.Unknown, err
 	}
 	if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
-		return nil, Unknown, err
+		return nil, status.Unknown, err
 	}
 
 	ptx := &txStatusImpl{
@@ -539,7 +540,7 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, Status,
 	return ptx.tx, ptx.status, nil
 }
 
-func (st *internalStateImpl) AddTx(tx *transactions.SignedTx, status Status) {
+func (st *internalStateImpl) AddTx(tx *transactions.SignedTx, status status.Status) {
 	st.addedTxs[tx.ID()] = &txStatusImpl{
 		tx:     tx,
 		status: status,
@@ -1359,7 +1360,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 		}
 
 		st.AddCurrentStaker(vdrTx, r)
-		st.AddTx(vdrTx, Committed)
+		st.AddTx(vdrTx, status.Committed)
 		st.SetCurrentSupply(newCurrentSupply)
 	}
 
@@ -1376,7 +1377,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 		}
 
 		st.AddChain(chain)
-		st.AddTx(chain, Committed)
+		st.AddTx(chain, status.Committed)
 	}
 
 	// Create the genesis block and save it as being accepted (We don't just

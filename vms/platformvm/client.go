@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	sts "github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 type Client struct {
@@ -350,7 +351,7 @@ func (c *Client) CreateBlockchain(
 }
 
 // GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-func (c *Client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, error) {
+func (c *Client) GetBlockchainStatus(blockchainID string) (sts.BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest("getBlockchainStatus", &GetBlockchainStatusArgs{
 		BlockchainID: blockchainID,

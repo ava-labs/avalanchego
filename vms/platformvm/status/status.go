@@ -1,13 +1,13 @@
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package platformvm
+package status
 
 import (
 	"errors"
 )
 
-var errUnknownStatus = errors.New("unknown status")
+var ErrUnknown = errors.New("unknown status")
 
 type Status uint32
 
@@ -49,7 +49,7 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	case "\"Dropped\"":
 		*s = Dropped
 	default:
-		return errUnknownStatus
+		return ErrUnknown
 	}
 	return nil
 }
@@ -60,7 +60,7 @@ func (s Status) Valid() error {
 	case Unknown, Committed, Aborted, Processing, Dropped:
 		return nil
 	default:
-		return errUnknownStatus
+		return ErrUnknown
 	}
 }
 

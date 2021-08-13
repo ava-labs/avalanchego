@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	sts "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -1773,9 +1774,9 @@ type GetBlockchainStatusArgs struct {
 }
 
 // GetBlockchainStatusReply is the reply from calling GetBlockchainStatus
-// [Status] is the blockchain's status.
+// [Status] is the blockchain's status
 type GetBlockchainStatusReply struct {
-	Status BlockchainStatus `json:"status"`
+	Status sts.BlockchainStatus `json:"status"`
 }
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
@@ -1789,11 +1790,11 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 	// if its aliased then vm created this chain.
 	if aliasedID, err := service.vm.Chains.Lookup(args.BlockchainID); err == nil {
 		if service.nodeValidates(aliasedID) {
-			reply.Status = Validating
+			reply.Status = sts.Validating
 			return nil
 		}
 
-		reply.Status = Syncing
+		reply.Status = sts.Syncing
 		return nil
 	}
 
@@ -1812,7 +1813,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
 	if exists {
-		reply.Status = Created
+		reply.Status = sts.Created
 		return nil
 	}
 
@@ -1821,7 +1822,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 		return fmt.Errorf("problem looking up blockchain: %w", err)
 	}
 	if preferred {
-		reply.Status = Preferred
+		reply.Status = sts.Preferred
 	}
 	return nil
 }
@@ -2068,7 +2069,7 @@ type GetTxStatusArgs struct {
 	// If IncludeReason is false returns a response that looks like:
 	// {
 	// 	"jsonrpc": "2.0",
-	// 	"result": "Dropped",
+	// 	"result": "sts Dropped",
 	// 	"id": 1
 	// }
 	// If IncludeReason is true returns a response that looks like this:
@@ -2085,7 +2086,7 @@ type GetTxStatusArgs struct {
 }
 
 type GetTxStatusResponse struct {
-	Status Status `json:"status"`
+	Status sts.Status `json:"status"`
 	// Reason this tx was dropped.
 	// Only non-empty if Status is dropped
 	Reason string `json:"reason,omitempty"`
@@ -2120,7 +2121,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	_, _, err = onAccept.GetTx(args.TxID)
 	if err == nil {
 		// Found the status in the preferred block's db. Report tx is processing.
-		response.Status = Processing
+		response.Status = sts.Processing
 		return nil
 	}
 	if err != database.ErrNotFound {
@@ -2130,12 +2131,12 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	reason, ok := service.vm.droppedTxCache.Get(args.TxID)
 	if !ok {
 		// The tx isn't being tracked by the node.
-		response.Status = Unknown
+		response.Status = sts.Unknown
 		return nil
 	}
 
 	// The tx was recently dropped because it was invalid.
-	response.Status = Dropped
+	response.Status = sts.Dropped
 	if !args.IncludeReason {
 		return nil
 	}

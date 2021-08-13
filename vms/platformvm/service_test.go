@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -250,7 +251,7 @@ func TestGetTxStatus(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case resp.Status != Unknown:
+	case resp.Status != status.Unknown:
 		t.Fatalf("status should be unknown but is %s", resp.Status)
 	case resp.Reason != "":
 		t.Fatalf("reason should be empty but is %s", resp.Reason)
@@ -262,7 +263,7 @@ func TestGetTxStatus(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case resp.Status != Unknown:
+	case resp.Status != status.Unknown:
 		t.Fatalf("status should be unknown but is %s", resp.Status)
 	case resp.Reason != "":
 		t.Fatalf("reason should be empty but is %s", resp.Reason)
@@ -280,7 +281,7 @@ func TestGetTxStatus(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case resp.Status != Dropped:
+	case resp.Status != status.Dropped:
 		t.Fatalf("status should be Dropped but is %s", resp.Status)
 	case resp.Reason != "":
 		t.Fatal("reason should be empty when IncludeReason is false")
@@ -291,7 +292,7 @@ func TestGetTxStatus(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case resp.Status != Dropped:
+	case resp.Status != status.Dropped:
 		t.Fatalf("status should be Dropped but is %s", resp.Status)
 	case resp.Reason == "":
 		t.Fatalf("reason shouldn't be empty")
@@ -317,7 +318,7 @@ func TestGetTxStatus(t *testing.T) {
 	switch {
 	case err != nil:
 		t.Fatal(err)
-	case resp.Status != Committed:
+	case resp.Status != status.Committed:
 		t.Fatalf("status should be Committed but is %s", resp.Status)
 	case resp.Reason != "":
 		t.Fatalf("reason should be empty but is %s", resp.Reason)
@@ -554,7 +555,7 @@ func TestGetStake(t *testing.T) {
 	assert.NoError(err)
 
 	service.vm.internalState.AddCurrentStaker(tx, 0)
-	service.vm.internalState.AddTx(tx, Committed)
+	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	assert.NoError(err)
 	err = service.vm.internalState.(*internalStateImpl).loadCurrentValidators()
@@ -598,7 +599,7 @@ func TestGetStake(t *testing.T) {
 	assert.NoError(err)
 
 	service.vm.internalState.AddPendingStaker(tx)
-	service.vm.internalState.AddTx(tx, Committed)
+	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	assert.NoError(err)
 	err = service.vm.internalState.(*internalStateImpl).loadPendingValidators()
@@ -702,7 +703,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	}
 
 	service.vm.internalState.AddCurrentStaker(tx, 0)
-	service.vm.internalState.AddTx(tx, Committed)
+	service.vm.internalState.AddTx(tx, status.Committed)
 	err = service.vm.internalState.Commit()
 	if err != nil {
 		t.Fatal(err)

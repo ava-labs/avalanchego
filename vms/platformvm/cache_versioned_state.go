@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -50,8 +51,8 @@ type MutableState interface {
 	GetChains(subnetID ids.ID) ([]*transactions.SignedTx, error)
 	AddChain(createChainTx *transactions.SignedTx)
 
-	GetTx(txID ids.ID) (*transactions.SignedTx, Status, error)
-	AddTx(tx *transactions.SignedTx, status Status)
+	GetTx(txID ids.ID) (*transactions.SignedTx, status.Status, error)
+	AddTx(tx *transactions.SignedTx, status status.Status)
 
 	CurrentStakerChainState() currentStakerChainState
 	PendingStakerChainState() pendingStakerChainState
@@ -92,7 +93,7 @@ type versionedStateImpl struct {
 
 type txStatusImpl struct {
 	tx     *transactions.SignedTx
-	status Status
+	status status.Status
 }
 
 type utxoImpl struct {
@@ -212,7 +213,7 @@ func (vs *versionedStateImpl) AddChain(createChainTx *transactions.SignedTx) {
 	vs.cachedChains[tx.SubnetID] = append(cachedChains, createChainTx)
 }
 
-func (vs *versionedStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, Status, error) {
+func (vs *versionedStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, status.Status, error) {
 	tx, exists := vs.addedTxs[txID]
 	if !exists {
 		return vs.parentState.GetTx(txID)
@@ -220,7 +221,7 @@ func (vs *versionedStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, Status
 	return tx.tx, tx.status, nil
 }
 
-func (vs *versionedStateImpl) AddTx(tx *transactions.SignedTx, status Status) {
+func (vs *versionedStateImpl) AddTx(tx *transactions.SignedTx, status status.Status) {
 	txID := tx.ID()
 	txStatus := &txStatusImpl{
 		tx:     tx,

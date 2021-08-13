@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -196,7 +197,7 @@ func TestAddDelegatorTxSemanticVerify(t *testing.T) {
 		}
 
 		vm.internalState.AddCurrentStaker(tx, 0)
-		vm.internalState.AddTx(tx, Committed)
+		vm.internalState.AddTx(tx, status.Committed)
 		if err := vm.internalState.Commit(); err != nil {
 			t.Fatal(err)
 		}

@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	sts "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -652,8 +653,8 @@ func TestAddValidatorCommit(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status of tx should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status of tx should be sts.Committed but is %s", status)
 	}
 
 	pendingStakers := vm.internalState.PendingStakerChainState()
@@ -797,8 +798,8 @@ func TestAddValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	}
 
 	pendingStakers := vm.internalState.PendingStakerChainState()
@@ -918,14 +919,14 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // accept the proposal
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	pendingStakers := vm.internalState.PendingStakerChainState()
@@ -999,16 +1000,16 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := commit.onAccept().GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // reject the proposal
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	}
 
 	pendingStakers := vm.internalState.PendingStakerChainState()
@@ -1063,14 +1064,14 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	// Verify that chain's timestamp has advanced
@@ -1104,14 +1105,14 @@ func TestRewardValidatorAccept(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // reward the genesis validator
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	currentStakers := vm.internalState.CurrentStakerChainState()
@@ -1159,14 +1160,14 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
@@ -1190,16 +1191,16 @@ func TestRewardValidatorReject(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := commit.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	}
 
 	currentStakers := vm.internalState.CurrentStakerChainState()
@@ -1245,14 +1246,14 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // advance the timestamp
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	} else if timestamp := vm.internalState.GetTimestamp(); !timestamp.Equal(defaultValidateEndTime) {
 		t.Fatal("expected timestamp to have advanced")
 	}
@@ -1276,16 +1277,16 @@ func TestRewardValidatorPreferred(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := commit.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	} else if err := abort.Verify(); err != nil {
 		t.Fatal(err)
 	} else if err := abort.Accept(); err != nil { // do not reward the genesis validator
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	}
 
 	currentStakers := vm.internalState.CurrentStakerChainState()
@@ -1341,8 +1342,8 @@ func TestCreateChain(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	// Verify chain was created
@@ -1399,8 +1400,8 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(createSubnetTx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	subnets, err := vm.internalState.GetSubnets()
@@ -1464,14 +1465,14 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // add the validator to pending validator set
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	pendingStakers := vm.internalState.PendingStakerChainState()
@@ -1512,14 +1513,14 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // move validator addValidatorTx from pending to current
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	pendingStakers = vm.internalState.PendingStakerChainState()
@@ -1568,14 +1569,14 @@ func TestCreateSubnet(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := abort.onAccept().GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Aborted {
-		t.Fatalf("status should be Aborted but is %s", status)
+	} else if status != sts.Aborted {
+		t.Fatalf("status should be sts.Aborted but is %s", status)
 	} else if err := commit.Accept(); err != nil { // remove validator from current validator set
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(block.Tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 
 	pendingStakers = vm.internalState.PendingStakerChainState()
@@ -1680,8 +1681,8 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	} else if _, status, err := vm.internalState.GetTx(tx.ID()); err != nil {
 		t.Fatal(err)
-	} else if status != Committed {
-		t.Fatalf("status should be Committed but is %s", status)
+	} else if status != sts.Committed {
+		t.Fatalf("status should be sts.Committed but is %s", status)
 	}
 	inputID = utxoID.InputID()
 	if _, err := vm.ctx.SharedMemory.Get(vm.ctx.XChainID, [][]byte{inputID[:]}); err == nil {
@@ -1760,8 +1761,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if status != Committed {
-		t.Fatalf("Wrong status returned. Expected %s; Got %s", Committed, status)
+	if status != sts.Committed {
+		t.Fatalf("Wrong status returned. Expected %s; Got %s", sts.Committed, status)
 	}
 }
 

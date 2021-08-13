@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -101,7 +102,7 @@ func (sb *StandardBlock) Verify() error {
 			}
 			return err
 		}
-		sb.onAcceptState.AddTx(tx, Committed)
+		sb.onAcceptState.AddTx(tx, status.Committed)
 		if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
