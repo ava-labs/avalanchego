@@ -36,8 +36,8 @@ func init() {
 var errBadIP = errors.New("bad ip format")
 
 type IPDesc struct {
-	IP   net.IP
-	Port uint16
+	IP   net.IP `json:"ip"`
+	Port uint16 `json:"port"`
 }
 
 func (ipDesc IPDesc) Equal(otherIPDesc IPDesc) bool {

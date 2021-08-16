@@ -59,15 +59,15 @@ func (tq *timeoutQueue) Pop() interface{} {
 // AdaptiveTimeoutConfig contains the parameters provided to the
 // adaptive timeout manager.
 type AdaptiveTimeoutConfig struct {
-	InitialTimeout time.Duration
-	MinimumTimeout time.Duration
-	MaximumTimeout time.Duration
+	InitialTimeout time.Duration `json:"initialTimeout"`
+	MinimumTimeout time.Duration `json:"minimumTimeout"`
+	MaximumTimeout time.Duration `json:"maximumTimeout"`
 	// Timeout is [timeoutCoefficient] * average response time
 	// [timeoutCoefficient] must be > 1
-	TimeoutCoefficient float64
+	TimeoutCoefficient float64 `json:"timeoutCoefficient"`
 	// Larger halflife --> less volatile timeout
 	// [timeoutHalfLife] must be positive
-	TimeoutHalflife time.Duration
+	TimeoutHalflife time.Duration `json:"timeoutHalflife"`
 }
 
 // AdaptiveTimeoutManager is a manager for timeouts.

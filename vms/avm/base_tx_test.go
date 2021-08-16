@@ -1108,7 +1108,7 @@ func TestBaseTxSemanticVerifyPendingInvalidUTXO(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1203,7 +1203,7 @@ func TestBaseTxSemanticVerifyPendingWrongAssetID(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1343,7 +1343,7 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1487,7 +1487,7 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: genesisTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,

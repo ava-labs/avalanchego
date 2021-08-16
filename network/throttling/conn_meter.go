@@ -38,12 +38,12 @@ type InboundConnThrottlerConfig struct {
 	// since the last time Allow(ipStr) returned true or if
 	// Allow(ipStr) has never been called.
 	// If <= 0, inbound connections not rate-limited.
-	AllowCooldown time.Duration
+	AllowCooldown time.Duration `json:"allowCooldown"`
 	// Maximum number of inbound connections allowed within [AllowCooldown].
 	// (As implemented in inboundConnThrottler, may actually allow
 	// [MaxRecentConns+1] due to a race condition but that's fine.)
 	// If <= 0, inbound connections not rate-limited.
-	MaxRecentConns int
+	MaxRecentConns int `json:"maxRecentConns"`
 }
 
 // Returns an InboundConnThrottler that allows an inbound connection from a given IP
