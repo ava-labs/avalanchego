@@ -828,6 +828,26 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 		return
 	}
 
+	if isVersionWithSubnets {
+		subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
+		for _, subnetIDBytes := range subnetIDsBytes {
+			subnetID, err := ids.ToID(subnetIDBytes)
+			if err != nil {
+				p.net.log.Debug("tracked subnet of %s%s at %s could not be parsed: %s", constants.NodeIDPrefix, p.nodeID, err)
+				p.discardIP()
+				return
+			}
+			// add only if we also track this subnet
+			if p.net.whitelistedSubnets.Contains(subnetID) {
+				p.trackedSubnets.Add(subnetID)
+			}
+		}
+	} else {
+		// this peer has old Version, we don't know what its interested in.
+		// so assume that it tracks all available subnets
+		p.trackedSubnets.Add(p.net.whitelistedSubnets.List()...)
+	}
+
 	sig := msg.Get(message.SigBytes).([]byte)
 	signed := ipAndTimeBytes(peerIP, versionTime)
 	if err := p.cert.CheckSignature(p.cert.SignatureAlgorithm, signed, sig); err != nil {
@@ -849,25 +869,6 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 	p.net.stateLock.Unlock()
 
 	p.sigAndTime.SetValue(signedPeerIP)
-
-	if isVersionWithSubnets {
-		subnetIDsBytes := msg.Get(message.TrackedSubnets).([][]byte)
-		for _, subnetIDBytes := range subnetIDsBytes {
-			subnetID, err := ids.ToID(subnetIDBytes)
-			if err != nil {
-				p.net.log.Debug("peer %s%s sent wrong subnetID %w", constants.NodeIDPrefix, p.nodeID, err)
-				continue
-			}
-			// add only if we also track this subnet
-			if p.net.whitelistedSubnets.Contains(subnetID) {
-				p.trackedSubnets.Add(subnetID)
-			}
-		}
-	} else {
-		// this peer has old Version, we don't know what its interested in.
-		// so assume that it tracks all available subnets
-		p.trackedSubnets.Add(p.net.whitelistedSubnets.List()...)
-	}
 
 	if ip := p.getIP(); ip.IsZero() {
 		addr := p.conn.RemoteAddr()
