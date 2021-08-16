@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -156,4 +157,27 @@ func TestSetPop(t *testing.T) {
 
 	_, ok = s.Pop()
 	assert.False(t, ok)
+}
+
+func TestSetMarshalJSON(t *testing.T) {
+	assert := assert.New(t)
+	set := Set{}
+	{
+		asJSON, err := set.MarshalJSON()
+		assert.NoError(err)
+		assert.Equal("[]", string(asJSON))
+	}
+	id1, id2 := GenerateTestID(), GenerateTestID()
+	set.Add(id1)
+	{
+		asJSON, err := set.MarshalJSON()
+		assert.NoError(err)
+		assert.Equal(fmt.Sprintf("[\"%s\"]", id1), string(asJSON))
+	}
+	set.Add(id2)
+	{
+		asJSON, err := set.MarshalJSON()
+		assert.NoError(err)
+		assert.Equal(fmt.Sprintf("[\"%s\",\"%s\"]", id1, id2), string(asJSON))
+	}
 }

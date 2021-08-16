@@ -23,6 +23,10 @@ func (op *MintOperation) InitCtx(ctx *snow.Context) {
 	op.TransferOutput.OutputOwners.InitCtx(ctx)
 }
 
+func (op *MintOperation) Cost() (uint64, error) {
+	return op.MintInput.Cost()
+}
+
 func (op *MintOperation) Outs() []verify.State {
 	return []verify.State{&op.MintOutput, &op.TransferOutput}
 }

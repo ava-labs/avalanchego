@@ -55,10 +55,7 @@ func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
-	if err != nil {
-		t.Fatal(err)
-	}
+	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
 	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}

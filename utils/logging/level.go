@@ -1,12 +1,15 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package logging
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
+
+const alignedStringLen = 5
 
 type Level int
 
@@ -21,26 +24,39 @@ const (
 	Verbo
 )
 
+const (
+	fatalStr   = "FATAL"
+	errorStr   = "ERROR"
+	warnStr    = "WARN"
+	infoStr    = "INFO"
+	traceStr   = "TRACE"
+	debugStr   = "DEBUG"
+	verboStr   = "VERBO"
+	offStr     = "OFF"
+	unknownStr = "UNKNO"
+)
+
+// Inverse of Level.String()
 func ToLevel(l string) (Level, error) {
 	switch strings.ToUpper(l) {
-	case "OFF":
+	case offStr:
 		return Off, nil
-	case "FATAL":
+	case fatalStr:
 		return Fatal, nil
-	case "ERROR":
+	case errorStr:
 		return Error, nil
-	case "WARN":
+	case warnStr:
 		return Warn, nil
-	case "INFO":
+	case infoStr:
 		return Info, nil
-	case "TRACE":
+	case traceStr:
 		return Trace, nil
-	case "DEBUG":
+	case debugStr:
 		return Debug, nil
-	case "VERBO":
+	case verboStr:
 		return Verbo, nil
 	default:
-		return Info, fmt.Errorf("unknown log level: %s", l)
+		return Off, fmt.Errorf("unknown log level: %q", l)
 	}
 }
 
@@ -70,20 +86,54 @@ func (l Level) Color() Color {
 func (l Level) String() string {
 	switch l {
 	case Fatal:
-		return "FATAL"
+		return fatalStr
 	case Error:
-		return "ERROR"
+		return errorStr
 	case Warn:
-		return "WARN "
+		return warnStr
 	case Info:
-		return "INFO "
+		return infoStr
 	case Trace:
-		return "TRACE"
+		return traceStr
 	case Debug:
-		return "DEBUG"
+		return debugStr
 	case Verbo:
-		return "VERBO"
+		return verboStr
+	case Off:
+		return offStr
 	default:
-		return "?????"
+		// This should never happen
+		return unknownStr
 	}
+}
+
+// String representation of this level as it will appear
+// in log files and in logs displayed to screen.
+// The returned value has length [alignedStringLen].
+func (l Level) AlignedString() string {
+	s := l.String()
+	sLen := len(s)
+	switch {
+	case sLen < alignedStringLen:
+		// Pad with spaces on the right
+		return fmt.Sprintf("%s%s", s, strings.Repeat(" ", alignedStringLen-sLen))
+	case sLen == alignedStringLen:
+		return s
+	default:
+		return s[:alignedStringLen]
+	}
+}
+
+func (l Level) MarshalJSON() ([]byte, error) {
+	return json.Marshal(l.String())
+}
+
+func (l *Level) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return err
+	}
+	var err error
+	*l, err = ToLevel(str)
+	return err
 }

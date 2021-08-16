@@ -207,7 +207,7 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	if err != nil {
 		return nil, err
 	}
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
 	return &vmproto.InitializeResponse{
 		LastAcceptedID:       lastAccepted[:],
 		LastAcceptedParentID: parentID[:],
@@ -301,7 +301,7 @@ func (vm *VMServer) BuildBlock(_ context.Context, _ *vmproto.BuildBlockRequest) 
 		return nil, err
 	}
 	blkID := blk.ID()
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
 	return &vmproto.BuildBlockResponse{
 		Id:       blkID[:],
 		ParentID: parentID[:],
@@ -316,7 +316,7 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 		return nil, err
 	}
 	blkID := blk.ID()
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
 	return &vmproto.ParseBlockResponse{
 		Id:       blkID[:],
 		ParentID: parentID[:],
@@ -334,7 +334,7 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
 	return &vmproto.GetBlockResponse{
 		ParentID: parentID[:],
 		Bytes:    blk.Bytes(),

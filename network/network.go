@@ -159,7 +159,6 @@ type network struct {
 	inboundConnThrottler         throttling.InboundConnThrottler
 	c                            message.Codec
 	b                            message.Builder
-	isFetchOnly                  bool
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -237,14 +236,17 @@ type network struct {
 }
 
 type Config struct {
-	HealthConfig
-	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig
-	InboundThrottlerConfig     throttling.MsgThrottlerConfig
-	OutboundThrottlerConfig    throttling.MsgThrottlerConfig
-	timer.AdaptiveTimeoutConfig
-	DialerConfig dialer.Config
+	HealthConfig                `json:"healthConfig"`
+	timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
+	InboundConnThrottlerConfig  throttling.InboundConnThrottlerConfig `json:"inboundConnThrottlerConfig"`
+	InboundThrottlerConfig      throttling.MsgThrottlerConfig         `json:"inboundThrottlerConfig"`
+	OutboundThrottlerConfig     throttling.MsgThrottlerConfig         `json:"outboundThrottlerConfig"`
+	DialerConfig                dialer.Config                         `json:"dialerConfig"`
 	// [Registerer] is set in node's initMetricsAPI method
-	MetricsRegisterer prometheus.Registerer
+	MetricsRegisterer  prometheus.Registerer `json:"-"`
+	CompressionEnabled bool                  `json:"compressionEnabled"`
+	// Peer alias configuration
+	PeerAliasTimeout time.Duration `json:"peerAliasTimeout"`
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -273,7 +275,6 @@ func NewDefaultNetwork(
 	peerListSize int,
 	peerListGossipSize int,
 	peerListGossipFreq time.Duration,
-	isFetchOnly bool,
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
 	compressionEnabled bool,
@@ -317,7 +318,6 @@ func NewDefaultNetwork(
 		benchlistManager,
 		peerAliasTimeout,
 		tlsKey,
-		isFetchOnly,
 		compressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
@@ -362,7 +362,6 @@ func NewNetwork(
 	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
-	isFetchOnly bool,
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
@@ -413,7 +412,6 @@ func NewNetwork(
 		benchlistManager:             benchlistManager,
 		tlsKey:                       tlsKey,
 		latestPeerIP:                 make(map[ids.ShortID]signedPeerIP),
-		isFetchOnly:                  isFetchOnly,
 		byteSlicePool: sync.Pool{
 			New: func() interface{} {
 				return make([]byte, 0, defaultByteSliceCap)
@@ -1118,22 +1116,14 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
-	allPeers := n.getAllPeers()
-
-	if int(numToGossip) > len(allPeers) {
-		numToGossip = uint(len(allPeers))
-	}
-
-	s := sampler.NewUniform()
-	if err := s.Initialize(uint64(len(allPeers))); err != nil {
-		return err
-	}
-	indices, err := s.Sample(int(numToGossip))
+	n.stateLock.RLock()
+	peers, err := n.peers.sample(int(numToGossip))
+	n.stateLock.RUnlock()
 	if err != nil {
 		return err
 	}
-	for _, index := range indices {
-		peer := allPeers[int(index)]
+
+	for _, peer := range peers {
 		canHandleCompressed := peer.canHandleCompressed.GetValue()
 		var msg message.Message
 		if canHandleCompressed {
@@ -1141,7 +1131,8 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 		} else {
 			msg = msgWithoutIsCompressedFlag
 		}
-		if peer.Send(msg, false) {
+		sent := peer.Send(msg, false)
+		if sent {
 			n.put.numSent.Inc()
 			n.put.sentBytes.Add(float64(len(msg.Bytes())))
 			// assume that if [saved] == 0, [msg] wasn't compressed
