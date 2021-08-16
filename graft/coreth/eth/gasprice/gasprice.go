@@ -44,7 +44,7 @@ import (
 const sampleNumber = 3 // Number of transactions sampled in a block
 
 var (
-	DefaultMaxPrice    = big.NewInt(500 * params.GWei)
+	DefaultMaxPrice    = big.NewInt(10 * params.GWei)
 	DefaultIgnorePrice = big.NewInt(2 * params.Wei)
 )
 
@@ -110,7 +110,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   big.NewInt(0),
+		lastPrice:   new(big.Int).Set(maxPrice),
 		maxPrice:    maxPrice,
 		ignorePrice: ignorePrice,
 		checkBlocks: blocks,
