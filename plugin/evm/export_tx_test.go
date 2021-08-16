@@ -549,7 +549,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 			name: "unsorted outputs",
 			tx: func() *Tx {
 				validExportTx := *validExportTx
-				validExportTx.ExportedOutputs = []*avax.TransferableOutput{
+				exportOutputs := []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{ID: custom0AssetID},
 						Out: &secp256k1fx.TransferOutput{
@@ -571,6 +571,10 @@ func TestExportTxSemanticVerify(t *testing.T) {
 						},
 					},
 				}
+				// Sort the outputs and then swap the ordering to ensure that they are ordered incorrectly
+				avax.SortTransferableOutputs(exportOutputs, Codec)
+				exportOutputs[0], exportOutputs[1] = exportOutputs[1], exportOutputs[0]
+				validExportTx.ExportedOutputs = exportOutputs
 				return &Tx{UnsignedAtomicTx: &validExportTx}
 			}(),
 			signers: [][]*crypto.PrivateKeySECP256K1R{
@@ -709,6 +713,14 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				{key},
 				{key},
 			},
+			baseFee:   initialBaseFee,
+			rules:     apricotRulesPhase3,
+			shouldErr: true,
+		},
+		{
+			name:      "no signatures",
+			tx:        &Tx{UnsignedAtomicTx: validExportTx},
+			signers:   [][]*crypto.PrivateKeySECP256K1R{},
 			baseFee:   initialBaseFee,
 			rules:     apricotRulesPhase3,
 			shouldErr: true,
@@ -1370,13 +1382,7 @@ func TestNewExportTx(t *testing.T) {
 			parent = vm.LastAcceptedBlockInternal().(*Block)
 			exportAmount := uint64(5000000)
 
-			testKeys0Addr := GetEthAddress(testKeys[0])
-			exportId, err := ids.ToShortID(testKeys0Addr[:])
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			tx, err = vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, exportId, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+			tx, err = vm.newExportTx(vm.ctx.AVAXAssetID, exportAmount, vm.ctx.XChainID, testShortIDAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 			if err != nil {
 				t.Fatal(err)
 			}
