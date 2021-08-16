@@ -304,6 +304,7 @@ func (vm *VM) newExportTx(
 	ins = append(ins, avaxIns...)
 	signers = append(signers, avaxSigners...)
 
+	avax.SortTransferableOutputs(outs, vm.codec)
 	SortEVMInputsAndSigners(ins, signers)
 
 	// Create the transaction
