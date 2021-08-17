@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/interfaces"
 	"github.com/ava-labs/coreth/rpc"
-	"github.com/ava-labs/coreth/signer/core"
+	"github.com/ava-labs/coreth/signer/core/apitypes"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/event"
@@ -213,7 +213,7 @@ func (api *ExternalSigner) SignTx(account accounts.Account, tx *types.Transactio
 		t := common.NewMixedcaseAddress(*tx.To())
 		to = &t
 	}
-	args := &core.SendTxArgs{
+	args := &apitypes.SendTxArgs{
 		Data:  &data,
 		Nonce: hexutil.Uint64(tx.Nonce()),
 		Value: hexutil.Big(*tx.Value()),
@@ -221,11 +221,14 @@ func (api *ExternalSigner) SignTx(account accounts.Account, tx *types.Transactio
 		To:    to,
 		From:  common.NewMixedcaseAddress(account.Address),
 	}
-	if tx.GasFeeCap() != nil {
+	switch tx.Type() {
+	case types.LegacyTxType, types.AccessListTxType:
+		args.GasPrice = (*hexutil.Big)(tx.GasPrice())
+	case types.DynamicFeeTxType:
 		args.MaxFeePerGas = (*hexutil.Big)(tx.GasFeeCap())
 		args.MaxPriorityFeePerGas = (*hexutil.Big)(tx.GasTipCap())
-	} else {
-		args.GasPrice = (*hexutil.Big)(tx.GasPrice())
+	default:
+		return nil, fmt.Errorf("Unsupported tx type %d", tx.Type())
 	}
 	// We should request the default chain id that we're operating with
 	// (the chain we're executing on)
