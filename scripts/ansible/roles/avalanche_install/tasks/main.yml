@@ -11,6 +11,7 @@
     #  - Follow system policy (e.g. umask ), if the directories are created.
     # noqa 208
   loop:
+    - path: "{{ bindir }}"
     - path: "{{ sharedstatedir }}"
     - path: "{{ logdir }}"
 
