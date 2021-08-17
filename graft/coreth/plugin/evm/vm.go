@@ -72,6 +72,9 @@ var (
 	x2cRate       = big.NewInt(x2cRateInt64)
 	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
 
+	minBlockTime = 2 * time.Second
+	maxBlockTime = 3 * time.Second
+
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
@@ -81,8 +84,6 @@ var (
 )
 
 const (
-	minBlockTime = 2 * time.Second
-	maxBlockTime = 3 * time.Second
 	// Max time from current time allowed for blocks, before they're considered future blocks
 	// and fail verification
 	maxFutureBlockTime   = 10 * time.Second
