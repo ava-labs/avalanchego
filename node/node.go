@@ -154,17 +154,17 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingIP.Port))
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.IP.Port))
 	if err != nil {
 		return err
 	}
 
 	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
 	if err != nil {
-		n.Log.Info("this node's IP is set to: %q", n.Config.StakingIP.IP())
+		n.Log.Info("this node's IP is set to: %q", n.Config.IP.IP())
 	} else {
 		ipDesc = utils.IPDesc{
-			IP:   n.Config.StakingIP.IP().IP,
+			IP:   n.Config.IP.IP().IP,
 			Port: ipDesc.Port,
 		}
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
@@ -260,7 +260,7 @@ func (n *Node) initNetworking() error {
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
-		n.Config.StakingIP,
+		n.Config.IP,
 		n.Config.NetworkID,
 		versionManager,
 		version.NewDefaultApplicationParser(),
@@ -274,14 +274,14 @@ func (n *Node) initNetworking() error {
 		n.Config.NetworkConfig.InboundConnThrottlerConfig,
 		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
-		n.Config.PeerAliasTimeout,
+		n.Config.NetworkConfig.PeerAliasTimeout,
 		tlsKey,
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
-		n.Config.CompressionEnabled,
+		n.Config.NetworkConfig.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
 	)
@@ -372,7 +372,7 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peerIP := range n.Config.BootstrapIPs {
-		if !peerIP.Equal(n.Config.StakingIP.IP()) {
+		if !peerIP.Equal(n.Config.IP.IP()) {
 			n.Net.TrackIP(peerIP)
 		}
 	}
@@ -684,24 +684,27 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
-			Chains:             n.chainManager,
-			Validators:         vdrs,
-			StakingEnabled:     n.Config.EnableStaking,
-			WhitelistedSubnets: n.Config.WhitelistedSubnets,
-			CreationTxFee:      n.Config.CreationTxFee,
-			TxFee:              n.Config.TxFee,
-			UptimePercentage:   n.Config.UptimeRequirement,
-			MinValidatorStake:  n.Config.MinValidatorStake,
-			MaxValidatorStake:  n.Config.MaxValidatorStake,
-			MinDelegatorStake:  n.Config.MinDelegatorStake,
-			MinDelegationFee:   n.Config.MinDelegationFee,
-			MinStakeDuration:   n.Config.MinStakeDuration,
-			MaxStakeDuration:   n.Config.MaxStakeDuration,
-			StakeMintingPeriod: n.Config.StakeMintingPeriod,
+			Chains:                n.chainManager,
+			Validators:            vdrs,
+			StakingEnabled:        n.Config.EnableStaking,
+			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
+			TxFee:                 n.Config.TxFee,
+			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
+			UptimePercentage:      n.Config.UptimeRequirement,
+			MinValidatorStake:     n.Config.MinValidatorStake,
+			MaxValidatorStake:     n.Config.MaxValidatorStake,
+			MinDelegatorStake:     n.Config.MinDelegatorStake,
+			MinDelegationFee:      n.Config.MinDelegationFee,
+			MinStakeDuration:      n.Config.MinStakeDuration,
+			MaxStakeDuration:      n.Config.MaxStakeDuration,
+			StakeMintingPeriod:    n.Config.StakeMintingPeriod,
+			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
-			CreationFee: n.Config.CreationTxFee,
-			Fee:         n.Config.TxFee,
+			TxFee:            n.Config.TxFee,
+			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
@@ -876,8 +879,10 @@ func (n *Node) initInfoAPI() error {
 		n.chainManager,
 		n.vmManager,
 		n.Net,
-		n.Config.CreationTxFee,
 		n.Config.TxFee,
+		n.Config.CreateAssetTxFee,
+		n.Config.CreateSubnetTxFee,
+		n.Config.CreateBlockchainTxFee,
 	)
 	if err != nil {
 		return err

@@ -36,7 +36,7 @@ jobs:
     - name: Create zip
       run: |
         mv .\build\avalanchego .\build\avalanchego.exe
-        mv .\build\avalanchego\plugins\evm .\build\avalanchego\plugins\evm.exe
+        mv .\build\plugins\evm .\build\plugins\evm.exe
         Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
     - name: Configure AWS credentials
