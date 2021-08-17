@@ -156,8 +156,6 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 // the channel use to send messages to the engine, the vm, and atomic memory
 func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory) {
 	vm, ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
-	minBlockTime = time.Millisecond
-	maxBlockTime = time.Millisecond
 	if err := vm.Initialize(
 		ctx,
 		dbManager,
