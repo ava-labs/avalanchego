@@ -75,7 +75,7 @@
     mode: u=rwx,go=rx
     remote_src: true
   loop:
-    - src: "{{ repo_folder }}/build/plugins"
+    - src: "{{ avalanche_binaries_dir }}/plugins"
   loop_control:
     label: "{{ avalanche_daemon_lib_dir }}/{{ item.src | basename }}"
   notify:
