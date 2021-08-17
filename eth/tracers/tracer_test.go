@@ -85,6 +85,7 @@ func runTrace(tracer *Tracer, vmctx *vmContext, chaincfg *params.ChainConfig) (j
 	}
 	return tracer.GetResult()
 }
+
 func TestTracer(t *testing.T) {
 	execTracer := func(code string) ([]byte, string) {
 		t.Helper()
