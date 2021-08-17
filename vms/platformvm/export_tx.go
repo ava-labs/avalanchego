@@ -30,6 +30,8 @@ var (
 type UnsignedExportTx struct {
 	BaseTx `serialize:"true"`
 
+	vm *VM
+
 	// Which chain to send the funds to
 	DestinationChain ids.ID `serialize:"true" json:"destinationChain"`
 
@@ -46,6 +48,10 @@ func (tx *UnsignedExportTx) InitCtx(ctx *snow.Context) {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
+}
+
+func (tx *UnsignedExportTx) SetVM(vm *VM) {
+	tx.vm = vm
 }
 
 // InputUTXOs returns an empty set
@@ -176,6 +182,8 @@ func (tx *UnsignedExportTx) AtomicAccept(ctx *snow.Context, batch database.Batch
 	if err != nil {
 		return err
 	}
+	tx.vm.pubsub.Publish(tx.ID(), NewPubSubExportFilterer(tx))
+
 	return ctx.SharedMemory.Apply(map[ids.ID]*atomic.Requests{chainID: requests}, batch)
 }
 
@@ -204,6 +212,7 @@ func (vm *VM) newExportTx(
 			Ins:          ins,
 			Outs:         outs, // Non-exported outputs
 		}},
+		vm:               vm,
 		DestinationChain: chainID,
 		ExportedOutputs: []*avax.TransferableOutput{{ // Exported to X-Chain
 			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},

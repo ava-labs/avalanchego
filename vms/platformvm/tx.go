@@ -85,6 +85,8 @@ type UnsignedAtomicTx interface {
 
 	// Accept this transaction with the additionally provided state transitions.
 	AtomicAccept(ctx *snow.Context, batch database.Batch) error
+
+	SetVM(vm *VM)
 }
 
 // Tx is a signed transaction
@@ -94,6 +96,12 @@ type Tx struct {
 
 	// The credentials of this transaction
 	Creds []verify.Verifiable `serialize:"true" json:"credentials"`
+
+	vm *VM
+}
+
+func (tx *Tx) SetVM(vm *VM) {
+	tx.vm = vm
 }
 
 // Sign this transaction with the provided signers

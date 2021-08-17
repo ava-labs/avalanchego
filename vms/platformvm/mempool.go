@@ -128,6 +128,8 @@ func (m *mempool) Add(tx *Tx) error {
 		return errMempoolFull
 	}
 
+	tx.SetVM(m.vm)
+
 	inputs := tx.InputIDs()
 	if m.consumedUTXOs.Overlaps(inputs) {
 		return errConflictingTx
