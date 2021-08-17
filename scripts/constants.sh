@@ -13,18 +13,9 @@ coreth_path="$GOPATH/pkg/mod/github.com/ava-labs/coreth@$coreth_version"
 
 # Where AvalancheGo binary goes
 build_dir="$AVALANCHE_PATH/build"
-binary_manager_path="$build_dir/avalanchego"
-
-# Latest Avalanchego binary
-latest_avalanchego_path="$build_dir"/avalanchego-latest
-latest_avalanchego_process_path="$latest_avalanchego_path/avalanchego-process"
-latest_plugin_dir="$latest_avalanchego_path/plugins"
-latest_evm_path="$latest_plugin_dir/evm"
-
-# Previous AvalancheGo binary
-prev_build_dir="$build_dir/avalanchego-preupgrade" # Where pre-db migration AvalancheGo binary goes
-prev_avalanchego_process_path="$prev_build_dir/avalanchego-process"
-prev_plugin_dir="$prev_build_dir/plugins"
+avalanchego_path="$build_dir/avalanchego"
+plugin_dir="$build_dir/plugins"
+evm_path="$plugin_dir/evm"
 
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
@@ -35,3 +26,12 @@ avalanchego_dockerhub_repo=${DOCKER_REPO:-"local"}
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 
 git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
+
+# Static compilation
+static_ld_flags=''
+if [ "${STATIC_COMPILATION:-}" = 1 ]
+then
+    export CC=musl-gcc
+    which $CC > /dev/null || ( echo $CC must be available for static compilation && exit 1 )
+    static_ld_flags=' -extldflags "-static" -linkmode external '
+fi

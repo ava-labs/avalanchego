@@ -23,6 +23,12 @@ func (b *Blocker) init() {
 	}
 }
 
+// Returns the number of items that have dependencies waiting on
+// them to be fulfilled
+func (b *Blocker) Len() int {
+	return len(*b)
+}
+
 // Fulfill notifies all objects blocking on the event whose ID is <id> that
 // the event has happened
 func (b *Blocker) Fulfill(id ids.ID) {

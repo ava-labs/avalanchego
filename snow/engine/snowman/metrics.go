@@ -11,8 +11,8 @@ import (
 )
 
 type metrics struct {
-	numRequests, numBlocked prometheus.Gauge
-	getAncestorsBlks        metric.Averager
+	numRequests, numBlocked, numBlockers prometheus.Gauge
+	getAncestorsBlks                     metric.Averager
 }
 
 // Initialize the metrics
@@ -28,6 +28,11 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 		Name:      "blocked",
 		Help:      "Number of blocks that are pending issuance",
 	})
+	m.numBlockers = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "blockers",
+		Help:      "Number of blocks that are blocking other blocks from being issued because they haven't been issued",
+	})
 	m.getAncestorsBlks = metric.NewAveragerWithErrs(
 		namespace,
 		"get_ancestors_blks",
@@ -39,6 +44,7 @@ func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error 
 	errs.Add(
 		reg.Register(m.numRequests),
 		reg.Register(m.numBlocked),
+		reg.Register(m.numBlockers),
 	)
 	return errs.Err
 }

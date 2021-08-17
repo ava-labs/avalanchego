@@ -37,7 +37,7 @@ func (c *CommitBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, err := c.parent()
+	parentIntf, err := c.parentBlock()
 	if err != nil {
 		return err
 	}

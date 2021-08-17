@@ -14,11 +14,7 @@ OK=`cp ./build/avalanchego $AVALANCHE_BUILD_BIN_DIR`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi
-OK=`cp -r ./build/avalanchego-latest $AVALANCHE_LIB_DIR`
-if [[ $OK -ne 0 ]]; then
-  exit $OK;
-fi
-OK=`cp -r ./build/avalanchego-preupgrade $AVALANCHE_LIB_DIR`
+OK=`cp -r ./build/plugins $AVALANCHE_LIB_DIR`
 if [[ $OK -ne 0 ]]; then
   exit $OK;
 fi

@@ -55,7 +55,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 	if ab.inputs.Overlaps(s) {
 		return true, nil
 	}
-	parent, err := ab.parent()
+	parent, err := ab.parentBlock()
 	if err != nil {
 		return false, err
 	}
@@ -88,7 +88,7 @@ func (ab *AtomicBlock) Verify() error {
 	}
 	ab.inputs = tx.InputUTXOs()
 
-	parentIntf, err := ab.parent()
+	parentIntf, err := ab.parentBlock()
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func (ab *AtomicBlock) Accept() error {
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
 		ab.Height(),
-		ab.ParentID(),
+		ab.Parent(),
 	)
 
 	if err := ab.CommonBlock.Accept(); err != nil {
@@ -184,7 +184,7 @@ func (ab *AtomicBlock) Reject() error {
 		"Rejecting Atomic Block %s at height %d with parent %s",
 		ab.ID(),
 		ab.Height(),
-		ab.ParentID(),
+		ab.Parent(),
 	)
 
 	if err := ab.vm.mempool.IssueTx(&ab.Tx); err != nil {

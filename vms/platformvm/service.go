@@ -1772,7 +1772,7 @@ type GetBlockchainStatusArgs struct {
 // GetBlockchainStatusReply is the reply from calling GetBlockchainStatus
 // [Status] is the blockchain's status.
 type GetBlockchainStatusReply struct {
-	Status Status `json:"status"`
+	Status BlockchainStatus `json:"status"`
 }
 
 // GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
@@ -1850,7 +1850,11 @@ func (service *Service) chainExists(blockID ids.ID, chainID ids.ID) (bool, error
 
 	block, ok := blockIntf.(decision)
 	if !ok {
-		block, ok = blockIntf.Parent().(decision)
+		parentBlockIntf, err := blockIntf.parentBlock()
+		if err != nil {
+			return false, err
+		}
+		block, ok = parentBlockIntf.(decision)
 		if !ok {
 			return false, errMissingDecisionBlock
 		}

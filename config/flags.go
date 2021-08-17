@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/rocksdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
@@ -67,13 +68,10 @@ func addProcessFlags(fs *flag.FlagSet) {
 	fs.String(BuildDirKey, defaultBuildDirs[0], "Path to the build directory")
 
 	// Plugin
-	fs.Bool(PluginModeKey, true, "Whether the app should run as a plugin")
+	fs.Bool(PluginModeKey, false, "Whether the app should run as a plugin")
 }
 
 func addNodeFlags(fs *flag.FlagSet) {
-	// Fetch only mode
-	fs.Bool(FetchOnlyKey, false, "If true, bootstrap the current database version then stop")
-
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value.")
 
@@ -87,8 +85,10 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(NetworkNameKey, defaultNetworkName, "Network ID this node will connect to")
 
 	// AVAX fees
-	fs.Uint64(TxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX")
-	fs.Uint64(CreationTxFeeKey, units.MilliAvax, "Transaction fee, in nAVAX, for transactions that create new state")
+	fs.Uint64(TxFeeKey, genesis.LocalParams.TxFee, "Transaction fee, in nAVAX")
+	fs.Uint64(CreateAssetTxFeeKey, genesis.LocalParams.CreateAssetTxFee, "Transaction fee, in nAVAX, for transactions that create new assets")
+	fs.Uint64(CreateSubnetTxFeeKey, genesis.LocalParams.CreateSubnetTxFee, "Transaction fee, in nAVAX, for transactions that create new subnets")
+	fs.Uint64(CreateBlockchainTxFeeKey, genesis.LocalParams.CreateBlockchainTxFee, "Transaction fee, in nAVAX, for transactions that create new blockchains")
 
 	// Database
 	fs.String(DBTypeKey, leveldb.Name, fmt.Sprintf("Database type to use. Should be one of {%s, %s, %s}", leveldb.Name, rocksdb.Name, memdb.Name))
@@ -204,20 +204,20 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.String(StakingCertPathKey, defaultStakingCertPath, "Path to the TLS certificate for staking")
 	fs.Uint64(StakingDisabledWeightKey, 1, "Weight to provide to each peer when staking is disabled")
 	// Uptime Requirement
-	fs.Float64(UptimeRequirementKey, .6, "Fraction of time a validator must be online to receive rewards")
+	fs.Float64(UptimeRequirementKey, genesis.LocalParams.UptimeRequirement, "Fraction of time a validator must be online to receive rewards")
 	// Minimum Stake required to validate the Primary Network
-	fs.Uint64(MinValidatorStakeKey, 2*units.KiloAvax, "Minimum stake, in nAVAX, required to validate the primary network")
+	fs.Uint64(MinValidatorStakeKey, genesis.LocalParams.MinValidatorStake, "Minimum stake, in nAVAX, required to validate the primary network")
 	// Maximum Stake that can be staked and delegated to a validator on the Primary Network
-	fs.Uint64(MaxValidatorStakeKey, 3*units.MegaAvax, "Maximum stake, in nAVAX, that can be placed on a validator on the primary network")
+	fs.Uint64(MaxValidatorStakeKey, genesis.LocalParams.MaxValidatorStake, "Maximum stake, in nAVAX, that can be placed on a validator on the primary network")
 	// Minimum Stake that can be delegated on the Primary Network
-	fs.Uint64(MinDelegatorStakeKey, 25*units.Avax, "Minimum stake, in nAVAX, that can be delegated on the primary network")
-	fs.Uint64(MinDelegatorFeeKey, 20000, "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
+	fs.Uint64(MinDelegatorStakeKey, genesis.LocalParams.MinDelegatorStake, "Minimum stake, in nAVAX, that can be delegated on the primary network")
+	fs.Uint64(MinDelegatorFeeKey, uint64(genesis.LocalParams.MinDelegationFee), "Minimum delegation fee, in the range [0, 1000000], that can be charged for delegation on the primary network")
 	// Minimum Stake Duration
-	fs.Duration(MinStakeDurationKey, 24*time.Hour, "Minimum staking duration")
+	fs.Duration(MinStakeDurationKey, genesis.LocalParams.MinStakeDuration, "Minimum staking duration")
 	// Maximum Stake Duration
-	fs.Duration(MaxStakeDurationKey, 365*24*time.Hour, "Maximum staking duration")
+	fs.Duration(MaxStakeDurationKey, genesis.LocalParams.MaxStakeDuration, "Maximum staking duration")
 	// Stake Minting Period
-	fs.Duration(StakeMintingPeriodKey, 365*24*time.Hour, "Consumption period of the staking function")
+	fs.Duration(StakeMintingPeriodKey, genesis.LocalParams.StakeMintingPeriod, "Consumption period of the staking function")
 	// Subnets
 	fs.String(WhitelistedSubnetsKey, "", "Whitelist of subnets to validate.")
 
@@ -242,8 +242,8 @@ func addNodeFlags(fs *flag.FlagSet) {
 	fs.Int(SnowOptimalProcessingKey, 50, "Optimal number of processing vertices in consensus")
 	fs.Int(SnowMaxProcessingKey, 1024, "Maximum number of processing items to be considered healthy")
 	fs.Duration(SnowMaxTimeProcessingKey, 2*time.Minute, "Maximum amount of time an item should be processing and still be healthy")
-	fs.Int64(SnowEpochFirstTransition, 1607626800, "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
-	fs.Duration(SnowEpochDuration, 6*time.Hour, "Duration of each epoch")
+	fs.Int64(SnowEpochFirstTransitionKey, genesis.LocalParams.EpochFirstTransition.Unix(), "Unix timestamp of the first epoch transaction, in seconds. Defaults to 12/10/2020 @ 7:00pm (UTC)")
+	fs.Duration(SnowEpochDurationKey, genesis.LocalParams.EpochDuration, "Duration of each epoch")
 
 	// Metrics
 	fs.Bool(MeterVMsEnabledKey, false, "Enable Meter VMs to track VM performance with more granularity")

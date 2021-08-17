@@ -62,7 +62,7 @@ func (s Status) Fetched() bool {
 	}
 }
 
-// Decided returns true if the status is Rejected or Executed.
+// Decided returns true if the status is Rejected or Accepted.
 func (s Status) Decided() bool {
 	switch s {
 	case Rejected, Accepted:
