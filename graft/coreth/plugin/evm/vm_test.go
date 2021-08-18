@@ -534,7 +534,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		}
 		txs[i] = signedTx
 	}
-	errs := vm.chain.AddRemoteTxs(txs)
+	errs := vm.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -832,7 +832,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxs(txs)
+	errs = vm1.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -861,7 +861,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
-	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -892,7 +892,7 @@ func TestSetPreferenceRace(t *testing.T) {
 	}
 
 	// Block D
-	errs = vm2.chain.AddRemoteTxs(txs[5:10])
+	errs = vm2.chain.AddRemoteTxsSync(txs[5:10])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1097,7 +1097,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 	}
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs := vm.chain.AddRemoteTxs([]*types.Transaction{signedTx})
+	errs := vm.chain.AddRemoteTxsSync([]*types.Transaction{signedTx})
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1372,7 +1372,7 @@ func TestReorgProtection(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxs(txs)
+	errs = vm1.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1401,7 +1401,7 @@ func TestReorgProtection(t *testing.T) {
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
-	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1555,7 +1555,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxs(txs)
+	errs = vm1.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1589,7 +1589,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1731,7 +1731,7 @@ func TestStickyPreference(t *testing.T) {
 	var errs []error
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.chain.AddRemoteTxs(txs)
+	errs = vm1.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -1765,7 +1765,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -1795,7 +1795,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.chain.AddRemoteTxs(txs[5:])
+	errs = vm2.chain.AddRemoteTxsSync(txs[5:])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -2002,7 +2002,7 @@ func TestUncleBlock(t *testing.T) {
 
 	var errs []error
 
-	errs = vm1.chain.AddRemoteTxs(txs)
+	errs = vm1.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -2028,7 +2028,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -2058,7 +2058,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.chain.AddRemoteTxs(txs[5:10])
+	errs = vm2.chain.AddRemoteTxsSync(txs[5:10])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -2275,7 +2275,7 @@ func TestAcceptReorg(t *testing.T) {
 
 	// Add the remote transactions, build the block, and set VM1's preference
 	// for block B
-	errs := vm1.chain.AddRemoteTxs(txs)
+	errs := vm1.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
@@ -2301,7 +2301,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	errs = vm2.chain.AddRemoteTxs(txs[0:5])
+	errs = vm2.chain.AddRemoteTxsSync(txs[0:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -2328,7 +2328,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.chain.AddRemoteTxs(txs[5:])
+	errs = vm2.chain.AddRemoteTxsSync(txs[5:])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
@@ -2528,7 +2528,7 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		}
 		txs[i] = signedTx
 	}
-	errs := vm.chain.AddRemoteTxs(txs)
+	errs := vm.chain.AddRemoteTxsSync(txs)
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -2702,7 +2702,7 @@ func TestApricotPhase1Transition(t *testing.T) {
 		}
 		txs[i] = signedTx
 	}
-	errs := vm1.chain.AddRemoteTxs(txs[:5])
+	errs := vm1.chain.AddRemoteTxsSync(txs[:5])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
@@ -2759,7 +2759,7 @@ func TestApricotPhase1Transition(t *testing.T) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm1.chain.AddRemoteTxs(txs[5:])
+	errs = vm1.chain.AddRemoteTxsSync(txs[5:])
 	for i, err := range errs {
 		if err != nil {
 			t.Fatalf("Failed to add tx at index %d: %s", i, err)
