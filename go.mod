@@ -13,6 +13,7 @@ require (
 	github.com/AppsFlyer/go-sundheit v0.2.0
 	github.com/Microsoft/go-winio v0.4.14
 	github.com/NYTimes/gziphandler v1.1.1
+	github.com/ava-labs/coreth v0.6.0-rc.1 // indirect
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/decred/dcrd/dcrec/secp256k1/v3 v3.0.0-20200627015759-01fd2de07837
 	github.com/golang-jwt/jwt v3.2.1+incompatible
@@ -26,7 +27,7 @@ require (
 	github.com/hashicorp/go-hclog v0.14.1
 	github.com/hashicorp/go-plugin v1.3.0
 	github.com/holiman/bloomfilter/v2 v2.0.3
-	github.com/huin/goupnp v1.0.1-0.20210310174557-0ca763054c88
+	github.com/huin/goupnp v1.0.1-0.20210626160114-33cdcbb30dda
 	github.com/jackpal/gateway v1.0.6
 	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0

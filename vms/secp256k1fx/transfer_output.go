@@ -4,6 +4,7 @@
 package secp256k1fx
 
 import (
+	"encoding/json"
 	"errors"
 
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -18,6 +19,19 @@ type TransferOutput struct {
 	Amt uint64 `serialize:"true" json:"amount"`
 
 	OutputOwners `serialize:"true"`
+}
+
+// MarshalJSON marshals Amt and the embedded OutputOwners struct
+// into a JSON readable format
+// If OutputOwners cannot be serialised then this will return error
+func (out *TransferOutput) MarshalJSON() ([]byte, error) {
+	result, err := out.OutputOwners.SerialisedKeys()
+	if err != nil {
+		return nil, err
+	}
+
+	result["amount"] = out.Amt
+	return json.Marshal(result)
 }
 
 // Amount returns the quantity of the asset this output consumes
