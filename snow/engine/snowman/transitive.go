@@ -45,7 +45,7 @@ type Transitive struct {
 	blkReqs common.Requests
 
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
-    // Block ID --> Block
+	// Block ID --> Block
 	pending map[ids.ID]snowman.Block
 
 	// operations that are blocked on a block being issued. This could be
