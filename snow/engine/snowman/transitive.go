@@ -785,6 +785,7 @@ func (t *Transitive) GetVM() common.VM {
 	return t.VM
 }
 
+// Returns true if the block whose ID is [blkID] is waiting to be issued to consensus
 func (t *Transitive) pendingContains(blkID ids.ID) bool {
 	_, ok := t.pending[blkID]
 	return ok
