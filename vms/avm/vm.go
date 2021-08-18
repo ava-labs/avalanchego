@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
 	"time"
 
@@ -17,8 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -30,9 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/index"
@@ -49,8 +44,6 @@ const (
 	batchSize          = 30
 	assetToFxCacheSize = 1024
 	maxUTXOsToFetch    = 1024
-
-	codecVersion = 0
 )
 
 var (
@@ -61,8 +54,7 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM   = &VM{}
-	_ secp256k1fx.VM = &VM{}
+	_ vertex.DAGVM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
@@ -79,9 +71,8 @@ type VM struct {
 	// Used to check local time
 	clock timer.Clock
 
-	genesisCodec  codec.Manager
-	codec         codec.Manager
-	codecRegistry codec.Registry
+	genesisCodec codec.Manager
+	codec        codec.Manager
 
 	pubsub *pubsub.Server
 
@@ -151,7 +142,8 @@ func (vm *VM) Initialize(
 		ctx.Log.Info("VM config initialized %+v", avmConfig)
 	}
 
-	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
+	err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics)
+	if err != nil {
 		return err
 	}
 	vm.AddressManager = avax.NewAddressManager(ctx)
@@ -162,38 +154,11 @@ func (vm *VM) Initialize(
 	vm.toEngine = toEngine
 	vm.baseDB = db
 	vm.db = versiondb.New(db)
-	vm.typeToFxIndex = map[reflect.Type]int{}
 	vm.assetToFxCache = &cache.LRU{Size: assetToFxCacheSize}
 
 	vm.pubsub = pubsub.New(ctx.NetworkID, ctx.Log)
 
-	genesisCodec := linearcodec.New(reflectcodec.DefaultTagName, 1<<20)
-	c := linearcodec.NewDefault()
-
-	vm.genesisCodec = codec.NewManager(math.MaxInt32)
-	vm.codec = codec.NewDefaultManager()
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&BaseTx{}),
-		c.RegisterType(&CreateAssetTx{}),
-		c.RegisterType(&OperationTx{}),
-		c.RegisterType(&ImportTx{}),
-		c.RegisterType(&ExportTx{}),
-		vm.codec.RegisterCodec(codecVersion, c),
-
-		genesisCodec.RegisterType(&BaseTx{}),
-		genesisCodec.RegisterType(&CreateAssetTx{}),
-		genesisCodec.RegisterType(&OperationTx{}),
-		genesisCodec.RegisterType(&ImportTx{}),
-		genesisCodec.RegisterType(&ExportTx{}),
-		vm.genesisCodec.RegisterCodec(codecVersion, genesisCodec),
-	)
-	if errs.Errored() {
-		return errs.Err
-	}
-
+	typedFxs := make([]Fx, len(fxs))
 	vm.fxs = make([]*parsedFx, len(fxs))
 	for i, fxContainer := range fxs {
 		if fxContainer == nil {
@@ -203,19 +168,25 @@ func (vm *VM) Initialize(
 		if !ok {
 			return errIncompatibleFx
 		}
+		typedFxs[i] = fx
 		vm.fxs[i] = &parsedFx{
 			ID: fxContainer.ID,
 			Fx: fx,
 		}
-		vm.codecRegistry = &codecRegistry{
-			codecs:      []codec.Registry{genesisCodec, c},
-			index:       i,
-			typeToIndex: vm.typeToFxIndex,
-		}
-		if err := fx.Initialize(vm); err != nil {
-			return err
-		}
 	}
+
+	vm.typeToFxIndex = map[reflect.Type]int{}
+	vm.genesisCodec, vm.codec, err = newCustomCodecs(
+		vm.typeToFxIndex,
+		&vm.clock,
+		ctx.Log,
+		typedFxs,
+	)
+	if err != nil {
+		return err
+	}
+
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, vm.codec)
 
 	state, err := NewMeteredState(vm.db, vm.genesisCodec, vm.codec, ctx.Namespace, ctx.Metrics)
 	if err != nil {
@@ -506,24 +477,6 @@ func (vm *VM) getAllUniqueAddressUTXOs(addr ids.ShortID, seen *ids.Set, utxos *[
 		}
 	}
 }
-
-/*
- ******************************************************************************
- *********************************** Fx API ***********************************
- ******************************************************************************
- */
-
-// Clock returns a reference to the internal clock of this VM
-func (vm *VM) Clock() *timer.Clock { return &vm.clock }
-
-// Codec returns a reference to the internal codec of this VM
-func (vm *VM) Codec() codec.Manager { return vm.codec }
-
-// CodecRegistry returns a reference to the internal codec registry of this VM
-func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
-
-// Logger returns a reference to the internal logger of this VM
-func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
 
 /*
  ******************************************************************************
