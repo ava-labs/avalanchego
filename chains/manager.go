@@ -151,11 +151,6 @@ type ManagerConfig struct {
 	RetryBootstrap            bool                   // Should Bootstrap be retried
 	RetryBootstrapMaxAttempts int                    // Max number of times to retry bootstrap
 	ChainConfigs              map[string]ChainConfig // alias -> ChainConfig
-	// If true, shut down the node after the Primary Network has bootstrapped
-	// and use [FetchOnlyFrom] as beacons
-	FetchOnly bool
-	// [FetchOnlyFrom] ignored unless [FetchOnly] is true
-	FetchOnlyFrom validators.Set
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
@@ -254,21 +249,12 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
 					go m.ShutdownNodeFunc(1)
 				}
-				if m.ManagerConfig.FetchOnly {
-					m.Log.Info("done with fetch only mode. Starting node shutdown")
-					go m.ShutdownNodeFunc(constants.ExitCodeDoneMigrating)
-				}
 			}
 		}
 		sb = newSubnet(onBootstrapped, chainParams.ID)
 		m.subnets[chainParams.SubnetID] = sb
 	} else {
 		sb.addChain(chainParams.ID)
-	}
-
-	// In fetch-only mode, use custom bootstrap beacons
-	if m.FetchOnly {
-		chainParams.CustomBeacons = m.FetchOnlyFrom
 	}
 
 	chain, err := m.buildChain(chainParams, sb)

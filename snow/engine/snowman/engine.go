@@ -4,9 +4,8 @@
 package snowman
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 // Engine describes the events that can occur to a Snowman instance.
@@ -19,11 +18,8 @@ import (
 // environment where lose of liveness and manual intervention is tolerable.
 type Engine interface {
 	common.Engine
+	block.Getter
 
 	// Initialize this engine.
 	Initialize(Config) error
-
-	// GetBlock returns a block by its ID.
-	// Returns an error if unknown.
-	GetBlock(blkID ids.ID) (snowman.Block, error)
 }

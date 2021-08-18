@@ -33,7 +33,7 @@ func TestNewSingleRocksDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	manager, err := NewRocksDB(dir, logging.NoLog{}, v1, true)
+	manager, err := NewRocksDB(dir, logging.NoLog{}, v1)
 	if err != nil {
 		t.Fatal(err)
 	}

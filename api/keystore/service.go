@@ -109,5 +109,5 @@ func CreateTestKeystore() (Keystore, error) {
 	if err != nil {
 		return nil, err
 	}
-	return New(logging.NoLog{}, dbManager)
+	return New(logging.NoLog{}, dbManager), nil
 }

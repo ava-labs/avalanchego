@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"encoding/json"
 	"strings"
 )
 
@@ -109,6 +110,13 @@ func (ids Set) List() []ID {
 	return idList
 }
 
+// SortedList returns this set as a sorted list
+func (ids Set) SortedList() []ID {
+	lst := ids.List()
+	SortIDs(lst)
+	return lst
+}
+
 // CappedList returns a list of length at most [size].
 // Size should be >= 0. If size < 0, returns nil.
 func (ids Set) CappedList(size int) []ID {
@@ -167,4 +175,10 @@ func (ids *Set) Pop() (ID, bool) {
 		return id, true
 	}
 	return ID{}, false
+}
+
+func (ids *Set) MarshalJSON() ([]byte, error) {
+	idsList := ids.List()
+	SortIDs(idsList)
+	return json.Marshal(idsList)
 }
