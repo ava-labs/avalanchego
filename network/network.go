@@ -233,6 +233,9 @@ type network struct {
 
 	// Rate-limits outgoing messages
 	outboundMsgThrottler throttling.OutboundMsgThrottler
+
+	// WhitelistedSubnets of the node
+	whitelistedSubnets ids.Set
 }
 
 type Config struct {
@@ -280,6 +283,7 @@ func NewDefaultNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	whitelistedSubnets ids.Set,
 ) (Network, error) {
 	return NewNetwork(
 		namespace,
@@ -321,6 +325,7 @@ func NewDefaultNetwork(
 		compressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
+		whitelistedSubnets,
 	)
 }
 
@@ -365,6 +370,7 @@ func NewNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	whitelistedSubnets ids.Set,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
@@ -420,6 +426,7 @@ func NewNetwork(
 		compressionEnabled:   compressionEnabled,
 		inboundMsgThrottler:  inboundMsgThrottler,
 		outboundMsgThrottler: outboundMsgThrottler,
+		whitelistedSubnets:   whitelistedSubnets,
 	}
 	codec, err := message.NewCodecWithAllocator(
 		fmt.Sprintf("%s_codec", namespace),
@@ -873,8 +880,8 @@ func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, vo
 
 // Gossip attempts to gossip the container to the network
 // Assumes [n.stateLock] is not held.
-func (n *network) Gossip(chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
+func (n *network) Gossip(subnetID, chainID, containerID ids.ID, container []byte) {
+	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -887,7 +894,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
+	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -1101,7 +1108,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
+func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
 	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
@@ -1117,7 +1124,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(int(numToGossip))
+	peers, err := n.peers.sample(subnetID, int(numToGossip))
 	n.stateLock.RUnlock()
 	if err != nil {
 		return err
@@ -1623,7 +1630,6 @@ func (n *network) disconnected(p *peer) {
 	defer p.net.stateLock.Unlock()
 
 	ip := p.getIP()
-
 	n.log.Debug("disconnected from %s at %s", p.nodeID, ip)
 
 	n.peers.remove(p)
