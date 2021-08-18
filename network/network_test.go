@@ -44,6 +44,8 @@ const (
 var (
 	errClosed  = errors.New("closed")
 	errRefused = errors.New("connection refused")
+
+	testSubnetID = ids.GenerateTestID()
 )
 
 type testListener struct {
@@ -194,19 +196,45 @@ func (c *testConn) SetWriteDeadline(time.Time) error { return nil }
 
 type testHandler struct {
 	router.Router
-	connected    func(ids.ShortID)
-	disconnected func(ids.ShortID)
+	ConnectedF    func(ids.ShortID)
+	DisconnectedF func(ids.ShortID)
+	PutF          func(
+		validatorID ids.ShortID,
+		chainID ids.ID,
+		requestID uint32,
+		containerID ids.ID,
+		container []byte,
+		onFinishedHandling func(),
+	)
 }
 
 func (h *testHandler) Connected(id ids.ShortID) {
-	if h.connected != nil {
-		h.connected(id)
+	if h.ConnectedF != nil {
+		h.ConnectedF(id)
 	}
 }
 
 func (h *testHandler) Disconnected(id ids.ShortID) {
-	if h.disconnected != nil {
-		h.disconnected(id)
+	if h.DisconnectedF != nil {
+		h.DisconnectedF(id)
+	}
+}
+
+func (h *testHandler) Put(
+	validatorID ids.ShortID,
+	chainID ids.ID,
+	requestID uint32,
+	containerID ids.ID,
+	container []byte,
+	onFinishedHandling func(),
+) {
+	if h.PutF != nil {
+		h.PutF(validatorID,
+			chainID,
+			requestID,
+			containerID,
+			container,
+			onFinishedHandling)
 	}
 }
 
@@ -336,12 +364,11 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net)
@@ -423,7 +450,7 @@ func TestEstablishConnection(t *testing.T) {
 	wg1.Add(1)
 
 	handler0 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
 				wg0.Done()
 			}
@@ -431,7 +458,7 @@ func TestEstablishConnection(t *testing.T) {
 	}
 
 	handler1 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
 				wg1.Done()
 			}
@@ -472,12 +499,11 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -506,12 +532,11 @@ func TestEstablishConnection(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -604,7 +629,7 @@ func TestDoubleTrack(t *testing.T) {
 	wg1.Add(1)
 
 	handler0 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
 				wg0.Done()
 			}
@@ -612,7 +637,7 @@ func TestDoubleTrack(t *testing.T) {
 	}
 
 	handler1 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
 				wg1.Done()
 			}
@@ -653,12 +678,11 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -687,12 +711,11 @@ func TestDoubleTrack(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -786,7 +809,7 @@ func TestDoubleClose(t *testing.T) {
 	wg1.Add(1)
 
 	handler0 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
 				wg0.Done()
 			}
@@ -794,7 +817,7 @@ func TestDoubleClose(t *testing.T) {
 	}
 
 	handler1 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
 				wg1.Done()
 			}
@@ -835,12 +858,11 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -869,12 +891,11 @@ func TestDoubleClose(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -973,7 +994,7 @@ func TestTrackConnected(t *testing.T) {
 	wg1.Add(1)
 
 	handler0 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
 				wg0.Done()
 			}
@@ -981,7 +1002,7 @@ func TestTrackConnected(t *testing.T) {
 	}
 
 	handler1 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
 				wg1.Done()
 			}
@@ -1022,12 +1043,11 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1056,12 +1076,11 @@ func TestTrackConnected(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1183,12 +1202,11 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1217,12 +1235,11 @@ func TestTrackConnectedRace(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1374,7 +1391,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	wg2.Add(2)
 
 	handler0 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id == id1 {
 				wg0.Done()
 				return
@@ -1392,7 +1409,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	}
 
 	handler1 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
 				wg0.Done()
 				return
@@ -1406,7 +1423,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	}
 
 	handler2 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if cleanup {
 				return
 			}
@@ -1416,7 +1433,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 	}
 
 	handler3 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
 				wg2.Done()
 				return
@@ -1475,12 +1492,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1509,12 +1525,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1543,12 +1558,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -1577,12 +1591,11 @@ func TestPeerAliasesTicker(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net3)
@@ -1812,7 +1825,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	wg3.Add(2)
 
 	handler0 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id == id1 {
 				wg0.Done()
 				return
@@ -1827,7 +1840,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 
 			assert.Fail(t, "handler 0 unauthorized connection", id.String())
 		},
-		disconnected: func(id ids.ShortID) {
+		DisconnectedF: func(id ids.ShortID) {
 			if id == id1 {
 				wg2.Done()
 				return
@@ -1841,7 +1854,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}
 
 	handler1 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
 				wg0.Done()
 				return
@@ -1855,7 +1868,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}
 
 	handler2 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if cleanup {
 				return
 			}
@@ -1865,7 +1878,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	}
 
 	handler3 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id == id0 {
 				wg3.Done()
 				return
@@ -1932,12 +1945,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -1966,12 +1978,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -2000,12 +2011,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -2034,12 +2044,11 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net3)
@@ -2239,7 +2248,7 @@ func TestPeerSignature(t *testing.T) {
 	handled := make(map[string]struct{})
 
 	handler0 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id0 {
 				handledLock.Lock()
 				handled[id0.String()+":"+id.String()] = struct{}{}
@@ -2250,7 +2259,7 @@ func TestPeerSignature(t *testing.T) {
 	}
 
 	handler1 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id1 {
 				handledLock.Lock()
 				handled[id1.String()+":"+id.String()] = struct{}{}
@@ -2261,7 +2270,7 @@ func TestPeerSignature(t *testing.T) {
 	}
 
 	handler2 := &testHandler{
-		connected: func(id ids.ShortID) {
+		ConnectedF: func(id ids.ShortID) {
 			if id != id2 {
 				handledLock.Lock()
 				handled[id2.String()+":"+id.String()] = struct{}{}
@@ -2305,12 +2314,11 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -2339,12 +2347,11 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -2373,12 +2380,11 @@ func TestPeerSignature(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -2751,12 +2757,11 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
@@ -2785,12 +2790,11 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		defaultPeerListSize,
 		defaultGossipPeerListTo,
 		defaultGossipPeerListFreq,
-		false,
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
 		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -2819,6 +2823,488 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	err = net0.Close()
 	assert.NoError(t, err)
 	err = net1.Close()
+	assert.NoError(t, err)
+}
+
+func TestPeerTrackedSubnets(t *testing.T) {
+	initCerts(t)
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
+
+	ip0 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		0,
+	)
+	id0 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip0.IP().String())))
+	ip1 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		1,
+	)
+	id1 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip1.IP().String())))
+
+	listener0 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller0 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener1 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller1 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+
+	caller0.outbounds[ip1.IP().String()] = listener1
+	caller1.outbounds[ip0.IP().String()] = listener0
+
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
+
+	vdrs := validators.NewSet()
+
+	var (
+		wg0 sync.WaitGroup
+		wg1 sync.WaitGroup
+	)
+	wg0.Add(1)
+	wg1.Add(1)
+
+	handler0 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id0, id)
+			wg0.Done()
+		},
+	}
+
+	handler1 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id1, id)
+			wg1.Done()
+		},
+	}
+
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+	subnetSet := ids.Set{}
+	subnetSet.Add(testSubnetID)
+	net0, err := NewDefaultNetwork(
+		"",
+		prometheus.NewRegistry(),
+		log,
+		id0,
+		ip0,
+		networkID,
+		versionManager,
+		versionParser,
+		listener0,
+		caller0,
+		serverUpgrader0,
+		clientUpgrader0,
+		vdrs,
+		vdrs,
+		handler0,
+		throttling.InboundConnThrottlerConfig{},
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler, subnetSet,
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net0)
+
+	net1, err := NewDefaultNetwork(
+		"",
+		prometheus.NewRegistry(),
+		log,
+		id1,
+		ip1,
+		networkID,
+		versionManager,
+		versionParser,
+		listener1,
+		caller1,
+		serverUpgrader1,
+		clientUpgrader1,
+		vdrs,
+		vdrs,
+		handler1,
+		throttling.InboundConnThrottlerConfig{},
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler, subnetSet,
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net1)
+
+	go func() {
+		err := net0.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net1.Dispatch()
+		assert.Error(t, err)
+	}()
+
+	net0.Track(ip1.IP(), id1)
+
+	wg0.Wait()
+	wg1.Wait()
+	peers := net0.(*network).peers
+	count := 0
+	for _, peer := range peers.peersList {
+		if peer == nil {
+			continue
+		}
+		count++
+		assert.True(t, peer.gotVersion.GetValue())
+		assert.True(t, peer.trackedSubnets.Contains(testSubnetID))
+		assert.True(t, peer.trackedSubnets.Contains(constants.PrimaryNetworkID))
+	}
+
+	assert.Greater(t, count, 0)
+
+	err = net0.Close()
+	assert.NoError(t, err)
+
+	err = net1.Close()
+	assert.NoError(t, err)
+}
+
+func TestPeerGossip(t *testing.T) {
+	initCerts(t)
+
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
+	versionParser := version.NewDefaultApplicationParser()
+
+	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
+	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
+
+	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
+	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
+
+	serverUpgrader2 := NewTLSServerUpgrader(tlsConfig2)
+	clientUpgrader2 := NewTLSClientUpgrader(tlsConfig2)
+
+	ip0 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		0,
+	)
+	ip1 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		1,
+	)
+	ip2 := utils.NewDynamicIPDesc(
+		net.IPv6loopback,
+		2,
+	)
+
+	id0 := certToID(cert0.Leaf)
+	id1 := certToID(cert1.Leaf)
+	id2 := certToID(cert2.Leaf)
+
+	listener0 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller0 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 0,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener1 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller1 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 1,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+	listener2 := &testListener{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		inbound: make(chan net.Conn, 1<<10),
+		closed:  make(chan struct{}),
+	}
+	caller2 := &testDialer{
+		addr: &net.TCPAddr{
+			IP:   net.IPv6loopback,
+			Port: 2,
+		},
+		outbounds: make(map[string]*testListener),
+	}
+
+	caller0.outbounds[ip1.IP().String()] = listener1
+	caller1.outbounds[ip0.IP().String()] = listener0
+	caller0.outbounds[ip2.IP().String()] = listener2
+	caller1.outbounds[ip2.IP().String()] = listener2
+
+	vdrs := validators.NewSet()
+	// id2 is a validator
+	_ = vdrs.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
+
+	allPeers := ids.ShortSet{}
+	allPeers.Add(id0, id1, id2)
+
+	var (
+		wg0  sync.WaitGroup
+		wg1  sync.WaitGroup
+		wg1P sync.WaitGroup
+		wg2  sync.WaitGroup
+		wg2P sync.WaitGroup
+	)
+	wg0.Add(2)
+	wg1.Add(1)
+	wg1P.Add(2)
+	wg2.Add(1)
+	wg2P.Add(1)
+
+	testSubnetContainerID := ids.GenerateTestID()
+	testPrimaryContainerID := ids.GenerateTestID()
+	allContainerIDs := []ids.ID{testSubnetContainerID, testPrimaryContainerID}
+	handler0 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id0, id)
+			wg0.Done()
+		},
+		PutF: func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte, onFinishedHandling func()) {
+			assert.Fail(t, "this should not receive any gossip")
+		},
+	}
+
+	handler1 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id1, id)
+			wg1.Done()
+		},
+		PutF: func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte, onFinishedHandling func()) {
+			assert.Contains(t, allContainerIDs, containerID)
+			wg1P.Done()
+		},
+	}
+
+	handler2 := &testHandler{
+		ConnectedF: func(id ids.ShortID) {
+			assert.NotEqual(t, id2, id)
+			wg2.Done()
+		},
+		PutF: func(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte, onFinishedHandling func()) {
+			// this one should not receive it
+			assert.NotEqual(t, testSubnetContainerID, containerID)
+			wg2P.Done()
+		},
+	}
+
+	versionManager := version.NewCompatibility(
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+		appVersion,
+		time.Now(),
+		appVersion,
+	)
+
+	subnetSet := ids.Set{}
+	subnetSet.Add(testSubnetID)
+
+	net0, err := NewDefaultNetwork(
+		"",
+		prometheus.NewRegistry(),
+		log,
+		id0,
+		ip0,
+		networkID,
+		versionManager,
+		versionParser,
+		listener0,
+		caller0,
+		serverUpgrader0,
+		clientUpgrader0,
+		vdrs,
+		vdrs,
+		handler0,
+		throttling.InboundConnThrottlerConfig{},
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert0.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler, subnetSet,
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net0)
+
+	net1, err := NewDefaultNetwork(
+		"",
+		prometheus.NewRegistry(),
+		log,
+		id1,
+		ip1,
+		networkID,
+		versionManager,
+		versionParser,
+		listener1,
+		caller1,
+		serverUpgrader1,
+		clientUpgrader1,
+		vdrs,
+		vdrs,
+		handler1,
+		throttling.InboundConnThrottlerConfig{},
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert1.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler, subnetSet,
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net1)
+
+	net2, err := NewDefaultNetwork(
+		"",
+		prometheus.NewRegistry(),
+		log,
+		id2,
+		ip2,
+		networkID,
+		versionManager,
+		versionParser,
+		listener2,
+		caller2,
+		serverUpgrader2,
+		clientUpgrader2,
+		vdrs,
+		vdrs,
+		handler2,
+		throttling.InboundConnThrottlerConfig{},
+		HealthConfig{},
+		benchlist.NewManager(&benchlist.Config{}),
+		defaultAliasTimeout,
+		cert2.PrivateKey.(crypto.Signer),
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+		true,
+		defaultInboundMsgThrottler,
+		defaultOutboundMsgThrottler, ids.Set{},
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, net2)
+
+	go func() {
+		err := net0.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net1.Dispatch()
+		assert.Error(t, err)
+	}()
+	go func() {
+		err := net2.Dispatch()
+		assert.Error(t, err)
+	}()
+
+	// ip0 -> ip2 and ip0 -> ip1 connect
+	net0.Track(ip2.IP(), id2)
+	net0.Track(ip1.IP(), id1)
+
+	wg0.Wait()
+	wg1.Wait()
+	wg2.Wait()
+
+	net0.Gossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"))
+	net0.Gossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"))
+
+	wg1P.Wait()
+	wg2P.Wait()
+
+	err = net0.Close()
+	assert.NoError(t, err)
+
+	err = net1.Close()
+	assert.NoError(t, err)
+
+	err = net2.Close()
 	assert.NoError(t, err)
 }
 

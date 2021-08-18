@@ -37,13 +37,13 @@ type Manager interface {
 
 // Config defines the configuration for a benchlist
 type Config struct {
-	Benchable              Benchable
-	Validators             validators.Manager
-	Threshold              int
-	MinimumFailingDuration time.Duration
-	Duration               time.Duration
-	MaxPortion             float64
-	PeerSummaryEnabled     bool
+	Benchable              Benchable          `json:"-"`
+	Validators             validators.Manager `json:"-"`
+	Threshold              int                `json:"threshold"`
+	MinimumFailingDuration time.Duration      `json:"minimumFailingDuration"`
+	Duration               time.Duration      `json:"duration"`
+	MaxPortion             float64            `json:"maxPortion"`
+	PeerSummaryEnabled     bool               `json:"peerSummaryEnabled"`
 }
 
 type manager struct {

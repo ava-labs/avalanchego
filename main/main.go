@@ -65,13 +65,6 @@ func main() {
 		syscall.SIGINT, syscall.SIGTERM,
 	)
 
-	// Migrate the database if necessary
-	migrationManager := newMigrationManager(nodeManager, nodeConfig, log)
-	if err := migrationManager.migrate(); err != nil {
-		log.Error("error while running migration: %s", err)
-		nodeManager.shutdown()
-	}
-
 	// Run normally
 	exitCode, err := nodeManager.runNormal()
 	if err != nil {

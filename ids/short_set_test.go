@@ -265,3 +265,28 @@ func TestShortSetPop(t *testing.T) {
 	_, ok = s.Pop()
 	assert.False(t, ok)
 }
+
+func TestShortSortedList(t *testing.T) {
+	assert := assert.New(t)
+
+	set := ShortSet{}
+	assert.Len(set.SortedList(), 0)
+
+	set.Add(ShortID{0})
+	sorted := set.SortedList()
+	assert.Len(sorted, 1)
+	assert.Equal(ShortID{0}, sorted[0])
+
+	set.Add(ShortID{1})
+	sorted = set.SortedList()
+	assert.Len(sorted, 2)
+	assert.Equal(ShortID{0}, sorted[0])
+	assert.Equal(ShortID{1}, sorted[1])
+
+	set.Add(ShortID{2})
+	sorted = set.SortedList()
+	assert.Len(sorted, 3)
+	assert.Equal(ShortID{0}, sorted[0])
+	assert.Equal(ShortID{1}, sorted[1])
+	assert.Equal(ShortID{2}, sorted[2])
+}

@@ -31,14 +31,20 @@ type Factory struct {
 	// Set of subnets that this node is validating
 	WhitelistedSubnets ids.Set
 
-	// Fee that must be burned by every state creating transaction
-	CreationTxFee uint64
-
 	// Fee that must be burned by every create staker transaction
 	AddStakerTxFee uint64
 
 	// Fee that is burned by every non-state creating transaction
 	TxFee uint64
+
+	// Fee that must be burned by every state creating transaction before AP3
+	CreateAssetTxFee uint64
+
+	// Fee that must be burned by every subnet creating transaction after AP3
+	CreateSubnetTxFee uint64
+
+	// Fee that must be burned by every blockchain creating transaction after AP3
+	CreateBlockchainTxFee uint64
 
 	// The minimum amount of tokens one must bond to be a validator
 	MinValidatorStake uint64
@@ -63,6 +69,9 @@ type Factory struct {
 
 	// Consumption period for the minting function
 	StakeMintingPeriod time.Duration
+
+	// Time of the AP3 network upgrade
+	ApricotPhase3Time time.Time
 }
 
 // New returns a new instance of the Platform Chain

@@ -4,6 +4,7 @@
 package ids
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -156,4 +157,52 @@ func TestSetPop(t *testing.T) {
 
 	_, ok = s.Pop()
 	assert.False(t, ok)
+}
+
+func TestSetMarshalJSON(t *testing.T) {
+	assert := assert.New(t)
+	set := Set{}
+	{
+		asJSON, err := set.MarshalJSON()
+		assert.NoError(err)
+		assert.Equal("[]", string(asJSON))
+	}
+	id1, id2 := GenerateTestID(), GenerateTestID()
+	set.Add(id1)
+	{
+		asJSON, err := set.MarshalJSON()
+		assert.NoError(err)
+		assert.Equal(fmt.Sprintf("[\"%s\"]", id1), string(asJSON))
+	}
+	set.Add(id2)
+	{
+		asJSON, err := set.MarshalJSON()
+		assert.NoError(err)
+		assert.Equal(fmt.Sprintf("[\"%s\",\"%s\"]", id1, id2), string(asJSON))
+	}
+}
+
+func TestSortedList(t *testing.T) {
+	assert := assert.New(t)
+
+	set := Set{}
+	assert.Len(set.SortedList(), 0)
+
+	set.Add(ID{0})
+	sorted := set.SortedList()
+	assert.Len(sorted, 1)
+	assert.Equal(ID{0}, sorted[0])
+
+	set.Add(ID{1})
+	sorted = set.SortedList()
+	assert.Len(sorted, 2)
+	assert.Equal(ID{0}, sorted[0])
+	assert.Equal(ID{1}, sorted[1])
+
+	set.Add(ID{2})
+	sorted = set.SortedList()
+	assert.Len(sorted, 3)
+	assert.Equal(ID{0}, sorted[0])
+	assert.Equal(ID{1}, sorted[1])
+	assert.Equal(ID{2}, sorted[2])
 }

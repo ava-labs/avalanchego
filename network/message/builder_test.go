@@ -89,6 +89,56 @@ func TestBuildVersion(t *testing.T) {
 	assert.EqualValues(t, sig, parsedMsg.Get(SigBytes))
 }
 
+func TestBuildVersionWithSubnets(t *testing.T) {
+	networkID := uint32(12345)
+	nodeID := uint32(56789)
+	myTime := uint64(time.Now().Unix())
+	ip := utils.IPDesc{
+		IP: net.IPv4(1, 2, 3, 4),
+	}
+	myVersion := version.NewDefaultVersion(1, 2, 3).String()
+	myVersionTime := uint64(time.Now().Unix())
+	sig := make([]byte, 65)
+	subnetID := ids.Empty.Prefix(1)
+	subnetIDs := [][]byte{subnetID[:]}
+	msg, err := TestBuilder.VersionWithSubnets(
+		networkID,
+		nodeID,
+		myTime,
+		ip,
+		myVersion,
+		myVersionTime,
+		sig,
+		[]ids.ID{subnetID},
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, msg)
+	assert.Equal(t, VersionWithSubnets, msg.Op())
+	assert.EqualValues(t, networkID, msg.Get(NetworkID))
+	assert.EqualValues(t, nodeID, msg.Get(NodeID))
+	assert.EqualValues(t, myTime, msg.Get(MyTime))
+	assert.EqualValues(t, ip, msg.Get(IP))
+	assert.EqualValues(t, myVersion, msg.Get(VersionStr))
+	assert.EqualValues(t, myVersionTime, msg.Get(VersionTime))
+	assert.EqualValues(t, sig, msg.Get(SigBytes))
+	assert.EqualValues(t, subnetIDs, msg.Get(TrackedSubnets))
+
+	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, parsedMsg)
+	assert.Equal(t, VersionWithSubnets, parsedMsg.Op())
+	assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
+	assert.EqualValues(t, networkID, parsedMsg.Get(NetworkID))
+	assert.EqualValues(t, nodeID, parsedMsg.Get(NodeID))
+	assert.EqualValues(t, myTime, parsedMsg.Get(MyTime))
+	assert.EqualValues(t, ip, parsedMsg.Get(IP))
+	assert.EqualValues(t, myVersion, parsedMsg.Get(VersionStr))
+	assert.EqualValues(t, myVersionTime, parsedMsg.Get(VersionTime))
+	assert.EqualValues(t, sig, parsedMsg.Get(SigBytes))
+	assert.EqualValues(t, subnetIDs, parsedMsg.Get(TrackedSubnets))
+}
+
 func TestBuildGetPeerList(t *testing.T) {
 	msg, err := TestBuilder.GetPeerList()
 	assert.NoError(t, err)

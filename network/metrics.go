@@ -89,7 +89,7 @@ type metrics struct {
 	inboundConnRateLimited   prometheus.Counter
 	inboundConnAllowed       prometheus.Counter
 
-	getVersion, version,
+	getVersion, version, versionWithSubnets,
 	getPeerlist, peerList,
 	ping, pong,
 	getAcceptedFrontier, acceptedFrontier,
@@ -166,6 +166,7 @@ func (m *metrics) initialize(namespace string, registerer prometheus.Registerer)
 
 		m.getVersion.initialize(message.GetVersion, namespace, registerer),
 		m.version.initialize(message.Version, namespace, registerer),
+		m.versionWithSubnets.initialize(message.VersionWithSubnets, namespace, registerer),
 		m.getPeerlist.initialize(message.GetPeerList, namespace, registerer),
 		m.peerList.initialize(message.PeerList, namespace, registerer),
 		m.ping.initialize(message.Ping, namespace, registerer),
@@ -191,6 +192,8 @@ func (m *metrics) message(msgType message.Op) *messageMetrics {
 		return &m.getVersion
 	case message.Version:
 		return &m.version
+	case message.VersionWithSubnets:
+		return &m.versionWithSubnets
 	case message.GetPeerList:
 		return &m.getPeerlist
 	case message.PeerList:

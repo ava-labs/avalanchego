@@ -37,7 +37,7 @@ func (a *AbortBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, err := a.parent()
+	parentIntf, err := a.parentBlock()
 	if err != nil {
 		return err
 	}

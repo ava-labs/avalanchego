@@ -101,6 +101,13 @@ func (ids ShortSet) List() []ShortID {
 	return idList
 }
 
+// SortedList returns this set as a sorted list
+func (ids ShortSet) SortedList() []ShortID {
+	lst := ids.List()
+	SortShortIDs(lst)
+	return lst
+}
+
 // Equals returns true if the sets contain the same elements
 func (ids ShortSet) Equals(oIDs ShortSet) bool {
 	if ids.Len() != oIDs.Len() {
