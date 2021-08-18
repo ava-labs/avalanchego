@@ -4,6 +4,7 @@
 package dummy
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -18,7 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header)
+type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, uncles []*types.Header) error
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
@@ -40,6 +41,10 @@ func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	}
 }
 
+func NewFaker() *DummyEngine {
+	return NewDummyEngine(new(ConsensusCallbacks))
+}
+
 var (
 	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 )
@@ -56,9 +61,32 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		return errUnclesUnsupported
 	}
 	// Ensure that the header's extra-data section is of a reasonable size
-	if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+	if !chain.Config().IsApricotPhase3(new(big.Int).SetUint64(header.Time)) {
+		if uint64(len(header.Extra)) > params.MaximumExtraDataSize {
+			return fmt.Errorf("extra-data too long: %d > %d", len(header.Extra), params.MaximumExtraDataSize)
+		}
+		// Verify BaseFee is not present before EIP-1559
+		// Note: this has been moved up from below in order to only switch on IsApricotPhase3 once.
+		if header.BaseFee != nil {
+			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
+		}
+	} else {
+		if len(header.Extra) != params.ApricotPhase3ExtraDataSize {
+			return fmt.Errorf("expected extra-data field to be: %d, but found %d", params.ApricotPhase3ExtraDataSize, len(header.Extra))
+		}
+		// Verify baseFee and rollupWindow encoding as part of header verification
+		expectedRollupWindowBytes, expectedBaseFee, err := CalcBaseFee(chain.Config(), parent, header.Time)
+		if err != nil {
+			return fmt.Errorf("failed to calculate base fee: %w", err)
+		}
+		if !bytes.Equal(expectedRollupWindowBytes, header.Extra) {
+			return fmt.Errorf("expected rollup window bytes: %x, found %x", expectedRollupWindowBytes, header.Extra)
+		}
+		if header.BaseFee.Cmp(expectedBaseFee) != 0 {
+			return fmt.Errorf("expected base fee (%d), found (%d)", expectedBaseFee, header.BaseFee)
+		}
 	}
+
 	// Verify the header's timestamp
 	if header.Time > uint64(time.Now().Add(allowedFutureBlockTime).Unix()) {
 		return consensus.ErrFutureBlock
@@ -76,7 +104,6 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 	if header.GasUsed > header.GasLimit {
 		return fmt.Errorf("invalid gasUsed: have %d, gasLimit %d", header.GasUsed, header.GasLimit)
 	}
-
 	if config := chain.Config(); config.IsApricotPhase1(new(big.Int).SetUint64((header.Time))) {
 		if header.GasLimit != params.ApricotPhase1GasLimit {
 			return fmt.Errorf("expected gas limit to be %d, but found %d", params.ApricotPhase1GasLimit, header.GasLimit)
@@ -138,11 +165,12 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 
 func (self *DummyEngine) Finalize(
 	chain consensus.ChainHeaderReader, header *types.Header,
-	state *state.StateDB, txs []*types.Transaction,
-	uncles []*types.Header) {
+	state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt,
+	uncles []*types.Header) error {
 	if self.cb.OnFinalize != nil {
-		self.cb.OnFinalize(chain, header, state, txs, uncles)
+		return self.cb.OnFinalize(chain, header, state, txs, receipts, uncles)
 	}
+	return nil
 }
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,

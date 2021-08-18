@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -29,8 +30,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
-	ethcrypto "github.com/ethereum/go-ethereum/crypto"
-
 	avalancheRPC "github.com/gorilla/rpc/v2"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -48,9 +47,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -60,12 +59,19 @@ import (
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
+const (
+	x2cRateInt64       int64 = 1000000000
+	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
+)
+
 var (
 	// x2cRate is the conversion rate between the smallest denomination on the X-Chain
 	// 1 nAVAX and the smallest denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
 	// This is only required for AVAX because the denomination of 1 AVAX is 9 decimal
 	// places on the X and P chains, but is 18 decimal places within the EVM.
-	x2cRate = big.NewInt(1000000000)
+	x2cRate       = big.NewInt(x2cRateInt64)
+	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
+
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Coreth
@@ -84,7 +90,6 @@ const (
 	maxUTXOsToFetch      = 1024
 	defaultMempoolSize   = 1024
 	codecVersion         = uint16(0)
-	txFee                = units.MilliAvax
 	secpFactoryCacheSize = 1024
 
 	decidedCacheSize    = 100
@@ -111,7 +116,6 @@ var (
 	errNoImportInputs             = errors.New("tx has no imported inputs")
 	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
 	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errSignatureInputsMismatch    = errors.New("number of inputs does not match number of signatures")
 	errWrongChainID               = errors.New("tx has wrong chain ID")
 	errInsufficientFunds          = errors.New("insufficient funds")
 	errNoExportOutputs            = errors.New("tx has no export outputs")
@@ -131,6 +135,7 @@ var (
 	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
 	errInsufficientFundsForFee    = errors.New("insufficient AVAX funds to pay transaction fee")
 	errNoEVMOutputs               = errors.New("tx has no EVM outputs")
+	errNilBaseFeeApricotPhase3    = errors.New("nil base fee is invalid in apricotPhase3")
 )
 
 // buildingBlkStatus denotes the current status of the VM in block production.
@@ -220,7 +225,6 @@ type VM struct {
 	baseCodec codec.Registry
 	codec     codec.Manager
 	clock     timer.Clock
-	txFee     uint64
 	mempool   *Mempool
 
 	shutdownChan chan struct{}
@@ -289,7 +293,9 @@ func (vm *VM) Initialize(
 	vm.shutdownChan = make(chan struct{}, 1)
 	vm.ctx = ctx
 	baseDB := dbManager.Current().Database
-	vm.chaindb = Database{prefixdb.New(ethDBPrefix, baseDB)}
+	// Use NewNested rather than New so that the structure of the database
+	// remains the same regardless of the provided baseDB type.
+	vm.chaindb = Database{prefixdb.NewNested(ethDBPrefix, baseDB)}
 	vm.db = versiondb.New(baseDB)
 	vm.acceptedBlockDB = prefixdb.New(acceptedPrefix, vm.db)
 	vm.acceptedAtomicTxDB = prefixdb.New(atomicTxPrefix, vm.db)
@@ -298,7 +304,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	// Set the ApricotPhase1BlockTimestamp for mainnet/fuji
+	// Set the chain config for mainnet/fuji chain IDs
 	switch {
 	case g.Config.ChainID.Cmp(params.AvalancheMainnetChainID) == 0:
 		g.Config = params.AvalancheMainnetChainConfig
@@ -306,6 +312,8 @@ func (vm *VM) Initialize(
 	case g.Config.ChainID.Cmp(params.AvalancheFujiChainID) == 0:
 		g.Config = params.AvalancheFujiChainConfig
 		phase0BlockValidator.extDataHashes = fujiExtDataHashes
+	case g.Config.ChainID.Cmp(params.AvalancheLocalChainID) == 0:
+		g.Config = params.AvalancheLocalChainConfig
 	}
 
 	// Allow ExtDataHashes to be garbage collected as soon as freed from block
@@ -314,37 +322,9 @@ func (vm *VM) Initialize(
 	mainnetExtDataHashes = nil
 
 	vm.chainID = g.Config.ChainID
-	vm.txFee = txFee
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
-
-	// Set minimum gas price and launch goroutine to sleep until
-	// network upgrade when the gas price must be changed
-	var gasPriceUpdate func() // must call after coreth.NewETHChain to avoid race
-	if g.Config.ApricotPhase1BlockTimestamp == nil {
-		ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
-		ethConfig.GPO.Default = params.LaunchMinGasPrice
-		ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
-	} else {
-		apricotTime := time.Unix(g.Config.ApricotPhase1BlockTimestamp.Int64(), 0)
-		log.Info(fmt.Sprintf("Apricot Upgrade Time %v.", apricotTime))
-		if time.Now().Before(apricotTime) {
-			untilApricot := time.Until(apricotTime)
-			log.Info(fmt.Sprintf("Upgrade will occur in %v", untilApricot))
-			ethConfig.Miner.GasPrice = params.LaunchMinGasPrice
-			ethConfig.GPO.Default = params.LaunchMinGasPrice
-			ethConfig.TxPool.PriceLimit = params.LaunchMinGasPrice.Uint64()
-			gasPriceUpdate = func() {
-				time.Sleep(untilApricot)
-				vm.chain.SetGasPrice(params.ApricotPhase1MinGasPrice)
-			}
-		} else {
-			ethConfig.Miner.GasPrice = params.ApricotPhase1MinGasPrice
-			ethConfig.GPO.Default = params.ApricotPhase1MinGasPrice
-			ethConfig.TxPool.PriceLimit = params.ApricotPhase1MinGasPrice.Uint64()
-		}
-	}
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -393,11 +373,9 @@ func (vm *VM) Initialize(
 	vm.chain = ethChain
 	lastAccepted := vm.chain.LastAcceptedBlock()
 
-	// Kickoff gasPriceUpdate goroutine once the backend is initialized, if it
-	// exists
-	if gasPriceUpdate != nil {
-		go gasPriceUpdate()
-	}
+	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
+	vm.handleGasPriceUpdates()
+
 	vm.notifyBuildBlockChan = toEngine
 
 	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
@@ -463,7 +441,7 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			break
 		}
 		rules := vm.chainConfig.AvalancheRules(header.Number, new(big.Int).SetUint64(header.Time))
-		if err := vm.verifyTx(tx, header.ParentHash, state, rules); err != nil {
+		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			vm.mempool.DiscardCurrentTx()
 			state.RevertToSnapshot(snapshot)
@@ -1006,8 +984,19 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 		return fmt.Errorf("failed to retrieve block state at tip while verifying atomic tx: %w", err)
 	}
 	rules := vm.currentRules()
+	parentHeader := preferredBlock.Header()
+	var nextBaseFee *big.Int
+	timestamp := time.Now().Unix()
+	bigTimestamp := big.NewInt(timestamp)
+	if vm.chainConfig.IsApricotPhase3(bigTimestamp) {
+		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(timestamp))
+		if err != nil {
+			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
+			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
+		}
+	}
 
-	return vm.verifyTx(tx, preferredBlock.Hash(), preferredState, rules)
+	return vm.verifyTx(tx, parentHeader.Hash(), nextBaseFee, preferredState, rules)
 }
 
 // verifyTx verifies that [tx] is valid to be issued into a block with parent block [parentHash]
@@ -1015,7 +1004,7 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 // Note: verifyTx may modify [state]. If [state] needs to be properly maintained, the caller is responsible
 // for reverting to the correct snapshot after calling this function. If this function is called with a
 // throwaway state, then this is not necessary.
-func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rules params.Rules) error {
+func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, baseFee *big.Int, state *state.StateDB, rules params.Rules) error {
 	parentIntf, err := vm.GetBlockInternal(ids.ID(parentHash))
 	if err != nil {
 		return fmt.Errorf("failed to get parent block: %w", err)
@@ -1024,7 +1013,7 @@ func (vm *VM) verifyTx(tx *Tx, parentHash common.Hash, state *state.StateDB, rul
 	if !ok {
 		return fmt.Errorf("parent block %s had unexpected type %T", parentIntf.ID(), parentIntf)
 	}
-	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, rules); err != nil {
+	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, parent, baseFee, rules); err != nil {
 		return err
 	}
 	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
@@ -1079,12 +1068,16 @@ func (vm *VM) GetAtomicUTXOs(
 	return utxos, lastAddrID, lastUTXOID, nil
 }
 
-// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding order)
-// to total [amount] of [assetID] owned by [keys]
-// Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input corresponds
-// to a single key, so that the signers can be passed in to [tx.Sign] which supports
-// multiple keys on a single input.
-func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids.ID, amount uint64) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+// GetSpendableFunds returns a list of EVMInputs and keys (in corresponding
+// order) to total [amount] of [assetID] owned by [keys].
+// Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input
+// corresponds to a single key, so that the signers can be passed in to
+// [tx.Sign] which supports multiple keys on a single input.
+func (vm *VM) GetSpendableFunds(
+	keys []*crypto.PrivateKeySECP256K1R,
+	assetID ids.ID,
+	amount uint64,
+) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
 	// Note: current state uses the state of the preferred block.
 	state, err := vm.chain.CurrentState()
 	if err != nil {
@@ -1134,6 +1127,106 @@ func (vm *VM) GetSpendableFunds(keys []*crypto.PrivateKeySECP256K1R, assetID ids
 	return inputs, signers, nil
 }
 
+// GetSpendableAVAXWithFee returns a list of EVMInputs and keys (in corresponding
+// order) to total [amount] + [fee] of [AVAX] owned by [keys].
+// This function accounts for the added cost of the additional inputs needed to
+// create the transaction and makes sure to skip any keys with a balance that is
+// insufficient to cover the additional fee.
+// Note: we return [][]*crypto.PrivateKeySECP256K1R even though each input
+// corresponds to a single key, so that the signers can be passed in to
+// [tx.Sign] which supports multiple keys on a single input.
+func (vm *VM) GetSpendableAVAXWithFee(
+	keys []*crypto.PrivateKeySECP256K1R,
+	amount uint64,
+	cost uint64,
+	baseFee *big.Int,
+) ([]EVMInput, [][]*crypto.PrivateKeySECP256K1R, error) {
+	// Note: current state uses the state of the preferred block.
+	state, err := vm.chain.CurrentState()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	initialFee, err := calculateDynamicFee(cost, baseFee)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	newAmount, err := math.Add64(amount, initialFee)
+	if err != nil {
+		return nil, nil, err
+	}
+	amount = newAmount
+
+	inputs := []EVMInput{}
+	signers := [][]*crypto.PrivateKeySECP256K1R{}
+	// Note: we assume that each key in [keys] is unique, so that iterating over
+	// the keys will not produce duplicated nonces in the returned EVMInput slice.
+	for _, key := range keys {
+		if amount == 0 {
+			break
+		}
+
+		prevFee, err := calculateDynamicFee(cost, baseFee)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		newCost := cost + EVMInputGas
+		newFee, err := calculateDynamicFee(newCost, baseFee)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		additionalFee := newFee - prevFee
+
+		addr := GetEthAddress(key)
+		// Since the asset is AVAX, we divide by the x2cRate to convert back to
+		// the correct denomination of AVAX that can be exported.
+		balance := new(big.Int).Div(state.GetBalance(addr), x2cRate).Uint64()
+		// If the balance for [addr] is insufficient to cover the additional cost
+		// of adding an input to the transaction, skip adding the input altogether
+		if balance <= additionalFee {
+			continue
+		}
+
+		// Update the cost for the next iteration
+		cost = newCost
+
+		newAmount, err := math.Add64(amount, additionalFee)
+		if err != nil {
+			return nil, nil, err
+		}
+		amount = newAmount
+
+		// Use the entire [balance] as an input, but if the required [amount]
+		// is less than the balance, update the [inputAmount] to spend the
+		// minimum amount to finish the transaction.
+		inputAmount := balance
+		if amount < balance {
+			inputAmount = amount
+		}
+		nonce, err := vm.GetCurrentNonce(addr)
+		if err != nil {
+			return nil, nil, err
+		}
+		inputs = append(inputs, EVMInput{
+			Address: addr,
+			Amount:  inputAmount,
+			AssetID: vm.ctx.AVAXAssetID,
+			Nonce:   nonce,
+		})
+		signers = append(signers, []*crypto.PrivateKeySECP256K1R{key})
+		amount -= inputAmount
+	}
+
+	if amount > 0 {
+		return nil, nil, errInsufficientFunds
+	}
+
+	return inputs, signers, nil
+}
+
 // GetCurrentNonce returns the nonce associated with the address at the
 // preferred block
 func (vm *VM) GetCurrentNonce(address common.Address) (uint64, error) {
@@ -1155,10 +1248,10 @@ func (vm *VM) currentRules() params.Rules {
 // follows the ruleset defined by [rules]
 func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
 	switch {
-	case rules.IsApricotPhase2:
+	case rules.IsApricotPhase3:
+		return phase3BlockValidator
+	case rules.IsApricotPhase2, rules.IsApricotPhase1:
 		// Note: the phase1BlockValidator is used in both apricot phase1 and phase2
-		return phase1BlockValidator
-	case rules.IsApricotPhase1:
 		return phase1BlockValidator
 	default:
 		return phase0BlockValidator
@@ -1191,54 +1284,19 @@ func (vm *VM) startContinuousProfiler() {
 	<-vm.shutdownChan
 }
 
-// ParseLocalAddress takes in an address for this chain and produces the ID
-func (vm *VM) ParseLocalAddress(addrStr string) (ids.ShortID, error) {
-	chainID, addr, err := vm.ParseAddress(addrStr)
+func (vm *VM) estimateBaseFee(ctx context.Context) (*big.Int, error) {
+	// Get the base fee to use
+	baseFee, err := vm.chain.APIBackend().EstimateBaseFee(ctx)
 	if err != nil {
-		return ids.ShortID{}, err
+		return nil, err
 	}
-	if chainID != vm.ctx.ChainID {
-		return ids.ShortID{}, fmt.Errorf("expected chainID to be %q but was %q",
-			vm.ctx.ChainID, chainID)
+	if baseFee == nil {
+		baseFee = initialBaseFee
+	} else {
+		// give some breathing room
+		baseFee.Mul(baseFee, big.NewInt(11))
+		baseFee.Div(baseFee, big.NewInt(10))
 	}
-	return addr, nil
-}
 
-// FormatLocalAddress takes in a raw address and produces the formatted address
-func (vm *VM) FormatLocalAddress(addr ids.ShortID) (string, error) {
-	return vm.FormatAddress(vm.ctx.ChainID, addr)
-}
-
-// FormatAddress takes in a chainID and a raw address and produces the formatted
-// address
-func (vm *VM) FormatAddress(chainID ids.ID, addr ids.ShortID) (string, error) {
-	chainIDAlias, err := vm.ctx.BCLookup.PrimaryAlias(chainID)
-	if err != nil {
-		return "", err
-	}
-	hrp := constants.GetHRP(vm.ctx.NetworkID)
-	return formatting.FormatAddress(chainIDAlias, hrp, addr.Bytes())
-}
-
-// ParseEthAddress parses [addrStr] and returns an Ethereum address
-func ParseEthAddress(addrStr string) (common.Address, error) {
-	if !common.IsHexAddress(addrStr) {
-		return common.Address{}, errInvalidAddr
-	}
-	return common.HexToAddress(addrStr), nil
-}
-
-// FormatEthAddress formats [addr] into a string
-func FormatEthAddress(addr common.Address) string {
-	return addr.Hex()
-}
-
-// GetEthAddress returns the ethereum address derived from [privKey]
-func GetEthAddress(privKey *crypto.PrivateKeySECP256K1R) common.Address {
-	return PublicKeyToEthAddress(privKey.PublicKey().(*crypto.PublicKeySECP256K1R))
-}
-
-// PublicKeyToEthAddress returns the ethereum address derived from [pubKey]
-func PublicKeyToEthAddress(pubKey *crypto.PublicKeySECP256K1R) common.Address {
-	return ethcrypto.PubkeyToAddress(*(pubKey.ToECDSA()))
+	return baseFee, nil
 }
