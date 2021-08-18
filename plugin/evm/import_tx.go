@@ -196,7 +196,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := vm.ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
 	if err != nil {
-		return fmt.Errorf("failed to fetch import UTXOs from %s with %w", tx.SourceChain, err)
+		return fmt.Errorf("failed to fetch import UTXOs from %s due to: %w", tx.SourceChain, err)
 	}
 
 	for i, in := range tx.ImportedInputs {
