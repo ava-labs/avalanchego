@@ -350,7 +350,6 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		// info
 		return block, nil
 	}
-	vm.currentBlocks[blk.ID()] = blk
 	return blk, nil
 }
 
