@@ -14,7 +14,6 @@ var (
 	errEmptyUTXO = errors.New("empty utxo is not valid")
 )
 
-// UTXO ...
 type UTXO struct {
 	UTXOID `serialize:"true"`
 	Asset  `serialize:"true"`

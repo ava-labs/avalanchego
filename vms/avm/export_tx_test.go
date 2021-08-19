@@ -5,8 +5,11 @@ package avm
 
 import (
 	"bytes"
+	"encoding/json"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/api/keystore"
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -762,7 +765,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -785,7 +788,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err != nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -822,7 +825,7 @@ func TestExportTxSemanticVerifyUnknownCredFx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -882,7 +885,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -905,7 +908,7 @@ func TestExportTxSemanticVerifyMissingUTXO(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an unknown utxo")
 	}
 }
@@ -959,7 +962,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: assetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -989,7 +992,7 @@ func TestExportTxSemanticVerifyInvalidAssetID(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an invalid asset ID")
 	}
 }
@@ -1087,7 +1090,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1147,7 +1150,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{keys[0].PublicKey().Address()},
@@ -1170,7 +1173,7 @@ func TestExportTxSemanticVerifyInvalidTransfer(t *testing.T) {
 		t.Fatalf("wrong tx type")
 	}
 
-	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Creds); err == nil {
+	if err := rawTx.UnsignedTx.SemanticVerify(vm, utx.UnsignedTx, rawTx.Credentials()); err == nil {
 		t.Fatalf("should have errored due to an invalid credential")
 	}
 }
@@ -1203,8 +1206,7 @@ func TestIssueExportTx(t *testing.T) {
 		genesisBytes,
 		nil,
 		nil,
-		issuer,
-		[]*common.Fx{{
+		issuer, []*common.Fx{{
 			ID: ids.Empty,
 			Fx: &secp256k1fx.Fx{},
 		}},
@@ -1243,7 +1245,7 @@ func TestIssueExportTx(t *testing.T) {
 		ExportedOuts: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1326,13 +1328,19 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	platformID := ids.Empty.Prefix(0)
 
 	ctx.Lock.Lock()
+
+	avmConfig := Config{
+		IndexTransactions: true,
+	}
+	avmConfigBytes, err := BuildAvmConfigBytes(avmConfig)
+	assert.NoError(t, err)
 	vm := &VM{}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		avmConfigBytes,
 		issuer,
 		[]*common.Fx{{
 			ID: ids.Empty,
@@ -1356,6 +1364,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 
 	key := keys[0]
 
+	assetID := avax.Asset{ID: avaxID}
 	tx := &Tx{UnsignedTx: &ExportTx{
 		BaseTx: BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    networkID,
@@ -1365,7 +1374,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 					TxID:        avaxID,
 					OutputIndex: 2,
 				},
-				Asset: avax.Asset{ID: avaxID},
+				Asset: assetID,
 				In: &secp256k1fx.TransferInput{
 					Amt:   startBalance,
 					Input: secp256k1fx.Input{SigIndices: []uint32{0}},
@@ -1374,9 +1383,9 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		}},
 		DestinationChain: platformChainID,
 		ExportedOuts: []*avax.TransferableOutput{{
-			Asset: avax.Asset{ID: avaxID},
+			Asset: assetID,
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1424,7 +1433,7 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 	utxoID := utxo.InputID()
 
 	peerSharedMemory := m.NewSharedMemory(platformID)
-	if err := peerSharedMemory.Remove(vm.ctx.ChainID, [][]byte{utxoID[:]}); err != nil {
+	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {RemoveRequests: [][]byte{utxoID[:]}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1432,9 +1441,17 @@ func TestClearForceAcceptedExportTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	assertIndexedTX(t, vm.db, 0, key.PublicKey().Address(), assetID.AssetID(), parsedTx.ID())
+	assertLatestIdx(t, vm.db, key.PublicKey().Address(), assetID.AssetID(), 1)
+
 	if _, err := peerSharedMemory.Get(vm.ctx.ChainID, [][]byte{utxoID[:]}); err == nil {
 		t.Fatalf("should have failed to read the utxo")
 	}
+}
+
+// Returns the byte representation of the given AVM config
+func BuildAvmConfigBytes(config Config) ([]byte, error) {
+	return json.Marshal(config)
 }
 
 func TestExportTxNotState(t *testing.T) {

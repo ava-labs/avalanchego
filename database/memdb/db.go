@@ -18,7 +18,7 @@ const (
 	Name = "memdb"
 
 	// DefaultSize is the default initial size of the memory database
-	DefaultSize = 1 << 10
+	DefaultSize = 1024
 )
 
 var (

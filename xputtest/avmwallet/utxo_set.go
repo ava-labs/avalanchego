@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-// UTXOSet ...
 type UTXOSet struct {
 	// Key: The id of a UTXO
 	// Value: The index in UTXOs of that UTXO
@@ -22,7 +21,6 @@ type UTXOSet struct {
 	UTXOs []*avax.UTXO
 }
 
-// Put ...
 func (us *UTXOSet) Put(utxo *avax.UTXO) {
 	if us.utxoMap == nil {
 		us.utxoMap = make(map[ids.ID]int)
@@ -34,7 +32,6 @@ func (us *UTXOSet) Put(utxo *avax.UTXO) {
 	}
 }
 
-// Get ...
 func (us *UTXOSet) Get(id ids.ID) *avax.UTXO {
 	if us.utxoMap == nil {
 		return nil
@@ -46,7 +43,6 @@ func (us *UTXOSet) Get(id ids.ID) *avax.UTXO {
 	return nil
 }
 
-// Remove ...
 func (us *UTXOSet) Remove(id ids.ID) *avax.UTXO {
 	i, ok := us.utxoMap[id]
 	if !ok {

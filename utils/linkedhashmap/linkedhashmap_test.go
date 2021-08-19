@@ -20,10 +20,10 @@ func TestLinkedHashmap(t *testing.T) {
 	_, exists := lh.Get(key0)
 	assert.False(exists, "shouldn't have found the value")
 
-	_, exists = lh.Oldest()
+	_, _, exists = lh.Oldest()
 	assert.False(exists, "shouldn't have found a value")
 
-	_, exists = lh.Newest()
+	_, _, exists = lh.Newest()
 	assert.False(exists, "shouldn't have found a value")
 
 	lh.Put(key0, 0)
@@ -33,12 +33,14 @@ func TestLinkedHashmap(t *testing.T) {
 	assert.True(exists, "should have found the value")
 	assert.Equal(0, val0, "wrong value")
 
-	val0, exists = lh.Oldest()
+	rkey0, val0, exists := lh.Oldest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(key0, rkey0, "wrong key")
 	assert.Equal(0, val0, "wrong value")
 
-	val0, exists = lh.Newest()
+	rkey0, val0, exists = lh.Newest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(key0, rkey0, "wrong key")
 	assert.Equal(0, val0, "wrong value")
 
 	key1 := ids.GenerateTestID()
@@ -49,12 +51,14 @@ func TestLinkedHashmap(t *testing.T) {
 	assert.True(exists, "should have found the value")
 	assert.Equal(1, val1, "wrong value")
 
-	val0, exists = lh.Oldest()
+	rkey0, val0, exists = lh.Oldest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(key0, rkey0, "wrong key")
 	assert.Equal(0, val0, "wrong value")
 
-	val1, exists = lh.Newest()
+	rkey1, val1, exists := lh.Newest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(key1, rkey1, "wrong key")
 	assert.Equal(1, val1, "wrong value")
 
 	lh.Delete(key0)
@@ -63,12 +67,14 @@ func TestLinkedHashmap(t *testing.T) {
 	_, exists = lh.Get(key0)
 	assert.False(exists, "shouldn't have found the value")
 
-	val1, exists = lh.Oldest()
+	rkey1, val1, exists = lh.Oldest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(rkey1, key1, "wrong key")
 	assert.Equal(1, val1, "wrong value")
 
-	val1, exists = lh.Newest()
+	rkey1, val1, exists = lh.Newest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(key1, rkey1, "wrong key")
 	assert.Equal(1, val1, "wrong value")
 
 	lh.Put(key0, 0)
@@ -77,12 +83,14 @@ func TestLinkedHashmap(t *testing.T) {
 	lh.Put(key1, 1)
 	assert.Equal(2, lh.Len(), "wrong hashmap length")
 
-	val0, exists = lh.Oldest()
+	rkey0, val0, exists = lh.Oldest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(key0, rkey0, "wrong key")
 	assert.Equal(0, val0, "wrong value")
 
-	val1, exists = lh.Newest()
+	rkey1, val1, exists = lh.Newest()
 	assert.True(exists, "should have found the value")
+	assert.Equal(key1, rkey1, "wrong key")
 	assert.Equal(1, val1, "wrong value")
 }
 

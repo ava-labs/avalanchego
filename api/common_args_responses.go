@@ -63,9 +63,18 @@ type JSONSpendHeader struct {
 	JSONChangeAddr
 }
 
-// GetTxArgs ...
 type GetTxArgs struct {
 	TxID     ids.ID              `json:"txID"`
+	Encoding formatting.Encoding `json:"encoding"`
+}
+
+// GetTxReply defines an object containing a single [Tx] object along with Encoding
+type GetTxReply struct {
+	// If [GetTxArgs.Encoding] is [Hex] or [CB58], [Tx] is the string
+	// representation of the tx under that encoding.
+	// If [GetTxArgs.Encoding] is [JSON], [Tx] is the actual tx, which will be
+	// returned as JSON to the caller.
+	Tx       interface{}         `json:"tx"`
 	Encoding formatting.Encoding `json:"encoding"`
 }
 

@@ -1,7 +1,7 @@
 package auth
 
 import (
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 )
 
 // Custom claim type used for API access token

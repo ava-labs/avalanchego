@@ -33,7 +33,7 @@ jobs:
           DOCKER_USERNAME: ${{ secrets.docker_username }}
           DOCKER_PASS: ${{ secrets.docker_pass }}
           DOCKER_REPO: ${{ secrets.docker_repo }}
-        run: .github/workflows/run_e2e_tests.sh avalanchego-basic --parallelism 5 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
+        run: .github/workflows/run_e2e_tests.sh avalanchego-basic --parallelism 2 --client-id $KURTOSIS_CLIENT_ID --client-secret $KURTOSIS_CLIENT_SECRET
 
       - name: Publish image to DockerHub
         env:

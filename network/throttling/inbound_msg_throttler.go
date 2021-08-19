@@ -48,7 +48,8 @@ type msgMetadata struct {
 // However, some of its metrics may not be registered.
 func NewSybilInboundMsgThrottler(
 	log logging.Logger,
-	metricsRegisterer prometheus.Registerer,
+	namespace string,
+	registerer prometheus.Registerer,
 	vdrs validators.Set,
 	config MsgThrottlerConfig,
 ) (InboundMsgThrottler, error) {
@@ -66,7 +67,7 @@ func NewSybilInboundMsgThrottler(
 		waitingToAcquire:    linkedhashmap.New(),
 		nodeToWaitingMsgIDs: make(map[ids.ShortID][]uint64),
 	}
-	if err := t.metrics.initialize(metricsRegisterer); err != nil {
+	if err := t.metrics.initialize(namespace, registerer); err != nil {
 		return nil, err
 	}
 	return t, nil
@@ -288,47 +289,47 @@ func (t *sybilInboundMsgThrottler) Release(msgSize uint64, nodeID ids.ShortID) {
 }
 
 type sybilInboundMsgThrottlerMetrics struct {
-	acquireLatency        prometheus.Histogram
+	acquireLatency        metric.Averager
 	remainingAtLargeBytes prometheus.Gauge
 	remainingVdrBytes     prometheus.Gauge
 	awaitingAcquire       prometheus.Gauge
 	awaitingRelease       prometheus.Gauge
 }
 
-func (m *sybilInboundMsgThrottlerMetrics) initialize(metricsRegisterer prometheus.Registerer) error {
-	m.acquireLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: constants.PlatformName,
-		Name:      "throttler_inbound_acquire_latency",
-		Help:      "Duration an incoming message waited to be read due to throttling",
-		Buckets:   metric.NanosecondsBuckets,
-	})
+func (m *sybilInboundMsgThrottlerMetrics) initialize(namespace string, reg prometheus.Registerer) error {
+	errs := wrappers.Errs{}
+	m.acquireLatency = metric.NewAveragerWithErrs(
+		namespace,
+		"throttler_inbound_acquire_latency",
+		"time (in ns) of an incoming message waiting to be read due to throttling",
+		reg,
+		&errs,
+	)
 	m.remainingAtLargeBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "throttler_inbound_remaining_at_large_bytes",
 		Help:      "Bytes remaining in the at large byte allocation",
 	})
 	m.remainingVdrBytes = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "throttler_inbound_remaining_validator_bytes",
 		Help:      "Bytes remaining in the validator byte allocation",
 	})
 	m.awaitingAcquire = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "throttler_inbound_awaiting_acquire",
 		Help:      "Number of incoming messages waiting to be read",
 	})
 	m.awaitingRelease = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: constants.PlatformName,
+		Namespace: namespace,
 		Name:      "throttler_inbound_awaiting_release",
 		Help:      "Number of messages currently being read/handled",
 	})
-	errs := wrappers.Errs{}
 	errs.Add(
-		metricsRegisterer.Register(m.acquireLatency),
-		metricsRegisterer.Register(m.remainingAtLargeBytes),
-		metricsRegisterer.Register(m.remainingVdrBytes),
-		metricsRegisterer.Register(m.awaitingAcquire),
-		metricsRegisterer.Register(m.awaitingRelease),
+		reg.Register(m.remainingAtLargeBytes),
+		reg.Register(m.remainingVdrBytes),
+		reg.Register(m.awaitingAcquire),
+		reg.Register(m.awaitingRelease),
 	)
 	return errs.Err
 }

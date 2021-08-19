@@ -6,6 +6,8 @@ package secp256k1fx
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -57,4 +59,32 @@ func TestMintOutputOwnersNotSorted(t *testing.T) {
 	if err := out.Verify(); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestMarshalJSONRequiresCtxWhenAddrsArePresent(t *testing.T) {
+	out := &OutputOwners{
+		Threshold: 1,
+		Addrs: []ids.ShortID{
+			{1},
+			{0},
+		},
+	}
+
+	_, err := out.MarshalJSON()
+	assert.Error(t, err)
+	assert.Equal(t, err.Error(), "cannot marshal without ctx")
+}
+
+func TestMarshalJSONDoesNotRequireCtxWhenAddrsAreAbsent(t *testing.T) {
+	out := &OutputOwners{
+		Threshold: 1,
+		Locktime:  2,
+		Addrs:     []ids.ShortID{},
+	}
+
+	b, err := out.MarshalJSON()
+	assert.NoError(t, err)
+
+	jsonData := string(b)
+	assert.Equal(t, jsonData, "{\"addresses\":[],\"locktime\":2,\"threshold\":1}")
 }

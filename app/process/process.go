@@ -5,8 +5,8 @@ package process
 
 import (
 	"fmt"
+	"path/filepath"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
@@ -27,36 +26,6 @@ const (
   /    |    \   /  / __ \|  |__/ __ \|   |  \  \___|   Y  \  ___/    \>> |
   \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\
           \/           \/          \/     \/     \/     \/     \/`
-
-	mustUpgradeMsg = `
-This version of AvalancheGo requires a database upgrade before running.
-
-To do the database upgrade, restart this node with argument --fetch-only.
-
-This will start the node in fetch only mode. It will bootstrap a new database
-version and then stop. By default, this node will attempt to bootstrap from a
-node running on the same machine (localhost) with staking port 9651. If no such
-node exists, fetch only mode will be unable to complete.
-
-The node in fetch only mode will by default not interfere with the node already
-running. When the node in fetch only mode finishes, stop the other node running
-on this computer and run without --fetch-only flag to run node normally. Fetch
-only mode will not change this node's staking key/certificate.
-
-Note that populating the new database version will approximately double the
-amount of disk space required by AvalancheGo. Ensure that this computer has at
-least enough disk space available.`
-
-	upgradingMsg = `
-Node running in fetch only mode.
-
-Fetch only mode will not change this node's staking key/certificate.
-
-Note that populating the new database version will approximately double the
-amount of disk space required by AvalancheGo. Ensure that this computer has at
-least enough disk space available.`
-
-	alreadyUpgradedMsg = "fetch only mode done. Restart this node without --fetch-only to run normally"
 )
 
 var (
@@ -96,52 +65,26 @@ func (a *App) Start() int {
 
 	// start the db manager
 	var dbManager manager.Manager
-	switch a.config.DBName {
+	switch a.config.DatabaseConfig.Name {
 	case rocksdb.Name:
-		dbManager, err = manager.NewRocksDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
+		path := filepath.Join(a.config.DatabaseConfig.Path, rocksdb.Name)
+		dbManager, err = manager.NewRocksDB(path, a.log, version.CurrentDatabase)
 	case leveldb.Name:
-		dbManager, err = manager.NewLevelDB(a.config.DBPath, a.log, version.CurrentDatabase, !a.config.FetchOnly)
+		dbManager, err = manager.NewLevelDB(a.config.DatabaseConfig.Path, a.log, version.CurrentDatabase)
 	case memdb.Name:
 		dbManager = manager.NewMemDB(version.CurrentDatabase)
 	default:
 		err = fmt.Errorf(
 			"db-type was %q but should have been one of {%s, %s, %s}",
-			a.config.DBName,
+			a.config.DatabaseConfig.Name,
 			leveldb.Name,
 			rocksdb.Name,
 			memdb.Name,
 		)
 	}
 	if err != nil {
-		a.log.Fatal("couldn't create %q db manager at %s: %s", a.config.DBName, a.config.DBPath, err)
+		a.log.Fatal("couldn't create %q db manager at %s: %s", a.config.DatabaseConfig.Name, a.config.DatabaseConfig.Path, err)
 		return 1
-	}
-
-	// ensure migrations are done
-	currentDBBootstrapped, err := dbManager.Current().Database.Has(chains.BootstrappedKey)
-	if err != nil {
-		a.log.Fatal("couldn't get whether database version %s ever bootstrapped: %s", version.CurrentDatabase, err)
-		return 1
-	}
-	a.log.Info("bootstrapped with current database version: %v", currentDBBootstrapped)
-	if a.config.FetchOnly {
-		// Flag says to run in fetch only mode
-		if currentDBBootstrapped {
-			// We have already bootstrapped the current database
-			a.log.Info(alreadyUpgradedMsg)
-			return constants.ExitCodeDoneMigrating
-		}
-		a.log.Info(upgradingMsg)
-	} else {
-		prevDB, exists := dbManager.Previous()
-		if !currentDBBootstrapped && exists && prevDB.Version.Compare(version.PrevDatabase) == 0 {
-			// If we have the previous database version but not the current one then node
-			// must run in fetch only mode (--fetch-only). The default behavior for a node in
-			// fetch only mode is to bootstrap from a node on the same machine (127.0.0.1)
-			// Tell the user to run in fetch only mode.
-			a.log.Fatal(mustUpgradeMsg)
-			return 1
-		}
 	}
 
 	defer func() {
@@ -167,18 +110,14 @@ func (a *App) Start() int {
 	if !a.config.EnableCrypto {
 		a.log.Warn("transaction signatures are not being checked")
 	}
-	crypto.EnableCrypto = a.config.EnableCrypto
-
-	if err := a.config.ConsensusParams.Valid(); err != nil {
-		a.log.Fatal("consensus parameters are invalid: %s", err)
-		return 1
-	}
+	// TODO: disable crypto verification
 
 	// Track if assertions should be executed
 	if a.config.LoggingConfig.Assertions {
 		a.log.Debug("assertions are enabled. This may slow down execution")
 	}
 
+	// TODO move this to config
 	// SupportsNAT() for NoRouter is false.
 	// Which means we tried to perform a NAT activity but we were not successful.
 	if a.config.AttemptedNATTraversal && !a.config.Nat.SupportsNAT() {
@@ -190,15 +129,15 @@ func (a *App) Start() int {
 	defer mapper.UnmapAllPorts()
 
 	// Open staking port we want for NAT Traversal to have the external port
-	// (config.StakingIP.Port) to connect to our internal listening port
+	// (config.IP.Port) to connect to our internal listening port
 	// (config.InternalStakingPort) which should be the same in most cases.
-	if a.config.StakingIP.IP().Port != 0 {
+	if a.config.IP.IP().Port != 0 {
 		mapper.Map(
 			"TCP",
-			a.config.StakingIP.IP().Port,
-			a.config.StakingIP.IP().Port,
+			a.config.IP.IP().Port,
+			a.config.IP.IP().Port,
 			stakingPortName,
-			&a.config.StakingIP,
+			&a.config.IP,
 			a.config.DynamicUpdateDuration,
 		)
 	}
@@ -222,7 +161,7 @@ func (a *App) Start() int {
 		a.config.DynamicPublicIPResolver,
 		a.config.DynamicUpdateDuration,
 		a.log,
-		&a.config.StakingIP,
+		&a.config.IP,
 	)
 	defer externalIPUpdater.Stop()
 

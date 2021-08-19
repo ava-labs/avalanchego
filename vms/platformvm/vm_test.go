@@ -70,7 +70,7 @@ var (
 	keys []*crypto.PrivateKeySECP256K1R
 
 	defaultMinValidatorStake = 5 * units.MilliAvax
-	defaultMaxValidatorStake = SupplyCap
+	defaultMaxValidatorStake = 500 * units.MilliAvax
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
@@ -285,15 +285,18 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 
 func defaultVM() (*VM, database.Database) {
 	vm := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		TxFee:              defaultTxFee,
-		MinValidatorStake:  defaultMinValidatorStake,
-		MaxValidatorStake:  defaultMaxValidatorStake,
-		MinDelegatorStake:  defaultMinDelegatorStake,
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                chains.MockManager{},
+		Validators:            validators.NewManager(),
+		TxFee:                 defaultTxFee,
+		CreateSubnetTxFee:     100 * defaultTxFee,
+		CreateBlockchainTxFee: 100 * defaultTxFee,
+		MinValidatorStake:     defaultMinValidatorStake,
+		MaxValidatorStake:     defaultMaxValidatorStake,
+		MinDelegatorStake:     defaultMinDelegatorStake,
+		MinStakeDuration:      defaultMinStakingDuration,
+		MaxStakeDuration:      defaultMaxStakingDuration,
+		StakeMintingPeriod:    defaultMaxStakingDuration,
+		ApricotPhase3Time:     defaultValidateEndTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -1648,13 +1651,13 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Put(vm.ctx.ChainID, []*atomic.Element{{
+	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2288,8 +2291,7 @@ func TestUnverifiedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parentBlk := secondAdvanceTimeBlk.Parent()
-	if parentBlkID := parentBlk.ID(); parentBlkID != firstOption.ID() {
+	if parentBlkID := secondAdvanceTimeBlk.Parent(); parentBlkID != firstOption.ID() {
 		t.Fatalf("Wrong parent block ID returned")
 	} else if err := firstOption.Verify(); err != nil {
 		t.Fatal(err)

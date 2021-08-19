@@ -13,13 +13,11 @@ import (
 
 var errInsufficientFunds = errors.New("insufficient funds")
 
-// FlowChecker ...
 type FlowChecker struct {
 	consumed, produced map[ids.ID]uint64
 	errs               wrappers.Errs
 }
 
-// NewFlowChecker ...
 func NewFlowChecker() *FlowChecker {
 	return &FlowChecker{
 		consumed: make(map[ids.ID]uint64),
@@ -27,10 +25,8 @@ func NewFlowChecker() *FlowChecker {
 	}
 }
 
-// Consume ...
 func (fc *FlowChecker) Consume(assetID ids.ID, amount uint64) { fc.add(fc.consumed, assetID, amount) }
 
-// Produce ...
 func (fc *FlowChecker) Produce(assetID ids.ID, amount uint64) { fc.add(fc.produced, assetID, amount) }
 
 func (fc *FlowChecker) add(value map[ids.ID]uint64, assetID ids.ID, amount uint64) {
@@ -39,7 +35,6 @@ func (fc *FlowChecker) add(value map[ids.ID]uint64, assetID ids.ID, amount uint6
 	fc.errs.Add(err)
 }
 
-// Verify ...
 func (fc *FlowChecker) Verify() error {
 	if !fc.errs.Errored() {
 		for assetID, producedAssetAmount := range fc.produced {

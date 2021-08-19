@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// TimedTx ...
 type TimedTx interface {
 	ID() ids.ID
 	StartTime() time.Time
@@ -73,13 +72,10 @@ func (h *EventHeap) Timestamp() time.Time {
 	return tx.EndTime()
 }
 
-// Add ...
 func (h *EventHeap) Add(tx *Tx) { heap.Push(h, tx) }
 
-// Peek ...
 func (h *EventHeap) Peek() *Tx { return h.Txs[0] }
 
-// Remove ...
 func (h *EventHeap) Remove() *Tx { return heap.Pop(h).(*Tx) }
 
 // Push implements the heap interface

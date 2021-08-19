@@ -55,10 +55,7 @@ func defaultService(t *testing.T) *Service {
 	vm, _ := defaultVM()
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
-	ks, err := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
-	if err != nil {
-		t.Fatal(err)
-	}
+	ks := keystore.New(logging.NoLog{}, manager.NewMemDB(version.DefaultVersion1_0_0))
 	if err := ks.CreateUser(testUsername, testPassword); err != nil {
 		t.Fatal(err)
 	}
@@ -223,13 +220,13 @@ func TestGetTxStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	inputID := utxo.InputID()
-	if err := peerSharedMemory.Put(service.vm.ctx.ChainID, []*atomic.Element{{
+	if err := peerSharedMemory.Apply(map[ids.ID]*atomic.Requests{service.vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
 		Key:   inputID[:],
 		Value: utxoBytes,
 		Traits: [][]byte{
 			recipientKey.PublicKey().Address().Bytes(),
 		},
-	}}); err != nil {
+	}}}}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -453,10 +450,10 @@ func TestGetBalance(t *testing.T) {
 			t.Fatal(err)
 		}
 		if reply.Balance != cjson.Uint64(defaultBalance) {
-			t.Fatalf("Wrong balance. Expected %d ; Returned %d", reply.Balance, defaultBalance)
+			t.Fatalf("Wrong balance. Expected %d ; Returned %d", defaultBalance, reply.Balance)
 		}
 		if reply.Unlocked != cjson.Uint64(defaultBalance) {
-			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", reply.Unlocked, defaultBalance)
+			t.Fatalf("Wrong unlocked balance. Expected %d ; Returned %d", defaultBalance, reply.Unlocked)
 		}
 		if reply.LockedStakeable != 0 {
 			t.Fatalf("Wrong locked stakeable balance. Expected %d ; Returned %d", reply.LockedStakeable, 0)

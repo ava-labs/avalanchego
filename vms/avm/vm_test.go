@@ -272,16 +272,20 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan common.Message, 1)
-	vm := &VM{
-		txFee:         testTxFee,
-		creationTxFee: testTxFee,
+	vm := &VM{Factory: Factory{
+		TxFee:            testTxFee,
+		CreateAssetTxFee: testTxFee,
+	}}
+	configBytes, err := BuildAvmConfigBytes(Config{IndexTransactions: true})
+	if err != nil {
+		tb.Fatal("should not have caused error in creating avm config bytes")
 	}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		configBytes,
 		issuer,
 		[]*common.Fx{
 			{
@@ -369,7 +373,7 @@ func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*Tx)
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -544,7 +548,7 @@ func TestTxSerialization(t *testing.T) {
 		Denomination: 0,
 		States: []*InitialState{
 			{
-				FxID: 0,
+				FxIndex: 0,
 				Outs: []verify.State{
 					&secp256k1fx.MintOutput{
 						OutputOwners: secp256k1fx.OutputOwners{
@@ -915,7 +919,7 @@ func TestIssueNFT(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 1,
+			FxIndex: 1,
 			Outs: []verify.State{
 				&nftfx.MintOutput{
 					GroupID: 1,
@@ -993,8 +997,8 @@ func TestIssueNFT(t *testing.T) {
 				},
 			}},
 		},
-		Creds: []verify.Verifiable{
-			&nftfx.Credential{},
+		Creds: []*FxCredential{
+			{Verifiable: &nftfx.Credential{}},
 		},
 	}
 	if err := transferNFTTx.SignNFTFx(vm.codec, nil); err != nil {
@@ -1066,7 +1070,7 @@ func TestIssueProperty(t *testing.T) {
 		Symbol:       "TR",
 		Denomination: 0,
 		States: []*InitialState{{
-			FxID: 2,
+			FxIndex: 2,
 			Outs: []verify.State{
 				&propertyfx.MintOutput{
 					OutputOwners: secp256k1fx.OutputOwners{
@@ -1124,10 +1128,12 @@ func TestIssueProperty(t *testing.T) {
 	fixedSig := [crypto.SECP256K1RSigLen]byte{}
 	copy(fixedSig[:], sig)
 
-	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &propertyfx.Credential{
-		Credential: secp256k1fx.Credential{
-			Sigs: [][crypto.SECP256K1RSigLen]byte{
-				fixedSig,
+	mintPropertyTx.Creds = append(mintPropertyTx.Creds, &FxCredential{
+		Verifiable: &propertyfx.Credential{
+			Credential: secp256k1fx.Credential{
+				Sigs: [][crypto.SECP256K1RSigLen]byte{
+					fixedSig,
+				},
 			},
 		},
 	})
@@ -1157,7 +1163,7 @@ func TestIssueProperty(t *testing.T) {
 		}},
 	}}
 
-	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &propertyfx.Credential{})
+	burnPropertyTx.Creds = append(burnPropertyTx.Creds, &FxCredential{Verifiable: &propertyfx.Credential{}})
 
 	unsignedBytes, err = vm.codec.Marshal(codecVersion, burnPropertyTx.UnsignedTx)
 	if err != nil {
@@ -1513,7 +1519,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 			},
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			In: &secp256k1fx.TransferInput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				Input: secp256k1fx.Input{
 					SigIndices: []uint32{
 						0,
@@ -1524,7 +1530,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - 2*vm.txFee,
+				Amt: startBalance - 2*vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},

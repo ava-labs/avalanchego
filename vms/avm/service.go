@@ -31,6 +31,9 @@ const (
 
 	// Max number of addresses allowed for a single keystore user
 	maxKeystoreAddresses = 5000
+
+	// Max number of items allowed in a page
+	maxPageSize uint64 = 1024
 )
 
 var (
@@ -59,7 +62,7 @@ type FormattedAssetID struct {
 
 // IssueTx attempts to issue a transaction into consensus
 func (service *Service) IssueTx(r *http.Request, args *api.FormattedTx, reply *api.JSONTxID) error {
-	service.vm.ctx.Log.Info("AVM: IssueTx called with %s", args.Tx)
+	service.vm.ctx.Log.Debug("AVM: IssueTx called with %s", args.Tx)
 
 	txBytes, err := formatting.Decode(args.Encoding, args.Tx)
 	if err != nil {
@@ -79,9 +82,64 @@ type GetTxStatusReply struct {
 	Status choices.Status `json:"status"`
 }
 
+type GetAddressTxsArgs struct {
+	api.JSONAddress
+	// Cursor used as a page index / offset
+	Cursor json.Uint64 `json:"cursor"`
+	// PageSize num of items per page
+	PageSize json.Uint64 `json:"pageSize"`
+	// AssetID defaulted to AVAX if omitted or left blank
+	AssetID string `json:"assetID"`
+}
+
+type GetAddressTxsReply struct {
+	TxIDs []ids.ID `json:"txIDs"`
+	// Cursor used as a page index / offset
+	Cursor json.Uint64 `json:"cursor"`
+}
+
+// GetAddressTxs returns list of transactions for a given address
+func (service *Service) GetAddressTxs(r *http.Request, args *GetAddressTxsArgs, reply *GetAddressTxsReply) error {
+	service.vm.ctx.Log.Debug("AVM: GetAddressTxs called with address=%s, assetID=%s, cursor=%d, pageSize=%d", args.Address, args.AssetID, args.Cursor, args.PageSize)
+	pageSize := uint64(args.PageSize)
+	if pageSize > maxPageSize {
+		return fmt.Errorf("pageSize > maximum allowed (%d)", maxPageSize)
+	} else if pageSize == 0 {
+		pageSize = maxPageSize
+	}
+
+	// Parse to address
+	address, err := service.vm.ParseLocalAddress(args.Address)
+	if err != nil {
+		return fmt.Errorf("couldn't parse argument 'address' to address: %w", err)
+	}
+
+	// Lookup assetID
+	assetID, err := service.vm.lookupAssetID(args.AssetID)
+	if err != nil {
+		return fmt.Errorf("specified `assetID` is invalid: %w", err)
+	}
+
+	cursor := uint64(args.Cursor)
+
+	service.vm.ctx.Log.Debug("Fetching up to %d transactions for address %s, assetID %s, cursor %d", pageSize, address, assetID, cursor)
+	// Read transactions from the indexer
+	reply.TxIDs, err = service.vm.addressTxsIndexer.Read(address[:], assetID, cursor, pageSize)
+	if err != nil {
+		return err
+	}
+	service.vm.ctx.Log.Debug("Fetched %d transactions for address %s, assetID %s, cursor %d", len(reply.TxIDs), address, assetID, cursor)
+
+	// To get the next set of tx IDs, the user should provide this cursor.
+	// e.g. if they provided cursor 5, and read 6 tx IDs, they should start
+	// next time from index (cursor) 11.
+	reply.Cursor = json.Uint64(cursor + uint64(len(reply.TxIDs)))
+	return nil
+}
+
 // GetTxStatus returns the status of the specified transaction
 func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
-	service.vm.ctx.Log.Info("AVM: GetTxStatus called with %s", args.TxID)
+	service.vm.ctx.Log.Debug("AVM: GetTxStatus called with %s", args.TxID)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
@@ -97,8 +155,8 @@ func (service *Service) GetTxStatus(r *http.Request, args *api.JSONTxID, reply *
 }
 
 // GetTx returns the specified transaction
-func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.FormattedTx) error {
-	service.vm.ctx.Log.Info("AVM: GetTx called with %s", args.TxID)
+func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.GetTxReply) error {
+	service.vm.ctx.Log.Debug("AVM: GetTx called with %s", args.TxID)
 
 	if args.TxID == ids.Empty {
 		return errNilTxID
@@ -112,18 +170,24 @@ func (service *Service) GetTx(r *http.Request, args *api.GetTxArgs, reply *api.F
 		return errUnknownTx
 	}
 
+	reply.Encoding = args.Encoding
+
+	if args.Encoding == formatting.JSON {
+		reply.Tx = tx
+		return tx.Init(service.vm)
+	}
+
 	var err error
-	reply.Tx, err = formatting.Encode(args.Encoding, tx.Bytes())
+	reply.Tx, err = formatting.EncodeWithChecksum(args.Encoding, tx.Bytes())
 	if err != nil {
 		return fmt.Errorf("couldn't encode tx as string: %s", err)
 	}
-	reply.Encoding = args.Encoding
 	return nil
 }
 
 // GetUTXOs gets all utxos for passed in addresses
 func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply *api.GetUTXOsReply) error {
-	service.vm.ctx.Log.Info("AVM: GetUTXOs called for with %s", args.Addresses)
+	service.vm.ctx.Log.Debug("AVM: GetUTXOs called for with %s", args.Addresses)
 
 	if len(args.Addresses) == 0 {
 		return errNoAddresses
@@ -198,7 +262,7 @@ func (service *Service) GetUTXOs(r *http.Request, args *api.GetUTXOsArgs, reply 
 		if err != nil {
 			return fmt.Errorf("problem marshalling UTXO: %w", err)
 		}
-		reply.UTXOs[i], err = formatting.Encode(args.Encoding, b)
+		reply.UTXOs[i], err = formatting.EncodeWithChecksum(args.Encoding, b)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO %s as string: %s", utxo.InputID(), err)
 		}
@@ -231,7 +295,7 @@ type GetAssetDescriptionReply struct {
 
 // GetAssetDescription creates an empty account with the name passed in
 func (service *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescriptionArgs, reply *GetAssetDescriptionReply) error {
-	service.vm.ctx.Log.Info("AVM: GetAssetDescription called with %s", args.AssetID)
+	service.vm.ctx.Log.Debug("AVM: GetAssetDescription called with %s", args.AssetID)
 
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
@@ -277,7 +341,7 @@ type GetBalanceReply struct {
 // Otherwise, returned balance includes assets held only partially by the
 // address, and includes balances with locktime in the future.
 func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
-	service.vm.ctx.Log.Info("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
+	service.vm.ctx.Log.Debug("AVM: GetBalance called with address: %s assetID: %s", args.Address, args.AssetID)
 
 	addr, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
@@ -323,13 +387,11 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 	return nil
 }
 
-// Balance ...
 type Balance struct {
 	AssetID string      `json:"asset"`
 	Balance json.Uint64 `json:"balance"`
 }
 
-// GetAllBalancesArgs ...
 type GetAllBalancesArgs struct {
 	api.JSONAddress
 	IncludePartial bool `json:"includePartial"`
@@ -347,7 +409,7 @@ type GetAllBalancesReply struct {
 // Otherwise, returned balance/UTXOs includes assets held only partially by the
 // address, and includes balances with locktime in the future.
 func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
-	service.vm.ctx.Log.Info("AVM: GetAllBalances called with address: %s", args.Address)
+	service.vm.ctx.Log.Debug("AVM: GetAllBalances called with address: %s", args.Address)
 
 	address, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
@@ -435,7 +497,7 @@ type AssetIDChangeAddr struct {
 
 // CreateAsset returns ID of the newly created asset
 func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateAsset called with name: %s symbol: %s number of holders: %d number of minters: %d",
+	service.vm.ctx.Log.Debug("AVM: CreateAsset called with name: %s symbol: %s number of holders: %d number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.InitialHolders),
@@ -475,7 +537,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 		utxos,
 		kc,
 		map[ids.ID]uint64{
-			service.vm.feeAssetID: service.vm.creationTxFee,
+			service.vm.feeAssetID: service.vm.CreateAssetTxFee,
 		},
 	)
 	if err != nil {
@@ -483,11 +545,11 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.creationTxFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.CreateAssetTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.creationTxFee,
+				Amt: amountSpent - service.vm.CreateAssetTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -498,8 +560,8 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 	}
 
 	initialState := &InitialState{
-		FxID: 0, // TODO: Should lookup secp256k1fx FxID
-		Outs: make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
+		FxIndex: 0, // TODO: Should lookup secp256k1fx FxID
+		Outs:    make([]verify.State, 0, len(args.InitialHolders)+len(args.MinterSets)),
 	}
 	for _, holder := range args.InitialHolders {
 		addr, err := service.vm.ParseLocalAddress(holder.Address)
@@ -561,7 +623,7 @@ func (service *Service) CreateAsset(r *http.Request, args *CreateAssetArgs, repl
 
 // CreateFixedCapAsset returns ID of the newly created asset
 func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
+	service.vm.ctx.Log.Debug("AVM: CreateFixedCapAsset called with name: %s symbol: %s number of holders: %d",
 		args.Name,
 		args.Symbol,
 		len(args.InitialHolders),
@@ -572,7 +634,7 @@ func (service *Service) CreateFixedCapAsset(r *http.Request, args *CreateAssetAr
 
 // CreateVariableCapAsset returns ID of the newly created asset
 func (service *Service) CreateVariableCapAsset(r *http.Request, args *CreateAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Debug("AVM: CreateVariableCapAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.MinterSets),
@@ -591,7 +653,7 @@ type CreateNFTAssetArgs struct {
 
 // CreateNFTAsset returns ID of the newly created asset
 func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs, reply *AssetIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: CreateNFTAsset called with name: %s symbol: %s number of minters: %d",
+	service.vm.ctx.Log.Debug("AVM: CreateNFTAsset called with name: %s symbol: %s number of minters: %d",
 		args.Name,
 		args.Symbol,
 		len(args.MinterSets),
@@ -630,7 +692,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 		utxos,
 		kc,
 		map[ids.ID]uint64{
-			service.vm.feeAssetID: service.vm.creationTxFee,
+			service.vm.feeAssetID: service.vm.CreateAssetTxFee,
 		},
 	)
 	if err != nil {
@@ -638,11 +700,11 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.creationTxFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.CreateAssetTxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.creationTxFee,
+				Amt: amountSpent - service.vm.CreateAssetTxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -653,8 +715,8 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 	}
 
 	initialState := &InitialState{
-		FxID: 1, // TODO: Should lookup nftfx FxID
-		Outs: make([]verify.State, 0, len(args.MinterSets)),
+		FxIndex: 1, // TODO: Should lookup nftfx FxID
+		Outs:    make([]verify.State, 0, len(args.MinterSets)),
 	}
 	for i, owner := range args.MinterSets {
 		minter := &nftfx.MintOutput{
@@ -703,7 +765,7 @@ func (service *Service) CreateNFTAsset(r *http.Request, args *CreateNFTAssetArgs
 
 // CreateAddress creates an address for the user [args.Username]
 func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply *api.JSONAddress) error {
-	service.vm.ctx.Log.Info("AVM: CreateAddress called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: CreateAddress called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -746,7 +808,7 @@ func (service *Service) CreateAddress(r *http.Request, args *api.UserPass, reply
 
 // ListAddresses returns all of the addresses controlled by user [args.Username]
 func (service *Service) ListAddresses(_ *http.Request, args *api.UserPass, response *api.JSONAddresses) error {
-	service.vm.ctx.Log.Info("AVM: ListAddresses called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ListAddresses called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -790,7 +852,7 @@ type ExportKeyReply struct {
 
 // ExportKey returns a private key from the provided user
 func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *ExportKeyReply) error {
-	service.vm.ctx.Log.Info("AVM: ExportKey called for user %q", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ExportKey called for user %q", args.Username)
 
 	addr, err := service.vm.ParseLocalAddress(args.Address)
 	if err != nil {
@@ -812,7 +874,7 @@ func (service *Service) ExportKey(r *http.Request, args *ExportKeyArgs, reply *E
 
 	// We assume that the maximum size of a byte slice that
 	// can be stringified is at least the length of a SECP256K1 private key
-	privKeyStr, _ := formatting.Encode(formatting.CB58, sk.Bytes())
+	privKeyStr, _ := formatting.EncodeWithChecksum(formatting.CB58, sk.Bytes())
 	reply.PrivateKey = constants.SecretKeyPrefix + privKeyStr
 	return db.Close()
 }
@@ -831,7 +893,7 @@ type ImportKeyReply struct {
 
 // ImportKey adds a private key to the provided user
 func (service *Service) ImportKey(r *http.Request, args *ImportKeyArgs, reply *api.JSONAddress) error {
-	service.vm.ctx.Log.Info("AVM: ImportKey called for user '%s'", args.Username)
+	service.vm.ctx.Log.Debug("AVM: ImportKey called for user '%s'", args.Username)
 
 	db, err := service.vm.ctx.Keystore.GetDatabase(args.Username, args.Password)
 	if err != nil {
@@ -932,7 +994,7 @@ func (service *Service) Send(r *http.Request, args *SendArgs, reply *api.JSONTxI
 
 // SendMultiple sends a transaction with multiple outputs.
 func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: Send called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: SendMultiple called with username: %s", args.Username)
 
 	// Validate the memo field
 	memoBytes := []byte(args.Memo)
@@ -1018,7 +1080,7 @@ func (service *Service) SendMultiple(r *http.Request, args *SendMultipleArgs, re
 		amountsWithFee[assetID] = amount
 	}
 
-	amountWithFee, err := safemath.Add64(amounts[service.vm.feeAssetID], service.vm.txFee)
+	amountWithFee, err := safemath.Add64(amounts[service.vm.feeAssetID], service.vm.TxFee)
 	if err != nil {
 		return fmt.Errorf("problem calculating required spend amount: %w", err)
 	}
@@ -1084,7 +1146,7 @@ type MintArgs struct {
 
 // Mint issues a transaction that mints more of the asset
 func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: Mint called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: Mint called with username: %s", args.Username)
 
 	if args.Amount == 0 {
 		return errInvalidMintAmount
@@ -1129,7 +1191,7 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 		feeUTXOs,
 		feeKc,
 		map[ids.ID]uint64{
-			service.vm.feeAssetID: service.vm.txFee,
+			service.vm.feeAssetID: service.vm.TxFee,
 		},
 	)
 	if err != nil {
@@ -1137,11 +1199,11 @@ func (service *Service) Mint(r *http.Request, args *MintArgs, reply *api.JSONTxI
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.TxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1203,7 +1265,7 @@ type SendNFTArgs struct {
 
 // SendNFT sends an NFT
 func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: SendNFT called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: SendNFT called with username: %s", args.Username)
 
 	// Parse the asset ID
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
@@ -1246,7 +1308,7 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 		utxos,
 		kc,
 		map[ids.ID]uint64{
-			service.vm.feeAssetID: service.vm.txFee,
+			service.vm.feeAssetID: service.vm.TxFee,
 		},
 	)
 	if err != nil {
@@ -1254,11 +1316,11 @@ func (service *Service) SendNFT(r *http.Request, args *SendNFTArgs, reply *api.J
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.TxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1316,7 +1378,7 @@ type MintNFTArgs struct {
 
 // MintNFT issues a MintNFT transaction and returns the ID of the newly created transaction
 func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: MintNFT called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: MintNFT called with username: %s", args.Username)
 
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
 	if err != nil {
@@ -1362,7 +1424,7 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 		feeUTXOs,
 		feeKc,
 		map[ids.ID]uint64{
-			service.vm.feeAssetID: service.vm.txFee,
+			service.vm.feeAssetID: service.vm.TxFee,
 		},
 	)
 	if err != nil {
@@ -1370,11 +1432,11 @@ func (service *Service) MintNFT(r *http.Request, args *MintNFTArgs, reply *api.J
 	}
 
 	outs := []*avax.TransferableOutput{}
-	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent > service.vm.TxFee {
 		outs = append(outs, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: service.vm.feeAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: amountSpent - service.vm.txFee,
+				Amt: amountSpent - service.vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Locktime:  0,
 					Threshold: 1,
@@ -1448,7 +1510,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportArgs, reply *api
 // The AVAX must have already been exported from the P/C-Chain.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSONTxID) error {
-	service.vm.ctx.Log.Info("AVM: Import called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: Import called with username: %s", args.Username)
 
 	chainID, err := service.vm.ctx.BCLookup.Lookup(args.SourceChain)
 	if err != nil {
@@ -1478,13 +1540,13 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 	ins := []*avax.TransferableInput{}
 	keys := [][]*crypto.PrivateKeySECP256K1R{}
 
-	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent < service.vm.txFee {
+	if amountSpent := amountsSpent[service.vm.feeAssetID]; amountSpent < service.vm.TxFee {
 		var localAmountsSpent map[ids.ID]uint64
 		localAmountsSpent, ins, keys, err = service.vm.Spend(
 			utxos,
 			kc,
 			map[ids.ID]uint64{
-				service.vm.feeAssetID: service.vm.txFee - amountSpent,
+				service.vm.feeAssetID: service.vm.TxFee - amountSpent,
 			},
 		)
 		if err != nil {
@@ -1501,7 +1563,7 @@ func (service *Service) Import(_ *http.Request, args *ImportArgs, reply *api.JSO
 
 	// Because we ensured that we had enough inputs for the fee, we can
 	// safely just remove it without concern for underflow.
-	amountsSpent[service.vm.feeAssetID] -= service.vm.txFee
+	amountsSpent[service.vm.feeAssetID] -= service.vm.TxFee
 
 	keys = append(keys, importKeys...)
 
@@ -1579,7 +1641,7 @@ type ExportArgs struct {
 // After this tx is accepted, the AVAX must be imported to the P/C-chain with an importTx.
 // Returns the ID of the newly created atomic transaction
 func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSONTxIDChangeAddr) error {
-	service.vm.ctx.Log.Info("AVM: Export called with username: %s", args.Username)
+	service.vm.ctx.Log.Debug("AVM: Export called with username: %s", args.Username)
 
 	// Parse the asset ID
 	assetID, err := service.vm.lookupAssetID(args.AssetID)
@@ -1623,13 +1685,13 @@ func (service *Service) Export(_ *http.Request, args *ExportArgs, reply *api.JSO
 
 	amounts := map[ids.ID]uint64{}
 	if assetID == service.vm.feeAssetID {
-		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.txFee)
+		amountWithFee, err := safemath.Add64(uint64(args.Amount), service.vm.TxFee)
 		if err != nil {
 			return fmt.Errorf("problem calculating required spend amount: %w", err)
 		}
 		amounts[service.vm.feeAssetID] = amountWithFee
 	} else {
-		amounts[service.vm.feeAssetID] = service.vm.txFee
+		amounts[service.vm.feeAssetID] = service.vm.TxFee
 		amounts[assetID] = uint64(args.Amount)
 	}
 

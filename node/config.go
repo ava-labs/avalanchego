@@ -21,152 +21,180 @@ import (
 	"github.com/ava-labs/avalanchego/utils/profiler"
 )
 
-// Config contains all of the configurations of an Avalanche node.
-type Config struct {
-	genesis.Params
+type IPCConfig struct {
+	IPCAPIEnabled      bool     `json:"ipcAPIEnabled"`
+	IPCPath            string   `json:"ipcPath"`
+	IPCDefaultChainIDs []string `json:"ipcDefaultChainIDs"`
+}
 
-	// If true, bootstrap the current database version and then end the node.
-	FetchOnly bool
+type APIAuthConfig struct {
+	APIRequireAuthToken bool   `json:"apiRequireAuthToken"`
+	APIAuthPassword     string `json:"-"`
+}
 
-	// Genesis information
-	GenesisBytes []byte
-	AvaxAssetID  ids.ID
+type APIIndexerConfig struct {
+	IndexAPIEnabled      bool `json:"indexAPIEnabled"`
+	IndexAllowIncomplete bool `json:"indexAllowIncomplete"`
+}
 
-	// protocol to use for opening the network interface
-	Nat nat.Router
+type HTTPConfig struct {
+	APIConfig `json:"apiConfig"`
+	HTTPHost  string `json:"httpHost"`
+	HTTPPort  uint16 `json:"httpPort"`
 
-	// Attempted NAT Traversal did we attempt
-	AttemptedNATTraversal bool
+	HTTPSEnabled  bool   `json:"httpsEnabled"`
+	HTTPSKeyFile  string `json:"httpsKeyFile"`
+	HTTPSCertFile string `json:"httpsCertFile"`
 
-	// ID of the network this node should connect to
-	NetworkID uint32
+	APIAllowedOrigins []string `json:"apiAllowedOrigins"`
+}
 
-	// Assertions configuration
-	EnableAssertions bool
-
-	// Crypto configuration
-	EnableCrypto bool
-
-	// Path to database
-	DBPath string
-
-	// Name of the database type to use
-	DBName string
-
-	// Staking configuration
-	StakingIP             utils.DynamicIPDesc
-	EnableStaking         bool
-	StakingTLSCert        tls.Certificate
-	DisabledStakingWeight uint64
-
-	// Throttling
-	SendQueueSize uint32
-
-	// Health
-	HealthCheckFreq time.Duration
-
-	// Network configuration
-	NetworkConfig      network.Config
-	PeerListSize       uint32
-	PeerListGossipSize uint32
-	PeerListGossipFreq time.Duration
-
-	// Benchlist Configuration
-	BenchlistConfig benchlist.Config
-
-	// Bootstrapping configuration
-	BootstrapIDs []ids.ShortID
-	BootstrapIPs []utils.IPDesc
-
-	// HTTP configuration
-	HTTPHost string
-	HTTPPort uint16
-
-	HTTPSEnabled        bool
-	HTTPSKeyFile        string
-	HTTPSCertFile       string
-	APIRequireAuthToken bool
-	APIAuthPassword     string
-	APIAllowedOrigins   []string
+type APIConfig struct {
+	APIAuthConfig    `json:"authConfig"`
+	APIIndexerConfig `json:"indexerConfig"`
+	IPCConfig        `json:"ipcConfig"`
 
 	// Enable/Disable APIs
-	AdminAPIEnabled    bool
-	InfoAPIEnabled     bool
-	KeystoreAPIEnabled bool
-	MetricsAPIEnabled  bool
-	HealthAPIEnabled   bool
-	IndexAPIEnabled    bool
+	AdminAPIEnabled    bool `json:"adminAPIEnabled"`
+	InfoAPIEnabled     bool `json:"infoAPIEnabled"`
+	KeystoreAPIEnabled bool `json:"keystoreAPIEnabled"`
+	MetricsAPIEnabled  bool `json:"metricsAPIEnabled"`
+	HealthAPIEnabled   bool `json:"healthAPIEnabled"`
+}
 
-	// Profiling configurations
-	ProfilerConfig profiler.Config
+type PeerListGossipConfig struct {
+	PeerListSize       uint32        `json:"peerListSize"`
+	PeerListGossipSize uint32        `json:"peerListGossipSize"`
+	PeerListGossipFreq time.Duration `json:"peerListGossipFreq"`
+}
 
-	// Logging configuration
-	LoggingConfig logging.Config
-
-	// Plugin directory
-	PluginDir string
-
-	// Consensus configuration
-	ConsensusParams avalanche.Parameters
-
-	// IPC configuration
-	IPCAPIEnabled      bool
-	IPCPath            string
-	IPCDefaultChainIDs []string
-
-	// Metrics
-	MeterVMEnabled bool
-
-	// Router that is used to handle incoming consensus messages
-	ConsensusRouter          router.Router
-	RouterHealthConfig       router.HealthConfig
-	ConsensusShutdownTimeout time.Duration
-	ConsensusGossipFrequency time.Duration
+type ConsensusGossipConfig struct {
+	// Gossip a container in the accepted frontier every [ConsensusGossipFrequency]
+	ConsensusGossipFrequency time.Duration `json:"consensusGossipFreq"`
 	// Number of peers to gossip to when gossiping accepted frontier
-	ConsensusGossipAcceptedFrontierSize uint
+	ConsensusGossipAcceptedFrontierSize uint `json:"consensusGossipAcceptedFrontierSize"`
 	// Number of peers to gossip each accepted container to
-	ConsensusGossipOnAcceptSize uint
+	ConsensusGossipOnAcceptSize uint `json:"consensusGossipOnAcceptSize"`
+}
 
+type GossipConfig struct {
+	PeerListGossipConfig
+	ConsensusGossipConfig
+}
+
+type IPConfig struct {
+	IP utils.DynamicIPDesc `json:"ip"`
+	// True if we attempted NAT Traversal
+	AttemptedNATTraversal bool `json:"attemptedNATTraversal"`
+	// Tries to perform network address translation
+	Nat nat.Router `json:"-"`
 	// Dynamic Update duration for IP or NAT traversal
-	DynamicUpdateDuration time.Duration
+	DynamicUpdateDuration time.Duration `json:"dynamicUpdateDuration"`
+	// Tries to resolve our IP from an external source
+	DynamicPublicIPResolver dynamicip.Resolver `json:"-"`
+}
 
-	DynamicPublicIPResolver dynamicip.Resolver
+type StakingConfig struct {
+	genesis.StakingConfig
+	EnableStaking         bool            `json:"enableStaking"`
+	StakingTLSCert        tls.Certificate `json:"-"`
+	DisabledStakingWeight uint64          `json:"disabledStakingWeight"`
+	StakingKeyPath        string          `json:"stakingKeyPath"`
+	StakingCertPath       string          `json:"stakingCertPath"`
+}
 
-	// Throttling incoming connections
-	ConnMeterResetDuration time.Duration
-	ConnMeterMaxConns      int
-
-	// Subnet Whitelist
-	WhitelistedSubnets ids.Set
-
-	IndexAllowIncomplete bool
-
+type BootstrapConfig struct {
 	// Should Bootstrap be retried
-	RetryBootstrap bool
+	RetryBootstrap bool `json:"retryBootstrap"`
 
 	// Max number of times to retry bootstrap
-	RetryBootstrapMaxAttempts int
+	RetryBootstrapMaxAttempts int `json:"retryBootstrapMaxAttempts"`
 
 	// Timeout when connecting to bootstrapping beacons
-	BootstrapBeaconConnectionTimeout time.Duration
+	BootstrapBeaconConnectionTimeout time.Duration `json:"bootstrapBeaconConnectionTimeout"`
 
 	// Max number of containers in a multiput message sent by this node.
-	BootstrapMultiputMaxContainersSent int
+	BootstrapMultiputMaxContainersSent int `json:"bootstrapMultiputMaxContainersSent"`
 
 	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
-	BootstrapMultiputMaxContainersReceived int
-
-	// Peer alias configuration
-	PeerAliasTimeout time.Duration
-
-	// ChainConfigs
-	ChainConfigs map[string]chains.ChainConfig
+	BootstrapMultiputMaxContainersReceived int `json:"bootstrapMultiputMaxContainersReceived"`
 
 	// Max time to spend fetching a container and its
 	// ancestors while responding to a GetAncestors message
-	BootstrapMaxTimeGetAncestors time.Duration
+	BootstrapMaxTimeGetAncestors time.Duration `json:"bootstrapMaxTimeGetAncestors"`
+
+	BootstrapIDs []ids.ShortID  `json:"bootstrapIDs"`
+	BootstrapIPs []utils.IPDesc `json:"bootstrapIPs"`
+}
+
+type DatabaseConfig struct {
+	// Path to database
+	Path string `json:"path"`
+
+	// Name of the database type to use
+	Name string `json:"name"`
+}
+
+// Config contains all of the configurations of an Avalanche node.
+type Config struct {
+	HTTPConfig          `json:"httpConfig"`
+	GossipConfig        `json:"gossipConfig"`
+	IPConfig            `json:"ipConfig"`
+	StakingConfig       `json:"stakingConfig"`
+	genesis.TxFeeConfig `json:"txFeeConfig"`
+	genesis.EpochConfig `json:"epochConfig"`
+	BootstrapConfig     `json:"bootstrapConfig"`
+	DatabaseConfig      `json:"databaseConfig"`
+
+	// Genesis information
+	GenesisBytes []byte `json:"-"`
+	AvaxAssetID  ids.ID `json:"avaxAssetID"`
+
+	// ID of the network this node should connect to
+	NetworkID uint32 `json:"networkID"`
+
+	// Assertions configuration
+	EnableAssertions bool `json:"enableAssertions"`
+
+	// Crypto configuration
+	EnableCrypto bool `json:"enableCrypto"`
+
+	// Health
+	HealthCheckFreq time.Duration `json:"healthCheckFreq"`
+
+	// Network configuration
+	NetworkConfig network.Config `json:"networkConfig"`
+
+	// Benchlist Configuration
+	BenchlistConfig benchlist.Config `json:"benchlistConfig"`
+
+	// Profiling configurations
+	ProfilerConfig profiler.Config `json:"profilerConfig"`
+
+	// Logging configuration
+	LoggingConfig logging.Config `json:"loggingConfig"`
+
+	// Plugin directory
+	PluginDir string `json:"pluginDir"`
+
+	// Consensus configuration
+	ConsensusParams avalanche.Parameters `json:"consensusParams"`
+
+	// Metrics
+	MeterVMEnabled bool `json:"meterVMEnabled"`
+
+	// Router that is used to handle incoming consensus messages
+	ConsensusRouter          router.Router       `json:"-"`
+	RouterHealthConfig       router.HealthConfig `json:"routerHealthConfig"`
+	ConsensusShutdownTimeout time.Duration       `json:"consensusShutdownTimeout"`
+
+	// Subnet Whitelist
+	WhitelistedSubnets ids.Set `json:"whitelistedSubnets"`
+
+	// ChainConfigs
+	ChainConfigs map[string]chains.ChainConfig `json:"-"`
 
 	// VM Aliases
-	VMAliases map[ids.ID][]string
+	VMAliases map[ids.ID][]string `json:"vmAliases"`
 }

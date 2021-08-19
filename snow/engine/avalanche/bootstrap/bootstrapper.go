@@ -38,7 +38,6 @@ var (
 	_                    common.Bootstrapable = &Bootstrapper{}
 )
 
-// Config ...
 type Config struct {
 	common.Config
 
@@ -51,7 +50,6 @@ type Config struct {
 	VM      vertex.DAGVM
 }
 
-// Bootstrapper ...
 type Bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher

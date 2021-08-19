@@ -6,12 +6,13 @@ package vertex
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const (
 	// maxSize is the maximum allowed vertex size. It is necessary to deter DoS
-	maxSize = 1 << 20
+	maxSize = units.MiB
 
 	// noEpochTransitionsCodecVersion is the codec version that was used when
 	// there were no epoch transitions

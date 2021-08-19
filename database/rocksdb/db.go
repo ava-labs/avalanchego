@@ -1,9 +1,8 @@
-// +build linux
-// +build amd64
+// +build linux,amd64,rocksdballowed
 
+// ^ Only build this file if this computer linux AND it's AMD64 AND rocksdb is allowed
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-
 package rocksdb
 
 import (
@@ -21,13 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	MemoryBudget   = 512 * 1024 * 1024 // 512 MiB
-	BitsPerKey     = 10                // 10 bits
-	BlockCacheSize = 12 * 1024 * 1024  // 12 MiB
-	BlockSize      = 8 * 1024          // 8 KiB
+	MemoryBudget   = 512 * units.MiB // 512 MiB
+	BitsPerKey     = 10              // 10 bits
+	BlockCacheSize = 12 * units.MiB  // 12 MiB
+	BlockSize      = 8 * units.KiB   // 8 KiB
 
 	// rocksDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.

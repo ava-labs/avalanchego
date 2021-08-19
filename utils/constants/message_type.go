@@ -5,8 +5,7 @@ package constants
 
 import "fmt"
 
-// MsgType ...
-type MsgType int
+type MsgType byte
 
 const (
 	NullMsg MsgType = iota

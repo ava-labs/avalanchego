@@ -13,22 +13,16 @@ import (
 type vertexMetrics struct {
 	pending,
 	parse,
-	get prometheus.Histogram
+	get metric.Averager
 }
 
 func (m *vertexMetrics) Initialize(
 	namespace string,
-	registerer prometheus.Registerer,
+	reg prometheus.Registerer,
 ) error {
-	m.pending = metric.NewNanosecondsLatencyMetric(namespace, "pending_txs")
-	m.parse = metric.NewNanosecondsLatencyMetric(namespace, "parse_tx")
-	m.get = metric.NewNanosecondsLatencyMetric(namespace, "get_tx")
-
 	errs := wrappers.Errs{}
-	errs.Add(
-		registerer.Register(m.pending),
-		registerer.Register(m.parse),
-		registerer.Register(m.get),
-	)
+	m.pending = newAverager(namespace, "pending_txs", reg, &errs)
+	m.parse = newAverager(namespace, "parse_tx", reg, &errs)
+	m.get = newAverager(namespace, "get_tx", reg, &errs)
 	return errs.Err
 }

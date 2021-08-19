@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// PeerID ...
 type PeerID struct {
 	IP           string    `json:"ip"`
 	PublicIP     string    `json:"publicIP"`

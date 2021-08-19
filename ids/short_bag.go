@@ -83,7 +83,6 @@ func (b *ShortBag) Equals(oIDs ShortBag) bool {
 	return true
 }
 
-// PrefixedString ...
 func (b *ShortBag) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 

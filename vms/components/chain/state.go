@@ -327,7 +327,6 @@ func (s *State) addBlockOutsideConsensus(blk snowman.Block) (snowman.Block, erro
 	return wrappedBlk, nil
 }
 
-// LastAccepted ...
 func (s *State) LastAccepted() (ids.ID, error) {
 	return s.lastAcceptedBlock.ID(), nil
 }

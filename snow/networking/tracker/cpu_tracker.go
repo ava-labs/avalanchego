@@ -34,7 +34,6 @@ type cpuTracker struct {
 	cpuSpenders     map[ids.ShortID]uptime.Meter
 }
 
-// NewCPUTracker ...
 func NewCPUTracker(factory uptime.Factory, halflife time.Duration) TimeTracker {
 	return &cpuTracker{
 		factory:         factory,

@@ -34,6 +34,7 @@ func (p *parser) Parse(blkBytes []byte) (queue.Job, error) {
 		numAccepted: p.numAccepted,
 		numDropped:  p.numDropped,
 		blk:         blk,
+		vm:          p.vm,
 	}, nil
 }
 
@@ -42,19 +43,22 @@ type blockJob struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
 	blk                     snowman.Block
+	vm                      block.Getter
 }
 
 func (b *blockJob) ID() ids.ID { return b.blk.ID() }
 func (b *blockJob) MissingDependencies() (ids.Set, error) {
 	missing := ids.Set{}
-	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
-		missing.Add(parent.ID())
+	parentID := b.blk.Parent()
+	if parent, err := b.vm.GetBlock(parentID); err != nil || parent.Status() != choices.Accepted {
+		missing.Add(parentID)
 	}
 	return missing, nil
 }
 
 func (b *blockJob) HasMissingDependencies() (bool, error) {
-	if parent := b.blk.Parent(); parent.Status() != choices.Accepted {
+	parentID := b.blk.Parent()
+	if parent, err := b.vm.GetBlock(parentID); err != nil || parent.Status() != choices.Accepted {
 		return true, nil
 	}
 	return false, nil
