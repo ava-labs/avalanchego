@@ -44,7 +44,7 @@ func (out *OutputOwners) InitCtx(ctx *snow.Context) {
 // the parent objects to json. Uses the OutputOwners.ctx method to format
 // the addresses. Returns errMarshal error if OutputOwners.ctx is not set.
 func (out *OutputOwners) MarshalJSON() ([]byte, error) {
-	result, err := out.SerialisedKeys()
+	result, err := out.Fields()
 	if err != nil {
 		return nil, err
 	}
@@ -52,9 +52,9 @@ func (out *OutputOwners) MarshalJSON() ([]byte, error) {
 	return json.Marshal(result)
 }
 
-// SerialisedKeys returns JSON keys in a map that can be used with marshal JSON
+// Fields returns JSON keys in a map that can be used with marshal JSON
 // to serialise OutputOwners struct
-func (out *OutputOwners) SerialisedKeys() (map[string]interface{}, error) {
+func (out *OutputOwners) Fields() (map[string]interface{}, error) {
 	addrsLen := len(out.Addrs)
 
 	// we need out.ctx to do this, if its absent, throw error
