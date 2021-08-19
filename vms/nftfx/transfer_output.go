@@ -38,7 +38,7 @@ func (out *TransferOutput) MarshalJSON() ([]byte, error) {
 	}
 
 	result["groupID"] = out.GroupID
-	result["Payload"] = out.Payload
+	result["payload"] = out.Payload
 	return json.Marshal(result)
 }
 
