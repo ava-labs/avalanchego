@@ -2399,7 +2399,7 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	return nil
 }
 
-// GetTimestampReply are the responses from GetTimestamp
+// GetTimestampReply is the response from GetTimestamp
 type GetTimestampReply struct {
 	// Current timestamp
 	Timestamp time.Time `json:"timestamp"`
