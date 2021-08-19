@@ -76,6 +76,10 @@ func (v *voter) Update() {
 	v.t.repoll()
 }
 
+// bubbleVotes bubbles the [votes] a set of the number of votes for specific blkIDs that received
+// votes in consensus, to their most recent ancestor that has been issued to consensus.
+// Note: bubbleVotes does not bubbleVotes to all of the ancestors in consensus, just the most recent one.
+// bubbling to the rest of the ancesotrs, which may also be in consensus is handled in RecordPoll.
 func (v *voter) bubbleVotes(votes ids.Bag) ids.Bag {
 	bubbledVotes := ids.Bag{}
 
@@ -83,21 +87,32 @@ votesLoop:
 	for _, vote := range votes.List() {
 		count := votes.Count(vote)
 		blk, err := v.t.GetBlock(vote)
+		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
 			continue
 		}
 
 		status := blk.Status()
 		blkID := blk.ID()
+		// If we have not fetched [blkID] break from the loop. We will drop the vote below
+		// and move on to the next vote.
+		// If [blk] has already been decided, break from the loop, we will drop the vote
+		// below since there is no need to count the votes for a [blk] we've already finalized.
+		// If [blk] is currently in consensus, break from the loop, we have reached the first
+		// ancestor of the original [vote] that has been issued consensus.
+		// In this case, the votes will be bubbled further from [blk] to any of its ancestors
+		// that are also in consensus.
 		for status.Fetched() && !v.t.Consensus.DecidedOrProcessing(blk) {
 			blkID = blk.Parent()
 			blk, err = v.t.GetBlock(blkID)
+			// If we cannot retrieve the block, drop [vote]
 			if err != nil {
 				continue votesLoop
 			}
 			status = blk.Status()
 		}
 
+		// If [blkID] is currently in consensus, count the votes
 		if !status.Decided() && v.t.Consensus.DecidedOrProcessing(blk) {
 			bubbledVotes.AddCount(blkID, count)
 		}
