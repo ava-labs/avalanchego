@@ -204,7 +204,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 		utxo := &avax.UTXO{}
 		if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return err
+			return fmt.Errorf("failed to unmarshal UTXO: %w", err)
 		}
 
 		cred := stx.Creds[i]
