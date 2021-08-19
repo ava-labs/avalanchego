@@ -175,7 +175,7 @@ changed: [localhost] => (item=/usr/local/lib/avalanchego)
 TASK [avalanche_install : Install Avalanche binary] ****************************
 changed: [localhost]
 
-TASK [avalanche_install : Remove outdataed support files] **********************
+TASK [avalanche_install : Remove outdated support files] **********************
 ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/evm'})
 ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-preupgrade'})
 ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-latest'})

@@ -5,7 +5,7 @@
     state: directory
     # This task intentionally leaves the owner, group, & mode unspecified.
     # These directories (e.g. /var/local/log) are shared resources.
-    # We lack the authority to unilaterlally decide their permissions.
+    # We lack the authority to unilaterally decide their permissions.
     # The goals are
     #  - Don't modify existing permissions, if the directories already exist.
     #  - Follow system policy (e.g. umask ), if the directories are created.
@@ -55,7 +55,7 @@
   notify:
     - Restart Avalanche service
 
-- name: Remove outdataed support files
+- name: Remove outdated support files
   become: true
   file:
     path: "{{ item.path }}"
