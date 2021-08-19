@@ -136,8 +136,8 @@ TASK [avalanche_download : Query releases] *************************************
 ok: [localhost]
 
 TASK [avalanche_download : Fetch release] **************************************
-changed: [localhost] => (item=avalanchego-linux-arm64-v1.4.12.tar.gz)
-changed: [localhost] => (item=avalanchego-linux-arm64-v1.4.12.tar.gz.sig)
+changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz)
+changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz.sig)
 
 TASK [avalanche_download : Create temp gnupghome] ******************************
 changed: [localhost]
@@ -152,7 +152,7 @@ TASK [avalanche_download : Cleanup temp gnupghome] *****************************
 changed: [localhost]
 
 TASK [avalanche_download : Unpack release] *************************************
-changed: [localhost] => (item=avalanchego-linux-arm64-v1.4.12.tar.gz)
+changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz)
 
 TASK [avalanche_user : Create Avalanche daemon group] **************************
 changed: [localhost]
@@ -177,10 +177,11 @@ changed: [localhost]
 
 TASK [avalanche_install : Remove outdataed support files] **********************
 ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/evm'})
+ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-preupgrade'})
+ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-latest'})
 
 TASK [avalanche_install : Install support files] *******************************
-changed: [localhost] => (item=/usr/local/lib/avalanchego/avalanchego-preupgrade)
-changed: [localhost] => (item=/usr/local/lib/avalanchego/avalanchego-latest)
+changed: [localhost] => (item=/usr/local/lib/avalanchego/plugins)
 
 TASK [avalanche_staker : Create staking key] ***********************************
 changed: [localhost]
@@ -201,5 +202,5 @@ RUNNING HANDLER [avalanche_service : Restart Avalanche service] ****************
 changed: [localhost]
 
 PLAY RECAP *********************************************************************
-localhost : ok=4 changed=25 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
+localhost : ok=6 changed=24 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
 ```

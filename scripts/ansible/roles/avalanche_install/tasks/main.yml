@@ -62,6 +62,8 @@
     state: absent
   loop:
     - path: "{{ avalanche_daemon_lib_dir }}/evm"
+    - path: "{{ avalanche_daemon_lib_dir }}/avalanchego-preupgrade"
+    - path: "{{ avalanche_daemon_lib_dir }}/avalanchego-latest"
   notify:
     - Restart Avalanche service
 
