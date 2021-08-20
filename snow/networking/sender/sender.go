@@ -271,10 +271,9 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
-		vID := validatorID // Prevent overwrite in next loop iteration
 		// Tell the router to expect a reply message from this validator
-		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
-		validatorIDs.Remove(vID)
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
+		validatorIDs.Remove(validatorID)
 	}
 
 	// Register failures for validators we didn't even send a request to.
@@ -328,9 +327,8 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
-		validatorIDs.Remove(vID)
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
+		validatorIDs.Remove(validatorID)
 	}
 
 	// Register failures for validators we didn't even send a request to.
