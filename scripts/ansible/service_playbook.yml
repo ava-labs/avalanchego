@@ -3,9 +3,7 @@
 - name: Configure Avalanche service
   hosts: avalanche_nodes
   roles:
-    - name: golang_base
-    - name: avalanche_base
-    - name: avalanche_build
+    - name: avalanche_download
     - name: avalanche_user
     - name: avalanche_install
     - name: avalanche_staker

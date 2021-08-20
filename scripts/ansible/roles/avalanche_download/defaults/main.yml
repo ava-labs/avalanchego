@@ -1,0 +1,17 @@
+avalanchego_architectures:
+  x86_64: amd64
+  aarch64: arm64
+
+avalanche_binaries_dir: "avalanchego-{{ avalanchego_version }}"
+
+avalanchego_architecture: "{{ avalanchego_architectures[ansible_facts.architecture] }}"
+avalanchego_archive: "avalanchego-{{ avalanchego_os }}-{{ avalanchego_architecture }}-{{ avalanchego_version }}.tar.gz"
+avalanchego_release: "{{ avalanchego_releases.json | rejectattr('prerelease') | first }}"
+avalanchego_os: "{{ ansible_facts.system | lower }}"
+avalanchego_version: "{{ avalanchego_release.tag_name }}"
+
+avalanchego_signer_keyid: D93080B0C0D5FE8B
+avalanchego_signer_pubkey: "{{ lookup('file', 'avalanchego.gpg.key') }}"
+
+repo_url: https://github.com/ava-labs/avalanchego
+repo_api_base: https://api.github.com
