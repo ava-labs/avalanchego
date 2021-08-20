@@ -733,7 +733,7 @@ func TestServiceGetTxJSON_BaseTx(t *testing.T) {
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
 	assert.Contains(t, jsonString, "\"memo\":\"0x0102030405060708\"")
 	assert.Contains(t, jsonString, "\"inputs\":[{\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
-	assert.Contains(t, jsonString, "\"outputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"outputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":49000,\"locktime\":0,\"threshold\":1}}]")
 }
 
 func TestServiceGetTxJSON_ExportTx(t *testing.T) {
@@ -780,7 +780,7 @@ func TestServiceGetTxJSON_ExportTx(t *testing.T) {
 	jsonString := string(jsonTxBytes)
 	// fxID in the VM is really set to 11111111111111111111111111111111LpoYY for [secp256k1fx.TransferOutput]
 	assert.Contains(t, jsonString, "\"inputs\":[{\"txID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"outputIndex\":2,\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"input\":{\"amount\":50000,\"signatureIndices\":[0]}}]")
-	assert.Contains(t, jsonString, "\"exportedOutputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"exportedOutputs\":[{\"assetID\":\"2XGxUr7VF7j1iwUp2aiGe4b6Ue2yyNghNS1SuNTNmZ77dPpXFZ\",\"fxID\":\"11111111111111111111111111111111LpoYY\",\"output\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":49000,\"locktime\":0,\"threshold\":1}}]}")
 }
 
 func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
@@ -868,8 +868,8 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 	jsonString := string(jsonTxBytes)
 
 	// contains the address in the right format
-	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
-	assert.Contains(t, jsonString, "\"initialStates\":[{\"fxIndex\":0,\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":1,\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":2,\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]}]},\"credentials\":[]}")
+	assert.Contains(t, jsonString, "\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]}")
+	assert.Contains(t, jsonString, "\"initialStates\":[{\"fxIndex\":0,\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":1,\"fxID\":\"TtF4d2QWbk5vzQGTEPrN48x6vwgAoAmKQ9cbp79inpQmcRKES\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":1,\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"groupID\":2,\"locktime\":0,\"threshold\":1}]},{\"fxIndex\":2,\"fxID\":\"2mcwQKiD8VEspmMJpL1dc7okQQ5dDVAWeCBZ7FWBFAbxpv3t7w\",\"outputs\":[{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1},{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"locktime\":0,\"threshold\":1}]}]},\"credentials\":[]}")
 }
 
 func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
@@ -1181,7 +1181,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 	assert.Contains(t, jsonString, "\"memo\":\"0x\"")
 	// contains the address in the right format
 	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
-	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":1,\"locktime\":0,\"threshold\":1}}}]}")
 
 	// contains the fxID
 	assert.Contains(t, jsonString, "\"operations\":[{\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":0}],\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"")
@@ -1288,7 +1288,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	// contains the address in the right format
 	assert.Contains(t, jsonString, "\"mintOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
-	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"]")
+	assert.Contains(t, jsonString, "\"transferOutput\":{\"addresses\":[\"X-testing1lnk637g0edwnqc2tn8tel39652fswa3xk4r65e\"],\"amount\":1,\"locktime\":0,\"threshold\":1}}}")
 
 	// contains the fxID
 	assert.Contains(t, jsonString, "\"assetID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"inputIDs\":[{\"txID\":\"2MDgrsBHMRsEPa4D4NA1Bo1pjkVLUK173S3dd9BgT2nCJNiDuS\",\"outputIndex\":1}],\"fxID\":\"LUC1cmcxnfNR9LdkACS2ccGKLEK7SYqB4gLLTycQfg1koyfSq\"")
