@@ -107,8 +107,8 @@ type BootstrapConfig struct {
 	// Should Bootstrap be retried
 	RetryBootstrap bool `json:"retryBootstrap"`
 
-	// Max number of times to retry bootstrap
-	RetryBootstrapMaxAttempts int `json:"retryBootstrapMaxAttempts"`
+	// Max number of times to retry bootstrap before warning the node operator
+	RetryBootstrapWarnFrequency int `json:"retryBootstrapMaxAttempts"`
 
 	// Timeout when connecting to bootstrapping beacons
 	BootstrapBeaconConnectionTimeout time.Duration `json:"bootstrapBeaconConnectionTimeout"`

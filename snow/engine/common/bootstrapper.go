@@ -321,7 +321,7 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 		b.bootstrapAttempts = 0
 	}
 
-	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapMaxAttempts == 0 {
+	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
 		b.Ctx.Log.Warn("failed to bootstrap the chain after %d attempts, is this node connected to the internet?")
 	}
 
