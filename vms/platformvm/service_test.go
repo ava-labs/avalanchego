@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -746,4 +747,31 @@ func TestGetCurrentValidators(t *testing.T) {
 	if !found {
 		t.Fatalf("didnt find delegator")
 	}
+}
+
+func TestGetTimestamp(t *testing.T) {
+	assert := assert.New(t)
+
+	service := defaultService(t)
+	service.vm.ctx.Lock.Lock()
+	defer func() {
+		err := service.vm.Shutdown()
+		assert.NoError(err)
+
+		service.vm.ctx.Lock.Unlock()
+	}()
+
+	reply := GetTimestampReply{}
+	err := service.GetTimestamp(nil, nil, &reply)
+	assert.NoError(err)
+
+	assert.Equal(service.vm.internalState.GetTimestamp(), reply.Timestamp)
+
+	newTimestamp := reply.Timestamp.Add(time.Second)
+	service.vm.internalState.SetTimestamp(newTimestamp)
+
+	err = service.GetTimestamp(nil, nil, &reply)
+	assert.NoError(err)
+
+	assert.Equal(newTimestamp, reply.Timestamp)
 }

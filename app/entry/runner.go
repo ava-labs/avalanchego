@@ -51,7 +51,7 @@ func Run(processConfig process.Config, nodeConfig node.Config) {
 
 	fmt.Println(process.Header)
 
-	_ = utils.HandleSignals(
+	utils.HandleSignals(
 		func(os.Signal) {
 			app.Stop()
 		},

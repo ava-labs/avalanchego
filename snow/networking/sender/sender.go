@@ -85,37 +85,18 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 		go s.router.GetAcceptedFrontier(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), func() {})
 	}
 
-	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
-	// so we don't even bother sending messages to them. We just have them immediately fail.
-	for validatorID := range validatorIDs {
-		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
-			s.failedDueToBench[constants.GetAcceptedFrontierMsg].Inc() // update metric
-			validatorIDs.Remove(validatorID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
-			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			go s.router.GetAcceptedFrontierFailed(validatorID, s.ctx.ChainID, requestID)
-		}
-	}
-
 	// Try to send the messages over the network.
-	// [sentTo] are the IDs of validators who may receive the message.
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sentTo := s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
+	s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
 
-	// Tell the router to expect a reply message from these validators
-	for _, validatorID := range sentTo {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
-		validatorIDs.Remove(vID)
-	}
-
-	// Register failures for validators we didn't even send a request to.
+	// Tell the router to expect a reply message from these validators.
+	// We register timeouts for all validators, regardless of if the message
+	// failed to be sent, to avoid busy looping when disconnected from the
+	// internet
 	for validatorID := range validatorIDs {
-		// Note: The call to RegisterRequestToUnreachableValidator is not strictly necessary.
-		// This call causes the reported network latency look larger than it actually is.
-		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.GetAcceptedFrontierFailed(validatorID, s.ctx.ChainID, requestID)
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
 	}
 }
 
@@ -139,35 +120,18 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 		go s.router.GetAccepted(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), containerIDs, func() {})
 	}
 
-	// Some of the validators in [validatorIDs] may be benched. That is, they've been unresponsive
-	// so we don't even bother sending messages to them. We just have them immediately fail.
-	for validatorID := range validatorIDs {
-		if s.timeouts.IsBenched(validatorID, s.ctx.ChainID) {
-			s.failedDueToBench[constants.GetAcceptedMsg].Inc() // update metric
-			validatorIDs.Remove(validatorID)
-			s.timeouts.RegisterRequestToUnreachableValidator()
-			// Immediately register a failure. Do so asynchronously to avoid deadlock.
-			go s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
-		}
-	}
-
 	// Try to send the messages over the network.
-	// [sentTo] are the IDs of validators who may receive the message.
-	// Note that this timeout duration won't exactly match the one that gets registered. That's OK.
+	// Note that this timeout duration won't exactly match the one that gets
+	// registered. That's OK.
 	timeoutDuration := s.timeouts.TimeoutDuration()
-	sentTo := s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
+	s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
 
 	// Tell the router to expect a reply message from these validators
-	for _, validatorID := range sentTo {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
-		validatorIDs.Remove(vID)
-	}
-
-	// Register failures for validators we didn't even send a request to.
+	// We register timeouts for all validators, regardless of if the message
+	// failed to be sent, to avoid busy looping when disconnected from the
+	// internet
 	for validatorID := range validatorIDs {
-		s.timeouts.RegisterRequestToUnreachableValidator()
-		go s.router.GetAcceptedFailed(validatorID, s.ctx.ChainID, requestID)
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
 	}
 }
 
@@ -307,10 +271,9 @@ func (s *Sender) PushQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
-		vID := validatorID // Prevent overwrite in next loop iteration
 		// Tell the router to expect a reply message from this validator
-		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
-		validatorIDs.Remove(vID)
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.PushQueryMsg)
+		validatorIDs.Remove(validatorID)
 	}
 
 	// Register failures for validators we didn't even send a request to.
@@ -364,9 +327,8 @@ func (s *Sender) PullQuery(validatorIDs ids.ShortSet, requestID uint32, containe
 
 	// Set timeouts so that if we don't hear back from these validators, we register a failure.
 	for _, validatorID := range sentTo {
-		vID := validatorID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(vID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
-		validatorIDs.Remove(vID)
+		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
+		validatorIDs.Remove(validatorID)
 	}
 
 	// Register failures for validators we didn't even send a request to.
@@ -391,5 +353,5 @@ func (s *Sender) Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID
 // Gossip the provided container
 func (s *Sender) Gossip(containerID ids.ID, container []byte) {
 	s.ctx.Log.Verbo("Gossiping %s", containerID)
-	s.sender.Gossip(s.ctx.ChainID, containerID, container)
+	s.sender.Gossip(s.ctx.SubnetID, s.ctx.ChainID, containerID, container)
 }

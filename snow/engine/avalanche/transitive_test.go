@@ -2642,7 +2642,7 @@ func TestEngineReBootstrapFails(t *testing.T) {
 	config := DefaultConfig()
 	config.Alpha = 1
 	config.RetryBootstrap = true
-	config.RetryBootstrapMaxAttempts = 4
+	config.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
 	config.Validators = vals
@@ -2788,7 +2788,7 @@ func TestEngineReBootstrappingIntoConsensus(t *testing.T) {
 	config := DefaultConfig()
 	config.Alpha = 1
 	config.RetryBootstrap = true
-	config.RetryBootstrapMaxAttempts = 4
+	config.RetryBootstrapWarnFrequency = 4
 
 	vals := validators.NewSet()
 	vdr := ids.GenerateTestShortID()

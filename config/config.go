@@ -310,7 +310,7 @@ func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) 
 func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
 	config := node.BootstrapConfig{
 		RetryBootstrap:                         v.GetBool(RetryBootstrapKey),
-		RetryBootstrapMaxAttempts:              v.GetInt(RetryBootstrapMaxAttemptsKey),
+		RetryBootstrapWarnFrequency:            v.GetInt(RetryBootstrapWarnFrequencyKey),
 		BootstrapBeaconConnectionTimeout:       v.GetDuration(BootstrapBeaconConnectionTimeoutKey),
 		BootstrapMaxTimeGetAncestors:           v.GetDuration(BootstrapMaxTimeGetAncestorsKey),
 		BootstrapMultiputMaxContainersSent:     int(v.GetUint(BootstrapMultiputMaxContainersSentKey)),
@@ -537,7 +537,6 @@ func getEpochConfig(v *viper.Viper, networkID uint32) (genesis.EpochConfig, erro
 
 func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	whitelistedSubnetIDs := ids.Set{}
-	whitelistedSubnetIDs.Add(constants.PrimaryNetworkID)
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
 		if subnet == "" {
 			continue

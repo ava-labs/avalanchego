@@ -487,3 +487,10 @@ func (c *Client) GetRewardUTXOs(args *api.GetTxArgs) ([][]byte, error) {
 	}
 	return utxos, err
 }
+
+// GetTimestamp returns the current chain timestamp
+func (c *Client) GetTimestamp() (time.Time, error) {
+	res := &GetTimestampReply{}
+	err := c.requester.SendRequest("getTimestamp", struct{}{}, res)
+	return res.Timestamp, err
+}

@@ -284,6 +284,7 @@ func (n *Node) initNetworking() error {
 		n.Config.NetworkConfig.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
+		n.Config.WhitelistedSubnets,
 	)
 	return err
 }
@@ -662,7 +663,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		HealthService:                          n.healthService,
 		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
 		RetryBootstrap:                         n.Config.RetryBootstrap,
-		RetryBootstrapMaxAttempts:              n.Config.RetryBootstrapMaxAttempts,
+		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                       n.Shutdown,
 		MeterVMEnabled:                         n.Config.MeterVMEnabled,
 		ChainConfigs:                           n.Config.ChainConfigs,

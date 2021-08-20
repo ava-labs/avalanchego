@@ -7,6 +7,4 @@
 
 # Set up the versions to be used
 # Don't export them as their used in the context of other calls
-coreth_version=${CORETH_VERSION:-'v0.6.0-rc.1'}
-# Release of AvalancheGo compatible with previous database version
-prev_avalanchego_version=${PREV_AVALANCHEGO_VERSION:-'v1.4.5-preupgrade.4' }
+coreth_version=${CORETH_VERSION:-'v0.6.1-rc.0'}
