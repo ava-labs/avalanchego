@@ -91,7 +91,10 @@ func (s *Sender) GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32
 	timeoutDuration := s.timeouts.TimeoutDuration()
 	_ = s.sender.GetAcceptedFrontier(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration)
 
-	// Tell the router to expect a reply message from these validators
+	// Tell the router to expect a reply message from these validators.
+	// We register timeouts for all validators, regardless of if the message
+	// failed to be sent, to avoid busy looping when disconnected from the
+	// internet
 	for validatorID := range validatorIDs {
 		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedFrontierMsg)
 	}
@@ -124,6 +127,9 @@ func (s *Sender) GetAccepted(validatorIDs ids.ShortSet, requestID uint32, contai
 	_ = s.sender.GetAccepted(validatorIDs, s.ctx.ChainID, requestID, timeoutDuration, containerIDs)
 
 	// Tell the router to expect a reply message from these validators
+	// We register timeouts for all validators, regardless of if the message
+	// failed to be sent, to avoid busy looping when disconnected from the
+	// internet
 	for validatorID := range validatorIDs {
 		s.router.RegisterRequest(validatorID, s.ctx.ChainID, requestID, constants.GetAcceptedMsg)
 	}
