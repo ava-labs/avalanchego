@@ -124,33 +124,33 @@ type ChainConfig struct {
 }
 
 type ManagerConfig struct {
-	StakingEnabled            bool // True iff the network has staking enabled
-	Log                       logging.Logger
-	LogFactory                logging.Factory
-	VMManager                 vms.Manager // Manage mappings from vm ID --> vm
-	DecisionEvents            *triggers.EventDispatcher
-	ConsensusEvents           *triggers.EventDispatcher
-	DBManager                 dbManager.Manager
-	Router                    router.Router    // Routes incoming messages to the appropriate chain
-	Net                       network.Network  // Sends consensus messages to other validators
-	ConsensusParams           avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
-	EpochFirstTransition      time.Time
-	EpochDuration             time.Duration
-	Validators                validators.Manager // Validators validating on this chain
-	NodeID                    ids.ShortID        // The ID of this node
-	NetworkID                 uint32             // ID of the network this node is connected to
-	Server                    *server.Server     // Handles HTTP API calls
-	Keystore                  keystore.Keystore
-	AtomicMemory              *atomic.Memory
-	AVAXAssetID               ids.ID
-	XChainID                  ids.ID
-	CriticalChains            ids.Set          // Chains that can't exit gracefully
-	WhitelistedSubnets        ids.Set          // Subnets to validate
-	TimeoutManager            *timeout.Manager // Manages request timeouts when sending messages to other validators
-	HealthService             health.Service
-	RetryBootstrap            bool                   // Should Bootstrap be retried
-	RetryBootstrapMaxAttempts int                    // Max number of times to retry bootstrap
-	ChainConfigs              map[string]ChainConfig // alias -> ChainConfig
+	StakingEnabled              bool // True iff the network has staking enabled
+	Log                         logging.Logger
+	LogFactory                  logging.Factory
+	VMManager                   vms.Manager // Manage mappings from vm ID --> vm
+	DecisionEvents              *triggers.EventDispatcher
+	ConsensusEvents             *triggers.EventDispatcher
+	DBManager                   dbManager.Manager
+	Router                      router.Router    // Routes incoming messages to the appropriate chain
+	Net                         network.Network  // Sends consensus messages to other validators
+	ConsensusParams             avcon.Parameters // The consensus parameters (alpha, beta, etc.) for new chains
+	EpochFirstTransition        time.Time
+	EpochDuration               time.Duration
+	Validators                  validators.Manager // Validators validating on this chain
+	NodeID                      ids.ShortID        // The ID of this node
+	NetworkID                   uint32             // ID of the network this node is connected to
+	Server                      *server.Server     // Handles HTTP API calls
+	Keystore                    keystore.Keystore
+	AtomicMemory                *atomic.Memory
+	AVAXAssetID                 ids.ID
+	XChainID                    ids.ID
+	CriticalChains              ids.Set          // Chains that can't exit gracefully
+	WhitelistedSubnets          ids.Set          // Subnets to validate
+	TimeoutManager              *timeout.Manager // Manages request timeouts when sending messages to other validators
+	HealthService               health.Service
+	RetryBootstrap              bool                   // Should Bootstrap be retried
+	RetryBootstrapWarnFrequency int                    // Max number of times to retry bootstrap before warning the node operator
+	ChainConfigs                map[string]ChainConfig // alias -> ChainConfig
 	// ShutdownNodeFunc allows the chain manager to issue a request to shutdown the node
 	ShutdownNodeFunc func(exitCode int)
 	MeterVMEnabled   bool // Should each VM be wrapped with a MeterVM
@@ -536,7 +536,7 @@ func (m *manager) createAvalancheChain(
 				Subnet:                        sb,
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
 				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
 				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
@@ -670,7 +670,7 @@ func (m *manager) createSnowmanChain(
 				Subnet:                        sb,
 				Timer:                         timer,
 				RetryBootstrap:                m.RetryBootstrap,
-				RetryBootstrapMaxAttempts:     m.RetryBootstrapMaxAttempts,
+				RetryBootstrapWarnFrequency:   m.RetryBootstrapWarnFrequency,
 				MaxTimeGetAncestors:           m.BootstrapMaxTimeGetAncestors,
 				MultiputMaxContainersSent:     m.BootstrapMultiputMaxContainersSent,
 				MultiputMaxContainersReceived: m.BootstrapMultiputMaxContainersReceived,
