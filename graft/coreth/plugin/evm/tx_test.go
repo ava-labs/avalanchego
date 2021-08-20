@@ -5,8 +5,10 @@ package evm
 
 import (
 	"math/big"
+	"strings"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/coreth/params"
 )
 
@@ -44,5 +46,87 @@ func TestCalculateDynamicFee(t *testing.T) {
 				t.Fatalf("Expected error: %s, found error: %s", test.expectedErr, err)
 			}
 		}
+	}
+}
+
+type atomicTxTest struct {
+	// setup returns the atomic transaction for the test
+	setup func(t *testing.T, vm *VM, sharedMemory *atomic.Memory) *Tx
+	// define a string that should be contained in the error message if the tx fails verification
+	// at some point. If the strings are empty, then the tx should pass verification at the
+	// respective step.
+	semanticVerifyErr, evmStateTransferErr, acceptErr string
+	// checkState is called iff building and verifying a block containing the transaction is successful. Verifies
+	// the state of the VM following the block's acceptance.
+	checkState func(t *testing.T, vm *VM)
+}
+
+func executeTxTest(t *testing.T, test atomicTxTest) {
+	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+
+	tx := test.setup(t, vm, sharedMemory)
+
+	lastAcceptedBlock := vm.LastAcceptedBlockInternal().(*Block)
+	if err := tx.UnsignedAtomicTx.SemanticVerify(vm, tx, lastAcceptedBlock, nil, apricotRulesPhase0); len(test.semanticVerifyErr) == 0 && err != nil {
+		t.Fatalf("SemanticVerify failed unexpectedly due to: %s", err)
+	} else if len(test.semanticVerifyErr) != 0 {
+		if err == nil {
+			t.Fatalf("SemanticVerify unexpectedly returned a nil error. Expected err: %s", test.semanticVerifyErr)
+		}
+		if !strings.Contains(err.Error(), test.semanticVerifyErr) {
+			t.Fatalf("Expected SemanticVerify to fail due to %s, but failed with: %s", test.semanticVerifyErr, err)
+		}
+		// If SemanticVerify failed for the expected reason, return early
+		return
+	}
+
+	// Retrieve dummy state to test that EVMStateTransfer works correctly
+	sdb, err := vm.chain.BlockState(lastAcceptedBlock.ethBlock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, sdb); len(test.evmStateTransferErr) == 0 && err != nil {
+		t.Fatalf("EVMStateTransfer failed unexpectedly due to: %s", err)
+	} else if len(test.evmStateTransferErr) != 0 {
+		if err == nil {
+			t.Fatalf("EVMStateTransfer unexpectedly returned a nil error. Expected err: %s", test.evmStateTransferErr)
+		}
+		if !strings.Contains(err.Error(), test.evmStateTransferErr) {
+			t.Fatalf("Expected SemanticVerify to fail due to %s, but failed with: %s", test.evmStateTransferErr, err)
+		}
+		// If EVMStateTransfer failed for the expected reason, return early
+		return
+	}
+
+	if err := vm.issueTx(tx); err != nil {
+		t.Fatal(err)
+	}
+	<-issuer
+
+	// If we've reached this point, we expect to be able to build and verify the block without any errors
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); len(test.acceptErr) == 0 && err != nil {
+		t.Fatalf("Accept failed unexpectedly due to: %s", err)
+	} else if len(test.acceptErr) != 0 {
+		if err == nil {
+			t.Fatalf("Accept unexpectedly returned a nil error. Expected err: %s", test.acceptErr)
+		}
+		if !strings.Contains(err.Error(), test.acceptErr) {
+			t.Fatalf("Expected Accept to fail due to %s, but failed with: %s", test.acceptErr, err)
+		}
+		// If Accept failed for the expected reason, return early
+		return
+	}
+
+	if test.checkState != nil {
+		test.checkState(t, vm)
 	}
 }
