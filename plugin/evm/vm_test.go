@@ -180,6 +180,40 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, confi
 	return issuer, vm, dbManager, m
 }
 
+func addUTXO(sharedMemory *atomic.Memory, ctx *snow.Context, txID ids.ID, assetID ids.ID, amount uint64, addr ids.ShortID) (*avax.UTXO, error) {
+	utxo := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID: txID,
+		},
+		Asset: avax.Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: amount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		},
+	}
+	utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		return nil, err
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{ctx.ChainID: {PutRequests: []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			addr.Bytes(),
+		},
+	}}}}); err != nil {
+		return nil, err
+	}
+
+	return utxo, nil
+}
+
 // GenesisVMWithUTXOs creates a GenesisVM and generates UTXOs in the X-Chain Shared Memory containing AVAX based on the [utxos] map
 // Generates UTXOIDs by using a hash of the address in the [utxos] map such that the UTXOs will be generated deterministically.
 func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string, utxos map[ids.ShortID]uint64) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory) {
@@ -189,34 +223,8 @@ func GenesisVMWithUTXOs(t *testing.T, finishBootstrapping bool, genesisJSON stri
 		if err != nil {
 			t.Fatalf("Failed to generate txID from addr: %s", err)
 		}
-		utxo := &avax.UTXO{
-			UTXOID: avax.UTXOID{
-				TxID: txID,
-			},
-			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-			Out: &secp256k1fx.TransferOutput{
-				Amt: avaxAmount,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{addr},
-				},
-			},
-		}
-		utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
-		inputID := utxo.InputID()
-		if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
-			Key:   inputID[:],
-			Value: utxoBytes,
-			Traits: [][]byte{
-				addr.Bytes(),
-			},
-		}}}}); err != nil {
-			t.Fatal(err)
+		if _, err := addUTXO(sharedMemory, vm.ctx, txID, vm.ctx.AVAXAssetID, avaxAmount, addr); err != nil {
+			t.Fatalf("Failed to add UTXO to shared memory: %s", err)
 		}
 	}
 
