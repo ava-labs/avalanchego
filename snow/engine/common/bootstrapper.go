@@ -4,7 +4,6 @@
 package common
 
 import (
-	"fmt"
 	"time"
 
 	stdmath "math"
@@ -322,8 +321,8 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 		b.bootstrapAttempts = 0
 	}
 
-	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
-		return fmt.Errorf("failed to bootstrap the chain after %d attempts", b.bootstrapAttempts)
+	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapMaxAttempts == 0 {
+		b.Ctx.Log.Warn("failed to bootstrap the chain after %d attempts, is this node connected to the internet?")
 	}
 
 	return b.startup()
