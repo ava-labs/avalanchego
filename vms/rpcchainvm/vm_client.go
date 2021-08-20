@@ -48,7 +48,7 @@ var (
 const (
 	decidedCacheSize    = 512
 	missingCacheSize    = 256
-	unverifiedCacheSize = 256
+	unverifiedCacheSize = 512
 	bytesToIDCacheSize  = 512
 )
 
