@@ -833,7 +833,7 @@ func TestServiceGetTxJSON_CreateAssetTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	txID, err := vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -924,7 +924,7 @@ func TestServiceGetTxJSON_OperationTxWithNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -1028,7 +1028,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleNftxMintOp(t *testing.T) {
 
 	key := keys[0]
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -1134,7 +1134,7 @@ func TestServiceGetTxJSON_OperationTxWithSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -1240,7 +1240,7 @@ func TestServiceGetTxJSON_OperationTxWithMultipleSecpMintOp(t *testing.T) {
 
 	key := keys[0]
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -1347,7 +1347,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOp(t *testing.T) {
 
 	key := keys[0]
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -1451,7 +1451,7 @@ func TestServiceGetTxJSON_OperationTxWithPropertyFxMintOpMultiple(t *testing.T) 
 
 	key := keys[0]
 
-	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, genesisBytes, vm)
+	createAssetTx := newAvaxCreateAssetTxWithOutputs(t, vm)
 	_, err = vm.IssueTx(createAssetTx.Bytes())
 	if err != nil {
 		t.Fatal(err)
@@ -1525,8 +1525,7 @@ func newAvaxExportTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
 	return tx
 }
 
-func newAvaxCreateAssetTxWithOutputs(t *testing.T, genesisBytes []byte, vm *VM) *Tx {
-	_ = GetAVAXTxFromGenesisTest(genesisBytes, t)
+func newAvaxCreateAssetTxWithOutputs(t *testing.T, vm *VM) *Tx {
 	key := keys[0]
 	tx := buildCreateAssetTx(key)
 	if err := tx.SignSECP256K1Fx(vm.codec, nil); err != nil {
