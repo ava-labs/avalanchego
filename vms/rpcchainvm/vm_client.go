@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -184,6 +185,11 @@ func (vm *VMClient) Initialize(
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
 
+	timestamp := time.Time{}
+	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+		return err
+	}
+
 	lastAcceptedBlk := &BlockClient{
 		vm:       vm,
 		id:       id,
@@ -191,6 +197,7 @@ func (vm *VMClient) Initialize(
 		status:   status,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
+		time:     timestamp,
 	}
 
 	chainState, err := chain.NewMeteredState(
@@ -346,6 +353,11 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
 
+	timestamp := time.Time{}
+	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+		return nil, err
+	}
+
 	return &BlockClient{
 		vm:       vm,
 		id:       id,
@@ -353,6 +365,7 @@ func (vm *VMClient) buildBlock() (snowman.Block, error) {
 		status:   choices.Processing,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
+		time:     timestamp,
 	}, nil
 }
 
@@ -373,6 +386,11 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
 
+	timestamp := time.Time{}
+	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+		return nil, err
+	}
+
 	blk := &BlockClient{
 		vm:       vm,
 		id:       id,
@@ -380,6 +398,7 @@ func (vm *VMClient) parseBlock(bytes []byte) (snowman.Block, error) {
 		status:   status,
 		bytes:    bytes,
 		height:   resp.Height,
+		time:     timestamp,
 	}
 
 	return blk, nil
@@ -395,8 +414,14 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 
 	parentID, err := ids.ToID(resp.ParentID)
 	vm.ctx.Log.AssertNoError(err)
+
 	status := choices.Status(resp.Status)
 	vm.ctx.Log.AssertDeferredNoError(status.Valid)
+
+	timestamp := time.Time{}
+	if err := timestamp.UnmarshalBinary(resp.Timestamp); err != nil {
+		return nil, err
+	}
 
 	blk := &BlockClient{
 		vm:       vm,
@@ -405,6 +430,7 @@ func (vm *VMClient) getBlock(id ids.ID) (snowman.Block, error) {
 		status:   status,
 		bytes:    resp.Bytes,
 		height:   resp.Height,
+		time:     timestamp,
 	}
 
 	return blk, nil
@@ -444,6 +470,7 @@ type BlockClient struct {
 	status   choices.Status
 	bytes    []byte
 	height   uint64
+	time     time.Time
 }
 
 func (b *BlockClient) ID() ids.ID { return b.id }
@@ -471,14 +498,18 @@ func (b *BlockClient) Parent() ids.ID {
 }
 
 func (b *BlockClient) Verify() error {
-	_, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
+	resp, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
 		Bytes: b.bytes,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return b.time.UnmarshalBinary(resp.Timestamp)
 }
 
-func (b *BlockClient) Bytes() []byte  { return b.bytes }
-func (b *BlockClient) Height() uint64 { return b.height }
+func (b *BlockClient) Bytes() []byte        { return b.bytes }
+func (b *BlockClient) Height() uint64       { return b.height }
+func (b *BlockClient) Timestamp() time.Time { return b.time }
 
 // AV-590, quantify overhead of passing these over RPC
 
