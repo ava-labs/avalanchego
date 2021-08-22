@@ -4,10 +4,11 @@
 package snowstorm
 
 import (
-	"math/rand"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/sampler"
 
 	sbcon "github.com/ava-labs/avalanchego/snow/consensus/snowball"
 )
@@ -19,7 +20,7 @@ func Simulate(
 	fact Factory,
 ) error {
 	net := Network{}
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	net.Initialize(
 		params,
 		numColors,
@@ -27,7 +28,7 @@ func Simulate(
 		maxInputConflicts,
 	)
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		if err := net.AddNode(fact.New()); err != nil {
 			return err
@@ -36,7 +37,7 @@ func Simulate(
 
 	numRounds := 0
 	for !net.Finalized() && !net.Disagreement() && numRounds < 50 {
-		rand.Seed(int64(numRounds) + seed)
+		sampler.Seed(int64(numRounds) + seed)
 		if err := net.Round(); err != nil {
 			return err
 		}

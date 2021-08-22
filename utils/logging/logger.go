@@ -24,6 +24,9 @@ type Logger interface {
 	// Log an event that may be useful for a user to see to measure the progress
 	// of the protocol
 	Info(format string, args ...interface{})
+	// Log an event that may be useful for understanding the order of the
+	// execution of the protocol
+	Trace(format string, args ...interface{})
 	// Log an event that may be useful for a programmer to see when debuging the
 	// execution of the protocol
 	Debug(format string, args ...interface{})
@@ -57,6 +60,10 @@ type Logger interface {
 	SetLogLevel(Level)
 	// Only logged events above or equal to the level set will be logged
 	SetDisplayLevel(Level)
+	// Gets current LogLevel
+	GetLogLevel() Level
+	// Gets current DisplayLevel
+	GetDisplayLevel() Level
 	// Add a prefix to all logged messages
 	SetPrefix(string)
 	// Enable or disable logging

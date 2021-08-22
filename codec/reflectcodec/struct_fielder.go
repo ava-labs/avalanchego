@@ -19,6 +19,8 @@ const (
 	TagValue = "true"
 )
 
+var _ StructFielder = &structFielder{}
+
 type FieldDesc struct {
 	Index       int
 	MaxSliceLen uint32

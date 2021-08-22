@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// Repeater ...
 type Repeater struct {
 	handler func()
 	timeout chan struct{}
@@ -19,7 +18,6 @@ type Repeater struct {
 	frequency time.Duration
 }
 
-// NewRepeater ...
 func NewRepeater(handler func(), frequency time.Duration) *Repeater {
 	repeater := &Repeater{
 		handler:   handler,
@@ -31,7 +29,6 @@ func NewRepeater(handler func(), frequency time.Duration) *Repeater {
 	return repeater
 }
 
-// Stop ...
 func (r *Repeater) Stop() {
 	r.lock.Lock()
 	if !r.finished {
@@ -43,7 +40,6 @@ func (r *Repeater) Stop() {
 	r.reset()
 }
 
-// Dispatch ...
 func (r *Repeater) Dispatch() {
 	r.lock.Lock()
 	defer r.lock.Unlock()

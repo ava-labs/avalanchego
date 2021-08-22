@@ -5,7 +5,18 @@ package avm
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/nftfx"
+	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+)
+
+var (
+	_ Fx = &secp256k1fx.Fx{}
+	_ Fx = &nftfx.Fx{}
+	_ Fx = &propertyfx.Fx{}
 )
 
 type parsedFx struct {
@@ -38,9 +49,15 @@ type Fx interface {
 	VerifyOperation(tx, op, cred interface{}, utxos []interface{}) error
 }
 
-// FxOperation ...
 type FxOperation interface {
 	verify.Verifiable
+	snow.ContextInitializable
+	avax.Coster
 
 	Outs() []verify.State
+}
+
+type FxCredential struct {
+	FxID              ids.ID `serialize:"false" json:"fxID"`
+	verify.Verifiable `serialize:"true" json:"credential"`
 }

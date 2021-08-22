@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/rpc/v2"
 	"github.com/gorilla/rpc/v2/json2"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -36,6 +37,7 @@ func TestCall(t *testing.T) {
 		"localhost",
 		8080,
 		[]string{"*"},
+		ids.GenerateTestShortID(),
 	)
 
 	serv := &Service{}

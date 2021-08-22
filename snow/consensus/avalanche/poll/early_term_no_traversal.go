@@ -9,6 +9,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var (
+	_ Factory = &earlyTermNoTraversalFactory{}
+	_ Poll    = &earlyTermNoTraversalPoll{}
+)
+
 type earlyTermNoTraversalFactory struct {
 	alpha int
 }

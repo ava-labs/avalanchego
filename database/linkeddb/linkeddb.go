@@ -14,7 +14,12 @@ const (
 	defaultCacheSize = 1024
 )
 
-var headKey = []byte{0x01}
+var (
+	headKey = []byte{0x01}
+
+	_ LinkedDB          = &linkedDB{}
+	_ database.Iterator = &iterator{}
+)
 
 // LinkedDB provides a key value interface while allowing iteration.
 type LinkedDB interface {

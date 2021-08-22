@@ -17,7 +17,6 @@ var (
 	errWrongPrivateKeySize = errors.New("wrong private key size")
 )
 
-// FactoryED25519 ...
 type FactoryED25519 struct{}
 
 // NewPrivateKey implements the Factory interface
@@ -42,7 +41,6 @@ func (*FactoryED25519) ToPrivateKey(b []byte) (PrivateKey, error) {
 	return &PrivateKeyED25519{sk: b}, nil
 }
 
-// PublicKeyED25519 ...
 type PublicKeyED25519 struct {
 	pk   ed25519.PublicKey
 	addr ids.ShortID
@@ -73,7 +71,6 @@ func (k *PublicKeyED25519) Address() ids.ShortID {
 // Bytes implements the PublicKey interface
 func (k *PublicKeyED25519) Bytes() []byte { return k.pk }
 
-// PrivateKeyED25519 ...
 type PrivateKeyED25519 struct {
 	sk ed25519.PrivateKey
 	pk *PublicKeyED25519

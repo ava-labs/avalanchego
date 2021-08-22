@@ -498,10 +498,10 @@ func TestPackerPackBool(t *testing.T) {
 
 func TestPackerUnpackBool(t *testing.T) {
 	var (
-		p                = Packer{Bytes: []byte{0x01}, Offset: 0}
-		actual           = p.UnpackBool()
-		expected    bool = true
-		expectedLen      = BoolLen
+		p           = Packer{Bytes: []byte{0x01}, Offset: 0}
+		actual      = p.UnpackBool()
+		expected    = true
+		expectedLen = BoolLen
 	)
 
 	switch {

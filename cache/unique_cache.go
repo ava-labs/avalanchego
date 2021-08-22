@@ -8,6 +8,8 @@ import (
 	"sync"
 )
 
+var _ Deduplicator = &EvictableLRU{}
+
 // EvictableLRU is an LRU cache that notifies the objects when they are evicted.
 type EvictableLRU struct {
 	lock      sync.Mutex

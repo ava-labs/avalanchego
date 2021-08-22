@@ -3,6 +3,11 @@
 
 package platformvm
 
+var (
+	_ TxError = &tempError{}
+	_ TxError = &permError{}
+)
+
 // TxError provides the ability for errors to be distinguished as permanent or
 // temporary
 type TxError interface {

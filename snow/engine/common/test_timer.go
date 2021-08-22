@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var _ Timer = &TimerTest{}
+
 // TimerTest is a test timer
 type TimerTest struct {
 	T *testing.T

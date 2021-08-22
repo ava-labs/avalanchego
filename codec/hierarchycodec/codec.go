@@ -15,7 +15,14 @@ import (
 
 const (
 	// default max length of a slice being marshalled by Marshal(). Should be <= math.MaxUint32.
-	defaultMaxSliceLength = 1 << 18
+	defaultMaxSliceLength = 256 * 1024
+)
+
+var (
+	_ Codec              = &hierarchyCodec{}
+	_ codec.Codec        = &hierarchyCodec{}
+	_ codec.Registry     = &hierarchyCodec{}
+	_ codec.GeneralCodec = &hierarchyCodec{}
 )
 
 // Codec marshals and unmarshals

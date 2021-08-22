@@ -3,7 +3,9 @@
 
 package utils
 
-import "crypto/rand"
+import (
+	"crypto/rand"
+)
 
 // CopyBytes returns a copy of the provided byte slice. If nil is provided, nil
 // will be returned.

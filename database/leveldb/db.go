@@ -20,21 +20,31 @@ import (
 )
 
 const (
-	// minBlockCacheSize is the minimum number of bytes to use for block caching
-	// in leveldb.
-	minBlockCacheSize = 12 * opt.MiB
+	// Name is the name of this database for database switches
+	Name = "leveldb"
 
-	// minWriteBufferSize is the minimum number of bytes to use for buffers in
+	// BlockCacheSize is the number of bytes to use for block caching in
 	// leveldb.
-	minWriteBufferSize = 12 * opt.MiB
+	BlockCacheSize = 12 * opt.MiB
 
-	// minHandleCap is the minimum number of files descriptors to cap levelDB to
-	// use
-	minHandleCap = 64
+	// WriteBufferSize is the number of bytes to use for buffers in leveldb.
+	WriteBufferSize = 12 * opt.MiB
+
+	// HandleCap is the number of files descriptors to cap levelDB to use.
+	HandleCap = 64
+
+	// BitsPerKey is the number of bits to add to the bloom filter per key.
+	BitsPerKey = 10
 
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	levelDBByteOverhead = 8
+)
+
+var (
+	_ database.Database = &Database{}
+	_ database.Batch    = &batch{}
+	_ database.Iterator = &iter{}
 )
 
 // Database is a persistent key-value store. Apart from basic data storage
@@ -51,25 +61,14 @@ type Database struct {
 }
 
 // New returns a wrapped LevelDB object.
-func New(file string, log logging.Logger, blockCacheSize, writeBufferSize, handleCap int) (*Database, error) {
-	// Enforce minimums
-	if blockCacheSize < minBlockCacheSize {
-		blockCacheSize = minBlockCacheSize
-	}
-	if writeBufferSize < minWriteBufferSize {
-		writeBufferSize = minWriteBufferSize
-	}
-	if handleCap < minHandleCap {
-		handleCap = minHandleCap
-	}
-
+func New(file string, log logging.Logger) (database.Database, error) {
 	// Open the db and recover any potential corruptions
 	db, err := leveldb.OpenFile(file, &opt.Options{
-		OpenFilesCacheCapacity: handleCap,
-		BlockCacheCapacity:     blockCacheSize,
+		OpenFilesCacheCapacity: HandleCap,
+		BlockCacheCapacity:     BlockCacheSize,
 		// There are two buffers of size WriteBuffer used.
-		WriteBuffer: writeBufferSize / 2,
-		Filter:      filter.NewBloomFilter(10),
+		WriteBuffer: WriteBufferSize / 2,
+		Filter:      filter.NewBloomFilter(BitsPerKey),
 	})
 	if _, corrupted := err.(*errors.ErrCorrupted); corrupted {
 		db, err = leveldb.RecoverFile(file, nil)
@@ -233,9 +232,9 @@ func (b *batch) Replay(w database.KeyValueWriter) error {
 	replay := &replayer{writer: w}
 	if err := b.Batch.Replay(replay); err != nil {
 		// Never actually returns an error, because Replay just returns nil
-		return b.db.handleError(err)
+		return err
 	}
-	return b.db.handleError(replay.err)
+	return replay.err
 }
 
 // Inner returns itself

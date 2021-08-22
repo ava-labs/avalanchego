@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 	"unicode"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -14,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
@@ -29,8 +31,8 @@ var (
 )
 
 const (
-	maxNameLen    = 1 << 7
-	maxGenesisLen = 1 << 20
+	maxNameLen    = 128
+	maxGenesisLen = units.MiB
 )
 
 // UnsignedCreateChainTx is an unsigned CreateChainTx
@@ -105,7 +107,10 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
+
+	timestamp := vs.GetTimestamp()
+	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
+	if err := tx.Verify(vm.ctx, vm.codec, createBlockchainTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, permError{err}
 	}
 
@@ -115,7 +120,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, createBlockchainTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
@@ -165,7 +170,9 @@ func (vm *VM) newCreateChainTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
+	timestamp := vm.internalState.GetTimestamp()
+	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
+	ins, outs, _, signers, err := vm.stake(keys, 0, createBlockchainTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -198,5 +205,12 @@ func (vm *VM) newCreateChainTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, vm.codec, vm.CreationTxFee, vm.ctx.AVAXAssetID)
+	return tx, utx.Verify(vm.ctx, vm.codec, createBlockchainTxFee, vm.ctx.AVAXAssetID)
+}
+
+func (vm *VM) getCreateBlockchainTxFee(t time.Time) uint64 {
+	if t.Before(vm.ApricotPhase3Time) {
+		return vm.CreateAssetTxFee
+	}
+	return vm.CreateBlockchainTxFee
 }

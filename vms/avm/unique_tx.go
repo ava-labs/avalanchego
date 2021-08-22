@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
@@ -19,6 +20,11 @@ var (
 	errMissingUTXO     = errors.New("missing utxo")
 	errUnknownTx       = errors.New("transaction is unknown")
 	errRejectedTx      = errors.New("transaction is rejected")
+)
+
+var (
+	_ snowstorm.Tx    = &UniqueTx{}
+	_ cache.Evictable = &UniqueTx{}
 )
 
 // UniqueTx provides a de-duplication service for txs. This only provides a
@@ -110,52 +116,67 @@ func (tx *UniqueTx) Key() interface{} { return tx.txID }
 // Accept is called when the transaction was finalized as accepted by consensus
 func (tx *UniqueTx) Accept() error {
 	if s := tx.Status(); s != choices.Processing {
-		tx.vm.ctx.Log.Error("Failed to accept tx %s because the tx is in state %s", tx.txID, s)
 		return fmt.Errorf("transaction has invalid status: %s", s)
 	}
 
+	txID := tx.ID()
 	defer tx.vm.db.Abort()
 
+	// Fetch the input UTXOs
+	inputUTXOIDs := tx.InputUTXOs()
+	inputUTXOs := make([]*avax.UTXO, 0, len(inputUTXOIDs))
+	for _, utxoID := range inputUTXOIDs {
+		// Don't bother fetching the input UTXO if its symbolic
+		if utxoID.Symbolic() {
+			continue
+		}
+
+		utxo, err := tx.vm.getUTXO(utxoID)
+		if err != nil {
+			// should never happen because the UTXO was previously verified to
+			// exist
+			return fmt.Errorf("error finding UTXO %s: %s", utxoID, err)
+		}
+		inputUTXOs = append(inputUTXOs, utxo)
+	}
+
+	outputUTXOs := tx.UTXOs()
+	// index input and output UTXOs
+	if err := tx.vm.addressTxsIndexer.Accept(tx.ID(), inputUTXOs, outputUTXOs); err != nil {
+		return fmt.Errorf("error indexing tx: %s", err)
+	}
+
 	// Remove spent utxos
-	for _, utxo := range tx.InputUTXOs() {
+	for _, utxo := range inputUTXOIDs {
 		if utxo.Symbolic() {
 			// If the UTXO is symbolic, it can't be spent
 			continue
 		}
 		utxoID := utxo.InputID()
 		if err := tx.vm.state.DeleteUTXO(utxoID); err != nil {
-			tx.vm.ctx.Log.Error("Failed to spend utxo %s due to %s", utxoID, err)
-			return err
+			return fmt.Errorf("couldn't delete UTXO %s: %s", utxoID, err)
 		}
 	}
-
 	// Add new utxos
-	for _, utxo := range tx.UTXOs() {
-		if err := tx.vm.state.PutUTXO(utxo.InputID(), utxo); err != nil {
-			tx.vm.ctx.Log.Error("Failed to fund utxo %s due to %s", utxo.InputID(), err)
-			return err
+	for _, utxo := range outputUTXOs {
+		utxoID := utxo.InputID()
+		if err := tx.vm.state.PutUTXO(utxoID, utxo); err != nil {
+			return fmt.Errorf("couldn't put UTXO %s: %w", utxoID, err)
 		}
 	}
 
 	if err := tx.setStatus(choices.Accepted); err != nil {
-		tx.vm.ctx.Log.Error("Failed to accept tx %s due to %s", tx.txID, err)
-		return err
+		return fmt.Errorf("couldn't set status of tx %s: %w", txID, err)
 	}
-
-	txID := tx.ID()
 
 	commitBatch, err := tx.vm.db.CommitBatch()
 	if err != nil {
-		tx.vm.ctx.Log.Error("Failed to calculate CommitBatch for %s due to %s", txID, err)
-		return err
+		return fmt.Errorf("couldn't create commitBatch while processing tx %s: %w", txID, err)
 	}
 
 	if err := tx.ExecuteWithSideEffects(tx.vm, commitBatch); err != nil {
-		tx.vm.ctx.Log.Error("Failed to commit accept %s due to %s", txID, err)
-		return err
+		return fmt.Errorf("ExecuteWithSideEffects errored while processing tx %s: %w", txID, err)
 	}
-
-	tx.vm.ctx.Log.Verbo("Accepted Tx: %s", txID)
 
 	tx.vm.pubsub.Publish(txID, NewPubSubFilterer(tx.Tx))
 	tx.vm.walletService.decided(txID)
@@ -312,8 +333,8 @@ func (tx *UniqueTx) SyntacticVerify() error {
 		tx.vm.ctx,
 		tx.vm.codec,
 		tx.vm.feeAssetID,
-		tx.vm.txFee,
-		tx.vm.creationTxFee,
+		tx.vm.TxFee,
+		tx.vm.CreateAssetTxFee,
 		len(tx.vm.fxs),
 	)
 	return tx.validity

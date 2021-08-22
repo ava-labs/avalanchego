@@ -24,13 +24,11 @@ linters:
     - gosimple
     - govet
     - ineffassign
-    - interfacer
     - misspell
     - nakedret
     - nolintlint
     - prealloc
     - stylecheck
-    - typecheck
     - unconvert
     - unparam
     - unused
@@ -40,7 +38,9 @@ linters:
     # - lll
     # - gomnd
     # - goprintffuncname
+    # - interfacer
     # - staticcheck
     # - structcheck
+    # - typecheck
     # - goerr113
     # - noctx

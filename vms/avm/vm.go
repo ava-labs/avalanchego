@@ -6,6 +6,7 @@ package avm
 import (
 	"bytes"
 	"container/list"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -32,7 +33,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/index"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -58,13 +61,13 @@ var (
 	errBootstrapping             = errors.New("chain is currently bootstrapping")
 	errInsufficientFunds         = errors.New("insufficient funds")
 
-	_ vertex.DAGVM    = &VM{}
-	_ common.StaticVM = &VM{}
-	_ secp256k1fx.VM  = &VM{}
+	_ vertex.DAGVM   = &VM{}
+	_ secp256k1fx.VM = &VM{}
 )
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
+	Factory
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
@@ -90,10 +93,6 @@ type VM struct {
 
 	// asset id that will be used for fees
 	feeAssetID ids.ID
-	// fee that must be burned by every state creating transaction
-	creationTxFee uint64
-	// fee that must be burned by every non-state creating transaction
-	txFee uint64
 
 	// Asset ID --> Bit set with fx IDs the asset supports
 	assetToFxCache *cache.LRU
@@ -111,6 +110,8 @@ type VM struct {
 	fxs           []*parsedFx
 
 	walletService WalletService
+
+	addressTxsIndexer index.AddressTxsIndexer
 }
 
 func (vm *VM) Connected(id ids.ShortID) error {
@@ -127,6 +128,11 @@ func (vm *VM) Disconnected(id ids.ShortID) error {
  ******************************************************************************
  */
 
+type Config struct {
+	IndexTransactions    bool `json:"index-transactions"`
+	IndexAllowIncomplete bool `json:"index-allow-incomplete"`
+}
+
 // Initialize implements the avalanche.DAGVM interface
 func (vm *VM) Initialize(
 	ctx *snow.Context,
@@ -137,6 +143,14 @@ func (vm *VM) Initialize(
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 ) error {
+	avmConfig := Config{}
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &avmConfig); err != nil {
+			return err
+		}
+		ctx.Log.Info("VM config initialized %+v", avmConfig)
+	}
+
 	if err := vm.metrics.Initialize(ctx.Namespace, ctx.Metrics); err != nil {
 		return err
 	}
@@ -226,6 +240,20 @@ func (vm *VM) Initialize(
 	vm.walletService.pendingTxMap = make(map[ids.ID]*list.Element)
 	vm.walletService.pendingTxOrdering = list.New()
 
+	// use no op impl when disabled in config
+	if avmConfig.IndexTransactions {
+		vm.ctx.Log.Info("address transaction indexing is enabled")
+		vm.addressTxsIndexer, err = index.NewIndexer(vm.db, vm.ctx.Log, ctx.Namespace, ctx.Metrics, avmConfig.IndexAllowIncomplete)
+		if err != nil {
+			return fmt.Errorf("failed to initialize address transaction indexer: %w", err)
+		}
+	} else {
+		vm.ctx.Log.Info("address transaction indexing is disabled")
+		vm.addressTxsIndexer, err = index.NewNoIndexer(vm.db, avmConfig.IndexAllowIncomplete)
+		if err != nil {
+			return fmt.Errorf("failed to initialize disabled indexer: %w", err)
+		}
+	}
 	return vm.db.Commit()
 }
 
@@ -267,6 +295,11 @@ func (vm *VM) Shutdown() error {
 	return vm.baseDB.Close()
 }
 
+// Get implements the avalanche.DAGVM interface
+func (vm *VM) Version() (string, error) {
+	return version.Current.String(), nil
+}
+
 // CreateHandlers implements the avalanche.DAGVM interface
 func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	codec := cjson.NewCodec()
@@ -274,8 +307,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	rpcServer := rpc.NewServer()
 	rpcServer.RegisterCodec(codec, "application/json")
 	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	rpcServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "avm"
 	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
 		return nil, err
@@ -284,8 +317,8 @@ func (vm *VM) CreateHandlers() (map[string]*common.HTTPHandler, error) {
 	walletServer := rpc.NewServer()
 	walletServer.RegisterCodec(codec, "application/json")
 	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptAPIRequest)
-	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterAPIRequest)
+	walletServer.RegisterInterceptFunc(vm.metrics.apiRequestMetric.InterceptRequest)
+	walletServer.RegisterAfterFunc(vm.metrics.apiRequestMetric.AfterRequest)
 	// name this service "wallet"
 	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
@@ -386,8 +419,7 @@ func (vm *VM) getPaginatedUTXOs(
 	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	for _, addr := range addrsList {
 		start := ids.Empty
@@ -432,8 +464,7 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, error) {
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	// iterate over the addresses and get all the utxos
 	for _, addr := range addrsList {
@@ -675,6 +706,18 @@ func (vm *VM) getFx(val interface{}) (int, error) {
 	return fx, nil
 }
 
+// getParsedFx returns the parsedFx object for a given TransferableInput
+// or TransferableOutput object
+func (vm *VM) getParsedFx(val interface{}) (*parsedFx, error) {
+	idx, err := vm.getFx(val)
+	if err != nil {
+		return nil, err
+	}
+
+	fx := vm.fxs[idx]
+	return fx, nil
+}
+
 func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	// Check cache to see whether this asset supports this fx
 	fxIDsIntf, assetInCache := vm.assetToFxCache.Get(assetID)
@@ -697,7 +740,7 @@ func (vm *VM) verifyFxUsage(fxID int, assetID ids.ID) bool {
 	}
 	fxIDs := ids.BitSet(0)
 	for _, state := range createAssetTx.States {
-		if state.FxID == uint32(fxID) {
+		if state.FxIndex == uint32(fxID) {
 			// Cache that this asset supports this fx
 			fxIDs.Add(uint(fxID))
 		}
@@ -801,7 +844,6 @@ func (vm *VM) LoadUser(
 	return utxos, kc, db.Close()
 }
 
-// Spend ...
 func (vm *VM) Spend(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -868,7 +910,6 @@ func (vm *VM) Spend(
 	return amountsSpent, ins, keys, nil
 }
 
-// SpendNFT ...
 func (vm *VM) SpendNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -943,7 +984,6 @@ func (vm *VM) SpendNFT(
 	return ops, keys, nil
 }
 
-// SpendAll ...
 func (vm *VM) SpendAll(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -993,7 +1033,6 @@ func (vm *VM) SpendAll(
 	return amountsSpent, ins, keys, nil
 }
 
-// Mint ...
 func (vm *VM) Mint(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,
@@ -1067,7 +1106,6 @@ func (vm *VM) Mint(
 	return ops, keys, nil
 }
 
-// MintNFT ...
 func (vm *VM) MintNFT(
 	utxos []*avax.UTXO,
 	kc *secp256k1fx.Keychain,

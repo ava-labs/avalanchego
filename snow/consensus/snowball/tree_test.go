@@ -4,13 +4,13 @@
 package snowball
 
 import (
-	"math/rand"
 	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
 const (
@@ -967,7 +967,7 @@ func TestSnowballConsistent(t *testing.T) {
 	}
 	seed := int64(0)
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 
 	n := Network{}
 	n.Initialize(params, numColors)

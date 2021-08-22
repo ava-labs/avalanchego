@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var _ Meter = &TimedMeter{}
+
 // TimedMeter is a meter that discards old events
 type TimedMeter struct {
 	lock sync.Mutex

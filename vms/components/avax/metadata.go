@@ -15,7 +15,6 @@ var (
 	errMetadataNotInitialize = errors.New("metadata was never initialized and is not valid")
 )
 
-// Metadata ...
 type Metadata struct {
 	id            ids.ID // The ID of this data
 	unsignedBytes []byte // Unsigned byte representation of this data

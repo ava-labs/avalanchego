@@ -12,6 +12,8 @@ import (
 	health "github.com/AppsFlyer/go-sundheit"
 )
 
+var _ Service = &service{}
+
 // Service performs health checks. Other things register health checks
 // with Service, which performs them.
 type Service interface {

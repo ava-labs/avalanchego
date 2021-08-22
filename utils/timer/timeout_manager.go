@@ -34,7 +34,6 @@ func (tm *TimeoutManager) Initialize(duration time.Duration) {
 	tm.timer = NewTimer(tm.Timeout)
 }
 
-// Dispatch ...
 func (tm *TimeoutManager) Dispatch() { tm.timer.Dispatch() }
 
 // Stop executing timeouts

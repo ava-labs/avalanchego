@@ -11,14 +11,15 @@ import (
 	"github.com/gorilla/websocket"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
 	// Size of the ws read buffer
-	readBufferSize = 1024
+	readBufferSize = units.KiB
 
 	// Size of the ws write buffer
-	writeBufferSize = 1024
+	writeBufferSize = units.KiB
 
 	// Time allowed to write a message to the peer.
 	writeWait = 10 * time.Second
@@ -30,13 +31,13 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer.
-	maxMessageSize = 10 * 1024 // bytes
+	maxMessageSize = 10 * units.KiB // bytes
 
 	// Maximum number of pending messages to send to a peer.
 	maxPendingMessages = 1024 // messages
 
 	// MaxBytes the max number of bytes for a filter
-	MaxBytes = 1 * 1024 * 1024
+	MaxBytes = 1 * units.MiB
 
 	// MaxAddresses the max number of addresses allowed
 	MaxAddresses = 10000

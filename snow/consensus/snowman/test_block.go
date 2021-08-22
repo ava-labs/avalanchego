@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 )
 
@@ -14,7 +15,7 @@ import (
 type TestBlock struct {
 	choices.TestDecidable
 
-	ParentV    Block
+	ParentV    ids.ID
 	HeightV    uint64
 	TimestampV time.Time
 	VerifyV    error
@@ -22,7 +23,7 @@ type TestBlock struct {
 }
 
 // Parent implements the Block interface
-func (b *TestBlock) Parent() Block { return b.ParentV }
+func (b *TestBlock) Parent() ids.ID { return b.ParentV }
 
 // Height returns the height of the block
 func (b *TestBlock) Height() uint64 { return b.HeightV }

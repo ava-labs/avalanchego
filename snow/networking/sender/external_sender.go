@@ -37,5 +37,5 @@ type ExternalSender interface {
 	PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
 	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
-	Gossip(chainID ids.ID, containerID ids.ID, container []byte)
+	Gossip(subnetID, chainID, containerID ids.ID, container []byte)
 }

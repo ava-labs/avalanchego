@@ -15,6 +15,8 @@ const (
 	maxUTXOsToFetch = 1024
 )
 
+var _ AtomicUTXOManager = &atomicUTXOManager{}
+
 type AtomicUTXOManager interface {
 	// GetAtomicUTXOs returns exported UTXOs such that at least one of the
 	// addresses in [addrs] is referenced.

@@ -19,6 +19,8 @@ import (
 	healthlib "github.com/ava-labs/avalanchego/health"
 )
 
+var _ Service = &apiServer{}
+
 // Service wraps a [healthlib.Service]. Handler() returns a handler
 // that handles incoming HTTP API requests. We have this in a separate
 // package from [healthlib] to avoid a circular import where this service
@@ -94,7 +96,7 @@ type APIHealthReply struct {
 
 // Health returns a summation of the health of the node
 func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
-	as.log.Info("Health.health called")
+	as.log.Debug("Health.health called")
 	reply.Checks, reply.Healthy = as.Results()
 	if reply.Healthy {
 		return nil
@@ -107,7 +109,7 @@ func (as *apiServer) Health(_ *http.Request, _ *APIHealthArgs, reply *APIHealthR
 // GetLiveness returns a summation of the health of the node
 // Deprecated: in favor of Health
 func (as *apiServer) GetLiveness(_ *http.Request, _ *APIHealthArgs, reply *APIHealthReply) error {
-	as.log.Info("Health.getLiveness called")
+	as.log.Debug("Health.getLiveness called")
 	reply.Checks, reply.Healthy = as.Results()
 	if reply.Healthy {
 		return nil

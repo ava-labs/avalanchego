@@ -11,7 +11,10 @@ const (
 	IsInitializedKey byte = iota
 )
 
-var isInitializedKey = []byte{IsInitializedKey}
+var (
+	isInitializedKey                = []byte{IsInitializedKey}
+	_                SingletonState = &singletonState{}
+)
 
 // SingletonState is a thin wrapper around a database to provide, caching,
 // serialization, and de-serialization of singletons.

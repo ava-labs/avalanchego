@@ -64,7 +64,6 @@ func (t *Timer) Stop() {
 	t.reset()
 }
 
-// Dispatch ...
 func (t *Timer) Dispatch() {
 	t.lock.Lock()
 	defer t.lock.Unlock()

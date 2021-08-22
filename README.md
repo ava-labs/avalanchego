@@ -4,7 +4,7 @@
 
 ---
 
-Official node implementation of the [Avalanche](https://avax.network) network -
+Node implementation for the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
 
 ## Installation
@@ -18,6 +18,7 @@ Note that as network usage increases, hardware requirements may change.
 - Software Dependencies:
   - [Go](https://golang.org/doc/install) version >= 1.15.5 and set up [`$GOPATH`](https://github.com/golang/go/wiki/SettingGOPATH).
   - [gcc](https://gcc.gnu.org/)
+  - g++
 
 ### Native Install
 
@@ -37,6 +38,47 @@ Build Avalanche using the build script:
 ```
 
 The Avalanche binary, named `avalanchego`, is in the `build` directory.
+
+### Binary Repository
+
+Install AvalancheGo using an `apt` repository.
+
+#### Adding the APT Repository
+
+If you have already added the APT repository, you do not need to add it again.
+
+To add the repository on Ubuntu Bionic distributions, run:
+
+```sh
+sudo su -
+wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
+echo "deb https://downloads.avax.network/apt bionic main" > /etc/apt/sources.list.d/avalanche.list
+exit
+```
+
+To add the repository on Ubuntu Focal distributions, run:
+
+```sh
+sudo su -
+wget -O - https://downloads.avax.network/avalanchego.gpg.key | apt-key add -
+echo "deb https://downloads.avax.network/apt focal main" > /etc/apt/sources.list.d/avalanche.list
+exit
+```
+
+#### Installing the Latest Version
+
+After adding the APT repository, install avalanchego by running:
+
+```sh
+sudo apt update
+sudo apt install avalanchego
+```
+
+### Binary Install
+
+Download the [latest build](https://github.com/ava-labs/avalanchego/releases/latest) for your operating system and architecture.
+
+The Avalanche binary to be executed is named `avalanchego`.
 
 ### Docker Install
 
@@ -102,12 +144,41 @@ To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the r
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) and protoc-gen-go installed. protoc must be on your $PATH.
+To use this script, you must have [protoc](https://grpc.io/docs/protoc-installation/) (v3.17.3), protoc-gen-go (v1.26.0) and protoc-gen-go-grpc (v1.1.0) installed. protoc must be on your $PATH.
+
+To install the protoc dependencies:
+
+```sh
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+```
+
+If you have not already, you may need to add `$GOPATH/bin` to your `$PATH`:
+
+```sh
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
 
 If you extract protoc to ~/software/protobuf/, the following should work:
 
 ```sh
 export PATH=$PATH:~/software/protobuf/bin/:~/go/bin
 go get google.golang.org/protobuf/cmd/protoc-gen-go
+go get google.golang.org/protobuf/cmd/protoc-gen-go-grpc
 scripts/protobuf_codegen.sh
 ```
+
+For more information, refer to the [GRPC Golang Quick Start Guide](https://grpc.io/docs/languages/go/quickstart/).
+
+### Running protobuf codegen from docker
+
+```sh
+docker build -t avalanche:protobuf_codegen -f Dockerfile.protoc .
+docker run -t -i -v $(pwd):/opt/avalanche -w/opt/avalanche avalanche:protobuf_codegen bash -c "scripts/protobuf_codegen.sh"
+```
+
+## Security Bugs
+
+**We and our community welcome responsible disclosures.**
+
+If you've discovered a security vulnerabilitiy, please report it via our [bug bounty program](https://hackenproof.com/avalanche/). Valid reports will be eligible for a reward (terms and conditions apply).

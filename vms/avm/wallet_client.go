@@ -9,12 +9,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// WalletClient ...
 type WalletClient struct {
 	requester rpc.EndpointRequester
 }
@@ -22,13 +22,13 @@ type WalletClient struct {
 // NewWalletClient returns an AVM wallet client for interacting with avm managed wallet on [chain]
 func NewWalletClient(uri, chain string, requestTimeout time.Duration) *WalletClient {
 	return &WalletClient{
-		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/bc/%s/wallet", chain), "wallet", requestTimeout),
+		requester: rpc.NewEndpointRequester(uri, fmt.Sprintf("/ext/%s/wallet", constants.ChainAliasPrefix+chain), "wallet", requestTimeout),
 	}
 }
 
 // IssueTx issues a transaction to a node and returns the TxID
 func (c *WalletClient) IssueTx(txBytes []byte) (ids.ID, error) {
-	txStr, err := formatting.Encode(formatting.Hex, txBytes)
+	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
 		return ids.ID{}, err
 	}

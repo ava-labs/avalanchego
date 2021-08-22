@@ -22,6 +22,8 @@ var (
 	errNoLeaves  = errors.New("couldn't pop a leaf from leaf set")
 )
 
+var _ Consensus = &Topological{}
+
 // TopologicalFactory implements Factory by returning a topological struct
 type TopologicalFactory struct{}
 
@@ -478,6 +480,7 @@ func (ta *Topological) update(vtx Vertex) error {
 	for _, dep := range deps {
 		if status := dep.Status(); status == choices.Rejected {
 			// My parent is rejected, so I should be rejected
+			ta.ctx.Log.Trace("rejecting vertex %s due to rejected parent %s", vtxID, dep.ID())
 			if err := vtx.Reject(); err != nil {
 				return err
 			}
@@ -539,6 +542,8 @@ func (ta *Topological) update(vtx Vertex) error {
 		if err := ta.ctx.ConsensusDispatcher.Accept(ta.ctx, vtxID, vtx.Bytes()); err != nil {
 			return err
 		}
+
+		ta.ctx.Log.Trace("accepting vertex %s", vtxID)
 		if err := vtx.Accept(); err != nil {
 			return err
 		}
@@ -549,6 +554,8 @@ func (ta *Topological) update(vtx Vertex) error {
 		if err := ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes()); err != nil {
 			return err
 		}
+
+		ta.ctx.Log.Trace("rejecting vertex %s due to a conflicting acceptance", vtxID)
 		if err := vtx.Reject(); err != nil {
 			return err
 		}

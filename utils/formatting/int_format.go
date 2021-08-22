@@ -8,7 +8,6 @@ import (
 	"math"
 )
 
-// IntFormat ...
 func IntFormat(maxValue int) string {
 	log := 1
 	if maxValue > 0 {

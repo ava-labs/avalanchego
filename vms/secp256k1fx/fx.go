@@ -42,7 +42,6 @@ type Fx struct {
 	bootstrapped bool
 }
 
-// Initialize ...
 func (fx *Fx) Initialize(vmIntf interface{}) error {
 	if err := fx.InitializeVM(vmIntf); err != nil {
 		return err
@@ -66,7 +65,6 @@ func (fx *Fx) Initialize(vmIntf interface{}) error {
 	return errs.Err
 }
 
-// InitializeVM ...
 func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	vm, ok := vmIntf.(VM)
 	if !ok {
@@ -76,10 +74,8 @@ func (fx *Fx) InitializeVM(vmIntf interface{}) error {
 	return nil
 }
 
-// Bootstrapping ...
 func (fx *Fx) Bootstrapping() error { return nil }
 
-// Bootstrapped ...
 func (fx *Fx) Bootstrapped() error { fx.bootstrapped = true; return nil }
 
 // VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
@@ -106,7 +102,6 @@ func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) 
 	return fx.VerifyCredentials(tx, in, cred, owner)
 }
 
-// VerifyOperation ...
 func (fx *Fx) VerifyOperation(txIntf, opIntf, credIntf interface{}, utxosIntf []interface{}) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {
@@ -140,7 +135,6 @@ func (fx *Fx) verifyOperation(tx Tx, op *MintOperation, cred *Credential, utxo *
 	return fx.VerifyCredentials(tx, &op.MintInput, cred, &utxo.OutputOwners)
 }
 
-// VerifyTransfer ...
 func (fx *Fx) VerifyTransfer(txIntf, inIntf, credIntf, utxoIntf interface{}) error {
 	tx, ok := txIntf.(Tx)
 	if !ok {

@@ -8,6 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 )
 
+var _ Vertex = &TestVertex{}
+
 // TestVertex is a useful test vertex
 type TestVertex struct {
 	choices.TestDecidable

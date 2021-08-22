@@ -3,6 +3,8 @@
 
 package verify
 
+import "github.com/ava-labs/avalanchego/snow"
+
 // Verifiable can be verified
 type Verifiable interface {
 	Verify() error
@@ -10,6 +12,7 @@ type Verifiable interface {
 
 // State that can be verified
 type State interface {
+	snow.ContextInitializable
 	Verifiable
 	VerifyState() error
 }

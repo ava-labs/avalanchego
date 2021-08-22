@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/galiaslookup/galiaslookupproto"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp"
@@ -48,9 +47,10 @@ var (
 )
 
 const (
-	decidedCacheSize    = 500
-	missingCacheSize    = 200
-	unverifiedCacheSize = 200
+	decidedCacheSize    = 512
+	missingCacheSize    = 256
+	unverifiedCacheSize = 512
+	bytesToIDCacheSize  = 512
 )
 
 // VMClient is an implementation of VM that talks over RPC.
@@ -207,6 +207,7 @@ func (vm *VMClient) Initialize(
 			DecidedCacheSize:    decidedCacheSize,
 			MissingCacheSize:    missingCacheSize,
 			UnverifiedCacheSize: unverifiedCacheSize,
+			BytesToIDCacheSize:  bytesToIDCacheSize,
 			LastAcceptedBlock:   lastAcceptedBlk,
 			GetBlock:            vm.getBlock,
 			UnmarshalBlock:      vm.parseBlock,
@@ -449,6 +450,17 @@ func (vm *VMClient) HealthCheck() (interface{}, error) {
 	)
 }
 
+func (vm *VMClient) Version() (string, error) {
+	resp, err := vm.client.Version(
+		context.Background(),
+		&vmproto.VersionRequest{},
+	)
+	if err != nil {
+		return "", err
+	}
+	return resp.Version, nil
+}
+
 // BlockClient is an implementation of Block that talks over RPC.
 type BlockClient struct {
 	vm *VMClient
@@ -481,16 +493,13 @@ func (b *BlockClient) Reject() error {
 
 func (b *BlockClient) Status() choices.Status { return b.status }
 
-func (b *BlockClient) Parent() snowman.Block {
-	if parent, err := b.vm.GetBlockInternal(b.parentID); err == nil {
-		return parent
-	}
-	return &missing.Block{BlkID: b.parentID}
+func (b *BlockClient) Parent() ids.ID {
+	return b.parentID
 }
 
 func (b *BlockClient) Verify() error {
 	resp, err := b.vm.client.BlockVerify(context.Background(), &vmproto.BlockVerifyRequest{
-		Id: b.id[:],
+		Bytes: b.bytes,
 	})
 	if err != nil {
 		return err

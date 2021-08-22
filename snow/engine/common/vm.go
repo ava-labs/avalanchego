@@ -16,9 +16,6 @@ type VM interface {
 	// Periodically called and reported via the node's Health API.
 	health.Checkable
 
-	// StaticVM allows a user to interact with a VM statically.
-	StaticVM
-
 	// Connector represents a handler that is called on connection connect/disconnect
 	validators.Connector
 
@@ -59,6 +56,23 @@ type VM interface {
 	// Shutdown is called when the node is shutting down.
 	Shutdown() error
 
+	// Version returns the version of the VM this node is running.
+	Version() (string, error)
+
+	// Creates the HTTP handlers for custom VM network calls.
+	//
+	// This exposes handlers that the outside world can use to communicate with
+	// a static reference to the VM. Each handler has the path:
+	// [Address of node]/ext/VM/[VM ID]/[extension]
+	//
+	// Returns a mapping from [extension]s to HTTP handlers.
+	//
+	// Each extension can specify how locking is managed for convenience.
+	//
+	// For example, it might make sense to have an extension for creating
+	// genesis bytes this VM can interpret.
+	CreateStaticHandlers() (map[string]*HTTPHandler, error)
+
 	// Creates the HTTP handlers for custom chain network calls.
 	//
 	// This exposes handlers that the outside world can use to communicate with
@@ -73,22 +87,4 @@ type VM interface {
 	// it have an extension called `accounts`, where clients could get
 	// information about their accounts.
 	CreateHandlers() (map[string]*HTTPHandler, error)
-}
-
-// StaticVM describes the functionality that allows a user to interact with a VM
-// statically.
-type StaticVM interface {
-	// Creates the HTTP handlers for custom VM network calls.
-	//
-	// This exposes handlers that the outside world can use to communicate with
-	// a static reference to the VM. Each handler has the path:
-	// [Address of node]/ext/VM/[VM ID]/[extension]
-	//
-	// Returns a mapping from [extension]s to HTTP handlers.
-	//
-	// Each extension can specify how locking is managed for convenience.
-	//
-	// For example, it might make sense to have an extension for creating
-	// genesis bytes this VM can interpret.
-	CreateStaticHandlers() (map[string]*HTTPHandler, error)
 }

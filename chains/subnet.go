@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
+var _ Subnet = &subnet{}
+
 // Subnet keeps track of the currently bootstrapping chains in a subnet. If no
 // chains in the subnet are currently bootstrapping, the subnet is considered
 // bootstrapped.
