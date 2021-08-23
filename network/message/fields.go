@@ -28,6 +28,7 @@ const (
 	SigBytes                         // Used in handshake / peer gossiping
 	VersionTime                      // Used in handshake / peer gossiping
 	SignedPeers                      // Used in peer gossiping
+	TrackedSubnets                   // Used in handshake / peer gossiping
 	AppRequestBytes                  // Used at application level
 	AppResponseBytes                 // Used at application level
 	AppGossipBytes                   // Used at application level
@@ -70,6 +71,8 @@ func (f Field) Packer() func(*wrappers.Packer, interface{}) {
 		return wrappers.TryPackLong
 	case SignedPeers:
 		return wrappers.TryPackIPCertList
+	case TrackedSubnets:
+		return wrappers.TryPackHashes
 	default:
 		return nil
 	}
@@ -112,6 +115,8 @@ func (f Field) Unpacker() func(*wrappers.Packer) interface{} {
 		return wrappers.TryUnpackLong
 	case SignedPeers:
 		return wrappers.TryUnpackIPCertList
+	case TrackedSubnets:
+		return wrappers.TryUnpackHashes
 	default:
 		return nil
 	}
@@ -157,6 +162,8 @@ func (f Field) String() string {
 		return "VersionTime"
 	case SignedPeers:
 		return "SignedPeers"
+	case TrackedSubnets:
+		return "TrackedSubnets"
 	default:
 		return "Unknown Field"
 	}

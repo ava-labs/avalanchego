@@ -238,13 +238,15 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	}
 
 	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.InitializeResponse{
 		LastAcceptedID:       lastAccepted[:],
 		LastAcceptedParentID: parentID[:],
 		Status:               uint32(choices.Accepted),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
-	}, nil
+		Timestamp:            timeBytes,
+	}, err
 }
 
 func (vm *VMServer) Bootstrapping(context.Context, *vmproto.EmptyMsg) (*vmproto.EmptyMsg, error) {
@@ -329,12 +331,14 @@ func (vm *VMServer) BuildBlock(context.Context, *vmproto.EmptyMsg) (*vmproto.Bui
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.BuildBlockResponse{
-		Id:       blkID[:],
-		ParentID: parentID[:],
-		Bytes:    blk.Bytes(),
-		Height:   blk.Height(),
-	}, nil
+		Id:        blkID[:],
+		ParentID:  parentID[:],
+		Bytes:     blk.Bytes(),
+		Height:    blk.Height(),
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest) (*vmproto.ParseBlockResponse, error) {
@@ -344,12 +348,14 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 	}
 	blkID := blk.ID()
 	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.ParseBlockResponse{
-		Id:       blkID[:],
-		ParentID: parentID[:],
-		Status:   uint32(blk.Status()),
-		Height:   blk.Height(),
-	}, nil
+		Id:        blkID[:],
+		ParentID:  parentID[:],
+		Status:    uint32(blk.Status()),
+		Height:    blk.Height(),
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
@@ -362,12 +368,14 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 		return nil, err
 	}
 	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.GetBlockResponse{
-		ParentID: parentID[:],
-		Bytes:    blk.Bytes(),
-		Status:   uint32(blk.Status()),
-		Height:   blk.Height(),
-	}, nil
+		ParentID:  parentID[:],
+		Bytes:     blk.Bytes(),
+		Status:    uint32(blk.Status()),
+		Height:    blk.Height(),
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceRequest) (*vmproto.EmptyMsg, error) {
@@ -444,12 +452,18 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*vm
 	return nil, vm.vm.AppGossip(nodeID, req.Msg)
 }
 
-func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.EmptyMsg, error) {
+func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
 	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
 		return nil, err
 	}
-	return &vmproto.EmptyMsg{}, blk.Verify()
+	if err := blk.Verify(); err != nil {
+		return nil, err
+	}
+	timeBytes, err := blk.Timestamp().MarshalBinary()
+	return &vmproto.BlockVerifyResponse{
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptRequest) (*vmproto.EmptyMsg, error) {

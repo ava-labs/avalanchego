@@ -34,7 +34,7 @@ type VMClient interface {
 	AppRequestFailed(ctx context.Context, in *AppRequestFailedMsg, opts ...grpc.CallOption) (*EmptyMsg, error)
 	AppResponse(ctx context.Context, in *AppResponseMsg, opts ...grpc.CallOption) (*EmptyMsg, error)
 	AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc.CallOption) (*EmptyMsg, error)
-	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*EmptyMsg, error)
+	BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error)
 	BlockAccept(ctx context.Context, in *BlockAcceptRequest, opts ...grpc.CallOption) (*EmptyMsg, error)
 	BlockReject(ctx context.Context, in *BlockRejectRequest, opts ...grpc.CallOption) (*EmptyMsg, error)
 }
@@ -191,8 +191,8 @@ func (c *vMClient) AppGossip(ctx context.Context, in *AppGossipMsg, opts ...grpc
 	return out, nil
 }
 
-func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*EmptyMsg, error) {
-	out := new(EmptyMsg)
+func (c *vMClient) BlockVerify(ctx context.Context, in *BlockVerifyRequest, opts ...grpc.CallOption) (*BlockVerifyResponse, error) {
+	out := new(BlockVerifyResponse)
 	err := c.cc.Invoke(ctx, "/vmproto.VM/BlockVerify", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -238,7 +238,7 @@ type VMServer interface {
 	AppRequestFailed(context.Context, *AppRequestFailedMsg) (*EmptyMsg, error)
 	AppResponse(context.Context, *AppResponseMsg) (*EmptyMsg, error)
 	AppGossip(context.Context, *AppGossipMsg) (*EmptyMsg, error)
-	BlockVerify(context.Context, *BlockVerifyRequest) (*EmptyMsg, error)
+	BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error)
 	BlockAccept(context.Context, *BlockAcceptRequest) (*EmptyMsg, error)
 	BlockReject(context.Context, *BlockRejectRequest) (*EmptyMsg, error)
 	mustEmbedUnimplementedVMServer()
@@ -296,7 +296,7 @@ func (UnimplementedVMServer) AppResponse(context.Context, *AppResponseMsg) (*Emp
 func (UnimplementedVMServer) AppGossip(context.Context, *AppGossipMsg) (*EmptyMsg, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AppGossip not implemented")
 }
-func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*EmptyMsg, error) {
+func (UnimplementedVMServer) BlockVerify(context.Context, *BlockVerifyRequest) (*BlockVerifyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BlockVerify not implemented")
 }
 func (UnimplementedVMServer) BlockAccept(context.Context, *BlockAcceptRequest) (*EmptyMsg, error) {

@@ -39,7 +39,7 @@ type ExternalSender interface {
 	SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
 	SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
-	SendGossip(chainID ids.ID, containerID ids.ID, container []byte)
+	SendGossip(subnetID, chainID, containerID ids.ID, container []byte)
 }
 
 // Sends app-level messages
@@ -49,5 +49,5 @@ type AppSender interface {
 	// Send an application-level response to a request
 	SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
 	// Gossip an application-level message
-	SendAppGossip(chainID ids.ID, appGossipBytes []byte)
+	SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 }

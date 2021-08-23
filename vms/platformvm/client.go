@@ -8,6 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -128,19 +129,29 @@ func (c *Client) GetStakingAssetID(subnetID ids.ID) (ids.ID, error) {
 }
 
 // GetCurrentValidators returns the list of current validators for subnet with ID [subnetID]
-func (c *Client) GetCurrentValidators(subnetID ids.ID) ([]interface{}, error) {
+func (c *Client) GetCurrentValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, error) {
+	nodeIDsStr := []string{}
+	for _, nodeID := range nodeIDs {
+		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
+	}
 	res := &GetCurrentValidatorsReply{}
 	err := c.requester.SendRequest("getCurrentValidators", &GetCurrentValidatorsArgs{
 		SubnetID: subnetID,
+		NodeIDs:  nodeIDsStr,
 	}, res)
 	return res.Validators, err
 }
 
 // GetPendingValidators returns the list of pending validators for subnet with ID [subnetID]
-func (c *Client) GetPendingValidators(subnetID ids.ID) ([]interface{}, []interface{}, error) {
+func (c *Client) GetPendingValidators(subnetID ids.ID, nodeIDs []ids.ShortID) ([]interface{}, []interface{}, error) {
+	nodeIDsStr := []string{}
+	for _, nodeID := range nodeIDs {
+		nodeIDsStr = append(nodeIDsStr, nodeID.PrefixedString(constants.NodeIDPrefix))
+	}
 	res := &GetPendingValidatorsReply{}
 	err := c.requester.SendRequest("getPendingValidators", &GetPendingValidatorsArgs{
 		SubnetID: subnetID,
+		NodeIDs:  nodeIDsStr,
 	}, res)
 	return res.Validators, res.Delegators, err
 }
@@ -350,7 +361,7 @@ func (c *Client) CreateBlockchain(
 }
 
 // GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-func (c *Client) GetBlockchainStatus(blockchainID string) (Status, error) {
+func (c *Client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest("getBlockchainStatus", &GetBlockchainStatusArgs{
 		BlockchainID: blockchainID,
@@ -423,12 +434,12 @@ func (c *Client) GetTxStatus(txID ids.ID, includeReason bool) (*GetTxStatusRespo
 
 // GetStake returns the amount of nAVAX that [addresses] have cumulatively
 // staked on the Primary Network.
-func (c *Client) GetStake(addrs []string) (uint64, error) {
+func (c *Client) GetStake(addrs []string) (*GetStakeReply, error) {
 	res := new(GetStakeReply)
 	err := c.requester.SendRequest("getStake", &api.JSONAddresses{
 		Addresses: addrs,
 	}, res)
-	return uint64(res.Staked), err
+	return res, err
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX for validators
@@ -475,4 +486,11 @@ func (c *Client) GetRewardUTXOs(args *api.GetTxArgs) ([][]byte, error) {
 		utxos[i] = utxoBytes
 	}
 	return utxos, err
+}
+
+// GetTimestamp returns the current chain timestamp
+func (c *Client) GetTimestamp() (time.Time, error) {
+	res := &GetTimestampReply{}
+	err := c.requester.SendRequest("getTimestamp", struct{}{}, res)
+	return res.Timestamp, err
 }

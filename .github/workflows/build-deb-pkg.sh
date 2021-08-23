@@ -37,3 +37,4 @@ sed -i "s/Version.*/$NEW_VERSION_STRING/g" debian/DEBIAN/control
 sed -i "s/Architecture.*/$NEW_ARCH_STRING/g" debian/DEBIAN/control
 dpkg-deb --build debian avalanchego-$TAG-$ARCH.deb
 aws s3 cp avalanchego-$TAG-$ARCH.deb s3://${BUCKET}/linux/debs/ubuntu/$RELEASE/$ARCH/
+rm -rf $PKG_ROOT

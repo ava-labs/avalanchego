@@ -272,16 +272,20 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 	ctx.Keystore = userKeystore.NewBlockchainKeyStore(ctx.ChainID)
 
 	issuer := make(chan common.Message, 1)
-	vm := &VM{
-		txFee:         testTxFee,
-		creationTxFee: testTxFee,
+	vm := &VM{Factory: Factory{
+		TxFee:            testTxFee,
+		CreateAssetTxFee: testTxFee,
+	}}
+	configBytes, err := BuildAvmConfigBytes(Config{IndexTransactions: true})
+	if err != nil {
+		tb.Fatal("should not have caused error in creating avm config bytes")
 	}
 	err = vm.Initialize(
 		ctx,
 		baseDBManager.NewPrefixDBManager([]byte{1}),
 		genesisBytes,
 		nil,
-		nil,
+		configBytes,
 		issuer,
 		[]*common.Fx{
 			{
@@ -370,7 +374,7 @@ func setupIssueTx(t testing.TB) (chan common.Message, *VM, *snow.Context, []*Tx)
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},
@@ -1521,7 +1525,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 			},
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			In: &secp256k1fx.TransferInput{
-				Amt: startBalance - vm.txFee,
+				Amt: startBalance - vm.TxFee,
 				Input: secp256k1fx.Input{
 					SigIndices: []uint32{
 						0,
@@ -1532,7 +1536,7 @@ func TestTxVerifyAfterVerifyAncestorTx(t *testing.T) {
 		Outs: []*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: avaxTx.ID()},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: startBalance - 2*vm.txFee,
+				Amt: startBalance - 2*vm.TxFee,
 				OutputOwners: secp256k1fx.OutputOwners{
 					Threshold: 1,
 					Addrs:     []ids.ShortID{key.PublicKey().Address()},

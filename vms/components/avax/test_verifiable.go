@@ -24,6 +24,8 @@ func (t *TestTransferable) InitCtx(*snow.Context) {
 
 func (t *TestTransferable) Amount() uint64 { return t.Val }
 
+func (t *TestTransferable) Cost() (uint64, error) { return 0, nil }
+
 type TestAddressable struct {
 	TestTransferable `serialize:"true"`
 

@@ -39,11 +39,11 @@ type ExternalSenderTest struct {
 	SendPullQueryF func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
 	SendChitsF     func(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
+	SendGossipF func(subnetID, chainID, containerID ids.ID, container []byte)
+
 	SendAppRequestF  func(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
 	SendAppResponseF func(nodeIDs ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytyes []byte)
-	SendAppGossipF   func(chainID ids.ID, appGossipBytyes []byte)
-
-	SendGossipF func(chainID ids.ID, containerID ids.ID, container []byte)
+	SendAppGossipF   func(subnetID, chainID ids.ID, appGossipBytyes []byte)
 }
 
 // Default set the default callable value to [cant]
@@ -261,10 +261,10 @@ func (s *ExternalSenderTest) SendAppResponse(nodeID ids.ShortID, chainID ids.ID,
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
+func (s *ExternalSenderTest) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte) {
 	switch {
 	case s.SendAppGossipF != nil:
-		s.SendAppGossipF(chainID, appGossipBytes)
+		s.SendAppGossipF(subnetID, chainID, appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendAppGossip")
 	case s.CantSendAppGossip && s.B != nil:
@@ -275,10 +275,10 @@ func (s *ExternalSenderTest) SendAppGossip(chainID ids.ID, appGossipBytes []byte
 // SendGossip calls SendGossipF if it was initialized. If it wasn't initialized and this
 // function shouldn't be called and testing was initialized, then testing will
 // fail.
-func (s *ExternalSenderTest) SendGossip(chainID ids.ID, containerID ids.ID, container []byte) {
+func (s *ExternalSenderTest) SendGossip(subnetID, chainID, containerID ids.ID, container []byte) {
 	switch {
 	case s.SendGossipF != nil:
-		s.SendGossipF(chainID, containerID, container)
+		s.SendGossipF(subnetID, chainID, containerID, container)
 	case s.CantSendGossip && s.T != nil:
 		s.T.Fatalf("Unexpectedly called SendGossip")
 	case s.CantSendGossip && s.B != nil:
