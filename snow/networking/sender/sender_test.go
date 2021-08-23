@@ -83,8 +83,8 @@ func TestTimeout(t *testing.T) {
 	wg.Add(2)
 
 	failedVDRs := ids.ShortSet{}
-	engine.QueryFailedF = func(nodeID ids.ShortID, _ uint32) error {
-		failedVDRs.Add(nodeID)
+	engine.QueryFailedF = func(validatorID ids.ShortID, _ uint32) error {
+		failedVDRs.Add(validatorID)
 		wg.Done()
 		return nil
 	}
@@ -107,7 +107,7 @@ func TestTimeout(t *testing.T) {
 	vdrIDs.Add(ids.ShortID{255})
 	vdrIDs.Add(ids.ShortID{254})
 
-	sender.SendPullQuery(vdrIDs, 0, ids.Empty)
+	sender.PullQuery(vdrIDs, 0, ids.Empty)
 
 	wg.Wait()
 
@@ -160,7 +160,7 @@ func TestReliableMessages(t *testing.T) {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 
-	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
+	engine.QueryFailedF = func(validatorID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -184,7 +184,7 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs := ids.ShortSet{}
 			vdrIDs.Add(ids.ShortID{1})
 
-			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -245,7 +245,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 		awaiting[i] = make(chan struct{}, 1)
 	}
 
-	engine.QueryFailedF = func(nodeID ids.ShortID, reqID uint32) error {
+	engine.QueryFailedF = func(validatorID ids.ShortID, reqID uint32) error {
 		close(awaiting[int(reqID)])
 		return nil
 	}
@@ -271,7 +271,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			// a query failed message
 			vdrIDs := ids.ShortSet{}
 			vdrIDs.Add(ids.GenerateTestShortID())
-			sender.SendPullQuery(vdrIDs, uint32(i), ids.Empty)
+			sender.PullQuery(vdrIDs, uint32(i), ids.Empty)
 		}
 	}()
 

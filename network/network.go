@@ -234,6 +234,9 @@ type network struct {
 
 	// Rate-limits outgoing messages
 	outboundMsgThrottler throttling.OutboundMsgThrottler
+
+	// WhitelistedSubnets of the node
+	whitelistedSubnets ids.Set
 }
 
 type Config struct {
@@ -244,7 +247,10 @@ type Config struct {
 	OutboundThrottlerConfig     throttling.MsgThrottlerConfig         `json:"outboundThrottlerConfig"`
 	DialerConfig                dialer.Config                         `json:"dialerConfig"`
 	// [Registerer] is set in node's initMetricsAPI method
-	MetricsRegisterer prometheus.Registerer `json:"-"`
+	MetricsRegisterer  prometheus.Registerer `json:"-"`
+	CompressionEnabled bool                  `json:"compressionEnabled"`
+	// Peer alias configuration
+	PeerAliasTimeout time.Duration `json:"peerAliasTimeout"`
 }
 
 // NewDefaultNetwork returns a new Network implementation with the provided
@@ -279,6 +285,7 @@ func NewDefaultNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	whitelistedSubnets ids.Set,
 ) (Network, error) {
 	return NewNetwork(
 		namespace,
@@ -321,6 +328,7 @@ func NewDefaultNetwork(
 		compressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
+		whitelistedSubnets,
 	)
 }
 
@@ -366,6 +374,7 @@ func NewNetwork(
 	compressionEnabled bool,
 	inboundMsgThrottler throttling.InboundMsgThrottler,
 	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	whitelistedSubnets ids.Set,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
@@ -422,6 +431,7 @@ func NewNetwork(
 		compressionEnabled:   compressionEnabled,
 		inboundMsgThrottler:  inboundMsgThrottler,
 		outboundMsgThrottler: outboundMsgThrottler,
+		whitelistedSubnets:   whitelistedSubnets,
 	}
 	codec, err := message.NewCodecWithAllocator(
 		fmt.Sprintf("%s_codec", namespace),
@@ -446,7 +456,7 @@ func NewNetwork(
 
 // GetAcceptedFrontier implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
+func (n *network) GetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID {
 	msg, err := n.b.GetAcceptedFrontier(chainID, requestID, uint64(deadline))
 	n.log.AssertNoError(err)
 	msgLen := len(msg.Bytes())
@@ -479,7 +489,7 @@ func (n *network) SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, 
 
 // AcceptedFrontier implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (n *network) AcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -516,7 +526,7 @@ func (n *network) SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, reque
 
 // GetAccepted implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
+func (n *network) GetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID {
 	now := n.clock.Time()
 
 	msg, err := n.b.GetAccepted(chainID, requestID, uint64(deadline), containerIDs)
@@ -559,7 +569,7 @@ func (n *network) SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestI
 
 // Accepted implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendAccepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
+func (n *network) Accepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID) {
 	now := n.clock.Time()
 
 	msg, err := n.b.Accepted(chainID, requestID, containerIDs)
@@ -596,7 +606,7 @@ func (n *network) SendAccepted(nodeID ids.ShortID, chainID ids.ID, requestID uin
 
 // GetAncestors implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+func (n *network) GetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -631,7 +641,7 @@ func (n *network) SendGetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID
 
 // MultiPut implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendMultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
+func (n *network) MultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -667,7 +677,7 @@ func (n *network) SendMultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uin
 
 // Get implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGet(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
+func (n *network) Get(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool {
 	now := n.clock.Time()
 
 	msg, err := n.b.Get(chainID, requestID, uint64(deadline), containerID)
@@ -697,7 +707,7 @@ func (n *network) SendGet(nodeID ids.ShortID, chainID ids.ID, requestID uint32, 
 
 // Put implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
+func (n *network) Put(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -739,7 +749,7 @@ func (n *network) SendPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, 
 
 // PushQuery implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
+func (n *network) PushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
 	now := n.clock.Time()
 
 	msgWithIsCompressedFlag, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, true, n.compressionEnabled)
@@ -803,7 +813,7 @@ func (n *network) SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 
 // PullQuery implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
+func (n *network) PullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID {
 	now := n.clock.Time()
 
 	msg, err := n.b.PullQuery(chainID, requestID, uint64(deadline), containerID)
@@ -838,7 +848,7 @@ func (n *network) SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID 
 
 // Chits implements the Sender interface.
 // Assumes [n.stateLock] is not held.
-func (n *network) SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
+func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID) {
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
@@ -949,7 +959,7 @@ func (n *network) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(int(n.appGossipSize))
+	peers, err := n.peers.sample(chainID, int(n.appGossipSize))
 	n.stateLock.RUnlock()
 	if err != nil {
 		n.log.Debug("failed to sample %d peers for AppGossip: %s", n.appGossipSize, err)
@@ -976,8 +986,8 @@ func (n *network) SendAppGossip(chainID ids.ID, appGossipBytes []byte) {
 
 // SendGossip attempts to gossip the container to the network
 // Assumes [n.stateLock] is not held.
-func (n *network) SendGossip(chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
+func (n *network) Gossip(subnetID, chainID, containerID ids.ID, container []byte) {
+	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -990,7 +1000,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
+	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -1204,7 +1214,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte, numToGossip uint) error {
+func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint) error {
 	now := n.clock.Time()
 
 	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
@@ -1220,7 +1230,7 @@ func (n *network) gossipContainer(chainID, containerID ids.ID, container []byte,
 	}
 
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(int(numToGossip))
+	peers, err := n.peers.sample(subnetID, int(numToGossip))
 	n.stateLock.RUnlock()
 	if err != nil {
 		return err
@@ -1726,7 +1736,6 @@ func (n *network) disconnected(p *peer) {
 	defer p.net.stateLock.Unlock()
 
 	ip := p.getIP()
-
 	n.log.Debug("disconnected from %s at %s", p.nodeID, ip)
 
 	n.peers.remove(p)

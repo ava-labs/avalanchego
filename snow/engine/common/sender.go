@@ -7,7 +7,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// Sender defines the consensus messages that can be sent.
+// Sender defines how a consensus engine sends messages and requests to other
+// validators
 type Sender interface {
 	FrontierSender
 	AcceptedSender
@@ -18,69 +19,73 @@ type Sender interface {
 }
 
 // FrontierSender defines how a consensus engine sends frontier messages to
-// other nodes.
+// other validators
 type FrontierSender interface {
-	// SendGetAcceptedFrontier requests that every node in [nodeIDs] sends
+	// GetAcceptedFrontier requests that every validator in [validatorIDs] sends
 	// an AcceptedFrontier message.
-	SendGetAcceptedFrontier(nodeIDs ids.ShortSet, requestID uint32)
+	GetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32)
 
-	// SendAcceptedFrontier responds to a AcceptedFrontier message with this
+	// AcceptedFrontier responds to a AcceptedFrontier message with this
 	// engine's current accepted frontier.
-	SendAcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID)
+	AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID)
 }
 
 // AcceptedSender defines how a consensus engine sends messages pertaining to
 // accepted containers
 type AcceptedSender interface {
-	// SendGetAccepted requests that every node in [nodeIDs] sends an
-	// Accepted message with all the IDs in [containerIDs] that the node
+	// GetAccepted requests that every validator in [validatorIDs] sends an
+	// Accepted message with all the IDs in [containerIDs] that the validator
 	// thinks is accepted.
-	SendGetAccepted(nodeIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID)
+	GetAccepted(validatorIDs ids.ShortSet, requestID uint32, containerIDs []ids.ID)
 
-	// SendAccepted responds to a GetAccepted message with a set of IDs of
+	// Accepted responds to a GetAccepted message with a set of IDs of
 	// containers that are accepted.
-	SendAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID)
+	Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID)
 }
 
-// FetchSender defines how a consensus engine sends retrieval messages to other nodes.
+// FetchSender defines how a consensus engine sends retrieval messages to other
+// validators
 type FetchSender interface {
-	// Request that the specified node send the specified container
-	// to this node.
-	SendGet(nodeID ids.ShortID, requestID uint32, containerID ids.ID)
+	// Request a container from a validator.
+	// Request that the specified validator send the specified container
+	// to this validator
+	Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
 
-	// SendGetAncestors requests that node [nodeID] send container [containerID] and its ancestors.
-	SendGetAncestors(nodeID ids.ShortID, requestID uint32, containerID ids.ID)
+	// GetAncestors requests that the validator with ID [validatorID] send container [containerID] and its
+	// ancestors. The maximum number of ancestors to send in response is defined in snow/engine/common/bootstrapper.go
+	GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID)
 
-	// Tell the specified node that the container whose ID is [containerID]
-	// has body [container].
-	SendPut(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte)
+	// Tell the specified validator that the container whose ID is <containerID>
+	// has body <container>
+	Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte)
 
-	// Give the specified node several containers at once.
-	// Should be in response to a GetAncestors message with request ID [requestID] from the node.
-	SendMultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte)
+	// Give the specified validator several containers at once
+	// Should be in response to a GetAncestors message with request ID [requestID] from the validator
+	MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte)
 }
 
-// QuerySender defines how a consensus engine sends query messages to other nodes.
+// QuerySender defines how a consensus engine sends query messages to other
+// validators
 type QuerySender interface {
-	// Request from the specified nodes their preferred frontier, given the
+	// Request from the specified validators their preferred frontier, given the
 	// existence of the specified container.
 	// This is the same as PullQuery, except that this message includes not only
 	// the ID of the container but also its body.
-	SendPushQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte)
+	PushQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID, container []byte)
 
-	// Request from the specified nodes their preferred frontier, given the
+	// Request from the specified validators their preferred frontier, given the
 	// existence of the specified container.
-	SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, containerID ids.ID)
+	PullQuery(validatorIDs ids.ShortSet, requestID uint32, containerID ids.ID)
 
-	// Send chits to the specified node
-	SendChits(nodeID ids.ShortID, requestID uint32, votes []ids.ID)
+	// Chits sends chits to the specified validator
+	Chits(validatorID ids.ShortID, requestID uint32, votes []ids.ID)
 }
 
 // Gossiper defines how a consensus engine gossips a container on the accepted
-// frontier to other nodes
+// frontier to other validators
 type Gossiper interface {
-	// Gossip the provided container throughout the network
-	SendGossip(containerID ids.ID, container []byte)
+	// Gossip gossips the provided container throughout the network
+	Gossip(containerID ids.ID, container []byte)
 }
 
 // Sends app-level messages.

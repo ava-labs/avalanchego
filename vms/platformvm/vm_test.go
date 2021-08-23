@@ -69,7 +69,7 @@ var (
 	keys []*crypto.PrivateKeySECP256K1R
 
 	defaultMinValidatorStake = 5 * units.MilliAvax
-	defaultMaxValidatorStake = SupplyCap
+	defaultMaxValidatorStake = 500 * units.MilliAvax
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
@@ -284,15 +284,18 @@ func BuildGenesisTestWithArgs(t *testing.T, args *BuildGenesisArgs) (*BuildGenes
 
 func defaultVM() (*VM, database.Database, *common.SenderTest) {
 	vm := &VM{Factory: Factory{
-		Chains:             chains.MockManager{},
-		Validators:         validators.NewManager(),
-		TxFee:              defaultTxFee,
-		MinValidatorStake:  defaultMinValidatorStake,
-		MaxValidatorStake:  defaultMaxValidatorStake,
-		MinDelegatorStake:  defaultMinDelegatorStake,
-		MinStakeDuration:   defaultMinStakingDuration,
-		MaxStakeDuration:   defaultMaxStakingDuration,
-		StakeMintingPeriod: defaultMaxStakingDuration,
+		Chains:                chains.MockManager{},
+		Validators:            validators.NewManager(),
+		TxFee:                 defaultTxFee,
+		CreateSubnetTxFee:     100 * defaultTxFee,
+		CreateBlockchainTxFee: 100 * defaultTxFee,
+		MinValidatorStake:     defaultMinValidatorStake,
+		MaxValidatorStake:     defaultMaxValidatorStake,
+		MinDelegatorStake:     defaultMinDelegatorStake,
+		MinStakeDuration:      defaultMinStakingDuration,
+		MaxStakeDuration:      defaultMaxStakingDuration,
+		StakeMintingPeriod:    defaultMaxStakingDuration,
+		ApricotPhase3Time:     defaultValidateEndTime,
 	}}
 
 	baseDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
@@ -2094,7 +2097,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	assert.NoError(t, err)
 
 	reqID := new(uint32)
-	externalSender.SendGetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
+	externalSender.GetAcceptedFrontierF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2161,8 +2164,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetAcceptedFrontierF = nil
-	externalSender.SendGetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
+	externalSender.GetAcceptedFrontierF = nil
+	externalSender.GetAcceptedF = func(ids ids.ShortSet, _ ids.ID, requestID uint32, _ time.Duration, _ []ids.ID) []ids.ShortID {
 		*reqID = requestID
 		return ids.List()
 	}
@@ -2172,8 +2175,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetAcceptedF = nil
-	externalSender.SendGetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
+	externalSender.GetAcceptedF = nil
+	externalSender.GetAncestorsF = func(_ ids.ShortID, _ ids.ID, requestID uint32, _ time.Duration, containerID ids.ID) bool {
 		*reqID = requestID
 		if containerID != advanceTimeBlkID {
 			t.Fatalf("wrong block requested")
@@ -2185,15 +2188,15 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	externalSender.SendGetF = nil
-	externalSender.CantSendPushQuery = false
-	externalSender.CantSendPullQuery = false
+	externalSender.GetF = nil
+	externalSender.CantPushQuery = false
+	externalSender.CantPullQuery = false
 
 	if err := engine.MultiPut(peerID, *reqID, [][]byte{advanceTimeBlkBytes}); err != nil {
 		t.Fatal(err)
 	}
 
-	externalSender.CantSendPushQuery = true
+	externalSender.CantPushQuery = true
 
 	preferred, err = vm.Preferred()
 	if err != nil {

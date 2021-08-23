@@ -20,9 +20,18 @@ evm_path="$plugin_dir/evm"
 # Avalabs docker hub
 # avaplatform/avalanchego - defaults to local as to avoid unintentional pushes
 # You should probably set it - export DOCKER_REPO='avaplatform/avalanchego'
-avalanchego_dockerhub_repo=${DOCKER_REPO:-"local"}
+avalanchego_dockerhub_repo=${DOCKER_REPO:-"avalanchego"}
 
 # Current branch
 current_branch=$(git symbolic-ref -q --short HEAD || git describe --tags --exact-match)
 
 git_commit=${AVALANCHEGO_COMMIT:-$( git rev-list -1 HEAD )}
+
+# Static compilation
+static_ld_flags=''
+if [ "${STATIC_COMPILATION:-}" = 1 ]
+then
+    export CC=musl-gcc
+    which $CC > /dev/null || ( echo $CC must be available for static compilation && exit 1 )
+    static_ld_flags=' -extldflags "-static" -linkmode external '
+fi

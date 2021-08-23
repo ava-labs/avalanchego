@@ -36,6 +36,7 @@ const (
 	AppRequest
 	AppResponse
 	AppGossip
+	VersionWithSubnets
 )
 
 var (
@@ -57,6 +58,7 @@ var (
 		PullQuery,
 		Chits,
 		Version,
+		VersionWithSubnets,
 		PeerList,
 		AppRequest,
 		AppResponse,
@@ -66,12 +68,13 @@ var (
 	// Defines the messages that can be sent/received with this network
 	messages = map[Op][]Field{
 		// Handshake:
-		GetVersion:  {},
-		Version:     {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes},
-		GetPeerList: {},
-		PeerList:    {SignedPeers},
-		Ping:        {},
-		Pong:        {},
+		GetVersion:         {},
+		Version:            {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes},
+		VersionWithSubnets: {NetworkID, NodeID, MyTime, IP, VersionStr, VersionTime, SigBytes, TrackedSubnets},
+		GetPeerList:        {},
+		PeerList:           {SignedPeers},
+		Ping:               {},
+		Pong:               {},
 		// Bootstrapping:
 		GetAcceptedFrontier: {ChainID, RequestID, Deadline},
 		AcceptedFrontier:    {ChainID, RequestID, ContainerIDs},
@@ -107,6 +110,8 @@ func (op Op) String() string {
 		return "get_version"
 	case Version:
 		return "version"
+	case VersionWithSubnets:
+		return "version_with_subnets"
 	case GetPeerList:
 		return "get_peerlist"
 	case PeerList:

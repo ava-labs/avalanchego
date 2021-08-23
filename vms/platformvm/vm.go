@@ -510,7 +510,8 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	// validate tx
 	switch typedTx := tx.UnsignedTx.(type) {
 	case UnsignedDecisionTx:
-		if err := typedTx.SynctacticVerify(vm); err != nil {
+		// TODO: check/fix usage of TxFee below.
+		if err := typedTx.SynctacticVerify(vm, vm.TxFee); err != nil {
 			vm.ctx.Log.Warn("AppResponse: UnsignedDecisionTx %v is syntactically invalid, err %v. Rejecting it.",
 				tx.ID(), err)
 			return vm.mempool.markReject(tx)

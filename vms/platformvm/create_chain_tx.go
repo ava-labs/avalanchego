@@ -6,6 +6,7 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 	"unicode"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -51,7 +52,7 @@ type UnsignedCreateChainTx struct {
 }
 
 // verify this transaction is well-formed
-func (tx *UnsignedCreateChainTx) SynctacticVerify(vm *VM) error {
+func (tx *UnsignedCreateChainTx) SynctacticVerify(vm *VM, createSubnetTxFee uint64) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -99,7 +100,10 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
-	if err := tx.SynctacticVerify(vm); err != nil {
+
+	timestamp := vs.GetTimestamp()
+	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
+	if err := tx.SynctacticVerify(vm, createBlockchainTxFee); err != nil {
 		return nil, permError{err}
 	}
 
@@ -109,7 +113,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
-	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, vm.CreationTxFee, vm.ctx.AVAXAssetID); err != nil {
+	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, createBlockchainTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
 
@@ -159,7 +163,9 @@ func (vm *VM) newCreateChainTx(
 	keys []*crypto.PrivateKeySECP256K1R, // Keys to sign the tx
 	changeAddr ids.ShortID, // Address to send change to, if there is any
 ) (*Tx, error) {
-	ins, outs, _, signers, err := vm.stake(keys, 0, vm.CreationTxFee, changeAddr)
+	timestamp := vm.internalState.GetTimestamp()
+	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
+	ins, outs, _, signers, err := vm.stake(keys, 0, createBlockchainTxFee, changeAddr)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't generate tx inputs/outputs: %w", err)
 	}
@@ -192,5 +198,12 @@ func (vm *VM) newCreateChainTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.SynctacticVerify(vm)
+	return tx, utx.SynctacticVerify(vm, createBlockchainTxFee)
+}
+
+func (vm *VM) getCreateBlockchainTxFee(t time.Time) uint64 {
+	if t.Before(vm.ApricotPhase3Time) {
+		return vm.CreateAssetTxFee
+	}
+	return vm.CreateBlockchainTxFee
 }

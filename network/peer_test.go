@@ -119,6 +119,7 @@ func TestPeer_Close(t *testing.T) {
 		true,
 		defaultInboundMsgThrottler,
 		defaultOutboundMsgThrottler,
+		ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, netwrk)

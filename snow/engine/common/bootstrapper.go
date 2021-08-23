@@ -4,7 +4,6 @@
 package common
 
 import (
-	"fmt"
 	"time"
 
 	stdmath "math"
@@ -94,7 +93,7 @@ func (b *Bootstrapper) GetAcceptedFrontier(validatorID ids.ShortID, requestID ui
 	if err != nil {
 		return err
 	}
-	b.Sender.SendAcceptedFrontier(validatorID, requestID, acceptedFrontier)
+	b.Sender.AcceptedFrontier(validatorID, requestID, acceptedFrontier)
 	return nil
 }
 
@@ -182,7 +181,7 @@ func (b *Bootstrapper) AcceptedFrontier(validatorID ids.ShortID, requestID uint3
 
 // GetAccepted implements the Engine interface.
 func (b *Bootstrapper) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
-	b.Sender.SendAccepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
+	b.Sender.Accepted(validatorID, requestID, b.Bootstrapable.FilterAccepted(containerIDs))
 	return nil
 }
 
@@ -322,8 +321,9 @@ func (b *Bootstrapper) RestartBootstrap(reset bool) error {
 		b.bootstrapAttempts = 0
 	}
 
-	if b.bootstrapAttempts >= b.RetryBootstrapMaxAttempts {
-		return fmt.Errorf("failed to bootstrap the chain after %d attempts", b.bootstrapAttempts)
+	if b.bootstrapAttempts > 0 && b.bootstrapAttempts%b.RetryBootstrapWarnFrequency == 0 {
+		b.Ctx.Log.Warn("continuing to attempt to bootstrap after %d failed attempts. Is this node connected to the internet?",
+			b.bootstrapAttempts)
 	}
 
 	return b.startup()
@@ -387,7 +387,7 @@ func (b *Bootstrapper) sendGetAcceptedFrontiers() {
 	}
 
 	if vdrs.Len() > 0 {
-		b.Sender.SendGetAcceptedFrontier(vdrs, b.RequestID)
+		b.Sender.GetAcceptedFrontier(vdrs, b.RequestID)
 	}
 }
 
@@ -408,6 +408,6 @@ func (b *Bootstrapper) sendGetAccepted() {
 			vdrs.Len(),
 			b.pendingSendAccepted.Len(),
 		)
-		b.Sender.SendGetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
+		b.Sender.GetAccepted(vdrs, b.RequestID, b.acceptedFrontier)
 	}
 }

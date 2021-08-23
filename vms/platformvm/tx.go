@@ -29,7 +29,7 @@ type UnsignedDecisionTx interface {
 	UnsignedTx
 
 	// Attempts to verify transaction is well-formed
-	SynctacticVerify(vm *VM) error
+	SynctacticVerify(vm *VM, createSubnetTxFee uint64) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, vs VersionedState, stx *Tx) (
