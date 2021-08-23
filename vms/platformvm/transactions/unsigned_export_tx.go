@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 var (
@@ -54,7 +53,7 @@ func (tx *UnsignedExportTx) Verify(
 		return errNoExportOutputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
+	if err := tx.BaseTx.Verify(ctx, c); err != nil {
 		return err
 	}
 
@@ -66,7 +65,7 @@ func (tx *UnsignedExportTx) Verify(
 			return ErrWrongLocktime
 		}
 	}
-	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, platformcodec.Codec) {
+	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, c) {
 		return ErrOutputsNotSorted
 	}
 
