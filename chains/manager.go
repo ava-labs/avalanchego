@@ -493,8 +493,14 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, consensusParams.Namespace, consensusParams.Metrics)
-	if err != nil {
+	if err := sender.Initialize(
+		ctx,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
