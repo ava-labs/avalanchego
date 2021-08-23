@@ -27,28 +27,20 @@
 package ethconfig
 
 import (
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/miner"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 )
 
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
 var DefaultFullGPOConfig = gasprice.Config{
-	Blocks:     20,
-	Percentile: 60,
-	MaxPrice:   gasprice.DefaultMaxPrice,
-}
-
-// DefaultLightGPOConfig contains default gasprice oracle settings for light client.
-var DefaultLightGPOConfig = gasprice.Config{
-	Blocks:     2,
-	Percentile: 60,
-	MaxPrice:   gasprice.DefaultMaxPrice,
+	Blocks:      20,
+	Percentile:  60,
+	MaxPrice:    gasprice.DefaultMaxPrice,
+	IgnorePrice: gasprice.DefaultIgnorePrice,
 }
 
 // DefaultConfig contains default settings for use on the Avalanche main net.
@@ -66,16 +58,11 @@ func NewDefaultConfig() Config {
 		TrieDirtyCache:          256,
 		TrieTimeout:             60 * time.Minute,
 		SnapshotCache:           128,
-		Miner: miner.Config{
-			GasFloor:              8000000,
-			GasCeil:               8000000,
-			ApricotPhase1GasLimit: params.ApricotPhase1GasLimit,
-			GasPrice:              big.NewInt(params.GWei),
-		},
-		TxPool:      core.DefaultTxPoolConfig,
-		RPCGasCap:   25000000,
-		GPO:         DefaultFullGPOConfig,
-		RPCTxFeeCap: 1, // 1 ether
+		Miner:                   miner.Config{},
+		TxPool:                  core.DefaultTxPoolConfig,
+		RPCGasCap:               25000000,
+		GPO:                     DefaultFullGPOConfig,
+		RPCTxFeeCap:             1, // 1 AVAX
 	}
 }
 
@@ -140,12 +127,6 @@ type Config struct {
 
 	// Miscellaneous options
 	DocRoot string `toml:"-"`
-
-	// Type of the EWASM interpreter ("" for default)
-	EWASMInterpreter string
-
-	// Type of the EVM interpreter ("" for default)
-	EVMInterpreter string
 
 	// RPCGasCap is the global gas cap for eth-call variants.
 	RPCGasCap uint64 `toml:",omitempty"`
