@@ -358,7 +358,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 		nodeIDs.Remove(s.ctx.NodeID)
 		// Register a timeout in case I don't respond to myself
 		s.router.RegisterRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, constants.AppRequestMsg)
-		go s.router.AppRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), appRequestBytes, nil)
+		go s.router.AppRequest(s.ctx.NodeID, s.ctx.ChainID, requestID, time.Now().Add(timeoutDuration), appRequestBytes, func() {})
 	}
 
 	// Some of the nodes in [nodeIDs] may be benched. That is, they've been unresponsive
@@ -394,7 +394,7 @@ func (s *Sender) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appReque
 // Sends a response to an application-level request from the given node
 func (s *Sender) SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error {
 	if nodeID == s.ctx.NodeID {
-		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes, nil)
+		go s.router.AppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes, func() {})
 	} else {
 		s.sender.SendAppResponse(nodeID, s.ctx.ChainID, requestID, appResponseBytes)
 	}
