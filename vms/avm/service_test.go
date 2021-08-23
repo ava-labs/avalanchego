@@ -380,7 +380,7 @@ func TestServiceGetBalanceStrict(t *testing.T) {
 
 	// A UTXO with a 1 out of 1 multisig
 	// but with a locktime in the future
-	now := vm.Clock().Time()
+	now := vm.clock.Time()
 	futureUTXO := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.GenerateTestID(),
@@ -571,7 +571,7 @@ func TestServiceGetAllBalances(t *testing.T) {
 
 	// A UTXO with a 1 out of 1 multisig
 	// but with a locktime in the future
-	now := vm.Clock().Time()
+	now := vm.clock.Time()
 	futureUTXO := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        ids.GenerateTestID(),
