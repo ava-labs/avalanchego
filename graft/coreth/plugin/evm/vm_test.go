@@ -164,6 +164,7 @@ func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, confi
 		[]byte(configJSON),
 		issuer,
 		[]*engCommon.Fx{},
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -637,6 +638,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		[]byte("{\"pruning-enabled\":true}"),
 		issuer,
 		[]*engCommon.Fx{},
+		nil,
 	); err != nil {
 		t.Fatal(err)
 	}
