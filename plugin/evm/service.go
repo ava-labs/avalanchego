@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
@@ -36,6 +37,8 @@ var (
 	errNoAddresses   = errors.New("no addresses provided")
 	errNoSourceChain = errors.New("no source chain provided")
 	errNilTxID       = errors.New("nil transaction ID")
+
+	initialBaseFee = big.NewInt(params.ApricotPhase3InitialBaseFee)
 )
 
 // SnowmanAPI introduces snowman specific functionality to the evm
@@ -51,7 +54,7 @@ type NetAPI struct{ vm *VM }
 func (s *NetAPI) Listening() bool { return true } // always listening
 
 // PeerCount returns the number of connected peers
-func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) } // TODO: report number of connected peers
+func (s *NetAPI) PeerCount() hexutil.Uint { return hexutil.Uint(0) }
 
 // Version returns the current ethereum protocol version.
 func (s *NetAPI) Version() string { return fmt.Sprintf("%d", s.vm.networkID) }
@@ -207,6 +210,9 @@ func (service *AvaxAPI) ImportKey(r *http.Request, args *ImportKeyArgs, reply *a
 type ImportArgs struct {
 	api.UserPass
 
+	// Fee that should be used when creating the tx
+	BaseFee *hexutil.Big `json:"baseFee"`
+
 	// Chain the funds are coming from
 	SourceChain string `json:"sourceChain"`
 
@@ -250,7 +256,18 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 		return fmt.Errorf("couldn't get keys controlled by the user: %w", err)
 	}
 
-	tx, err := service.vm.newImportTx(chainID, to, privKeys)
+	var baseFee *big.Int
+	if args.BaseFee == nil {
+		// Get the base fee to use
+		baseFee, err = service.vm.estimateBaseFee(context.Background())
+		if err != nil {
+			return err
+		}
+	} else {
+		baseFee = args.BaseFee.ToInt()
+	}
+
+	tx, err := service.vm.newImportTx(chainID, to, baseFee, privKeys)
 	if err != nil {
 		return err
 	}
@@ -262,6 +279,9 @@ func (service *AvaxAPI) Import(_ *http.Request, args *ImportArgs, response *api.
 // ExportAVAXArgs are the arguments to ExportAVAX
 type ExportAVAXArgs struct {
 	api.UserPass
+
+	// Fee that should be used when creating the tx
+	BaseFee *hexutil.Big `json:"baseFee"`
 
 	// Amount of asset to send
 	Amount json.Uint64 `json:"amount"`
@@ -322,13 +342,25 @@ func (service *AvaxAPI) Export(_ *http.Request, args *ExportArgs, response *api.
 		return fmt.Errorf("couldn't get addresses controlled by the user: %w", err)
 	}
 
+	var baseFee *big.Int
+	if args.BaseFee == nil {
+		// Get the base fee to use
+		baseFee, err = service.vm.estimateBaseFee(context.Background())
+		if err != nil {
+			return err
+		}
+	} else {
+		baseFee = args.BaseFee.ToInt()
+	}
+
 	// Create the transaction
 	tx, err := service.vm.newExportTx(
 		assetID,             // AssetID
 		uint64(args.Amount), // Amount
 		chainID,             // ID of the chain to send the funds to
 		to,                  // Address
-		privKeys,            // Private keys
+		baseFee,
+		privKeys, // Private keys
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create tx: %w", err)

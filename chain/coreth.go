@@ -5,7 +5,6 @@ package chain
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -70,7 +69,7 @@ func (self *ETHChain) APIBackend() *eth.EthAPIBackend {
 }
 
 func (self *ETHChain) PendingSize() (int, error) {
-	pending, err := self.backend.TxPool().Pending()
+	pending, err := self.backend.TxPool().Pending(true)
 	count := 0
 	for _, txs := range pending {
 		count += len(txs)
@@ -188,9 +187,4 @@ func (self *ETHChain) GetTxAcceptedSubmitCh() <-chan core.NewTxsEvent {
 
 func (self *ETHChain) GetTxPool() *core.TxPool {
 	return self.backend.TxPool()
-}
-
-// SetGasPrice sets the gas price on the backend
-func (self *ETHChain) SetGasPrice(newGasPrice *big.Int) {
-	self.backend.SetGasPrice(newGasPrice)
 }

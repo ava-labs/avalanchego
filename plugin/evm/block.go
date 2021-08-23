@@ -8,11 +8,12 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
@@ -242,7 +243,7 @@ func (b *Block) verify(writes bool) error {
 			log.Info("skipping atomic tx verification on bonus block", "block", b.id)
 		} else {
 			utx := atomicTx.UnsignedAtomicTx
-			if err := utx.SemanticVerify(vm, atomicTx, ancestor, rules); err != nil {
+			if err := utx.SemanticVerify(vm, atomicTx, ancestor, b.ethBlock.BaseFee(), rules); err != nil {
 				return fmt.Errorf("invalid block due to failed semanatic verify: %w at height %d", err, b.Height())
 			}
 		}
