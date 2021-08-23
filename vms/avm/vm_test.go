@@ -235,10 +235,10 @@ func BuildGenesisTestWithArgs(tb testing.TB, args *BuildGenesisArgs) []byte {
 }
 
 func GenesisVM(tb testing.TB) ([]byte, chan common.Message, *VM, *atomic.Memory) {
-	return GenesisVMWithArgs(tb, nil)
+	return GenesisVMWithArgs(tb, nil, nil)
 }
 
-func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
+func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGenesisArgs) ([]byte, chan common.Message, *VM, *atomic.Memory) {
 	var genesisBytes []byte
 
 	if args != nil {
@@ -287,7 +287,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 		nil,
 		configBytes,
 		issuer,
-		[]*common.Fx{
+		append([]*common.Fx{
 			{
 				ID: ids.Empty,
 				Fx: &secp256k1fx.Fx{},
@@ -296,7 +296,7 @@ func GenesisVMWithArgs(tb testing.TB, args *BuildGenesisArgs) ([]byte, chan comm
 				ID: nftfx.ID,
 				Fx: &nftfx.Fx{},
 			},
-		},
+		}, additionalFxs...),
 	)
 	if err != nil {
 		tb.Fatal(err)
@@ -781,7 +781,7 @@ func TestGenesisGetPaginatedUTXOs(t *testing.T) {
 			},
 		},
 	}
-	_, _, vm, _ := GenesisVMWithArgs(t, genesisArgs)
+	_, _, vm, _ := GenesisVMWithArgs(t, nil, genesisArgs)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1230,7 +1230,7 @@ func setupTxFeeAssets(t *testing.T) ([]byte, chan common.Message, *VM, *atomic.M
 			},
 		},
 	}
-	genesisBytes, issuer, vm, m := GenesisVMWithArgs(t, customArgs)
+	genesisBytes, issuer, vm, m := GenesisVMWithArgs(t, nil, customArgs)
 	expectedID, err := vm.Aliaser.Lookup(assetAlias)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedID, vm.feeAssetID)
