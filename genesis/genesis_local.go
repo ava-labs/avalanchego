@@ -94,8 +94,10 @@ var (
 	// LocalParams are the params used for local networks
 	LocalParams = Params{
 		TxFeeConfig: TxFeeConfig{
-			TxFee:         units.MilliAvax,
-			CreationTxFee: units.MilliAvax,
+			TxFee:                 units.MilliAvax,
+			CreateAssetTxFee:      units.MilliAvax,
+			CreateSubnetTxFee:     100 * units.MilliAvax,
+			CreateBlockchainTxFee: 100 * units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement:  .6, // 60%

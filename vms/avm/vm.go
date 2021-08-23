@@ -67,6 +67,7 @@ var (
 
 // VM implements the avalanche.DAGVM interface
 type VM struct {
+	Factory
 	metrics
 	avax.AddressManager
 	avax.AtomicUTXOManager
@@ -92,10 +93,6 @@ type VM struct {
 
 	// asset id that will be used for fees
 	feeAssetID ids.ID
-	// fee that must be burned by every state creating transaction
-	creationTxFee uint64
-	// fee that must be burned by every non-state creating transaction
-	txFee uint64
 
 	// Asset ID --> Bit set with fx IDs the asset supports
 	assetToFxCache *cache.LRU
@@ -422,8 +419,7 @@ func (vm *VM) getPaginatedUTXOs(
 	seen := make(ids.Set, limit) // IDs of UTXOs already in the list
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	for _, addr := range addrsList {
 		start := ids.Empty
@@ -468,8 +464,7 @@ func (vm *VM) getAllUTXOs(addrs ids.ShortSet) ([]*avax.UTXO, error) {
 	utxos := make([]*avax.UTXO, 0, maxUTXOsToFetch)
 
 	// enforces the same ordering for pagination
-	addrsList := addrs.List()
-	ids.SortShortIDs(addrsList)
+	addrsList := addrs.SortedList()
 
 	// iterate over the addresses and get all the utxos
 	for _, addr := range addrsList {

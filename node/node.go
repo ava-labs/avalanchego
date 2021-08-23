@@ -284,6 +284,7 @@ func (n *Node) initNetworking() error {
 		n.Config.NetworkConfig.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
+		n.Config.WhitelistedSubnets,
 	)
 	return err
 }
@@ -662,7 +663,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		HealthService:                          n.healthService,
 		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
 		RetryBootstrap:                         n.Config.RetryBootstrap,
-		RetryBootstrapMaxAttempts:              n.Config.RetryBootstrapMaxAttempts,
+		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                       n.Shutdown,
 		MeterVMEnabled:                         n.Config.MeterVMEnabled,
 		ChainConfigs:                           n.Config.ChainConfigs,
@@ -684,24 +685,27 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
-			Chains:             n.chainManager,
-			Validators:         vdrs,
-			StakingEnabled:     n.Config.EnableStaking,
-			WhitelistedSubnets: n.Config.WhitelistedSubnets,
-			CreationTxFee:      n.Config.CreationTxFee,
-			TxFee:              n.Config.TxFee,
-			UptimePercentage:   n.Config.UptimeRequirement,
-			MinValidatorStake:  n.Config.MinValidatorStake,
-			MaxValidatorStake:  n.Config.MaxValidatorStake,
-			MinDelegatorStake:  n.Config.MinDelegatorStake,
-			MinDelegationFee:   n.Config.MinDelegationFee,
-			MinStakeDuration:   n.Config.MinStakeDuration,
-			MaxStakeDuration:   n.Config.MaxStakeDuration,
-			StakeMintingPeriod: n.Config.StakeMintingPeriod,
+			Chains:                n.chainManager,
+			Validators:            vdrs,
+			StakingEnabled:        n.Config.EnableStaking,
+			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
+			TxFee:                 n.Config.TxFee,
+			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
+			UptimePercentage:      n.Config.UptimeRequirement,
+			MinValidatorStake:     n.Config.MinValidatorStake,
+			MaxValidatorStake:     n.Config.MaxValidatorStake,
+			MinDelegatorStake:     n.Config.MinDelegatorStake,
+			MinDelegationFee:      n.Config.MinDelegationFee,
+			MinStakeDuration:      n.Config.MinStakeDuration,
+			MaxStakeDuration:      n.Config.MaxStakeDuration,
+			StakeMintingPeriod:    n.Config.StakeMintingPeriod,
+			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
-			CreationFee: n.Config.CreationTxFee,
-			Fee:         n.Config.TxFee,
+			TxFee:            n.Config.TxFee,
+			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
@@ -876,8 +880,10 @@ func (n *Node) initInfoAPI() error {
 		n.chainManager,
 		n.vmManager,
 		n.Net,
-		n.Config.CreationTxFee,
 		n.Config.TxFee,
+		n.Config.CreateAssetTxFee,
+		n.Config.CreateSubnetTxFee,
+		n.Config.CreateBlockchainTxFee,
 	)
 	if err != nil {
 		return err

@@ -35,8 +35,12 @@ type StakingConfig struct {
 type TxFeeConfig struct {
 	// Transaction fee
 	TxFee uint64 `json:"txFee"`
-	// Transaction fee for transactions that create new state
-	CreationTxFee uint64 `json:"creationTxFee"`
+	// Transaction fee for create asset transactions
+	CreateAssetTxFee uint64 `json:"createAssetTxFee"`
+	// Transaction fee for create subnet transactions
+	CreateSubnetTxFee uint64 `json:"createSubnetTxFee"`
+	// Transaction fee for create blockchain transactions
+	CreateBlockchainTxFee uint64 `json:"createBlockchainTxFee"`
 }
 
 type EpochConfig struct {

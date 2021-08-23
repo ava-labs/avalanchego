@@ -175772,8 +175772,10 @@ var (
 	// MainnetParams are the params used for mainnet
 	MainnetParams = Params{
 		TxFeeConfig: TxFeeConfig{
-			TxFee:         units.MilliAvax,
-			CreationTxFee: 10 * units.MilliAvax,
+			TxFee:                 units.MilliAvax,
+			CreateAssetTxFee:      10 * units.MilliAvax,
+			CreateSubnetTxFee:     1 * units.Avax,
+			CreateBlockchainTxFee: 1 * units.Avax,
 		},
 		StakingConfig: StakingConfig{
 			UptimeRequirement:  .6, // 60%

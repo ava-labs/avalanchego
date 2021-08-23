@@ -28,8 +28,8 @@ type Config struct {
 	// Should Bootstrap be retried
 	RetryBootstrap bool
 
-	// Max number of times to retry bootstrap
-	RetryBootstrapMaxAttempts int
+	// Max number of times to retry bootstrap before warning the node operator
+	RetryBootstrapWarnFrequency int
 
 	// Max time to spend fetching a container and its ancestors when responding
 	// to a GetAncestors

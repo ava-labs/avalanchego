@@ -127,76 +127,80 @@ Target operating systems supported by these roles & playbooks are
 ## Example run
 
 ```
-PLAY [Configure Avalanche service] ****************************************************
+PLAY [Configure Avalanche service] *********************************************
 
-TASK [Gathering Facts] ****************************************************************
+TASK [Gathering Facts] *********************************************************
 ok: [localhost]
 
-TASK [golang_base : Dispatch tasks] ***************************************************
-included: …/roles/golang_base/tasks/ubuntu-20.04.yml for localhost
-
-TASK [golang_base : Install Go] *******************************************************
+TASK [avalanche_download : Query releases] *************************************
 ok: [localhost]
 
-TASK [avalanche_base : Dispatch tasks] ************************************************
-included: …/roles/avalanche_base/tasks/ubuntu.yml for localhost
+TASK [avalanche_download : Fetch release] **************************************
+changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz)
+changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz.sig)
 
-TASK [avalanche_base : Install Avalanche dependencies] ********************************
+TASK [avalanche_download : Create temp gnupghome] ******************************
+changed: [localhost]
+
+TASK [avalanche_download : Import keys] ****************************************
+changed: [localhost]
+
+TASK [avalanche_download : Verify signature] ***********************************
 ok: [localhost]
 
-TASK [avalanche_build : Update git clone] *********************************************
+TASK [avalanche_download : Cleanup temp gnupghome] *****************************
 changed: [localhost]
 
-TASK [avalanche_build : Build project] ************************************************
+TASK [avalanche_download : Unpack release] *************************************
+changed: [localhost] => (item=avalanchego-linux-arm64-v1.5.0.tar.gz)
+
+TASK [avalanche_user : Create Avalanche daemon group] **************************
 changed: [localhost]
 
-TASK [avalanche_user : Create Avalanche daemon group] *********************************
+TASK [avalanche_user : Create Avalanche daemon user] ***************************
 changed: [localhost]
 
-TASK [avalanche_user : Create Avalanche daemon user] **********************************
-[WARNING]: The value False (type bool) in a string field was converted to 'False'
-(type string). If this does not look like what you expect, quote the entire value to
-ensure it does not change.
-changed: [localhost]
-
-TASK [avalanche_install : Create shared directories] **********************************
-ok: [localhost] => (item={'path': '/var/local/lib'})
+TASK [avalanche_install : Create shared directories] ***************************
+changed: [localhost] => (item={'path': '/usr/local/bin'})
+changed: [localhost] => (item={'path': '/var/local/lib'})
 changed: [localhost] => (item={'path': '/var/local/log'})
 
-TASK [avalanche_install : Create Avalanche directories] *******************************
-ok: [localhost] => (item=/var/local/lib/avalanchego)
+TASK [avalanche_install : Create Avalanche directories] ************************
+changed: [localhost] => (item=/var/local/lib/avalanchego)
 changed: [localhost] => (item=/var/local/lib/avalanchego/db)
 changed: [localhost] => (item=/var/local/lib/avalanchego/staking)
 changed: [localhost] => (item=/var/local/log/avalanchego)
 changed: [localhost] => (item=/usr/local/lib/avalanchego)
 
-TASK [avalanche_install : Install Avalanche binary] ***********************************
+TASK [avalanche_install : Install Avalanche binary] ****************************
 changed: [localhost]
 
-TASK [avalanche_install : Install Avalanche plugins] **********************************
-changed: [localhost] => (item={'path': '~auser/go/src/github.com/ava-labs/avalanchego/build/plugins/evm'})
+TASK [avalanche_install : Remove outdated support files] **********************
+ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/evm'})
+ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-preupgrade'})
+ok: [localhost] => (item={'path': '/usr/local/lib/avalanchego/avalanchego-latest'})
 
-TASK [avalanche_staker : Create staking key] ******************************************
+TASK [avalanche_install : Install support files] *******************************
+changed: [localhost] => (item=/usr/local/lib/avalanchego/plugins)
+
+TASK [avalanche_staker : Create staking key] ***********************************
 changed: [localhost]
 
-TASK [avalanche_staker : Create staking certificate signing request] ******************
+TASK [avalanche_staker : Create staking certificate signing request] ***********
 changed: [localhost]
 
-TASK [avalanche_staker : Create staking certificate] **********************************
+TASK [avalanche_staker : Create staking certificate] ***************************
 changed: [localhost]
 
-TASK [avalanche_service : Configure Avalanche service] ********************************
+TASK [avalanche_service : Configure Avalanche service] *************************
 changed: [localhost]
 
-TASK [avalanche_service : Enable Avalanche service] ***********************************
+TASK [avalanche_service : Enable Avalanche service] ****************************
 changed: [localhost]
 
-RUNNING HANDLER [avalanche_service : Reload systemd] **********************************
-ok: [localhost]
-
-RUNNING HANDLER [avalanche_service : Restart Avalanche service] ***********************
+RUNNING HANDLER [avalanche_service : Restart Avalanche service] ****************
 changed: [localhost]
 
-PLAY RECAP ****************************************************************************
-localhost : ok=20  changed=14  unreachable=0  failed=0  skipped=0  rescued=0  ignored=0
+PLAY RECAP *********************************************************************
+localhost : ok=6 changed=24 unreachable=0 failed=0 skipped=0 rescued=0 ignored=0
 ```

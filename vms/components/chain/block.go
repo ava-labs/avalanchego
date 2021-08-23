@@ -21,15 +21,15 @@ type BlockWrapper struct {
 // consensus and eventually be decided ie. either Accept/Reject will be called
 // on [bw] removing it from [verifiedBlocks].
 func (bw *BlockWrapper) Verify() error {
-	blkID := bw.ID()
-	bw.state.unverifiedBlocks.Evict(blkID)
-
 	if err := bw.Block.Verify(); err != nil {
 		// Note: we cannot cache blocks failing verification in case
 		// the error is temporary and the block could become valid in
 		// the future.
 		return err
 	}
+
+	blkID := bw.ID()
+	bw.state.unverifiedBlocks.Evict(blkID)
 	bw.state.verifiedBlocks[blkID] = bw
 	return nil
 }

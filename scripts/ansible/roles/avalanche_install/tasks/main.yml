@@ -5,12 +5,13 @@
     state: directory
     # This task intentionally leaves the owner, group, & mode unspecified.
     # These directories (e.g. /var/local/log) are shared resources.
-    # We lack the authority to unilaterlally decide their permissions.
+    # We lack the authority to unilaterally decide their permissions.
     # The goals are
     #  - Don't modify existing permissions, if the directories already exist.
     #  - Follow system policy (e.g. umask ), if the directories are created.
     # noqa 208
   loop:
+    - path: "{{ bindir }}"
     - path: "{{ sharedstatedir }}"
     - path: "{{ logdir }}"
 
@@ -54,13 +55,15 @@
   notify:
     - Restart Avalanche service
 
-- name: Remove outdataed support files
+- name: Remove outdated support files
   become: true
   file:
     path: "{{ item.path }}"
     state: absent
   loop:
     - path: "{{ avalanche_daemon_lib_dir }}/evm"
+    - path: "{{ avalanche_daemon_lib_dir }}/avalanchego-preupgrade"
+    - path: "{{ avalanche_daemon_lib_dir }}/avalanchego-latest"
   notify:
     - Restart Avalanche service
 
@@ -74,7 +77,7 @@
     mode: u=rwx,go=rx
     remote_src: true
   loop:
-    - src: "{{ repo_folder }}/build/plugins"
+    - src: "{{ avalanche_binaries_dir }}/plugins"
   loop_control:
     label: "{{ avalanche_daemon_lib_dir }}/{{ item.src | basename }}"
   notify:

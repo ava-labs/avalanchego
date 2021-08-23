@@ -22,15 +22,17 @@ import (
 
 // Info is the API service for unprivileged info on a node
 type Info struct {
-	version       version.Application
-	nodeID        ids.ShortID
-	networkID     uint32
-	log           logging.Logger
-	networking    network.Network
-	chainManager  chains.Manager
-	vmManager     vms.Manager
-	creationTxFee uint64
-	txFee         uint64
+	version               version.Application
+	nodeID                ids.ShortID
+	networkID             uint32
+	log                   logging.Logger
+	networking            network.Network
+	chainManager          chains.Manager
+	vmManager             vms.Manager
+	txFee                 uint64
+	createAssetTxFee      uint64
+	createSubnetTxFee     uint64
+	createBlockchainTxFee uint64
 }
 
 // NewService returns a new admin API service
@@ -42,23 +44,27 @@ func NewService(
 	chainManager chains.Manager,
 	vmManager vms.Manager,
 	peers network.Network,
-	creationTxFee uint64,
 	txFee uint64,
+	createAssetTxFee uint64,
+	createSubnetTxFee uint64,
+	createBlockchainTxFee uint64,
 ) (*common.HTTPHandler, error) {
 	newServer := rpc.NewServer()
 	codec := json.NewCodec()
 	newServer.RegisterCodec(codec, "application/json")
 	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
 	if err := newServer.RegisterService(&Info{
-		version:       version,
-		nodeID:        nodeID,
-		networkID:     networkID,
-		log:           log,
-		chainManager:  chainManager,
-		vmManager:     vmManager,
-		networking:    peers,
-		creationTxFee: creationTxFee,
-		txFee:         txFee,
+		version:               version,
+		nodeID:                nodeID,
+		networkID:             networkID,
+		log:                   log,
+		chainManager:          chainManager,
+		vmManager:             vmManager,
+		networking:            peers,
+		txFee:                 txFee,
+		createAssetTxFee:      createAssetTxFee,
+		createSubnetTxFee:     createSubnetTxFee,
+		createBlockchainTxFee: createBlockchainTxFee,
 	}, "info"); err != nil {
 		return nil, err
 	}
@@ -221,13 +227,20 @@ func (service *Info) IsBootstrapped(_ *http.Request, args *IsBootstrappedArgs, r
 }
 
 type GetTxFeeResponse struct {
-	CreationTxFee json.Uint64 `json:"creationTxFee"`
-	TxFee         json.Uint64 `json:"txFee"`
+	TxFee json.Uint64 `json:"txFee"`
+	// TODO: remove [CreationTxFee] after enough time for dependencies to update
+	CreationTxFee         json.Uint64 `json:"creationTxFee"`
+	CreateAssetTxFee      json.Uint64 `json:"createAssetTxFee"`
+	CreateSubnetTxFee     json.Uint64 `json:"createSubnetTxFee"`
+	CreateBlockchainTxFee json.Uint64 `json:"createBlockchainTxFee"`
 }
 
 // GetTxFee returns the transaction fee in nAVAX.
 func (service *Info) GetTxFee(_ *http.Request, args *struct{}, reply *GetTxFeeResponse) error {
-	reply.CreationTxFee = json.Uint64(service.creationTxFee)
 	reply.TxFee = json.Uint64(service.txFee)
+	reply.CreationTxFee = json.Uint64(service.createAssetTxFee)
+	reply.CreateAssetTxFee = json.Uint64(service.createAssetTxFee)
+	reply.CreateSubnetTxFee = json.Uint64(service.createSubnetTxFee)
+	reply.CreateBlockchainTxFee = json.Uint64(service.createBlockchainTxFee)
 	return nil
 }

@@ -310,7 +310,7 @@ func getBenchlistConfig(v *viper.Viper, alpha, k int) (benchlist.Config, error) 
 func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig, error) {
 	config := node.BootstrapConfig{
 		RetryBootstrap:                         v.GetBool(RetryBootstrapKey),
-		RetryBootstrapMaxAttempts:              v.GetInt(RetryBootstrapMaxAttemptsKey),
+		RetryBootstrapWarnFrequency:            v.GetInt(RetryBootstrapWarnFrequencyKey),
 		BootstrapBeaconConnectionTimeout:       v.GetDuration(BootstrapBeaconConnectionTimeoutKey),
 		BootstrapMaxTimeGetAncestors:           v.GetDuration(BootstrapMaxTimeGetAncestorsKey),
 		BootstrapMultiputMaxContainersSent:     int(v.GetUint(BootstrapMultiputMaxContainersSentKey)),
@@ -512,8 +512,10 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		return genesis.TxFeeConfig{
-			TxFee:         v.GetUint64(TxFeeKey),
-			CreationTxFee: v.GetUint64(CreationTxFeeKey),
+			TxFee:                 v.GetUint64(TxFeeKey),
+			CreateAssetTxFee:      v.GetUint64(CreateAssetTxFeeKey),
+			CreateSubnetTxFee:     v.GetUint64(CreateSubnetTxFeeKey),
+			CreateBlockchainTxFee: v.GetUint64(CreateBlockchainTxFeeKey),
 		}
 	}
 	return genesis.GetTxFeeConfig(networkID)
@@ -535,7 +537,6 @@ func getEpochConfig(v *viper.Viper, networkID uint32) (genesis.EpochConfig, erro
 
 func getWhitelistedSubnets(v *viper.Viper) (ids.Set, error) {
 	whitelistedSubnetIDs := ids.Set{}
-	whitelistedSubnetIDs.Add(constants.PrimaryNetworkID)
 	for _, subnet := range strings.Split(v.GetString(WhitelistedSubnetsKey), ",") {
 		if subnet == "" {
 			continue
@@ -699,7 +700,7 @@ func readSingleFile(parentDir string, fileName string) ([]byte, error) {
 		return nil, err
 	}
 	if len(files) > 1 {
-		return nil, fmt.Errorf("too much %s file in %s", fileName, parentDir)
+		return nil, fmt.Errorf(`too many files matched "%s.*" in %s`, fileName, parentDir)
 	}
 	if len(files) == 0 { // no file found, return nothing
 		return nil, nil
