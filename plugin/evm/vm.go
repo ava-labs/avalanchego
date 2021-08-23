@@ -60,7 +60,7 @@ import (
 )
 
 const (
-	x2cRateInt64       int64 = 1000000000
+	x2cRateInt64       int64 = 1_000_000_000
 	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
 )
 
