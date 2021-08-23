@@ -31,11 +31,15 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/crypto"
+
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 )
+
+var emptyCodeHash = crypto.Keccak256Hash(nil)
 
 /*
 The State Transitioning Model
@@ -59,6 +63,8 @@ type StateTransition struct {
 	msg        Message
 	gas        uint64
 	gasPrice   *big.Int
+	gasFeeCap  *big.Int
+	gasTipCap  *big.Int
 	initialGas uint64
 	value      *big.Int
 	data       []byte
@@ -72,11 +78,13 @@ type Message interface {
 	To() *common.Address
 
 	GasPrice() *big.Int
+	GasFeeCap() *big.Int
+	GasTipCap() *big.Int
 	Gas() uint64
 	Value() *big.Int
 
 	Nonce() uint64
-	CheckNonce() bool
+	IsFake() bool
 	Data() []byte
 	AccessList() types.AccessList
 }
@@ -160,13 +168,15 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 // NewStateTransition initialises and returns a new state transition object.
 func NewStateTransition(evm *vm.EVM, msg Message, gp *GasPool) *StateTransition {
 	return &StateTransition{
-		gp:       gp,
-		evm:      evm,
-		msg:      msg,
-		gasPrice: msg.GasPrice(),
-		value:    msg.Value(),
-		data:     msg.Data(),
-		state:    evm.StateDB,
+		gp:        gp,
+		evm:       evm,
+		msg:       msg,
+		gasPrice:  msg.GasPrice(),
+		gasFeeCap: msg.GasFeeCap(),
+		gasTipCap: msg.GasTipCap(),
+		value:     msg.Value(),
+		data:      msg.Data(),
+		state:     evm.StateDB,
 	}
 }
 
@@ -190,8 +200,15 @@ func (st *StateTransition) to() common.Address {
 }
 
 func (st *StateTransition) buyGas() error {
-	mgval := new(big.Int).Mul(new(big.Int).SetUint64(st.msg.Gas()), st.gasPrice)
-	if have, want := st.state.GetBalance(st.msg.From()), mgval; have.Cmp(want) < 0 {
+	mgval := new(big.Int).SetUint64(st.msg.Gas())
+	mgval = mgval.Mul(mgval, st.gasPrice)
+	balanceCheck := mgval
+	if st.gasFeeCap != nil {
+		balanceCheck = new(big.Int).SetUint64(st.msg.Gas())
+		balanceCheck.Mul(balanceCheck, st.gasFeeCap)
+		balanceCheck.Add(balanceCheck, st.value)
+	}
+	if have, want := st.state.GetBalance(st.msg.From()), balanceCheck; have.Cmp(want) < 0 {
 		return fmt.Errorf("%w: address %v have %v want %v", ErrInsufficientFunds, st.msg.From().Hex(), have, want)
 	}
 	if err := st.gp.SubGas(st.msg.Gas()); err != nil {
@@ -205,8 +222,9 @@ func (st *StateTransition) buyGas() error {
 }
 
 func (st *StateTransition) preCheck() error {
-	// Make sure this transaction's nonce is correct.
-	if st.msg.CheckNonce() {
+	// Only check transactions that are not fake
+	if !st.msg.IsFake() {
+		// Make sure this transaction's nonce is correct.
 		stNonce := st.state.GetNonce(st.msg.From())
 		if msgNonce := st.msg.Nonce(); stNonce < msgNonce {
 			return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooHigh,
@@ -214,6 +232,35 @@ func (st *StateTransition) preCheck() error {
 		} else if stNonce > msgNonce {
 			return fmt.Errorf("%w: address %v, tx: %d state: %d", ErrNonceTooLow,
 				st.msg.From().Hex(), msgNonce, stNonce)
+		}
+		// Make sure the sender is an EOA
+		if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != emptyCodeHash && codeHash != (common.Hash{}) {
+			return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
+				st.msg.From().Hex(), codeHash)
+		}
+	}
+	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)
+	if st.evm.ChainConfig().IsApricotPhase3(st.evm.Context.Time) {
+		// Skip the checks if gas fields are zero and baseFee was explicitly disabled (eth_call)
+		if !st.evm.Config.NoBaseFee || st.gasFeeCap.BitLen() > 0 || st.gasTipCap.BitLen() > 0 {
+			if l := st.gasFeeCap.BitLen(); l > 256 {
+				return fmt.Errorf("%w: address %v, maxFeePerGas bit length: %d", ErrFeeCapVeryHigh,
+					st.msg.From().Hex(), l)
+			}
+			if l := st.gasTipCap.BitLen(); l > 256 {
+				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas bit length: %d", ErrTipVeryHigh,
+					st.msg.From().Hex(), l)
+			}
+			if st.gasFeeCap.Cmp(st.gasTipCap) < 0 {
+				return fmt.Errorf("%w: address %v, maxPriorityFeePerGas: %s, maxFeePerGas: %s", ErrTipAboveFeeCap,
+					st.msg.From().Hex(), st.gasTipCap, st.gasFeeCap)
+			}
+			// This will panic if baseFee is nil, but basefee presence is verified
+			// as part of header validation.
+			if st.gasFeeCap.Cmp(st.evm.Context.BaseFee) < 0 {
+				return fmt.Errorf("%w: address %v, maxFeePerGas: %s baseFee: %s", ErrFeeCapTooLow,
+					st.msg.From().Hex(), st.gasFeeCap, st.evm.Context.BaseFee)
+			}
 		}
 	}
 	return st.buyGas()
@@ -274,7 +321,6 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	if rules := st.evm.ChainConfig().AvalancheRules(st.evm.Context.BlockNumber, st.evm.Context.Time); rules.IsApricotPhase2 {
 		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 	}
-
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err

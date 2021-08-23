@@ -113,8 +113,6 @@ var (
 	preimageHitCounter = metrics.NewRegisteredCounter("db/preimage/hits", nil)
 )
 
-// We don't remove these constants to minimize the amount of changes that need
-// to be made to other files.
 const (
 	// freezerHeaderTable indicates the name of the freezer header table.
 	freezerHeaderTable = "headers"

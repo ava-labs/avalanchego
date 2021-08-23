@@ -28,7 +28,6 @@ package tests
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -43,11 +42,6 @@ import (
 
 	"github.com/ava-labs/coreth/params"
 )
-
-func TestMain(m *testing.M) {
-	flag.Parse()
-	os.Exit(m.Run())
-}
 
 func readJSON(reader io.Reader, value interface{}) error {
 	data, err := ioutil.ReadAll(reader)
@@ -94,11 +88,11 @@ func findLine(data []byte, offset int64) (line int) {
 
 // testMatcher controls skipping and chain config assignment to tests.
 type testMatcher struct {
-	configpat    []testConfig
-	failpat      []testFailure
-	skiploadpat  []*regexp.Regexp
-	slowpat      []*regexp.Regexp
-	whitelistpat *regexp.Regexp
+	configpat      []testConfig
+	failpat        []testFailure
+	skiploadpat    []*regexp.Regexp
+	slowpat        []*regexp.Regexp
+	runonlylistpat *regexp.Regexp
 }
 
 type testConfig struct {
@@ -129,8 +123,8 @@ func (tm *testMatcher) fails(pattern string, reason string) {
 	tm.failpat = append(tm.failpat, testFailure{regexp.MustCompile(pattern), reason})
 }
 
-func (tm *testMatcher) whitelist(pattern string) {
-	tm.whitelistpat = regexp.MustCompile(pattern)
+func (tm *testMatcher) runonly(pattern string) {
+	tm.runonlylistpat = regexp.MustCompile(pattern)
 }
 
 // config defines chain config for tests matching the pattern.
@@ -224,9 +218,9 @@ func (tm *testMatcher) runTestFile(t *testing.T, path, name string, runTest inte
 	if r, _ := tm.findSkip(name); r != "" {
 		t.Skip(r)
 	}
-	if tm.whitelistpat != nil {
-		if !tm.whitelistpat.MatchString(name) {
-			t.Skip("Skipped by whitelist")
+	if tm.runonlylistpat != nil {
+		if !tm.runonlylistpat.MatchString(name) {
+			t.Skip("Skipped by runonly")
 		}
 	}
 	t.Parallel()

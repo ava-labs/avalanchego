@@ -275,7 +275,6 @@ func TestMulticoin(t *testing.T) {
 	log.Info(fmt.Sprintf("bob's balance = %s", state.GetBalance(bobKey.Address)))
 	log.Info(fmt.Sprintf("bob's mcbalance(0) = %s", bobMCBalance))
 	log.Info(fmt.Sprintf("contract mcbalance(0) = %s", contractMCBalance))
-	log.Info(fmt.Sprintf("state = %s", state.Dump(true, false, true)))
 
 	if genMCBalance.Cmp(big.NewInt(10000000000000000)) != 0 {
 		t.Fatal("incorrect genesis MC balance")
