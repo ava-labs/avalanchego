@@ -114,6 +114,7 @@ const (
 	BootstrapMultiputMaxContainersSentKey     = "bootstrap-multiput-max-containers-sent"
 	BootstrapMultiputMaxContainersReceivedKey = "bootstrap-multiput-max-containers-received"
 	ChainConfigDirKey                         = "chain-config-dir"
+	SubnetConfigDirKey                        = "subnet-config-dir"
 	ProfileDirKey                             = "profile-dir"
 	ProfileContinuousEnabledKey               = "profile-continuous-enabled"
 	ProfileContinuousFreqKey                  = "profile-continuous-freq"
