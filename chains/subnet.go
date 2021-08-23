@@ -35,12 +35,11 @@ type subnet struct {
 	bootstrappedSema chan struct{}
 }
 
-func newSubnet(onBootstrapped func(), firstChainID ids.ID) Subnet {
+func newSubnet(onBootstrapped func()) Subnet {
 	sb := &subnet{
 		onBootstrapped:   onBootstrapped,
 		bootstrappedSema: make(chan struct{}),
 	}
-	sb.addChain(firstChainID)
 	return sb
 }
 
