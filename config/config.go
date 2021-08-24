@@ -666,13 +666,13 @@ func readChainConfigPath(chainConfigPath string) (map[string]chains.ChainConfig,
 		}
 
 		// chainconfigdir/chainId/config.*
-		configData, err := storage.ReadSingleFile(chainDir, chainConfigFileName)
+		configData, err := storage.ReadFileWithName(chainDir, chainConfigFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}
 
 		// chainconfigdir/chainId/upgrade.*
-		upgradeData, err := storage.ReadSingleFile(chainDir, chainUpgradeFileName)
+		upgradeData, err := storage.ReadFileWithName(chainDir, chainUpgradeFileName)
 		if err != nil {
 			return chainConfigMap, err
 		}

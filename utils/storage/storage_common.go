@@ -25,21 +25,21 @@ func FileExists(filePath string) (bool, error) {
 	return false, err
 }
 
-// readSingleFile reads a single file with name fileName without specifying any extension.
+// ReadFileWithName reads a single file with name fileNameWithoutExt without specifying any extension.
 // it errors when there are more than 1 file with the given fileName
-func ReadSingleFile(parentDir string, fileName string) ([]byte, error) {
-	filePath := path.Join(parentDir, fileName)
+func ReadFileWithName(parentDir string, fileNameNoExt string) ([]byte, error) {
+	filePath := path.Join(parentDir, fileNameNoExt)
 	files, err := filepath.Glob(filePath + ".*") // all possible extensions
 	if err != nil {
 		return nil, err
 	}
 	if len(files) > 1 {
-		return nil, fmt.Errorf(`too many files matched "%s.*" in %s`, fileName, parentDir)
+		return nil, fmt.Errorf(`too many files matched "%s.*" in %s`, fileNameNoExt, parentDir)
 	}
 	if len(files) == 0 { // no file found, return nothing
 		return nil, nil
 	}
-	return safeReadFile(files[0])
+	return ioutil.ReadFile(files[0])
 }
 
 // folderExists checks if a folder exists before we
@@ -68,13 +68,4 @@ func DirSize(path string) (uint64, error) {
 			return nil
 		})
 	return uint64(size), err
-}
-
-// safeReadFile reads a file but does not return an error if there is no file exists at path
-func safeReadFile(path string) ([]byte, error) {
-	ok, err := FileExists(path)
-	if err == nil && ok {
-		return ioutil.ReadFile(path)
-	}
-	return nil, err
 }
