@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/coreth/params"
 )
 
 func getTheValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
@@ -52,7 +53,7 @@ func getTheValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 		t.Fatal(err)
 	}
 
-	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, testEthAddrs[0], initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,13 +140,16 @@ func getTheIllFormedTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 	importedAVAXAmount := importedAmount[vm.ctx.AVAXAssetID]
 	outs := []EVMOutput{}
 
+	txFeeWithoutChange := params.AvalancheAtomicTxFee
+	txFeeWithChange := params.AvalancheAtomicTxFee
+
 	// AVAX output
-	if importedAVAXAmount < vm.txFee { // imported amount goes toward paying tx fee
+	if importedAVAXAmount < txFeeWithoutChange { // imported amount goes toward paying tx fee
 		t.Fatal(errInsufficientFundsForFee)
-	} else if importedAVAXAmount > vm.txFee {
+	} else if importedAVAXAmount > txFeeWithChange {
 		outs = append(outs, EVMOutput{
 			Address: testEthAddrs[0],
-			Amount:  importedAVAXAmount - vm.txFee,
+			Amount:  importedAVAXAmount - txFeeWithChange,
 			AssetID: vm.ctx.AVAXAssetID,
 		})
 	}
