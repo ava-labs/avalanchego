@@ -4,15 +4,9 @@
 package evm
 
 import (
-	"errors"
-
 	"github.com/ava-labs/coreth/ethdb"
 
 	"github.com/ava-labs/avalanchego/database"
-)
-
-var (
-	errOpNotSupported = errors.New("this operation is not supported")
 )
 
 // Database implements ethdb.Database
