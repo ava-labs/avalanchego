@@ -863,7 +863,7 @@ func (n *network) SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32
 func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID {
 	now := n.clock.Time()
 
-	msg, err := n.b.AppRequest(chainID, requestID, uint64(deadline), appRequestBytes)
+	msg, err := n.b.AppRequest(chainID, requestID, uint64(deadline), appRequestBytes, n.compressionEnabled)
 	if err != nil {
 		n.log.Error("failed to build AppRequest(%s, %d): %s", chainID, requestID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appRequestBytes})
@@ -898,7 +898,7 @@ func (n *network) SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID
 func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponse []byte) {
 	now := n.clock.Time()
 
-	msg, err := n.b.AppResponse(chainID, requestID, appResponse)
+	msg, err := n.b.AppResponse(chainID, requestID, appResponse, n.compressionEnabled)
 	if err != nil {
 		n.log.Error("failed to build AppResponse(%s, %d): %s", chainID, requestID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appResponse})
@@ -926,7 +926,7 @@ func (n *network) SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID 
 func (n *network) SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte) {
 	now := n.clock.Time()
 
-	msg, err := n.b.AppGossip(chainID, appGossipBytes)
+	msg, err := n.b.AppGossip(chainID, appGossipBytes, n.compressionEnabled)
 	if err != nil {
 		n.log.Error("failed to build AppGossip(%s): %s", chainID, err)
 		n.log.Verbo("message: %s", formatting.DumpBytes{Bytes: appGossipBytes})

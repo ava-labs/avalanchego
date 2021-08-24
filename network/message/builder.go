@@ -126,17 +126,20 @@ type Builder interface {
 		requestID uint32,
 		deadline uint64,
 		msg []byte,
+		compress bool,
 	) (Message, error)
 
 	AppResponse(
 		chainID ids.ID,
 		requestID uint32,
 		msg []byte,
+		compress bool,
 	) (Message, error)
 
 	AppGossip(
 		chainID ids.ID,
 		msg []byte,
+		compress bool,
 	) (Message, error)
 }
 
@@ -457,7 +460,7 @@ func (b *builder) Chits(
 }
 
 // Application level request
-func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte) (Message, error) {
+func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, msg []byte, compress bool) (Message, error) {
 	return b.c.Pack(
 		AppRequest,
 		map[Field]interface{}{
@@ -466,13 +469,12 @@ func (b *builder) AppRequest(chainID ids.ID, requestID uint32, deadline uint64, 
 			Deadline:        deadline,
 			AppRequestBytes: msg,
 		},
-		AppRequest.Compressable(),
-		AppRequest.Compressable(),
+		compress && AppRequest.Compressable(), // App messages may be compressed
 	)
 }
 
 // Application level response
-func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Message, error) {
+func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte, compress bool) (Message, error) {
 	return b.c.Pack(
 		AppResponse,
 		map[Field]interface{}{
@@ -480,20 +482,18 @@ func (b *builder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (Mes
 			RequestID:        requestID,
 			AppResponseBytes: msg,
 		},
-		AppResponse.Compressable(),
-		AppResponse.Compressable(),
+		compress && AppResponse.Compressable(), // App messages may be compressed
 	)
 }
 
 // Application level gossiped message
-func (b *builder) AppGossip(chainID ids.ID, msg []byte) (Message, error) {
+func (b *builder) AppGossip(chainID ids.ID, msg []byte, compress bool) (Message, error) {
 	return b.c.Pack(
 		AppGossip,
 		map[Field]interface{}{
 			ChainID:        chainID[:],
 			AppGossipBytes: msg,
 		},
-		AppGossip.Compressable(),
-		AppGossip.Compressable(),
+		compress && AppGossip.Compressable(), // App messages may be compressed
 	)
 }
