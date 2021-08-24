@@ -45,12 +45,14 @@ type (
 	DummyEngine struct {
 		cb       *ConsensusCallbacks
 		ethFaker bool
+		isFullFaker bool
 	}
 )
 
-func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
+func NewDummyEngine(cb *ConsensusCallbacks, isFullFaker bool) *DummyEngine {
 	return &DummyEngine{
 		cb: cb,
+        isFullFaker: isFullFaker,
 	}
 }
 
@@ -69,7 +71,11 @@ func NewComplexETHFaker(cb *ConsensusCallbacks) *DummyEngine {
 }
 
 func NewFaker() *DummyEngine {
-	return NewDummyEngine(new(ConsensusCallbacks))
+	return NewDummyEngine(new(ConsensusCallbacks), false)
+}
+
+func NewFullFaker() *DummyEngine {
+	return NewDummyEngine(new(ConsensusCallbacks), true)
 }
 
 func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, header *types.Header, parent *types.Header) error {
@@ -212,6 +218,10 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 }
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
+    // If we're running a full engine faking, accept any input as valid
+    if self.isFullFaker {
+        return nil
+    }
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
