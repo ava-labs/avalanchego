@@ -80,7 +80,7 @@ func (s *Socket) Listen() error {
 
 // Send writes the given message to all connection clients
 func (s *Socket) Send(msg []byte) {
-	var conns []net.Conn = nil
+	var conns []net.Conn
 
 	// Get a copy of connections
 	s.connLock.RLock()
