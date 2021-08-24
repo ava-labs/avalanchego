@@ -67,14 +67,12 @@ type KeyValueStore interface {
 	io.Closer
 }
 
-// Reader contains the methods required to read data from both key-value as well as
-// immutable ancient data.
+// Reader contains the methods required to read data from key-value storage.
 type Reader interface {
 	KeyValueReader
 }
 
-// Writer contains the methods required to write data to both key-value as well as
-// immutable ancient data.
+// Writer contains the methods required to write data to key-value storage.
 type Writer interface {
 	KeyValueWriter
 }

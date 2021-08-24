@@ -259,9 +259,6 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 }
 
 // empty returns an indicator whether the blockchain is empty.
-// Note, it's a special case that we connect a non-empty ancient
-// database with an empty node, so that we can plugin the ancient
-// into node seamlessly.
 func (bc *BlockChain) empty() bool {
 	genesis := bc.genesisBlock.Hash()
 	for _, hash := range []common.Hash{rawdb.ReadHeadBlockHash(bc.db), rawdb.ReadHeadHeaderHash(bc.db), rawdb.ReadHeadFastBlockHash(bc.db)} {
