@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 )
@@ -34,26 +32,21 @@ type UnsignedExportTx struct {
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 
 // Verify this is well-formed
-func (tx *UnsignedExportTx) Verify(
-	avmID ids.ID,
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+func (tx *UnsignedExportTx) SyntacticVerify(synCtx AtomicTxSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DestinationChain != avmID:
+	case tx.DestinationChain != synCtx.AvmID:
 		// TODO: remove this check if we allow for P->C swaps
 		return ErrWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.syntacticVerify(synCtx.Ctx, synCtx.C); err != nil {
 		return err
 	}
 
@@ -65,7 +58,7 @@ func (tx *UnsignedExportTx) Verify(
 			return ErrWrongLocktime
 		}
 	}
-	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, c) {
+	if !avax.IsSortedTransferableOutputs(tx.ExportedOutputs, synCtx.C) {
 		return ErrOutputsNotSorted
 	}
 

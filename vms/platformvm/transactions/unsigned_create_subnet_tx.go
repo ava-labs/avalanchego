@@ -4,9 +4,6 @@
 package transactions
 
 import (
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
@@ -19,11 +16,7 @@ type UnsignedCreateSubnetTx struct {
 }
 
 // Verify this transactions.is well-formed
-func (tx *UnsignedCreateSubnetTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+func (tx *UnsignedCreateSubnetTx) SyntacticVerify(synCtx DecisionTxSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
@@ -32,7 +25,7 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 		return nil
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.syntacticVerify(synCtx.Ctx, synCtx.C); err != nil {
 		return err
 	}
 	if err := tx.Owner.Verify(); err != nil {

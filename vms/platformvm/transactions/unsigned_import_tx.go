@@ -7,11 +7,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 var (
@@ -40,26 +37,21 @@ func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 }
 
 // Verify this is well-formed
-func (tx *UnsignedImportTx) Verify(
-	avmID ids.ID,
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+func (tx *UnsignedImportTx) SyntacticVerify(synCtx AtomicTxSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.SourceChain != avmID:
+	case tx.SourceChain != synCtx.AvmID:
 		// TODO: remove this check if we allow for P->C swaps
 		return ErrWrongChainID
 	case len(tx.ImportedInputs) == 0:
 		return errNoImportInputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, platformcodec.Codec); err != nil {
+	if err := tx.BaseTx.syntacticVerify(synCtx.Ctx, synCtx.C); err != nil {
 		return err
 	}
 

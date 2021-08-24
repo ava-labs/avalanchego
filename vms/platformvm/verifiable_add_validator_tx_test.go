@@ -35,15 +35,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	// Case: tx is nil
 	var unsignedTx VerifiableUnsignedAddValidatorTx
-	if err := unsignedTx.Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := unsignedTx.SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -65,15 +66,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
 	}
 
@@ -105,15 +107,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because stake owner has no addresses")
 	}
 
@@ -139,15 +142,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	}
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because rewards owner has no addresses")
 	}
 
@@ -169,15 +173,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.Wght-- // 1 less than minimum amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because stake amount too small")
 	}
 
@@ -199,15 +204,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Shares++ // 1 more than max amount
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because of too many shares")
 	}
 
@@ -229,15 +235,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.End-- // 1 less than min duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
@@ -259,15 +266,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.End = tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.Start - 1
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because validation length too short")
 	}
 
@@ -289,15 +297,16 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Validator.End++ // 1 more than maximum duration
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
-	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err == nil {
+	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  defaultMinStakingDuration,
+		MaxStakeDuration:  defaultMaxStakingDuration,
+		MinDelegationFee:  defaultMinDelegationFee,
+	}
+	if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err == nil {
 		t.Fatal("should have errored because validation length too long")
 	}
 
@@ -314,16 +323,19 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 
 	); err != nil {
 		t.Fatal(err)
-	} else if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		defaultMinDelegationFee,
-	); err != nil {
-		t.Fatal(err)
+	} else {
+		syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
+			Ctx:               vm.ctx,
+			C:                 platformcodec.Codec,
+			MinValidatorStake: vm.MinValidatorStake,
+			MaxValidatorStake: vm.MaxValidatorStake,
+			MinStakeDuration:  defaultMinStakingDuration,
+			MaxStakeDuration:  defaultMaxStakingDuration,
+			MinDelegationFee:  defaultMinDelegationFee,
+		}
+		if err := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticVerify(syntacticCtx); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

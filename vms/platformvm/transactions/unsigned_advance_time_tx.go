@@ -19,3 +19,8 @@ type UnsignedAdvanceTimeTx struct {
 	// Unix time this block proposes increasing the timestamp to
 	Time uint64 `serialize:"true" json:"time"`
 }
+
+func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(synCtx ProposalTxSyntacticVerificationContext,
+) error {
+	return nil
+}

@@ -61,14 +61,14 @@ func (tx VerifiableUnsignedAddDelegatorTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	// Verify the tx is well-formed
-	if err := tx.Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinDelegatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-	); err != nil {
+	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinDelegatorStake: vm.MinDelegatorStake,
+		MinStakeDuration:  vm.MinStakeDuration,
+		MaxStakeDuration:  vm.MaxStakeDuration,
+	}
+	if err := tx.SyntacticVerify(syntacticCtx); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -264,13 +264,15 @@ func (vm *VM) newAddDelegatorTx(
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinDelegatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-	)
+
+	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinDelegatorStake: vm.MinDelegatorStake,
+		MinStakeDuration:  vm.MinStakeDuration,
+		MaxStakeDuration:  vm.MaxStakeDuration,
+	}
+	return tx, utx.SyntacticVerify(syntacticCtx)
 }
 
 // CanDelegate returns if the [new] delegator can be added to a validator who

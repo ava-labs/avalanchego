@@ -6,10 +6,7 @@ package transactions
 import (
 	"errors"
 	"fmt"
-	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
@@ -41,39 +38,32 @@ type UnsignedAddValidatorTx struct {
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddValidatorTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	minStake uint64,
-	maxStake uint64,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
-	minDelegationFee uint32,
+func (tx *UnsignedAddValidatorTx) SyntacticVerify(synCtx ProposalTxSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.Validator.Wght < minStake: // Ensure validator is staking at least the minimum amount
+	case tx.Validator.Wght < synCtx.MinValidatorStake: // Ensure validator is staking at least the minimum amount
 		return entities.ErrWeightTooSmall
-	case tx.Validator.Wght > maxStake: // Ensure validator isn't staking too much
+	case tx.Validator.Wght > synCtx.MaxValidatorStake: // Ensure validator isn't staking too much
 		return errWeightTooLarge
 	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
-	case tx.Shares < minDelegationFee:
+	case tx.Shares < synCtx.MinDelegationFee:
 		return errInsufficientDelegationFee
 	}
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < minStakeDuration: // Ensure staking length is not too short
+	case duration < synCtx.MinStakeDuration: // Ensure staking length is not too short
 		return ErrStakeTooShort
-	case duration > maxStakeDuration: // Ensure staking length is not too long
+	case duration > synCtx.MaxStakeDuration: // Ensure staking length is not too long
 		return ErrStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.syntacticVerify(synCtx.Ctx, synCtx.C); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -93,7 +83,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, c):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, synCtx.C):
 		return ErrOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("validator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)

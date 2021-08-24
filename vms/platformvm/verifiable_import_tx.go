@@ -45,7 +45,14 @@ func (tx VerifiableUnsignedImportTx) SemanticVerify(
 	parentState MutableState,
 	stx *transactions.SignedTx,
 ) (VersionedState, TxError) {
-	if err := tx.Verify(vm.ctx.XChainID, vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
+		Ctx:        vm.ctx,
+		C:          platformcodec.Codec,
+		AvmID:      vm.ctx.XChainID,
+		FeeAssetID: vm.ctx.AVAXAssetID,
+		FeeAmount:  vm.TxFee,
+	}
+	if err := tx.SyntacticVerify(syntacticCtx); err != nil {
 		return nil, permError{err}
 	}
 
@@ -215,5 +222,13 @@ func (vm *VM) newImportTx(
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx.XChainID, vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID)
+
+	syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
+		Ctx:        vm.ctx,
+		C:          platformcodec.Codec,
+		AvmID:      vm.ctx.XChainID,
+		FeeAssetID: vm.ctx.AVAXAssetID,
+		FeeAmount:  vm.TxFee,
+	}
+	return tx, utx.SyntacticVerify(syntacticCtx)
 }

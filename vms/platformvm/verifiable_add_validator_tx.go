@@ -54,16 +54,16 @@ func (tx VerifiableUnsignedAddValidatorTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	// Verify the tx is well-formed
-	if err := tx.Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-		vm.MinDelegationFee,
-	); err != nil {
+	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  vm.MinStakeDuration,
+		MaxStakeDuration:  vm.MaxStakeDuration,
+		MinDelegationFee:  vm.MinDelegationFee,
+	}
+	if err := tx.SyntacticVerify(syntacticCtx); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -220,13 +220,14 @@ func (vm *VM) newAddValidatorTx(
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(
-		vm.ctx,
-		platformcodec.Codec,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-		vm.MinDelegationFee,
-	)
+	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
+		Ctx:               vm.ctx,
+		C:                 platformcodec.Codec,
+		MinValidatorStake: vm.MinValidatorStake,
+		MaxValidatorStake: vm.MaxValidatorStake,
+		MinStakeDuration:  vm.MinStakeDuration,
+		MaxStakeDuration:  vm.MaxStakeDuration,
+		MinDelegationFee:  vm.MinDelegationFee,
+	}
+	return tx, utx.SyntacticVerify(syntacticCtx)
 }

@@ -156,7 +156,14 @@ func TestVerifiableUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.UnsignedTx.(VerifiableUnsignedCreateChainTx).SyntacticallyVerified = false
 		tx.UnsignedTx = test.setup(tx.UnsignedTx.(VerifiableUnsignedCreateChainTx))
-		if err := tx.UnsignedTx.(VerifiableUnsignedCreateChainTx).Verify(vm.ctx, platformcodec.Codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil && !test.shouldErr {
+
+		syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
+			Ctx:        vm.ctx,
+			C:          platformcodec.Codec,
+			FeeAmount:  vm.TxFee,
+			FeeAssetID: vm.ctx.AVAXAssetID,
+		}
+		if err := tx.UnsignedTx.(VerifiableUnsignedCreateChainTx).SyntacticVerify(syntacticCtx); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)

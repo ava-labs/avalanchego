@@ -24,8 +24,8 @@ type BaseTx struct {
 	SyntacticallyVerified bool
 }
 
-// Verify returns nil iff this tx is well formed
-func (tx *BaseTx) Verify(ctx *snow.Context, c codec.Manager) error {
+// syntacticVerify returns nil iff this tx is well formed
+func (tx *BaseTx) syntacticVerify(ctx *snow.Context, c codec.Manager) error {
 	switch {
 	case tx == nil:
 		return ErrNilTx

@@ -27,3 +27,8 @@ type UnsignedRewardValidatorTx struct {
 	// Marks if this validator should be rewarded according to this node.
 	ShouldPreferCommit bool
 }
+
+func (tx *UnsignedRewardValidatorTx) SyntacticVerify(synCtx ProposalTxSyntacticVerificationContext,
+) error {
+	return nil
+}

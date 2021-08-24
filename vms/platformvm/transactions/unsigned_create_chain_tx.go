@@ -7,9 +7,7 @@ import (
 	"errors"
 	"unicode"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -48,11 +46,7 @@ type UnsignedCreateChainTx struct {
 }
 
 // Verify this transactions.is well-formed
-func (tx *UnsignedCreateChainTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+func (tx *UnsignedCreateChainTx) SyntacticVerify(synCtx DecisionTxSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
@@ -77,7 +71,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 		}
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.syntacticVerify(synCtx.Ctx, synCtx.C); err != nil {
 		return err
 	}
 	if err := tx.SubnetAuth.Verify(); err != nil {

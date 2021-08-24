@@ -33,8 +33,14 @@ func (tx VerifiableUnsignedCreateSubnetTx) SemanticVerify(
 ) {
 	timestamp := vs.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	// Make sure this transaction is well formed.
-	if err := tx.Verify(vm.ctx, platformcodec.Codec, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
+	syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
+		Ctx:        vm.ctx,
+		C:          platformcodec.Codec,
+		FeeAmount:  createSubnetTxFee,
+		FeeAssetID: vm.ctx.AVAXAssetID,
+	}
+
+	if err := tx.SyntacticVerify(syntacticCtx); err != nil {
 		return nil, permError{err}
 	}
 
@@ -92,7 +98,14 @@ func (vm *VM) newCreateSubnetTx(
 	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, platformcodec.Codec, createSubnetTxFee, vm.ctx.AVAXAssetID)
+
+	syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
+		Ctx:        vm.ctx,
+		C:          platformcodec.Codec,
+		FeeAmount:  createSubnetTxFee,
+		FeeAssetID: vm.ctx.AVAXAssetID,
+	}
+	return tx, utx.SyntacticVerify(syntacticCtx)
 }
 
 func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {

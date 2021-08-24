@@ -12,7 +12,7 @@ import (
 
 // VerifiableUnsignedDecisionTx is an unsigned operation that can be immediately decided
 type VerifiableUnsignedDecisionTx interface {
-	transactions.UnsignedTx
+	transactions.UnsignedDecisionTx
 
 	// Attempts to verify this transactions.with the provided state.
 	SemanticVerify(vm *VM, vs VersionedState, stx *transactions.SignedTx) (
@@ -23,7 +23,7 @@ type VerifiableUnsignedDecisionTx interface {
 
 // VerifiableUnsignedProposalTx is an unsigned operation that can be proposed
 type VerifiableUnsignedProposalTx interface {
-	transactions.UnsignedTx
+	transactions.UnsignedProposalTx
 
 	// Attempts to verify this transactions.with the provided state.
 	SemanticVerify(vm *VM, state MutableState, stx *transactions.SignedTx) (
@@ -38,7 +38,7 @@ type VerifiableUnsignedProposalTx interface {
 
 // VerifiableUnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type VerifiableUnsignedAtomicTx interface {
-	transactions.UnsignedTx
+	transactions.UnsignedAtomicTx
 
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
