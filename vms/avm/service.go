@@ -361,7 +361,7 @@ func (service *Service) GetBalance(r *http.Request, args *GetBalanceArgs, reply 
 		return fmt.Errorf("problem retrieving UTXOs: %w", err)
 	}
 
-	now := service.vm.Clock().Unix()
+	now := service.vm.clock.Unix()
 	reply.UTXOIDs = make([]avax.UTXOID, 0, len(utxos))
 	for _, utxo := range utxos {
 		if utxo.AssetID() != assetID {
@@ -423,7 +423,7 @@ func (service *Service) GetAllBalances(r *http.Request, args *GetAllBalancesArgs
 		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
 	}
 
-	now := service.vm.Clock().Unix()
+	now := service.vm.clock.Unix()
 	assetIDs := ids.Set{}               // IDs of assets the address has a non-zero balance of
 	balances := make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
 	for _, utxo := range utxos {
