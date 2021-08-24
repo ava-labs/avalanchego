@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 type TimedTx interface {
@@ -23,13 +25,13 @@ type TimedTx interface {
 // their startTime or their endTime. If SortByStartTime == true, the first
 // element of [Txs] is the tx in the heap with the earliest startTime. Otherwise
 // the first element is the tx with earliest endTime. The default value of this
-// struct will order transactions by endTime. This struct implements the heap
+// struct will order transactions. by endTime. This struct implements the heap
 // interface.
 // Transactions must be syntactically verified before adding to EventHeap to
 // ensure that EventHeap can always by marshalled.
 type EventHeap struct {
-	SortByStartTime bool  `serialize:"true"`
-	Txs             []*Tx `serialize:"true"`
+	SortByStartTime bool                     `serialize:"true"`
+	Txs             []*transactions.SignedTx `serialize:"true"`
 }
 
 func (h *EventHeap) Len() int { return len(h.Txs) }
@@ -48,8 +50,8 @@ func (h *EventHeap) Less(i, j int) bool {
 	case iTime.Unix() < jTime.Unix():
 		return true
 	case iTime == jTime:
-		_, iOk := iTx.(*UnsignedAddValidatorTx)
-		_, jOk := jTx.(*UnsignedAddValidatorTx)
+		_, iOk := iTx.(VerifiableUnsignedAddValidatorTx)
+		_, jOk := jTx.(VerifiableUnsignedAddValidatorTx)
 
 		if iOk != jOk {
 			return iOk == h.SortByStartTime
@@ -63,7 +65,7 @@ func (h *EventHeap) Less(i, j int) bool {
 }
 func (h *EventHeap) Swap(i, j int) { h.Txs[i], h.Txs[j] = h.Txs[j], h.Txs[i] }
 
-// Timestamp returns the timestamp on the top transaction on the heap
+// Timestamp returns the timestamp on the top transactions.on the heap
 func (h *EventHeap) Timestamp() time.Time {
 	tx := h.Txs[0].UnsignedTx.(TimedTx)
 	if h.SortByStartTime {
@@ -72,14 +74,14 @@ func (h *EventHeap) Timestamp() time.Time {
 	return tx.EndTime()
 }
 
-func (h *EventHeap) Add(tx *Tx) { heap.Push(h, tx) }
+func (h *EventHeap) Add(tx *transactions.SignedTx) { heap.Push(h, tx) }
 
-func (h *EventHeap) Peek() *Tx { return h.Txs[0] }
+func (h *EventHeap) Peek() *transactions.SignedTx { return h.Txs[0] }
 
-func (h *EventHeap) Remove() *Tx { return heap.Pop(h).(*Tx) }
+func (h *EventHeap) Remove() *transactions.SignedTx { return heap.Pop(h).(*transactions.SignedTx) }
 
 // Push implements the heap interface
-func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(*Tx)) }
+func (h *EventHeap) Push(x interface{}) { h.Txs = append(h.Txs, x.(*transactions.SignedTx)) }
 
 // Pop implements the heap interface
 func (h *EventHeap) Pop() interface{} {
@@ -91,5 +93,5 @@ func (h *EventHeap) Pop() interface{} {
 
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() ([]byte, error) {
-	return Codec.Marshal(codecVersion, h)
+	return platformcodec.Codec.Marshal(platformcodec.Version, h)
 }

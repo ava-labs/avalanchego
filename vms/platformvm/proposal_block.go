@@ -9,6 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var _ Block = &ProposalBlock{}
@@ -26,7 +29,7 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx Tx `serialize:"true" json:"tx"`
+	Tx transactions.SignedTx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState VersionedState
@@ -85,11 +88,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx.UnsignedTx)
+	unsignedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &pb.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx)
+	signedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -146,7 +149,7 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
+	tx, ok := pb.Tx.UnsignedTx.(VerifiableUnsignedProposalTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -178,8 +181,8 @@ func (pb *ProposalBlock) Verify() error {
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
-		// If this block's transaction proposes to advance the timestamp, the
-		// transaction may fail verification now but be valid in the future, so
+		// If this block's transactions.proposes to advance the timestamp, the
+		// transactions.may fail verification now but be valid in the future, so
 		// don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
 			pb.vm.ctx.Log.Trace("rejecting block %s due to a permanent verification error: %s", blkID, err)
@@ -193,8 +196,8 @@ func (pb *ProposalBlock) Verify() error {
 		}
 		return err
 	}
-	pb.onCommitState.AddTx(&pb.Tx, Committed)
-	pb.onAbortState.AddTx(&pb.Tx, Aborted)
+	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
+	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
 
 	pb.timestamp = parentState.GetTimestamp()
 
@@ -233,7 +236,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
+	tx, ok := pb.Tx.UnsignedTx.(VerifiableUnsignedProposalTx)
 	if !ok {
 		return [2]snowman.Block{}, errWrongTxType
 	}
@@ -244,12 +247,12 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	return [2]snowman.Block{abort, commit}, nil
 }
 
-// newProposalBlock creates a new block that proposes to issue a transaction.
+// newProposalBlock creates a new block that proposes to issue a transactions.
 //
 // The parent of this block has ID [parentID].
 //
 // The parent must be a decision block.
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx transactions.SignedTx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -261,7 +264,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*Proposal
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(codecVersion, &block)
+	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

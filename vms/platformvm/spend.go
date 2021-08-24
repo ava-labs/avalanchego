@@ -9,6 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -16,7 +19,6 @@ import (
 
 var (
 	errLockedFundsNotMarkedAsLocked = errors.New("locked funds not marked as locked")
-	errWrongLocktime                = errors.New("wrong locktime reported")
 	errUnknownOwners                = errors.New("unknown owners")
 	errCantSign                     = errors.New("can't sign")
 )
@@ -60,7 +62,7 @@ func (vm *VM) stake(
 		kc.Add(key)
 	}
 
-	// Minimum time this transaction will be issued at
+	// Minimum time this transactions.will be issued at
 	now := uint64(vm.clock.Time().Unix())
 
 	ins := []*avax.TransferableInput{}
@@ -83,7 +85,7 @@ func (vm *VM) stake(
 			continue // We only care about staking AVAX, so ignore other assets
 		}
 
-		out, ok := utxo.Out.(*StakeableLockOut)
+		out, ok := utxo.Out.(*entities.StakeableLockOut)
 		if !ok {
 			// This output isn't locked, so it will be handled during the next
 			// iteration of the UTXO set
@@ -127,7 +129,7 @@ func (vm *VM) stake(
 		ins = append(ins, &avax.TransferableInput{
 			UTXOID: utxo.UTXOID,
 			Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
-			In: &StakeableLockIn{
+			In: &entities.StakeableLockIn{
 				Locktime:       out.Locktime,
 				TransferableIn: in,
 			},
@@ -136,7 +138,7 @@ func (vm *VM) stake(
 		// Add the output to the staked outputs
 		stakedOuts = append(stakedOuts, &avax.TransferableOutput{
 			Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-			Out: &StakeableLockOut{
+			Out: &entities.StakeableLockOut{
 				Locktime: out.Locktime,
 				TransferableOut: &secp256k1fx.TransferOutput{
 					Amt:          amountToStake,
@@ -150,7 +152,7 @@ func (vm *VM) stake(
 			// Some of it must be returned
 			returnedOuts = append(returnedOuts, &avax.TransferableOutput{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-				Out: &StakeableLockOut{
+				Out: &entities.StakeableLockOut{
 					Locktime: out.Locktime,
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt:          remainingValue,
@@ -180,7 +182,7 @@ func (vm *VM) stake(
 		}
 
 		out := utxo.Out
-		inner, ok := out.(*StakeableLockOut)
+		inner, ok := out.(*entities.StakeableLockOut)
 		if ok {
 			if inner.Locktime > now {
 				// This output is currently locked, so this output can't be
@@ -269,9 +271,9 @@ func (vm *VM) stake(
 			amountBurned, amountStaked, fee, amount)
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, vm.codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, vm.codec)   // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers)            // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, platformcodec.Codec) // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, platformcodec.Codec)   // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
@@ -294,7 +296,7 @@ func (vm *VM) authorize(
 			err,
 		)
 	}
-	subnet, ok := subnetTx.UnsignedTx.(*UnsignedCreateSubnetTx)
+	subnet, ok := subnetTx.UnsignedTx.(VerifiableUnsignedCreateSubnetTx)
 	if !ok {
 		return nil, nil, errWrongTxType
 	}
@@ -330,7 +332,7 @@ func (vm *VM) authorize(
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpend(
 	utxoDB UTXOGetter,
-	tx UnsignedTx,
+	tx transactions.UnsignedTx,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
 	creds []verify.Verifiable,
@@ -362,7 +364,7 @@ func (vm *VM) semanticVerifySpend(
 // [utxos[i]] is the UTXO being consumed by [ins[i]]
 // Precondition: [tx] has already been syntactically verified
 func (vm *VM) semanticVerifySpendUTXOs(
-	tx UnsignedTx,
+	tx transactions.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -384,7 +386,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 	}
 
-	// Time this transaction is being verified
+	// Time this transactions.is being verified
 	now := uint64(vm.clock.Time().Unix())
 
 	// Track the amount of unlocked transfers
@@ -409,7 +411,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		out := utxo.Out
 		locktime := uint64(0)
 		// Set [locktime] to this UTXO's locktime, if applicable
-		if inner, ok := out.(*StakeableLockOut); ok {
+		if inner, ok := out.(*entities.StakeableLockOut); ok {
 			out = inner.TransferableOut
 			locktime = inner.Locktime
 		}
@@ -418,12 +420,12 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		// The UTXO says it's locked until [locktime], but this input, which
 		// consumes it, is not locked even though [locktime] hasn't passed. This
 		// is invalid.
-		if inner, ok := in.(*StakeableLockIn); now < locktime && !ok {
+		if inner, ok := in.(*entities.StakeableLockIn); now < locktime && !ok {
 			return permError{errLockedFundsNotMarkedAsLocked}
 		} else if ok {
 			if inner.Locktime != locktime {
 				// This input is locked, but its locktime is wrong
-				return permError{errWrongLocktime}
+				return permError{transactions.ErrWrongLocktime}
 			}
 			in = inner.TransferableIn
 		}
@@ -451,7 +453,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
+		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),
@@ -478,7 +480,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		output := out.Output()
 		locktime := uint64(0)
 		// Set [locktime] to this output's locktime, if applicable
-		if inner, ok := output.(*StakeableLockOut); ok {
+		if inner, ok := output.(*entities.StakeableLockOut); ok {
 			output = inner.TransferableOut
 			locktime = inner.Locktime
 		}
@@ -499,7 +501,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := vm.codec.Marshal(codecVersion, owner)
+		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),

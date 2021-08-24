@@ -22,6 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/status"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -74,12 +77,12 @@ type InternalState interface {
 	uptime.State
 
 	SetHeight(height uint64)
-	AddCurrentStaker(tx *Tx, potentialReward uint64)
-	DeleteCurrentStaker(tx *Tx)
+	AddCurrentStaker(tx *transactions.SignedTx, potentialReward uint64)
+	DeleteCurrentStaker(tx *transactions.SignedTx)
 	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error)
 
-	AddPendingStaker(tx *Tx)
-	DeletePendingStaker(tx *Tx)
+	AddPendingStaker(tx *transactions.SignedTx)
+	DeletePendingStaker(tx *transactions.SignedTx)
 
 	SetCurrentStakerChainState(currentStakerChainState)
 	SetPendingStakerChainState(pendingStakerChainState)
@@ -158,9 +161,9 @@ type internalStateImpl struct {
 
 	currentHeight         uint64
 	addedCurrentStakers   []*validatorReward
-	deletedCurrentStakers []*Tx
-	addedPendingStakers   []*Tx
-	deletedPendingStakers []*Tx
+	deletedCurrentStakers []*transactions.SignedTx
+	addedPendingStakers   []*transactions.SignedTx
+	deletedPendingStakers []*transactions.SignedTx
 	uptimes               map[ids.ShortID]*currentValidatorState // nodeID -> uptimes
 	updatedUptimes        map[ids.ShortID]struct{}               // nodeID -> nil
 
@@ -187,8 +190,8 @@ type internalStateImpl struct {
 	blockCache  cache.Cacher     // cache of blockID -> Block, if the entry is nil, it is not in the database
 	blockDB     database.Database
 
-	addedTxs map[ids.ID]*txStatusImpl // map of txID -> {*Tx, Status}
-	txCache  cache.Cacher             // cache of txID -> {*Tx, Status} if the entry is nil, it is not in the database
+	addedTxs map[ids.ID]*txStatusImpl // map of txID -> {*transactions.Tx, Status}
+	txCache  cache.Cacher             // cache of txID -> {*transactions.Tx, Status} if the entry is nil, it is not in the database
 	txDB     database.Database
 
 	addedRewardUTXOs map[ids.ID][]*avax.UTXO // map of txID -> []*UTXO
@@ -199,14 +202,14 @@ type internalStateImpl struct {
 	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
-	cachedSubnets []*Tx // nil if the subnets haven't been loaded
-	addedSubnets  []*Tx
+	cachedSubnets []*transactions.SignedTx // nil if the subnets haven't been loaded
+	addedSubnets  []*transactions.SignedTx
 	subnetBaseDB  database.Database
 	subnetDB      linkeddb.LinkedDB
 
-	addedChains  map[ids.ID][]*Tx // maps subnetID -> the newly added chains to the subnet
-	chainCache   cache.Cacher     // cache of subnetID -> the chains after all local modifications []*Tx
-	chainDBCache cache.Cacher     // cache of subnetID -> linkedDB
+	addedChains  map[ids.ID][]*transactions.SignedTx // maps subnetID -> the newly added chains to the subnet
+	chainCache   cache.Cacher                        // cache of subnetID -> the chains after all local modifications []*transactions.Tx
+	chainDBCache cache.Cacher                        // cache of subnetID -> linkedDB
 	chainDB      database.Database
 
 	originalTimestamp, timestamp         time.Time
@@ -226,8 +229,8 @@ type heightWithSubnet struct {
 }
 
 type stateTx struct {
-	Tx     []byte `serialize:"true"`
-	Status Status `serialize:"true"`
+	Tx     []byte        `serialize:"true"`
+	Status status.Status `serialize:"true"`
 }
 
 type stateBlk struct {
@@ -295,7 +298,7 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 		subnetBaseDB: subnetBaseDB,
 		subnetDB:     linkeddb.NewDefault(subnetBaseDB),
 
-		addedChains: make(map[ids.ID][]*Tx),
+		addedChains: make(map[ids.ID][]*transactions.SignedTx),
 		chainDB:     prefixdb.New(chainPrefix, baseDB),
 
 		singletonDB: prefixdb.New(singletonPrefix, baseDB),
@@ -307,7 +310,7 @@ func (st *internalStateImpl) initCaches() {
 	st.blockCache = &cache.LRU{Size: blockCacheSize}
 	st.txCache = &cache.LRU{Size: txCacheSize}
 	st.rewardUTXOsCache = &cache.LRU{Size: rewardUTXOsCacheSize}
-	st.utxoState = avax.NewUTXOState(st.utxoDB, GenesisCodec)
+	st.utxoState = avax.NewUTXOState(st.utxoDB, platformcodec.GenesisCodec)
 	st.chainCache = &cache.LRU{Size: chainCacheSize}
 	st.chainDBCache = &cache.LRU{Size: chainDBCacheSize}
 }
@@ -349,7 +352,7 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 		return err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, GenesisCodec, namespace, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, platformcodec.GenesisCodec, namespace, metrics)
 	if err != nil {
 		return err
 	}
@@ -447,7 +450,7 @@ func (st *internalStateImpl) SetCurrentSupply(currentSupply uint64) { st.current
 func (st *internalStateImpl) GetLastAccepted() ids.ID             { return st.lastAccepted }
 func (st *internalStateImpl) SetLastAccepted(lastAccepted ids.ID) { st.lastAccepted = lastAccepted }
 
-func (st *internalStateImpl) GetSubnets() ([]*Tx, error) {
+func (st *internalStateImpl) GetSubnets() ([]*transactions.SignedTx, error) {
 	if st.cachedSubnets != nil {
 		return st.cachedSubnets, nil
 	}
@@ -455,7 +458,7 @@ func (st *internalStateImpl) GetSubnets() ([]*Tx, error) {
 	subnetDBIt := st.subnetDB.NewIterator()
 	defer subnetDBIt.Release()
 
-	txs := []*Tx(nil)
+	txs := []*transactions.SignedTx(nil)
 	for subnetDBIt.Next() {
 		subnetIDBytes := subnetDBIt.Key()
 		subnetID, err := ids.ToID(subnetIDBytes)
@@ -476,22 +479,22 @@ func (st *internalStateImpl) GetSubnets() ([]*Tx, error) {
 	return txs, nil
 }
 
-func (st *internalStateImpl) AddSubnet(createSubnetTx *Tx) {
+func (st *internalStateImpl) AddSubnet(createSubnetTx *transactions.SignedTx) {
 	st.addedSubnets = append(st.addedSubnets, createSubnetTx)
 	if st.cachedSubnets != nil {
 		st.cachedSubnets = append(st.cachedSubnets, createSubnetTx)
 	}
 }
 
-func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
+func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*transactions.SignedTx, error) {
 	if chainsIntf, cached := st.chainCache.Get(subnetID); cached {
-		return chainsIntf.([]*Tx), nil
+		return chainsIntf.([]*transactions.SignedTx), nil
 	}
 	chainDB := st.getChainDB(subnetID)
 	chainDBIt := chainDB.NewIterator()
 	defer chainDBIt.Release()
 
-	txs := []*Tx(nil)
+	txs := []*transactions.SignedTx(nil)
 	for chainDBIt.Next() {
 		chainIDBytes := chainDBIt.Key()
 		chainID, err := ids.ToID(chainIDBytes)
@@ -512,12 +515,12 @@ func (st *internalStateImpl) GetChains(subnetID ids.ID) ([]*Tx, error) {
 	return txs, nil
 }
 
-func (st *internalStateImpl) AddChain(createChainTxIntf *Tx) {
-	createChainTx := createChainTxIntf.UnsignedTx.(*UnsignedCreateChainTx)
+func (st *internalStateImpl) AddChain(createChainTxIntf *transactions.SignedTx) {
+	createChainTx := createChainTxIntf.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 	subnetID := createChainTx.SubnetID
 	st.addedChains[subnetID] = append(st.addedChains[subnetID], createChainTxIntf)
 	if chainsIntf, cached := st.chainCache.Get(subnetID); cached {
-		chains := chainsIntf.([]*Tx)
+		chains := chainsIntf.([]*transactions.SignedTx)
 		chains = append(chains, createChainTxIntf)
 		st.chainCache.Put(subnetID, chains)
 	}
@@ -533,13 +536,13 @@ func (st *internalStateImpl) getChainDB(subnetID ids.ID) linkeddb.LinkedDB {
 	return chainDB
 }
 
-func (st *internalStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
+func (st *internalStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, status.Status, error) {
 	if tx, exists := st.addedTxs[txID]; exists {
 		return tx.tx, tx.status, nil
 	}
 	if txIntf, cached := st.txCache.Get(txID); cached {
 		if txIntf == nil {
-			return nil, Unknown, database.ErrNotFound
+			return nil, status.Unknown, database.ErrNotFound
 		}
 		tx := txIntf.(*txStatusImpl)
 		return tx.tx, tx.status, nil
@@ -547,22 +550,22 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
 	txBytes, err := st.txDB.Get(txID[:])
 	if err == database.ErrNotFound {
 		st.txCache.Put(txID, nil)
-		return nil, Unknown, database.ErrNotFound
+		return nil, status.Unknown, database.ErrNotFound
 	} else if err != nil {
-		return nil, Unknown, err
+		return nil, status.Unknown, err
 	}
 
 	stx := stateTx{}
-	if _, err := GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
-		return nil, Unknown, err
+	if _, err := platformcodec.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
+		return nil, status.Unknown, err
 	}
 
-	tx := Tx{}
-	if _, err := GenesisCodec.Unmarshal(stx.Tx, &tx); err != nil {
-		return nil, Unknown, err
+	tx := transactions.SignedTx{}
+	if _, err := platformcodec.GenesisCodec.Unmarshal(stx.Tx, &tx); err != nil {
+		return nil, status.Unknown, err
 	}
-	if err := tx.Sign(GenesisCodec, nil); err != nil {
-		return nil, Unknown, err
+	if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
+		return nil, status.Unknown, err
 	}
 
 	ptx := &txStatusImpl{
@@ -574,7 +577,7 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*Tx, Status, error) {
 	return ptx.tx, ptx.status, nil
 }
 
-func (st *internalStateImpl) AddTx(tx *Tx, status Status) {
+func (st *internalStateImpl) AddTx(tx *transactions.SignedTx, status status.Status) {
 	st.addedTxs[tx.ID()] = &txStatusImpl{
 		tx:     tx,
 		status: status,
@@ -597,7 +600,7 @@ func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := Codec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := platformcodec.Codec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -652,12 +655,12 @@ func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
 	}
 
 	blkStatus := stateBlk{}
-	if _, err := GenesisCodec.Unmarshal(blkBytes, &blkStatus); err != nil {
+	if _, err := platformcodec.GenesisCodec.Unmarshal(blkBytes, &blkStatus); err != nil {
 		return nil, err
 	}
 
 	var blk Block
-	if _, err := GenesisCodec.Unmarshal(blkStatus.Blk, &blk); err != nil {
+	if _, err := platformcodec.GenesisCodec.Unmarshal(blkStatus.Blk, &blk); err != nil {
 		return nil, err
 	}
 	if err := blk.initialize(st.vm, blkStatus.Blk, blkStatus.Status, blk); err != nil {
@@ -715,14 +718,14 @@ func (st *internalStateImpl) SetHeight(height uint64) {
 	st.currentHeight = height
 }
 
-func (st *internalStateImpl) AddCurrentStaker(tx *Tx, potentialReward uint64) {
+func (st *internalStateImpl) AddCurrentStaker(tx *transactions.SignedTx, potentialReward uint64) {
 	st.addedCurrentStakers = append(st.addedCurrentStakers, &validatorReward{
 		addStakerTx:     tx,
 		potentialReward: potentialReward,
 	})
 }
 
-func (st *internalStateImpl) DeleteCurrentStaker(tx *Tx) {
+func (st *internalStateImpl) DeleteCurrentStaker(tx *transactions.SignedTx) {
 	st.deletedCurrentStakers = append(st.deletedCurrentStakers, tx)
 }
 
@@ -731,7 +734,7 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 		Height:   height,
 		SubnetID: subnetID,
 	}
-	prefixBytes, err := Codec.Marshal(codecVersion, prefixStruct)
+	prefixBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, prefixStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +756,7 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 		}
 
 		weightDiff := ValidatorWeightDiff{}
-		_, err = Codec.Unmarshal(diffIter.Value(), &weightDiff)
+		_, err = platformcodec.Codec.Unmarshal(diffIter.Value(), &weightDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -765,11 +768,11 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 	return weightDiffs, nil
 }
 
-func (st *internalStateImpl) AddPendingStaker(tx *Tx) {
+func (st *internalStateImpl) AddPendingStaker(tx *transactions.SignedTx) {
 	st.addedPendingStakers = append(st.addedPendingStakers, tx)
 }
 
-func (st *internalStateImpl) DeletePendingStaker(tx *Tx) {
+func (st *internalStateImpl) DeletePendingStaker(tx *transactions.SignedTx) {
 	st.deletedPendingStakers = append(st.deletedPendingStakers, tx)
 }
 
@@ -865,7 +868,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			weight   uint64
 		)
 		switch tx := currentStaker.addStakerTx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			startTime := tx.StartTime()
 			vdr := &currentValidatorState{
 				txID:        txID,
@@ -876,7 +879,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				PotentialReward: potentialReward,
 			}
 
-			vdrBytes, err := GenesisCodec.Marshal(codecVersion, vdr)
+			vdrBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, vdr)
 			if err != nil {
 				return err
 			}
@@ -889,7 +892,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *UnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddDelegatorTx:
 			if err := database.PutUInt64(st.currentDelegatorList, txID[:], potentialReward); err != nil {
 				return err
 			}
@@ -897,7 +900,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			if err := st.currentSubnetValidatorList.Put(txID[:], nil); err != nil {
 				return err
 			}
@@ -937,7 +940,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			weight   uint64
 		)
 		switch tx := tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			db = st.currentValidatorList
 			delete(st.uptimes, tx.Validator.NodeID)
 			delete(st.updatedUptimes, tx.Validator.NodeID)
@@ -945,13 +948,13 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *UnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddDelegatorTx:
 			db = st.currentDelegatorList
 
 			subnetID = constants.PrimaryNetworkID
 			nodeID = tx.Validator.NodeID
 			weight = tx.Validator.Wght
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			db = st.currentSubnetValidatorList
 
 			subnetID = tx.Validator.Subnet
@@ -996,7 +999,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			Height:   st.currentHeight,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := Codec.Marshal(codecVersion, prefixStruct)
+		prefixBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, prefixStruct)
 		if err != nil {
 			return err
 		}
@@ -1007,7 +1010,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				delete(nodeUpdates, nodeID)
 				continue
 			}
-			nodeDiffBytes, err := Codec.Marshal(codecVersion, nodeDiff)
+			nodeDiffBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, nodeDiff)
 			if err != nil {
 				return err
 			}
@@ -1027,11 +1030,11 @@ func (st *internalStateImpl) writePendingStakers() error {
 	for _, tx := range st.addedPendingStakers {
 		var db database.KeyValueWriter
 		switch tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			db = st.pendingValidatorList
-		case *UnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddDelegatorTx:
 			db = st.pendingDelegatorList
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			db = st.pendingSubnetValidatorList
 		default:
 			return errWrongTxType
@@ -1047,11 +1050,11 @@ func (st *internalStateImpl) writePendingStakers() error {
 	for _, tx := range st.deletedPendingStakers {
 		var db database.KeyValueWriter
 		switch tx.UnsignedTx.(type) {
-		case *UnsignedAddValidatorTx:
+		case VerifiableUnsignedAddValidatorTx:
 			db = st.pendingValidatorList
-		case *UnsignedAddDelegatorTx:
+		case VerifiableUnsignedAddDelegatorTx:
 			db = st.pendingDelegatorList
-		case *UnsignedAddSubnetValidatorTx:
+		case VerifiableUnsignedAddSubnetValidatorTx:
 			db = st.pendingSubnetValidatorList
 		default:
 			return errWrongTxType
@@ -1073,7 +1076,7 @@ func (st *internalStateImpl) writeUptimes() error {
 		uptime := st.uptimes[nodeID]
 		uptime.LastUpdated = uint64(uptime.lastUpdated.Unix())
 
-		uptimeBytes, err := GenesisCodec.Marshal(codecVersion, uptime)
+		uptimeBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, uptime)
 		if err != nil {
 			return err
 		}
@@ -1093,7 +1096,7 @@ func (st *internalStateImpl) writeBlocks() error {
 			Blk:    blk.Bytes(),
 			Status: blk.Status(),
 		}
-		btxBytes, err := GenesisCodec.Marshal(codecVersion, &sblk)
+		btxBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, &sblk)
 		if err != nil {
 			return err
 		}
@@ -1115,7 +1118,7 @@ func (st *internalStateImpl) writeTXs() error {
 			Tx:     txStatus.tx.Bytes(),
 			Status: txStatus.status,
 		}
-		txBytes, err := GenesisCodec.Marshal(codecVersion, &stx)
+		txBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, &stx)
 		if err != nil {
 			return err
 		}
@@ -1139,7 +1142,7 @@ func (st *internalStateImpl) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+			utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
 			if err != nil {
 				return err
 			}
@@ -1279,12 +1282,12 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		uptime := &currentValidatorState{
 			txID: txID,
 		}
-		if _, err := GenesisCodec.Unmarshal(uptimeBytes, uptime); err != nil {
+		if _, err := platformcodec.GenesisCodec.Unmarshal(uptimeBytes, uptime); err != nil {
 			return err
 		}
 		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
 
-		addValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddValidatorTx)
+		addValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1292,7 +1295,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		cs.validators = append(cs.validators, tx)
 		cs.validatorsByNodeID[addValidatorTx.Validator.NodeID] = &currentValidatorImpl{
 			validatorImpl: validatorImpl{
-				subnets: make(map[ids.ID]*UnsignedAddSubnetValidatorTx),
+				subnets: make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx),
 			},
 			addValidatorTx:  addValidatorTx,
 			potentialReward: uptime.PotentialReward,
@@ -1328,7 +1331,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			return err
 		}
 
-		addDelegatorTx, ok := tx.UnsignedTx.(*UnsignedAddDelegatorTx)
+		addDelegatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1362,7 +1365,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 			return err
 		}
 
-		addSubnetValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
+		addSubnetValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1393,7 +1396,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 
 func (st *internalStateImpl) loadPendingValidators() error {
 	ps := &pendingStakerChainStateImpl{
-		validatorsByNodeID:      make(map[ids.ShortID]*UnsignedAddValidatorTx),
+		validatorsByNodeID:      make(map[ids.ShortID]VerifiableUnsignedAddValidatorTx),
 		validatorExtrasByNodeID: make(map[ids.ShortID]*validatorImpl),
 	}
 
@@ -1410,7 +1413,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			return err
 		}
 
-		addValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddValidatorTx)
+		addValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1435,7 +1438,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			return err
 		}
 
-		addDelegatorTx, ok := tx.UnsignedTx.(*UnsignedAddDelegatorTx)
+		addDelegatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1445,8 +1448,8 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			vdr.delegators = append(vdr.delegators, addDelegatorTx)
 		} else {
 			ps.validatorExtrasByNodeID[addDelegatorTx.Validator.NodeID] = &validatorImpl{
-				delegators: []*UnsignedAddDelegatorTx{addDelegatorTx},
-				subnets:    make(map[ids.ID]*UnsignedAddSubnetValidatorTx),
+				delegators: []VerifiableUnsignedAddDelegatorTx{addDelegatorTx},
+				subnets:    make(map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx),
 			}
 		}
 	}
@@ -1467,7 +1470,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			return err
 		}
 
-		addSubnetValidatorTx, ok := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx)
+		addSubnetValidatorTx, ok := tx.UnsignedTx.(VerifiableUnsignedAddSubnetValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1477,7 +1480,7 @@ func (st *internalStateImpl) loadPendingValidators() error {
 			vdr.subnets[addSubnetValidatorTx.Validator.Subnet] = addSubnetValidatorTx
 		} else {
 			ps.validatorExtrasByNodeID[addSubnetValidatorTx.Validator.NodeID] = &validatorImpl{
-				subnets: map[ids.ID]*UnsignedAddSubnetValidatorTx{
+				subnets: map[ids.ID]VerifiableUnsignedAddSubnetValidatorTx{
 					addSubnetValidatorTx.Validator.Subnet: addSubnetValidatorTx,
 				},
 			}
@@ -1503,7 +1506,7 @@ func (st *internalStateImpl) shouldInit() (bool, error) {
 
 func (st *internalStateImpl) init(genesisBytes []byte) error {
 	genesis := &Genesis{}
-	if _, err := GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
+	if _, err := platformcodec.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
 		return err
 	}
 	if err := genesis.Initialize(); err != nil {
@@ -1522,7 +1525,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 
 	// Persist primary network validator set at genesis
 	for _, vdrTx := range genesis.Validators {
-		tx, ok := vdrTx.UnsignedTx.(*UnsignedAddValidatorTx)
+		tx, ok := vdrTx.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1543,12 +1546,12 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 		}
 
 		st.AddCurrentStaker(vdrTx, r)
-		st.AddTx(vdrTx, Committed)
+		st.AddTx(vdrTx, status.Committed)
 		st.SetCurrentSupply(newCurrentSupply)
 	}
 
 	for _, chain := range genesis.Chains {
-		unsignedChain, ok := chain.UnsignedTx.(*UnsignedCreateChainTx)
+		unsignedChain, ok := chain.UnsignedTx.(VerifiableUnsignedCreateChainTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -1560,7 +1563,7 @@ func (st *internalStateImpl) init(genesisBytes []byte) error {
 		}
 
 		st.AddChain(chain)
-		st.AddTx(chain, Committed)
+		st.AddTx(chain, status.Committed)
 	}
 
 	// Create the genesis block and save it as being accepted (We don't just

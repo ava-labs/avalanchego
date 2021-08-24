@@ -13,13 +13,15 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 const (
 	// syncBound is the synchrony bound used for safe decision making
 	syncBound = 10 * time.Second
 
-	// BatchSize is the number of decision transaction to place into a block
+	// BatchSize is the number of decision transactions.to place into a block
 	BatchSize = 30
 
 	MaxMempoolByteSize   = 3 * units.GiB // TODO: Should be default, configurable by users
@@ -40,7 +42,7 @@ type Mempool struct {
 
 	// TODO: factor out VM into separable interfaces
 
-	// vm.codec
+	// platformcodec.Codec
 	// vm.ctx.Log
 	// vm.ctx.Lock
 
@@ -73,14 +75,14 @@ type Mempool struct {
 	dropIncoming bool
 
 	unissuedProposalTxs *EventHeap
-	unissuedDecisionTxs []*Tx
-	unissuedAtomicTxs   []*Tx
+	unissuedDecisionTxs []*transactions.SignedTx
+	unissuedAtomicTxs   []*transactions.SignedTx
 
 	rejectedProposalTxs *cache.LRU
 	rejectedDecisionTxs *cache.LRU
 	rejectedAtomicTxs   *cache.LRU
 
-	unissuedTxs    map[ids.ID]*Tx
+	unissuedTxs    map[ids.ID]*transactions.SignedTx
 	totalBytesSize int
 }
 
@@ -89,17 +91,17 @@ func (m *Mempool) has(txID ids.ID) bool {
 	return ok
 }
 
-func (m *Mempool) hasRoomFor(tx *Tx) bool {
+func (m *Mempool) hasRoomFor(tx *transactions.SignedTx) bool {
 	return m.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
 }
 
-func (m *Mempool) markReject(tx *Tx) error {
+func (m *Mempool) markReject(tx *transactions.SignedTx) error {
 	switch tx.UnsignedTx.(type) {
-	case UnsignedProposalTx:
+	case VerifiableUnsignedProposalTx:
 		m.rejectedProposalTxs.Put(tx.ID(), struct{}{})
-	case UnsignedDecisionTx:
+	case VerifiableUnsignedDecisionTx:
 		m.rejectedDecisionTxs.Put(tx.ID(), struct{}{})
-	case UnsignedAtomicTx:
+	case VerifiableUnsignedAtomicTx:
 		m.rejectedAtomicTxs.Put(tx.ID(), struct{}{})
 	default:
 		return errUnknownTxType
@@ -120,12 +122,12 @@ func (m *Mempool) isAlreadyRejected(txID ids.ID) bool {
 	return res
 }
 
-func (m *Mempool) register(tx *Tx) {
+func (m *Mempool) register(tx *transactions.SignedTx) {
 	m.unissuedTxs[tx.ID()] = tx
 	m.totalBytesSize += len(tx.Bytes())
 }
 
-func (m *Mempool) deregister(tx *Tx) {
+func (m *Mempool) deregister(tx *transactions.SignedTx) {
 	delete(m.unissuedTxs, tx.ID())
 	m.totalBytesSize -= len(tx.Bytes())
 }
@@ -138,7 +140,7 @@ func (m *Mempool) Initialize(vm *VM) {
 
 	// Transactions from clients that have not yet been put into blocks and
 	// added to consensus
-	m.unissuedTxs = make(map[ids.ID]*Tx)
+	m.unissuedTxs = make(map[ids.ID]*transactions.SignedTx)
 	m.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
 
 	m.rejectedProposalTxs = &cache.LRU{Size: rejectedTxsCacheSize}
@@ -155,13 +157,13 @@ func (m *Mempool) Initialize(vm *VM) {
 }
 
 // IssueTx enqueues the [tx] to be put into a block
-func (m *Mempool) IssueTx(tx *Tx) error {
+func (m *Mempool) IssueTx(tx *transactions.SignedTx) error {
 	if m.dropIncoming {
 		return nil
 	}
 
 	// Initialize the transaction
-	if err := tx.Sign(m.vm.codec, nil); err != nil {
+	if err := tx.Sign(platformcodec.Codec, nil); err != nil {
 		return err
 	}
 
@@ -169,7 +171,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	case nil:
 		txID := tx.ID()
 		m.vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		txIDBytes, err := m.vm.codec.Marshal(codecVersion, txID)
+		txIDBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, txID)
 		if err != nil {
 			return err
 		}
@@ -181,7 +183,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	}
 }
 
-func (m *Mempool) AddUncheckedTx(tx *Tx) error {
+func (m *Mempool) AddUncheckedTx(tx *transactions.SignedTx) error {
 	txID := tx.ID()
 	if m.has(txID) {
 		return errAttemptReRegisterTx
@@ -193,9 +195,9 @@ func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.unissuedProposalTxs.Add(tx)
-	case UnsignedDecisionTx:
+	case VerifiableUnsignedDecisionTx:
 		m.unissuedDecisionTxs = append(m.unissuedDecisionTxs, tx)
-	case UnsignedAtomicTx:
+	case VerifiableUnsignedAtomicTx:
 		m.unissuedAtomicTxs = append(m.unissuedAtomicTxs, tx)
 	default:
 		return errUnknownTxType
@@ -235,7 +237,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if numTxs > len(m.unissuedDecisionTxs) {
 			numTxs = len(m.unissuedDecisionTxs)
 		}
-		var txs []*Tx
+		var txs []*transactions.SignedTx
 		txs, m.unissuedDecisionTxs = m.unissuedDecisionTxs[:numTxs], m.unissuedDecisionTxs[numTxs:]
 		for _, tx := range txs {
 			m.deregister(tx)
@@ -360,7 +362,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 		maxLocalStartTime := localTime.Add(maxFutureStartTime)
 		// If the start time is too far in the future relative to local time
-		// drop the transaction and continue
+		// drop the transactions.and continue
 		if startTime.After(maxLocalStartTime) {
 			m.unissuedProposalTxs.Remove()
 			m.deregister(tx)
@@ -368,7 +370,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		}
 
 		// If the chain timestamp is too far in the past to issue this
-		// transaction but according to local time, it's ready to be issued,
+		// transactions.but according to local time, it's ready to be issued,
 		// then attempt to advance the timestamp, so it can be issued.
 		maxChainStartTime := currentChainTimestamp.Add(maxFutureStartTime)
 		if startTime.After(maxChainStartTime) {
@@ -410,7 +412,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
 // consensus engine.
 func (m *Mempool) ResetTimer() {
-	// If there is a pending transaction, trigger building of a block with that
+	// If there is a pending transactions. trigger building of a block with that
 	// transaction
 	if len(m.unissuedDecisionTxs) > 0 || len(m.unissuedAtomicTxs) > 0 {
 		m.vm.NotifyBlockReady()

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var errUnknownBlockType = errors.New("unknown block type")
@@ -51,7 +52,7 @@ func newTxMetrics(namespace string, name string) prometheus.Counter {
 	return prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_txs_accepted", name),
-		Help:      fmt.Sprintf("Number of %s transactions accepted", name),
+		Help:      fmt.Sprintf("Number of %s transactions. accepted", name),
 	})
 }
 
@@ -140,25 +141,25 @@ func (m *metrics) AcceptBlock(b snowman.Block) error {
 	return nil
 }
 
-func (m *metrics) AcceptTx(tx *Tx) error {
+func (m *metrics) AcceptTx(tx *transactions.SignedTx) error {
 	switch tx.UnsignedTx.(type) {
-	case *UnsignedAddDelegatorTx:
+	case VerifiableUnsignedAddDelegatorTx:
 		m.numAddDelegatorTxs.Inc()
-	case *UnsignedAddSubnetValidatorTx:
+	case VerifiableUnsignedAddSubnetValidatorTx:
 		m.numAddSubnetValidatorTxs.Inc()
-	case *UnsignedAddValidatorTx:
+	case VerifiableUnsignedAddValidatorTx:
 		m.numAddValidatorTxs.Inc()
-	case *UnsignedAdvanceTimeTx:
+	case VerifiableUnsignedAdvanceTimeTx:
 		m.numAdvanceTimeTxs.Inc()
-	case *UnsignedCreateChainTx:
+	case VerifiableUnsignedCreateChainTx:
 		m.numCreateChainTxs.Inc()
-	case *UnsignedCreateSubnetTx:
+	case VerifiableUnsignedCreateSubnetTx:
 		m.numCreateSubnetTxs.Inc()
-	case *UnsignedImportTx:
+	case VerifiableUnsignedImportTx:
 		m.numImportTxs.Inc()
-	case *UnsignedExportTx:
+	case VerifiableUnsignedExportTx:
 		m.numExportTxs.Inc()
-	case *UnsignedRewardValidatorTx:
+	case VerifiableUnsignedRewardValidatorTx:
 		m.numRewardValidatorTxs.Inc()
 	default:
 		return errUnknownTxType

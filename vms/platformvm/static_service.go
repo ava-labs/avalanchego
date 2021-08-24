@@ -15,6 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
+	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -44,7 +47,7 @@ type APIUTXO struct {
 }
 
 // APIStaker is the representation of a staker sent via APIs.
-// [TxID] is the txID of the transaction that added this staker.
+// [TxID] is the txID of the transactions.that added this staker.
 // [Amount] is the amount of tokens being staked.
 // [StartTime] is the Unix time when they start staking
 // [Endtime] is the Unix time repr. of when they are done staking
@@ -146,22 +149,22 @@ type GenesisUTXO struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs         []*GenesisUTXO `serialize:"true"`
-	Validators    []*Tx          `serialize:"true"`
-	Chains        []*Tx          `serialize:"true"`
-	Timestamp     uint64         `serialize:"true"`
-	InitialSupply uint64         `serialize:"true"`
-	Message       string         `serialize:"true"`
+	UTXOs         []*GenesisUTXO           `serialize:"true"`
+	Validators    []*transactions.SignedTx `serialize:"true"`
+	Chains        []*transactions.SignedTx `serialize:"true"`
+	Timestamp     uint64                   `serialize:"true"`
+	InitialSupply uint64                   `serialize:"true"`
+	Message       string                   `serialize:"true"`
 }
 
 func (g *Genesis) Initialize() error {
 	for _, tx := range g.Validators {
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
+		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
 			return err
 		}
 	}
 	for _, tx := range g.Chains {
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
+		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
 			return err
 		}
 	}
@@ -206,7 +209,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			},
 		}
 		if apiUTXO.Locktime > args.Time {
-			utxo.Out = &StakeableLockOut{
+			utxo.Out = &entities.StakeableLockOut{
 				Locktime:        uint64(apiUTXO.Locktime),
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
@@ -245,7 +248,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				},
 			}
 			if apiUTXO.Locktime > args.Time {
-				utxo.Out = &StakeableLockOut{
+				utxo.Out = &entities.StakeableLockOut{
 					Locktime:        uint64(apiUTXO.Locktime),
 					TransferableOut: utxo.Out,
 				}
@@ -288,22 +291,24 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			delegationFee = uint32(*validator.ExactDelegationFee)
 		}
 
-		tx := &Tx{UnsignedTx: &UnsignedAddValidatorTx{
-			BaseTx: BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    uint32(args.NetworkID),
-				BlockchainID: ids.Empty,
-			}},
-			Validator: Validator{
-				NodeID: nodeID,
-				Start:  uint64(args.Time),
-				End:    uint64(validator.EndTime),
-				Wght:   weight,
+		tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedAddValidatorTx{
+			UnsignedAddValidatorTx: &transactions.UnsignedAddValidatorTx{
+				BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    uint32(args.NetworkID),
+					BlockchainID: ids.Empty,
+				}},
+				Validator: entities.Validator{
+					NodeID: nodeID,
+					Start:  uint64(args.Time),
+					End:    uint64(validator.EndTime),
+					Wght:   weight,
+				},
+				Stake:        stake,
+				RewardsOwner: owner,
+				Shares:       delegationFee,
 			},
-			Stake:        stake,
-			RewardsOwner: owner,
-			Shares:       delegationFee,
 		}}
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
+		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -311,25 +316,27 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the chains that exist at genesis.
-	chains := []*Tx{}
+	chains := []*transactions.SignedTx{}
 	for _, chain := range args.Chains {
 		genesisBytes, err := formatting.Decode(args.Encoding, chain.GenesisData)
 		if err != nil {
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
-		tx := &Tx{UnsignedTx: &UnsignedCreateChainTx{
-			BaseTx: BaseTx{BaseTx: avax.BaseTx{
-				NetworkID:    uint32(args.NetworkID),
-				BlockchainID: ids.Empty,
-			}},
-			SubnetID:    chain.SubnetID,
-			ChainName:   chain.Name,
-			VMID:        chain.VMID,
-			FxIDs:       chain.FxIDs,
-			GenesisData: genesisBytes,
-			SubnetAuth:  &secp256k1fx.Input{},
+		tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedCreateChainTx{
+			UnsignedCreateChainTx: &transactions.UnsignedCreateChainTx{
+				BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    uint32(args.NetworkID),
+					BlockchainID: ids.Empty,
+				}},
+				SubnetID:    chain.SubnetID,
+				ChainName:   chain.Name,
+				VMID:        chain.VMID,
+				FxIDs:       chain.FxIDs,
+				GenesisData: genesisBytes,
+				SubnetAuth:  &secp256k1fx.Input{},
+			},
 		}}
-		if err := tx.Sign(GenesisCodec, nil); err != nil {
+		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -347,7 +354,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := GenesisCodec.Marshal(codecVersion, genesis)
+	bytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}
