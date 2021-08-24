@@ -14,11 +14,38 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 )
 
-var errNilTx = errors.New("nil tx is not valid")
+var (
+	errNilTx = errors.New("nil tx is not valid")
+
+	_ UnsignedTx = &BaseTx{}
+)
 
 // BaseTx is the basis of all transactions.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true"`
+}
+
+// Init sets the FxID fields in the inputs and outputs of this [BaseTx]
+// Also sets the [ctx] in the OutputOwners to the given [vm.ctx] so that the
+// addresses can be json marshalled into human readable format
+func (t *BaseTx) Init(vm *VM) error {
+	for _, in := range t.Ins {
+		fx, err := vm.getParsedFx(in.In)
+		if err != nil {
+			return err
+		}
+		in.FxID = fx.ID
+	}
+
+	for _, out := range t.Outs {
+		fx, err := vm.getParsedFx(out.Out)
+		if err != nil {
+			return err
+		}
+		out.FxID = fx.ID
+		out.InitCtx(vm.ctx)
+	}
+	return nil
 }
 
 // SyntacticVerify that this transaction is well-formed.

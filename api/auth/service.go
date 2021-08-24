@@ -30,7 +30,7 @@ type Token struct {
 }
 
 func (s *service) NewToken(_ *http.Request, args *NewTokenArgs, reply *Token) error {
-	s.auth.log.Info("Auth: NewToken called")
+	s.auth.log.Debug("Auth: NewToken called")
 
 	var err error
 	reply.Token, err = s.auth.NewToken(args.Password.Password, defaultTokenLifespan, args.Endpoints)
@@ -43,7 +43,7 @@ type RevokeTokenArgs struct {
 }
 
 func (s *service) RevokeToken(_ *http.Request, args *RevokeTokenArgs, reply *api.SuccessResponse) error {
-	s.auth.log.Info("Auth: RevokeToken called")
+	s.auth.log.Debug("Auth: RevokeToken called")
 
 	reply.Success = true
 	return s.auth.RevokeToken(args.Token.Token, args.Password.Password)
@@ -55,7 +55,7 @@ type ChangePasswordArgs struct {
 }
 
 func (s *service) ChangePassword(_ *http.Request, args *ChangePasswordArgs, reply *api.SuccessResponse) error {
-	s.auth.log.Info("Auth: ChangePassword called")
+	s.auth.log.Debug("Auth: ChangePassword called")
 
 	reply.Success = true
 	return s.auth.ChangePassword(args.OldPassword, args.NewPassword)

@@ -18,7 +18,6 @@ var errWrongKeyType = errors.New("wrong key type")
 
 const rsaSize = 3072
 
-// FactoryRSA ...
 type FactoryRSA struct{}
 
 // NewPrivateKey implements the Factory interface
@@ -59,7 +58,6 @@ func (*FactoryRSA) ToPrivateKey(b []byte) (PrivateKey, error) {
 	}, nil
 }
 
-// PublicKeyRSA ...
 type PublicKeyRSA struct {
 	pk    *rsa.PublicKey
 	addr  ids.ShortID
@@ -100,7 +98,6 @@ func (k *PublicKeyRSA) Bytes() []byte {
 	return k.bytes
 }
 
-// PrivateKeyRSA ...
 type PrivateKeyRSA struct {
 	sk    *rsa.PrivateKey
 	pk    *PublicKeyRSA

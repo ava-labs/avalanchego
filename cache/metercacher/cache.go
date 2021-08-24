@@ -14,7 +14,8 @@ var _ cache.Cacher = &Cache{}
 
 type Cache struct {
 	metrics
-	cache cache.Cacher
+	cache.Cacher
+
 	clock timer.Clock
 }
 
@@ -23,20 +24,20 @@ func New(
 	registerer prometheus.Registerer,
 	cache cache.Cacher,
 ) (cache.Cacher, error) {
-	meterCache := &Cache{cache: cache}
+	meterCache := &Cache{Cacher: cache}
 	return meterCache, meterCache.metrics.Initialize(namespace, registerer)
 }
 
 func (c *Cache) Put(key, value interface{}) {
 	start := c.clock.Time()
-	c.cache.Put(key, value)
+	c.Cacher.Put(key, value)
 	end := c.clock.Time()
 	c.put.Observe(float64(end.Sub(start)))
 }
 
 func (c *Cache) Get(key interface{}) (interface{}, bool) {
 	start := c.clock.Time()
-	value, has := c.cache.Get(key)
+	value, has := c.Cacher.Get(key)
 	end := c.clock.Time()
 	c.get.Observe(float64(end.Sub(start)))
 	if has {
@@ -46,18 +47,4 @@ func (c *Cache) Get(key interface{}) (interface{}, bool) {
 	}
 
 	return value, has
-}
-
-func (c *Cache) Evict(key interface{}) {
-	start := c.clock.Time()
-	c.cache.Evict(key)
-	end := c.clock.Time()
-	c.evict.Observe(float64(end.Sub(start)))
-}
-
-func (c *Cache) Flush() {
-	start := c.clock.Time()
-	c.cache.Flush()
-	end := c.clock.Time()
-	c.flush.Observe(float64(end.Sub(start)))
 }

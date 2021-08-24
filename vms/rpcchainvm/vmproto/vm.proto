@@ -34,6 +34,7 @@ message InitializeResponse {
     uint32 status = 3;
     uint64 height = 4;
     bytes bytes = 5;
+    bytes timestamp = 6;
 }
 
 message VersionedDBServer {
@@ -78,6 +79,7 @@ message BuildBlockResponse {
     bytes parentID = 2;
     bytes bytes = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
     // status is always processing
 }
 
@@ -90,6 +92,7 @@ message ParseBlockResponse {
     bytes parentID = 2;
     uint32 status = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
 }
 
 message GetBlockRequest {
@@ -101,6 +104,7 @@ message GetBlockResponse {
     bytes bytes = 2;
     uint32 status = 3;
     uint64 height = 4;
+    bytes timestamp = 5;
 }
 
 message SetPreferenceRequest {
@@ -110,10 +114,12 @@ message SetPreferenceRequest {
 message SetPreferenceResponse {}
 
 message BlockVerifyRequest {
-    bytes id = 1;
+    bytes bytes = 1;
 }
 
-message BlockVerifyResponse {}
+message BlockVerifyResponse {
+    bytes timestamp = 1;
+}
 
 message BlockAcceptRequest {
     bytes id = 1;
@@ -133,6 +139,12 @@ message HealthResponse {
     string details = 1;
 }
 
+message VersionRequest {}
+
+message VersionResponse {
+    string version = 1;
+}
+
 service VM {
     rpc Initialize(InitializeRequest) returns (InitializeResponse);
     rpc Bootstrapping(BootstrappingRequest) returns (BootstrappingResponse);
@@ -145,6 +157,7 @@ service VM {
     rpc GetBlock(GetBlockRequest) returns (GetBlockResponse);
     rpc SetPreference(SetPreferenceRequest) returns (SetPreferenceResponse);
     rpc Health(HealthRequest) returns (HealthResponse);
+    rpc Version(VersionRequest) returns (VersionResponse);
 
     rpc BlockVerify(BlockVerifyRequest) returns (BlockVerifyResponse);
     rpc BlockAccept(BlockAcceptRequest) returns (BlockAcceptResponse);

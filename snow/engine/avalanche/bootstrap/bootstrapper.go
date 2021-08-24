@@ -38,7 +38,6 @@ var (
 	_                    common.Bootstrapable = &Bootstrapper{}
 )
 
-// Config ...
 type Config struct {
 	common.Config
 
@@ -51,7 +50,6 @@ type Config struct {
 	VM      vertex.DAGVM
 }
 
-// Bootstrapper ...
 type Bootstrapper struct {
 	common.Bootstrapper
 	common.Fetcher
@@ -451,7 +449,7 @@ func (b *Bootstrapper) checkFinish() error {
 	previouslyExecuted := b.executedStateTransitions
 	b.executedStateTransitions = executedVts
 
-	// Not that executedVts < c*previouslyExecuted is enforced so that the
+	// Note that executedVts < c*previouslyExecuted is enforced so that the
 	// bootstrapping process will terminate even as new vertices are being
 	// issued.
 	if executedVts > 0 && executedVts < previouslyExecuted/2 && b.RetryBootstrap {

@@ -13,16 +13,11 @@ var (
 	ID = ids.ID{'a', 'v', 'm'}
 )
 
-// Factory ...
 type Factory struct {
-	CreationFee uint64
-	Fee         uint64
+	TxFee            uint64
+	CreateAssetTxFee uint64
 }
 
-// New ...
 func (f *Factory) New(*snow.Context) (interface{}, error) {
-	return &VM{
-		creationTxFee: f.CreationFee,
-		txFee:         f.Fee,
-	}, nil
+	return &VM{Factory: *f}, nil
 }

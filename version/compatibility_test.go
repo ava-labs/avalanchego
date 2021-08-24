@@ -77,16 +77,16 @@ func TestCompatibility(t *testing.T) {
 			time:        minCompatableTime,
 			connectable: true,
 			compatible:  false,
-			unmaskable:  true,
-			wontMask:    true,
+			unmaskable:  false,
+			wontMask:    false,
 		},
 		{
 			peer:        NewDefaultApplication("avalanche", 1, 2, 5),
 			time:        time.Unix(8500, 0),
 			connectable: true,
 			compatible:  false,
-			unmaskable:  true,
-			wontMask:    true,
+			unmaskable:  false,
+			wontMask:    false,
 		},
 		{
 			peer:        NewDefaultApplication("avalanche", 1, 1, 5),
@@ -101,14 +101,6 @@ func TestCompatibility(t *testing.T) {
 			time:        time.Unix(6500, 0),
 			connectable: true,
 			compatible:  false,
-			unmaskable:  true,
-			wontMask:    false,
-		},
-		{
-			peer:        NewDefaultApplication("avalanche", 1, 0, 5),
-			time:        time.Unix(6500, 0),
-			connectable: true,
-			compatible:  false,
 			unmaskable:  false,
 			wontMask:    false,
 		},
@@ -117,11 +109,6 @@ func TestCompatibility(t *testing.T) {
 		peer := test.peer
 		compatibility.clock.Set(test.time)
 		t.Run(fmt.Sprintf("%s-%s", peer, test.time), func(t *testing.T) {
-			if err := compatibility.Connectable(peer); test.connectable && err != nil {
-				t.Fatalf("incorrectly marked %s as un-connectable with %s", peer, err)
-			} else if !test.connectable && err == nil {
-				t.Fatalf("incorrectly marked %s as connectable", peer)
-			}
 			if err := compatibility.Compatible(peer); test.compatible && err != nil {
 				t.Fatalf("incorrectly marked %s as incompatible with %s", peer, err)
 			} else if !test.compatible && err == nil {

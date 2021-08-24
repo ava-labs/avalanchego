@@ -5,11 +5,15 @@ package node
 
 import (
 	"crypto"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"path/filepath"
 	"sync"
+
+	"github.com/hashicorp/go-plugin"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -28,6 +32,8 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
+	"github.com/ava-labs/avalanchego/network/dialer"
+	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -51,8 +57,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/timestampvm"
-	"github.com/hashicorp/go-plugin"
 
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
@@ -150,23 +154,21 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.StakingIP.Port))
+	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.IP.Port))
 	if err != nil {
 		return err
 	}
 
 	ipDesc, err := utils.ToIPDesc(listener.Addr().String())
 	if err != nil {
-		n.Log.Info("this node's IP is set to: %q", n.Config.StakingIP.IP())
+		n.Log.Info("this node's IP is set to: %q", n.Config.IP.IP())
 	} else {
 		ipDesc = utils.IPDesc{
-			IP:   n.Config.StakingIP.IP().IP,
+			IP:   n.Config.IP.IP().IP,
 			Port: ipDesc.Port,
 		}
 		n.Log.Info("this node's IP is set to: %q", ipDesc)
 	}
-
-	dialer := network.NewDialer(TCP, n.Config.DialerConfig, n.Log)
 
 	tlsKey, ok := n.Config.StakingTLSCert.PrivateKey.(crypto.Signer)
 	if !ok {
@@ -230,38 +232,61 @@ func (n *Node) initNetworking() error {
 
 	versionManager := version.GetCompatibility(n.Config.NetworkID)
 
-	n.Net = network.NewDefaultNetwork(
+	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
+	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
+		n.Log,
+		networkNamespace,
+		n.Config.NetworkConfig.MetricsRegisterer,
+		primaryNetworkValidators,
+		n.Config.NetworkConfig.InboundThrottlerConfig,
+	)
+	if err != nil {
+		return fmt.Errorf("initializing inbound message throttler failed with: %s", err)
+	}
+
+	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
+		n.Log,
+		networkNamespace,
+		n.Config.NetworkConfig.MetricsRegisterer,
+		primaryNetworkValidators,
+		n.Config.NetworkConfig.OutboundThrottlerConfig,
+	)
+	if err != nil {
+		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
+	}
+
+	n.Net, err = network.NewDefaultNetwork(
+		networkNamespace,
 		n.Config.ConsensusParams.Metrics,
 		n.Log,
 		n.ID,
-		n.Config.StakingIP,
+		n.Config.IP,
 		n.Config.NetworkID,
 		versionManager,
 		version.NewDefaultApplicationParser(),
 		listener,
-		dialer,
+		dialer.NewDialer(TCP, n.Config.NetworkConfig.DialerConfig, n.Log),
 		serverUpgrader,
 		clientUpgrader,
 		primaryNetworkValidators,
 		n.beacons,
 		consensusRouter,
-		n.Config.ConnMeterResetDuration,
-		n.Config.ConnMeterMaxConns,
-		n.Config.SendQueueSize,
-		n.Config.NetworkHealthConfig,
+		n.Config.NetworkConfig.InboundConnThrottlerConfig,
+		n.Config.NetworkConfig.HealthConfig,
 		n.benchlistManager,
-		n.Config.PeerAliasTimeout,
+		n.Config.NetworkConfig.PeerAliasTimeout,
 		tlsKey,
 		int(n.Config.PeerListSize),
 		int(n.Config.PeerListGossipSize),
 		n.Config.PeerListGossipFreq,
-		n.Config.DialerConfig,
-		n.Config.FetchOnly,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		n.Config.NetworkConfig.CompressionEnabled,
+		inboundMsgThrottler,
+		outboundMsgThrottler,
+		n.Config.WhitelistedSubnets,
 	)
-
-	return nil
+	return err
 }
 
 type insecureValidatorManager struct {
@@ -348,10 +373,8 @@ func (n *Node) Dispatch() error {
 
 	// Add bootstrap nodes to the peer network
 	for _, peerIP := range n.Config.BootstrapIPs {
-		if !peerIP.Equal(n.Config.StakingIP.IP()) {
+		if !peerIP.Equal(n.Config.IP.IP()) {
 			n.Net.TrackIP(peerIP)
-		} else {
-			n.Log.Error("can't add self as a bootstrapper")
 		}
 	}
 
@@ -493,6 +516,7 @@ func (n *Node) initAPIServer() error {
 			n.Config.HTTPHost,
 			n.Config.HTTPPort,
 			n.Config.APIAllowedOrigins,
+			n.ID,
 		)
 		return nil
 	}
@@ -508,6 +532,7 @@ func (n *Node) initAPIServer() error {
 		n.Config.HTTPHost,
 		n.Config.HTTPPort,
 		n.Config.APIAllowedOrigins,
+		n.ID,
 		a,
 	)
 
@@ -524,12 +549,36 @@ func (n *Node) initAPIServer() error {
 	return n.APIServer.AddRoute(handler, &sync.RWMutex{}, "auth", "", n.Log)
 }
 
+// Create the vmManager and register any aliases.
+func (n *Node) initVMManager() error {
+	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
+
+	n.Log.Info("initializing VM aliases")
+	vmAliases := genesis.GetVMAliases()
+
+	for vmID, aliases := range vmAliases {
+		for _, alias := range aliases {
+			if err := n.vmManager.Alias(vmID, alias); err != nil {
+				return err
+			}
+		}
+	}
+
+	// use aliases in given config
+	for vmID, aliases := range n.Config.VMAliases {
+		for _, alias := range aliases {
+			if err := n.vmManager.Alias(vmID, alias); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // Create the vmManager, chainManager and register the following VMs:
 // AVM, Simple Payments DAG, Simple Payments Chain, and Platform VM
 // Assumes n.DBManager, n.vdrs all initialized (non-nil)
 func (n *Node) initChainManager(avaxAssetID ids.ID) error {
-	n.vmManager = vms.NewManager(&n.APIServer, n.HTTPLog)
-
 	createAVMTx, err := genesis.VMGenesis(n.Config.GenesisBytes, avm.ID)
 	if err != nil {
 		return err
@@ -550,9 +599,16 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		cChainID,
 	)
 
+	requestsNamespace := fmt.Sprintf("%s_requests", constants.PlatformName)
+
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
-	if err := timeoutManager.Initialize(&n.Config.NetworkConfig, n.benchlistManager); err != nil {
+	if err := timeoutManager.Initialize(
+		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
+		n.benchlistManager,
+		requestsNamespace,
+		n.Config.NetworkConfig.MetricsRegisterer,
+	); err != nil {
 		return err
 	}
 	go n.Log.RecoverAndPanic(timeoutManager.Dispatch)
@@ -567,8 +623,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		criticalChains,
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
-		n.Config.NetworkConfig.MetricsNamespace,
-		n.Config.NetworkConfig.Registerer,
+		requestsNamespace,
+		n.Config.NetworkConfig.MetricsRegisterer,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
@@ -582,13 +638,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	}
 
 	n.chainManager = chains.New(&chains.ManagerConfig{
-		FetchOnly:                              n.Config.FetchOnly,
-		FetchOnlyFrom:                          fetchOnlyFrom,
 		StakingEnabled:                         n.Config.EnableStaking,
-		MaxPendingMsgs:                         n.Config.MaxPendingMsgs,
-		MaxNonStakerPendingMsgs:                n.Config.MaxNonStakerPendingMsgs,
-		StakerMSGPortion:                       n.Config.StakerMSGPortion,
-		StakerCPUPortion:                       n.Config.StakerCPUPortion,
 		Log:                                    n.Log,
 		LogFactory:                             n.LogFactory,
 		VMManager:                              n.vmManager,
@@ -613,7 +663,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		HealthService:                          n.healthService,
 		WhitelistedSubnets:                     n.Config.WhitelistedSubnets,
 		RetryBootstrap:                         n.Config.RetryBootstrap,
-		RetryBootstrapMaxAttempts:              n.Config.RetryBootstrapMaxAttempts,
+		RetryBootstrapWarnFrequency:            n.Config.RetryBootstrapWarnFrequency,
 		ShutdownNodeFunc:                       n.Shutdown,
 		MeterVMEnabled:                         n.Config.MeterVMEnabled,
 		ChainConfigs:                           n.Config.ChainConfigs,
@@ -635,29 +685,28 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	errs := wrappers.Errs{}
 	errs.Add(
 		n.vmManager.RegisterFactory(platformvm.ID, &platformvm.Factory{
-			Chains:             n.chainManager,
-			Validators:         vdrs,
-			StakingEnabled:     n.Config.EnableStaking,
-			WhitelistedSubnets: n.Config.WhitelistedSubnets,
-			CreationTxFee:      n.Config.CreationTxFee,
-			TxFee:              n.Config.TxFee,
-			UptimePercentage:   n.Config.UptimeRequirement,
-			MinValidatorStake:  n.Config.MinValidatorStake,
-			MaxValidatorStake:  n.Config.MaxValidatorStake,
-			MinDelegatorStake:  n.Config.MinDelegatorStake,
-			MinDelegationFee:   n.Config.MinDelegationFee,
-			MinStakeDuration:   n.Config.MinStakeDuration,
-			MaxStakeDuration:   n.Config.MaxStakeDuration,
-			StakeMintingPeriod: n.Config.StakeMintingPeriod,
+			Chains:                n.chainManager,
+			Validators:            vdrs,
+			StakingEnabled:        n.Config.EnableStaking,
+			WhitelistedSubnets:    n.Config.WhitelistedSubnets,
+			TxFee:                 n.Config.TxFee,
+			CreateAssetTxFee:      n.Config.CreateAssetTxFee,
+			CreateSubnetTxFee:     n.Config.CreateSubnetTxFee,
+			CreateBlockchainTxFee: n.Config.CreateBlockchainTxFee,
+			UptimePercentage:      n.Config.UptimeRequirement,
+			MinValidatorStake:     n.Config.MinValidatorStake,
+			MaxValidatorStake:     n.Config.MaxValidatorStake,
+			MinDelegatorStake:     n.Config.MinDelegatorStake,
+			MinDelegationFee:      n.Config.MinDelegationFee,
+			MinStakeDuration:      n.Config.MinStakeDuration,
+			MaxStakeDuration:      n.Config.MaxStakeDuration,
+			StakeMintingPeriod:    n.Config.StakeMintingPeriod,
+			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
-			CreationFee: n.Config.CreationTxFee,
-			Fee:         n.Config.TxFee,
+			TxFee:            n.Config.TxFee,
+			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		}),
-		n.vmManager.RegisterFactory(evm.ID, &rpcchainvm.Factory{
-			Path: filepath.Join(n.Config.PluginDir, "evm"),
-		}),
-		n.vmManager.RegisterFactory(timestampvm.ID, &timestampvm.Factory{}),
 		n.vmManager.RegisterFactory(secp256k1fx.ID, &secp256k1fx.Factory{}),
 		n.vmManager.RegisterFactory(nftfx.ID, &nftfx.Factory{}),
 		n.vmManager.RegisterFactory(propertyfx.ID, &propertyfx.Factory{}),
@@ -666,8 +715,47 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return errs.Err
 	}
 
+	if err := n.registerRPCVMs(); err != nil {
+		return err
+	}
+
 	// Notify the API server when new chains are created
 	n.chainManager.AddRegistrant(&n.APIServer)
+	return nil
+}
+
+// registerRPCVMs iterates in plugin dir and registers rpc chain VMs.
+func (n *Node) registerRPCVMs() error {
+	files, err := ioutil.ReadDir(n.Config.PluginDir)
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		name := file.Name()
+		// Strip any extension from the file. This is to support windows .exe
+		// files.
+		name = name[:len(name)-len(filepath.Ext(name))]
+
+		vmID, err := n.vmManager.Lookup(name)
+		if err != nil {
+			// there is no alias with plugin name, try to use full vmID.
+			vmID, err = ids.FromString(name)
+			if err != nil {
+				return fmt.Errorf("invalid vmID %s", name)
+			}
+		}
+
+		if err = n.vmManager.RegisterFactory(vmID, &rpcchainvm.Factory{
+			Path: filepath.Join(n.Config.PluginDir, file.Name()),
+		}); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -683,11 +771,7 @@ func (n *Node) initSharedMemory() error {
 func (n *Node) initKeystoreAPI() error {
 	n.Log.Info("initializing keystore")
 	keystoreDB := n.DBManager.NewPrefixDBManager([]byte("keystore"))
-	ks, err := keystore.New(n.Log, keystoreDB)
-	if err != nil {
-		return err
-	}
-	n.keystore = ks
+	n.keystore = keystore.New(n.Log, keystoreDB)
 	keystoreHandler, err := n.keystore.CreateHandler()
 	if err != nil {
 		return err
@@ -711,8 +795,7 @@ func (n *Node) initMetricsAPI() error {
 	// It is assumed by components of the system that the Metrics interface is
 	// non-nil. So, it is set regardless of if the metrics API is available or not.
 	n.Config.ConsensusParams.Metrics = registry
-	n.Config.NetworkConfig.MetricsNamespace = constants.PlatformName
-	n.Config.NetworkConfig.Registerer = registry
+	n.Config.NetworkConfig.MetricsRegisterer = registry
 
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
@@ -734,12 +817,27 @@ func (n *Node) initMetricsAPI() error {
 // initAdminAPI initializes the Admin API service
 // Assumes n.log, n.chainManager, and n.ValidatorAPI already initialized
 func (n *Node) initAdminAPI() error {
+	// Convert node config to map
+	configJSON, err := json.Marshal(n.Config)
+	if err != nil {
+		return fmt.Errorf("couldn't marshal config: %w", err)
+	}
+	n.Log.Info("node config:\n%s", configJSON)
 	if !n.Config.AdminAPIEnabled {
 		n.Log.Info("skipping admin API initialization because it has been disabled")
 		return nil
 	}
 	n.Log.Info("initializing admin API")
-	service, err := admin.NewService(n.Log, n.chainManager, &n.APIServer, n.Config.ProfilerConfig.Dir)
+	service, err := admin.NewService(
+		admin.Config{
+			Log:          n.Log,
+			ChainManager: n.chainManager,
+			HTTPServer:   &n.APIServer,
+			ProfileDir:   n.Config.ProfilerConfig.Dir,
+			LogFactory:   n.LogFactory,
+			NodeConfig:   n.Config,
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -776,13 +874,16 @@ func (n *Node) initInfoAPI() error {
 	n.Log.Info("initializing info API")
 	service, err := info.NewService(
 		n.Log,
-		version.Current,
+		version.CurrentApp,
 		n.ID,
 		n.Config.NetworkID,
 		n.chainManager,
+		n.vmManager,
 		n.Net,
-		n.Config.CreationTxFee,
 		n.Config.TxFee,
+		n.Config.CreateAssetTxFee,
+		n.Config.CreateSubnetTxFee,
+		n.Config.CreateBlockchainTxFee,
 	)
 	if err != nil {
 		return err
@@ -800,7 +901,12 @@ func (n *Node) initHealthAPI() error {
 	}
 
 	n.Log.Info("initializing Health API")
-	healthService, err := health.NewService(n.Config.HealthCheckFreq, n.Log, n.Config.NetworkConfig.MetricsNamespace, n.Config.ConsensusParams.Metrics)
+	healthService, err := health.NewService(
+		n.Config.HealthCheckFreq,
+		n.Log,
+		fmt.Sprintf("%s_health", constants.PlatformName),
+		n.Config.ConsensusParams.Metrics,
+	)
 	if err != nil {
 		return err
 	}
@@ -860,10 +966,10 @@ func (n *Node) initIPCAPI() error {
 	return n.APIServer.AddRoute(service, &sync.RWMutex{}, "ipcs", "", n.HTTPLog)
 }
 
-// Give chains and VMs aliases as specified by the genesis information
-func (n *Node) initAliases(genesisBytes []byte) error {
-	n.Log.Info("initializing aliases")
-	defaultAliases, chainAliases, vmAliases, err := genesis.Aliases(genesisBytes)
+// Give chains aliases as specified by the genesis information
+func (n *Node) initChainAliases(genesisBytes []byte) error {
+	n.Log.Info("initializing chain aliases")
+	_, chainAliases, err := genesis.Aliases(genesisBytes)
 	if err != nil {
 		return err
 	}
@@ -875,15 +981,31 @@ func (n *Node) initAliases(genesisBytes []byte) error {
 			}
 		}
 	}
-	for vmID, aliases := range vmAliases {
-		for _, alias := range aliases {
-			if err := n.vmManager.Alias(vmID, alias); err != nil {
-				return err
-			}
+	return nil
+}
+
+// APIs aliases as specified by the genesis information
+func (n *Node) initAPIAliases(genesisBytes []byte) error {
+	n.Log.Info("initializing API aliases")
+	apiAliases, _, err := genesis.Aliases(genesisBytes)
+	if err != nil {
+		return err
+	}
+
+	for url, aliases := range apiAliases {
+		if err := n.APIServer.AddAliases(url, aliases...); err != nil {
+			return err
 		}
 	}
-	for url, aliases := range defaultAliases {
-		if err := n.APIServer.AddAliases(url, aliases...); err != nil {
+
+	for vmID, aliases := range n.Config.VMAliases {
+		urlAliases := []string{}
+		for _, alias := range aliases {
+			urlAliases = append(urlAliases, constants.VMAliasPrefix+alias)
+		}
+
+		url := constants.VMAliasPrefix + vmID.String()
+		if err := n.APIServer.AddAliases(url, urlAliases...); err != nil {
 			return err
 		}
 	}
@@ -906,7 +1028,7 @@ func (n *Node) Initialize(
 	}
 	n.LogFactory = logFactory
 	n.DoneShuttingDown.Add(1)
-	n.Log.Info("node version is: %s", version.Current)
+	n.Log.Info("node version is: %s", version.CurrentApp)
 	n.Log.Info("node ID is: %s", n.ID.PrefixedString(constants.NodeIDPrefix))
 	n.Log.Info("current database version: %s", dbManager.Current().Version)
 
@@ -951,6 +1073,9 @@ func (n *Node) Initialize(
 	if err := n.initHealthAPI(); err != nil {
 		return fmt.Errorf("couldn't initialize health API: %w", err)
 	}
+	if err := n.initVMManager(); err != nil {
+		return fmt.Errorf("couldn't initialize API aliases: %w", err)
+	}
 	if err := n.initChainManager(n.Config.AvaxAssetID); err != nil { // Set up the chain manager
 		return fmt.Errorf("couldn't initialize chain manager: %w", err)
 	}
@@ -966,8 +1091,11 @@ func (n *Node) Initialize(
 	if err := n.initIPCAPI(); err != nil { // Start the IPC API
 		return fmt.Errorf("couldn't initialize the IPC API: %w", err)
 	}
-	if err := n.initAliases(n.Config.GenesisBytes); err != nil { // Set up aliases
-		return fmt.Errorf("couldn't initialize aliases: %w", err)
+	if err := n.initChainAliases(n.Config.GenesisBytes); err != nil {
+		return fmt.Errorf("couldn't initialize chain aliases: %w", err)
+	}
+	if err := n.initAPIAliases(n.Config.GenesisBytes); err != nil {
+		return fmt.Errorf("couldn't initialize API aliases: %w", err)
 	}
 	if err := n.initIndexer(); err != nil {
 		return fmt.Errorf("couldn't initialize indexer: %w", err)

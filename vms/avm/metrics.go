@@ -4,15 +4,16 @@
 package avm
 
 import (
-	"github.com/ava-labs/avalanchego/utils/metricutils"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
 	numTxRefreshes, numTxRefreshHits, numTxRefreshMisses prometheus.Counter
 
-	apiRequestMetric metricutils.APIRequestMetrics
+	apiRequestMetric metric.APIInterceptor
 }
 
 func (m *metrics) Initialize(
@@ -35,14 +36,14 @@ func (m *metrics) Initialize(
 		Help:      "Number of times unique txs have not been unique and weren't cached",
 	})
 
-	m.apiRequestMetric = metricutils.NewAPIMetrics(namespace)
+	apiRequestMetric, err := metric.NewAPIInterceptor(namespace, registerer)
+	m.apiRequestMetric = apiRequestMetric
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
 		registerer.Register(m.numTxRefreshes),
 		registerer.Register(m.numTxRefreshHits),
 		registerer.Register(m.numTxRefreshMisses),
-
-		m.apiRequestMetric.Register(registerer),
 	)
 	return errs.Err
 }

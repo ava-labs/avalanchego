@@ -29,7 +29,7 @@ func newFormattedContainer(c Container, index uint64, enc formatting.Encoding) (
 		ID:       c.ID,
 		Index:    json.Uint64(index),
 	}
-	bytesStr, err := formatting.Encode(enc, c.Bytes)
+	bytesStr, err := formatting.EncodeWithChecksum(enc, c.Bytes)
 	if err != nil {
 		return fc, err
 	}

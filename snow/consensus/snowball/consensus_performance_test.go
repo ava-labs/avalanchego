@@ -4,9 +4,9 @@
 package snowball
 
 import (
-	"math/rand"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -24,22 +24,22 @@ func TestSnowballOptimized(t *testing.T) {
 
 	nNaive := nBitwise
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		nBitwise.AddNode(&Tree{})
 	}
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	for i := 0; i < numNodes; i++ {
 		nNaive.AddNode(&Flat{})
 	}
 
 	numRounds := 0
 	for !nBitwise.Finalized() && !nBitwise.Disagreement() && !nNaive.Finalized() && !nNaive.Disagreement() {
-		rand.Seed(int64(numRounds) + seed)
+		sampler.Seed(int64(numRounds) + seed)
 		nBitwise.Round()
 
-		rand.Seed(int64(numRounds) + seed)
+		sampler.Seed(int64(numRounds) + seed)
 		nNaive.Round()
 		numRounds++
 	}

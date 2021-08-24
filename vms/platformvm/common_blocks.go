@@ -6,12 +6,12 @@ package platformvm
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 // When one stakes, one must specify the time one will start to validate and
@@ -97,7 +97,7 @@ type Block interface {
 
 	// parent returns the parent block, similarly to Parent. However, it
 	// provides the more specific Block interface.
-	parent() (Block, error)
+	parentBlock() (Block, error)
 
 	// addChild notifies this block that it has a child block building on it.
 	// When this block commits its changes, it should set the child's base state
@@ -131,11 +131,12 @@ type CommonBlock struct {
 	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
 	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
 
-	self   Block // self is a reference to this block's implementing struct
-	id     ids.ID
-	bytes  []byte
-	status choices.Status
-	vm     *VM
+	self      Block // self is a reference to this block's implementing struct
+	id        ids.ID
+	bytes     []byte
+	timestamp time.Time
+	status    choices.Status
+	vm        *VM
 
 	// This block's children
 	children []Block
@@ -160,23 +161,22 @@ func (b *CommonBlock) Bytes() []byte { return b.bytes }
 func (b *CommonBlock) Status() choices.Status { return b.status }
 
 // ParentID returns [b]'s parent's ID
-func (b *CommonBlock) ParentID() ids.ID { return b.PrntID }
+func (b *CommonBlock) Parent() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.
 func (b *CommonBlock) Height() uint64 { return b.Hght }
 
-// Parent returns [b]'s parent
-func (b *CommonBlock) Parent() snowman.Block {
-	// TODO: This should properly propegate the error.
-	if parent, err := b.parent(); err == nil {
-		return parent
+// Timestamp returns this block's time.
+func (b *CommonBlock) Timestamp() time.Time {
+	if b.id == b.vm.lastAcceptedID {
+		return b.vm.internalState.GetTimestamp()
 	}
-	return &missing.Block{BlkID: b.ParentID()}
+	return b.timestamp
 }
 
 // Parent returns [b]'s parent
-func (b *CommonBlock) parent() (Block, error) {
-	return b.vm.getBlock(b.ParentID())
+func (b *CommonBlock) parentBlock() (Block, error) {
+	return b.vm.getBlock(b.Parent())
 }
 
 func (b *CommonBlock) addChild(child Block) {
@@ -192,7 +192,7 @@ func (b *CommonBlock) conflicts(s ids.Set) (bool, error) {
 	if b.Status() == choices.Accepted {
 		return false, nil
 	}
-	parent, err := b.parent()
+	parent, err := b.parentBlock()
 	if err != nil {
 		return false, err
 	}
@@ -204,7 +204,7 @@ func (b *CommonBlock) Verify() error {
 		return errBlockNil
 	}
 
-	parent, err := b.parent()
+	parent, err := b.parentBlock()
 	if err != nil {
 		return err
 	}
@@ -313,7 +313,7 @@ type DoubleDecisionBlock struct {
 func (ddb *DoubleDecisionBlock) Accept() error {
 	ddb.vm.ctx.Log.Verbo("Accepting block with ID %s", ddb.ID())
 
-	parentIntf, err := ddb.parent()
+	parentIntf, err := ddb.parentBlock()
 	if err != nil {
 		return err
 	}

@@ -3,7 +3,6 @@
 
 package common
 
-// Fetcher ...
 type Fetcher struct {
 	// number of containers fetched so far
 	NumFetched uint32

@@ -79,16 +79,18 @@ func (t *txJob) Execute() error {
 		t.numDropped.Inc()
 		return fmt.Errorf("attempting to execute transaction with status %s", status)
 	case choices.Processing:
+		txID := t.tx.ID()
 		if err := t.tx.Verify(); err != nil {
 			t.log.Error("transaction %s failed verification during bootstrapping due to %s",
-				t.tx.ID(), err)
+				txID, err)
 			return fmt.Errorf("failed to verify transaction in bootstrapping: %w", err)
 		}
 
 		t.numAccepted.Inc()
+		t.log.Trace("accepting transaction %s in bootstrapping", txID)
 		if err := t.tx.Accept(); err != nil {
 			t.log.Error("transaction %s failed to accept during bootstrapping due to %s",
-				t.tx.ID(), err)
+				txID, err)
 			return fmt.Errorf("failed to accept transaction in bootstrapping: %w", err)
 		}
 	}

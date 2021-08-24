@@ -1,0 +1,53 @@
+- name: Query releases
+  uri:
+    url: "{{ repo_api_base }}/repos{{ repo_url | urlsplit('path') }}/releases"
+  register: avalanchego_releases
+  changed_when: false
+  check_mode: false
+
+- name: Fetch release
+  get_url:
+    url: "{{ repo_url }}/releases/download/{{ avalanchego_version }}/{{ item.file }}"
+    dest: ./
+  loop:
+    - file: "{{ avalanchego_archive }}"
+    - file: "{{ avalanchego_archive }}.sig"
+  loop_control:
+    label: "{{ item.file }}"
+
+- name: Verify release
+  block:
+    - name: Create temp gnupghome
+      tempfile:
+        state: directory
+        suffix: gpg
+      register: avalanche_download_gnupghome
+
+    - name: Import keys
+      environment:
+        GNUPGHOME: "{{ avalanche_download_gnupghome.path }}"
+      command:
+        cmd: gpg --import
+        stdin: "{{ avalanchego_signer_pubkey }}"
+
+    - name: Verify signature
+      environment:
+        GNUPGHOME: "{{ avalanche_download_gnupghome.path }}"
+      command:
+        cmd: gpg --trusted-key "{{ avalanchego_signer_keyid }}" --verify "{{ avalanchego_archive }}.sig" "{{ avalanchego_archive }}"
+      changed_when: false
+  always:
+    - name: Cleanup temp gnupghome
+      file:
+        path: "{{ avalanche_download_gnupghome.path }}"
+        state: absent
+
+- name: Unpack release
+  unarchive:
+    src: "{{ avalanchego_archive }}"
+    dest: ./
+    remote_src: true
+  loop:
+    - file: "{{ avalanchego_archive }}"
+  loop_control:
+    label: "{{ item.file }}"

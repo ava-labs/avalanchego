@@ -55,7 +55,7 @@ func (ab *AtomicBlock) conflicts(s ids.Set) (bool, error) {
 	if ab.inputs.Overlaps(s) {
 		return true, nil
 	}
-	parent, err := ab.parent()
+	parent, err := ab.parentBlock()
 	if err != nil {
 		return false, err
 	}
@@ -71,6 +71,7 @@ func (ab *AtomicBlock) Verify() error {
 	blkID := ab.ID()
 
 	if err := ab.CommonDecisionBlock.Verify(); err != nil {
+		ab.vm.ctx.Log.Trace("rejecting block %s due to a failed verification: %s", blkID, err)
 		if err := ab.Reject(); err != nil {
 			ab.vm.ctx.Log.Error(
 				"failed to reject atomic block %s due to %s",
@@ -87,7 +88,7 @@ func (ab *AtomicBlock) Verify() error {
 	}
 	ab.inputs = tx.InputUTXOs()
 
-	parentIntf, err := ab.parent()
+	parentIntf, err := ab.parentBlock()
 	if err != nil {
 		return err
 	}
@@ -116,7 +117,9 @@ func (ab *AtomicBlock) Verify() error {
 	}
 	onAccept.AddTx(&ab.Tx, Committed)
 
+	ab.timestamp = onAccept.GetTimestamp()
 	ab.onAcceptState = onAccept
+
 	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
@@ -128,7 +131,7 @@ func (ab *AtomicBlock) Accept() error {
 		"Accepting Atomic Block %s at height %d with parent %s",
 		blkID,
 		ab.Height(),
-		ab.ParentID(),
+		ab.Parent(),
 	)
 
 	if err := ab.CommonBlock.Accept(); err != nil {
@@ -183,7 +186,7 @@ func (ab *AtomicBlock) Reject() error {
 		"Rejecting Atomic Block %s at height %d with parent %s",
 		ab.ID(),
 		ab.Height(),
-		ab.ParentID(),
+		ab.Parent(),
 	)
 
 	if err := ab.vm.mempool.IssueTx(&ab.Tx); err != nil {

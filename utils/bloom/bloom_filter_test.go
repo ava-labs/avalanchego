@@ -3,6 +3,7 @@ package bloom
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,7 +12,7 @@ func TestNew(t *testing.T) {
 		assert          = assert.New(t)
 		maxN     uint64 = 10000
 		p               = 0.1
-		maxBytes uint64 = 1024 * 1024 // 1 MiB
+		maxBytes uint64 = 1 * units.MiB // 1 MiB
 	)
 	f, err := New(maxN, p, maxBytes)
 	assert.NoError(err)

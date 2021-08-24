@@ -13,33 +13,37 @@ import (
 func TestInterface(t *testing.T) {
 	for _, test := range database.Tests {
 		folder := t.TempDir()
-		db, err := New(folder, logging.NoLog{}, 0, 0, 0)
+		db, err := New(folder, logging.NoLog{})
 		if err != nil {
-			t.Fatalf("leveldb.New(%q, logging.NoLog{}, 0, 0, 0) errored with %s", folder, err)
+			t.Fatalf("leveldb.New(%q, logging.NoLog{}) errored with %s", folder, err)
 		}
 
-		// The database may have been closed by the test, so we don't care if it
-		// errors here.
 		defer db.Close()
 
 		test(t, db)
+
+		// The database may have been closed by the test, so we don't care if it
+		// errors here.
+		_ = db.Close()
 	}
 }
 
 func BenchmarkInterface(b *testing.B) {
 	for _, size := range database.BenchmarkSizes {
-		keys, values := database.SetupBenchmark(b, size, size)
+		keys, values := database.SetupBenchmark(b, size[0], size[1], size[2])
 		for _, bench := range database.Benchmarks {
 			folder := b.TempDir()
 
-			db, err := New(folder, logging.NoLog{}, 0, 0, 0)
+			db, err := New(folder, logging.NoLog{})
 			if err != nil {
 				b.Fatal(err)
 			}
 
-			defer db.Close()
-
 			bench(b, db, "leveldb", keys, values)
+
+			// The database may have been closed by the test, so we don't care if it
+			// errors here.
+			_ = db.Close()
 		}
 	}
 }

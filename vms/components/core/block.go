@@ -5,11 +5,10 @@ package core
 
 import (
 	"errors"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/components/missing"
 )
 
 var (
@@ -24,8 +23,9 @@ var (
 // Block's methods can be over-written by structs that embed this struct.
 type Block struct {
 	Metadata
-	PrntID ids.ID `serialize:"true" json:"parentID"` // parent's ID
-	Hght   uint64 `serialize:"true" json:"height"`   // This block's height. The genesis block is at height 0.
+	PrntID ids.ID `serialize:"true" json:"parentID"`  // parent's ID
+	Hght   uint64 `serialize:"true" json:"height"`    // This block's height. The genesis block is at height 0.
+	Time   int64  `serialize:"true" json:"timestamp"` // This block's time. The genesis time is at 0.
 	VM     *SnowmanVM
 }
 
@@ -39,19 +39,13 @@ func (b *Block) Initialize(bytes []byte, vm *SnowmanVM) {
 }
 
 // ParentID returns [b]'s parent's ID
-func (b *Block) ParentID() ids.ID { return b.PrntID }
+func (b *Block) Parent() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.
 func (b *Block) Height() uint64 { return b.Hght }
 
-// Parent returns [b]'s parent
-func (b *Block) Parent() snowman.Block {
-	parent, err := b.VM.GetBlock(b.ParentID())
-	if err != nil {
-		return &missing.Block{BlkID: b.ParentID()}
-	}
-	return parent
-}
+// Timestamp returns this block's time. The genesis block has time 0.
+func (b *Block) Timestamp() time.Time { return time.Unix(b.Time, 0) }
 
 // Accept sets this block's status to Accepted and sets lastAccepted to this
 // block's ID and saves this info to b.vm.DB
@@ -110,6 +104,6 @@ func (b *Block) Verify() (bool, error) {
 }
 
 // NewBlock returns a new *Block
-func NewBlock(parentID ids.ID, height uint64) *Block {
-	return &Block{PrntID: parentID, Hght: height}
+func NewBlock(parentID ids.ID, height uint64, time int64) *Block {
+	return &Block{PrntID: parentID, Hght: height, Time: time}
 }

@@ -6,16 +6,18 @@ package snowman
 import (
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 type metrics struct {
-	numRequests, numBlocked prometheus.Gauge
-	getAncestorsBlks        prometheus.Histogram
+	numRequests, numBlocked, numBlockers prometheus.Gauge
+	getAncestorsBlks                     metric.Averager
 }
 
 // Initialize the metrics
-func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer) error {
+func (m *metrics) Initialize(namespace string, reg prometheus.Registerer) error {
+	errs := wrappers.Errs{}
 	m.numRequests = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "requests",
@@ -26,28 +28,23 @@ func (m *metrics) Initialize(namespace string, registerer prometheus.Registerer)
 		Name:      "blocked",
 		Help:      "Number of blocks that are pending issuance",
 	})
-	m.getAncestorsBlks = prometheus.NewHistogram(prometheus.HistogramOpts{
+	m.numBlockers = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
-		Name:      "get_ancestors_blks",
-		Help:      "The number of blocks fetched in a call to GetAncestors",
-		Buckets: []float64{
-			0,
-			1,
-			5,
-			10,
-			100,
-			500,
-			1000,
-			1500,
-			2000,
-		},
+		Name:      "blockers",
+		Help:      "Number of blocks that are blocking other blocks from being issued because they haven't been issued",
 	})
+	m.getAncestorsBlks = metric.NewAveragerWithErrs(
+		namespace,
+		"get_ancestors_blks",
+		"blocks fetched in a call to GetAncestors",
+		reg,
+		&errs,
+	)
 
-	errs := wrappers.Errs{}
 	errs.Add(
-		registerer.Register(m.numRequests),
-		registerer.Register(m.numBlocked),
-		registerer.Register(m.getAncestorsBlks),
+		reg.Register(m.numRequests),
+		reg.Register(m.numBlocked),
+		reg.Register(m.numBlockers),
 	)
 	return errs.Err
 }

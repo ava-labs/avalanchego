@@ -207,13 +207,15 @@ func (vm *VMServer) Initialize(_ context.Context, req *vmproto.InitializeRequest
 	if err != nil {
 		return nil, err
 	}
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.InitializeResponse{
 		LastAcceptedID:       lastAccepted[:],
 		LastAcceptedParentID: parentID[:],
 		Status:               uint32(choices.Accepted),
 		Height:               blk.Height(),
 		Bytes:                blk.Bytes(),
+		Timestamp:            timeBytes,
 	}, err
 }
 
@@ -301,13 +303,15 @@ func (vm *VMServer) BuildBlock(_ context.Context, _ *vmproto.BuildBlockRequest) 
 		return nil, err
 	}
 	blkID := blk.ID()
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.BuildBlockResponse{
-		Id:       blkID[:],
-		ParentID: parentID[:],
-		Bytes:    blk.Bytes(),
-		Height:   blk.Height(),
-	}, nil
+		Id:        blkID[:],
+		ParentID:  parentID[:],
+		Bytes:     blk.Bytes(),
+		Height:    blk.Height(),
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest) (*vmproto.ParseBlockResponse, error) {
@@ -316,13 +320,15 @@ func (vm *VMServer) ParseBlock(_ context.Context, req *vmproto.ParseBlockRequest
 		return nil, err
 	}
 	blkID := blk.ID()
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.ParseBlockResponse{
-		Id:       blkID[:],
-		ParentID: parentID[:],
-		Status:   uint32(blk.Status()),
-		Height:   blk.Height(),
-	}, nil
+		Id:        blkID[:],
+		ParentID:  parentID[:],
+		Status:    uint32(blk.Status()),
+		Height:    blk.Height(),
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*vmproto.GetBlockResponse, error) {
@@ -334,13 +340,15 @@ func (vm *VMServer) GetBlock(_ context.Context, req *vmproto.GetBlockRequest) (*
 	if err != nil {
 		return nil, err
 	}
-	parentID := blk.Parent().ID()
+	parentID := blk.Parent()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
 	return &vmproto.GetBlockResponse{
-		ParentID: parentID[:],
-		Bytes:    blk.Bytes(),
-		Status:   uint32(blk.Status()),
-		Height:   blk.Height(),
-	}, nil
+		ParentID:  parentID[:],
+		Bytes:     blk.Bytes(),
+		Status:    uint32(blk.Status()),
+		Height:    blk.Height(),
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) SetPreference(_ context.Context, req *vmproto.SetPreferenceRequest) (*vmproto.SetPreferenceResponse, error) {
@@ -378,16 +386,25 @@ func (vm *VMServer) Health(_ context.Context, req *vmproto.HealthRequest) (*vmpr
 	}, nil
 }
 
+func (vm *VMServer) Version(_ context.Context, req *vmproto.VersionRequest) (*vmproto.VersionResponse, error) {
+	version, err := vm.vm.Version()
+	return &vmproto.VersionResponse{
+		Version: version,
+	}, err
+}
+
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {
-	id, err := ids.ToID(req.Id)
+	blk, err := vm.vm.ParseBlock(req.Bytes)
 	if err != nil {
 		return nil, err
 	}
-	blk, err := vm.vm.GetBlock(id)
-	if err != nil {
+	if err := blk.Verify(); err != nil {
 		return nil, err
 	}
-	return &vmproto.BlockVerifyResponse{}, blk.Verify()
+	timeBytes, err := blk.Timestamp().MarshalBinary()
+	return &vmproto.BlockVerifyResponse{
+		Timestamp: timeBytes,
+	}, err
 }
 
 func (vm *VMServer) BlockAccept(_ context.Context, req *vmproto.BlockAcceptRequest) (*vmproto.BlockAcceptResponse, error) {

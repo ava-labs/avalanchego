@@ -5,5 +5,5 @@ package ulimit
 
 const (
 	// DefaultFDLimit is the default recommended number of FDs to allocate.
-	DefaultFDLimit uint64 = 1 << 15 // 32k
+	DefaultFDLimit uint64 = 32 * 1024
 )

@@ -4,9 +4,9 @@
 package snowball
 
 import (
-	"math/rand"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -24,7 +24,7 @@ func TestSnowballGovernance(t *testing.T) {
 	nBitwise := Network{}
 	nBitwise.Initialize(params, numColors)
 
-	rand.Seed(seed)
+	sampler.Seed(seed)
 	for i := 0; i < numRed; i++ {
 		nBitwise.AddNodeSpecificColor(&Tree{}, []int{0, 1})
 	}

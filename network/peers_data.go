@@ -1,6 +1,9 @@
 package network
 
-import "github.com/ava-labs/avalanchego/ids"
+import (
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/sampler"
+)
 
 // peersData encapsulate all peers known to Network.
 // peers in peersData can be retrieved by their id and can be iterated over
@@ -22,29 +25,29 @@ func (p *peersData) reset() {
 }
 
 func (p *peersData) add(peer *peer) {
-	if _, ok := p.getByID(peer.id); !ok { // new insertion
+	if _, ok := p.getByID(peer.nodeID); !ok { // new insertion
 		p.peersList = append(p.peersList, peer)
-		p.peersIdxes[peer.id] = len(p.peersList) - 1
+		p.peersIdxes[peer.nodeID] = len(p.peersList) - 1
 	} else { // update
-		p.peersList[p.peersIdxes[peer.id]] = peer
+		p.peersList[p.peersIdxes[peer.nodeID]] = peer
 	}
 }
 
 func (p *peersData) remove(peer *peer) {
-	if _, ok := p.getByID(peer.id); !ok {
+	if _, ok := p.getByID(peer.nodeID); !ok {
 		return
 	}
 
 	// Drop p by replacing it with last peer in peersList.
 	// if p is already the last peer, simply drop it.
 	// Keep peersIdxes synced. peersList order is not preserved
-	idToDrop := peer.id
+	idToDrop := peer.nodeID
 	idxToReplace := p.peersIdxes[idToDrop]
 
 	if idxToReplace != len(p.peersList)-1 {
 		lastPeer := p.peersList[len(p.peersList)-1]
 		p.peersList[idxToReplace] = lastPeer
-		p.peersIdxes[lastPeer.id] = idxToReplace
+		p.peersIdxes[lastPeer.nodeID] = idxToReplace
 	}
 	p.peersList = p.peersList[:len(p.peersList)-1]
 	delete(p.peersIdxes, idToDrop)
@@ -68,4 +71,38 @@ func (p *peersData) getByIdx(idx int) (*peer, bool) {
 
 func (p *peersData) size() int {
 	return len(p.peersList)
+}
+
+// Randomly sample [n] peers that have finished the handshake and tracks the subnetID.
+// If < [n] peers have finished the handshake and tracks the subnetID, returns < [n] peers.
+// If [n] > [p.size()], returns <= [p.size()] peers.
+// [n] must be >= 0.
+// [p] must not be modified while this method is executing.
+func (p *peersData) sample(subnetID ids.ID, n int) ([]*peer, error) {
+	numPeers := p.size()
+	if numPeers < n {
+		n = numPeers
+	}
+	if n == 0 {
+		return nil, nil
+	}
+	s := sampler.NewUniform()
+	if err := s.Initialize(uint64(numPeers)); err != nil {
+		return nil, err
+	}
+	peers := make([]*peer, 0, n) // peers we'll gossip to
+	for len(peers) < n {
+		idx, err := s.Next()
+		if err != nil {
+			// all peers have been sampled and not enough valid ones found.
+			// return what we have
+			return peers, nil
+		}
+		peer := p.peersList[idx]
+		if !peer.finishedHandshake.GetValue() || !peer.trackedSubnets.Contains(subnetID) {
+			continue
+		}
+		peers = append(peers, peer)
+	}
+	return peers, nil
 }

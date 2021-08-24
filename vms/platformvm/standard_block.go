@@ -54,7 +54,7 @@ func (sb *StandardBlock) Verify() error {
 		return err
 	}
 
-	parentIntf, err := sb.parent()
+	parentIntf, err := sb.parentBlock()
 	if err != nil {
 		return err
 	}
@@ -118,6 +118,8 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
+	sb.timestamp = sb.onAcceptState.GetTimestamp()
+
 	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil
@@ -128,7 +130,7 @@ func (sb *StandardBlock) Reject() error {
 		"Rejecting Standard Block %s at height %d with parent %s",
 		sb.ID(),
 		sb.Height(),
-		sb.ParentID(),
+		sb.Parent(),
 	)
 
 	for _, tx := range sb.Txs {

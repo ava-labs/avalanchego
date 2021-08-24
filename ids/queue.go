@@ -18,7 +18,6 @@ func (qs *QueueSet) init() {
 	}
 }
 
-// SetHead ...
 func (qs *QueueSet) SetHead(id ID) {
 	qs.init()
 
@@ -34,14 +33,12 @@ func (qs *QueueSet) SetHead(id ID) {
 	qs.idList.PushFront(id)
 }
 
-// Append ...
 func (qs *QueueSet) Append(id ID) {
 	qs.init()
 
 	qs.idList.PushBack(id)
 }
 
-// GetTail ...
 func (qs *QueueSet) GetTail() ID {
 	qs.init()
 

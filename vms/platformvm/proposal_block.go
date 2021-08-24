@@ -50,7 +50,7 @@ func (pb *ProposalBlock) Accept() error {
 		"Accepting Proposal Block %s at height %d with parent %s",
 		blkID,
 		pb.Height(),
-		pb.ParentID(),
+		pb.Parent(),
 	)
 
 	pb.status = choices.Accepted
@@ -64,7 +64,7 @@ func (pb *ProposalBlock) Reject() error {
 		"Rejecting Proposal Block %s at height %d with parent %s",
 		pb.ID(),
 		pb.Height(),
-		pb.ParentID(),
+		pb.Parent(),
 	)
 
 	pb.onCommitState = nil
@@ -135,6 +135,7 @@ func (pb *ProposalBlock) Verify() error {
 	blkID := pb.ID()
 
 	if err := pb.CommonBlock.Verify(); err != nil {
+		pb.vm.ctx.Log.Trace("rejecting block %s due to a failed verification: %s", blkID, err)
 		if err := pb.Reject(); err != nil {
 			pb.vm.ctx.Log.Error(
 				"failed to reject proposal block %s due to %s",
@@ -150,7 +151,7 @@ func (pb *ProposalBlock) Verify() error {
 		return errWrongTxType
 	}
 
-	parentIntf, parentErr := pb.parent()
+	parentIntf, parentErr := pb.parentBlock()
 	if parentErr != nil {
 		return parentErr
 	}
@@ -158,6 +159,7 @@ func (pb *ProposalBlock) Verify() error {
 	// The parent of a proposal block (ie this block) must be a decision block
 	parent, ok := parentIntf.(decision)
 	if !ok {
+		pb.vm.ctx.Log.Trace("rejecting block %s due to an incorrect parent type", blkID)
 		if err := pb.Reject(); err != nil {
 			pb.vm.ctx.Log.Error(
 				"failed to reject proposal block %s due to %s",
@@ -180,6 +182,7 @@ func (pb *ProposalBlock) Verify() error {
 		// transaction may fail verification now but be valid in the future, so
 		// don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
+			pb.vm.ctx.Log.Trace("rejecting block %s due to a permanent verification error: %s", blkID, err)
 			if err := pb.Reject(); err != nil {
 				pb.vm.ctx.Log.Error(
 					"failed to reject proposal block %s due to %s",
@@ -192,6 +195,8 @@ func (pb *ProposalBlock) Verify() error {
 	}
 	pb.onCommitState.AddTx(&pb.Tx, Committed)
 	pb.onAbortState.AddTx(&pb.Tx, Aborted)
+
+	pb.timestamp = parentState.GetTimestamp()
 
 	pb.vm.currentBlocks[blkID] = pb
 	parentIntf.addChild(pb)

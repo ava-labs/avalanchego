@@ -7,10 +7,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/metricutils"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var errUnknownBlockType = errors.New("unknown block type")
@@ -35,7 +36,7 @@ type metrics struct {
 	numImportTxs,
 	numRewardValidatorTxs prometheus.Counter
 
-	apiRequestMetrics metricutils.APIRequestMetrics
+	apiRequestMetrics metric.APIInterceptor
 }
 
 func newBlockMetrics(namespace string, name string) prometheus.Counter {
@@ -86,10 +87,12 @@ func (m *metrics) Initialize(
 	m.numImportTxs = newTxMetrics(namespace, "import")
 	m.numRewardValidatorTxs = newTxMetrics(namespace, "reward_validator")
 
-	m.apiRequestMetrics = metricutils.NewAPIMetrics(namespace)
-
+	apiRequestMetrics, err := metric.NewAPIInterceptor(namespace, registerer)
+	m.apiRequestMetrics = apiRequestMetrics
 	errs := wrappers.Errs{}
 	errs.Add(
+		err,
+
 		registerer.Register(m.percentConnected),
 		registerer.Register(m.totalStake),
 
@@ -108,8 +111,6 @@ func (m *metrics) Initialize(
 		registerer.Register(m.numExportTxs),
 		registerer.Register(m.numImportTxs),
 		registerer.Register(m.numRewardValidatorTxs),
-
-		m.apiRequestMetrics.Register(registerer),
 	)
 	return errs.Err
 }

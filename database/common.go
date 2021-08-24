@@ -1,7 +1,6 @@
 package database
 
 const (
-	// MaxExcessCapacityFactor ...
 	// If, when a batch is reset, the cap(batch)/len(batch) > MaxExcessCapacityFactor,
 	// the underlying array's capacity will be reduced by a factor of capacityReductionFactor.
 	// Higher value for MaxExcessCapacityFactor --> less aggressive array downsizing --> less memory allocations
@@ -9,6 +8,5 @@ const (
 	// Higher value for CapacityReductionFactor --> more aggressive array downsizing --> more memory allocations
 	// but less unnecessary data in the underlying array that can't be garbage collected.
 	MaxExcessCapacityFactor = 4
-	// CapacityReductionFactor ...
 	CapacityReductionFactor = 2
 )

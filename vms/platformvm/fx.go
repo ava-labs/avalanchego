@@ -28,7 +28,6 @@ type Fx interface {
 	CreateOutput(amount uint64, controlGroup interface{}) (interface{}, error)
 }
 
-// Owned ...
 type Owned interface {
 	Owners() interface{}
 }

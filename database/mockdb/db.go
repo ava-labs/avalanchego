@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	errNoFunction                   = errors.New("user didn't specify what value(s) return")
-	_             database.Database = &Database{}
+	errNoFunction = errors.New("user didn't specify what value(s) return")
+
+	_ database.Database = &Database{}
 )
 
 // Database implements database.Database.

@@ -59,17 +59,15 @@ func (tq *timeoutQueue) Pop() interface{} {
 // AdaptiveTimeoutConfig contains the parameters provided to the
 // adaptive timeout manager.
 type AdaptiveTimeoutConfig struct {
-	InitialTimeout time.Duration
-	MinimumTimeout time.Duration
-	MaximumTimeout time.Duration
+	InitialTimeout time.Duration `json:"initialTimeout"`
+	MinimumTimeout time.Duration `json:"minimumTimeout"`
+	MaximumTimeout time.Duration `json:"maximumTimeout"`
 	// Timeout is [timeoutCoefficient] * average response time
 	// [timeoutCoefficient] must be > 1
-	TimeoutCoefficient float64
+	TimeoutCoefficient float64 `json:"timeoutCoefficient"`
 	// Larger halflife --> less volatile timeout
 	// [timeoutHalfLife] must be positive
-	TimeoutHalflife  time.Duration
-	MetricsNamespace string
-	Registerer       prometheus.Registerer
+	TimeoutHalflife time.Duration `json:"timeoutHalflife"`
 }
 
 // AdaptiveTimeoutManager is a manager for timeouts.
@@ -93,20 +91,24 @@ type AdaptiveTimeoutManager struct {
 }
 
 // Initialize this timeout manager with the provided config
-func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) error {
+func (tm *AdaptiveTimeoutManager) Initialize(
+	config *AdaptiveTimeoutConfig,
+	metricsNamespace string,
+	metricsRegister prometheus.Registerer,
+) error {
 	tm.networkTimeoutMetric = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: config.MetricsNamespace,
-		Name:      "network_timeout",
+		Namespace: metricsNamespace,
+		Name:      "current_timeout",
 		Help:      "Duration of current network timeout in nanoseconds",
 	})
 	tm.avgLatency = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: config.MetricsNamespace,
-		Name:      "avg_network_latency",
+		Namespace: metricsNamespace,
+		Name:      "average_latency",
 		Help:      "Average network latency in nanoseconds",
 	})
 	tm.numTimeouts = prometheus.NewCounter(prometheus.CounterOpts{
-		Namespace: config.MetricsNamespace,
-		Name:      "request_timeouts",
+		Namespace: metricsNamespace,
+		Name:      "timeouts",
 		Help:      "Number of timed out requests",
 	})
 
@@ -130,9 +132,9 @@ func (tm *AdaptiveTimeoutManager) Initialize(config *AdaptiveTimeoutConfig) erro
 	tm.timer = NewTimer(tm.Timeout)
 
 	errs := &wrappers.Errs{}
-	errs.Add(config.Registerer.Register(tm.networkTimeoutMetric))
-	errs.Add(config.Registerer.Register(tm.avgLatency))
-	errs.Add(config.Registerer.Register(tm.numTimeouts))
+	errs.Add(metricsRegister.Register(tm.networkTimeoutMetric))
+	errs.Add(metricsRegister.Register(tm.avgLatency))
+	errs.Add(metricsRegister.Register(tm.numTimeouts))
 	return errs.Err
 }
 
@@ -143,7 +145,6 @@ func (tm *AdaptiveTimeoutManager) TimeoutDuration() time.Duration {
 	return tm.currentTimeout
 }
 
-// Dispatch ...
 func (tm *AdaptiveTimeoutManager) Dispatch() { tm.timer.Dispatch() }
 
 // Stop executing timeouts

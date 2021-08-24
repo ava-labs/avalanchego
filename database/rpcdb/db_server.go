@@ -150,11 +150,21 @@ func (db *DatabaseServer) IteratorNext(_ context.Context, req *rpcdbproto.Iterat
 	if !exists {
 		return nil, errUnknownIterator
 	}
-	return &rpcdbproto.IteratorNextResponse{
-		FoundNext: it.Next(),
-		Key:       it.Key(),
-		Value:     it.Value(),
-	}, nil
+
+	size := 0
+	data := []*rpcdbproto.PutRequest(nil)
+	for size < maxBatchSize && it.Next() {
+		key := it.Key()
+		value := it.Value()
+		size += len(key) + len(value)
+
+		data = append(data, &rpcdbproto.PutRequest{
+			Key:   key,
+			Value: value,
+		})
+	}
+
+	return &rpcdbproto.IteratorNextResponse{Data: data}, nil
 }
 
 // IteratorError attempts to report any errors that occurred during iteration
