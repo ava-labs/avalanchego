@@ -154,7 +154,8 @@ func setupGenesis(t *testing.T, genesisJSON string) (*VM, *snow.Context, manager
 
 // GenesisVM creates a VM instance with the genesis test bytes and returns
 // the channel use to send messages to the engine, the vm, and atomic memory
-func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory, *engCommon.SenderTest) {
+func GenesisVM(t *testing.T, finishBootstrapping bool, genesisJSON string, configJSON string, upgradeJSON string,
+) (chan engCommon.Message, *VM, manager.Manager, *atomic.Memory, *engCommon.SenderTest) {
 	vm, ctx, dbManager, genesisBytes, issuer, m := setupGenesis(t, genesisJSON)
 	appSender := &engCommon.SenderTest{}
 	appSender.CantSendAppGossip = true
