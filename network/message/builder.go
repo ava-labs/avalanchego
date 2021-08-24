@@ -38,7 +38,6 @@ type Builder interface {
 
 	PeerList(
 		peers []utils.IPCertDesc,
-		includeIsCompressedFlag,
 		compress bool,
 	) (Message, error)
 
@@ -82,7 +81,6 @@ type Builder interface {
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
-		includeIsCompressedFlag bool,
 		compressed bool,
 	) (Message, error)
 
@@ -98,7 +96,6 @@ type Builder interface {
 		requestID uint32,
 		containerID ids.ID,
 		container []byte,
-		includeIsCompressedFlag bool,
 		compress bool,
 	) (Message, error)
 
@@ -108,7 +105,6 @@ type Builder interface {
 		deadline uint64,
 		containerID ids.ID,
 		container []byte,
-		includeIsCompressedFlag bool,
 		compress bool,
 	) (Message, error)
 
@@ -137,7 +133,6 @@ func (b *builder) GetVersion() (Message, error) {
 		GetVersion,
 		nil,
 		GetVersion.Compressable(), // GetVersion messages can't be compressed
-		GetVersion.Compressable(),
 	)
 }
 
@@ -162,7 +157,6 @@ func (b *builder) Version(
 			SigBytes:    sig,
 		},
 		Version.Compressable(), // Version Messages can't be compressed
-		Version.Compressable(),
 	)
 }
 
@@ -194,7 +188,6 @@ func (b *builder) VersionWithSubnets(
 			TrackedSubnets: subnetIDBytes,
 		},
 		VersionWithSubnets.Compressable(), // Version Messages can't be compressed
-		VersionWithSubnets.Compressable(),
 	)
 }
 
@@ -203,18 +196,16 @@ func (b *builder) GetPeerList() (Message, error) {
 		GetPeerList,
 		nil,
 		GetPeerList.Compressable(), // GetPeerList messages can't be compressed
-		GetPeerList.Compressable(),
 	)
 }
 
-func (b *builder) PeerList(peers []utils.IPCertDesc, includeIsCompressedFlag, compress bool) (Message, error) {
+func (b *builder) PeerList(peers []utils.IPCertDesc, compress bool) (Message, error) {
 	return b.c.Pack(
 		PeerList,
 		map[Field]interface{}{
 			SignedPeers: peers,
 		},
-		includeIsCompressedFlag, // PeerList messages may be compressed
-		compress && PeerList.Compressable(),
+		compress && PeerList.Compressable(), // PeerList messages may be compressed
 	)
 }
 
@@ -223,7 +214,6 @@ func (b *builder) Ping() (Message, error) {
 		Ping,
 		nil,
 		Ping.Compressable(), // Ping messages can't be compressed
-		Ping.Compressable(),
 	)
 }
 
@@ -232,7 +222,6 @@ func (b *builder) Pong() (Message, error) {
 		Pong,
 		nil,
 		Pong.Compressable(), // Ping messages can't be compressed
-		Pong.Compressable(),
 	)
 }
 
@@ -249,7 +238,6 @@ func (b *builder) GetAcceptedFrontier(
 			Deadline:  deadline,
 		},
 		GetAcceptedFrontier.Compressable(), // GetAcceptedFrontier messages can't be compressed
-		GetAcceptedFrontier.Compressable(),
 	)
 }
 
@@ -271,7 +259,6 @@ func (b *builder) AcceptedFrontier(
 			ContainerIDs: containerIDBytes,
 		},
 		AcceptedFrontier.Compressable(), // AcceptedFrontier messages can't be compressed
-		AcceptedFrontier.Compressable(),
 	)
 }
 
@@ -295,7 +282,6 @@ func (b *builder) GetAccepted(
 			ContainerIDs: containerIDBytes,
 		},
 		GetAccepted.Compressable(), // GetAccepted messages can't be compressed
-		GetAccepted.Compressable(),
 	)
 }
 
@@ -317,7 +303,6 @@ func (b *builder) Accepted(
 			ContainerIDs: containerIDBytes,
 		},
 		Accepted.Compressable(), // Accepted messages can't be compressed
-		Accepted.Compressable(),
 	)
 }
 
@@ -336,7 +321,6 @@ func (b *builder) GetAncestors(
 			ContainerID: containerID[:],
 		},
 		GetAncestors.Compressable(), // GetAncestors messages can't be compressed
-		GetAncestors.Compressable(),
 	)
 }
 
@@ -344,7 +328,6 @@ func (b *builder) MultiPut(
 	chainID ids.ID,
 	requestID uint32,
 	containers [][]byte,
-	includeIsCompressedFlag bool,
 	compressed bool,
 ) (Message, error) {
 	return b.c.Pack(
@@ -354,8 +337,7 @@ func (b *builder) MultiPut(
 			RequestID:           requestID,
 			MultiContainerBytes: containers,
 		},
-		includeIsCompressedFlag, // MultiPut messages may be compressed
-		compressed && MultiPut.Compressable(),
+		compressed && MultiPut.Compressable(), // MultiPut messages may be compressed
 	)
 }
 
@@ -374,7 +356,6 @@ func (b *builder) Get(
 			ContainerID: containerID[:],
 		},
 		Get.Compressable(), // Get messages can't be compressed
-		Get.Compressable(),
 	)
 }
 
@@ -383,7 +364,6 @@ func (b *builder) Put(
 	requestID uint32,
 	containerID ids.ID,
 	container []byte,
-	includeIsCompressedFlag bool,
 	compress bool,
 ) (Message, error) {
 	return b.c.Pack(
@@ -394,8 +374,7 @@ func (b *builder) Put(
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		includeIsCompressedFlag, // Put messages may be compressed
-		compress && Put.Compressable(),
+		compress && Put.Compressable(), // Put messages may be compressed
 	)
 }
 
@@ -405,7 +384,6 @@ func (b *builder) PushQuery(
 	deadline uint64,
 	containerID ids.ID,
 	container []byte,
-	includeIsCompressedFlag bool,
 	compress bool,
 ) (Message, error) {
 	return b.c.Pack(
@@ -417,8 +395,7 @@ func (b *builder) PushQuery(
 			ContainerID:    containerID[:],
 			ContainerBytes: container,
 		},
-		includeIsCompressedFlag, // PushQuery messages may be compressed
-		compress && PushQuery.Compressable(),
+		compress && PushQuery.Compressable(), // PushQuery messages may be compressed
 	)
 }
 
@@ -437,7 +414,6 @@ func (b *builder) PullQuery(
 			ContainerID: containerID[:],
 		},
 		PullQuery.Compressable(), // PullQuery messages can't be compressed
-		PullQuery.Compressable(),
 	)
 }
 
@@ -459,6 +435,5 @@ func (b *builder) Chits(
 			ContainerIDs: containerIDBytes,
 		},
 		Chits.Compressable(), // Chits messages can't be compressed
-		Chits.Compressable(),
 	)
 }
