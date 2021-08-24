@@ -47,7 +47,7 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 		return nil, err
 	}
 	addresses := []ids.ShortID{}
-	if _, err := Codec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := GenesisCodec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil

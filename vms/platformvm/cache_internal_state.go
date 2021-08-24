@@ -560,7 +560,7 @@ func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := Codec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := GenesisCodec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -953,7 +953,7 @@ func (st *internalStateImpl) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+			utxoBytes, err := GenesisCodec.Marshal(codecVersion, utxo)
 			if err != nil {
 				return err
 			}
