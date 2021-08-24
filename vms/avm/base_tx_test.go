@@ -736,7 +736,19 @@ func TestBaseTxSemanticVerify(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
-	genesisBytes, _, vm, _ := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVMWithArgs(
+		t,
+		[]*common.Fx{{
+			ID: ids.GenerateTestID(),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(secp256k1fx.VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+				},
+			},
+		}},
+		nil,
+	)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -744,10 +756,6 @@ func TestBaseTxSemanticVerifyUnknownFx(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-
-	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
@@ -801,10 +809,6 @@ func TestBaseTxSemanticVerifyWrongAssetID(t *testing.T) {
 		ctx.Lock.Unlock()
 	}()
 
-	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
-		t.Fatal(err)
-	}
-
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 
 	tx := &Tx{UnsignedTx: &BaseTx{BaseTx: avax.BaseTx{
@@ -856,7 +860,8 @@ func TestBaseTxSemanticVerifyUnauthorizedFx(t *testing.T) {
 	}()
 
 	fx := &FxTest{}
-	fx.InitializeF = func(interface{}) error {
+	fx.InitializeF = func(vmIntf interface{}) error {
+		vm := vmIntf.(secp256k1fx.VM)
 		return vm.CodecRegistry().RegisterType(&avax.TestTransferable{})
 	}
 
@@ -1283,7 +1288,8 @@ func TestBaseTxSemanticVerifyPendingUnauthorizedFx(t *testing.T) {
 	vm := &VM{}
 
 	fx := &FxTest{}
-	fx.InitializeF = func(interface{}) error {
+	fx.InitializeF = func(vmIntf interface{}) error {
+		vm := vmIntf.(secp256k1fx.VM)
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
 
@@ -1427,7 +1433,8 @@ func TestBaseTxSemanticVerifyPendingInvalidSignature(t *testing.T) {
 	vm := &VM{}
 
 	fx := &FxTest{}
-	fx.InitializeF = func(interface{}) error {
+	fx.InitializeF = func(vmIntf interface{}) error {
+		vm := vmIntf.(secp256k1fx.VM)
 		return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 	}
 
@@ -1616,7 +1623,19 @@ func TestBaseTxSemanticVerifyMalformedOutput(t *testing.T) {
 }
 
 func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
-	genesisBytes, _, vm, _ := GenesisVM(t)
+	genesisBytes, _, vm, _ := GenesisVMWithArgs(
+		t,
+		[]*common.Fx{{
+			ID: ids.GenerateTestID(),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(secp256k1fx.VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestTransferable{})
+				},
+			},
+		}},
+		nil,
+	)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -1624,10 +1643,6 @@ func TestBaseTxSemanticVerifyInvalidFxOutput(t *testing.T) {
 		}
 		ctx.Lock.Unlock()
 	}()
-
-	if err := vm.CodecRegistry().RegisterType(&avax.TestTransferable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	genesisTx := GetAVAXTxFromGenesisTest(genesisBytes, t)
 

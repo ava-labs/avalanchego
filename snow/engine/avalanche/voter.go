@@ -84,9 +84,12 @@ func (v *voter) Update() {
 
 func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 	vertexHeap := vertex.NewHeap()
-	for vote := range votes {
+	for vote, set := range votes {
 		vtx, err := v.t.Manager.GetVtx(vote)
 		if err != nil {
+			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because we failed to fetch the vertex",
+				set.Len(), vote)
+			votes.RemoveSet(vote)
 			continue
 		}
 		vertexHeap.Push(vtx)
@@ -99,7 +102,7 @@ func (v *voter) bubbleVotes(votes ids.UniqueBag) (ids.UniqueBag, error) {
 		status := vtx.Status()
 
 		if !status.Fetched() {
-			v.t.Ctx.Log.Verbo("Dropping %d vote(s) for %s because the vertex is unknown",
+			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the vertex is unknown",
 				set.Len(), vtxID)
 			votes.RemoveSet(vtxID)
 			continue

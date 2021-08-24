@@ -92,6 +92,8 @@ votesLoop:
 		blk, err := v.t.GetBlock(vote)
 		// If we cannot retrieve the block, drop [vote]
 		if err != nil {
+			v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because the block couldn't be fetched",
+				count, vote)
 			continue
 		}
 
@@ -113,6 +115,8 @@ votesLoop:
 			blk, err = v.t.GetBlock(blkID)
 			// If we cannot retrieve the block, drop [vote]
 			if err != nil {
+				v.t.Ctx.Log.Debug("Dropping %d vote(s) for %s because %s couldn't be fetched",
+					count, vote, blkID)
 				continue votesLoop
 			}
 			status = blk.Status()
