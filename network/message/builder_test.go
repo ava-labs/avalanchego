@@ -570,7 +570,7 @@ func TestBuildAppGossipMsg(t *testing.T) {
 	appGossipBytes[len(appGossipBytes)-1] = 1
 
 	{ // no compression
-		msg, err := TestBuilder.AppGossip(chainID, appGossipBytes, true)
+		msg, err := TestBuilder.AppGossip(chainID, appGossipBytes, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, AppGossip, msg.Op())
