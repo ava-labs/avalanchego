@@ -300,7 +300,6 @@ func TestBuildPut(t *testing.T) {
 		assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 		assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
 		assert.Equal(t, container, parsedMsg.Get(ContainerBytes))
-		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 	}
 }
 
@@ -331,7 +330,6 @@ func TestBuildPushQuery(t *testing.T) {
 		assert.Equal(t, deadline, parsedMsg.Get(Deadline))
 		assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
 		assert.Equal(t, container, parsedMsg.Get(ContainerBytes))
-		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 	}
 }
 
@@ -408,7 +406,6 @@ func TestBuildMultiPut(t *testing.T) {
 		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
 		assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 		assert.Equal(t, containers, parsedMsg.Get(MultiContainerBytes))
-		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
 	}
 }
 
