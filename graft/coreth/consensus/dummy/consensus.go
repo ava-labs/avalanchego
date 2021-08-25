@@ -190,7 +190,6 @@ func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, heade
 	}
 
 	var (
-		blockFeePremium      = new(big.Int)
 		gasUsed              = new(big.Int)
 		blockFeeContribution = new(big.Int)
 		totalBlockFee        = new(big.Int)
@@ -200,8 +199,8 @@ func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, heade
 	for i, receipt := range receipts {
 		// Each transaction contributes the excess over the baseFee towards the totalBlockFee
 		// This should be equivalent to the sum of the "priority fees" within EIP-1559.
-		blockFeePremium = blockFeePremium.Sub(txs[i].GasPrice(), header.BaseFee)
-		blockFeeContribution = blockFeeContribution.Mul(blockFeePremium, gasUsed.SetUint64(receipt.GasUsed))
+		txFeePremium := txs[i].EffectiveGasTipValue(header.BaseFee)
+		blockFeeContribution = blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
 
 		totalBlockFee = totalBlockFee.Add(totalBlockFee, blockFeeContribution)
 	}
