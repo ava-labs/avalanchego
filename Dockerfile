@@ -31,4 +31,14 @@ WORKDIR /avalanchego/build
 # Copy the executables into the container
 COPY --from=builder /build/build/ .
 
-CMD [ "./avalanchego" ]
+RUN addgroup -gid 1001 --system ava01 
+RUN adduser --uid 1001  --ingroup ava01  ava01
+RUN chown ava01:ava01 /home/ava01
+
+USER ava01
+
+RUN mkdir /home/ava01/.avalanchego
+
+VOLUME ["/home/ava01/.avalanchego"]
+
+
