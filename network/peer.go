@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // The signature of a peer's certificate on the byte representation
@@ -978,7 +979,18 @@ func (p *peer) handlePing(_ message.Message) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePong(_ message.Message) {}
+func (p *peer) handlePong(_ message.Message) {
+	if !p.finishedHandshake.GetValue() {
+		// If the handshake isn't finished - do nothing
+		return
+	}
+
+	peerVersion := p.versionStruct.GetValue().(version.Application)
+	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
+		p.net.log.Debug("disconnecting from peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
+		p.discardIP()
+	}
+}
 
 // assumes the [stateLock] is not held
 func (p *peer) handleGetAcceptedFrontier(msg message.Message, onFinishedHandling func()) {
