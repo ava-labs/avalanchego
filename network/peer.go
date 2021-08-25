@@ -987,7 +987,7 @@ func (p *peer) handlePong(_ message.Message) {
 
 	peerVersion := p.versionStruct.GetValue().(version.Application)
 	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
-		p.net.log.Debug("disconnecting to peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
+		p.net.log.Debug("disconnecting from peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
 		p.discardIP()
 	}
 }
