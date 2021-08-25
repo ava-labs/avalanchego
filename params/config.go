@@ -30,6 +30,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -62,9 +63,10 @@ var (
 		PetersburgBlock:             big.NewInt(0),
 		IstanbulBlock:               big.NewInt(0),
 		MuirGlacierBlock:            big.NewInt(0),
-		ApricotPhase1BlockTimestamp: big.NewInt(1617199200), // 10am EST 3/31/2021
-		ApricotPhase2BlockTimestamp: big.NewInt(1620644400), // 10am EST 5/10/2021
-		ApricotPhase3BlockTimestamp: big.NewInt(1629813600), // 10am EST 8/24/2021
+		ApricotPhase1BlockTimestamp: big.NewInt(time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase2BlockTimestamp: big.NewInt(time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase3BlockTimestamp: big.NewInt(time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase4BlockTimestamp: big.NewInt(time.Date(2021, time.August, 26, 2, 0, 0, 0, time.UTC).Unix()),
 	}
 
 	// AvalancheFujiChainConfig is the configuration for the Fuji Test Network
@@ -82,9 +84,10 @@ var (
 		PetersburgBlock:             big.NewInt(0),
 		IstanbulBlock:               big.NewInt(0),
 		MuirGlacierBlock:            big.NewInt(0),
-		ApricotPhase1BlockTimestamp: big.NewInt(1616767200), // 10am EST 3/26/2021
-		ApricotPhase2BlockTimestamp: big.NewInt(1620223200), // 10am EST 5/5/2021
-		ApricotPhase3BlockTimestamp: big.NewInt(1629140400), // 3pm EST 8/16/2021
+		ApricotPhase1BlockTimestamp: big.NewInt(time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase2BlockTimestamp: big.NewInt(time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase3BlockTimestamp: big.NewInt(time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase4BlockTimestamp: big.NewInt(time.Date(2021, time.August, 26, 2, 0, 0, 0, time.UTC).Unix()),
 	}
 
 	// AvalancheLocalChainConfig is the configuration for the Avalanche Local Network
