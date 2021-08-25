@@ -108,8 +108,11 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 
 			// Flushing from 0 to snapshotBlock into the disk
             for i := uint64(0); i < point; i++ {
-                if err := chain.snaps.Flatten(blocks[i].Hash()); err != nil {
-			        t.Fatalf("Failed to flatten snap diff for block %v: %v", i, err)
+                //if err := chain.snaps.Flatten(blocks[i].Hash()); err != nil {
+			    //    t.Fatalf("Failed to flatten snap diff for block %v: %v", i, err)
+                //}
+                if err := chain.Accept(blocks[i]); err != nil {
+			        t.Fatalf("Failed to accept block %v: %v", i, err)
                 }
             }
 
@@ -154,7 +157,9 @@ func (basic *snapshotTestBasic) verify(t *testing.T, chain *BlockChain, blocks [
 		t.Errorf("The correspnding block[%d] of snapshot disk layer is missing", basic.expSnapshotBottom)
 	} else if !bytes.Equal(chain.snaps.DiskRoot().Bytes(), block.Root().Bytes()) {
 		t.Errorf("The snapshot disk layer root is incorrect, want %x, get %x", block.Root(), chain.snaps.DiskRoot())
-	}
+	} else if len(chain.snaps.Snapshots(block.Hash(), -1, false)) != 1 {
+		t.Errorf("The correspnding block[%d] of snapshot disk layer is missing", basic.expSnapshotBottom)
+    }
 
 	// Check the snapshot, ensure it's integrated
 	if err := chain.snaps.Verify(block.Root()); err != nil {
@@ -230,7 +235,8 @@ func (snaptest *snapshotTest) test(t *testing.T) {
 
 	// Restart the chain normally
 	chain.Stop()
-	newchain, err := NewBlockChain(snaptest.db, defaultCacheConfig, params.TestChainConfig, snaptest.engine, vm.Config{}, common.Hash{})
+	//newchain, err := NewBlockChain(snaptest.db, defaultCacheConfig, params.TestChainConfig, snaptest.engine, vm.Config{}, common.Hash{})
+	newchain, err := NewBlockChain(snaptest.db, defaultCacheConfig, params.TestChainConfig, snaptest.engine, vm.Config{}, blocks[7].Hash())
 	if err != nil {
 		t.Fatalf("Failed to recreate chain: %v", err)
 	}
