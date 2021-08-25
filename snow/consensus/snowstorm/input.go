@@ -310,6 +310,14 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 			changed = true
 		}
 	}
+
+	if len(ig.txs) > 0 {
+		if metThreshold.Len() == 0 {
+			ig.Failed()
+		} else {
+			ig.Successful()
+		}
+	}
 	return changed, ig.errs.Err
 }
 

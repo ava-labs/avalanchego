@@ -16,8 +16,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Metrics reports commonly used consensus metrics.
-type Metrics struct {
+// Latency reports commonly used consensus latency metrics.
+type Latency struct {
 	// Clock gives access to the current wall clock time
 	Clock timer.Clock
 
@@ -42,7 +42,7 @@ type Metrics struct {
 }
 
 // Initialize the metrics with the provided names.
-func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Logger, namespace string, reg prometheus.Registerer) error {
+func (m *Latency) Initialize(metricName, descriptionName string, log logging.Logger, namespace string, reg prometheus.Registerer) error {
 	m.processingEntries = linkedhashmap.New()
 	m.log = log
 
@@ -67,18 +67,19 @@ func (m *Metrics) Initialize(metricName, descriptionName string, log logging.Log
 		reg,
 		&errs,
 	)
+
 	errs.Add(reg.Register(m.numProcessing))
 	return errs.Err
 }
 
 // Issued marks the item as having been issued.
-func (m *Metrics) Issued(id ids.ID) {
+func (m *Latency) Issued(id ids.ID) {
 	m.processingEntries.Put(id, m.Clock.Time())
 	m.numProcessing.Inc()
 }
 
 // Accepted marks the item as having been accepted.
-func (m *Metrics) Accepted(id ids.ID) {
+func (m *Latency) Accepted(id ids.ID) {
 	startTime, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Accepted transaction %v", id.String())
@@ -93,7 +94,7 @@ func (m *Metrics) Accepted(id ids.ID) {
 }
 
 // Rejected marks the item as having been rejected.
-func (m *Metrics) Rejected(id ids.ID) {
+func (m *Latency) Rejected(id ids.ID) {
 	startTime, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Rejected transaction %v", id.String())
@@ -107,7 +108,7 @@ func (m *Metrics) Rejected(id ids.ID) {
 	m.numProcessing.Dec()
 }
 
-func (m *Metrics) MeasureAndGetOldestDuration() time.Duration {
+func (m *Latency) MeasureAndGetOldestDuration() time.Duration {
 	now := m.Clock.Time()
 	_, oldestTimeIntf, exists := m.processingEntries.Oldest()
 	oldestTime := now
@@ -119,6 +120,6 @@ func (m *Metrics) MeasureAndGetOldestDuration() time.Duration {
 	return duration
 }
 
-func (m *Metrics) ProcessingLen() int {
+func (m *Latency) ProcessingLen() int {
 	return m.processingEntries.Len()
 }
