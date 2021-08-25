@@ -54,7 +54,6 @@ var (
 	testCChainID            = ids.ID{'c', 'c', 'h', 'a', 'i', 'n', 't', 'e', 's', 't'}
 	testXChainID            = ids.ID{'t', 'e', 's', 't', 'x'}
 	nonExistentID           = ids.ID{'F'}
-	testTxFee               = uint64(1000)
 	testKeys         []*crypto.PrivateKeySECP256K1R
 	testEthAddrs     []common.Address // testEthAddrs[i] corresponds to testKeys[i]
 	testShortIDAddrs []ids.ShortID
@@ -73,7 +72,6 @@ var (
 	apricotRulesPhase1 = params.Rules{IsApricotPhase1: true}
 	apricotRulesPhase2 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true}
 	apricotRulesPhase3 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true}
-	apricotRulesPhase4 = params.Rules{IsApricotPhase1: true, IsApricotPhase2: true, IsApricotPhase3: true, IsApricotPhase4: true}
 )
 
 func init() {
