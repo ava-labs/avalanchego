@@ -1133,6 +1133,10 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	// add to mempool and possibly re-gossip
 	switch err := vm.mempool.AddTx(tx); err {
 	case nil:
+		if time.Now().Before(vm.gossipActivationTime) {
+			vm.ctx.Log.Verbo("issued tx before gossiping activation time. Not gossiping it")
+			return nil
+		}
 		txID := tx.ID()
 		vm.ctx.Log.Debug("Gossiping txID %v", txID)
 		txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
