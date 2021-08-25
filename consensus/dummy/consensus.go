@@ -23,14 +23,12 @@ var (
 	blockGasDiv = new(big.Int).SetUint64(10)
 )
 
-type OnFinalizeCallbackType = func(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt, uncles []*types.Header) error
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
 
 type ConsensusCallbacks struct {
 	OnAPIs                OnAPIsCallbackType
-	OnFinalize            OnFinalizeCallbackType
 	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
 	OnExtraStateChange    OnExtraStateChangeType
 }
@@ -233,9 +231,6 @@ func (self *DummyEngine) Finalize(
 		return err
 	}
 
-	if self.cb.OnFinalize != nil {
-		return self.cb.OnFinalize(chain, header, state, txs, receipts, uncles)
-	}
 	return nil
 }
 
