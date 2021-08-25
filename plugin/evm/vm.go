@@ -433,7 +433,7 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 	}
 }
 
-func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
+func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, uint64, error) {
 	snapshot := state.Snapshot()
 	for {
 		tx, exists := vm.mempool.NextTx()
@@ -453,28 +453,31 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			// Discard the transaction from the mempool and error if the transaction
 			// cannot be marshalled. This should never happen.
 			vm.mempool.DiscardCurrentTx()
-			return nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
+			return nil, 0, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 		}
-		return atomicTxBytes, nil
+		return atomicTxBytes, 0, nil
 	}
 
 	if len(txs) == 0 {
 		// this could happen due to the async logic of geth tx pool
-		return nil, errEmptyBlock
+		return nil, 0, errEmptyBlock
 	}
 
-	return nil, nil
+	return nil, 0, nil
 }
 
-func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) error {
+func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (uint64, error) {
 	tx, err := vm.extractAtomicTx(block)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if tx == nil {
-		return nil
+		return 0, nil
 	}
-	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
+	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
+		return 0, err
+	}
+	return 0, nil
 }
 
 func (vm *VM) pruneChain() error {
