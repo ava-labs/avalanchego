@@ -708,34 +708,34 @@ func (st *internalStateImpl) Commit() error {
 
 func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	if err := st.writeCurrentStakers(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write current stakers with: %w", err)
 	}
 	if err := st.writePendingStakers(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write pending stakers with: %w", err)
 	}
 	if err := st.writeUptimes(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write uptimes with: %w", err)
 	}
 	if err := st.writeBlocks(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write blocks with: %w", err)
 	}
 	if err := st.writeTXs(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write txs with: %w", err)
 	}
 	if err := st.writeRewardUTXOs(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write reward UTXOs with: %w", err)
 	}
 	if err := st.writeUTXOs(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write UTXOs with: %w", err)
 	}
 	if err := st.writeSubnets(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write current subnets with: %w", err)
 	}
 	if err := st.writeChains(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write chains with: %w", err)
 	}
 	if err := st.writeSingletons(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write singletons with: %w", err)
 	}
 	return st.baseDB.CommitBatch()
 }
