@@ -23,9 +23,9 @@ var (
 	blockGasDiv = new(big.Int).SetUint64(10)
 )
 
-type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error)
+type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution uint64, err error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
-type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) error
+type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution uint64, err error)
 
 type ConsensusCallbacks struct {
 	OnAPIs                OnAPIsCallbackType
@@ -226,7 +226,10 @@ func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, heade
 func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, state *state.StateDB, receipts []*types.Receipt) error {
 	// Perform extra state change while finalizing the block
 	if self.cb.OnExtraStateChange != nil {
-		return self.cb.OnExtraStateChange(block, state)
+		// TODO this should return the amount of gas that was consumed by the extra state change, so that it can be passed in to verifyBlockFee
+		if _, err := self.cb.OnExtraStateChange(block, state); err != nil {
+			return err
+		}
 	}
 	if err := self.verifyBlockFee(chain, block.Header(), block.Transactions(), receipts); err != nil {
 		return err
@@ -239,7 +242,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var extdata []byte
 	if self.cb.OnFinalizeAndAssemble != nil {
-		ret, err := self.cb.OnFinalizeAndAssemble(header, state, txs)
+		ret, _, err := self.cb.OnFinalizeAndAssemble(header, state, txs)
 		extdata = ret
 		if err != nil {
 			return nil, err

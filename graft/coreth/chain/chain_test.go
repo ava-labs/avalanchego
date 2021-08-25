@@ -53,13 +53,13 @@ func newTestChain(name string, config *eth.Config,
 		rawdb.NewMemoryDatabase(),
 		eth.DefaultSettings,
 		&dummy.ConsensusCallbacks{
-			OnFinalizeAndAssemble: func(head *types.Header, _ *state.StateDB, _ []*types.Transaction) ([]byte, error) {
+			OnFinalizeAndAssemble: func(head *types.Header, _ *state.StateDB, _ []*types.Transaction) ([]byte, uint64, error) {
 				randData := make([]byte, 32)
 				_, err := rand.Read(randData)
 				if err != nil {
 					t.Fatal(err)
 				}
-				return randData, nil
+				return randData, 0, nil
 			},
 		},
 		common.Hash{},
