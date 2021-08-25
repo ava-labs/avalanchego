@@ -283,7 +283,7 @@ func TestNewImportTx(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		importTx := tx.UnsignedAtomicTx.(*UnsignedImportTx)
+		importTx := tx.UnsignedAtomicTx
 		var actualFee uint64
 		actualAVAXBurned, err := importTx.Burned(vm.ctx.AVAXAssetID)
 		if err != nil {
