@@ -25,7 +25,8 @@ var errUnhealthy = errors.New("snowstorm consensus is not healthy")
 
 type common struct {
 	// metrics that describe this consensus instance
-	metrics.Metrics
+	metrics.Latency
+	metrics.Polls
 
 	// context that this consensus instance is executing in
 	ctx *snow.Context
@@ -60,8 +61,11 @@ func (c *common) Initialize(ctx *snow.Context, params sbcon.Parameters) error {
 	c.ctx = ctx
 	c.params = params
 
-	if err := c.Metrics.Initialize("txs", "transaction(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
-		return fmt.Errorf("failed to initialize metrics: %w", err)
+	if err := c.Latency.Initialize("txs", "transaction(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+		return fmt.Errorf("failed to initialize latency metrics: %w", err)
+	}
+	if err := c.Polls.Initialize(params.Namespace, params.Metrics); err != nil {
+		return fmt.Errorf("failed to initialize poll metrics: %w", err)
 	}
 	return params.Verify()
 }
@@ -93,14 +97,14 @@ func (c *common) Finalized() bool {
 
 // HealthCheck returns information about the consensus health.
 func (c *common) HealthCheck() (interface{}, error) {
-	numOutstandingTxs := c.Metrics.ProcessingLen()
+	numOutstandingTxs := c.Latency.ProcessingLen()
 	healthy := numOutstandingTxs <= c.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingTransactions": numOutstandingTxs,
 	}
 
 	// check for long running transactions
-	timeReqRunning := c.Metrics.MeasureAndGetOldestDuration()
+	timeReqRunning := c.Latency.MeasureAndGetOldestDuration()
 	healthy = healthy && timeReqRunning <= c.params.MaxItemProcessingTime
 	details["longestRunningTx"] = timeReqRunning.String()
 
@@ -128,7 +132,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	}
 
 	// Notify the metrics that this transaction is being issued.
-	c.Metrics.Issued(txID)
+	c.Latency.Issued(txID)
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
 	if inputs := tx.InputIDs(); len(inputs) != 0 {
@@ -151,7 +155,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	}
 
 	// Notify the metrics that this transaction was accepted.
-	c.Metrics.Accepted(txID)
+	c.Latency.Accepted(txID)
 	return false, nil
 }
 
@@ -172,7 +176,7 @@ func (c *common) acceptTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's acceptance
-	c.Metrics.Accepted(txID)
+	c.Latency.Accepted(txID)
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
 	c.pendingAccept.Fulfill(txID)
@@ -200,7 +204,7 @@ func (c *common) rejectTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's rejection
-	c.Metrics.Rejected(txID)
+	c.Latency.Rejected(txID)
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// tx can't be accepted.

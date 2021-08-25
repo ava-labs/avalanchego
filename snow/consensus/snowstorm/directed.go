@@ -239,6 +239,14 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			changed = true
 		}
 	}
+
+	if len(dg.txs) > 0 {
+		if metThreshold.Len() == 0 {
+			dg.Failed()
+		} else {
+			dg.Successful()
+		}
+	}
 	return changed, dg.errs.Err
 }
 
