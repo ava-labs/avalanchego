@@ -107,8 +107,8 @@ var (
 		ApricotPhase3BlockTimestamp: big.NewInt(0),
 	}
 
-	TestChainConfig            = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
-	AllAvalancheUpgradesConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
+	TestChainConfig            = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil}
+	AllAvalancheUpgradesConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0)}
 	TestRules                  = TestChainConfig.AvalancheRules(new(big.Int), new(big.Int))
 )
 
@@ -145,11 +145,13 @@ type ChainConfig struct {
 	ApricotPhase2BlockTimestamp *big.Int `json:"apricotPhase2BlockTimestamp,omitempty"`
 	// Apricot Phase 3 introduces dynamic fees and batching of atomic transactions (nil = no fork, 0 = already activated)
 	ApricotPhase3BlockTimestamp *big.Int `json:"apricotPhase3BlockTimestamp,omitempty"`
+	// Apricot Phase 4 introduces a modified version of the London Hard Fork from Ethereum (nil = no fork, 0 = already activated)
+	ApricotPhase4BlockTimestamp *big.Int `json:"apricotPhase4BlockTimestamp,omitempty"`
 }
 
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Apricot Phase 1: %v, Apricot Phase 2: %v, Apricot Phase 3: %v, Engine: Dummy Consensus Engine}",
+	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v Petersburg: %v Istanbul: %v, Muir Glacier: %v, Apricot Phase 1: %v, Apricot Phase 2: %v, Apricot Phase 3: %v, Apricot Phase 4: %v, Engine: Dummy Consensus Engine}",
 		c.ChainID,
 		c.HomesteadBlock,
 		c.DAOForkBlock,
@@ -165,6 +167,7 @@ func (c *ChainConfig) String() string {
 		c.ApricotPhase1BlockTimestamp,
 		c.ApricotPhase2BlockTimestamp,
 		c.ApricotPhase3BlockTimestamp,
+		c.ApricotPhase4BlockTimestamp,
 	)
 }
 
@@ -240,6 +243,12 @@ func (c *ChainConfig) IsApricotPhase3(blockTimestamp *big.Int) bool {
 	return isForked(c.ApricotPhase3BlockTimestamp, blockTimestamp)
 }
 
+// IsApricotPhase4 returns whether [blockTimestamp] represents a block
+// with a timestamp after the Apricot Phase 4 upgrade time.
+func (c *ChainConfig) IsApricotPhase4(blockTimestamp *big.Int) bool {
+	return isForked(c.ApricotPhase4BlockTimestamp, blockTimestamp)
+}
+
 // CheckCompatible checks whether scheduled fork transitions have been imported
 // with a mismatching chain configuration.
 func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *ConfigCompatError {
@@ -312,6 +321,7 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		{name: "apricotPhase1BlockTimestamp", block: c.ApricotPhase1BlockTimestamp},
 		{name: "apricotPhase2BlockTimestamp", block: c.ApricotPhase2BlockTimestamp},
 		{name: "apricotPhase3BlockTimestamp", block: c.ApricotPhase3BlockTimestamp},
+		{name: "apricotPhase4BlockTimestamp", block: c.ApricotPhase4BlockTimestamp},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -452,6 +462,7 @@ type Rules struct {
 	IsApricotPhase1 bool
 	IsApricotPhase2 bool
 	IsApricotPhase3 bool
+	IsApricotPhase4 bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -481,5 +492,6 @@ func (c *ChainConfig) AvalancheRules(blockNum, blockTimestamp *big.Int) Rules {
 	rules.IsApricotPhase1 = c.IsApricotPhase1(blockTimestamp)
 	rules.IsApricotPhase2 = c.IsApricotPhase2(blockTimestamp)
 	rules.IsApricotPhase3 = c.IsApricotPhase3(blockTimestamp)
+	rules.IsApricotPhase4 = c.IsApricotPhase4(blockTimestamp)
 	return rules
 }
