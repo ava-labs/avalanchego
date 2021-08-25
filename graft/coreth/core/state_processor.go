@@ -96,11 +96,8 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 		receipts = append(receipts, receipt)
 		allLogs = append(allLogs, receipt.Logs...)
 	}
-	if err := p.engine.ExtraStateChange(block, statedb); err != nil {
-		return nil, nil, 0, err
-	}
 	// Finalize the block, applying any consensus engine specific extras (e.g. block rewards)
-	if err := p.engine.Finalize(p.bc, header, statedb, block.Transactions(), receipts, block.Uncles()); err != nil {
+	if err := p.engine.Finalize(p.bc, block, statedb, receipts); err != nil {
 		return nil, nil, 0, fmt.Errorf("engine finalization check failed: %w", err)
 	}
 

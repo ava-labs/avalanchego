@@ -223,11 +223,12 @@ func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, heade
 	return nil
 }
 
-func (self *DummyEngine) Finalize(
-	chain consensus.ChainHeaderReader, header *types.Header,
-	state *state.StateDB, txs []*types.Transaction, receipts []*types.Receipt,
-	uncles []*types.Header) error {
-	if err := self.verifyBlockFee(chain, header, txs, receipts); err != nil {
+func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, state *state.StateDB, receipts []*types.Receipt) error {
+	// Perform extra state change while finalizing the block
+	if self.cb.OnExtraStateChange != nil {
+		return self.cb.OnExtraStateChange(block, state)
+	}
+	if err := self.verifyBlockFee(chain, block.Header(), block.Transactions(), receipts); err != nil {
 		return err
 	}
 
@@ -270,12 +271,5 @@ func (self *DummyEngine) APIs(chain consensus.ChainHeaderReader) (res []rpc.API)
 }
 
 func (self *DummyEngine) Close() error {
-	return nil
-}
-
-func (self *DummyEngine) ExtraStateChange(block *types.Block, statedb *state.StateDB) error {
-	if self.cb.OnExtraStateChange != nil {
-		return self.cb.OnExtraStateChange(block, statedb)
-	}
 	return nil
 }
