@@ -169,6 +169,11 @@ func (m *Mempool) IssueTx(tx *transactions.SignedTx) error {
 
 	switch err := m.AddUncheckedTx(tx); err {
 	case nil:
+		if time.Now().Before(m.vm.gossipActivationTime) {
+			m.vm.ctx.Log.Verbo("issued tx before gossiping activation time. Not gossiping it")
+			return nil
+		}
+
 		txID := tx.ID()
 		m.vm.ctx.Log.Debug("Gossiping txID %v", txID)
 		txIDBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, txID)
