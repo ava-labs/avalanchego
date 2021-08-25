@@ -268,7 +268,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 
 	// add a tx to it
 	tx := getTheValidTx(vm, sharedMemory, t)
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.issueTx(tx /*local*/, true); err != nil {
 		t.Fatal("Could not add tx to mempool")
 	}
 	<-issuer
@@ -667,7 +667,7 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 
 	// add a tx to it
 	tx := getTheValidTx(vm, sharedMemory, t)
-	if err := vm.issueTx(tx); err != nil {
+	if err := vm.issueTx(tx /*local*/, true); err != nil {
 		t.Fatal("Could not add tx to mempool")
 	}
 	if len(gossipedBytes) == 0 {

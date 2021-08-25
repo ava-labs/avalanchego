@@ -754,33 +754,13 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		return nil // nothing to do
 	}
 
-	// verify tx
-	if err := vm.verifyTxAtTip(tx); err != nil {
-		vm.mempool.discardedTxs.Put(tx.ID(), tx)
-		return nil
-	}
-
-	// add to mempool and possibly re-gossip
-	switch err := vm.mempool.AddTx(tx); err {
-	case nil:
-		txID := tx.ID()
-		vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
-		if err != nil {
-			return err
-		}
-
-		return vm.appSender.SendAppGossip(txIDBytes)
-	case errTooManyAtomicTx:
-		// tx has not been accepted to mempool due to size
-		// do not gossip since we cannot serve it
-		return nil
-	default:
+	err = vm.issueTx(tx /*local*/, false)
+	if err != nil {
 		vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
-		vm.mempool.discardedTxs.Put(tx.ID(), tx)
-		return err
 	}
+
+	return err
 }
 
 // This VM doesn't (currently) have any app-specific messages
@@ -1138,23 +1118,46 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 
 // issueTx verifies [tx] as valid to be issued on top of the currently preferred block
 // and then issues [tx] into the mempool if valid.
-func (vm *VM) issueTx(tx *Tx) error {
+func (vm *VM) issueTx(tx *Tx, local bool) error {
 	if err := vm.verifyTxAtTip(tx); err != nil {
+		if !local {
+			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// so that they won't be requested again
+			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			return nil
+		}
+
 		return err
 	}
 
-	if err := vm.mempool.AddTx(tx); err != nil {
+	// add to mempool and possibly re-gossip
+	switch err := vm.mempool.AddTx(tx); err {
+	case nil:
+		txID := tx.ID()
+		vm.ctx.Log.Debug("Gossiping txID %v", txID)
+		txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
+		if err != nil {
+			return err
+		}
+
+		return vm.appSender.SendAppGossip(txIDBytes)
+	case errTooManyAtomicTx:
+		if !local {
+			// tx has not been accepted to mempool due to size
+			// do not gossip since we cannot serve it
+			return nil
+		}
+
+		return errTooManyAtomicTx // backward compatibility for local txs
+
+	default:
+		if !local {
+			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// so that they won't be requested again
+			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+		}
 		return err
 	}
-
-	txID := tx.ID()
-	vm.ctx.Log.Debug("Gossiping txID %v", txID)
-	txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
-	if err != nil {
-		return err
-	}
-
-	return vm.appSender.SendAppGossip(txIDBytes)
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
