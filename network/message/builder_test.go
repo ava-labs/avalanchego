@@ -471,3 +471,133 @@ func TestBuildMultiPut(t *testing.T) {
 		assert.Equal(t, containers, parsedMsg.Get(MultiContainerBytes))
 	}
 }
+
+func TestBuildAppRequestMsg(t *testing.T) {
+	chainID := ids.GenerateTestID()
+	appRequestBytes := make([]byte, 1024)
+	appRequestBytes[0] = 1
+	appRequestBytes[len(appRequestBytes)-1] = 1
+	deadline := uint64(time.Now().Unix())
+
+	{ // no compression
+		msg, err := TestBuilder.AppRequest(chainID, 1, deadline, appRequestBytes, false)
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppRequest, msg.Op())
+		assert.Equal(t, deadline, msg.Get(Deadline))
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+		msg, err = TestCodec.Parse(msg.Bytes())
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppRequest, msg.Op())
+		assert.Equal(t, deadline, msg.Get(Deadline))
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+	}
+
+	{ // with compression
+		msg, err := TestBuilder.AppRequest(chainID, 1, deadline, appRequestBytes, true)
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppRequest, msg.Op())
+		assert.Equal(t, deadline, msg.Get(Deadline))
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+		msg, err = TestCodec.Parse(msg.Bytes())
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppRequest, msg.Op())
+		assert.Equal(t, deadline, msg.Get(Deadline))
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appRequestBytes, msg.Get(AppRequestBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+	}
+}
+
+func TestBuildAppResponseMsg(t *testing.T) {
+	chainID := ids.GenerateTestID()
+	appResponseBytes := make([]byte, 1024)
+	appResponseBytes[0] = 1
+	appResponseBytes[len(appResponseBytes)-1] = 1
+
+	{ // no compression
+		msg, err := TestBuilder.AppResponse(chainID, 1, appResponseBytes, false)
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppResponse, msg.Op())
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+		msg, err = TestCodec.Parse(msg.Bytes())
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppResponse, msg.Op())
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+	}
+
+	{ // with compression
+		msg, err := TestBuilder.AppResponse(chainID, 1, appResponseBytes, true)
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppResponse, msg.Op())
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+		msg, err = TestCodec.Parse(msg.Bytes())
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppResponse, msg.Op())
+		assert.EqualValues(t, 1, msg.Get(RequestID))
+		assert.Equal(t, appResponseBytes, msg.Get(AppResponseBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+	}
+}
+
+func TestBuildAppGossipMsg(t *testing.T) {
+	chainID := ids.GenerateTestID()
+	appGossipBytes := make([]byte, 1024)
+	appGossipBytes[0] = 1
+	appGossipBytes[len(appGossipBytes)-1] = 1
+
+	{ // no compression
+		msg, err := TestBuilder.AppGossip(chainID, appGossipBytes, false)
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppGossip, msg.Op())
+		assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+		msg, err = TestCodec.Parse(msg.Bytes())
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppGossip, msg.Op())
+		assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+	}
+
+	{ // with compression
+		msg, err := TestBuilder.AppGossip(chainID, appGossipBytes, true)
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppGossip, msg.Op())
+		assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+
+		msg, err = TestCodec.Parse(msg.Bytes())
+		assert.NoError(t, err)
+		assert.NotNil(t, msg)
+		assert.Equal(t, AppGossip, msg.Op())
+		assert.Equal(t, appGossipBytes, msg.Get(AppGossipBytes))
+		assert.Equal(t, chainID[:], msg.Get(ChainID))
+	}
+}

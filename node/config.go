@@ -77,9 +77,15 @@ type ConsensusGossipConfig struct {
 	ConsensusGossipOnAcceptSize uint `json:"consensusGossipOnAcceptSize"`
 }
 
+type AppGossipConfig struct {
+	// Number of peers to gossip an AppGossip message
+	AppGossipSize uint `json:"appGossipSize"`
+}
+
 type GossipConfig struct {
 	PeerListGossipConfig
 	ConsensusGossipConfig
+	AppGossipConfig
 }
 
 type IPConfig struct {

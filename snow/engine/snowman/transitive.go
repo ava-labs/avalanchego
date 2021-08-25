@@ -141,7 +141,7 @@ func (t *Transitive) Gossip() error {
 		return nil
 	}
 	t.Ctx.Log.Verbo("gossiping %s as accepted to the network", blkID)
-	t.Sender.Gossip(blkID, blk.Bytes())
+	t.Sender.SendGossip(blkID, blk.Bytes())
 	return nil
 }
 
@@ -163,7 +163,7 @@ func (t *Transitive) Get(vdr ids.ShortID, requestID uint32, blkID ids.ID) error 
 	}
 
 	// Respond to the validator with the fetched block and the same requestID.
-	t.Sender.Put(vdr, requestID, blkID, blk.Bytes())
+	t.Sender.SendPut(vdr, requestID, blkID, blk.Bytes())
 	return nil
 }
 
@@ -197,7 +197,7 @@ func (t *Transitive) GetAncestors(vdr ids.ShortID, requestID uint32, blkID ids.I
 	}
 
 	t.metrics.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
-	t.Sender.MultiPut(vdr, requestID, ancestorsBytes)
+	t.Sender.SendMultiPut(vdr, requestID, ancestorsBytes)
 	return nil
 }
 
@@ -377,6 +377,46 @@ func (t *Transitive) QueryFailed(vdr ids.ShortID, requestID uint32) error {
 	})
 	t.metrics.numBlockers.Set(float64(t.blocked.Len()))
 	return t.buildBlocks()
+}
+
+// AppRequest implements the Engine interface
+func (t *Transitive) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppRequest(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM of this request
+	return t.VM.AppRequest(nodeID, requestID, request)
+}
+
+// AppResponse implements the Engine interface
+func (t *Transitive) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppResponse(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM of a response to its request
+	return t.VM.AppResponse(nodeID, requestID, response)
+}
+
+// AppRequestFailed implements the Engine interface
+func (t *Transitive) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppRequestFailed(%s, %d) due to bootstrapping", nodeID, requestID)
+		return nil
+	}
+	// Notify the VM that a request it made failed
+	return t.VM.AppRequestFailed(nodeID, requestID)
+}
+
+// AppGossip implements the Engine interface
+func (t *Transitive) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	if !t.Ctx.IsBootstrapped() {
+		t.Ctx.Log.Debug("dropping AppGossip(%s) due to bootstrapping", nodeID)
+		return nil
+	}
+	// Notify the VM of this message which has been gossiped to it
+	return t.VM.AppGossip(nodeID, msg)
 }
 
 // Notify implements the Engine interface
@@ -588,7 +628,7 @@ func (t *Transitive) sendRequest(vdr ids.ShortID, blkID ids.ID) {
 	t.RequestID++
 	t.blkReqs.Add(vdr, t.RequestID, blkID)
 	t.Ctx.Log.Verbo("sending Get(%s, %d, %s)", vdr, t.RequestID, blkID)
-	t.Sender.Get(vdr, t.RequestID, blkID)
+	t.Sender.SendGet(vdr, t.RequestID, blkID)
 
 	// Tracks performance statistics
 	t.metrics.numRequests.Set(float64(t.blkReqs.Len()))
@@ -609,7 +649,7 @@ func (t *Transitive) pullQuery(blkID ids.ID) {
 		vdrList := vdrBag.List()
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
-		t.Sender.PullQuery(vdrSet, t.RequestID, blkID)
+		t.Sender.SendPullQuery(vdrSet, t.RequestID, blkID)
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blkID)
 	}
@@ -630,7 +670,7 @@ func (t *Transitive) pushQuery(blk snowman.Block) {
 		vdrSet := ids.NewShortSet(len(vdrList))
 		vdrSet.Add(vdrList...)
 
-		t.Sender.PushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
+		t.Sender.SendPushQuery(vdrSet, t.RequestID, blk.ID(), blk.Bytes())
 	} else if err != nil {
 		t.Ctx.Log.Error("query for %s was dropped due to an insufficient number of validators", blk.ID())
 	}

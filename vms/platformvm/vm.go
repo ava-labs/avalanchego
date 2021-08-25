@@ -139,6 +139,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
+	_ common.AppSender,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
 
@@ -405,6 +406,26 @@ func (vm *VM) NotifyBlockReady() {
 
 func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return nil
 }
 
 // CreateHandlers returns a map where:

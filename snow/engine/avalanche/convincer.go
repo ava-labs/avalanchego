@@ -42,5 +42,5 @@ func (c *convincer) Update() {
 	}
 	c.sent = true
 
-	c.sender.Chits(c.vdr, c.requestID, c.consensus.Preferences().List())
+	c.sender.SendChits(c.vdr, c.requestID, c.consensus.Preferences().List())
 }
