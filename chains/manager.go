@@ -338,6 +338,12 @@ func (m *manager) buildChain(chainParams ChainParameters, sb Subnet) (*chain, er
 		EpochDuration:        m.EpochDuration,
 	}
 
+	if sbConfigs, ok := m.SubnetConfigs[chainParams.SubnetID]; ok {
+		if sbConfigs.ValidatorOnly {
+			ctx.SetValidatorOnly()
+		}
+	}
+
 	// Get a factory for the vm we want to use on our chain
 	vmFactory, err := m.VMManager.GetFactory(vmID)
 	if err != nil {
