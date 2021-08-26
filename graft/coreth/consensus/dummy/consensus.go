@@ -28,6 +28,8 @@ var (
 	// the amount of time after a parent block was issued that a block fee
 	// exists
 	apricotPhase4BlockGasFeeDuration uint64 = 10 // in seconds
+
+	errMissingParent = errors.New("missing parent")
 )
 
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
@@ -247,6 +249,9 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 	}
 	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
 		parent := chain.GetHeaderByHash(block.ParentHash())
+		if parent == nil {
+			return errMissingParent
+		}
 		if err := self.verifyBlockFee(
 			block.BaseFee(),
 			apricotPhase4MaxRequiredBlockGasFee,
@@ -279,6 +284,9 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 	}
 	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		parent := chain.GetHeaderByHash(header.ParentHash)
+		if parent == nil {
+			return nil, errMissingParent
+		}
 		if err := self.verifyBlockFee(
 			header.BaseFee,
 			apricotPhase4MaxRequiredBlockGasFee,
