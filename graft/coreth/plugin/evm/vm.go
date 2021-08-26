@@ -455,9 +455,12 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			vm.mempool.DiscardCurrentTx()
 			return nil, nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 		}
-		contribution, err := tx.BlockFeeContribution(vm.ctx.AVAXAssetID, header.BaseFee)
-		if err != nil {
-			return nil, nil, err
+		var contribution *big.Int
+		if rules.IsApricotPhase4 {
+			contribution, err = tx.BlockFeeContribution(vm.ctx.AVAXAssetID, header.BaseFee)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		return atomicTxBytes, contribution, nil
 	}
@@ -482,6 +485,10 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 	}
 	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
 		return nil, err
+	}
+	// If ApricotPhase4 has not activated yet, there is no contribution
+	if !vm.chainConfig.IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
+		return nil, nil
 	}
 	// Calculate the block fee contribution
 	return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
