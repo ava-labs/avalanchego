@@ -171,6 +171,7 @@ func init() {
 		c.RegisterType(&secp256k1fx.Credential{}),
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.OutputOwners{}),
+		c.RegisterType([]common.Hash{}), // to serialize coreEth hashes
 		Codec.RegisterCodec(codecVersion, c),
 	)
 
@@ -678,7 +679,6 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
 	vm.ctx.Log.Verbo("called AppRequest")
 
@@ -1075,6 +1075,22 @@ func (vm *VM) signalTxsReady() {
 	}
 }
 
+func (vm *VM) ethTxHashesToBytes(ethTxs []*types.Transaction) ([]byte, error) {
+	ethIDs := make([]common.Hash, len(ethTxs))
+	for idx, ethTx := range ethTxs {
+		ethIDs[idx] = ethTx.Hash()
+	}
+
+	return vm.codec.Marshal(codecVersion, ethIDs)
+}
+
+func (vm *VM) bytesToEthTxHashes(b []byte) ([]common.Hash, error) {
+	ethIDs := make([]common.Hash, 0)
+
+	_, err := vm.codec.Unmarshal(b, &ethIDs)
+	return ethIDs, err
+}
+
 // awaitSubmittedTxs waits for new transactions to be submitted
 // and notifies the VM when the tx pool has transactions to be
 // put into a new block.
@@ -1085,7 +1101,7 @@ func (vm *VM) awaitSubmittedTxs() {
 	}
 	for {
 		select {
-		case ethTxs := <-vm.txSubmitChan:
+		case ethTxsEvent := <-vm.txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
 			vm.signalTxsReady()
 
@@ -1095,12 +1111,7 @@ func (vm *VM) awaitSubmittedTxs() {
 			}
 
 			// pick IDs and serialize them
-			ethIDs := make([]common.Hash, len(ethTxs.Txs))
-			for idx, ethTx := range ethTxs.Txs {
-				ethIDs[idx] = ethTx.Hash()
-			}
-
-			ethTxsBytes, err := rlp.EncodeToBytes(ethTxs.Txs)
+			ethTxsBytes, err := vm.ethTxHashesToBytes(ethTxsEvent.Txs)
 			if err != nil {
 				log.Trace("Could not parse ethTxIDs. Understand what to do")
 			}
