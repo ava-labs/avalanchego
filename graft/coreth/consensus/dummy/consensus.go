@@ -214,6 +214,7 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 		blockGas.Add(blockGas, extraStateChangeContribution)
 	}
 
+	// requiredBlockGasFee = (maxBlockGasFee * (blockFeeDuration - timeElapsed)) / blockFeeDuration
 	bigBlockFeeDuration := new(big.Int).SetUint64(blockFeeDuration)
 	// feeTimeRemaining can be negative - but that doesn't matter.
 	feeTimeRemaining := new(big.Int).Sub(
