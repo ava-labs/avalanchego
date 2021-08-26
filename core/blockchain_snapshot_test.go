@@ -27,6 +27,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+
 	//"time"
 
 	"github.com/ava-labs/coreth/consensus"
@@ -35,8 +36,8 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethdb"
-    "github.com/ethereum/go-ethereum/common"
 )
 
 // snapshotTestBasic wraps the common testing fields in the snapshot tests.
@@ -48,8 +49,8 @@ type snapshotTestBasic struct {
 	expCanonicalBlocks int    // Number of canonical blocks expected to remain in the database (excl. genesis)
 	expHeadHeader      uint64 // Block number of the expected head header
 	//expHeadFastBlock   uint64 // Block number of the expected head fast sync block
-	expHeadBlock       uint64 // Block number of the expected head full block
-	expSnapshotBottom  uint64 // The block height corresponding to the snapshot disk layer
+	expHeadBlock      uint64 // Block number of the expected head full block
+	expSnapshotBottom uint64 // The block height corresponding to the snapshot disk layer
 
 	// share fields, set in runtime
 	datadir string
@@ -57,8 +58,8 @@ type snapshotTestBasic struct {
 	gendb   ethdb.Database
 	engine  consensus.Engine
 
-    // restart logistic
-    lastAcceptedHash common.Hash
+	// restart logistic
+	lastAcceptedHash common.Hash
 }
 
 func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Block) {
@@ -90,8 +91,8 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 	}
 	blocks, _ := GenerateChain(params.TestChainConfig, genesis, engine, gendb, basic.chainBlocks, func(i int, b *BlockGen) {})
 
-    // genesis as last accepted
-    basic.lastAcceptedHash = chain.GetBlockByNumber(0).Hash()
+	// genesis as last accepted
+	basic.lastAcceptedHash = chain.GetBlockByNumber(0).Hash()
 	//basic.lastAcceptedHash = common.Hash{}
 
 	// Insert the blocks with configured settings.
@@ -114,15 +115,15 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 		if basic.snapshotBlock > 0 && basic.snapshotBlock == point {
 
 			// Flushing from 0 to snapshotBlock into the disk
-            for i := uint64(0); i < point; i++ {
-                //if err := chain.snaps.Flatten(blocks[i].Hash()); err != nil {
-			    //   t.Fatalf("Failed to flatten snap diff for block %v: %v", i, err)
-                //}
-                if err := chain.Accept(blocks[i]); err != nil {
-			        t.Fatalf("Failed to accept block %v: %v", i, err)
-                }
-                basic.lastAcceptedHash = blocks[i].Hash()
-            }
+			for i := uint64(0); i < point; i++ {
+				//if err := chain.snaps.Flatten(blocks[i].Hash()); err != nil {
+				//   t.Fatalf("Failed to flatten snap diff for block %v: %v", i, err)
+				//}
+				if err := chain.Accept(blocks[i]); err != nil {
+					t.Fatalf("Failed to accept block %v: %v", i, err)
+				}
+				basic.lastAcceptedHash = blocks[i].Hash()
+			}
 
 			diskRoot, blockRoot := chain.snaps.DiskRoot(), blocks[point-1].Root()
 			if !bytes.Equal(diskRoot.Bytes(), blockRoot.Bytes()) {
@@ -153,11 +154,11 @@ func (basic *snapshotTestBasic) verify(t *testing.T, chain *BlockChain, blocks [
 	if head := chain.CurrentHeader(); head.Number.Uint64() != basic.expHeadHeader {
 		t.Errorf("Head header mismatch: have %d, want %d", head.Number, basic.expHeadHeader)
 	}
-    /*
-	if head := chain.CurrentFastBlock(); head.NumberU64() != basic.expHeadFastBlock {
-		t.Errorf("Head fast block mismatch: have %d, want %d", head.NumberU64(), basic.expHeadFastBlock)
-	}
-    */
+	/*
+		if head := chain.CurrentFastBlock(); head.NumberU64() != basic.expHeadFastBlock {
+			t.Errorf("Head fast block mismatch: have %d, want %d", head.NumberU64(), basic.expHeadFastBlock)
+		}
+	*/
 	if head := chain.CurrentBlock(); head.NumberU64() != basic.expHeadBlock {
 		t.Errorf("Head block mismatch: have %d, want %d", head.NumberU64(), basic.expHeadBlock)
 	}
@@ -170,7 +171,7 @@ func (basic *snapshotTestBasic) verify(t *testing.T, chain *BlockChain, blocks [
 		t.Errorf("The snapshot disk layer root is incorrect, want %x, get %x", block.Root(), chain.snaps.DiskRoot())
 	} else if len(chain.snaps.Snapshots(block.Hash(), -1, false)) != 1 {
 		t.Errorf("The correspnding block[%d] of snapshot disk layer is missing", basic.expSnapshotBottom)
-    }
+	}
 
 	// Check the snapshot, ensure it's integrated
 	if err := chain.snaps.Verify(block.Root()); err != nil {
@@ -252,7 +253,7 @@ func (snaptest *snapshotTest) test(t *testing.T) {
 	}
 	defer newchain.Stop()
 
-    //fmt.Printf("%v\n", newchain.LastAcceptedBlock().NumberU64())
+	//fmt.Printf("%v\n", newchain.LastAcceptedBlock().NumberU64())
 	//fmt.Printf("%v\n", chain.snaps.Snapshots(blocks[7].Hash(), -1, false))
 	//fmt.Printf("%v\n", newchain.snaps.Snapshots(blocks[7].Hash(), -1, false))
 
@@ -326,7 +327,7 @@ func (snaptest *gappedSnapshotTest) test(t *testing.T) {
 		TrieCleanLimit: 256,
 		TrieDirtyLimit: 256,
 		//TrieTimeLimit:  5 * time.Minute,
-		SnapshotLimit:  0,
+		SnapshotLimit: 0,
 	}
 	newchain, err := NewBlockChain(snaptest.db, cacheConfig, params.TestChainConfig, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash)
 	if err != nil {
@@ -449,7 +450,7 @@ func (snaptest *wipeCrashSnapshotTest) test(t *testing.T) {
 		TrieCleanLimit: 256,
 		TrieDirtyLimit: 256,
 		//TrieTimeLimit:  5 * time.Minute,
-		SnapshotLimit:  0,
+		SnapshotLimit: 0,
 	}
 	newchain, err := NewBlockChain(snaptest.db, config, params.TestChainConfig, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash)
 	if err != nil {
@@ -464,7 +465,7 @@ func (snaptest *wipeCrashSnapshotTest) test(t *testing.T) {
 		TrieCleanLimit: 256,
 		TrieDirtyLimit: 256,
 		//TrieTimeLimit:  5 * time.Minute,
-		SnapshotLimit:  256,
+		SnapshotLimit: 256,
 		//SnapshotWait:   false, // Don't wait rebuild
 	}
 	newchain, err = NewBlockChain(snaptest.db, config, params.TestChainConfig, snaptest.engine, vm.Config{}, snaptest.lastAcceptedHash)
@@ -509,8 +510,8 @@ func TestRestartWithNewSnapshot(t *testing.T) {
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			//expHeadFastBlock:   8,
-			expHeadBlock:       4,
-			expSnapshotBottom:  4, // Initial disk layer built from genesis
+			expHeadBlock:      4,
+			expSnapshotBottom: 4, // Initial disk layer built from genesis
 		},
 	}
 	test.test(t)
@@ -548,8 +549,8 @@ func TestNoCommitCrashWithNewSnapshot(t *testing.T) {
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			//expHeadFastBlock:   8,
-			expHeadBlock:       4,
-			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
+			expHeadBlock:      4,
+			expSnapshotBottom: 4, // Last committed disk layer, wait recovery
 		},
 	}
 	test.test(t)
@@ -587,8 +588,8 @@ func TestLowCommitCrashWithNewSnapshot(t *testing.T) {
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			//expHeadFastBlock:   8,
-			expHeadBlock:       4,
-			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
+			expHeadBlock:      4,
+			expSnapshotBottom: 4, // Last committed disk layer, wait recovery
 		},
 	}
 	test.test(t)
@@ -626,8 +627,8 @@ func TestHighCommitCrashWithNewSnapshot(t *testing.T) {
 			expCanonicalBlocks: 8,
 			expHeadHeader:      8,
 			//expHeadFastBlock:   8,
-			expHeadBlock:       4,
-			expSnapshotBottom:  4, // Last committed disk layer, wait recovery
+			expHeadBlock:      4,
+			expSnapshotBottom: 4, // Last committed disk layer, wait recovery
 		},
 	}
 	test.test(t)
@@ -663,8 +664,8 @@ func TestGappedNewSnapshot(t *testing.T) {
 			expCanonicalBlocks: 10,
 			expHeadHeader:      8,
 			//expHeadFastBlock:   10,
-			expHeadBlock:       0,
-			expSnapshotBottom:  0, // Rebuilt snapshot from the latest HEAD
+			expHeadBlock:      0,
+			expSnapshotBottom: 0, // Rebuilt snapshot from the latest HEAD
 		},
 		gapped: 2,
 	}
@@ -741,8 +742,8 @@ func TestRecoverSnapshotFromWipingCrash(t *testing.T) {
 			expCanonicalBlocks: 10,
 			expHeadHeader:      8,
 			//expHeadFastBlock:   10,
-			expHeadBlock:       4,
-			expSnapshotBottom:  4,
+			expHeadBlock:      4,
+			expSnapshotBottom: 4,
 		},
 		newBlocks: 2,
 	}
@@ -855,4 +856,3 @@ func verifyCutoff(t *testing.T, chain *BlockChain, canonical bool, inserted type
 		}
 	}
 }
-
