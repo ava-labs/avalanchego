@@ -23,9 +23,9 @@ var (
 	blockGasDiv = new(big.Int).SetUint64(10)
 )
 
-type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution uint64, err error)
+type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
-type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution uint64, err error)
+type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, err error)
 
 type ConsensusCallbacks struct {
 	OnAPIs                OnAPIsCallbackType
@@ -173,7 +173,7 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 	return nil
 }
 
-func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt) error {
+func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, header *types.Header, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
 	// If the engine is not charging the base fee, skip the verification.
 	// Note: this is a hack to support tests migrated from geth without substantial modification.
 	if self.skipBlockFee {
@@ -210,6 +210,10 @@ func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, heade
 	// Calculate how much gas the [totalBlockFee] would purchase at the price level
 	// set by this block.
 	blockGas := new(big.Int).Div(totalBlockFee, header.BaseFee)
+	// Add in the external contribution
+	if extraStateChangeContribution != nil {
+		blockGas.Add(blockGas, extraStateChangeContribution)
+	}
 
 	// Set the blockGasFee to [header.GasLimit / 10].
 	blockGasLimit := new(big.Int).SetUint64(header.GasLimit)
@@ -225,13 +229,15 @@ func (self *DummyEngine) verifyBlockFee(chain consensus.ChainHeaderReader, heade
 
 func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, state *state.StateDB, receipts []*types.Receipt) error {
 	// Perform extra state change while finalizing the block
+	var contribution *big.Int
 	if self.cb.OnExtraStateChange != nil {
-		// TODO this should return the amount of gas that was consumed by the extra state change, so that it can be passed in to verifyBlockFee
-		if _, err := self.cb.OnExtraStateChange(block, state); err != nil {
+		extraStateChangeContribution, err := self.cb.OnExtraStateChange(block, state)
+		if err != nil {
 			return err
 		}
+		contribution = extraStateChangeContribution
 	}
-	if err := self.verifyBlockFee(chain, block.Header(), block.Transactions(), receipts); err != nil {
+	if err := self.verifyBlockFee(chain, block.Header(), block.Transactions(), receipts, contribution); err != nil {
 		return err
 	}
 
@@ -240,15 +246,19 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 
 func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	var extdata []byte
+	var (
+		contribution *big.Int
+		extdata      []byte
+	)
 	if self.cb.OnFinalizeAndAssemble != nil {
-		ret, _, err := self.cb.OnFinalizeAndAssemble(header, state, txs)
+		ret, extraStateChangeContribution, err := self.cb.OnFinalizeAndAssemble(header, state, txs)
 		extdata = ret
 		if err != nil {
 			return nil, err
 		}
+		contribution = extraStateChangeContribution
 	}
-	if err := self.verifyBlockFee(chain, header, txs, receipts); err != nil {
+	if err := self.verifyBlockFee(chain, header, txs, receipts, contribution); err != nil {
 		return nil, err
 	}
 	// commit the final state root

@@ -433,7 +433,7 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 	}
 }
 
-func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, uint64, error) {
+func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, error) {
 	snapshot := state.Snapshot()
 	for {
 		tx, exists := vm.mempool.NextTx()
@@ -453,31 +453,38 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			// Discard the transaction from the mempool and error if the transaction
 			// cannot be marshalled. This should never happen.
 			vm.mempool.DiscardCurrentTx()
-			return nil, 0, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
+			return nil, nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 		}
-		return atomicTxBytes, 0, nil
+		contribution, err := tx.BlockFeeContribution(vm.ctx.AVAXAssetID, header.BaseFee)
+		if err != nil {
+			return nil, nil, err
+		}
+		return atomicTxBytes, contribution, nil
 	}
 
 	if len(txs) == 0 {
 		// this could happen due to the async logic of geth tx pool
-		return nil, 0, errEmptyBlock
+		return nil, nil, errEmptyBlock
 	}
 
-	return nil, 0, nil
+	return nil, nil, nil
 }
 
-func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (uint64, error) {
+func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big.Int, error) {
 	tx, err := vm.extractAtomicTx(block)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
+	// If [tx] is nil, avoid returning a nil value, but consider the extra state change to have
+	// contributed nothing to the block fee.
 	if tx == nil {
-		return 0, nil
+		return nil, nil
 	}
 	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
-		return 0, err
+		return nil, err
 	}
-	return 0, nil
+	// Calculate the block fee contribution
+	return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
 }
 
 func (vm *VM) pruneChain() error {
