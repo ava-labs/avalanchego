@@ -66,7 +66,7 @@ var (
 		ApricotPhase1BlockTimestamp: big.NewInt(time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhase2BlockTimestamp: big.NewInt(time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhase3BlockTimestamp: big.NewInt(time.Date(2021, time.August, 24, 14, 0, 0, 0, time.UTC).Unix()),
-		ApricotPhase4BlockTimestamp: big.NewInt(time.Date(2021, time.August, 26, 2, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase4BlockTimestamp: big.NewInt(time.Date(2021, time.August, 28, 2, 0, 0, 0, time.UTC).Unix()),
 	}
 
 	// AvalancheFujiChainConfig is the configuration for the Fuji Test Network
@@ -87,7 +87,7 @@ var (
 		ApricotPhase1BlockTimestamp: big.NewInt(time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhase2BlockTimestamp: big.NewInt(time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC).Unix()),
 		ApricotPhase3BlockTimestamp: big.NewInt(time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC).Unix()),
-		ApricotPhase4BlockTimestamp: big.NewInt(time.Date(2021, time.August, 26, 2, 0, 0, 0, time.UTC).Unix()),
+		ApricotPhase4BlockTimestamp: big.NewInt(time.Date(2021, time.August, 28, 2, 0, 0, 0, time.UTC).Unix()),
 	}
 
 	// AvalancheLocalChainConfig is the configuration for the Avalanche Local Network
