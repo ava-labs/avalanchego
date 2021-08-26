@@ -14,20 +14,20 @@ type snowball struct {
 
 	// lastVote is the last poll number that this choice was included in a
 	// successful network poll
-	lastVote int
+	lastVote uint64
 
 	// rogue identifies if there is a known conflict with this choice
 	rogue bool
 }
 
-func (sb *snowball) Confidence(currentVote int) int {
+func (sb *snowball) Confidence(currentVote uint64) int {
 	if sb.lastVote != currentVote {
 		return 0
 	}
 	return sb.confidence
 }
 
-func (sb *snowball) RecordSuccessfulPoll(currentVote int) {
+func (sb *snowball) RecordSuccessfulPoll(currentVote uint64) {
 	// If this choice wasn't voted for during the last poll, the confidence
 	// should have been reset during the last poll. So, we reset it now.
 	if sb.lastVote+1 != currentVote {
