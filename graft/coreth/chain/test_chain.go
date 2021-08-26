@@ -88,6 +88,7 @@ func NewDefaultChain(t *testing.T) (*ETHChain, chan core.NewTxPoolHeadEvent, <-c
 		eth.DefaultSettings,
 		new(dummy.ConsensusCallbacks),
 		common.Hash{},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

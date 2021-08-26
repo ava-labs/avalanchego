@@ -106,6 +106,7 @@ func TestMulticoin(t *testing.T) {
 		eth.DefaultSettings,
 		new(dummy.ConsensusCallbacks),
 		common.Hash{},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
