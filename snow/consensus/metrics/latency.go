@@ -16,18 +16,31 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+type opStart struct {
+	time       time.Time
+	pollNumber uint64
+}
+
 // Latency reports commonly used consensus latency metrics.
 type Latency struct {
 	// Clock gives access to the current wall clock time
 	Clock timer.Clock
 
-	// ProcessingEntries keeps track of the time that each item was issued into
-	// the consensus instance. This is used to calculate the amount of time to
-	// accept or reject the item.
+	// ProcessingEntries keeps track of the [opStart] that each item was issued
+	// into the consensus instance. This is used to calculate the amount of time
+	// to accept or reject the item.
 	processingEntries linkedhashmap.LinkedHashmap
 
 	// log reports anomalous events.
 	log logging.Logger
+
+	// pollsAccepted tracks the number of polls that an item was in processing
+	// for before being accepted
+	pollsAccepted metric.Averager
+
+	// pollsRejected tracks the number of polls that an item was in processing
+	// for before being rejected
+	pollsRejected metric.Averager
 
 	// numProcessing keeps track of the number of items processing
 	numProcessing prometheus.Gauge
@@ -53,6 +66,20 @@ func (m *Latency) Initialize(metricName, descriptionName string, log logging.Log
 	})
 
 	errs := wrappers.Errs{}
+	m.pollsAccepted = metric.NewAveragerWithErrs(
+		namespace,
+		fmt.Sprintf("%s_polls_accepted", metricName),
+		fmt.Sprintf("number of polls from issuance of a %s to its acceptance", descriptionName),
+		reg,
+		&errs,
+	)
+	m.pollsRejected = metric.NewAveragerWithErrs(
+		namespace,
+		fmt.Sprintf("%s_polls_rejected", metricName),
+		fmt.Sprintf("number of polls from issuance of a %s to its rejection", descriptionName),
+		reg,
+		&errs,
+	)
 	m.latAccepted = metric.NewAveragerWithErrs(
 		namespace,
 		fmt.Sprintf("%s_accepted", metricName),
@@ -73,37 +100,48 @@ func (m *Latency) Initialize(metricName, descriptionName string, log logging.Log
 }
 
 // Issued marks the item as having been issued.
-func (m *Latency) Issued(id ids.ID) {
-	m.processingEntries.Put(id, m.Clock.Time())
+func (m *Latency) Issued(id ids.ID, pollNumber uint64) {
+	m.processingEntries.Put(id, opStart{
+		time:       m.Clock.Time(),
+		pollNumber: pollNumber,
+	})
 	m.numProcessing.Inc()
 }
 
 // Accepted marks the item as having been accepted.
-func (m *Latency) Accepted(id ids.ID) {
-	startTime, ok := m.processingEntries.Get(id)
+func (m *Latency) Accepted(id ids.ID, pollNumber uint64) {
+	startIntf, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Accepted transaction %v", id.String())
 		return
 	}
 	m.processingEntries.Delete(id)
 
+	start := startIntf.(opStart)
+
+	m.pollsAccepted.Observe(float64(pollNumber - start.pollNumber))
+
 	endTime := m.Clock.Time()
-	duration := endTime.Sub(startTime.(time.Time))
+	duration := endTime.Sub(start.time)
 	m.latAccepted.Observe(float64(duration))
 	m.numProcessing.Dec()
 }
 
 // Rejected marks the item as having been rejected.
-func (m *Latency) Rejected(id ids.ID) {
-	startTime, ok := m.processingEntries.Get(id)
+func (m *Latency) Rejected(id ids.ID, pollNumber uint64) {
+	startIntf, ok := m.processingEntries.Get(id)
 	if !ok {
 		m.log.Debug("unable to measure Rejected transaction %v", id.String())
 		return
 	}
 	m.processingEntries.Delete(id)
 
+	start := startIntf.(opStart)
+
+	m.pollsRejected.Observe(float64(pollNumber - start.pollNumber))
+
 	endTime := m.Clock.Time()
-	duration := endTime.Sub(startTime.(time.Time))
+	duration := endTime.Sub(start.time)
 	m.latRejected.Observe(float64(duration))
 	m.numProcessing.Dec()
 }
@@ -113,7 +151,7 @@ func (m *Latency) MeasureAndGetOldestDuration() time.Duration {
 	_, oldestTimeIntf, exists := m.processingEntries.Oldest()
 	oldestTime := now
 	if exists {
-		oldestTime = oldestTimeIntf.(time.Time)
+		oldestTime = oldestTimeIntf.(opStart).time
 	}
 
 	duration := now.Sub(oldestTime)

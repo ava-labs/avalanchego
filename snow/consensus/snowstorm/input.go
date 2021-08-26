@@ -47,7 +47,7 @@ type inputTx struct {
 	// successful network poll. This timestamp is needed to ensure correctness
 	// in the case that a tx was rejected when it was preferred in a conflict
 	// set and there was a tie for the second highest numSuccessfulPolls.
-	lastVote int
+	lastVote uint64
 
 	// tx is the actual transaction this node represents
 	tx Tx
@@ -200,7 +200,9 @@ func (ig *Input) Issued(tx Tx) bool {
 func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 	// Increase the vote ID. This is only updated here and is used to reset the
 	// confidence values of transactions lazily.
-	ig.currentVote++
+	// This is also used to track the number of polls required to accept/reject
+	// a transaction.
+	ig.pollNumber++
 
 	// This flag tracks if the Avalanche instance needs to recompute its
 	// frontiers. Frontiers only need to be recalculated if preferences change
@@ -221,7 +223,7 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 		}
 
 		txNode.numSuccessfulPolls++
-		txNode.lastVote = ig.currentVote
+		txNode.lastVote = ig.pollNumber
 
 		// This tx is preferred if it is preferred in all of its conflict sets
 		preferred := true
@@ -237,10 +239,10 @@ func (ig *Input) RecordPoll(votes ids.Bag) (bool, error) {
 			// should have been reset during the last poll. So, we reset it now.
 			// Additionally, if a different tx was voted for in the last poll,
 			// the confidence should also be reset.
-			if utxo.lastVote+1 != ig.currentVote || txID != utxo.color {
+			if utxo.lastVote+1 != ig.pollNumber || txID != utxo.color {
 				utxo.confidence = 0
 			}
-			utxo.lastVote = ig.currentVote
+			utxo.lastVote = ig.pollNumber
 
 			// Update the Snowflake counter and preference.
 			utxo.color = txID
@@ -329,7 +331,7 @@ func (ig *Input) String() string {
 		confidence := ig.params.BetaRogue
 		for _, inputID := range tx.tx.InputIDs() {
 			input := ig.utxos[inputID]
-			if input.lastVote != ig.currentVote || txID != input.color {
+			if input.lastVote != ig.pollNumber || txID != input.color {
 				confidence = 0
 				break
 			}
@@ -426,7 +428,7 @@ func (ig *Input) removeConflict(txID ids.ID, inputIDs []ids.ID) {
 		// preferred.
 		preference := ids.ID{}
 		numSuccessfulPolls := -1
-		lastVote := 0
+		var lastVote uint64
 
 		// Find the new Snowball preference
 		for spender := range utxo.spenders {
