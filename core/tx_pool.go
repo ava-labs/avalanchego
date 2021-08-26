@@ -27,7 +27,6 @@
 package core
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -39,7 +38,6 @@ import (
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
-	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/prque"
@@ -156,8 +154,6 @@ type blockChain interface {
 
 // TxPoolConfig are the configuration parameters of the transaction pool.
 type TxPoolConfig struct {
-	Client *ethclient.Client // optional passthrough client
-
 	Locals    []common.Address // Addresses that should be treated by default as local
 	NoLocals  bool             // Whether local transaction handling should be disabled
 	Journal   string           // Journal of local transactions to survive node restarts
@@ -931,15 +927,6 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 			errs[i] = ErrInvalidSender
 			invalidTxMeter.Mark(1)
 			continue
-		}
-
-		if pool.config.Client != nil {
-			if err := pool.config.Client.SendTransaction(context.Background(), tx); err != nil {
-				// TODO: should this mark the tx as erred?
-				log.Error("Failed to pass transaction to remote", "err", err)
-			} else {
-				log.Info("Passed transaction to remote")
-			}
 		}
 
 		// Accumulate all unknown transactions for deeper processing
