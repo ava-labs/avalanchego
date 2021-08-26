@@ -752,38 +752,47 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		return nil
 	}
 
-	// decode single tx
+	// attempt to decode atomicTx
 	tx := &Tx{}
-	_, err := vm.codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
-	if err != nil {
-		vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
+	if _, err := vm.codec.Unmarshal(response, tx); err == nil {
+		unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
+		if err != nil {
+			vm.ctx.Log.Debug("AppResponse: failed unmarshalling UnsignedAtomicTx from Node %v, reqID %v, err %v",
+				nodeID, requestID, err)
+			return err
+		}
+		tx.Initialize(unsignedBytes, response)
+		vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
+
+		// Note: we currently do not check whether nodes send us exactly the tx matching
+		// the txID we asked for. At least we should check we do not receive total garbage
+
+		// check if  tx is already known
+		if _, dropped, found := vm.mempool.GetTx(tx.ID()); found || dropped {
+			return nil // nothing to do
+		}
+
+		err = vm.issueTx(tx /*local*/, false)
+		if err != nil {
+			vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
+				nodeID, requestID, err)
+		}
+
 		return err
 	}
-	unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
-	if err != nil {
-		vm.ctx.Log.Debug("AppResponse: failed unmarshalling UnsignedAtomicTx from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
-		return err
-	}
-	tx.Initialize(unsignedBytes, response)
-	vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
 
-	// Note: we currently do not check whether nodes send us exactly the tx matching
-	// the txID we asked for. At least we should check we do not receive total garbage
-
-	// check if  tx is already known
-	if _, dropped, found := vm.mempool.GetTx(tx.ID()); found || dropped {
-		return nil // nothing to do
+	corethTxs := make([]*types.Transaction, 0)
+	if _, err := vm.codec.Unmarshal(response, corethTxs); err == nil {
+		errs := vm.chain.GetTxPool().AddLocals(corethTxs)
+		for _, err := range errs {
+			if err != nil {
+				return err
+			}
+		}
 	}
 
-	err = vm.issueTx(tx /*local*/, false)
-	if err != nil {
-		vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
-	}
-
-	return err
+	vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v")
+	return fmt.Errorf("failed unmarshalling AppGossipResponse")
 }
 
 func (vm *VM) bytesToAtmTxID(b []byte) (ids.ID, error) {
