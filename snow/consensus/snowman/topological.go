@@ -28,6 +28,9 @@ type Topological struct {
 	metrics.Latency
 	metrics.Polls
 
+	// pollNumber is the number of times RecordPolls has been called
+	pollNumber uint64
+
 	// ctx is the context this snowman instance is executing in
 	ctx *snow.Context
 
@@ -124,7 +127,7 @@ func (ts *Topological) Add(blk Block) error {
 	if err := ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
 		return err
 	}
-	ts.Latency.Issued(blkID)
+	ts.Latency.Issued(blkID, ts.pollNumber)
 
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
@@ -142,7 +145,7 @@ func (ts *Topological) Add(blk Block) error {
 		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
 			return err
 		}
-		ts.Latency.Rejected(blkID)
+		ts.Latency.Rejected(blkID, ts.pollNumber)
 		return nil
 	}
 
@@ -228,6 +231,9 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // - Runtime = 3 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
 func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
+	// Register a new poll call
+	ts.pollNumber++
+
 	var voteStack []votes
 	if voteBag.Len() >= ts.params.Alpha {
 		// If there is no way for an alpha majority to occur, there is no need
@@ -548,7 +554,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		return err
 	}
 
-	ts.Latency.Accepted(pref)
+	ts.Latency.Accepted(pref, ts.pollNumber)
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
@@ -580,7 +586,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
 			return err
 		}
-		ts.Latency.Rejected(childID)
+		ts.Latency.Rejected(childID, ts.pollNumber)
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, childID)
@@ -617,7 +623,7 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
 				return err
 			}
-			ts.Latency.Rejected(childID)
+			ts.Latency.Rejected(childID, ts.pollNumber)
 
 			// add the newly rejected block to the end of the queue
 			rejected = append(rejected, childID)

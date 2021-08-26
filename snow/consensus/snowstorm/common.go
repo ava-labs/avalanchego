@@ -44,7 +44,7 @@ type common struct {
 	virtuousVoting ids.Set
 
 	// number of times RecordPoll has been called
-	currentVote int
+	pollNumber uint64
 
 	// keeps track of whether dependencies have been accepted
 	pendingAccept events.Blocker
@@ -132,7 +132,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	}
 
 	// Notify the metrics that this transaction is being issued.
-	c.Latency.Issued(txID)
+	c.Latency.Issued(txID, c.pollNumber)
 
 	// If this tx has inputs, it needs to be voted on before being accepted.
 	if inputs := tx.InputIDs(); len(inputs) != 0 {
@@ -155,7 +155,7 @@ func (c *common) shouldVote(con Consensus, tx Tx) (bool, error) {
 	}
 
 	// Notify the metrics that this transaction was accepted.
-	c.Latency.Accepted(txID)
+	c.Latency.Accepted(txID, c.pollNumber)
 	return false, nil
 }
 
@@ -176,7 +176,7 @@ func (c *common) acceptTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's acceptance
-	c.Latency.Accepted(txID)
+	c.Latency.Accepted(txID, c.pollNumber)
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// should be notified that it doesn't need to block on this tx anymore.
 	c.pendingAccept.Fulfill(txID)
@@ -204,7 +204,7 @@ func (c *common) rejectTx(tx Tx) error {
 	}
 
 	// Update the metrics to account for this transaction's rejection
-	c.Latency.Rejected(txID)
+	c.Latency.Rejected(txID, c.pollNumber)
 
 	// If there is a tx that was accepted pending on this tx, the ancestor
 	// tx can't be accepted.

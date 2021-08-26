@@ -193,7 +193,9 @@ func (dg *Directed) Issued(tx Tx) bool {
 func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 	// Increase the vote ID. This is only updated here and is used to reset the
 	// confidence values of transactions lazily.
-	dg.currentVote++
+	// This is also used to track the number of polls required to accept/reject
+	// a transaction.
+	dg.pollNumber++
 
 	// This flag tracks if the Avalanche instance needs to recompute its
 	// frontiers. Frontiers only need to be recalculated if preferences change
@@ -213,7 +215,7 @@ func (dg *Directed) RecordPoll(votes ids.Bag) (bool, error) {
 			continue
 		}
 
-		txNode.RecordSuccessfulPoll(dg.currentVote)
+		txNode.RecordSuccessfulPoll(dg.pollNumber)
 
 		// If the tx should be accepted, then we should defer its acceptance
 		// until its dependencies are decided. If this tx was already marked to
@@ -256,7 +258,7 @@ func (dg *Directed) String() string {
 		nodes = append(nodes, &snowballNode{
 			txID:               txNode.tx.ID(),
 			numSuccessfulPolls: txNode.numSuccessfulPolls,
-			confidence:         txNode.Confidence(dg.currentVote),
+			confidence:         txNode.Confidence(dg.pollNumber),
 		})
 	}
 	return ConsensusString("DG", nodes)

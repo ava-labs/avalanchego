@@ -42,6 +42,9 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 type Topological struct {
 	metrics.Latency
 
+	// pollNumber is the number of times RecordPolls has been called
+	pollNumber uint64
+
 	// Context used for logging
 	ctx *snow.Context
 	// Threshold for confidence increases
@@ -157,7 +160,7 @@ func (ta *Topological) Add(vtx Vertex) error {
 	}
 
 	ta.nodes[vtxID] = vtx // Add this vertex to the set of nodes
-	ta.Latency.Issued(vtxID)
+	ta.Latency.Issued(vtxID, ta.pollNumber)
 
 	return ta.update(vtx) // Update the vertex and it's ancestry
 }
@@ -185,6 +188,9 @@ func (ta *Topological) Preferences() ids.Set { return ta.preferred }
 
 // RecordPoll implements the Avalanche interface
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
+	// Register a new poll call
+	ta.pollNumber++
+
 	// If it isn't possible to have alpha votes for any transaction, then we can
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
@@ -488,7 +494,7 @@ func (ta *Topological) update(vtx Vertex) error {
 				return err
 			}
 			delete(ta.nodes, vtxID)
-			ta.Latency.Rejected(vtxID)
+			ta.Latency.Rejected(vtxID, ta.pollNumber)
 
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
@@ -548,7 +554,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			return err
 		}
 		delete(ta.nodes, vtxID)
-		ta.Latency.Accepted(vtxID)
+		ta.Latency.Accepted(vtxID, ta.pollNumber)
 	case rejectable:
 		// I'm rejectable, why not reject?
 		if err := ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes()); err != nil {
@@ -560,7 +566,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			return err
 		}
 		delete(ta.nodes, vtxID)
-		ta.Latency.Rejected(vtxID)
+		ta.Latency.Rejected(vtxID, ta.pollNumber)
 	}
 	return nil
 }
