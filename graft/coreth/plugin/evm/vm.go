@@ -171,7 +171,8 @@ func init() {
 		c.RegisterType(&secp256k1fx.Credential{}),
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		c.RegisterType([]common.Hash{}), // to serialize coreEth hashes
+		c.RegisterType([]common.Hash{}),        // to serialize coreEth hashes
+		c.RegisterType([]*types.Transaction{}), // to serialize coreEth txes in response
 		Codec.RegisterCodec(codecVersion, c),
 	)
 
@@ -687,35 +688,52 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		return nil
 	}
 
-	// decode single id
-	txID := ids.ID{}
-	_, err := vm.codec.Unmarshal(request, &txID) // TODO: cleanup way we serialize this
-	if err != nil {
-		vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
-		return err
-	}
-	vm.ctx.Log.Debug("called AppRequest with txID %v", txID)
+	if txID, err := vm.bytesToAtmTxID(request); err == nil {
+		vm.ctx.Log.Debug("called AppRequest with txID %v", txID)
 
-	if !vm.mempool.has(txID) {
-		return nil
-	}
-	// Note: rejected tx do not need to be explicitly handled,
-	// since they are not added to mempool
+		if !vm.mempool.has(txID) {
+			return nil
+		}
+		// Note: rejected tx do not need to be explicitly handled,
+		// since they are not added to mempool
 
-	// fetch tx
-	resTx, dropped, found := vm.mempool.GetTx(txID)
-	if !dropped && !found {
-		return fmt.Errorf("incoherent mempool. Could not find registered tx")
+		// fetch tx
+		resTx, dropped, found := vm.mempool.GetTx(txID)
+		if !dropped && !found {
+			return fmt.Errorf("incoherent mempool. Could not find registered tx")
+		}
+
+		// send response
+		response, err := vm.codec.Marshal(codecVersion, *resTx)
+		if err != nil {
+			return err
+		}
+
+		return vm.appSender.SendAppResponse(nodeID, requestID, response)
+	} else if hashList, err := vm.bytesToEthTxHashes(request); err == nil {
+		vm.ctx.Log.Debug("called AppRequest with coreth hashes list")
+
+		txsToRespondTo := make([]*types.Transaction, 0)
+		for _, txHash := range hashList {
+			if tx := vm.chain.GetTxPool().Get(txHash); tx != nil {
+				txsToRespondTo = append(txsToRespondTo, tx)
+			}
+		}
+
+		response, err := vm.codec.Marshal(codecVersion, txsToRespondTo)
+		if err != nil {
+			return err
+		}
+
+		nodesSet := ids.NewShortSet(1)
+		nodesSet.Add(nodeID)
+		return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), response)
+
 	}
 
-	// send response
-	response, err := vm.codec.Marshal(codecVersion, *resTx)
-	if err != nil {
-		return err
-	}
-
-	return vm.appSender.SendAppResponse(nodeID, requestID, response)
+	vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v",
+		nodeID, requestID)
+	return fmt.Errorf("failed unmarshalling AppGossipRequest")
 }
 
 // This VM doesn't (currently) have any app-specific messages
@@ -768,7 +786,13 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	return err
 }
 
-// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) bytesToAtmTxID(b []byte) (ids.ID, error) {
+	atmID := ids.ID{}
+
+	_, err := vm.codec.Unmarshal(b, &atmID)
+	return atmID, err
+}
+
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	vm.ctx.Log.Verbo("called AppGossip")
 
@@ -777,26 +801,41 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 
-	// decode single id
-	txID := ids.ID{}
-	_, err := vm.codec.Unmarshal(msg, &txID) // TODO: cleanup way we serialize this
-	if err != nil {
-		vm.ctx.Log.Debug("AppGossip: failed unmarshalling message from Node %v, err %v", nodeID, err)
-		return err
-	}
-	vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
+	if txID, err := vm.bytesToAtmTxID(msg); err == nil {
+		vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
 
-	_, dropped, found := vm.mempool.GetTx(txID)
-	switch {
-	case found && !dropped:
-		return nil // already known and valid tx
-	case found && dropped:
-		return nil // already known and invalid tx
+		_, dropped, found := vm.mempool.GetTx(txID)
+		switch {
+		case found && !dropped:
+			return nil // already known and valid tx
+		case found && dropped:
+			return nil // already known and invalid tx
+		}
+
+		nodesSet := ids.NewShortSet(1)
+		nodesSet.Add(nodeID)
+		return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
+	} else if hashList, err := vm.bytesToEthTxHashes(msg); err == nil {
+		vm.ctx.Log.Debug("called AppGossip with coreth hashes list")
+
+		hashesToRequest := make([]common.Hash, 0)
+		for _, txHash := range hashList {
+			if !vm.chain.GetTxPool().Has(txHash) {
+				hashesToRequest = append(hashesToRequest, txHash)
+			}
+		}
+
+		msg, err := vm.ethTxHashesToBytes(hashesToRequest)
+		if err != nil {
+			return err
+		}
+
+		nodesSet := ids.NewShortSet(1)
+		nodesSet.Add(nodeID)
+		return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
 	}
 
-	nodesSet := ids.NewShortSet(1)
-	nodesSet.Add(nodeID)
-	return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
+	return fmt.Errorf("could not decode AppGossip msg")
 }
 
 // NewHandler returns a new Handler for a service where:
@@ -1075,13 +1114,8 @@ func (vm *VM) signalTxsReady() {
 	}
 }
 
-func (vm *VM) ethTxHashesToBytes(ethTxs []*types.Transaction) ([]byte, error) {
-	ethIDs := make([]common.Hash, len(ethTxs))
-	for idx, ethTx := range ethTxs {
-		ethIDs[idx] = ethTx.Hash()
-	}
-
-	return vm.codec.Marshal(codecVersion, ethIDs)
+func (vm *VM) ethTxHashesToBytes(ethTxHashes []common.Hash) ([]byte, error) {
+	return vm.codec.Marshal(codecVersion, ethTxHashes)
 }
 
 func (vm *VM) bytesToEthTxHashes(b []byte) ([]common.Hash, error) {
@@ -1111,7 +1145,11 @@ func (vm *VM) awaitSubmittedTxs() {
 			}
 
 			// pick IDs and serialize them
-			ethTxsBytes, err := vm.ethTxHashesToBytes(ethTxsEvent.Txs)
+			ethHashes := make([]common.Hash, len(ethTxsEvent.Txs))
+			for idx, ethTx := range ethTxsEvent.Txs {
+				ethHashes[idx] = ethTx.Hash()
+			}
+			ethTxsBytes, err := vm.ethTxHashesToBytes(ethHashes)
 			if err != nil {
 				log.Trace("Could not parse ethTxIDs. Understand what to do")
 			}
