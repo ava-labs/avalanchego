@@ -11,6 +11,8 @@ sharedstatedir: "{{ localstatedir }}/lib"
 # Has no Meson builtin equivalent
 logdir: "{{ localstatedir }}/log"
 
+avalanche_binary: "{{ avalanche_binaries_dir }}/avalanchego"
+
 # These names are specific to Avalanche. Default values are based loosely on *nix
 # conventions.
 avalanche_daemon_home_dir: "{{ sharedstatedir }}/avalanchego"

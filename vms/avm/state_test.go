@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -16,7 +17,19 @@ import (
 )
 
 func TestSetsAndGets(t *testing.T) {
-	_, _, vm, _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVMWithArgs(
+		t,
+		[]*common.Fx{{
+			ID: ids.GenerateTestID(),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(secp256k1fx.VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+				},
+			},
+		}},
+		nil,
+	)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -26,9 +39,6 @@ func TestSetsAndGets(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -97,7 +107,19 @@ func TestSetsAndGets(t *testing.T) {
 }
 
 func TestFundingNoAddresses(t *testing.T) {
-	_, _, vm, _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVMWithArgs(
+		t,
+		[]*common.Fx{{
+			ID: ids.GenerateTestID(),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(secp256k1fx.VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
+				},
+			},
+		}},
+		nil,
+	)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -107,9 +129,6 @@ func TestFundingNoAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.CodecRegistry().RegisterType(&avax.TestVerifiable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
@@ -129,7 +148,19 @@ func TestFundingNoAddresses(t *testing.T) {
 }
 
 func TestFundingAddresses(t *testing.T) {
-	_, _, vm, _ := GenesisVM(t)
+	_, _, vm, _ := GenesisVMWithArgs(
+		t,
+		[]*common.Fx{{
+			ID: ids.GenerateTestID(),
+			Fx: &FxTest{
+				InitializeF: func(vmIntf interface{}) error {
+					vm := vmIntf.(secp256k1fx.VM)
+					return vm.CodecRegistry().RegisterType(&avax.TestAddressable{})
+				},
+			},
+		}},
+		nil,
+	)
 	ctx := vm.ctx
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -139,9 +170,6 @@ func TestFundingAddresses(t *testing.T) {
 	}()
 
 	state := vm.state
-	if err := vm.CodecRegistry().RegisterType(&avax.TestAddressable{}); err != nil {
-		t.Fatal(err)
-	}
 
 	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{

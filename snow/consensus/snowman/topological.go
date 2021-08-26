@@ -25,7 +25,11 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // strongly preferred branch. This tree structure amortizes network polls to
 // vote on more than just the next block.
 type Topological struct {
-	metrics.Metrics
+	metrics.Latency
+	metrics.Polls
+
+	// pollNumber is the number of times RecordPolls has been called
+	pollNumber uint64
 
 	// ctx is the context this snowman instance is executing in
 	ctx *snow.Context
@@ -84,7 +88,10 @@ func (ts *Topological) Initialize(ctx *snow.Context, params snowball.Parameters,
 	if err := params.Verify(); err != nil {
 		return err
 	}
-	if err := ts.Metrics.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ts.Latency.Initialize("blks", "block(s)", ctx.Log, params.Namespace, params.Metrics); err != nil {
+		return err
+	}
+	if err := ts.Polls.Initialize(params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 	ts.leaves = ids.Set{}
@@ -120,7 +127,7 @@ func (ts *Topological) Add(blk Block) error {
 	if err := ts.ctx.ConsensusDispatcher.Issue(ts.ctx, blkID, blkBytes); err != nil {
 		return err
 	}
-	ts.Metrics.Issued(blkID)
+	ts.Latency.Issued(blkID, ts.pollNumber)
 
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
@@ -138,7 +145,7 @@ func (ts *Topological) Add(blk Block) error {
 		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, blkID, blkBytes); err != nil {
 			return err
 		}
-		ts.Metrics.Rejected(blkID)
+		ts.Latency.Rejected(blkID, ts.pollNumber)
 		return nil
 	}
 
@@ -223,6 +230,9 @@ func (ts *Topological) Preference() ids.ID { return ts.tail }
 // - Runtime = 3 * |live set| + |votes|
 // - Space = 2 * |live set| + |votes|
 func (ts *Topological) RecordPoll(voteBag ids.Bag) error {
+	// Register a new poll call
+	ts.pollNumber++
+
 	var voteStack []votes
 	if voteBag.Len() >= ts.params.Alpha {
 		// If there is no way for an alpha majority to occur, there is no need
@@ -278,14 +288,14 @@ func (ts *Topological) Finalized() bool { return len(ts.blocks) == 1 }
 
 // HealthCheck returns information about the consensus health.
 func (ts *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingBlks := ts.Metrics.ProcessingLen()
+	numOutstandingBlks := ts.Latency.ProcessingLen()
 	healthy := numOutstandingBlks <= ts.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingBlocks": numOutstandingBlks,
 	}
 
 	// check for long running blocks
-	timeReqRunning := ts.Metrics.MeasureAndGetOldestDuration()
+	timeReqRunning := ts.Latency.MeasureAndGetOldestDuration()
 	healthy = healthy && timeReqRunning <= ts.params.MaxItemProcessingTime
 	details["longestRunningBlock"] = timeReqRunning.String()
 
@@ -414,10 +424,13 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 	// If the voteStack is empty, then the full tree should falter. This won't
 	// change the preferred branch.
 	if len(voteStack) == 0 {
-		ts.ctx.Log.Verbo("No progress was made after a vote with %d pending blocks", len(ts.blocks)-1)
-
 		headBlock := ts.blocks[ts.head]
 		headBlock.shouldFalter = true
+
+		if numProcessing := len(ts.blocks) - 1; numProcessing > 0 {
+			ts.ctx.Log.Verbo("No progress was made after a vote with %d pending blocks", numProcessing)
+			ts.Polls.Failed()
+		}
 		return ts.tail, nil
 	}
 
@@ -510,6 +523,8 @@ func (ts *Topological) vote(voteStack []votes) (ids.ID, error) {
 			}
 		}
 	}
+
+	ts.Polls.Successful()
 	return newPreferred, nil
 }
 
@@ -538,7 +553,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		return err
 	}
 
-	ts.Metrics.Accepted(pref)
+	ts.Latency.Accepted(pref, ts.pollNumber)
 
 	// Because this is the newest accepted block, this is the new head.
 	ts.head = pref
@@ -570,7 +585,7 @@ func (ts *Topological) accept(n *snowmanBlock) error {
 		if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
 			return err
 		}
-		ts.Metrics.Rejected(childID)
+		ts.Latency.Rejected(childID, ts.pollNumber)
 
 		// Track which blocks have been directly rejected
 		rejects = append(rejects, childID)
@@ -607,7 +622,7 @@ func (ts *Topological) rejectTransitively(rejected []ids.ID) error {
 			if err := ts.ctx.ConsensusDispatcher.Reject(ts.ctx, childID, bytes); err != nil {
 				return err
 			}
-			ts.Metrics.Rejected(childID)
+			ts.Latency.Rejected(childID, ts.pollNumber)
 
 			// add the newly rejected block to the end of the queue
 			rejected = append(rejected, childID)

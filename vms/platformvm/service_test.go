@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -33,13 +34,13 @@ import (
 
 var (
 	// Test user username
-	testUsername string = "ScoobyUser"
+	testUsername = "ScoobyUser"
 
 	// Test user password, must meet minimum complexity/length requirements
-	testPassword string = "ShaggyPassword1Zoinks!"
+	testPassword = "ShaggyPassword1Zoinks!"
 
 	// Bytes docoded from CB58 "ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
-	testPrivateKey []byte = []byte{
+	testPrivateKey = []byte{
 		0x56, 0x28, 0x9e, 0x99, 0xc9, 0x4b, 0x69, 0x12,
 		0xbf, 0xc1, 0x2a, 0xdc, 0x09, 0x3c, 0x9b, 0x51,
 		0x12, 0x4f, 0x0d, 0xc5, 0x4a, 0xc7, 0xa7, 0x66,
@@ -48,7 +49,7 @@ var (
 
 	// 3cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c
 	// Platform address resulting from the above private key
-	testAddress string = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
+	testAddress = "P-testing18jma8ppw3nhx5r4ap8clazz0dps7rv5umpc36y"
 )
 
 func defaultService(t *testing.T) *Service {
@@ -746,4 +747,31 @@ func TestGetCurrentValidators(t *testing.T) {
 	if !found {
 		t.Fatalf("didnt find delegator")
 	}
+}
+
+func TestGetTimestamp(t *testing.T) {
+	assert := assert.New(t)
+
+	service := defaultService(t)
+	service.vm.ctx.Lock.Lock()
+	defer func() {
+		err := service.vm.Shutdown()
+		assert.NoError(err)
+
+		service.vm.ctx.Lock.Unlock()
+	}()
+
+	reply := GetTimestampReply{}
+	err := service.GetTimestamp(nil, nil, &reply)
+	assert.NoError(err)
+
+	assert.Equal(service.vm.internalState.GetTimestamp(), reply.Timestamp)
+
+	newTimestamp := reply.Timestamp.Add(time.Second)
+	service.vm.internalState.SetTimestamp(newTimestamp)
+
+	err = service.GetTimestamp(nil, nil, &reply)
+	assert.NoError(err)
+
+	assert.Equal(newTimestamp, reply.Timestamp)
 }

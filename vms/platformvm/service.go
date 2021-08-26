@@ -2398,3 +2398,17 @@ func (service *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, rep
 	reply.Encoding = args.Encoding
 	return nil
 }
+
+// GetTimestampReply is the response from GetTimestamp
+type GetTimestampReply struct {
+	// Current timestamp
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// GetTimestamp returns the current timestamp on chain.
+func (service *Service) GetTimestamp(_ *http.Request, args *struct{}, reply *GetTimestampReply) error {
+	service.vm.ctx.Log.Debug("Platform: GetTimestamp called")
+
+	reply.Timestamp = service.vm.internalState.GetTimestamp()
+	return nil
+}

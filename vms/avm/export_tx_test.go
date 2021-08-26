@@ -1043,7 +1043,7 @@ func TestExportTxSemanticVerifyInvalidFx(t *testing.T) {
 				ID: ids.Empty.Prefix(0),
 				Fx: &FxTest{
 					InitializeF: func(vmIntf interface{}) error {
-						vm := vmIntf.(*VM)
+						vm := vmIntf.(secp256k1fx.VM)
 						return vm.CodecRegistry().RegisterType(&avax.TestVerifiable{})
 					},
 				},

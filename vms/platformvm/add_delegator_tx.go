@@ -386,7 +386,7 @@ func maxStakeAmount(
 
 	var (
 		err      error
-		maxStake uint64 = 0
+		maxStake uint64
 	)
 
 	// Iterate through time until [endTime].
@@ -527,7 +527,7 @@ func fixedMaxStakeAmount(
 			// Changed in AP3:
 			// Remove the delegator from the heap and update the heap so that
 			// the top of the heap is the next delegator to remove.
-			_ = toRemoveHeap.Remove()
+			toRemoveHeap.Remove()
 		}
 
 		// Add to [currentStake] the stake of this pending delegator to
@@ -575,7 +575,7 @@ func fixedMaxStakeAmount(
 		// Changed in AP3:
 		// Remove the delegator from the heap and update the heap so that the
 		// top of the heap is the next delegator to remove.
-		_ = toRemoveHeap.Remove()
+		toRemoveHeap.Remove()
 	}
 
 	// We have advanced time to be inside the delegation window.

@@ -106,7 +106,7 @@ const (
 	HealthCheckFreqKey                        = "health-check-frequency"
 	HealthCheckAveragerHalflifeKey            = "health-check-averager-halflife"
 	RetryBootstrapKey                         = "bootstrap-retry-enabled"
-	RetryBootstrapMaxAttemptsKey              = "bootstrap-retry-max-attempts"
+	RetryBootstrapWarnFrequencyKey            = "bootstrap-retry-warn-frequency"
 	PeerAliasTimeoutKey                       = "peer-alias-timeout"
 	PluginModeKey                             = "plugin-mode-enabled"
 	BootstrapBeaconConnectionTimeoutKey       = "bootstrap-beacon-connection-timeout"
