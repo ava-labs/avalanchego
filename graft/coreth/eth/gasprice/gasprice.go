@@ -41,10 +41,13 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const sampleNumber = 3 // Number of transactions sampled in a block
+const (
+	sampleNumber       = 3 // Number of transactions sampled in a block
+	ignoreGasThreshold = uint64(750_000)
+)
 
 var (
-	DefaultMaxPrice    = big.NewInt(10 * params.GWei)
+	DefaultMaxPrice    = big.NewInt(150 * params.GWei)
 	DefaultIgnorePrice = big.NewInt(2 * params.Wei)
 )
 
@@ -110,7 +113,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   new(big.Int).Set(maxPrice),
+		lastPrice:   common.Big0,
 		maxPrice:    maxPrice,
 		ignorePrice: ignorePrice,
 		checkBlocks: blocks,
@@ -296,7 +299,9 @@ func (s *txSorter) Less(i, j int) bool {
 // transaction prices for sampling), nil gasprice is returned.
 func (oracle *Oracle) getBlockValues(ctx context.Context, signer types.Signer, blockNum uint64, limit int, ignoreUnder *big.Int, result chan results, quit chan struct{}) {
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
-	if block == nil {
+	// To avoid biasing the suggestion with transactions that chose to pay the full block
+	// fee on their own, we ignore blocks with less gas than [ignoreGasThreshold].
+	if block == nil || block.GasUsed() < ignoreGasThreshold {
 		select {
 		case result <- results{nil, nil, err}:
 		case <-quit:
