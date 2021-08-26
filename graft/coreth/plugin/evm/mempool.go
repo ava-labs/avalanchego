@@ -68,6 +68,7 @@ func (m *Mempool) AddTx(tx *Tx) error {
 	if m.client != nil {
 		// If a passthrough client is provided - issue the transaction there
 		if _, err := m.client.IssueTx(tx.Bytes()); err != nil {
+			log.Error("Failed to pass atomic transaction to remote", "err", err)
 			return err
 		}
 		log.Info("Passed atomic transaction to remote")
