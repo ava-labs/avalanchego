@@ -27,7 +27,7 @@ var (
 
 	// the amount of time after a parent block was issued that a block fee
 	// exists
-	apricotPhase4BlockGasFeeDuration uint64 = 10 // in seconds
+	apricotPhase4BlockGasFeeDuration uint64 = 20 // in seconds
 
 	errMissingParent = errors.New("missing parent")
 )
