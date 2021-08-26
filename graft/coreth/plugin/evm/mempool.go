@@ -17,6 +17,9 @@ const (
 
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
+	// client to pass tx issuance to
+	client *Client
+
 	lock sync.RWMutex
 	// maxSize is the maximum number of transactions allowed to be kept in mempool
 	maxSize int
@@ -35,8 +38,9 @@ type Mempool struct {
 }
 
 // NewMempool returns a Mempool with [maxSize]
-func NewMempool(maxSize int) *Mempool {
+func NewMempool(maxSize int, client *Client) *Mempool {
 	return &Mempool{
+		client:       client,
 		txs:          make(map[ids.ID]*Tx),
 		issuedTxs:    make(map[ids.ID]*Tx),
 		discardedTxs: &cache.LRU{Size: discardedTxsCacheSize},
@@ -61,6 +65,14 @@ func (m *Mempool) length() int {
 // Add attempts to add [tx] to the mempool and returns an error if
 // it could not be addeed to the mempool.
 func (m *Mempool) AddTx(tx *Tx) error {
+	if m.client != nil {
+		// If a passthrough client is provided - issue the transaction there
+		if _, err := m.client.IssueTx(tx.Bytes()); err != nil {
+			return err
+		}
+		log.Info("Passed atomic transaction to remote")
+	}
+
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
