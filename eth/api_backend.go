@@ -41,12 +41,14 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
@@ -60,6 +62,7 @@ type EthAPIBackend struct {
 	allowUnprotectedTxs bool
 	eth                 *Ethereum
 	gpo                 *gasprice.Oracle
+	client              *ethclient.Client
 }
 
 // ChainConfig returns the active chain configuration.
@@ -287,8 +290,19 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	if deadline, exists := ctx.Deadline(); exists && time.Until(deadline) < 0 {
 		return errExpired
 	}
-	err := b.eth.txPool.AddLocal(signedTx)
-	return err
+	if err := b.eth.txPool.AddLocal(signedTx); err != nil {
+		return err
+	}
+	if b.client == nil {
+		return nil
+	}
+	if err := b.client.SendTransaction(ctx, signedTx); err != nil {
+		log.Error("Failed to pass transaction to remote", "err", err)
+		return err
+	} else {
+		log.Info("Passed transaction to remote")
+	}
+	return nil
 }
 
 func (b *EthAPIBackend) GetPoolTransactions() (types.Transactions, error) {
