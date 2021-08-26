@@ -231,6 +231,8 @@ type VM struct {
 	gossipActivationTime time.Time
 	appSender            commonEng.AppSender
 	gossipReq.Handler
+	Gossiper
+	txSubmitChan <-chan core.NewTxsEvent
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -365,6 +367,7 @@ func (vm *VM) Initialize(
 	vm.gossipActivationTime = timer.MaxTime     // TODO: setup upon deploy
 	vm.appSender = appSender
 	vm.Handler = gossipReq.NewHandler()
+	vm.Gossiper = NewGossiper(appSender, &vm.shutdownWg, vm.shutdownChan)
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -418,6 +421,8 @@ func (vm *VM) Initialize(
 		UnmarshalBlock:     vm.parseBlock,
 		BuildBlock:         vm.buildBlock,
 	})
+
+	go vm.Gossiper.listenAndGossip()
 
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
@@ -1075,12 +1080,33 @@ func (vm *VM) signalTxsReady() {
 // put into a new block.
 func (vm *VM) awaitSubmittedTxs() {
 	defer vm.shutdownWg.Done()
-	txSubmitChan := vm.chain.GetTxSubmitCh()
+	if vm.txSubmitChan == nil { // this allows depencendy injection in UTs
+		vm.txSubmitChan = vm.chain.GetTxSubmitCh()
+	}
 	for {
 		select {
-		case <-txSubmitChan:
+		case ethTxs := <-vm.txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
 			vm.signalTxsReady()
+
+			if time.Now().Before(vm.gossipActivationTime) {
+				vm.ctx.Log.Verbo("issued coreth tx before gossiping activation time. Not gossiping it")
+				continue
+			}
+
+			// pick IDs and serialize them
+			ethIDs := make([]common.Hash, len(ethTxs.Txs))
+			for idx, ethTx := range ethTxs.Txs {
+				ethIDs[idx] = ethTx.Hash()
+			}
+
+			ethTxsBytes, err := rlp.EncodeToBytes(ethTxs.Txs)
+			if err != nil {
+				log.Trace("Could not parse ethTxIDs. Understand what to do")
+			}
+
+			// gossip them
+			vm.Gossiper.GossipEthTxIDs(ethTxsBytes) // TODO: only executable ones should be picked, not queued
 		case <-vm.mempool.Pending:
 			log.Trace("New atomic Tx detected, trying to generate a block")
 			vm.signalTxsReady()
@@ -1144,7 +1170,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 			return err
 		}
 
-		return vm.appSender.SendAppGossip(txIDBytes)
+		return vm.Gossiper.GossipAtomicTxID(txIDBytes)
 	case errTooManyAtomicTx:
 		if !local {
 			// tx has not been accepted to mempool due to size

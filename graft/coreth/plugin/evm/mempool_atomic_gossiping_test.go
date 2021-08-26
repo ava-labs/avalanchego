@@ -197,7 +197,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	// shows that a CreateChainTx received as gossip response can be added to mempool
 	// and then remove by inclusion in a block
 
-	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -257,7 +257,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	// shows that a locally generated CreateChainTx can be added to mempool
 	// and then removed by inclusion in a block
 
-	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -345,7 +345,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	// show that a tx discovered by a GossipResponse is re-gossiped
 	// only if duly added to mempool
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -412,7 +412,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 	// show that invalid txes are not accepted to mempool, nor rejected
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -452,7 +452,7 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 	// show that a txID discovered from gossip is requested to the same node
 	// only if the txID is unknown
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -515,7 +515,7 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	// show that txes already marked as invalid are not re-requested on gossiping
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -559,7 +559,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	// show that a node answer to request with response
 	// only if it has the requested tx
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -616,7 +616,7 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 	// (which should not have been gossiped around in the first place)
 	// no response is sent
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -650,7 +650,7 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 
 func TestMempool_IssueTxAndGossiping(t *testing.T) {
 	// show that locally generated txes are gossiped
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
