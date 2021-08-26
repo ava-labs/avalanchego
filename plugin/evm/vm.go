@@ -344,6 +344,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	var eclient *ethclient.Client
 	if vm.config.APIPassthoughEnabled {
 		clientURL := fmt.Sprintf("%s/ext/bc/%s/rpc", vm.config.APIPassthoughURL, chainAlias)
 		client, err := rpc.Dial(clientURL)
@@ -351,7 +352,7 @@ func (vm *VM) Initialize(
 			return err
 		}
 		log.Info("client connected to", "url", clientURL)
-		ethConfig.TxPool.Client = ethclient.NewClient(client)
+		eclient = ethclient.NewClient(client)
 	}
 
 	vm.chainConfig = g.Config
@@ -393,7 +394,7 @@ func (vm *VM) Initialize(
 	default:
 		lastAcceptedHash = common.BytesToHash(lastAcceptedBytes)
 	}
-	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), vm.createConsensusCallbacks(), lastAcceptedHash)
+	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), vm.createConsensusCallbacks(), lastAcceptedHash, eclient)
 	if err != nil {
 		return err
 	}
