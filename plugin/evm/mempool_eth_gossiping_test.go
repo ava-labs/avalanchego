@@ -5,10 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 func getEThValidTxs() []*types.Transaction {
@@ -115,8 +117,13 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 	vm := VM{
 		codec: Codec,
 	}
+
 	ethTxs := getEThValidTxs()
-	bytes, err := vm.ethTxHashesToBytes(ethTxs)
+	ethHashes := make([]common.Hash, len(ethTxs))
+	for idx, ethTx := range ethTxs {
+		ethHashes[idx] = ethTx.Hash()
+	}
+	bytes, err := vm.ethTxHashesToBytes(ethHashes)
 	if err != nil {
 		t.Fatal("Could no duly encode eth tx hashes")
 	}
@@ -136,64 +143,71 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 	}
 }
 
-// func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
-// 	// show that a txID discovered from gossip is requested to the same node
-// 	// only if the txID is unknown
+func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
+	// show that a coreth hashes discovered from gossip is requested to the same node
+	// only if the coreth hash is unknown
 
-// 	_, vm, _, _, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
-// 	defer func() {
-// 		if err := vm.Shutdown(); err != nil {
-// 			t.Fatal(err)
-// 		}
-// 	}()
-// 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	_, vm, _, _, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 
-// 	isTxRequested := false
-// 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-// 	IsRightNodeRequested := false
-// 	var requestedBytes []byte
-// 	sender.CantSendAppRequest = true
-// 	sender.SendAppRequestF = func(nodes ids.ShortSet, reqID uint32, resp []byte) error {
-// 		isTxRequested = true
-// 		if nodes.Contains(nodeID) {
-// 			IsRightNodeRequested = true
-// 		}
-// 		requestedBytes = resp
-// 		return nil
-// 	}
+	isTxRequested := false
+	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
+	IsRightNodeRequested := false
+	sender.CantSendAppRequest = true
+	sender.SendAppRequestF = func(nodes ids.ShortSet, reqID uint32, resp []byte) error {
+		isTxRequested = true
+		if nodes.Contains(nodeID) {
+			IsRightNodeRequested = true
+		}
 
-// 	ethTxs := getEThValidTxs(vm, t)
-// 	ethTxsBytes, err := ethTxIDsToBytes(ethTxs)
-// 	if err != nil {
-// 		log.Trace("Could not parse ethTxIDs. Understand what to do")
-// 	}
+		return nil
+	}
 
-// 	// show that unknown txID is requested
-// 	if err := vm.AppGossip(nodeID, ethTxsBytes); err != nil {
-// 		t.Fatal("error in reception of gossiped tx")
-// 	}
-// 	if !isTxRequested {
-// 		t.Fatal("unknown txID should have been requested")
-// 	}
-// 	if !IsRightNodeRequested {
-// 		t.Fatal("unknown txID should have been requested to a different node")
-// 	}
+	ethTxs := getEThValidTxs()
+	ethHash := make([]common.Hash, 1)
+	ethHash = append(ethHash, ethTxs[0].Hash())
+	unknownEthTxsBytes, err := vm.ethTxHashesToBytes(ethHash)
+	if err != nil {
+		log.Trace("Could not parse ethTxIDs. Understand what to do")
+	}
 
-// 	// show that requested bytes can be duly decoded
-// 	if err := vm.AppRequest(nodeID, vm.IssueID(), requestedBytes); err != nil {
-// 		t.Fatal("requested bytes following gossiping cannot be decoded")
-// 	}
+	// show that unknown coreth hashes is requested
+	if err := vm.AppGossip(nodeID, unknownEthTxsBytes); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if !isTxRequested {
+		t.Fatal("unknown txID should have been requested")
+	}
+	if !IsRightNodeRequested {
+		t.Fatal("unknown txID should have been requested to a different node")
+	}
 
-// 	// // show that known txID is not requested
-// 	// isTxRequested = false
-// 	// if err := mempool.AddTx(tx); err != nil {
-// 	// 	t.Fatal("could not add tx to mempool")
-// 	// }
+	// // show that requested bytes can be duly decoded
+	// if err := vm.AppRequest(nodeID, vm.IssueID(), requestedBytes); err != nil {
+	// 	t.Fatal("requested bytes following gossiping cannot be decoded")
+	// }
 
-// 	// if err := vm.AppGossip(nodeID, txID); err != nil {
-// 	// 	t.Fatal("error in reception of gossiped tx")
-// 	// }
-// 	// if isTxRequested {
-// 	// 	t.Fatal("known txID should not be requested")
-// 	// }
-// }
+	// TODO: find a way to add transactions to the pool
+	// // show that known coreth hashes is not requested
+	// isTxRequested = false
+	// if err := vm.chain.GetTxPool().AddLocal(ethTxs[1]); err != nil {
+	// 	t.Fatal("could not add tx to mempool")
+	// }
+
+	// ethHash[0] = ethTxs[1].Hash()
+	// knownEthTxsBytes, err := vm.ethTxHashesToBytes(ethHash)
+	// if err != nil {
+	// 	log.Trace("Could not parse ethTxIDs. Understand what to do")
+	// }
+	// if err := vm.AppGossip(nodeID, knownEthTxsBytes); err != nil {
+	// 	t.Fatal("error in reception of gossiped tx")
+	// }
+	// if isTxRequested {
+	// 	t.Fatal("known txID should not be requested")
+	// }
+}
