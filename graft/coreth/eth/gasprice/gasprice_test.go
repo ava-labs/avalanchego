@@ -28,7 +28,6 @@ package gasprice
 
 import (
 	"context"
-	"math"
 	"math/big"
 	"testing"
 
@@ -65,13 +64,14 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 	return b.chain.Config()
 }
 
-func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int) *testBackend {
+func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int, numTxs int) *testBackend {
 	var (
 		key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr   = crypto.PubkeyToAddress(key.PublicKey)
+		bal, _ = new(big.Int).SetString("100000000000000000000000", 10)
 		gspec  = &core.Genesis{
 			Config: params.TestChainConfig,
-			Alloc:  core.GenesisAlloc{addr: {Balance: big.NewInt(math.MaxInt64)}},
+			Alloc:  core.GenesisAlloc{addr: {Balance: bal}},
 		}
 		signer = types.LatestSigner(gspec.Config)
 	)
@@ -90,34 +90,36 @@ func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int) *testBac
 	blocks, _ := core.GenerateChain(gspec.Config, genesis, engine, db, 32, func(i int, b *core.BlockGen) {
 		b.SetCoinbase(common.Address{1})
 
-		var tx *types.Transaction
-		if apricotPhase3BlockTimestamp != nil && b.Number().Cmp(apricotPhase3BlockTimestamp) >= 0 {
-			txdata := &types.DynamicFeeTx{
-				ChainID:   gspec.Config.ChainID,
-				Nonce:     b.TxNonce(addr),
-				To:        &common.Address{},
-				Gas:       30000,
-				GasFeeCap: big.NewInt(500 * params.GWei),
-				GasTipCap: big.NewInt(int64(i+1) * params.GWei),
-				Data:      []byte{},
+		for tc := 0; tc < numTxs; tc++ {
+			var tx *types.Transaction
+			if apricotPhase3BlockTimestamp != nil && b.Number().Cmp(apricotPhase3BlockTimestamp) >= 0 {
+				txdata := &types.DynamicFeeTx{
+					ChainID:   gspec.Config.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: big.NewInt(500 * params.GWei),
+					GasTipCap: big.NewInt(int64(i+1) * params.GWei),
+					Data:      []byte{},
+				}
+				tx = types.NewTx(txdata)
+			} else {
+				txdata := &types.LegacyTx{
+					Nonce:    b.TxNonce(addr),
+					To:       &common.Address{},
+					Gas:      params.TxGas,
+					GasPrice: big.NewInt(int64(i+500) * params.GWei),
+					Value:    big.NewInt(100),
+					Data:     []byte{},
+				}
+				tx = types.NewTx(txdata)
 			}
-			tx = types.NewTx(txdata)
-		} else {
-			txdata := &types.LegacyTx{
-				Nonce:    b.TxNonce(addr),
-				To:       &common.Address{},
-				Gas:      21000,
-				GasPrice: big.NewInt(int64(i+500) * params.GWei),
-				Value:    big.NewInt(100),
-				Data:     []byte{},
+			tx, err := types.SignTx(tx, signer, key)
+			if err != nil {
+				t.Fatalf("failed to create tx: %v", err)
 			}
-			tx = types.NewTx(txdata)
+			b.AddTx(tx)
 		}
-		tx, err := types.SignTx(tx, signer, key)
-		if err != nil {
-			t.Fatalf("failed to create tx: %v", err)
-		}
-		b.AddTx(tx)
 	})
 	// Construct testing chain
 	diskdb := rawdb.NewMemoryDatabase()
@@ -126,7 +128,9 @@ func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int) *testBac
 	if err != nil {
 		t.Fatalf("Failed to create local chain, %v", err)
 	}
-	chain.InsertChain(blocks)
+	if _, err := chain.InsertChain(blocks); err != nil {
+		t.Fatalf("Failed to insert chain, %v", err)
+	}
 	return &testBackend{chain: chain}
 }
 
@@ -138,7 +142,7 @@ func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {
 	return b.chain.GetBlockByNumber(number)
 }
 
-func TestSuggestTipCap(t *testing.T) {
+func TestSuggestTipCapSmallBlocks(t *testing.T) {
 	config := Config{
 		Blocks:     3,
 		Percentile: 60,
@@ -149,13 +153,44 @@ func TestSuggestTipCap(t *testing.T) {
 		expect *big.Int // Expected gasprice suggestion
 	}{
 		{nil, big.NewInt(params.GWei * int64(225))},
-		{big.NewInt(0), big.NewInt(params.GWei * int64(10))},  // Fork point in genesis
-		{big.NewInt(1), big.NewInt(params.GWei * int64(10))},  // Fork point in first block
-		{big.NewInt(32), big.NewInt(params.GWei * int64(10))}, // Fork point in last block
-		{big.NewInt(33), big.NewInt(params.GWei * int64(10))}, // Fork point in the future
+		{big.NewInt(0), big.NewInt(0)},  // Fork point in genesis
+		{big.NewInt(1), big.NewInt(0)},  // Fork point in first block
+		{big.NewInt(32), big.NewInt(0)}, // Fork point in last block
+		{big.NewInt(33), big.NewInt(0)}, // Fork point in the future
 	}
 	for _, c := range cases {
-		backend := newTestBackend(t, c.fork)
+		backend := newTestBackend(t, c.fork, 1)
+		oracle := NewOracle(backend, config)
+
+		// The gas price sampled is: 32G, 31G, 30G, 29G, 28G, 27G
+		got, err := oracle.SuggestTipCap(context.Background())
+		if err != nil {
+			t.Fatalf("Failed to retrieve recommended gas price: %v", err)
+		}
+		if got.Cmp(c.expect) != 0 {
+			t.Fatalf("Gas price mismatch, want %d, got %d, with fork: %d", c.expect, got, c.fork)
+		}
+	}
+}
+
+func TestSuggestTipCapLargeBlocks(t *testing.T) {
+	config := Config{
+		Blocks:     3,
+		Percentile: 60,
+	}
+	// TODO(aaronbuchwald) review modified test cases
+	var cases = []struct {
+		fork   *big.Int // ApricotPhase3BlockTimestamp
+		expect *big.Int // Expected gasprice suggestion
+	}{
+		{nil, big.NewInt(params.GWei * int64(225))},
+		{big.NewInt(0), big.NewInt(31000000000)},   // Fork point in genesis
+		{big.NewInt(1), big.NewInt(31000000000)},   // Fork point in first block
+		{big.NewInt(32), big.NewInt(150000000000)}, // Fork point in last block
+		{big.NewInt(33), big.NewInt(150000000000)}, // Fork point in the future
+	}
+	for _, c := range cases {
+		backend := newTestBackend(t, c.fork, 40)
 		oracle := NewOracle(backend, config)
 
 		// The gas price sampled is: 32G, 31G, 30G, 29G, 28G, 27G
