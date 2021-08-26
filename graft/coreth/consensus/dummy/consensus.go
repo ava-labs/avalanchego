@@ -20,9 +20,14 @@ import (
 )
 
 var (
-	// the required block fee that must be paid cumulatively by the tips of all transactions in a block to
-	// cover the cost of producing a block
-	apricotPhase4RequiredBlockGasFee = new(big.Int).SetUint64(BlockGasFee)
+	// the maximum required block fee that could be required to be paid
+	// by the tips of all transactions in a block to cover the cost of producing
+	// a block
+	apricotPhase4MaxRequiredBlockGasFee = new(big.Int).SetUint64(BlockGasFee)
+
+	// the amount of time after a parent block was issued that a block fee
+	// exists
+	apricotPhase4BlockGasFeeDuration uint64 = 10 // in seconds
 )
 
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
@@ -175,7 +180,7 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 	return nil
 }
 
-func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, requiredBlockGasFee *big.Int, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
+func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.Int, blockFeeDuration, timeElapsed uint64, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
 	var (
 		gasUsed              = new(big.Int)
 		blockFeeContribution = new(big.Int)
@@ -207,6 +212,21 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, requiredBlockGasFee *b
 		blockGas.Add(blockGas, extraStateChangeContribution)
 	}
 
+	bigBlockFeeDuration := new(big.Int).SetUint64(blockFeeDuration)
+	// feeTimeRemaining can be negative - but that doesn't matter.
+	feeTimeRemaining := new(big.Int).Sub(
+		bigBlockFeeDuration,
+		new(big.Int).SetUint64(timeElapsed),
+	)
+	requiredBlockGasFeeNum := new(big.Int).Mul(
+		maxBlockGasFee,
+		feeTimeRemaining,
+	)
+	requiredBlockGasFee := new(big.Int).Div(
+		requiredBlockGasFeeNum,
+		bigBlockFeeDuration,
+	)
+
 	// We require that [blockGas] covers at least [blockGasFee] to ensure that it
 	// costs a minimum amount to produce a valid block.
 	if blockGas.Cmp(requiredBlockGasFee) < 0 {
@@ -226,7 +246,16 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		contribution = extraStateChangeContribution
 	}
 	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
-		if err := self.verifyBlockFee(block.BaseFee(), apricotPhase4RequiredBlockGasFee, block.Transactions(), receipts, contribution); err != nil {
+		parent := chain.GetHeaderByHash(block.ParentHash())
+		if err := self.verifyBlockFee(
+			block.BaseFee(),
+			apricotPhase4MaxRequiredBlockGasFee,
+			apricotPhase4BlockGasFeeDuration,
+			block.Time()-parent.Time,
+			block.Transactions(),
+			receipts,
+			contribution,
+		); err != nil {
 			return err
 		}
 	}
@@ -249,7 +278,16 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		contribution = extraStateChangeContribution
 	}
 	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-		if err := self.verifyBlockFee(header.BaseFee, apricotPhase4RequiredBlockGasFee, txs, receipts, contribution); err != nil {
+		parent := chain.GetHeaderByHash(header.ParentHash)
+		if err := self.verifyBlockFee(
+			header.BaseFee,
+			apricotPhase4MaxRequiredBlockGasFee,
+			apricotPhase4BlockGasFeeDuration,
+			header.Time-parent.Time,
+			txs,
+			receipts,
+			contribution,
+		); err != nil {
 			return nil, err
 		}
 	}
