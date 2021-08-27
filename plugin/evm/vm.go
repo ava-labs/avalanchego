@@ -725,10 +725,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 			return err
 		}
 
-		nodesSet := ids.NewShortSet(1)
-		nodesSet.Add(nodeID)
-		return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), response)
-
+		return vm.appSender.SendAppResponse(nodeID, requestID, response)
 	}
 
 	vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v",
@@ -736,7 +733,6 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 	return fmt.Errorf("failed unmarshalling AppGossipRequest")
 }
 
-// This VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	vm.ctx.Log.Verbo("called AppResponse")
 
