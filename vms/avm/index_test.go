@@ -402,7 +402,7 @@ func TestIndexer_Read(t *testing.T) {
 	assert.Len(t, testTxs, 25)
 
 	// read the pages, 5 items at a time
-	var cursor uint64 = 0
+	var cursor uint64
 	var pageSize uint64 = 5
 	for cursor < 25 {
 		txIDs, err := vm.addressTxsIndexer.Read(addr[:], assetID, cursor, pageSize)
@@ -598,7 +598,7 @@ func setupTestTxsInDB(t *testing.T, db *versiondb.Database, address ids.ShortID,
 
 	addressPrefixDB := prefixdb.New(address[:], db)
 	assetPrefixDB := prefixdb.New(assetID[:], addressPrefixDB)
-	var idx uint64 = 0
+	var idx uint64
 	idxBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(idxBytes, idx)
 	for _, txID := range testTxs {

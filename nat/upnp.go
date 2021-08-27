@@ -163,7 +163,7 @@ func discover(target string) *upnpRouter {
 			continue
 		}
 		go func(dev *goupnp.MaybeRootDevice) {
-			var r *upnpRouter = nil
+			var r *upnpRouter
 			dev.Root.Device.VisitServices(func(service *goupnp.Service) {
 				c := goupnp.ServiceClient{
 					SOAPClient: service.NewSOAPClient(),

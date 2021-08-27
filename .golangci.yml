@@ -19,7 +19,7 @@ linters:
     - gofmt
     - gofumpt
     - goimports
-    - golint
+    - revive 
     - gosec
     - gosimple
     - govet
