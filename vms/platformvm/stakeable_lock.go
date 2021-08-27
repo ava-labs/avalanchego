@@ -6,7 +6,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-var errInvalidLocktime = errors.New("invalid locktime")
+var (
+	errInvalidLocktime      = errors.New("invalid locktime")
+	errNestedStakeableLocks = errors.New("shouldn't nest stakeable locks")
+)
 
 type StakeableLockOut struct {
 	Locktime             uint64 `serialize:"true" json:"locktime"`
@@ -25,7 +28,7 @@ func (s *StakeableLockOut) Verify() error {
 		return errInvalidLocktime
 	}
 	if _, nested := s.TransferableOut.(*StakeableLockOut); nested {
-		return errors.New("shouldn't nest stakeable locks")
+		return errNestedStakeableLocks
 	}
 	return s.TransferableOut.Verify()
 }
@@ -40,7 +43,7 @@ func (s *StakeableLockIn) Verify() error {
 		return errInvalidLocktime
 	}
 	if _, nested := s.TransferableIn.(*StakeableLockIn); nested {
-		return errors.New("shouldn't nest stakeable locks")
+		return errNestedStakeableLocks
 	}
 	return s.TransferableIn.Verify()
 }
