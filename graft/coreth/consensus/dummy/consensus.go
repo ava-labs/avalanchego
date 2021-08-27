@@ -51,8 +51,8 @@ type (
 
 func NewDummyEngine(cb *ConsensusCallbacks, isFullFaker bool) *DummyEngine {
 	return &DummyEngine{
-		cb: cb,
-        isFullFaker: isFullFaker,
+		cb:          cb,
+		isFullFaker: isFullFaker,
 	}
 }
 
@@ -218,10 +218,10 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 }
 
 func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
-    // If we're running a full engine faking, accept any input as valid
-    if self.isFullFaker {
-        return nil
-    }
+	// If we're running a full engine faking, accept any input as valid
+	if self.isFullFaker {
+		return nil
+	}
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
