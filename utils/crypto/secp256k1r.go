@@ -42,6 +42,8 @@ const (
 	compactSigMagicOffset = 27
 )
 
+var errCompressed = errors.New("wasn't expecting a compresses key")
+
 type FactorySECP256K1R struct{ Cache cache.LRU }
 
 // NewPrivateKey implements the Factory interface
@@ -97,7 +99,7 @@ func (f *FactorySECP256K1R) RecoverHashPublicKey(hash, sig []byte) (PublicKey, e
 	}
 
 	if compressed {
-		return nil, errors.New("wasn't expecting a compresses key")
+		return nil, errCompressed
 	}
 
 	pubkey := &PublicKeySECP256K1R{pk: rawPubkey}

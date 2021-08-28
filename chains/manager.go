@@ -49,8 +49,11 @@ const (
 )
 
 var (
-	BootstrappedKey         = []byte{0x00}
-	_               Manager = &manager{}
+	BootstrappedKey = []byte{0x00}
+
+	errUnknownChainID = errors.New("unknown chain ID")
+
+	_ Manager = &manager{}
 )
 
 // Manager manages the chains running on this node.
@@ -726,7 +729,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 
 	chain, exists := m.chains[chainID]
 	if !exists {
-		return ids.ID{}, errors.New("unknown chain ID")
+		return ids.ID{}, errUnknownChainID
 	}
 	return chain.Context().SubnetID, nil
 }

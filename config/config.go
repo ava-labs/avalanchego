@@ -54,7 +54,16 @@ var (
 		CorethConfigKey: "please use --config-file to specify C-Chain config",
 	}
 
-	errInvalidStakerWeights = errors.New("staking weights must be positive")
+	errInvalidStakerWeights       = errors.New("staking weights must be positive")
+	errAuthPasswordTooWeak        = errors.New("API auth password is not strong enough")
+	errInvalidUptimeRequirement   = errors.New("uptime requirement must be in the range [0, 1]")
+	errMinValidatorStakeAboveMax  = errors.New("minimum validator stake can't be greater than maximum validator stake")
+	errInvalidDelegationFee       = errors.New("delegation fee must be in the range [0, 1,000,000]")
+	errInvalidMinStakeDuration    = errors.New("min stake duration must be > 0")
+	errMinStakeDurationAboveMax   = errors.New("max stake duration can't be less than min stake duration")
+	errStakeMintingPeriodBelowMin = errors.New("stake minting period can't be less than max stake duration")
+
+	errDuplicatedCChainConfig = errors.New("C-Chain config is already provided in chain config files")
 )
 
 func GetProcessConfig(v *viper.Viper) (process.Config, error) {
@@ -156,7 +165,7 @@ func getAPIAuthConfig(v *viper.Viper) (node.APIAuthConfig, error) {
 	}
 	config.APIAuthPassword = strings.TrimSpace(string(pwBytes))
 	if !password.SufficientlyStrong(config.APIAuthPassword, password.OK) {
-		return node.APIAuthConfig{}, errors.New("API auth password is not strong enough")
+		return node.APIAuthConfig{}, errAuthPasswordTooWeak
 	}
 	return config, nil
 }
@@ -490,18 +499,18 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.StakeMintingPeriod = v.GetDuration(StakeMintingPeriodKey)
 		config.MinDelegationFee = v.GetUint32(MinDelegatorFeeKey)
 		switch {
-		case config.UptimeRequirement < 0:
-			return node.StakingConfig{}, fmt.Errorf("%q must be <= 0", UptimeRequirementKey)
+		case config.UptimeRequirement < 0 || config.UptimeRequirement > 1:
+			return node.StakingConfig{}, errInvalidUptimeRequirement
 		case config.MinValidatorStake > config.MaxValidatorStake:
-			return node.StakingConfig{}, errors.New("minimum validator stake can't be greater than maximum validator stake")
+			return node.StakingConfig{}, errMinValidatorStakeAboveMax
 		case config.MinDelegationFee > 1_000_000:
-			return node.StakingConfig{}, errors.New("delegation fee must be in the range [0, 1,000,000]")
+			return node.StakingConfig{}, errInvalidDelegationFee
 		case config.MinStakeDuration <= 0:
-			return node.StakingConfig{}, errors.New("min stake duration must be > 0")
+			return node.StakingConfig{}, errInvalidMinStakeDuration
 		case config.MaxStakeDuration < config.MinStakeDuration:
-			return node.StakingConfig{}, errors.New("max stake duration can't be less than min stake duration")
+			return node.StakingConfig{}, errMinStakeDurationAboveMax
 		case config.StakeMintingPeriod < config.MaxStakeDuration:
-			return node.StakingConfig{}, errors.New("stake minting period can't be less than max stake duration")
+			return node.StakingConfig{}, errStakeMintingPeriodBelowMin
 		}
 	} else {
 		config.StakingConfig = genesis.GetStakingConfig(networkID)
@@ -614,7 +623,7 @@ func getChainConfigs(v *viper.Viper) (map[string]chains.ChainConfig, error) {
 	if v.IsSet(CorethConfigKey) {
 		// error if C config is already populated
 		if isCChainConfigSet(chainConfigs) {
-			return nil, errors.New("C-Chain config is already provided in chain config files")
+			return nil, errDuplicatedCChainConfig
 		}
 		corethConfigValue := v.Get(CorethConfigKey)
 		var corethConfigBytes []byte
