@@ -1,6 +1,8 @@
 package evm
 
 import (
+	"crypto/ecdsa"
+	"encoding/json"
 	"math/big"
 	"testing"
 	"time"
@@ -9,35 +11,63 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
-func getEThValidTxs() []*types.Transaction {
-	res := make([]*types.Transaction, 0)
+func fundAddressByGenesis(addr common.Address) (string, error) {
+	balance := big.NewInt(0xffffffffffffff)
+	genesis := &core.Genesis{
+		Difficulty: common.Big0,
+		GasLimit:   uint64(5000000),
+	}
+	funds := make(map[common.Address]core.GenesisAccount)
+	funds[addr] = core.GenesisAccount{
+		Balance: balance,
+	}
+	genesis.Alloc = funds
 
-	testAddr := common.HexToAddress("b94f5374fce5edbc8e2a8697c15331677e6ebf0b")
-
-	// generate two transactions
-	for nonce := uint64(1); nonce <= 2; nonce++ {
-		emptyEip2718Tx := types.NewTx(&types.AccessListTx{
-			ChainID:  big.NewInt(1),
-			Nonce:    nonce,
-			To:       &testAddr,
-			Value:    big.NewInt(10),
-			Gas:      25000,
-			GasPrice: big.NewInt(1),
-			Data:     common.FromHex("5544"),
-		})
-
-		signedEip2718Tx_1, _ := emptyEip2718Tx.WithSignature(
-			types.NewEIP2930Signer(big.NewInt(1)),
-			common.Hex2Bytes("c9519f4f2b30335884581971573fadf60c6204f59a911df35ee8a540456b266032f1e8e2c5dd761f9e4f88f41c8310aeaba26a8bfcdacfedfa12ec3862d3752101"),
-		)
-
-		res = append(res, signedEip2718Tx_1)
+	genesis.Config = &params.ChainConfig{
+		ChainID: params.AvalancheLocalChainID,
 	}
 
+	bytes, err := json.Marshal(genesis)
+	return string(bytes), err
+}
+
+func getEThValidTxs(key *ecdsa.PrivateKey) []*types.Transaction {
+	res := make([]*types.Transaction, 0)
+
+	nonce := uint64(1)
+	to := common.Address{}
+	amount := big.NewInt(10000)
+	gaslimit := uint64(100000)
+	gasprice := big.NewInt(1)
+
+	tx_1, _ := types.SignTx(
+		types.NewTransaction(nonce,
+			to,
+			amount,
+			gaslimit,
+			gasprice,
+			nil),
+		types.HomesteadSigner{}, key)
+	res = append(res, tx_1)
+
+	nonce++
+	tx_2, _ := types.SignTx(
+		types.NewTransaction(
+			nonce,
+			to,
+			amount,
+			gaslimit,
+			gasprice,
+			nil),
+		types.HomesteadSigner{}, key)
+	res = append(res, tx_2)
 	return res
 }
 
@@ -63,7 +93,8 @@ func TestMempool_EthTxsAreGossipedAfterActivation(t *testing.T) {
 	}
 
 	// create eth txes and notify VM about them
-	ethTxs := getEThValidTxs()
+	key, _ := crypto.GenerateKey()
+	ethTxs := getEThValidTxs(key)
 	go func() {
 		evt := core.NewTxsEvent{Txs: ethTxs}
 		fakeTxSubmitChan <- evt
@@ -99,7 +130,8 @@ func TestMempool_EthTxsAreNotGossipedBeforeActivation(t *testing.T) {
 	}
 
 	// create eth txes and notify VM about them
-	ethTxs := getEThValidTxs()
+	key, _ := crypto.GenerateKey()
+	ethTxs := getEThValidTxs(key)
 	go func() {
 		evt := core.NewTxsEvent{Txs: ethTxs}
 		fakeTxSubmitChan <- evt
@@ -118,7 +150,8 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 		codec: Codec,
 	}
 
-	ethTxs := getEThValidTxs()
+	key, _ := crypto.GenerateKey()
+	ethTxs := getEThValidTxs(key)
 	ethHashes := make([]common.Hash, len(ethTxs))
 	for idx, ethTx := range ethTxs {
 		ethHashes[idx] = ethTx.Hash()
@@ -147,67 +180,204 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 	// show that a coreth hashes discovered from gossip is requested to the same node
 	// only if the coreth hash is unknown
 
-	_, vm, _, _, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", nil)
+	key, _ := crypto.GenerateKey()
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	if err != nil {
+		t.Fatal("could not format genesis")
+	}
+
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "", nil)
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
 	isTxRequested := false
+	isRightNodeRequested := false
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	IsRightNodeRequested := false
 	sender.CantSendAppRequest = true
 	sender.SendAppRequestF = func(nodes ids.ShortSet, reqID uint32, resp []byte) error {
 		isTxRequested = true
 		if nodes.Contains(nodeID) {
-			IsRightNodeRequested = true
+			isRightNodeRequested = true
 		}
 
 		return nil
 	}
 
-	ethTxs := getEThValidTxs()
-	ethHash := make([]common.Hash, 1)
-	ethHash = append(ethHash, ethTxs[0].Hash())
-	unknownEthTxsBytes, err := vm.ethTxHashesToBytes(ethHash)
+	// prepare a couple of txes
+	ethTx := getEThValidTxs(key)[0]
+
+	// show that unknown coreth hashes is requested
+	unknownEthTxsBytes, err := vm.ethTxHashesToBytes([]common.Hash{ethTx.Hash()})
 	if err != nil {
 		log.Trace("Could not parse ethTxIDs. Understand what to do")
 	}
 
-	// show that unknown coreth hashes is requested
 	if err := vm.AppGossip(nodeID, unknownEthTxsBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !isTxRequested {
 		t.Fatal("unknown txID should have been requested")
 	}
-	if !IsRightNodeRequested {
+	if !isRightNodeRequested {
 		t.Fatal("unknown txID should have been requested to a different node")
 	}
 
-	// // show that requested bytes can be duly decoded
-	// if err := vm.AppRequest(nodeID, vm.IssueID(), requestedBytes); err != nil {
-	// 	t.Fatal("requested bytes following gossiping cannot be decoded")
-	// }
+	// show that known coreth tx is not requested
+	isTxRequested = false
+	if err := vm.chain.GetTxPool().AddLocal(ethTx); err != nil {
+		t.Fatal("could not add tx to mempool")
+	}
 
-	// TODO: find a way to add transactions to the pool
-	// // show that known coreth hashes is not requested
-	// isTxRequested = false
-	// if err := vm.chain.GetTxPool().AddLocal(ethTxs[1]); err != nil {
-	// 	t.Fatal("could not add tx to mempool")
-	// }
+	knownEthTxsBytes, err := vm.ethTxHashesToBytes([]common.Hash{ethTx.Hash()})
+	if err != nil {
+		log.Trace("Could not parse ethTxIDs. Understand what to do")
+	}
+	if err := vm.AppGossip(nodeID, knownEthTxsBytes); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if isTxRequested {
+		t.Fatal("known txID should not be requested")
+	}
+}
 
-	// ethHash[0] = ethTxs[1].Hash()
-	// knownEthTxsBytes, err := vm.ethTxHashesToBytes(ethHash)
-	// if err != nil {
-	// 	log.Trace("Could not parse ethTxIDs. Understand what to do")
-	// }
-	// if err := vm.AppGossip(nodeID, knownEthTxsBytes); err != nil {
-	// 	t.Fatal("error in reception of gossiped tx")
-	// }
-	// if isTxRequested {
-	// 	t.Fatal("known txID should not be requested")
-	// }
+func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
+	// show that a tx discovered by a GossipResponse is re-gossiped
+	// only if duly added to mempool
+
+	key, _ := crypto.GenerateKey()
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	if err != nil {
+		t.Fatal("could not format genesis")
+	}
+
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "", nil)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
+
+	isTxReGossiped := false
+	sender.CantSendAppGossip = true
+	sender.SendAppGossipF = func([]byte) error {
+		isTxReGossiped = true
+		return nil
+	}
+
+	// prepare a couple of txes
+	ethTxs := getEThValidTxs(key)
+	responseBytes, err := rlp.EncodeToBytes(ethTxs)
+	if err != nil {
+		t.Fatal("could not encode coreth txs")
+	}
+
+	// responses with unknown requestID are rejected
+	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
+	reqID := vm.IssueID()
+
+	unknownReqID := reqID + 1
+	if err := vm.AppResponse(nodeID, unknownReqID, responseBytes); err != nil {
+		t.Fatal("responses with unknown requestID should be dropped")
+	}
+
+	if vm.chain.GetTxPool().Has(ethTxs[0].Hash()) {
+		t.Fatal("responses with unknown requestID should not affect mempool")
+	}
+	if vm.chain.GetTxPool().Has(ethTxs[1].Hash()) {
+		t.Fatal("responses with unknown requestID should not affect mempool")
+	}
+	if isTxReGossiped {
+		t.Fatal("responses with unknown requestID should not result in gossiping")
+	}
+
+	// received tx and check it is accepted and re-gossiped
+	if err := vm.AppResponse(nodeID, reqID, responseBytes); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if !vm.chain.GetTxPool().Has(ethTxs[0].Hash()) {
+		t.Fatal("responses with unknown requestID should not affect mempool")
+	}
+	if !vm.chain.GetTxPool().Has(ethTxs[1].Hash()) {
+		t.Fatal("responses with unknown requestID should not affect mempool")
+	}
+	if !isTxReGossiped {
+		t.Fatal("tx accepted in mempool should have been re-gossiped")
+	}
+}
+
+func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
+	// show that a node answer to request with response
+	// only if it has the requested tx
+
+	key, _ := crypto.GenerateKey()
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	if err != nil {
+		t.Fatal("could not format genesis")
+	}
+
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "", nil)
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	isResponseIssued := false
+	var respondedBytes []byte
+	sender.CantSendAppResponse = true
+	sender.SendAppResponseF = func(nodeID ids.ShortID, reqID uint32, resp []byte) error {
+		isResponseIssued = true
+		respondedBytes = resp
+		return nil
+	}
+
+	// prepare a coreth tx
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
+	ethTx := getEThValidTxs(key)[0]
+	ethHashBytes, err := vm.ethTxHashesToBytes([]common.Hash{ethTx.Hash()})
+	if err != nil {
+		t.Fatal("Could no duly encode eth tx hashes")
+	}
+
+	// show that there is no response if tx is unknown
+	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
+	if err := vm.AppRequest(nodeID, vm.IssueID(), ethHashBytes); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if isResponseIssued {
+		t.Fatal("there should be no response with unknown tx")
+	}
+
+	// show that there is response if tx is known
+	if err := vm.chain.GetTxPool().AddLocal(ethTx); err != nil {
+		t.Fatal("could not add tx to mempool")
+	}
+
+	if err := vm.AppRequest(nodeID, vm.IssueID(), ethHashBytes); err != nil {
+		t.Fatal("error in reception of gossiped tx")
+	}
+	if !isResponseIssued {
+		t.Fatal("there should be a response with known tx")
+	}
+
+	// show that responded bytes can be duly decoded
+	if err := vm.AppResponse(nodeID, vm.IssueID(), respondedBytes); err != nil {
+		t.Fatal("bytes sent in response of AppRequest cannot be decoded")
+	}
 }
