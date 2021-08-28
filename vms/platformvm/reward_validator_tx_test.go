@@ -390,7 +390,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	firstMsgChan := make(chan common.Message, 1)
-	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil); err != nil {
+	if err := firstVM.Initialize(firstCtx, firstDB, genesisBytes, nil, nil, firstMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -430,7 +430,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	}()
 
 	secondMsgChan := make(chan common.Message, 1)
-	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil); err != nil {
+	if err := secondVM.Initialize(secondCtx, secondDB, genesisBytes, nil, nil, secondMsgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -586,7 +586,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	ctx.Lock.Lock()
 
 	msgChan := make(chan common.Message, 1)
-	if err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil); err != nil {
+	if err := vm.Initialize(ctx, db, genesisBytes, nil, nil, msgChan, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {

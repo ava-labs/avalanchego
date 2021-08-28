@@ -287,16 +287,20 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 		nil,
 		configBytes,
 		issuer,
-		append([]*common.Fx{
-			{
-				ID: ids.Empty,
-				Fx: &secp256k1fx.Fx{},
+		append(
+			[]*common.Fx{
+				{
+					ID: ids.Empty,
+					Fx: &secp256k1fx.Fx{},
+				},
+				{
+					ID: nftfx.ID,
+					Fx: &nftfx.Fx{},
+				},
 			},
-			{
-				ID: nftfx.ID,
-				Fx: &nftfx.Fx{},
-			},
-		}, additionalFxs...),
+			additionalFxs...,
+		),
+		nil,
 	)
 	if err != nil {
 		tb.Fatal(err)
@@ -606,6 +610,7 @@ func TestInvalidGenesis(t *testing.T) {
 		nil,                          // configBytes
 		make(chan common.Message, 1), // engineMessenger
 		nil,                          // fxs
+		nil,                          // AppSender
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid genesis")
@@ -634,6 +639,7 @@ func TestInvalidFx(t *testing.T) {
 		[]*common.Fx{ // fxs
 			nil,
 		},
+		nil,
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid interface")
@@ -667,6 +673,7 @@ func TestFxInitializationFailure(t *testing.T) {
 				},
 			},
 		}},
+		nil,
 	)
 	if err == nil {
 		t.Fatalf("Should have errored due to an invalid fx initialization")
@@ -894,6 +901,7 @@ func TestIssueNFT(t *testing.T) {
 				Fx: &nftfx.Fx{},
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -1045,6 +1053,7 @@ func TestIssueProperty(t *testing.T) {
 				Fx: &propertyfx.Fx{},
 			},
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatal(err)

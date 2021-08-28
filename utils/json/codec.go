@@ -20,7 +20,10 @@ const (
 	Null = "null"
 )
 
-var errUppercaseMethod = errors.New("method must start with a non-uppercase letter")
+var (
+	errUppercaseMethod = errors.New("method must start with a non-uppercase letter")
+	errInvalidArg      = errors.New("couldn't unmarshal an argument. Ensure arguments are valid and properly formatted. See documentation for example calls")
+)
 
 // NewCodec returns a new json codec that will convert the first character of
 // the method to uppercase
@@ -56,7 +59,7 @@ func (r *request) Method() (string, error) {
 
 func (r *request) ReadRequest(args interface{}) error {
 	if err := r.CodecRequest.ReadRequest(args); err != nil {
-		return errors.New("couldn't unmarshal an argument. Ensure arguments are valid and properly formatted. See documentation for example calls")
+		return errInvalidArg
 	}
 	return nil
 }

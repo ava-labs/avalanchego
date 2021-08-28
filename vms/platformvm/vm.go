@@ -140,6 +140,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
+	_ common.AppSender,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
 
@@ -338,7 +339,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.mempool.BuildBlock
 // ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	var blk Block
-	if _, err := GenesisCodec.Unmarshal(b, &blk); err != nil {
+	if _, err := Codec.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
 	if err := blk.initialize(vm, b, choices.Processing, blk); err != nil {
@@ -398,6 +399,26 @@ func (vm *VM) NotifyBlockReady() {
 
 func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return nil
+}
+
+// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return nil
 }
 
 // CreateHandlers returns a map where:
@@ -522,6 +543,9 @@ func (vm *VM) updateValidators(force bool) error {
 	if err := vm.Validators.Set(constants.PrimaryNetworkID, primaryValidators); err != nil {
 		return err
 	}
+
+	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
+	vm.localStake.Set(float64(weight))
 	vm.totalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
