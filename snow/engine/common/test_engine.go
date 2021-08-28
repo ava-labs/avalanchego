@@ -31,10 +31,6 @@ var (
 	errPullQuery                 = errors.New("unexpectedly called PullQuery")
 	errQueryFailed               = errors.New("unexpectedly called QueryFailed")
 	errChits                     = errors.New("unexpectedly called Chits")
-	errAppRequest                = errors.New("unexpectedly called AppRequest")
-	errAppResponse               = errors.New("unexpectedly called AppResponse")
-	errAppRequestFailed          = errors.New("unexpectedly called AppRequestFailed")
-	errAppGossip                 = errors.New("unexpectedly called AppGossip")
 
 	_ Engine = &EngineTest{}
 )
