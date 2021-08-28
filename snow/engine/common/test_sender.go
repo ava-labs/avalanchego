@@ -10,6 +10,12 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var (
+	errSendAppRequest  = errors.New("unexpectedly called SendAppRequest")
+	errSendAppResponse = errors.New("unexpectedly called SendAppResponse")
+	errSendAppGossip   = errors.New("unexpectedly called SendAppGossip")
+)
+
 // SenderTest is a test sender
 type SenderTest struct {
 	T *testing.T
@@ -57,7 +63,7 @@ func (s *SenderTest) Default(cant bool) {
 	s.CantSendAppGossip = cant
 }
 
-// GetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized. If it
+// SendGetAcceptedFrontier calls SendGetAcceptedFrontierF if it was initialized. If it
 // wasn't initialized and this function shouldn't be called and testing was
 // initialized, then testing will fail.
 func (s *SenderTest) SendGetAcceptedFrontier(validatorIDs ids.ShortSet, requestID uint32) {
@@ -197,9 +203,9 @@ func (s *SenderTest) SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appR
 	case s.SendAppRequestF != nil:
 		return s.SendAppRequestF(nodeIDs, requestID, appRequestBytes)
 	case s.CantSendAppRequest && s.T != nil:
-		s.T.Fatalf("Unexpectedly called SendAppRequest")
+		s.T.Fatal(errSendAppRequest)
 	}
-	return errors.New("unexpectedly called SendAppRequest")
+	return errSendAppRequest
 }
 
 // SendAppResponse calls SendAppResponseF if it was initialized. If it wasn't initialized and this
@@ -210,9 +216,9 @@ func (s *SenderTest) SendAppResponse(nodeID ids.ShortID, requestID uint32, appRe
 	case s.SendAppResponseF != nil:
 		return s.SendAppResponseF(nodeID, requestID, appResponseBytes)
 	case s.CantSendAppResponse && s.T != nil:
-		s.T.Fatalf("Unexpectedly called SendAppResponse")
+		s.T.Fatal(errSendAppResponse)
 	}
-	return errors.New("unexpectedly called SendAppResponse")
+	return errSendAppResponse
 }
 
 // SendAppGossip calls SendAppGossipF if it was initialized. If it wasn't initialized and this
@@ -223,7 +229,7 @@ func (s *SenderTest) SendAppGossip(appGossipBytes []byte) error {
 	case s.SendAppGossipF != nil:
 		return s.SendAppGossipF(appGossipBytes)
 	case s.CantSendAppGossip && s.T != nil:
-		s.T.Fatalf("Unexpectedly called SendAppGossip")
+		s.T.Fatal(errSendAppGossip)
 	}
-	return errors.New("unexpectedly called SendAppGossip")
+	return errSendAppGossip
 }

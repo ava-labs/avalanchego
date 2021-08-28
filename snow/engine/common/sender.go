@@ -83,7 +83,7 @@ type Gossiper interface {
 	SendGossip(containerID ids.ID, container []byte)
 }
 
-// Sends app-level messages.
+// AppSender sends app-level messages.
 type AppSender interface {
 	// Send an application-level request.
 	// A non-nil error should be considered fatal.

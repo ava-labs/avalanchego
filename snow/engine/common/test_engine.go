@@ -9,7 +9,34 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
+)
+
+var (
+	errTimeout                   = errors.New("unexpectedly called Timeout")
+	errGossip                    = errors.New("unexpectedly called Gossip")
+	errNotify                    = errors.New("unexpectedly called Notify")
+	errGetAcceptedFrontier       = errors.New("unexpectedly called GetAcceptedFrontier")
+	errGetAcceptedFrontierFailed = errors.New("unexpectedly called GetAcceptedFrontierFailed")
+	errAcceptedFrontier          = errors.New("unexpectedly called AcceptedFrontier")
+	errGetAccepted               = errors.New("unexpectedly called GetAccepted")
+	errGetAcceptedFailed         = errors.New("unexpectedly called GetAcceptedFailed")
+	errAccepted                  = errors.New("unexpectedly called Accepted")
+	errGet                       = errors.New("unexpectedly called Get")
+	errGetAncestors              = errors.New("unexpectedly called GetAncestors")
+	errGetFailed                 = errors.New("unexpectedly called GetFailed")
+	errGetAncestorsFailed        = errors.New("unexpectedly called GetAncestorsFailed")
+	errPut                       = errors.New("unexpectedly called Put")
+	errMultiPut                  = errors.New("unexpectedly called MultiPut")
+	errPushQuery                 = errors.New("unexpectedly called PushQuery")
+	errPullQuery                 = errors.New("unexpectedly called PullQuery")
+	errQueryFailed               = errors.New("unexpectedly called QueryFailed")
+	errChits                     = errors.New("unexpectedly called Chits")
+	errAppRequest                = errors.New("unexpectedly called AppRequest")
+	errAppResponse               = errors.New("unexpectedly called AppResponse")
+	errAppRequestFailed          = errors.New("unexpectedly called AppRequestFailed")
+	errAppGossip                 = errors.New("unexpectedly called AppGossip")
+
+	_ Engine = &EngineTest{}
 )
 
 // EngineTest is a test engine
@@ -55,7 +82,8 @@ type EngineTest struct {
 	CantAppResponse,
 	CantAppGossip,
 	CantAppRequestFailed,
-	CantGetVtx, CantGetVM bool
+
+	CantGetVM bool
 
 	IsBootstrappedF                                    func() bool
 	ContextF                                           func() *snow.Context
@@ -70,13 +98,10 @@ type EngineTest struct {
 	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(nodeID ids.ShortID, requestID uint32) error
 	ConnectedF, DisconnectedF func(nodeID ids.ShortID) error
 	HealthF                   func() (interface{}, error)
-	GetVtxF                   func() (avalanche.Vertex, error)
 	GetVMF                    func() VM
 	AppRequestF, AppResponseF func(nodeID ids.ShortID, requestID uint32, msg []byte) error
 	AppGossipF                func(nodeID ids.ShortID, msg []byte) error
 }
-
-var _ Engine = &EngineTest{}
 
 func (e *EngineTest) Default(cant bool) {
 	e.CantIsBootstrapped = cant
@@ -109,7 +134,6 @@ func (e *EngineTest) Default(cant bool) {
 	e.CantAppRequestFailed = cant
 	e.CantAppResponse = cant
 	e.CantAppGossip = cant
-	e.CantGetVtx = cant
 	e.CantGetVM = cant
 }
 
@@ -131,9 +155,9 @@ func (e *EngineTest) Timeout() error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Timeout")
+		e.T.Fatal(errTimeout)
 	}
-	return errors.New("unexpectedly called Timeout")
+	return errTimeout
 }
 
 func (e *EngineTest) Gossip() error {
@@ -144,9 +168,9 @@ func (e *EngineTest) Gossip() error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Gossip")
+		e.T.Fatal(errGossip)
 	}
-	return errors.New("unexpectedly called Gossip")
+	return errGossip
 }
 
 func (e *EngineTest) Halt() {
@@ -165,9 +189,9 @@ func (e *EngineTest) Shutdown() error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Shutdown")
+		e.T.Fatal(errShutdown)
 	}
-	return errors.New("unexpectedly called Shutdown")
+	return errShutdown
 }
 
 func (e *EngineTest) Notify(msg Message) error {
@@ -178,9 +202,9 @@ func (e *EngineTest) Notify(msg Message) error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Notify")
+		e.T.Fatal(errNotify)
 	}
-	return errors.New("unexpectedly called Notify")
+	return errNotify
 }
 
 func (e *EngineTest) GetAcceptedFrontier(nodeID ids.ShortID, requestID uint32) error {
@@ -191,9 +215,9 @@ func (e *EngineTest) GetAcceptedFrontier(nodeID ids.ShortID, requestID uint32) e
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetAcceptedFrontier")
+		e.T.Fatal(errGetAcceptedFrontier)
 	}
-	return errors.New("unexpectedly called GetAcceptedFrontier")
+	return errGetAcceptedFrontier
 }
 
 func (e *EngineTest) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32) error {
@@ -204,9 +228,9 @@ func (e *EngineTest) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uin
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetAcceptedFrontierFailed")
+		e.T.Fatal(errGetAcceptedFrontierFailed)
 	}
-	return errors.New("unexpectedly called GetAcceptedFrontierFailed")
+	return errGetAcceptedFrontierFailed
 }
 
 func (e *EngineTest) AcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
@@ -217,9 +241,9 @@ func (e *EngineTest) AcceptedFrontier(nodeID ids.ShortID, requestID uint32, cont
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called AcceptedFrontierF")
+		e.T.Fatal(errAcceptedFrontier)
 	}
-	return errors.New("unexpectedly called AcceptedFrontierF")
+	return errAcceptedFrontier
 }
 
 func (e *EngineTest) GetAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
@@ -230,9 +254,9 @@ func (e *EngineTest) GetAccepted(nodeID ids.ShortID, requestID uint32, container
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetAccepted")
+		e.T.Fatal(errGetAccepted)
 	}
-	return errors.New("unexpectedly called GetAccepted")
+	return errGetAccepted
 }
 
 func (e *EngineTest) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) error {
@@ -243,9 +267,9 @@ func (e *EngineTest) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) err
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetAcceptedFailed")
+		e.T.Fatal(errGetAcceptedFailed)
 	}
-	return errors.New("unexpectedly called GetAcceptedFailed")
+	return errGetAcceptedFailed
 }
 
 func (e *EngineTest) Accepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
@@ -256,9 +280,9 @@ func (e *EngineTest) Accepted(nodeID ids.ShortID, requestID uint32, containerIDs
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Accepted")
+		e.T.Fatal(errAccepted)
 	}
-	return errors.New("unexpectedly called Accepted")
+	return errAccepted
 }
 
 func (e *EngineTest) Get(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
@@ -269,9 +293,9 @@ func (e *EngineTest) Get(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Get")
+		e.T.Fatal(errGet)
 	}
-	return errors.New("unexpectedly called Get")
+	return errGet
 }
 
 func (e *EngineTest) GetAncestors(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
@@ -282,9 +306,9 @@ func (e *EngineTest) GetAncestors(nodeID ids.ShortID, requestID uint32, containe
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetAncestors")
+		e.T.Fatal(errGetAncestors)
 	}
-	return errors.New("unexpectedly called GetAncestors")
+	return errGetAncestors
 }
 
 func (e *EngineTest) GetFailed(nodeID ids.ShortID, requestID uint32) error {
@@ -295,9 +319,9 @@ func (e *EngineTest) GetFailed(nodeID ids.ShortID, requestID uint32) error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetFailed")
+		e.T.Fatal(errGetFailed)
 	}
-	return errors.New("unexpectedly called GetFailed")
+	return errGetFailed
 }
 
 func (e *EngineTest) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) error {
@@ -308,9 +332,9 @@ func (e *EngineTest) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) er
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetAncestorsFailed")
+		e.T.Fatal(errGetAncestorsFailed)
 	}
-	return errors.New("unexpectedly called GetAncestorsFailed")
+	return errGetAncestorsFailed
 }
 
 func (e *EngineTest) Put(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
@@ -321,9 +345,9 @@ func (e *EngineTest) Put(nodeID ids.ShortID, requestID uint32, containerID ids.I
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Put")
+		e.T.Fatal(errPut)
 	}
-	return errors.New("unexpectedly called Put")
+	return errPut
 }
 
 func (e *EngineTest) MultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
@@ -334,9 +358,9 @@ func (e *EngineTest) MultiPut(nodeID ids.ShortID, requestID uint32, containers [
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called MultiPut")
+		e.T.Fatal(errMultiPut)
 	}
-	return errors.New("unexpectedly called MultiPut")
+	return errMultiPut
 }
 
 func (e *EngineTest) PushQuery(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
@@ -347,9 +371,9 @@ func (e *EngineTest) PushQuery(nodeID ids.ShortID, requestID uint32, containerID
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called PushQuery")
+		e.T.Fatal(errPushQuery)
 	}
-	return errors.New("unexpectedly called PushQuery")
+	return errPushQuery
 }
 
 func (e *EngineTest) PullQuery(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
@@ -360,9 +384,9 @@ func (e *EngineTest) PullQuery(nodeID ids.ShortID, requestID uint32, containerID
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called PullQuery")
+		e.T.Fatal(errPullQuery)
 	}
-	return errors.New("unexpectedly called PullQuery")
+	return errPullQuery
 }
 
 func (e *EngineTest) QueryFailed(nodeID ids.ShortID, requestID uint32) error {
@@ -373,9 +397,9 @@ func (e *EngineTest) QueryFailed(nodeID ids.ShortID, requestID uint32) error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called QueryFailed")
+		e.T.Fatal(errQueryFailed)
 	}
-	return errors.New("unexpectedly called QueryFailed")
+	return errQueryFailed
 }
 
 func (e *EngineTest) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
@@ -386,9 +410,9 @@ func (e *EngineTest) AppRequest(nodeID ids.ShortID, requestID uint32, request []
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called AppRequest")
+		e.T.Fatal(errAppRequest)
 	}
-	return errors.New("unexpectedly called AppRequest")
+	return errAppRequest
 }
 
 func (e *EngineTest) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
@@ -399,9 +423,9 @@ func (e *EngineTest) AppResponse(nodeID ids.ShortID, requestID uint32, response 
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called AppResponse")
+		e.T.Fatal(errAppResponse)
 	}
-	return errors.New("unexpectedly called AppResponse")
+	return errAppResponse
 }
 
 func (e *EngineTest) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
@@ -412,9 +436,9 @@ func (e *EngineTest) AppRequestFailed(nodeID ids.ShortID, requestID uint32) erro
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called AppRequestFailed")
+		e.T.Fatal(errAppRequestFailed)
 	}
-	return errors.New("unexpectedly called AppRequestFailed")
+	return errAppRequestFailed
 }
 
 func (e *EngineTest) AppGossip(nodeID ids.ShortID, msg []byte) error {
@@ -425,12 +449,11 @@ func (e *EngineTest) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called AppGossip")
+		e.T.Fatal(errAppGossip)
 	}
-	return errors.New("unexpectedly called AppGossip")
+	return errAppGossip
 }
 
-// Chits ...
 func (e *EngineTest) Chits(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.ChitsF != nil {
 		return e.ChitsF(nodeID, requestID, containerIDs)
@@ -439,9 +462,9 @@ func (e *EngineTest) Chits(nodeID ids.ShortID, requestID uint32, containerIDs []
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Chits")
+		e.T.Fatal(errChits)
 	}
-	return errors.New("unexpectedly called Chits")
+	return errChits
 }
 
 func (e *EngineTest) Connected(nodeID ids.ShortID) error {
@@ -452,9 +475,9 @@ func (e *EngineTest) Connected(nodeID ids.ShortID) error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Connected")
+		e.T.Fatal(errConnected)
 	}
-	return errors.New("unexpectedly called Connected")
+	return errConnected
 }
 
 func (e *EngineTest) Disconnected(nodeID ids.ShortID) error {
@@ -465,9 +488,9 @@ func (e *EngineTest) Disconnected(nodeID ids.ShortID) error {
 		return nil
 	}
 	if e.T != nil {
-		e.T.Fatalf("Unexpectedly called Disconnected")
+		e.T.Fatal(errDisconnected)
 	}
-	return errors.New("unexpectedly called Disconnected")
+	return errDisconnected
 }
 
 func (e *EngineTest) IsBootstrapped() bool {
@@ -485,19 +508,9 @@ func (e *EngineTest) HealthCheck() (interface{}, error) {
 		return e.HealthF()
 	}
 	if e.CantHealth && e.T != nil {
-		e.T.Fatalf("Unexpectedly called Health")
+		e.T.Fatal(errHealthCheck)
 	}
-	return nil, errors.New("unexpectedly called Health")
-}
-
-func (e *EngineTest) GetVtx() (avalanche.Vertex, error) {
-	if e.GetVtxF != nil {
-		return e.GetVtxF()
-	}
-	if e.CantGetVtx && e.T != nil {
-		e.T.Fatalf("Unexpectedly called GetVtx")
-	}
-	return nil, errors.New("unexpectedly called GetVtx")
+	return nil, errHealthCheck
 }
 
 func (e *EngineTest) GetVM() VM {

@@ -24,6 +24,10 @@ var (
 	errConnected            = errors.New("unexpectedly called Connected")
 	errDisconnected         = errors.New("unexpectedly called Disconnected")
 	errVersion              = errors.New("unexpectedly called Version")
+	errAppRequest           = errors.New("unexpectedly called AppRequest")
+	errAppResponse          = errors.New("unexpectedly called AppResponse")
+	errAppRequestFailed     = errors.New("unexpectedly called AppRequestFailed")
+	errAppGossip            = errors.New("unexpectedly called AppGossip")
 
 	_ VM = &TestVM{}
 )
@@ -154,9 +158,9 @@ func (vm *TestVM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 		return nil
 	}
 	if vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called AppRequestFailed")
+		vm.T.Fatal(errAppRequest)
 	}
-	return errors.New("unexpectedly called AppRequestFailed")
+	return errAppRequest
 }
 
 func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
@@ -167,9 +171,9 @@ func (vm *TestVM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byt
 		return nil
 	}
 	if vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called AppRequest")
+		vm.T.Fatal(errAppRequest)
 	}
-	return errors.New("unexpectedly called AppRequest")
+	return errAppRequest
 }
 
 func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
@@ -180,9 +184,9 @@ func (vm *TestVM) AppResponse(nodeID ids.ShortID, requestID uint32, response []b
 		return nil
 	}
 	if vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called AppResponse")
+		vm.T.Fatal(errAppResponse)
 	}
-	return errors.New("unexpectedly called AppResponse")
+	return errAppResponse
 }
 
 func (vm *TestVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
@@ -193,9 +197,9 @@ func (vm *TestVM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 	if vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called AppGossip")
+		vm.T.Fatal(errAppGossip)
 	}
-	return errors.New("unexpectedly called AppGossip")
+	return errAppGossip
 }
 
 func (vm *TestVM) Connected(id ids.ShortID) error {
