@@ -171,8 +171,6 @@ func init() {
 		c.RegisterType(&secp256k1fx.Credential{}),
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		c.RegisterType([]common.Hash{}),        // to serialize coreEth hashes
-		c.RegisterType([]*types.Transaction{}), // to serialize coreEth txes in response
 		Codec.RegisterCodec(codecVersion, c),
 	)
 
@@ -720,7 +718,12 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 			}
 		}
 
-		response, err := vm.codec.Marshal(codecVersion, txsToRespondTo)
+		if len(txsToRespondTo) == 0 {
+			// TODO: send back an empty message?
+			return nil // txes no more in mempool
+		}
+
+		response, err := rlp.EncodeToBytes(txsToRespondTo)
 		if err != nil {
 			return err
 		}
@@ -778,13 +781,15 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	}
 
 	corethTxs := make([]*types.Transaction, 0)
-	if _, err := vm.codec.Unmarshal(response, corethTxs); err == nil {
+	if err := rlp.DecodeBytes(response, &corethTxs); err == nil {
 		errs := vm.chain.GetTxPool().AddLocals(corethTxs)
 		for _, err := range errs {
 			if err != nil {
-				return err
+				vm.ctx.Log.Debug("AppResponse: failed AddLocals response from Node %v, reqID %v, err %v",
+					nodeID, requestID, err)
 			}
 		}
+		return nil
 	}
 
 	vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v")
@@ -828,6 +833,10 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 			if !vm.chain.GetTxPool().Has(txHash) {
 				hashesToRequest = append(hashesToRequest, txHash)
 			}
+		}
+
+		if len(hashesToRequest) == 0 {
+			return nil // nothing to ask
 		}
 
 		msg, err := vm.ethTxHashesToBytes(hashesToRequest)
@@ -1120,14 +1129,13 @@ func (vm *VM) signalTxsReady() {
 }
 
 func (vm *VM) ethTxHashesToBytes(ethTxHashes []common.Hash) ([]byte, error) {
-	return vm.codec.Marshal(codecVersion, ethTxHashes)
+	return rlp.EncodeToBytes(ethTxHashes)
 }
 
 func (vm *VM) bytesToEthTxHashes(b []byte) ([]common.Hash, error) {
-	ethIDs := make([]common.Hash, 0)
-
-	_, err := vm.codec.Unmarshal(b, &ethIDs)
-	return ethIDs, err
+	ethHashes := make([]common.Hash, 0)
+	err := rlp.DecodeBytes(b, &ethHashes)
+	return ethHashes, err
 }
 
 // awaitSubmittedTxs waits for new transactions to be submitted

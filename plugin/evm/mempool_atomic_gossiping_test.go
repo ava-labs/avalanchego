@@ -593,7 +593,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 		t.Fatal("there should be no response with unknown tx")
 	}
 
-	// show that there is response if tx is unknown
+	// show that there is response if tx is known
 	if err := mempool.AddTx(tx); err != nil {
 		t.Fatal("could not add tx to mempool")
 	}
