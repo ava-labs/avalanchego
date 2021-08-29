@@ -2423,3 +2423,35 @@ func (service *Service) GetTimestamp(_ *http.Request, args *struct{}, reply *Get
 	reply.Timestamp = service.vm.internalState.GetTimestamp()
 	return nil
 }
+
+// GetValidatorsAtArgs is the response from GetValidatorsAt
+type GetValidatorsAtArgs struct {
+	Height   json.Uint64 `json:"height"`
+	SubnetID ids.ID      `json:"subnetID"`
+}
+
+// GetValidatorsAtReply is the response from GetValidatorsAt
+type GetValidatorsAtReply struct {
+	Validators map[string]uint64 `json:"validators"`
+}
+
+// GetValidatorsAt returns the weights of the validator set of a provided subnet
+// at the specified height.
+func (service *Service) GetValidatorsAt(_ *http.Request, args *GetValidatorsAtArgs, reply *GetValidatorsAtReply) error {
+	service.vm.ctx.Log.Info(
+		"Platform: GetValidatorsAt called with Height %d and SubnetID %s",
+		args.Height,
+		args.SubnetID,
+	)
+
+	validators, err := service.vm.GetValidatorSet(uint64(args.Height), args.SubnetID)
+	if err != nil {
+		return fmt.Errorf("couldn't get validator set: %w", err)
+	}
+
+	reply.Validators = make(map[string]uint64, len(validators))
+	for nodeID, weight := range validators {
+		reply.Validators[nodeID.PrefixedString(constants.NodeIDPrefix)] = weight
+	}
+	return nil
+}
