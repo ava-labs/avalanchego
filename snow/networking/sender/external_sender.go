@@ -14,40 +14,40 @@ import (
 type ExternalSender interface {
 	AppSender
 
-	// Send a GetAcceptedFrontier message for chain [chainID] to validators in [validatorIDs].
+	// Send a GetAcceptedFrontier message for chain [chainID] to validators in [nodeIDs].
 	// The validator should reply by [deadline].
 	// Returns the IDs of validators that may receive the message.
-	// If we're not connected to a validator in [validatorIDs], for example,
+	// If we're not connected to a validator in [nodeIDs], for example,
 	// it will not be included in the return value.
-	GetAcceptedFrontier(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID
-	AcceptedFrontier(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
+	SendGetAcceptedFrontier(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration) []ids.ShortID
+	SendAcceptedFrontier(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	GetAccepted(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID
-	Accepted(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
+	SendGetAccepted(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerIDs []ids.ID) []ids.ShortID
+	SendAccepted(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerIDs []ids.ID)
 
-	// Request ancestors of container [containerID] in chain [chainID] from validator [validatorID].
+	// Request ancestors of container [containerID] in chain [chainID] from validator [nodeID].
 	// The validator should reply by [deadline].
 	// Returns true if the validator may receive the message.
-	// If we're not connected to [validatorID], for example, returns false.
-	GetAncestors(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
-	MultiPut(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
+	// If we're not connected to [nodeID], for example, returns false.
+	SendGetAncestors(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
+	SendMultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containers [][]byte)
 
-	Get(validatorID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
-	Put(validatorID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
+	SendGet(nodeID ids.ShortID, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) bool
+	SendPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32, containerID ids.ID, container []byte)
 
-	PushQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID
-	PullQuery(validatorIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
-	Chits(validatorID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
+	SendPushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID
+	SendPullQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID) []ids.ShortID
+	SendChits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, votes []ids.ID)
 
-	Gossip(subnetID, chainID, containerID ids.ID, container []byte)
+	SendGossip(subnetID, chainID, containerID ids.ID, container []byte)
 }
 
-// Sends app-level messages
+// AppSender sends app-level messages
 type AppSender interface {
 	// Send an application-level request
 	SendAppRequest(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, appRequestBytes []byte) []ids.ShortID
 	// Send an application-level response to a request
 	SendAppResponse(nodeID ids.ShortID, chainID ids.ID, requestID uint32, appResponseBytes []byte)
 	// Gossip an application-level message
-	SendAppGossip(chainID ids.ID, appGossipBytes []byte)
+	SendAppGossip(subnetID, chainID ids.ID, appGossipBytes []byte)
 }

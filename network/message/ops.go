@@ -32,11 +32,11 @@ const (
 	// Handshake / peer gossiping
 	Version
 	PeerList
+	VersionWithSubnets
 	// Application level:
 	AppRequest
 	AppResponse
 	AppGossip
-	VersionWithSubnets
 )
 
 var (
@@ -97,7 +97,7 @@ var (
 
 func (op Op) Compressable() bool {
 	switch op {
-	case PeerList, Put, MultiPut, PushQuery:
+	case PeerList, Put, MultiPut, PushQuery, AppRequest, AppResponse, AppGossip:
 		return true
 	default:
 		return false

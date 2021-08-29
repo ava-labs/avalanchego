@@ -60,8 +60,8 @@ const (
 	// to be minted
 	MinConsumptionRate = 100000 // 10%
 
-	// The maximum amount of weight on a validator is required to be no more
-	// than [MaxValidatorWeightFactor] * the validator's stake amount.
+	// MaxValidatorWeightFactor is the maximum factor of the validator stake
+	// that is allowed to be placed on a validator.
 	MaxValidatorWeightFactor uint64 = 5
 
 	// SupplyCap is the maximum amount of AVAX that should ever exist
@@ -403,7 +403,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.mempool.BuildBlock
 // ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	var blk Block
-	if _, err := platformcodec.GenesisCodec.Unmarshal(b, &blk); err != nil {
+	if _, err := platformcodec.Codec.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
 	if err := blk.initialize(vm, b, choices.Processing, blk); err != nil {
@@ -465,7 +465,7 @@ func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppRequestFailed this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	vm.ctx.Log.Verbo("called AppRequestFailed")
 
@@ -477,7 +477,7 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppRequest this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
 	vm.ctx.Log.Verbo("called AppRequest")
 
@@ -517,7 +517,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 	return vm.appSender.SendAppResponse(nodeID, requestID, response)
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppResponse this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	vm.ctx.Log.Verbo("called AppResponse")
 
@@ -626,7 +626,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	}
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppGossip this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	vm.ctx.Log.Verbo("called AppGossip")
 
@@ -762,7 +762,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	return vdrSet, nil
 }
 
-// Implements validators.VM interface
+// GetCurrentHeight implements validators.VM interface
 func (vm *VM) GetCurrentHeight() (uint64, error) {
 	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
 	if err != nil {

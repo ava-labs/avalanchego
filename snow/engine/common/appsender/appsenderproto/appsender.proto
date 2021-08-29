@@ -1,6 +1,6 @@
 syntax = "proto3";
 package appsenderproto;
-option go_package = "github.com/ava-labs/avalanchego/vms/rpcchainvm/sender/appsenderproto";
+option go_package = "github.com/ava-labs/avalanchego/snow/engine/common/appsender/appsenderproto";
 
 message SendAppRequestMsg {
     // The nodes to send this request to

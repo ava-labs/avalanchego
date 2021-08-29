@@ -52,8 +52,11 @@ const (
 )
 
 var (
-	BootstrappedKey         = []byte{0x00}
-	_               Manager = &manager{}
+	BootstrappedKey = []byte{0x00}
+
+	errUnknownChainID = errors.New("unknown chain ID")
+
+	_ Manager = &manager{}
 )
 
 // Manager manages the chains running on this node.
@@ -502,8 +505,14 @@ func (m *manager) createAvalancheChain(
 
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, consensusParams.Namespace, consensusParams.Metrics)
-	if err != nil {
+	if err := sender.Initialize(
+		ctx,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
@@ -748,7 +757,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 
 	chain, exists := m.chains[chainID]
 	if !exists {
-		return ids.ID{}, errors.New("unknown chain ID")
+		return ids.ID{}, errUnknownChainID
 	}
 	return chain.Context().SubnetID, nil
 }

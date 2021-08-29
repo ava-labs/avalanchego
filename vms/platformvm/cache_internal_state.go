@@ -600,7 +600,7 @@ func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := platformcodec.Codec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := platformcodec.GenesisCodec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -1142,7 +1142,7 @@ func (st *internalStateImpl) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
+			utxoBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, utxo)
 			if err != nil {
 				return err
 			}
@@ -1228,10 +1228,7 @@ func (st *internalStateImpl) load() error {
 	if err := st.loadCurrentValidators(); err != nil {
 		return err
 	}
-	if err := st.loadPendingValidators(); err != nil {
-		return err
-	}
-	return nil
+	return st.loadPendingValidators()
 }
 
 func (st *internalStateImpl) loadSingletons() error {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/vms/rpcchainvm/appsender/appsenderproto"
+	"github.com/ava-labs/avalanchego/snow/engine/common/appsender/appsenderproto"
 )
 
 var _ appsenderproto.AppSenderServer = &Server{}

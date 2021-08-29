@@ -15,12 +15,13 @@ import (
 )
 
 var (
-	errNilOutput                         = errors.New("nil output")
-	errOutputUnspendable                 = errors.New("output is unspendable")
-	errOutputUnoptimized                 = errors.New("output representation should be optimized")
-	errAddrsNotSortedUnique              = errors.New("addresses not sorted and unique")
-	errMarshal                           = errors.New("cannot marshal without ctx")
-	_                       verify.State = &OutputOwners{}
+	errNilOutput            = errors.New("nil output")
+	errOutputUnspendable    = errors.New("output is unspendable")
+	errOutputUnoptimized    = errors.New("output representation should be optimized")
+	errAddrsNotSortedUnique = errors.New("addresses not sorted and unique")
+	errMarshal              = errors.New("cannot marshal without ctx")
+
+	_ verify.State = &OutputOwners{}
 )
 
 type OutputOwners struct {

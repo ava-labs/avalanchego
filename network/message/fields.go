@@ -28,10 +28,10 @@ const (
 	SigBytes                         // Used in handshake / peer gossiping
 	VersionTime                      // Used in handshake / peer gossiping
 	SignedPeers                      // Used in peer gossiping
+	TrackedSubnets                   // Used in handshake / peer gossiping
 	AppRequestBytes                  // Used at application level
 	AppResponseBytes                 // Used at application level
 	AppGossipBytes                   // Used at application level
-	TrackedSubnets                   // Used in handshake / peer gossiping
 )
 
 // Packer returns the packer function that can be used to pack this field.
