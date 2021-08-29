@@ -9,7 +9,6 @@ import (
 
 var errUnknownBlockchainStatus = errors.New("unknown blockchain status")
 
-// Status ...
 type BlockchainStatus uint32
 
 // List of possible status values

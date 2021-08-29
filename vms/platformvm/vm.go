@@ -55,8 +55,8 @@ const (
 	// to be minted
 	MinConsumptionRate = 100000 // 10%
 
-	// The maximum amount of weight on a validator is required to be no more
-	// than [MaxValidatorWeightFactor] * the validator's stake amount.
+	// MaxValidatorWeightFactor is the maximum factor of the validator stake
+	// that is allowed to be placed on a validator.
 	MaxValidatorWeightFactor uint64 = 5
 
 	// SupplyCap is the maximum amount of AVAX that should ever exist
@@ -401,22 +401,22 @@ func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppRequestFailed this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	return nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppRequest this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
 	return nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppResponse this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
 	return nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
+// AppGossip this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	return nil
 }
