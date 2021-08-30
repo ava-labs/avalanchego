@@ -76,7 +76,8 @@ func TestPeer_Close(t *testing.T) {
 	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
 	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 	handler := &testHandler{}
 
 	versionManager := version.NewCompatibility(
@@ -103,7 +104,7 @@ func TestPeer_Close(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},

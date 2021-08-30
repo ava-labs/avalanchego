@@ -268,7 +268,7 @@ func (n *Node) initNetworking() error {
 		dialer.NewDialer(TCP, n.Config.NetworkConfig.DialerConfig, n.Log),
 		serverUpgrader,
 		clientUpgrader,
-		primaryNetworkValidators,
+		n.vdrs,
 		n.beacons,
 		consensusRouter,
 		n.Config.NetworkConfig.InboundConnThrottlerConfig,

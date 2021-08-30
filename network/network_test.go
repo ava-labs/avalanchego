@@ -327,7 +327,8 @@ func TestNewDefaultNetwork(t *testing.T) {
 	serverUpgrader := NewTLSServerUpgrader(tlsConfig0)
 	clientUpgrader := NewTLSClientUpgrader(tlsConfig0)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 	handler := &testHandler{}
 
 	versionManager := version.NewCompatibility(
@@ -354,7 +355,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -440,7 +441,8 @@ func TestEstablishConnection(t *testing.T) {
 	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
 	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 
 	var (
 		wg0 sync.WaitGroup
@@ -489,7 +491,7 @@ func TestEstablishConnection(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -522,7 +524,7 @@ func TestEstablishConnection(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -619,7 +621,8 @@ func TestDoubleTrack(t *testing.T) {
 	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
 	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 
 	var (
 		wg0 sync.WaitGroup
@@ -668,7 +671,7 @@ func TestDoubleTrack(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -701,7 +704,7 @@ func TestDoubleTrack(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -799,7 +802,8 @@ func TestDoubleClose(t *testing.T) {
 	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
 	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 
 	var (
 		wg0 sync.WaitGroup
@@ -848,7 +852,7 @@ func TestDoubleClose(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -881,7 +885,7 @@ func TestDoubleClose(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -984,7 +988,8 @@ func TestTrackConnected(t *testing.T) {
 	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
 	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 
 	var (
 		wg0 sync.WaitGroup
@@ -1033,7 +1038,7 @@ func TestTrackConnected(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1066,7 +1071,7 @@ func TestTrackConnected(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1165,7 +1170,8 @@ func TestTrackConnectedRace(t *testing.T) {
 	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
 	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 	handler := &testHandler{}
 
 	versionManager := version.NewCompatibility(
@@ -1192,7 +1198,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1225,7 +1231,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1376,7 +1382,8 @@ func TestPeerAliasesTicker(t *testing.T) {
 	serverUpgrader := upgrader
 	clientUpgrader := upgrader
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 
 	var (
 		wg0     sync.WaitGroup
@@ -1482,7 +1489,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1515,7 +1522,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1548,7 +1555,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler2,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1581,7 +1588,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler3,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1694,7 +1701,8 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -1712,17 +1720,17 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	)
 	id2 := ids.ShortID(hashing.ComputeHash160Array([]byte(ip2.IP().String())))
 
-	err := vdrs.AddWeight(id0, 1)
+	err := vdrs.AddWeight(constants.PrimaryNetworkID, id0, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vdrs.AddWeight(id1, 1)
+	err = vdrs.AddWeight(constants.PrimaryNetworkID, id1, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = vdrs.AddWeight(id2, 1)
+	err = vdrs.AddWeight(constants.PrimaryNetworkID, id2, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1935,7 +1943,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -1968,7 +1976,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2001,7 +2009,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler2,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2034,7 +2042,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		serverUpgrader,
 		clientUpgrader,
 		vdrs,
-		vdrs,
+		beacons,
 		handler3,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2228,9 +2236,12 @@ func TestPeerSignature(t *testing.T) {
 	caller0.outbounds[ip2.IP().String()] = listener2
 	caller1.outbounds[ip2.IP().String()] = listener2
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 	// id2 is a validator
-	_ = vdrs.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
+	vdrSet := validators.NewSet()
+	_ = vdrSet.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
+	_ = vdrs.Set(constants.PrimaryNetworkID, vdrSet)
 
 	allPeers := ids.ShortSet{}
 	allPeers.Add(id0, id1, id2)
@@ -2304,7 +2315,7 @@ func TestPeerSignature(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2337,7 +2348,7 @@ func TestPeerSignature(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2370,7 +2381,7 @@ func TestPeerSignature(t *testing.T) {
 		serverUpgrader2,
 		clientUpgrader2,
 		vdrs,
-		vdrs,
+		beacons,
 		handler2,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2492,9 +2503,9 @@ func TestValidatorIPs(t *testing.T) {
 	thirdValidatorPeer := createPeer(ids.ShortID{0x03}, thirdValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, thirdValidatorPeer, true)
 
-	assert.True(t, dummyNetwork.vdrs.Contains(firstValidatorPeer.nodeID))
-	assert.True(t, dummyNetwork.vdrs.Contains(secondValidatorPeer.nodeID))
-	assert.True(t, dummyNetwork.vdrs.Contains(thirdValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, firstValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, secondValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, thirdValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err := dummyNetwork.validatorIPs()
@@ -2527,7 +2538,7 @@ func TestValidatorIPs(t *testing.T) {
 	disconnectedValidatorPeer := createPeer(ids.ShortID{0x01}, disconnectedValidatorIPDesc, appVersion)
 	disconnectedValidatorPeer.finishedHandshake.SetValue(false)
 	addPeerToNetwork(&dummyNetwork, disconnectedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, disconnectedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2545,7 +2556,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	zeroValidatorPeer := createPeer(ids.ShortID{0x01}, zeroIPValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, zeroValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(zeroValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, zeroValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2564,7 +2575,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	nonValidatorPeer := createPeer(ids.ShortID{0x04}, nonValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, nonValidatorPeer, false)
-	assert.False(t, dummyNetwork.vdrs.Contains(nonValidatorPeer.nodeID))
+	assert.False(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, nonValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2584,7 +2595,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	maskedValidatorPeer := createPeer(ids.ShortID{0x01}, maskedValidatorIPDesc, maskedVersion)
 	addPeerToNetwork(&dummyNetwork, maskedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(maskedValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, maskedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2610,7 +2621,7 @@ func TestValidatorIPs(t *testing.T) {
 		time: uint64(0),
 	})
 	addPeerToNetwork(&dummyNetwork, wrongCertValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(wrongCertValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, wrongCertValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2632,7 +2643,7 @@ func TestValidatorIPs(t *testing.T) {
 		}
 		peer := createPeer(ids.ShortID{byte(i)}, ipDesc, appVersion)
 		addPeerToNetwork(&dummyNetwork, peer, true)
-		assert.True(t, dummyNetwork.vdrs.Contains(peer.nodeID))
+		assert.True(t, dummyNetwork.vdrs.Contains(constants.PrimaryNetworkID, peer.nodeID))
 	}
 
 	// test
@@ -2710,9 +2721,10 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	vdrs := validators.NewSet()
-	assert.NoError(t, vdrs.AddWeight(id1, 1))
-	assert.NoError(t, vdrs.AddWeight(id0, 1))
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
+	assert.NoError(t, vdrs.AddWeight(constants.PrimaryNetworkID, id1, 1))
+	assert.NoError(t, vdrs.AddWeight(constants.PrimaryNetworkID, id0, 1))
 
 	net0Compatibility := version.NewCompatibility(
 		net0Version,
@@ -2747,7 +2759,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		&testHandler{},
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2780,7 +2792,7 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		&testHandler{},
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2884,7 +2896,8 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
 	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 
 	var (
 		wg0 sync.WaitGroup
@@ -2932,7 +2945,7 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -2965,7 +2978,7 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -3103,9 +3116,12 @@ func TestPeerGossip(t *testing.T) {
 	caller0.outbounds[ip2.IP().String()] = listener2
 	caller1.outbounds[ip2.IP().String()] = listener2
 
-	vdrs := validators.NewSet()
+	vdrs := validators.NewManager()
+	beacons := validators.NewSet()
 	// id2 is a validator
-	_ = vdrs.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
+	vdrSet := validators.NewSet()
+	_ = vdrSet.Set([]validators.Validator{validators.NewValidator(id2, math.MaxUint64)})
+	_ = vdrs.Set(constants.PrimaryNetworkID, vdrSet)
 
 	allPeers := ids.ShortSet{}
 	allPeers.Add(id0, id1, id2)
@@ -3186,7 +3202,7 @@ func TestPeerGossip(t *testing.T) {
 		serverUpgrader0,
 		clientUpgrader0,
 		vdrs,
-		vdrs,
+		beacons,
 		handler0,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -3219,7 +3235,7 @@ func TestPeerGossip(t *testing.T) {
 		serverUpgrader1,
 		clientUpgrader1,
 		vdrs,
-		vdrs,
+		beacons,
 		handler1,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -3252,7 +3268,7 @@ func TestPeerGossip(t *testing.T) {
 		serverUpgrader2,
 		clientUpgrader2,
 		vdrs,
-		vdrs,
+		beacons,
 		handler2,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
@@ -3292,8 +3308,8 @@ func TestPeerGossip(t *testing.T) {
 	wg1.Wait()
 	wg2.Wait()
 
-	net0.Gossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"))
-	net0.Gossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"))
+	net0.Gossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"), false)
+	net0.Gossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"), false)
 
 	wg1P.Wait()
 	wg2P.Wait()
@@ -3328,16 +3344,13 @@ func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool)
 	targetNetwork.peers.add(peerToAdd)
 
 	if isValidator {
-		validator := validators.NewValidator(peerToAdd.nodeID, uint64(10))
-		currentValidators := targetNetwork.vdrs.List()
-		currentValidators = append(currentValidators, validator)
-		_ = targetNetwork.vdrs.Set(currentValidators)
+		_ = targetNetwork.vdrs.AddWeight(constants.PrimaryNetworkID, peerToAdd.nodeID, 10)
 	}
 }
 
 func clearPeersData(targetNetwork *network) {
 	targetNetwork.peers.reset()
-	targetNetwork.vdrs = validators.NewSet()
+	targetNetwork.vdrs = validators.NewManager()
 }
 
 func isIPDescIn(targetIP utils.IPDesc, ipDescList []utils.IPCertDesc) bool {

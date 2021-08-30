@@ -78,7 +78,7 @@ func (p *peersData) size() int {
 // If [n] > [p.size()], returns <= [p.size()] peers.
 // [n] must be >= 0.
 // [p] must not be modified while this method is executing.
-func (p *peersData) sample(subnetID ids.ID, n int) ([]*peer, error) {
+func (p *peersData) filterSample(n int, filterFn func(*peer) bool) ([]*peer, error) {
 	numPeers := p.size()
 	if numPeers < n {
 		n = numPeers
@@ -99,10 +99,9 @@ func (p *peersData) sample(subnetID ids.ID, n int) ([]*peer, error) {
 			return peers, nil
 		}
 		peer := p.peersList[idx]
-		if !peer.finishedHandshake.GetValue() || !peer.trackedSubnets.Contains(subnetID) {
-			continue
+		if filterFn(peer) {
+			peers = append(peers, peer)
 		}
-		peers = append(peers, peer)
 	}
 	return peers, nil
 }

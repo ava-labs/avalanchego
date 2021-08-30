@@ -918,7 +918,7 @@ func (p *peer) trackSignedPeer(peer utils.IPCertDesc) {
 	}
 
 	nodeID := certToID(peer.Cert)
-	if !p.net.vdrs.Contains(nodeID) && !p.net.beacons.Contains(nodeID) {
+	if !p.net.vdrs.Contains(constants.PrimaryNetworkID, nodeID) && !p.net.beacons.Contains(nodeID) {
 		p.net.log.Verbo(
 			"not peering to %s at %s because they are not a validator or beacon",
 			nodeID.PrefixedString(constants.NodeIDPrefix), peer.IPDesc,

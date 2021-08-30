@@ -132,9 +132,9 @@ type network struct {
 	dialer                 dialer.Dialer
 	serverUpgrader         Upgrader
 	clientUpgrader         Upgrader
-	vdrs                   validators.Set // set of current validators in the Avalanche network
-	beacons                validators.Set // set of beacons in the Avalanche network
-	router                 router.Router  // router must be thread safe
+	vdrs                   validators.Manager // set of current validators in the Avalanche network
+	beacons                validators.Set     // set of beacons in the Avalanche network
+	router                 router.Router      // router must be thread safe
 	nodeID                 uint32
 	clock                  timer.Clock
 	initialReconnectDelay  time.Duration
@@ -267,7 +267,7 @@ func NewDefaultNetwork(
 	dialer dialer.Dialer,
 	serverUpgrader,
 	clientUpgrader Upgrader,
-	vdrs validators.Set,
+	vdrs validators.Manager,
 	beacons validators.Set,
 	router router.Router,
 	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
@@ -343,7 +343,7 @@ func NewNetwork(
 	dialer dialer.Dialer,
 	serverUpgrader,
 	clientUpgrader Upgrader,
-	vdrs validators.Set,
+	vdrs validators.Manager,
 	beacons validators.Set,
 	router router.Router,
 	initialReconnectDelay,
@@ -880,8 +880,8 @@ func (n *network) Chits(nodeID ids.ShortID, chainID ids.ID, requestID uint32, vo
 
 // Gossip attempts to gossip the container to the network
 // Assumes [n.stateLock] is not held.
-func (n *network) Gossip(subnetID, chainID, containerID ids.ID, container []byte) {
-	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.gossipAcceptedFrontierSize); err != nil {
+func (n *network) Gossip(subnetID, chainID, containerID ids.ID, container []byte, validatorOnly bool) {
+	if err := n.gossipContainer(subnetID, chainID, containerID, container, n.gossipAcceptedFrontierSize, validatorOnly); err != nil {
 		n.log.Debug("failed to Gossip(%s, %s): %s", chainID, containerID, err)
 		n.log.Verbo("container:\n%s", formatting.DumpBytes{Bytes: container})
 	}
@@ -894,7 +894,7 @@ func (n *network) Accept(ctx *snow.Context, containerID ids.ID, container []byte
 		// don't gossip during bootstrapping
 		return nil
 	}
-	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.gossipOnAcceptSize)
+	return n.gossipContainer(ctx.SubnetID, ctx.ChainID, containerID, container, n.gossipOnAcceptSize, ctx.IsValidatorOnly())
 }
 
 // shouldUpgradeIncoming returns whether we should
@@ -1108,7 +1108,7 @@ func (n *network) IP() utils.IPDesc {
 }
 
 // Assumes [n.stateLock] is not held.
-func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint) error {
+func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, container []byte, numToGossip uint, validatorOnly bool) error {
 	now := n.clock.Time()
 
 	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
@@ -1123,8 +1123,20 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
 	}
 
+	var filterFn func(p *peer) bool
+	if validatorOnly {
+		filterFn = func(p *peer) bool {
+			return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID) &&
+				n.vdrs.Contains(subnetID, p.nodeID)
+		}
+	} else {
+		filterFn = func(p *peer) bool {
+			return p.finishedHandshake.GetValue() && p.trackedSubnets.Contains(subnetID)
+		}
+	}
+
 	n.stateLock.RLock()
-	peers, err := n.peers.sample(subnetID, int(numToGossip))
+	peers, err := n.peers.filterSample(int(numToGossip), filterFn)
 	n.stateLock.RUnlock()
 	if err != nil {
 		return err
@@ -1205,7 +1217,7 @@ func (n *network) gossipPeerList() {
 		stakers := make([]*peer, 0, len(allPeers))
 		nonStakers := make([]*peer, 0, len(allPeers))
 		for _, peer := range allPeers {
-			if n.vdrs.Contains(peer.nodeID) {
+			if n.vdrs.Contains(constants.PrimaryNetworkID, peer.nodeID) {
 				stakers = append(stakers, peer)
 			} else {
 				nonStakers = append(nonStakers, peer)
@@ -1550,7 +1562,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 			continue
 		case peerIP.IsZero():
 			continue
-		case !n.vdrs.Contains(peer.nodeID):
+		case !n.vdrs.Contains(constants.PrimaryNetworkID, peer.nodeID):
 			continue
 		}
 
@@ -1643,7 +1655,7 @@ func (n *network) disconnected(p *peer) {
 		delete(n.disconnectedIPs, str)
 		delete(n.connectedIPs, str)
 
-		if n.vdrs.Contains(p.nodeID) {
+		if n.vdrs.Contains(constants.PrimaryNetworkID, p.nodeID) {
 			n.track(ip, p.nodeID)
 		}
 	}
