@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var errMissingTxDependenciesOnAccept = errors.New("attempting to accept a transaction with missing dependencies")
+
 type txParser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
@@ -70,7 +72,7 @@ func (t *txJob) Execute() error {
 	}
 	if hasMissingDeps {
 		t.numDropped.Inc()
-		return errors.New("attempting to accept a transaction with missing dependencies")
+		return errMissingTxDependenciesOnAccept
 	}
 
 	status := t.tx.Status()

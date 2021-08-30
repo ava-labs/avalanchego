@@ -92,7 +92,7 @@ func (vm *TestVM) LastAccepted() (ids.ID, error) {
 		return vm.LastAcceptedF()
 	}
 	if vm.CantLastAccepted && vm.T != nil {
-		vm.T.Fatalf("Unexpectedly called LastAccepted")
+		vm.T.Fatal(errLastAccepted)
 	}
 	return ids.ID{}, errLastAccepted
 }
