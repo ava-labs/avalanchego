@@ -332,9 +332,8 @@ func (s *Sender) SendPullQuery(nodeIDs ids.ShortSet, requestID uint32, container
 
 	// Set timeouts so that if we don't hear back from these nodes, we register a failure.
 	for _, nodeID := range sentTo {
-		nID := nodeID // Prevent overwrite in next loop iteration
-		s.router.RegisterRequest(nID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
-		nodeIDs.Remove(nID)
+		s.router.RegisterRequest(nodeID, s.ctx.ChainID, requestID, constants.PullQueryMsg)
+		nodeIDs.Remove(nodeID)
 	}
 
 	// Register failures for nodes we didn't even send a request to.
