@@ -29,7 +29,10 @@ const (
 	stacktraceFile = "stacktrace.txt"
 )
 
-var errAliasTooLong = errors.New("alias length is too long")
+var (
+	errAliasTooLong = errors.New("alias length is too long")
+	errNoLogLevel   = errors.New("need to specify either displayLevel or logLevel")
+)
 
 type Config struct {
 	Log          logging.Logger
@@ -189,7 +192,7 @@ func (service *Admin) SetLoggerLevel(_ *http.Request, args *SetLoggerLevelArgs, 
 	service.Log.Debug("Admin: SetLogLevels called with LoggerName: %q, LogLevel: %q, DisplayLevel: %q", args.LoggerName, args.LogLevel, args.DisplayLevel)
 
 	if args.LogLevel == nil && args.DisplayLevel == nil {
-		return errors.New("need to specify either displayLevel or logLevel")
+		return errNoLogLevel
 	}
 
 	var loggerNames []string

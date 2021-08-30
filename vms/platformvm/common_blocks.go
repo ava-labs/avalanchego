@@ -154,13 +154,13 @@ func (b *CommonBlock) initialize(vm *VM, bytes []byte, status choices.Status, se
 // ID returns the ID of this block
 func (b *CommonBlock) ID() ids.ID { return b.id }
 
-// Status returns the status of this block
+// Bytes returns the binary representation of this block
 func (b *CommonBlock) Bytes() []byte { return b.bytes }
 
 // Status returns the status of this block
 func (b *CommonBlock) Status() choices.Status { return b.status }
 
-// ParentID returns [b]'s parent's ID
+// Parent returns this block's parent's ID
 func (b *CommonBlock) Parent() ids.ID { return b.PrntID }
 
 // Height returns this block's height. The genesis block has height 0.

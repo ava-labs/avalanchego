@@ -79,7 +79,7 @@ type ConsensusGossipConfig struct {
 
 type AppGossipConfig struct {
 	// Number of peers to gossip an AppGossip message
-	AppGossipSize uint
+	AppGossipSize uint `json:"appGossipSize"`
 }
 
 type GossipConfig struct {

@@ -527,10 +527,19 @@ func setupTestVM(t *testing.T, ctx *snow.Context, baseDBManager manager.Manager,
 	avmConfigBytes, err := BuildAvmConfigBytes(config)
 	assert.NoError(t, err)
 	appSender := &common.SenderTest{}
-	if err := vm.Initialize(ctx, baseDBManager.NewPrefixDBManager([]byte{1}), genesisBytes, nil, avmConfigBytes, issuer, []*common.Fx{{
-		ID: ids.Empty,
-		Fx: &secp256k1fx.Fx{},
-	}}, appSender); err != nil {
+	if err := vm.Initialize(
+		ctx,
+		baseDBManager.NewPrefixDBManager([]byte{1}),
+		genesisBytes,
+		nil,
+		avmConfigBytes,
+		issuer,
+		[]*common.Fx{{
+			ID: ids.Empty,
+			Fx: &secp256k1fx.Fx{},
+		}},
+		appSender,
+	); err != nil {
 		t.Fatal(err)
 	}
 	vm.batchTimeout = 0

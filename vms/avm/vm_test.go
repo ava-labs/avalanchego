@@ -287,16 +287,19 @@ func GenesisVMWithArgs(tb testing.TB, additionalFxs []*common.Fx, args *BuildGen
 		nil,
 		configBytes,
 		issuer,
-		append([]*common.Fx{
-			{
-				ID: ids.Empty,
-				Fx: &secp256k1fx.Fx{},
+		append(
+			[]*common.Fx{
+				{
+					ID: ids.Empty,
+					Fx: &secp256k1fx.Fx{},
+				},
+				{
+					ID: nftfx.ID,
+					Fx: &nftfx.Fx{},
+				},
 			},
-			{
-				ID: nftfx.ID,
-				Fx: &nftfx.Fx{},
-			},
-		}, additionalFxs...),
+			additionalFxs...,
+		),
 		nil,
 	)
 	if err != nil {

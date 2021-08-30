@@ -17,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var errMissingDependenciesOnAccept = errors.New("attempting to accept a block with missing dependencies")
+
 type parser struct {
 	log                     logging.Logger
 	numAccepted, numDropped prometheus.Counter
@@ -71,7 +73,7 @@ func (b *blockJob) Execute() error {
 	}
 	if hasMissingDeps {
 		b.numDropped.Inc()
-		return errors.New("attempting to accept a block with missing dependencies")
+		return errMissingDependenciesOnAccept
 	}
 	status := b.blk.Status()
 	switch status {
