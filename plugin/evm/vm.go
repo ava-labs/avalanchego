@@ -231,7 +231,7 @@ type VM struct {
 	gossipActivationTime time.Time
 	appSender            commonEng.AppSender
 	gossipReq.Handler
-	Gossiper
+	appGossipBytesCh chan []byte
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -363,10 +363,10 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	vm.mempool = NewMempool(defaultMempoolSize) // TODO: read size from settings
-	vm.gossipActivationTime = timer.MaxTime     // TODO: setup upon deploy
+	vm.gossipActivationTime = time.Unix(0, 0)   // TODO: setup upon deploy
 	vm.appSender = appSender
 	vm.Handler = gossipReq.NewHandler()
-	vm.Gossiper = NewGossiper(appSender, &vm.shutdownWg, vm.shutdownChan)
+	vm.appGossipBytesCh = make(chan []byte, 1024) // TODO: pick proper size
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -421,7 +421,7 @@ func (vm *VM) Initialize(
 		BuildBlock:         vm.buildBlock,
 	})
 
-	go vm.Gossiper.listenAndGossip()
+	go vm.listenAndGossip()
 
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
@@ -664,7 +664,20 @@ func (vm *VM) Version() (string, error) {
 	return Version, nil
 }
 
-// This VM doesn't (currently) have any app-specific messages
+func (vm *VM) listenAndGossip() {
+	defer vm.shutdownWg.Done()
+	vm.shutdownWg.Add(1)
+
+	for {
+		select {
+		case bytes := <-vm.appGossipBytesCh:
+			vm.appSender.SendAppGossip(bytes) // TODO check for errors
+		case <-vm.shutdownChan:
+			return
+		}
+	}
+}
+
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	vm.ctx.Log.Verbo("called AppRequestFailed")
 
@@ -1171,7 +1184,8 @@ func (vm *VM) awaitSubmittedTxs() {
 				}
 
 				// gossip them
-				vm.Gossiper.GossipEthTxHashes(ethTxsBytes)
+				vm.ctx.Log.Debug("AppGossip: gossiping %v coreth txs", len(ethHashes))
+				vm.appGossipBytesCh <- ethTxsBytes
 			}
 		case <-vm.mempool.Pending:
 			log.Trace("New atomic Tx detected, trying to generate a block")
@@ -1236,7 +1250,8 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 			return err
 		}
 
-		return vm.Gossiper.GossipAtomicTxID(txIDBytes)
+		vm.appGossipBytesCh <- txIDBytes
+		return nil
 	case errTooManyAtomicTx:
 		if !local {
 			// tx has not been accepted to mempool due to size
