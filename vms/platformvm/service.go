@@ -2080,7 +2080,7 @@ type GetTxStatusArgs struct {
 	// If IncludeReason is false returns a response that looks like:
 	// {
 	// 	"jsonrpc": "2.0",
-	// 	"result": "sts Dropped",
+	// 	"result": "Dropped",
 	// 	"id": 1
 	// }
 	// If IncludeReason is true returns a response that looks like this:
