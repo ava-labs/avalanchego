@@ -78,7 +78,7 @@ func (tx VerifiableUnsignedExportTx) SemanticVerify(
 	return newState, nil
 }
 
-// Accept this transactions.
+// Accept this transaction
 func (tx VerifiableUnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	txID := tx.ID()
 
