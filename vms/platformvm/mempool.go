@@ -19,14 +19,14 @@ const (
 	// syncBound is the synchrony bound used for safe decision making
 	syncBound = 10 * time.Second
 
-	// BatchSize is the number of decision transactions.to place into a block
+	// BatchSize is the number of decision transaction to place into a block
 	BatchSize = 30
 )
 
 var (
 	errEndOfTime       = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
 	errNoPendingBlocks = errors.New("no pending blocks")
-	errUnknownTxType   = errors.New("unknown transactions.type")
+	errUnknownTxType   = errors.New("unknown transaction type")
 )
 
 // Mempool implements a simple mempool to convert txs into valid blocks
@@ -273,7 +273,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 		maxLocalStartTime := localTime.Add(maxFutureStartTime)
 		// If the start time is too far in the future relative to local time
-		// drop the transactions.and continue
+		// drop the transaction and continue
 		if startTime.After(maxLocalStartTime) {
 			m.unissuedProposalTxs.Remove()
 			m.unissuedTxIDs.Remove(txID)
@@ -281,7 +281,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		}
 
 		// If the chain timestamp is too far in the past to issue this
-		// transactions.but according to local time, it's ready to be issued,
+		// transaction but according to local time, it's ready to be issued,
 		// then attempt to advance the timestamp, so it can be issued.
 		maxChainStartTime := currentChainTimestamp.Add(maxFutureStartTime)
 		if startTime.After(maxChainStartTime) {
@@ -323,7 +323,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
 // consensus engine.
 func (m *Mempool) ResetTimer() {
-	// If there is a pending transactions. trigger building of a block with that
+	// If there is a pending transaction trigger building of a block with that
 	// transaction
 	if len(m.unissuedDecisionTxs) > 0 || len(m.unissuedAtomicTxs) > 0 {
 		m.vm.NotifyBlockReady()

@@ -14,7 +14,7 @@ import (
 type VerifiableUnsignedDecisionTx interface {
 	transactions.UnsignedDecisionTx
 
-	// Attempts to verify this transactions.with the provided state.
+	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, vs VersionedState, stx *transactions.SignedTx) (
 		onAcceptFunc func() error,
 		err TxError,
@@ -25,7 +25,7 @@ type VerifiableUnsignedDecisionTx interface {
 type VerifiableUnsignedProposalTx interface {
 	transactions.UnsignedProposalTx
 
-	// Attempts to verify this transactions.with the provided state.
+	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, state MutableState, stx *transactions.SignedTx) (
 		onCommitState VersionedState,
 		onAbortState VersionedState,
@@ -42,9 +42,9 @@ type VerifiableUnsignedAtomicTx interface {
 
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
-	// Attempts to verify this transactions.with the provided state.
+	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, parentState MutableState, stx *transactions.SignedTx) (VersionedState, TxError)
 
-	// Accept this transactions.with the additionally provided state transitions.
+	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
 }

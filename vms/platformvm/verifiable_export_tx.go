@@ -29,7 +29,7 @@ type VerifiableUnsignedExportTx struct {
 	*transactions.UnsignedExportTx `serialize:"true"`
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedExportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,

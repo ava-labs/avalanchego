@@ -22,7 +22,7 @@ type VerifiableUnsignedCreateChainTx struct {
 	*transactions.UnsignedCreateChainTx `serialize:"true"`
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
@@ -31,7 +31,7 @@ func (tx VerifiableUnsignedCreateChainTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	// Make sure this transactions.is well formed.
+	// Make sure this transaction is well formed.
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}

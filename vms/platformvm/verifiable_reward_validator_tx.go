@@ -20,7 +20,7 @@ import (
 
 var (
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
-	errWrongTxType         = errors.New("wrong transactions.type")
+	errWrongTxType         = errors.New("wrong transaction type")
 
 	_ VerifiableUnsignedProposalTx = VerifiableUnsignedRewardValidatorTx{}
 )
@@ -29,7 +29,7 @@ type VerifiableUnsignedRewardValidatorTx struct {
 	*transactions.UnsignedRewardValidatorTx `serialize:"true"`
 }
 
-// SemanticVerify this transactions.performs a valid state transition.
+// SemanticVerify this transaction performs a valid state transition.
 //
 // The current validating set must have at least one member.
 // The next validator to be removed must be the validator specified in this block.
@@ -284,7 +284,7 @@ func (tx VerifiableUnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
 	return tx.ShouldPreferCommit
 }
 
-// RewardStakerTx creates a new transactions.that proposes to remove the staker
+// RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.
 func (vm *VM) newRewardValidatorTx(txID ids.ID) (*transactions.SignedTx, error) {
 	tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedRewardValidatorTx{

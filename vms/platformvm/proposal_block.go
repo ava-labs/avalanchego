@@ -181,8 +181,8 @@ func (pb *ProposalBlock) Verify() error {
 	if err != nil {
 		txID := tx.ID()
 		pb.vm.droppedTxCache.Put(txID, err.Error()) // cache tx as dropped
-		// If this block's transactions.proposes to advance the timestamp, the
-		// transactions.may fail verification now but be valid in the future, so
+		// If this block's transaction proposes to advance the timestamp, the
+		// transaction may fail verification now but be valid in the future, so
 		// don't (permanently) mark the block as rejected.
 		if !err.Temporary() {
 			pb.vm.ctx.Log.Trace("rejecting block %s due to a permanent verification error: %s", blkID, err)
@@ -247,7 +247,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 	return [2]snowman.Block{abort, commit}, nil
 }
 
-// newProposalBlock creates a new block that proposes to issue a transactions.
+// newProposalBlock creates a new block that proposes to issue a transaction.
 //
 // The parent of this block has ID [parentID].
 //

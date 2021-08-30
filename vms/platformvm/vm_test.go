@@ -855,7 +855,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	if vm.mempool.unissuedProposalTxs.Len() > 0 {
-		t.Fatalf("Expected there to be 0 unissued proposal transactions. after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
+		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
 	}
 }
 

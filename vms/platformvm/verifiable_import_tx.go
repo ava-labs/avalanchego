@@ -39,7 +39,7 @@ func (tx VerifiableUnsignedImportTx) InputUTXOs() ids.Set {
 	return set
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedImportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
@@ -113,10 +113,10 @@ func (tx VerifiableUnsignedImportTx) SemanticVerify(
 	return newState, nil
 }
 
-// Accept this transactions.and spend imported inputs
+// Accept this transaction and spend imported inputs
 // We spend imported UTXOs here rather than in semanticVerify because
 // we don't want to remove an imported UTXO in semanticVerify
-// only to have the transactions.not be Accepted. This would be inconsistent.
+// only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
 func (tx VerifiableUnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))

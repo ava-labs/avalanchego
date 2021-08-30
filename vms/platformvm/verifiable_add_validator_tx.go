@@ -42,7 +42,7 @@ func (tx VerifiableUnsignedAddValidatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,

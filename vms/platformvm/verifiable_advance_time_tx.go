@@ -24,7 +24,7 @@ func (tx VerifiableUnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.UnsignedAdvanceTimeTx.Time), 0)
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,

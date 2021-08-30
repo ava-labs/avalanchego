@@ -62,7 +62,7 @@ func (vm *VM) stake(
 		kc.Add(key)
 	}
 
-	// Minimum time this transactions.will be issued at
+	// Minimum time this transaction will be issued at
 	now := uint64(vm.clock.Time().Unix())
 
 	ins := []*avax.TransferableInput{}
@@ -386,7 +386,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 	}
 
-	// Time this transactions.is being verified
+	// Time this transaction is being verified
 	now := uint64(vm.clock.Time().Unix())
 
 	// Track the amount of unlocked transfers
