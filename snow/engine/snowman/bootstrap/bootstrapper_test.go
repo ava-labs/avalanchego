@@ -47,7 +47,7 @@ func newConfig(t *testing.T) (Config, ids.ShortID, *common.SenderTest, *block.Te
 		BootstrappedF:   func(ids.ID) { isBootstrapped = true },
 	}
 
-	sender.CantGetAcceptedFrontier = false
+	sender.CantSendGetAcceptedFrontier = false
 
 	peer := ids.GenerateTestShortID()
 	if err := peers.AddWeight(peer, 1); err != nil {
@@ -256,7 +256,7 @@ func TestBootstrapperUnknownByzantineResponse(t *testing.T) {
 	}
 
 	requestID := new(uint32)
-	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -424,7 +424,7 @@ func TestBootstrapperPartialFetch(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -584,7 +584,7 @@ func TestBootstrapperMultiPut(t *testing.T) {
 
 	requestID := new(uint32)
 	requested := ids.Empty
-	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -826,7 +826,7 @@ func TestBootstrapperFinalized(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}
@@ -995,7 +995,7 @@ func TestRestartBootstrapping(t *testing.T) {
 	}
 
 	requestIDs := map[ids.ID]uint32{}
-	sender.GetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
+	sender.SendGetAncestorsF = func(vdr ids.ShortID, reqID uint32, vtxID ids.ID) {
 		if vdr != peerID {
 			t.Fatalf("Should have requested block from %s, requested from %s", peerID, vdr)
 		}

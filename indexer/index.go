@@ -26,11 +26,11 @@ const (
 
 var (
 	// Maps to the byte representation of the next accepted index
-	nextAcceptedIndexKey   []byte = []byte{0x00}
-	indexToContainerPrefix []byte = []byte{0x01}
-	containerToIDPrefix    []byte = []byte{0x02}
-	errNoneAccepted               = errors.New("no containers have been accepted")
-	errNumToFetchZero             = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
+	nextAcceptedIndexKey   = []byte{0x00}
+	indexToContainerPrefix = []byte{0x01}
+	containerToIDPrefix    = []byte{0x02}
+	errNoneAccepted        = errors.New("no containers have been accepted")
+	errNumToFetchZero      = fmt.Errorf("numToFetch must be in [1,%d]", MaxFetchedByRange)
 
 	_ Index = &index{}
 )

@@ -19,6 +19,7 @@ var errUnknownBlockType = errors.New("unknown block type")
 
 type metrics struct {
 	percentConnected prometheus.Gauge
+	localStake       prometheus.Gauge
 	totalStake       prometheus.Gauge
 
 	numAbortBlocks,
@@ -66,6 +67,11 @@ func (m *metrics) Initialize(
 		Name:      "percent_connected",
 		Help:      "Percent of connected stake",
 	})
+	m.localStake = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "local_staked",
+		Help:      "Total amount of AVAX on this node staked",
+	})
 	m.totalStake = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "total_staked",
@@ -95,6 +101,7 @@ func (m *metrics) Initialize(
 		err,
 
 		registerer.Register(m.percentConnected),
+		registerer.Register(m.localStake),
 		registerer.Register(m.totalStake),
 
 		registerer.Register(m.numAbortBlocks),

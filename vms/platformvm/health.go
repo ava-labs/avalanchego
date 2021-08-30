@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-// Health implements the common.VM interface
+// HealthCheck implements the common.VM interface
 func (vm *VM) HealthCheck() (interface{}, error) {
 	// Returns nil if this node is connected to > alpha percent of the Primary Network's stake
 	percentConnected, err := vm.getPercentConnected()
