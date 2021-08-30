@@ -76,13 +76,23 @@ func TestMempool_EthTxs_AddedTxesGossipedAfterActivation(t *testing.T) {
 	// Note: channel through which coreth mempool push txes to vm is injected here
 	// to ease up UT, which target only VM behavious in response to coreth mempool signals
 
-	fakeTxSubmitChan := make(chan core.NewTxsEvent)
-	_, vm, _, _, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", fakeTxSubmitChan)
+	key, _ := crypto.GenerateKey()
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	if err != nil {
+		t.Fatal("could not format genesis")
+	}
+
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 
 	gossipedBytes := make([]byte, 0)
@@ -93,13 +103,13 @@ func TestMempool_EthTxs_AddedTxesGossipedAfterActivation(t *testing.T) {
 	}
 
 	// create eth txes and notify VM about them
-	key, _ := crypto.GenerateKey()
 	ethTxs := getEThValidTxs(key)
-	go func() {
-		evt := core.NewTxsEvent{Txs: ethTxs}
-		fakeTxSubmitChan <- evt
-		close(fakeTxSubmitChan)
-	}()
+	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	for _, err := range errs {
+		if err != nil {
+			t.Fatal("Failed adding coreth tx to mempool")
+		}
+	}
 
 	time.Sleep(10 * time.Second) // TODO: cleanup this to avoid sleep
 
@@ -113,13 +123,22 @@ func TestMempool_EthTxs_AddedTxesNotGossipedBeforeActivation(t *testing.T) {
 	// Note: channel through which coreth mempool push txes to vm is injected here
 	// to ease up UT, which target only VM behavious in response to coreth mempool signals
 
-	fakeTxSubmitChan := make(chan core.NewTxsEvent)
-	_, vm, _, _, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "", fakeTxSubmitChan)
+	key, _ := crypto.GenerateKey()
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	if err != nil {
+		t.Fatal("could not format genesis")
+	}
+
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
 		}
 	}()
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
 	vm.gossipActivationTime = timer.MaxTime // disable mempool gossiping
 
 	gossipedBytes := make([]byte, 0)
@@ -130,13 +149,13 @@ func TestMempool_EthTxs_AddedTxesNotGossipedBeforeActivation(t *testing.T) {
 	}
 
 	// create eth txes and notify VM about them
-	key, _ := crypto.GenerateKey()
 	ethTxs := getEThValidTxs(key)
-	go func() {
-		evt := core.NewTxsEvent{Txs: ethTxs}
-		fakeTxSubmitChan <- evt
-		close(fakeTxSubmitChan)
-	}()
+	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	for _, err := range errs {
+		if err != nil {
+			t.Fatal("Failed adding coreth tx to mempool")
+		}
+	}
 
 	time.Sleep(10 * time.Second) // TODO: cleanup this to avoid sleep
 
@@ -188,7 +207,7 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 		t.Fatal("could not format genesis")
 	}
 
-	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "", nil)
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -260,7 +279,7 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 		t.Fatal("could not format genesis")
 	}
 
-	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "", nil)
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
@@ -331,7 +350,7 @@ func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
 		t.Fatal("could not format genesis")
 	}
 
-	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "", nil)
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
 			t.Fatal(err)
