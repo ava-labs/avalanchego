@@ -782,10 +782,10 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 
 	corethTxs := make([]*types.Transaction, 0)
 	if err := rlp.DecodeBytes(response, &corethTxs); err == nil {
-		errs := vm.chain.GetTxPool().AddLocals(corethTxs)
+		errs := vm.chain.GetTxPool().AddRemotes(corethTxs)
 		for _, err := range errs {
 			if err != nil {
-				vm.ctx.Log.Debug("AppResponse: failed AddLocals response from Node %v, reqID %v, err %v",
+				vm.ctx.Log.Debug("AppResponse: failed AddRemotes response from Node %v, reqID %v, err %v",
 					nodeID, requestID, err)
 			}
 		}
@@ -1157,18 +1157,24 @@ func (vm *VM) awaitSubmittedTxs() {
 				continue
 			}
 
-			// pick IDs and serialize them
+			// pick hashes and serialize them
 			ethHashes := make([]common.Hash, len(ethTxsEvent.Txs))
 			for idx, ethTx := range ethTxsEvent.Txs {
-				ethHashes[idx] = ethTx.Hash()
-			}
-			ethTxsBytes, err := vm.ethTxHashesToBytes(ethHashes)
-			if err != nil {
-				log.Trace("Could not parse ethTxIDs. Understand what to do")
+				txStatus := vm.chain.GetTxPool().Status([]common.Hash{ethTx.Hash()})[0]
+				if txStatus == core.TxStatusPending {
+					ethHashes[idx] = ethTx.Hash()
+				}
 			}
 
-			// gossip them
-			vm.Gossiper.GossipEthTxIDs(ethTxsBytes) // TODO: only executable ones should be picked, not queued
+			if len(ethHashes) > 0 {
+				ethTxsBytes, err := vm.ethTxHashesToBytes(ethHashes)
+				if err != nil {
+					log.Trace("Could not parse ethTxIDs. Understand what to do")
+				}
+
+				// gossip them
+				vm.Gossiper.GossipEthTxHashes(ethTxsBytes)
+			}
 		case <-vm.mempool.Pending:
 			log.Trace("New atomic Tx detected, trying to generate a block")
 			vm.signalTxsReady()
