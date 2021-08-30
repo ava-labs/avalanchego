@@ -232,7 +232,6 @@ type VM struct {
 	appSender            commonEng.AppSender
 	gossipReq.Handler
 	Gossiper
-	txSubmitChan <-chan core.NewTxsEvent
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -1143,12 +1142,11 @@ func (vm *VM) bytesToEthTxHashes(b []byte) ([]common.Hash, error) {
 // put into a new block.
 func (vm *VM) awaitSubmittedTxs() {
 	defer vm.shutdownWg.Done()
-	if vm.txSubmitChan == nil { // this allows depencendy injection in UTs
-		vm.txSubmitChan = vm.chain.GetTxSubmitCh()
-	}
+	txSubmitChan := vm.chain.GetTxSubmitCh()
+
 	for {
 		select {
-		case ethTxsEvent := <-vm.txSubmitChan:
+		case ethTxsEvent := <-txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
 			vm.signalTxsReady()
 

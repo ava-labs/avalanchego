@@ -161,7 +161,7 @@ func TestImportTxVerify(t *testing.T) {
 }
 
 func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
-	_, vm, _, sharedMemory, _ := GenesisVM(t, false, genesisJSONApricotPhase0, "", "", nil)
+	_, vm, _, sharedMemory, _ := GenesisVM(t, false, genesisJSONApricotPhase0, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -341,7 +341,7 @@ func TestImportTxSemanticVerifyApricotPhase0(t *testing.T) {
 }
 
 func TestImportTxSemanticVerifyApricotPhase2(t *testing.T) {
-	_, vm, _, sharedMemory, _ := GenesisVM(t, false, genesisJSONApricotPhase2, "", "", nil)
+	_, vm, _, sharedMemory, _ := GenesisVM(t, false, genesisJSONApricotPhase2, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -570,7 +570,7 @@ func TestNewImportTx(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, vm, _, sharedMemory, _ := GenesisVM(t, true, test.genesis, "", "", nil)
+			_, vm, _, sharedMemory, _ := GenesisVM(t, true, test.genesis, "", "")
 
 			defer func() {
 				if err := vm.Shutdown(); err != nil {
