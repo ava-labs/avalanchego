@@ -86,13 +86,13 @@ type EngineTest struct {
 	HaltF                                              func()
 	TimeoutF, GossipF, ShutdownF                       func() error
 	NotifyF                                            func(Message) error
-	GetF, GetAncestorsF, PullQueryF                    func(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error
-	PutF, PushQueryF                                   func(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
-	MultiPutF                                          func(validatorID ids.ShortID, requestID uint32, containers [][]byte) error
-	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
+	GetF, GetAncestorsF, PullQueryF                    func(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error
+	PutF, PushQueryF                                   func(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error
+	MultiPutF                                          func(nodeID ids.ShortID, requestID uint32, containers [][]byte) error
+	AcceptedFrontierF, GetAcceptedF, AcceptedF, ChitsF func(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error
 	GetAcceptedFrontierF, GetFailedF, GetAncestorsFailedF,
-	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(validatorID ids.ShortID, requestID uint32) error
-	ConnectedF, DisconnectedF func(validatorID ids.ShortID) error
+	QueryFailedF, GetAcceptedFrontierFailedF, GetAcceptedFailedF, AppRequestFailedF func(nodeID ids.ShortID, requestID uint32) error
+	ConnectedF, DisconnectedF func(nodeID ids.ShortID) error
 	HealthF                   func() (interface{}, error)
 	GetVMF                    func() VM
 	AppRequestF, AppResponseF func(nodeID ids.ShortID, requestID uint32, msg []byte) error
@@ -101,41 +101,31 @@ type EngineTest struct {
 
 func (e *EngineTest) Default(cant bool) {
 	e.CantIsBootstrapped = cant
-
 	e.CantTimeout = cant
 	e.CantGossip = cant
 	e.CantHalt = cant
 	e.CantShutdown = cant
-
 	e.CantContext = cant
-
 	e.CantNotify = cant
-
 	e.CantGetAcceptedFrontier = cant
 	e.CantGetAcceptedFrontierFailed = cant
 	e.CantAcceptedFrontier = cant
-
 	e.CantGetAccepted = cant
 	e.CantGetAcceptedFailed = cant
 	e.CantAccepted = cant
-
 	e.CantGet = cant
 	e.CantGetAncestors = cant
 	e.CantGetAncestorsFailed = cant
 	e.CantGetFailed = cant
 	e.CantPut = cant
 	e.CantMultiPut = cant
-
 	e.CantPushQuery = cant
 	e.CantPullQuery = cant
 	e.CantQueryFailed = cant
 	e.CantChits = cant
-
 	e.CantConnected = cant
 	e.CantDisconnected = cant
-
 	e.CantHealth = cant
-
 	e.CantAppRequest = cant
 	e.CantAppRequestFailed = cant
 	e.CantAppResponse = cant
@@ -213,9 +203,9 @@ func (e *EngineTest) Notify(msg Message) error {
 	return errNotify
 }
 
-func (e *EngineTest) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint32) error {
+func (e *EngineTest) GetAcceptedFrontier(nodeID ids.ShortID, requestID uint32) error {
 	if e.GetAcceptedFrontierF != nil {
-		return e.GetAcceptedFrontierF(validatorID, requestID)
+		return e.GetAcceptedFrontierF(nodeID, requestID)
 	}
 	if !e.CantGetAcceptedFrontier {
 		return nil
@@ -226,9 +216,9 @@ func (e *EngineTest) GetAcceptedFrontier(validatorID ids.ShortID, requestID uint
 	return errGetAcceptedFrontier
 }
 
-func (e *EngineTest) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestID uint32) error {
+func (e *EngineTest) GetAcceptedFrontierFailed(nodeID ids.ShortID, requestID uint32) error {
 	if e.GetAcceptedFrontierFailedF != nil {
-		return e.GetAcceptedFrontierFailedF(validatorID, requestID)
+		return e.GetAcceptedFrontierFailedF(nodeID, requestID)
 	}
 	if !e.CantGetAcceptedFrontierFailed {
 		return nil
@@ -239,9 +229,9 @@ func (e *EngineTest) GetAcceptedFrontierFailed(validatorID ids.ShortID, requestI
 	return errGetAcceptedFrontierFailed
 }
 
-func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (e *EngineTest) AcceptedFrontier(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.AcceptedFrontierF != nil {
-		return e.AcceptedFrontierF(validatorID, requestID, containerIDs)
+		return e.AcceptedFrontierF(nodeID, requestID, containerIDs)
 	}
 	if !e.CantAcceptedFrontier {
 		return nil
@@ -252,9 +242,9 @@ func (e *EngineTest) AcceptedFrontier(validatorID ids.ShortID, requestID uint32,
 	return errAcceptedFrontier
 }
 
-func (e *EngineTest) GetAccepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (e *EngineTest) GetAccepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.GetAcceptedF != nil {
-		return e.GetAcceptedF(validatorID, requestID, containerIDs)
+		return e.GetAcceptedF(nodeID, requestID, containerIDs)
 	}
 	if !e.CantGetAccepted {
 		return nil
@@ -265,9 +255,9 @@ func (e *EngineTest) GetAccepted(validatorID ids.ShortID, requestID uint32, cont
 	return errGetAccepted
 }
 
-func (e *EngineTest) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32) error {
+func (e *EngineTest) GetAcceptedFailed(nodeID ids.ShortID, requestID uint32) error {
 	if e.GetAcceptedFailedF != nil {
-		return e.GetAcceptedFailedF(validatorID, requestID)
+		return e.GetAcceptedFailedF(nodeID, requestID)
 	}
 	if !e.CantGetAcceptedFailed {
 		return nil
@@ -278,9 +268,9 @@ func (e *EngineTest) GetAcceptedFailed(validatorID ids.ShortID, requestID uint32
 	return errGetAcceptedFailed
 }
 
-func (e *EngineTest) Accepted(validatorID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
+func (e *EngineTest) Accepted(nodeID ids.ShortID, requestID uint32, containerIDs []ids.ID) error {
 	if e.AcceptedF != nil {
-		return e.AcceptedF(validatorID, requestID, containerIDs)
+		return e.AcceptedF(nodeID, requestID, containerIDs)
 	}
 	if !e.CantAccepted {
 		return nil
@@ -291,9 +281,9 @@ func (e *EngineTest) Accepted(validatorID ids.ShortID, requestID uint32, contain
 	return errAccepted
 }
 
-func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+func (e *EngineTest) Get(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
 	if e.GetF != nil {
-		return e.GetF(validatorID, requestID, containerID)
+		return e.GetF(nodeID, requestID, containerID)
 	}
 	if !e.CantGet {
 		return nil
@@ -304,9 +294,9 @@ func (e *EngineTest) Get(validatorID ids.ShortID, requestID uint32, containerID 
 	return errGet
 }
 
-func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+func (e *EngineTest) GetAncestors(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
 	if e.GetAncestorsF != nil {
-		return e.GetAncestorsF(validatorID, requestID, containerID)
+		return e.GetAncestorsF(nodeID, requestID, containerID)
 	}
 	if !e.CantGetAncestors {
 		return nil
@@ -317,9 +307,9 @@ func (e *EngineTest) GetAncestors(validatorID ids.ShortID, requestID uint32, con
 	return errGetAncestors
 }
 
-func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error {
+func (e *EngineTest) GetFailed(nodeID ids.ShortID, requestID uint32) error {
 	if e.GetFailedF != nil {
-		return e.GetFailedF(validatorID, requestID)
+		return e.GetFailedF(nodeID, requestID)
 	}
 	if !e.CantGetFailed {
 		return nil
@@ -330,9 +320,9 @@ func (e *EngineTest) GetFailed(validatorID ids.ShortID, requestID uint32) error 
 	return errGetFailed
 }
 
-func (e *EngineTest) GetAncestorsFailed(validatorID ids.ShortID, requestID uint32) error {
+func (e *EngineTest) GetAncestorsFailed(nodeID ids.ShortID, requestID uint32) error {
 	if e.GetAncestorsFailedF != nil {
-		return e.GetAncestorsFailedF(validatorID, requestID)
+		return e.GetAncestorsFailedF(nodeID, requestID)
 	}
 	if e.CantGetAncestorsFailed {
 		return nil
@@ -343,9 +333,9 @@ func (e *EngineTest) GetAncestorsFailed(validatorID ids.ShortID, requestID uint3
 	return errGetAncestorsFailed
 }
 
-func (e *EngineTest) Put(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
+func (e *EngineTest) Put(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
 	if e.PutF != nil {
-		return e.PutF(validatorID, requestID, containerID, container)
+		return e.PutF(nodeID, requestID, containerID, container)
 	}
 	if !e.CantPut {
 		return nil
@@ -356,9 +346,9 @@ func (e *EngineTest) Put(validatorID ids.ShortID, requestID uint32, containerID 
 	return errPut
 }
 
-func (e *EngineTest) MultiPut(validatorID ids.ShortID, requestID uint32, containers [][]byte) error {
+func (e *EngineTest) MultiPut(nodeID ids.ShortID, requestID uint32, containers [][]byte) error {
 	if e.MultiPutF != nil {
-		return e.MultiPutF(validatorID, requestID, containers)
+		return e.MultiPutF(nodeID, requestID, containers)
 	}
 	if !e.CantMultiPut {
 		return nil
@@ -369,9 +359,9 @@ func (e *EngineTest) MultiPut(validatorID ids.ShortID, requestID uint32, contain
 	return errMultiPut
 }
 
-func (e *EngineTest) PushQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
+func (e *EngineTest) PushQuery(nodeID ids.ShortID, requestID uint32, containerID ids.ID, container []byte) error {
 	if e.PushQueryF != nil {
-		return e.PushQueryF(validatorID, requestID, containerID, container)
+		return e.PushQueryF(nodeID, requestID, containerID, container)
 	}
 	if !e.CantPushQuery {
 		return nil
@@ -382,9 +372,9 @@ func (e *EngineTest) PushQuery(validatorID ids.ShortID, requestID uint32, contai
 	return errPushQuery
 }
 
-func (e *EngineTest) PullQuery(validatorID ids.ShortID, requestID uint32, containerID ids.ID) error {
+func (e *EngineTest) PullQuery(nodeID ids.ShortID, requestID uint32, containerID ids.ID) error {
 	if e.PullQueryF != nil {
-		return e.PullQueryF(validatorID, requestID, containerID)
+		return e.PullQueryF(nodeID, requestID, containerID)
 	}
 	if !e.CantPullQuery {
 		return nil
@@ -395,9 +385,9 @@ func (e *EngineTest) PullQuery(validatorID ids.ShortID, requestID uint32, contai
 	return errPullQuery
 }
 
-func (e *EngineTest) QueryFailed(validatorID ids.ShortID, requestID uint32) error {
+func (e *EngineTest) QueryFailed(nodeID ids.ShortID, requestID uint32) error {
 	if e.QueryFailedF != nil {
-		return e.QueryFailedF(validatorID, requestID)
+		return e.QueryFailedF(nodeID, requestID)
 	}
 	if !e.CantQueryFailed {
 		return nil
@@ -473,9 +463,9 @@ func (e *EngineTest) Chits(nodeID ids.ShortID, requestID uint32, containerIDs []
 	return errChits
 }
 
-func (e *EngineTest) Connected(validatorID ids.ShortID) error {
+func (e *EngineTest) Connected(nodeID ids.ShortID) error {
 	if e.ConnectedF != nil {
-		return e.ConnectedF(validatorID)
+		return e.ConnectedF(nodeID)
 	}
 	if !e.CantConnected {
 		return nil
@@ -486,9 +476,9 @@ func (e *EngineTest) Connected(validatorID ids.ShortID) error {
 	return errConnected
 }
 
-func (e *EngineTest) Disconnected(validatorID ids.ShortID) error {
+func (e *EngineTest) Disconnected(nodeID ids.ShortID) error {
 	if e.DisconnectedF != nil {
-		return e.DisconnectedF(validatorID)
+		return e.DisconnectedF(nodeID)
 	}
 	if !e.CantDisconnected {
 		return nil
