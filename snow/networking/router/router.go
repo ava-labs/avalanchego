@@ -43,27 +43,27 @@ type Router interface {
 type ExternalRouter interface {
 	AppRouter
 	RegisterRequest(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		msgType constants.MsgType,
 	)
 	GetAcceptedFrontier(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Time,
 		onFinishedHandling func(),
 	)
 	AcceptedFrontier(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
 		onFinishedHandling func(),
 	)
 	GetAccepted(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Time,
@@ -71,14 +71,14 @@ type ExternalRouter interface {
 		onFinishedHandling func(),
 	)
 	Accepted(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		containerIDs []ids.ID,
 		onFinishedHandling func(),
 	)
 	GetAncestors(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Time,
@@ -86,14 +86,14 @@ type ExternalRouter interface {
 		onFinishedHandling func(),
 	)
 	MultiPut(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		containers [][]byte,
 		onFinishedHandling func(),
 	)
 	Get(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Time,
@@ -101,7 +101,7 @@ type ExternalRouter interface {
 		onFinishedHandling func(),
 	)
 	Put(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		containerID ids.ID,
@@ -109,7 +109,7 @@ type ExternalRouter interface {
 		onFinishedHandling func(),
 	)
 	PushQuery(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Time,
@@ -118,7 +118,7 @@ type ExternalRouter interface {
 		onFinishedHandling func(),
 	)
 	PullQuery(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		deadline time.Time,
@@ -126,7 +126,7 @@ type ExternalRouter interface {
 		onFinishedHandling func(),
 	)
 	Chits(
-		validatorID ids.ShortID,
+		nodeID ids.ShortID,
 		chainID ids.ID,
 		requestID uint32,
 		votes []ids.ID,
@@ -134,7 +134,7 @@ type ExternalRouter interface {
 	)
 }
 
-// Routes app-level messages
+// AppRouter routes app-level messages
 type AppRouter interface {
 	AppRequest(
 		nodeID ids.ShortID,
@@ -161,16 +161,16 @@ type AppRouter interface {
 
 // InternalRouter deals with messages internal to this node
 type InternalRouter interface {
-	GetAcceptedFrontierFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetAcceptedFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-	GetAncestorsFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-	QueryFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-
-	Connected(validatorID ids.ShortID)
-	Disconnected(validatorID ids.ShortID)
-
-	AppRequestFailed(validatorID ids.ShortID, chainID ids.ID, requestID uint32)
-
 	benchlist.Benchable
+
+	GetAcceptedFrontierFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+	GetAcceptedFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+	GetFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+	GetAncestorsFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+	QueryFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+
+	AppRequestFailed(nodeID ids.ShortID, chainID ids.ID, requestID uint32)
+
+	Connected(nodeID ids.ShortID)
+	Disconnected(nodeID ids.ShortID)
 }
