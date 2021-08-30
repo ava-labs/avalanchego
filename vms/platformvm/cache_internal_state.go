@@ -888,6 +888,10 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				return err
 			}
 			st.uptimes[tx.Validator.NodeID] = vdr
+
+			subnetID = constants.PrimaryNetworkID
+			nodeID = tx.Validator.NodeID
+			weight = tx.Validator.Wght
 		case VerifiableUnsignedAddDelegatorTx:
 			if err := database.PutUInt64(st.currentDelegatorList, txID[:], potentialReward); err != nil {
 				return err
