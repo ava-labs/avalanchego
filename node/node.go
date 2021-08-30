@@ -72,6 +72,9 @@ var (
 
 	errPrimarySubnetNotBootstrapped = errors.New("primary subnet has not finished bootstrapping")
 	errInvalidTLSKey                = errors.New("invalid TLS key")
+	errPNotCreated                  = errors.New("P-Chain not created")
+	errXNotCreated                  = errors.New("X-Chain not created")
+	errCNotCreated                  = errors.New("C-Chain not created")
 )
 
 // Node is an instance of an Avalanche node.
@@ -281,6 +284,7 @@ func (n *Node) initNetworking() error {
 		n.Config.PeerListGossipFreq,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		n.Config.AppGossipSize,
 		n.Config.NetworkConfig.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
@@ -914,11 +918,11 @@ func (n *Node) initHealthAPI() error {
 
 	isBootstrappedFunc := func() (interface{}, error) {
 		if pChainID, err := n.chainManager.Lookup("P"); err != nil {
-			return nil, errors.New("P-Chain not created")
+			return nil, errPNotCreated
 		} else if xChainID, err := n.chainManager.Lookup("X"); err != nil {
-			return nil, errors.New("X-Chain not created")
+			return nil, errXNotCreated
 		} else if cChainID, err := n.chainManager.Lookup("C"); err != nil {
-			return nil, errors.New("C-Chain not created")
+			return nil, errCNotCreated
 		} else if !n.chainManager.IsBootstrapped(pChainID) || !n.chainManager.IsBootstrapped(xChainID) || !n.chainManager.IsBootstrapped(cChainID) {
 			return nil, errPrimarySubnetNotBootstrapped
 		}

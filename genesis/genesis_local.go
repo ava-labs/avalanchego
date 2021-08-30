@@ -100,7 +100,7 @@ var (
 			CreateBlockchainTxFee: 100 * units.MilliAvax,
 		},
 		StakingConfig: StakingConfig{
-			UptimeRequirement:  .6, // 60%
+			UptimeRequirement:  .8, // 80%
 			MinValidatorStake:  2 * units.KiloAvax,
 			MaxValidatorStake:  3 * units.MegaAvax,
 			MinDelegatorStake:  25 * units.Avax,

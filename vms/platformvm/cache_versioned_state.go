@@ -33,8 +33,14 @@ type UTXOState interface {
 	UTXODeleter
 }
 
+type ValidatorState interface {
+	CurrentStakerChainState() currentStakerChainState
+	PendingStakerChainState() pendingStakerChainState
+}
+
 type MutableState interface {
 	UTXOState
+	ValidatorState
 
 	AddRewardUTXO(txID ids.ID, utxo *avax.UTXO)
 	GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error)
@@ -53,9 +59,6 @@ type MutableState interface {
 
 	GetTx(txID ids.ID) (*transactions.SignedTx, status.Status, error)
 	AddTx(tx *transactions.SignedTx, status status.Status)
-
-	CurrentStakerChainState() currentStakerChainState
-	PendingStakerChainState() pendingStakerChainState
 }
 
 type VersionedState interface {

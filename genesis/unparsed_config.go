@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 )
 
+var errInvalidETHAddress = errors.New("invalid eth address")
+
 type UnparsedAllocation struct {
 	ETHAddr        string         `json:"ethAddr"`
 	AVAXAddr       string         `json:"avaxAddr"`
@@ -26,7 +28,7 @@ func (ua UnparsedAllocation) Parse() (Allocation, error) {
 	}
 
 	if len(ua.ETHAddr) < 2 {
-		return a, errors.New("invalid eth address")
+		return a, errInvalidETHAddress
 	}
 
 	ethAddrBytes, err := hex.DecodeString(ua.ETHAddr[2:])

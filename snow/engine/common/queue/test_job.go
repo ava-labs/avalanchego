@@ -10,6 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var (
+	errExecute                = errors.New("unexpectedly called Execute")
+	errHasMissingDependencies = errors.New("unexpectedly called HasMissingDependencies")
+)
+
 // TestJob is a test Job
 type TestJob struct {
 	T *testing.T
@@ -60,9 +65,9 @@ func (j *TestJob) Execute() error {
 		return j.ExecuteF()
 	}
 	if j.CantExecute && j.T != nil {
-		j.T.Fatalf("Unexpectedly called Execute")
+		j.T.Fatal(errExecute)
 	}
-	return errors.New("unexpectedly called Execute")
+	return errExecute
 }
 
 func (j *TestJob) Bytes() []byte {
@@ -80,7 +85,7 @@ func (j *TestJob) HasMissingDependencies() (bool, error) {
 		return j.HasMissingDependenciesF()
 	}
 	if j.CantHasMissingDependencies && j.T != nil {
-		j.T.Fatalf("Unexpectedly called HasMissingDependencies")
+		j.T.Fatal(errHasMissingDependencies)
 	}
-	return false, errors.New("unexpectedly called HasMissingDependencies")
+	return false, errHasMissingDependencies
 }

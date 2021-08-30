@@ -40,7 +40,10 @@ func (TopologicalFactory) New() Consensus { return &Topological{} }
 // of the voting results. Assumes that vertices are inserted in topological
 // order.
 type Topological struct {
-	metrics.Metrics
+	metrics.Latency
+
+	// pollNumber is the number of times RecordPolls has been called
+	pollNumber uint64
 
 	// Context used for logging
 	ctx *snow.Context
@@ -101,7 +104,7 @@ func (ta *Topological) Initialize(
 	ta.votes = ids.UniqueBag{}
 	ta.kahnNodes = make(map[ids.ID]kahnNode)
 
-	if err := ta.Metrics.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
+	if err := ta.Latency.Initialize("vtx", "vertex/vertices", ctx.Log, params.Namespace, params.Metrics); err != nil {
 		return err
 	}
 
@@ -157,7 +160,7 @@ func (ta *Topological) Add(vtx Vertex) error {
 	}
 
 	ta.nodes[vtxID] = vtx // Add this vertex to the set of nodes
-	ta.Metrics.Issued(vtxID)
+	ta.Latency.Issued(vtxID, ta.pollNumber)
 
 	return ta.update(vtx) // Update the vertex and it's ancestry
 }
@@ -185,6 +188,9 @@ func (ta *Topological) Preferences() ids.Set { return ta.preferred }
 
 // RecordPoll implements the Avalanche interface
 func (ta *Topological) RecordPoll(responses ids.UniqueBag) error {
+	// Register a new poll call
+	ta.pollNumber++
+
 	// If it isn't possible to have alpha votes for any transaction, then we can
 	// just reset the confidence values in the conflict graph and not perform
 	// any traversals.
@@ -229,14 +235,14 @@ func (ta *Topological) Finalized() bool { return ta.cg.Finalized() }
 
 // HealthCheck returns information about the consensus health.
 func (ta *Topological) HealthCheck() (interface{}, error) {
-	numOutstandingVtx := ta.Metrics.ProcessingLen()
+	numOutstandingVtx := ta.Latency.ProcessingLen()
 	healthy := numOutstandingVtx <= ta.params.MaxOutstandingItems
 	details := map[string]interface{}{
 		"outstandingVertices": numOutstandingVtx,
 	}
 
 	// check for long running vertices
-	timeReqRunning := ta.Metrics.MeasureAndGetOldestDuration()
+	timeReqRunning := ta.Latency.MeasureAndGetOldestDuration()
 	healthy = healthy && timeReqRunning <= ta.params.MaxItemProcessingTime
 	details["longestRunningVertex"] = timeReqRunning.String()
 
@@ -488,7 +494,7 @@ func (ta *Topological) update(vtx Vertex) error {
 				return err
 			}
 			delete(ta.nodes, vtxID)
-			ta.Metrics.Rejected(vtxID)
+			ta.Latency.Rejected(vtxID, ta.pollNumber)
 
 			ta.preferenceCache[vtxID] = false
 			ta.virtuousCache[vtxID] = false
@@ -548,7 +554,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			return err
 		}
 		delete(ta.nodes, vtxID)
-		ta.Metrics.Accepted(vtxID)
+		ta.Latency.Accepted(vtxID, ta.pollNumber)
 	case rejectable:
 		// I'm rejectable, why not reject?
 		if err := ta.ctx.ConsensusDispatcher.Reject(ta.ctx, vtxID, vtx.Bytes()); err != nil {
@@ -560,7 +566,7 @@ func (ta *Topological) update(vtx Vertex) error {
 			return err
 		}
 		delete(ta.nodes, vtxID)
-		ta.Metrics.Rejected(vtxID)
+		ta.Latency.Rejected(vtxID, ta.pollNumber)
 	}
 	return nil
 }

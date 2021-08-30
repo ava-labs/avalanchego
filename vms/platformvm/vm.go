@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -58,8 +59,8 @@ const (
 	// to be minted
 	MinConsumptionRate = 100000 // 10%
 
-	// The maximum amount of weight on a validator is required to be no more
-	// than [MaxValidatorWeightFactor] * the validator's stake amount.
+	// MaxValidatorWeightFactor is the maximum factor of the validator stake
+	// that is allowed to be placed on a validator.
 	MaxValidatorWeightFactor uint64 = 5
 
 	// SupplyCap is the maximum amount of AVAX that should ever exist
@@ -193,6 +194,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	msgs chan<- common.Message,
 	_ []*common.Fx,
+	_ common.AppSender,
 ) error {
 	ctx.Log.Verbo("initializing platform chain")
 
@@ -389,7 +391,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.mempool.BuildBlock
 // ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	var blk Block
-	if _, err := platformcodec.GenesisCodec.Unmarshal(b, &blk); err != nil {
+	if _, err := platformcodec.Codec.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
 	if err := blk.initialize(vm, b, choices.Processing, blk); err != nil {
@@ -437,14 +439,6 @@ func (vm *VM) Preferred() (Block, error) {
 	return vm.getBlock(vm.preferred)
 }
 
-func (vm *VM) PreferredHeight() (uint64, error) {
-	blk, err := vm.getBlock(vm.preferred)
-	if err != nil {
-		return 0, err
-	}
-	return blk.Height(), nil
-}
-
 // NotifyBlockReady tells the consensus engine that a new block is ready to be
 // created
 func (vm *VM) NotifyBlockReady() {
@@ -457,6 +451,26 @@ func (vm *VM) NotifyBlockReady() {
 
 func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
+}
+
+// AppRequestFailed this VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+
+// AppRequest this VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return nil
+}
+
+// AppResponse this VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return nil
+}
+
+// AppGossip this VM doesn't (currently) have any app-specific messages
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return nil
 }
 
 // CreateHandlers returns a map where:
@@ -511,6 +525,61 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 	return vm.internalState.Commit()
 }
 
+// GetValidatorSet returns the validator set at the specified height for the
+// provided subnetID.
+func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
+	if err != nil {
+		return nil, err
+	}
+	lastAcceptedHeight := lastAccepted.Height()
+	if lastAcceptedHeight < height {
+		return nil, database.ErrNotFound
+	}
+
+	currentValidators, ok := vm.Validators.GetValidators(subnetID)
+	if !ok {
+		return nil, errNotEnoughValidators
+	}
+	currentValidatorList := currentValidators.List()
+
+	vdrSet := make(map[ids.ShortID]uint64, len(currentValidatorList))
+	for _, vdr := range currentValidatorList {
+		vdrSet[vdr.ID()] = vdr.Weight()
+	}
+
+	for i := lastAcceptedHeight; i > height; i-- {
+		diffs, err := vm.internalState.GetValidatorWeightDiffs(i, subnetID)
+		if err != nil {
+			return nil, err
+		}
+
+		for nodeID, diff := range diffs {
+			var op func(uint64, uint64) (uint64, error)
+			if diff.Decrease {
+				// The validator's weight was decreased at this block, so in the
+				// prior block it was higher.
+				op = safemath.Add64
+			} else {
+				// The validator's weight was increased at this block, so in the
+				// prior block it was lower.
+				op = safemath.Sub64
+			}
+
+			newWeight, err := op(vdrSet[nodeID], diff.Amount)
+			if err != nil {
+				return nil, err
+			}
+			if newWeight == 0 {
+				delete(vdrSet, nodeID)
+			} else {
+				vdrSet[nodeID] = newWeight
+			}
+		}
+	}
+	return vdrSet, nil
+}
+
 func (vm *VM) updateValidators(force bool) error {
 	now := vm.clock.Time()
 	if !force && !vm.bootstrapped && now.Sub(vm.lastVdrUpdate) < 5*time.Second {
@@ -526,6 +595,9 @@ func (vm *VM) updateValidators(force bool) error {
 	if err := vm.Validators.Set(constants.PrimaryNetworkID, primaryValidators); err != nil {
 		return err
 	}
+
+	weight, _ := primaryValidators.GetWeight(vm.ctx.NodeID)
+	vm.localStake.Set(float64(weight))
 	vm.totalStake.Set(float64(primaryValidators.Weight()))
 
 	for subnetID := range vm.WhitelistedSubnets {
@@ -542,7 +614,7 @@ func (vm *VM) updateValidators(force bool) error {
 
 // Returns the time when the next staker of any subnet starts/stops staking
 // after the current timestamp
-func (vm *VM) nextStakerChangeTime(vs MutableState) (time.Time, error) {
+func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	currentStakers := vs.CurrentStakerChainState()
 	pendingStakers := vs.PendingStakerChainState()
 

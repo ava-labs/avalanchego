@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -36,6 +37,7 @@ var (
 	validatorPrefix       = []byte("validator")
 	delegatorPrefix       = []byte("delegator")
 	subnetValidatorPrefix = []byte("subnetValidator")
+	validatorDiffsPrefix  = []byte("validatorDiffs")
 	blockPrefix           = []byte("block")
 	txPrefix              = []byte("tx")
 	rewardUTXOsPrefix     = []byte("rewardUTXOs")
@@ -62,19 +64,22 @@ const (
 	mediumPriority
 	topPriority
 
-	blockCacheSize       = 2048
-	txCacheSize          = 2048
-	rewardUTXOsCacheSize = 2048
-	chainCacheSize       = 2048
-	chainDBCacheSize     = 2048
+	validatorDiffsCacheSize = 2048
+	blockCacheSize          = 2048
+	txCacheSize             = 2048
+	rewardUTXOsCacheSize    = 2048
+	chainCacheSize          = 2048
+	chainDBCacheSize        = 2048
 )
 
 type InternalState interface {
 	MutableState
 	uptime.State
 
+	SetHeight(height uint64)
 	AddCurrentStaker(tx *transactions.SignedTx, potentialReward uint64)
 	DeleteCurrentStaker(tx *transactions.SignedTx)
+	GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error)
 
 	AddPendingStaker(tx *transactions.SignedTx)
 	DeletePendingStaker(tx *transactions.SignedTx)
@@ -109,16 +114,20 @@ type InternalState interface {
  * | | '-. subnetValidator
  * | |   '-. list
  * | |     '-- txID -> nil
- * | '-. pending
- * |   |-. validator
- * |   | '-. list
- * |   |   '-- txID -> nil
- * |   |-. delegator
- * |   | '-. list
- * |   |   '-- txID -> nil
- * |   '-. subnetValidator
+ * | |-. pending
+ * | | |-. validator
+ * | | | '-. list
+ * | | |   '-- txID -> nil
+ * | | |-. delegator
+ * | | | '-. list
+ * | | |   '-- txID -> nil
+ * | | '-. subnetValidator
+ * | |   '-. list
+ * | |     '-- txID -> nil
+ * | '-. diffs
+ * |   '-. height+subnet
  * |     '-. list
- * |       '-- txID -> nil
+ * |       '-- nodeID -> weightChange
  * |-. blocks
  * | '-- blockID -> block bytes
  * |-. txs
@@ -150,6 +159,7 @@ type internalStateImpl struct {
 	currentStakerChainState currentStakerChainState
 	pendingStakerChainState pendingStakerChainState
 
+	currentHeight         uint64
 	addedCurrentStakers   []*validatorReward
 	deletedCurrentStakers []*transactions.SignedTx
 	addedPendingStakers   []*transactions.SignedTx
@@ -172,6 +182,9 @@ type internalStateImpl struct {
 	pendingDelegatorList         linkeddb.LinkedDB
 	pendingSubnetValidatorBaseDB database.Database
 	pendingSubnetValidatorList   linkeddb.LinkedDB
+
+	validatorDiffsCache cache.Cacher // cache of heightWithSubnet -> map[ids.ShortID]*ValidatorWeightDiff
+	validatorDiffsDB    database.Database
 
 	addedBlocks map[ids.ID]Block // map of blockID -> Block
 	blockCache  cache.Cacher     // cache of blockID -> Block, if the entry is nil, it is not in the database
@@ -205,6 +218,16 @@ type internalStateImpl struct {
 	singletonDB                          database.Database
 }
 
+type ValidatorWeightDiff struct {
+	Decrease bool   `serialize:"true"`
+	Amount   uint64 `serialize:"true"`
+}
+
+type heightWithSubnet struct {
+	Height   uint64 `serialize:"true"`
+	SubnetID ids.ID `serialize:"true"`
+}
+
 type stateTx struct {
 	Tx     []byte        `serialize:"true"`
 	Status status.Status `serialize:"true"`
@@ -229,6 +252,8 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 	pendingValidatorBaseDB := prefixdb.New(validatorPrefix, pendingValidatorsDB)
 	pendingDelegatorBaseDB := prefixdb.New(delegatorPrefix, pendingValidatorsDB)
 	pendingSubnetValidatorBaseDB := prefixdb.New(subnetValidatorPrefix, pendingValidatorsDB)
+
+	validatorDiffsDB := prefixdb.New(validatorDiffsPrefix, validatorsDB)
 
 	rewardUTXODB := prefixdb.New(rewardUTXOsPrefix, baseDB)
 	utxoDB := prefixdb.New(utxoPrefix, baseDB)
@@ -256,6 +281,7 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 		pendingDelegatorList:         linkeddb.NewDefault(pendingDelegatorBaseDB),
 		pendingSubnetValidatorBaseDB: pendingSubnetValidatorBaseDB,
 		pendingSubnetValidatorList:   linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
+		validatorDiffsDB:             validatorDiffsDB,
 
 		addedBlocks: make(map[ids.ID]Block),
 		blockDB:     prefixdb.New(blockPrefix, baseDB),
@@ -280,6 +306,7 @@ func newInternalStateDatabases(vm *VM, db database.Database) *internalStateImpl 
 }
 
 func (st *internalStateImpl) initCaches() {
+	st.validatorDiffsCache = &cache.LRU{Size: validatorDiffsCacheSize}
 	st.blockCache = &cache.LRU{Size: blockCacheSize}
 	st.txCache = &cache.LRU{Size: txCacheSize}
 	st.rewardUTXOsCache = &cache.LRU{Size: rewardUTXOsCacheSize}
@@ -289,6 +316,15 @@ func (st *internalStateImpl) initCaches() {
 }
 
 func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometheus.Registerer) error {
+	validatorDiffsCache, err := metercacher.New(
+		fmt.Sprintf("%s_validator_diffs_cache", namespace),
+		metrics,
+		&cache.LRU{Size: validatorDiffsCacheSize},
+	)
+	if err != nil {
+		return err
+	}
+
 	blockCache, err := metercacher.New(
 		fmt.Sprintf("%s_block_cache", namespace),
 		metrics,
@@ -331,10 +367,11 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 	}
 
 	chainDBCache, err := metercacher.New(
-		fmt.Sprintf("%s_chaindb_cache", namespace),
+		fmt.Sprintf("%s_chain_db_cache", namespace),
 		metrics,
 		&cache.LRU{Size: chainDBCacheSize},
 	)
+	st.validatorDiffsCache = validatorDiffsCache
 	st.blockCache = blockCache
 	st.txCache = txCache
 	st.rewardUTXOsCache = rewardUTXOsCache
@@ -563,7 +600,7 @@ func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := platformcodec.Codec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := platformcodec.GenesisCodec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -677,6 +714,10 @@ func (st *internalStateImpl) SetUptime(nodeID ids.ShortID, upDuration time.Durat
 	return nil
 }
 
+func (st *internalStateImpl) SetHeight(height uint64) {
+	st.currentHeight = height
+}
+
 func (st *internalStateImpl) AddCurrentStaker(tx *transactions.SignedTx, potentialReward uint64) {
 	st.addedCurrentStakers = append(st.addedCurrentStakers, &validatorReward{
 		addStakerTx:     tx,
@@ -696,6 +737,45 @@ func (st *internalStateImpl) DeletePendingStaker(tx *transactions.SignedTx) {
 	st.deletedPendingStakers = append(st.deletedPendingStakers, tx)
 }
 
+func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids.ID) (map[ids.ShortID]*ValidatorWeightDiff, error) {
+	prefixStruct := heightWithSubnet{
+		Height:   height,
+		SubnetID: subnetID,
+	}
+	prefixBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, prefixStruct)
+	if err != nil {
+		return nil, err
+	}
+	prefixStr := string(prefixBytes)
+
+	if weightDiffsIntf, ok := st.validatorDiffsCache.Get(prefixStr); ok {
+		return weightDiffsIntf.(map[ids.ShortID]*ValidatorWeightDiff), nil
+	}
+
+	rawDiffDB := prefixdb.New(prefixBytes, st.validatorDiffsDB)
+	diffDB := linkeddb.NewDefault(rawDiffDB)
+	diffIter := diffDB.NewIterator()
+
+	weightDiffs := make(map[ids.ShortID]*ValidatorWeightDiff)
+	for diffIter.Next() {
+		nodeID, err := ids.ToShortID(diffIter.Key())
+		if err != nil {
+			return nil, err
+		}
+
+		weightDiff := ValidatorWeightDiff{}
+		_, err = platformcodec.Codec.Unmarshal(diffIter.Value(), &weightDiff)
+		if err != nil {
+			return nil, err
+		}
+
+		weightDiffs[nodeID] = &weightDiff
+	}
+
+	st.validatorDiffsCache.Put(prefixStr, weightDiffs)
+	return weightDiffs, nil
+}
+
 func (st *internalStateImpl) Abort() {
 	st.baseDB.Abort()
 }
@@ -711,34 +791,34 @@ func (st *internalStateImpl) Commit() error {
 
 func (st *internalStateImpl) CommitBatch() (database.Batch, error) {
 	if err := st.writeCurrentStakers(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write current stakers with: %w", err)
 	}
 	if err := st.writePendingStakers(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write pending stakers with: %w", err)
 	}
 	if err := st.writeUptimes(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write uptimes with: %w", err)
 	}
 	if err := st.writeBlocks(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write blocks with: %w", err)
 	}
 	if err := st.writeTXs(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write txs with: %w", err)
 	}
 	if err := st.writeRewardUTXOs(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write reward UTXOs with: %w", err)
 	}
 	if err := st.writeUTXOs(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write UTXOs with: %w", err)
 	}
 	if err := st.writeSubnets(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write current subnets with: %w", err)
 	}
 	if err := st.writeChains(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write chains with: %w", err)
 	}
 	if err := st.writeSingletons(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write singletons with: %w", err)
 	}
 	return st.baseDB.CommitBatch()
 }
@@ -777,10 +857,16 @@ type currentValidatorState struct {
 }
 
 func (st *internalStateImpl) writeCurrentStakers() error {
+	weightDiffs := make(map[ids.ID]map[ids.ShortID]*ValidatorWeightDiff) // subnetID -> nodeID -> weightDiff
 	for _, currentStaker := range st.addedCurrentStakers {
 		txID := currentStaker.addStakerTx.ID()
 		potentialReward := currentStaker.potentialReward
 
+		var (
+			subnetID ids.ID
+			nodeID   ids.ShortID
+			weight   uint64
+		)
 		switch tx := currentStaker.addStakerTx.UnsignedTx.(type) {
 		case VerifiableUnsignedAddValidatorTx:
 			startTime := tx.StartTime()
@@ -806,27 +892,71 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			if err := database.PutUInt64(st.currentDelegatorList, txID[:], potentialReward); err != nil {
 				return err
 			}
+
+			subnetID = constants.PrimaryNetworkID
+			nodeID = tx.Validator.NodeID
+			weight = tx.Validator.Wght
 		case VerifiableUnsignedAddSubnetValidatorTx:
 			if err := st.currentSubnetValidatorList.Put(txID[:], nil); err != nil {
 				return err
 			}
+
+			subnetID = tx.Validator.Subnet
+			nodeID = tx.Validator.NodeID
+			weight = tx.Validator.Wght
 		default:
 			return errWrongTxType
 		}
+
+		subnetDiffs, ok := weightDiffs[subnetID]
+		if !ok {
+			subnetDiffs = make(map[ids.ShortID]*ValidatorWeightDiff)
+			weightDiffs[subnetID] = subnetDiffs
+		}
+
+		nodeDiff, ok := subnetDiffs[nodeID]
+		if !ok {
+			nodeDiff = &ValidatorWeightDiff{}
+			subnetDiffs[nodeID] = nodeDiff
+		}
+
+		newWeight, err := safemath.Add64(nodeDiff.Amount, weight)
+		if err != nil {
+			return err
+		}
+		nodeDiff.Amount = newWeight
 	}
 	st.addedCurrentStakers = nil
 
 	for _, tx := range st.deletedCurrentStakers {
-		var db database.KeyValueWriter
+		var (
+			db       database.KeyValueWriter
+			subnetID ids.ID
+			nodeID   ids.ShortID
+			weight   uint64
+		)
 		switch tx := tx.UnsignedTx.(type) {
 		case VerifiableUnsignedAddValidatorTx:
 			db = st.currentValidatorList
+
 			delete(st.uptimes, tx.Validator.NodeID)
 			delete(st.updatedUptimes, tx.Validator.NodeID)
+
+			subnetID = constants.PrimaryNetworkID
+			nodeID = tx.Validator.NodeID
+			weight = tx.Validator.Wght
 		case VerifiableUnsignedAddDelegatorTx:
 			db = st.currentDelegatorList
+
+			subnetID = constants.PrimaryNetworkID
+			nodeID = tx.Validator.NodeID
+			weight = tx.Validator.Wght
 		case VerifiableUnsignedAddSubnetValidatorTx:
 			db = st.currentSubnetValidatorList
+
+			subnetID = tx.Validator.Subnet
+			nodeID = tx.Validator.NodeID
+			weight = tx.Validator.Wght
 		default:
 			return errWrongTxType
 		}
@@ -835,8 +965,60 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 		if err := db.Delete(txID[:]); err != nil {
 			return err
 		}
+
+		subnetDiffs, ok := weightDiffs[subnetID]
+		if !ok {
+			subnetDiffs = make(map[ids.ShortID]*ValidatorWeightDiff)
+			weightDiffs[subnetID] = subnetDiffs
+		}
+
+		nodeDiff, ok := subnetDiffs[nodeID]
+		if !ok {
+			nodeDiff = &ValidatorWeightDiff{}
+			subnetDiffs[nodeID] = nodeDiff
+		}
+
+		if nodeDiff.Decrease {
+			newWeight, err := safemath.Add64(nodeDiff.Amount, weight)
+			if err != nil {
+				return err
+			}
+			nodeDiff.Amount = newWeight
+		} else {
+			nodeDiff.Decrease = nodeDiff.Amount < weight
+			nodeDiff.Amount = safemath.Diff64(nodeDiff.Amount, weight)
+		}
 	}
 	st.deletedCurrentStakers = nil
+
+	for subnetID, nodeUpdates := range weightDiffs {
+		prefixStruct := heightWithSubnet{
+			Height:   st.currentHeight,
+			SubnetID: subnetID,
+		}
+		prefixBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, prefixStruct)
+		if err != nil {
+			return err
+		}
+		rawDiffDB := prefixdb.New(prefixBytes, st.validatorDiffsDB)
+		diffDB := linkeddb.NewDefault(rawDiffDB)
+		for nodeID, nodeDiff := range nodeUpdates {
+			if nodeDiff.Amount == 0 {
+				delete(nodeUpdates, nodeID)
+				continue
+			}
+			nodeDiffBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, nodeDiff)
+			if err != nil {
+				return err
+			}
+
+			nodeID := nodeID
+			if err := diffDB.Put(nodeID[:], nodeDiffBytes); err != nil {
+				return err
+			}
+		}
+		st.validatorDiffsCache.Put(string(prefixBytes), nodeUpdates)
+	}
 	return nil
 }
 
@@ -956,7 +1138,7 @@ func (st *internalStateImpl) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
+			utxoBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, utxo)
 			if err != nil {
 				return err
 			}
@@ -1042,10 +1224,7 @@ func (st *internalStateImpl) load() error {
 	if err := st.loadCurrentValidators(); err != nil {
 		return err
 	}
-	if err := st.loadPendingValidators(); err != nil {
-		return err
-	}
-	return nil
+	return st.loadPendingValidators()
 }
 
 func (st *internalStateImpl) loadSingletons() error {
