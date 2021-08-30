@@ -7,7 +7,7 @@ import (
 	"errors"
 )
 
-var ErrUnknown = errors.New("unknown status")
+var errUnknownStatus = errors.New("unknown status")
 
 type Status uint32
 
@@ -49,7 +49,7 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	case "\"Dropped\"":
 		*s = Dropped
 	default:
-		return ErrUnknown
+		return errUnknownStatus
 	}
 	return nil
 }
@@ -60,7 +60,7 @@ func (s Status) Valid() error {
 	case Unknown, Committed, Aborted, Processing, Dropped:
 		return nil
 	default:
-		return ErrUnknown
+		return errUnknownStatus
 	}
 }
 
