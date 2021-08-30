@@ -8,7 +8,7 @@ import (
 
 type Gossiper interface {
 	GossipAtomicTxID(atmTxIDBytes []byte) error
-	GossipEthTxIDs(ethTxIDsBytes []byte) error
+	GossipEthTxHashes(ethTxIDsBytes []byte) error
 	listenAndGossip()
 }
 
@@ -48,7 +48,7 @@ func (g *gossiper) GossipAtomicTxID(atmTxIDBytes []byte) error {
 	return nil
 }
 
-func (g *gossiper) GossipEthTxIDs(ethTxIDsBytes []byte) error {
+func (g *gossiper) GossipEthTxHashes(ethTxIDsBytes []byte) error {
 	g.bytesChan <- ethTxIDsBytes
 	return nil
 }

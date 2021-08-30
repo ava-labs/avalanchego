@@ -41,7 +41,7 @@ func fundAddressByGenesis(addr common.Address) (string, error) {
 func getEThValidTxs(key *ecdsa.PrivateKey) []*types.Transaction {
 	res := make([]*types.Transaction, 0)
 
-	nonce := uint64(1)
+	nonce := uint64(0)
 	to := common.Address{}
 	amount := big.NewInt(10000)
 	gaslimit := uint64(100000)
@@ -71,7 +71,7 @@ func getEThValidTxs(key *ecdsa.PrivateKey) []*types.Transaction {
 	return res
 }
 
-func TestMempool_EthTxsAreGossipedAfterActivation(t *testing.T) {
+func TestMempool_EthTxs_AddedTxesGossipedAfterActivation(t *testing.T) {
 	// show that locally generated eth txes are gossiped
 	// Note: channel through which coreth mempool push txes to vm is injected here
 	// to ease up UT, which target only VM behavious in response to coreth mempool signals
@@ -108,7 +108,7 @@ func TestMempool_EthTxsAreGossipedAfterActivation(t *testing.T) {
 	}
 }
 
-func TestMempool_EthTxsAreNotGossipedBeforeActivation(t *testing.T) {
+func TestMempool_EthTxs_AddedTxesNotGossipedBeforeActivation(t *testing.T) {
 	// show that locally generated eth txes are gossiped
 	// Note: channel through which coreth mempool push txes to vm is injected here
 	// to ease up UT, which target only VM behavious in response to coreth mempool signals
@@ -307,6 +307,7 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 	if err := vm.AppResponse(nodeID, reqID, responseBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
+	time.Sleep(10 * time.Second)
 	if !vm.chain.GetTxPool().Has(ethTxs[0].Hash()) {
 		t.Fatal("responses with unknown requestID should not affect mempool")
 	}
