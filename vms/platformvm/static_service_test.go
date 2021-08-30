@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 func TestBuildGenesisInvalidUTXOBalance(t *testing.T) {
@@ -243,7 +242,7 @@ func TestBuildGenesisReturnsSortedValidators(t *testing.T) {
 	}
 
 	genesis := &Genesis{}
-	if _, err := platformcodec.Codec.Unmarshal(genesisBytes, genesis); err != nil {
+	if _, err := Codec.Unmarshal(genesisBytes, genesis); err != nil {
 		t.Fatal(err)
 	}
 	validators := genesis.Validators

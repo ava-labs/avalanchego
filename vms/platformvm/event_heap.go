@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -93,5 +92,5 @@ func (h *EventHeap) Pop() interface{} {
 
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() ([]byte, error) {
-	return platformcodec.Codec.Marshal(platformcodec.Version, h)
+	return Codec.Marshal(CodecVersion, h)
 }

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -220,5 +219,5 @@ func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*transactions.SignedTx, err
 			Time: uint64(timestamp.Unix()),
 		},
 	}}
-	return tx, tx.Sign(platformcodec.Codec, nil)
+	return tx, tx.Sign(Codec, nil)
 }

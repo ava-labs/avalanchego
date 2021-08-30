@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -37,7 +36,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	var unsignedTx VerifiableUnsignedAddValidatorTx
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -68,7 +67,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -109,7 +108,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -144,7 +143,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -175,7 +174,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -206,7 +205,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -237,7 +236,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -268,7 +267,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -299,7 +298,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddValidatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
@@ -326,7 +325,7 @@ func TestAddValidatorTxSyntacticVerify(t *testing.T) {
 	} else {
 		syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 			Ctx:               vm.ctx,
-			C:                 platformcodec.Codec,
+			C:                 Codec,
 			MinValidatorStake: vm.MinValidatorStake,
 			MaxValidatorStake: vm.MaxValidatorStake,
 			MinStakeDuration:  defaultMinStakingDuration,

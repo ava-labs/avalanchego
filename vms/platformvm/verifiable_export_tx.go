@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -37,7 +36,7 @@ func (tx VerifiableUnsignedExportTx) SemanticVerify(
 ) (VersionedState, TxError) {
 	syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
 		Ctx:        vm.ctx,
-		C:          platformcodec.Codec,
+		C:          Codec,
 		AvmID:      vm.ctx.XChainID,
 		FeeAssetID: vm.ctx.AVAXAssetID,
 		FeeAmount:  vm.TxFee,
@@ -93,7 +92,7 @@ func (tx VerifiableUnsignedExportTx) Accept(ctx *snow.Context, batch database.Ba
 			Out:   out.Out,
 		}
 
-		utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
+		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("failed to marshal UTXO: %w", err)
 		}
@@ -157,13 +156,13 @@ func (vm *VM) newExportTx(
 		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
-	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
 		Ctx:        vm.ctx,
-		C:          platformcodec.Codec,
+		C:          Codec,
 		AvmID:      vm.ctx.XChainID,
 		FeeAssetID: vm.ctx.AVAXAssetID,
 		FeeAmount:  vm.TxFee,

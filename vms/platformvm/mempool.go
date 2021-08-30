@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -35,7 +34,6 @@ type Mempool struct {
 
 	// TODO: factor out VM into separable interfaces
 
-	// platformcodec.Codec
 	// vm.ctx.Log
 	// vm.ctx.Lock
 
@@ -98,7 +96,7 @@ func (m *Mempool) IssueTx(tx *transactions.SignedTx) error {
 	}
 
 	// Initialize the transaction
-	if err := tx.Sign(platformcodec.Codec, nil); err != nil {
+	if err := tx.Sign(Codec, nil); err != nil {
 		return err
 	}
 	txID := tx.ID()

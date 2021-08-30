@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
@@ -310,7 +309,7 @@ func (st *internalStateImpl) initCaches() {
 	st.blockCache = &cache.LRU{Size: blockCacheSize}
 	st.txCache = &cache.LRU{Size: txCacheSize}
 	st.rewardUTXOsCache = &cache.LRU{Size: rewardUTXOsCacheSize}
-	st.utxoState = avax.NewUTXOState(st.utxoDB, platformcodec.GenesisCodec)
+	st.utxoState = avax.NewUTXOState(st.utxoDB, GenesisCodec)
 	st.chainCache = &cache.LRU{Size: chainCacheSize}
 	st.chainDBCache = &cache.LRU{Size: chainDBCacheSize}
 }
@@ -352,7 +351,7 @@ func (st *internalStateImpl) initMeteredCaches(namespace string, metrics prometh
 		return err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, platformcodec.GenesisCodec, namespace, metrics)
+	utxoState, err := avax.NewMeteredUTXOState(st.utxoDB, GenesisCodec, namespace, metrics)
 	if err != nil {
 		return err
 	}
@@ -556,15 +555,15 @@ func (st *internalStateImpl) GetTx(txID ids.ID) (*transactions.SignedTx, status.
 	}
 
 	stx := stateTx{}
-	if _, err := platformcodec.GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
+	if _, err := GenesisCodec.Unmarshal(txBytes, &stx); err != nil {
 		return nil, status.Unknown, err
 	}
 
 	tx := transactions.SignedTx{}
-	if _, err := platformcodec.GenesisCodec.Unmarshal(stx.Tx, &tx); err != nil {
+	if _, err := GenesisCodec.Unmarshal(stx.Tx, &tx); err != nil {
 		return nil, status.Unknown, err
 	}
-	if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
+	if err := tx.Sign(GenesisCodec, nil); err != nil {
 		return nil, status.Unknown, err
 	}
 
@@ -600,7 +599,7 @@ func (st *internalStateImpl) GetRewardUTXOs(txID ids.ID) ([]*avax.UTXO, error) {
 	utxos := []*avax.UTXO(nil)
 	for it.Next() {
 		utxo := &avax.UTXO{}
-		if _, err := platformcodec.GenesisCodec.Unmarshal(it.Value(), utxo); err != nil {
+		if _, err := GenesisCodec.Unmarshal(it.Value(), utxo); err != nil {
 			return nil, err
 		}
 		utxos = append(utxos, utxo)
@@ -655,12 +654,12 @@ func (st *internalStateImpl) GetBlock(blockID ids.ID) (Block, error) {
 	}
 
 	blkStatus := stateBlk{}
-	if _, err := platformcodec.GenesisCodec.Unmarshal(blkBytes, &blkStatus); err != nil {
+	if _, err := GenesisCodec.Unmarshal(blkBytes, &blkStatus); err != nil {
 		return nil, err
 	}
 
 	var blk Block
-	if _, err := platformcodec.GenesisCodec.Unmarshal(blkStatus.Blk, &blk); err != nil {
+	if _, err := GenesisCodec.Unmarshal(blkStatus.Blk, &blk); err != nil {
 		return nil, err
 	}
 	if err := blk.initialize(st.vm, blkStatus.Blk, blkStatus.Status, blk); err != nil {
@@ -742,7 +741,7 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 		Height:   height,
 		SubnetID: subnetID,
 	}
-	prefixBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, prefixStruct)
+	prefixBytes, err := Codec.Marshal(CodecVersion, prefixStruct)
 	if err != nil {
 		return nil, err
 	}
@@ -764,7 +763,7 @@ func (st *internalStateImpl) GetValidatorWeightDiffs(height uint64, subnetID ids
 		}
 
 		weightDiff := ValidatorWeightDiff{}
-		_, err = platformcodec.Codec.Unmarshal(diffIter.Value(), &weightDiff)
+		_, err = Codec.Unmarshal(diffIter.Value(), &weightDiff)
 		if err != nil {
 			return nil, err
 		}
@@ -879,7 +878,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				PotentialReward: potentialReward,
 			}
 
-			vdrBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, vdr)
+			vdrBytes, err := GenesisCodec.Marshal(CodecVersion, vdr)
 			if err != nil {
 				return err
 			}
@@ -1000,7 +999,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 			Height:   st.currentHeight,
 			SubnetID: subnetID,
 		}
-		prefixBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, prefixStruct)
+		prefixBytes, err := Codec.Marshal(CodecVersion, prefixStruct)
 		if err != nil {
 			return err
 		}
@@ -1011,7 +1010,7 @@ func (st *internalStateImpl) writeCurrentStakers() error {
 				delete(nodeUpdates, nodeID)
 				continue
 			}
-			nodeDiffBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, nodeDiff)
+			nodeDiffBytes, err := Codec.Marshal(CodecVersion, nodeDiff)
 			if err != nil {
 				return err
 			}
@@ -1076,7 +1075,7 @@ func (st *internalStateImpl) writeUptimes() error {
 		uptime := st.uptimes[nodeID]
 		uptime.LastUpdated = uint64(uptime.lastUpdated.Unix())
 
-		uptimeBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, uptime)
+		uptimeBytes, err := GenesisCodec.Marshal(CodecVersion, uptime)
 		if err != nil {
 			return err
 		}
@@ -1096,7 +1095,7 @@ func (st *internalStateImpl) writeBlocks() error {
 			Blk:    blk.Bytes(),
 			Status: blk.Status(),
 		}
-		btxBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, &sblk)
+		btxBytes, err := GenesisCodec.Marshal(CodecVersion, &sblk)
 		if err != nil {
 			return err
 		}
@@ -1118,7 +1117,7 @@ func (st *internalStateImpl) writeTXs() error {
 			Tx:     txStatus.tx.Bytes(),
 			Status: txStatus.status,
 		}
-		txBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, &stx)
+		txBytes, err := GenesisCodec.Marshal(CodecVersion, &stx)
 		if err != nil {
 			return err
 		}
@@ -1142,7 +1141,7 @@ func (st *internalStateImpl) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, utxo)
+			utxoBytes, err := GenesisCodec.Marshal(CodecVersion, utxo)
 			if err != nil {
 				return err
 			}
@@ -1279,7 +1278,7 @@ func (st *internalStateImpl) loadCurrentValidators() error {
 		uptime := &currentValidatorState{
 			txID: txID,
 		}
-		if _, err := platformcodec.GenesisCodec.Unmarshal(uptimeBytes, uptime); err != nil {
+		if _, err := GenesisCodec.Unmarshal(uptimeBytes, uptime); err != nil {
 			return err
 		}
 		uptime.lastUpdated = time.Unix(int64(uptime.LastUpdated), 0)
@@ -1503,7 +1502,7 @@ func (st *internalStateImpl) shouldInit() (bool, error) {
 
 func (st *internalStateImpl) init(genesisBytes []byte) error {
 	genesis := &Genesis{}
-	if _, err := platformcodec.GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
+	if _, err := GenesisCodec.Unmarshal(genesisBytes, genesis); err != nil {
 		return err
 	}
 	if err := genesis.Initialize(); err != nil {

@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -159,12 +158,12 @@ type Genesis struct {
 
 func (g *Genesis) Initialize() error {
 	for _, tx := range g.Validators {
-		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
+		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
 		}
 	}
 	for _, tx := range g.Chains {
-		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
+		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
 		}
 	}
@@ -308,7 +307,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				Shares:       delegationFee,
 			},
 		}}
-		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
+		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -336,7 +335,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				SubnetAuth:  &secp256k1fx.Input{},
 			},
 		}}
-		if err := tx.Sign(platformcodec.GenesisCodec, nil); err != nil {
+		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
 		}
 
@@ -354,7 +353,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := platformcodec.GenesisCodec.Marshal(platformcodec.Version, genesis)
+	bytes, err := GenesisCodec.Marshal(CodecVersion, genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}

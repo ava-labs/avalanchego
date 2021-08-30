@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -292,5 +291,5 @@ func (vm *VM) newRewardValidatorTx(txID ids.ID) (*transactions.SignedTx, error) 
 			TxID: txID,
 		},
 	}}
-	return tx, tx.Sign(platformcodec.Codec, nil)
+	return tx, tx.Sign(Codec, nil)
 }

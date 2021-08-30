@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -271,9 +270,9 @@ func (vm *VM) stake(
 			amountBurned, amountStaked, fee, amount)
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers)            // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, platformcodec.Codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, platformcodec.Codec)   // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, Codec)    // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, Codec)      // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
@@ -453,7 +452,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
+		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),
@@ -501,7 +500,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
+		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),

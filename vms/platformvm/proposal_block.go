@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
@@ -88,11 +87,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &pb.Tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &pb.Tx)
+	signedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -264,7 +263,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx transactions.S
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &block)
+	bytes, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
@@ -502,13 +501,13 @@ func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, tx)
+	bytes, err := Codec.Marshal(CodecVersion, tx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var unmarshaledTx transactions.SignedTx
-	if _, err := platformcodec.Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
+	if _, err := Codec.Unmarshal(bytes, &unmarshaledTx); err != nil {
 		t.Fatal(err)
 	} else if tx.UnsignedTx.(VerifiableUnsignedAdvanceTimeTx).Time != unmarshaledTx.UnsignedTx.(VerifiableUnsignedAdvanceTimeTx).Time {
 		t.Fatal("should have same timestamp")
