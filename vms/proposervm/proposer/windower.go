@@ -67,6 +67,11 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 		w.ctx.Lock.Lock()
 		defer w.ctx.Lock.Unlock()
 	}
+
+	if validatorID == ids.ShortEmpty {
+		return MaxDelay, nil
+	}
+
 	validatorsMap, err := w.ctx.ValidatorVM.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {
 		return 0, err

@@ -7,9 +7,11 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 const (
@@ -106,20 +108,24 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return errTimeTooAdvanced
 	}
 
-	childHeight := child.Height()
+	delay := childTimestamp.Sub(parentTimestamp)
 	proposerID := child.Proposer()
+	if delay >= proposer.MaxDelay && proposerID != ids.ShortEmpty {
+		return errExpectedNoProposer
+	}
+
+	childHeight := child.Height()
 	minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
 	if err != nil {
 		return err
 	}
 
-	minTimestamp := parentTimestamp.Add(minDelay)
 	p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
 		childID, parentTimestamp, minDelay, childTimestamp)
 
-	if childTimestamp.Before(minTimestamp) {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose until %s",
-			childTimestamp, constants.NodeIDPrefix, proposerID, minTimestamp)
+	if delay < minDelay {
+		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose yet",
+			childTimestamp, constants.NodeIDPrefix, proposerID)
 		return errProposerWindowNotStarted
 	}
 

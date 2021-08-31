@@ -600,13 +600,11 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		t.Fatal("could not retrieve pChain height")
 	}
 
-	netSlb, err := statelessblock.Build(
+	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		netcoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
