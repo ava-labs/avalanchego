@@ -3732,26 +3732,89 @@ func TestBuildInvalidBlockHead(t *testing.T) {
 	}
 }
 
-func TestInvalidAndValidLogLevel(t *testing.T) {
-	issuer, vm2, dbManager, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "{\"log-level\": \"info\"}", "")
-
-	vm := &VM{}
+func initVM(t *testing.T, test struct {
+	name                     string
+	logConfig                string
+	genesisJSON, upgradeJSON string
+	expectedErr              string
+}) (*VM, error) {
+	vm, ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
 	if err := vm.Initialize(
-		NewContext(),
+		ctx,
 		dbManager,
-		[]byte(genesisJSONApricotPhase2),
+		genesisBytes,
 		[]byte(""),
-		[]byte("{\"log-level\":\"cchain\"}"),
+		[]byte(test.logConfig),
 		issuer,
 		[]*engCommon.Fx{},
-	); err == nil {
-		t.Fatal("should fail initialize due to invalid log level")
+	); err != nil {
+		return nil, err
 	}
 
-	defer func() {
-		if err := vm2.Shutdown(); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	return vm, nil
+}
+
+func TestInvalidAndValidLogLevel(t *testing.T) {
+
+	configTests := []struct {
+		name                     string
+		logConfig                string
+		genesisJSON, upgradeJSON string
+		expectedErr              string
+	}{
+		{
+			name:        "Log level info",
+			logConfig:   "{\"log-level\": \"info\"}",
+			genesisJSON: genesisJSONApricotPhase2,
+			upgradeJSON: "",
+			expectedErr: "",
+		},
+		{
+			name:        "Wrong log level",
+			logConfig:   "{\"log-level\": \"cchain\"}",
+			genesisJSON: genesisJSONApricotPhase3,
+			upgradeJSON: "",
+			expectedErr: "failed to initialize logger due to",
+		},
+	}
+	for _, test := range configTests {
+		t.Run(test.name, func(t *testing.T) {
+
+			vm, err := initVM(t, test)
+
+			if len(test.expectedErr) == 0 && err != nil {
+				t.Fatal(err)
+			} else if len(test.expectedErr) > 0 {
+				if err == nil {
+					t.Fatalf("initialize should have failed due to %s", test.expectedErr)
+				} else if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Fatalf("Expected initialize to fail due to %s, but failed with %s", test.expectedErr, err.Error())
+				}
+			}
+
+			if vm != nil {
+				defer func() {
+					shutdownChan := make(chan error, 1)
+					shutdownFunc := func() {
+						err := vm.Shutdown()
+						shutdownChan <- err
+					}
+
+					go shutdownFunc()
+					shutdownTimeout := 50 * time.Millisecond
+					ticker := time.NewTicker(shutdownTimeout)
+					select {
+					case <-ticker.C:
+						t.Fatalf("VM shutdown took longer than timeout: %v", shutdownTimeout)
+					case err := <-shutdownChan:
+						if err != nil {
+							t.Fatalf("Shutdown errored: %s", err)
+						}
+					}
+				}()
+			}
+
+		})
+	}
 
 }

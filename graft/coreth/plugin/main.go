@@ -24,7 +24,6 @@ func main() {
 		fmt.Println(evm.Version)
 		os.Exit(0)
 	}
-	// Set the Ethereum logger to debug by default
 
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: rpcchainvm.Handshake,
