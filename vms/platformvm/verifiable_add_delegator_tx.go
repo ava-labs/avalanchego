@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -63,7 +62,7 @@ func (tx VerifiableUnsignedAddDelegatorTx) SemanticVerify(
 ) {
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinDelegatorStake: vm.MinDelegatorStake,
 		MinStakeDuration:  vm.MinStakeDuration,
 		MaxStakeDuration:  vm.MaxStakeDuration,
@@ -259,13 +258,13 @@ func (vm *VM) newAddDelegatorTx(
 		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
-	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinDelegatorStake: vm.MinDelegatorStake,
 		MinStakeDuration:  vm.MinStakeDuration,
 		MaxStakeDuration:  vm.MaxStakeDuration,

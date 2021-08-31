@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
@@ -36,7 +35,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	var unsignedTx VerifiableUnsignedAddDelegatorTx
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinDelegatorStake: vm.MinDelegatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
@@ -63,7 +62,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinDelegatorStake: vm.MinDelegatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
@@ -90,7 +89,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinDelegatorStake: vm.MinDelegatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
@@ -117,7 +116,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinDelegatorStake: vm.MinDelegatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
@@ -143,7 +142,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(VerifiableUnsignedAddDelegatorTx).SyntacticallyVerified = false
 	syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinDelegatorStake: vm.MinDelegatorStake,
 		MinStakeDuration:  defaultMinStakingDuration,
 		MaxStakeDuration:  defaultMaxStakingDuration,
@@ -166,7 +165,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	} else {
 		syntacticCtx = transactions.ProposalTxSyntacticVerificationContext{
 			Ctx:               vm.ctx,
-			C:                 platformcodec.Codec,
+			C:                 Codec,
 			MinDelegatorStake: vm.MinDelegatorStake,
 			MinStakeDuration:  defaultMinStakingDuration,
 			MaxStakeDuration:  defaultMaxStakingDuration,

@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -58,7 +57,7 @@ func (tx VerifiableUnsignedAddSubnetValidatorTx) SemanticVerify(
 ) {
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:              vm.ctx,
-		C:                platformcodec.Codec,
+		C:                Codec,
 		FeeAmount:        vm.TxFee,
 		FeeAssetID:       vm.ctx.AVAXAssetID,
 		MinStakeDuration: vm.MinStakeDuration,
@@ -268,13 +267,13 @@ func (vm *VM) newAddSubnetValidatorTx(
 	}
 
 	tx := &transactions.SignedTx{UnsignedTx: utx}
-	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:              vm.ctx,
-		C:                platformcodec.Codec,
+		C:                Codec,
 		FeeAmount:        vm.TxFee,
 		FeeAssetID:       vm.ctx.AVAXAssetID,
 		MinStakeDuration: vm.MinStakeDuration,

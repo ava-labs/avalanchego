@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -22,7 +21,7 @@ type SignedTx struct {
 
 // Sign this transaction with the provided signers
 func (tx *SignedTx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(platformcodec.Version, &tx.UnsignedTx)
+	unsignedBytes, err := c.Marshal(0, &tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -43,7 +42,7 @@ func (tx *SignedTx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(platformcodec.Version, tx)
+	signedBytes, err := c.Marshal(0, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

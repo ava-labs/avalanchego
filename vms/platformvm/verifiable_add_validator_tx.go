@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -42,7 +41,7 @@ func (tx VerifiableUnsignedAddValidatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
@@ -56,7 +55,7 @@ func (tx VerifiableUnsignedAddValidatorTx) SemanticVerify(
 ) {
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  vm.MinStakeDuration,
@@ -217,12 +216,12 @@ func (vm *VM) newAddValidatorTx(
 	}
 
 	tx := &transactions.SignedTx{UnsignedTx: utx}
-	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 	syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 		Ctx:               vm.ctx,
-		C:                 platformcodec.Codec,
+		C:                 Codec,
 		MinValidatorStake: vm.MinValidatorStake,
 		MaxValidatorStake: vm.MaxValidatorStake,
 		MinStakeDuration:  vm.MinStakeDuration,

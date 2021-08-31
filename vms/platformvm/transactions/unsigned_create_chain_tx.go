@@ -45,7 +45,7 @@ type UnsignedCreateChainTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-// Verify this transactions.is well-formed
+// Verify this transaction is well-formed
 func (tx *UnsignedCreateChainTx) SyntacticVerify(synCtx DecisionTxSyntacticVerificationContext,
 ) error {
 	switch {

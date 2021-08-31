@@ -9,19 +9,18 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var (
-	errConflictingParentTxs = errors.New("block contains a transactions.that conflicts with a transactions.in a parent block")
+	errConflictingParentTxs = errors.New("block contains a transaction that conflicts with a transaction in a parent block")
 
 	_ Block    = &AtomicBlock{}
 	_ decision = &AtomicBlock{}
 )
 
-// AtomicBlock being accepted results in the atomic transactions.contained in the
+// AtomicBlock being accepted results in the atomic transaction contained in the
 // block to be accepted and committed to the chain.
 type AtomicBlock struct {
 	CommonDecisionBlock `serialize:"true"`
@@ -37,11 +36,11 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
-	unsignedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &ab.Tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &ab.Tx)
+	signedBytes, err := Codec.Marshal(CodecVersion, &ab.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -218,7 +217,7 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx transactions.Sig
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(ab)
-	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &blk)
+	bytes, err := Codec.Marshal(CodecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

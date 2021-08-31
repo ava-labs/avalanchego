@@ -6,7 +6,6 @@ package platformvm
 import (
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/gorilla/rpc/v2"
@@ -15,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
-	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/manager"
 	"github.com/ava-labs/avalanchego/ids"
@@ -34,8 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/request"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
@@ -82,58 +78,6 @@ var (
 	_ Fx                   = &secp256k1fx.Fx{}
 )
 
-func init() {
-	c := linearcodec.NewDefault()
-	platformcodec.Codec = codec.NewDefaultManager()
-	gc := linearcodec.New(reflectcodec.DefaultTagName, math.MaxUint32)
-	platformcodec.GenesisCodec = codec.NewManager(math.MaxUint32)
-
-	errs := wrappers.Errs{}
-	for _, c := range []codec.Registry{c, gc} {
-		errs.Add(
-			c.RegisterType(&ProposalBlock{}),
-			c.RegisterType(&AbortBlock{}),
-			c.RegisterType(&CommitBlock{}),
-			c.RegisterType(&StandardBlock{}),
-			c.RegisterType(&AtomicBlock{}),
-
-			// The Fx is registered here because this is the same place it is
-			// registered in the AVM. This ensures that the typeIDs match up for
-			// utxos in shared memory.
-			c.RegisterType(&secp256k1fx.TransferInput{}),
-			c.RegisterType(&secp256k1fx.MintOutput{}),
-			c.RegisterType(&secp256k1fx.TransferOutput{}),
-			c.RegisterType(&secp256k1fx.MintOperation{}),
-			c.RegisterType(&secp256k1fx.Credential{}),
-			c.RegisterType(&secp256k1fx.Input{}),
-			c.RegisterType(&secp256k1fx.OutputOwners{}),
-
-			c.RegisterType(VerifiableUnsignedAddValidatorTx{}),
-			c.RegisterType(VerifiableUnsignedAddSubnetValidatorTx{}),
-			c.RegisterType(VerifiableUnsignedAddDelegatorTx{}),
-
-			c.RegisterType(VerifiableUnsignedCreateChainTx{}),
-			c.RegisterType(VerifiableUnsignedCreateSubnetTx{}),
-
-			c.RegisterType(VerifiableUnsignedImportTx{}),
-			c.RegisterType(VerifiableUnsignedExportTx{}),
-
-			c.RegisterType(VerifiableUnsignedAdvanceTimeTx{}),
-			c.RegisterType(VerifiableUnsignedRewardValidatorTx{}),
-
-			c.RegisterType(&entities.StakeableLockIn{}),
-			c.RegisterType(&entities.StakeableLockOut{}),
-		)
-	}
-	errs.Add(
-		platformcodec.Codec.RegisterCodec(platformcodec.Version, c),
-		platformcodec.GenesisCodec.RegisterCodec(platformcodec.Version, gc),
-	)
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-}
-
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	Factory
@@ -174,9 +118,10 @@ type VM struct {
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped bool
 
-	// Contains the IDs of transactions. recently dropped because they failed verification.
-	// These txs may be re-issued and put into accepted blocks, so check the database
-	// to see if it was later committed/aborted before reporting that it's dropped.
+	// Contains the IDs of transactions recently dropped because they failed
+	// verification. These txs may be re-issued and put into accepted blocks, so
+	// check the database to see if it was later committed/aborted before
+	// reporting that it's dropped.
 	// Key: Tx ID
 	// Value: String repr. of the verification error
 	droppedTxCache cache.LRU
@@ -216,7 +161,7 @@ func (vm *VM) Initialize(
 	vm.AddressManager = avax.NewAddressManager(ctx)
 
 	// Initialize the utility to fetch atomic UTXOs
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, platformcodec.Codec)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(ctx.SharedMemory, Codec)
 
 	vm.fx = &secp256k1fx.Fx{}
 
@@ -403,7 +348,7 @@ func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.mempool.BuildBlock
 // ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 	var blk Block
-	if _, err := platformcodec.Codec.Unmarshal(b, &blk); err != nil {
+	if _, err := Codec.Unmarshal(b, &blk); err != nil {
 		return nil, err
 	}
 	if err := blk.initialize(vm, b, choices.Processing, blk); err != nil {
@@ -488,7 +433,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 
 	// decode single id
 	txID := ids.ID{}
-	_, err := platformcodec.Codec.Unmarshal(request, &txID) // TODO: cleanup way we serialize this
+	_, err := Codec.Unmarshal(request, &txID) // TODO: cleanup way we serialize this
 	if err != nil {
 		vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
@@ -509,7 +454,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 	}
 
 	// send response
-	response, err := platformcodec.Codec.Marshal(platformcodec.Version, *resTx)
+	response, err := Codec.Marshal(CodecVersion, *resTx)
 	if err != nil {
 		return err
 	}
@@ -535,13 +480,13 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 
 	// decode single tx
 	tx := &transactions.SignedTx{}
-	_, err := platformcodec.Codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
+	_, err := Codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
 	if err != nil {
 		vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
 		return err
 	}
-	unsignedBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, &tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(CodecVersion, &tx.UnsignedTx)
 	if err != nil {
 		vm.ctx.Log.Debug("AppResponse: failed unmarshalling unsignedTx from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
@@ -564,7 +509,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	case VerifiableUnsignedDecisionTx:
 		syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
 			Ctx:        vm.ctx,
-			C:          platformcodec.Codec,
+			C:          Codec,
 			FeeAmount:  vm.TxFee, // TODO: check/fix usage of TxFee below.
 			FeeAssetID: vm.ctx.AVAXAssetID,
 		}
@@ -576,7 +521,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	case VerifiableUnsignedProposalTx:
 		syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
 			Ctx:               vm.ctx,
-			C:                 platformcodec.Codec,
+			C:                 Codec,
 			MinDelegatorStake: vm.MinDelegatorStake,
 			MinStakeDuration:  vm.MinStakeDuration,
 			MaxStakeDuration:  vm.MaxStakeDuration,
@@ -589,7 +534,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	case VerifiableUnsignedAtomicTx:
 		syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
 			Ctx:        vm.ctx,
-			C:          platformcodec.Codec,
+			C:          Codec,
 			AvmID:      vm.ctx.XChainID,
 			FeeAssetID: vm.ctx.AVAXAssetID,
 			FeeAmount:  vm.TxFee,
@@ -608,7 +553,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	case nil:
 		txID := tx.ID()
 		vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		txIDBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, txID)
+		txIDBytes, err := Codec.Marshal(CodecVersion, txID)
 		if err != nil {
 			return err
 		}
@@ -637,7 +582,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 
 	// decode single id
 	txID := ids.ID{}
-	_, err := platformcodec.Codec.Unmarshal(msg, &txID) // TODO: cleanup way we serialize this
+	_, err := Codec.Unmarshal(msg, &txID) // TODO: cleanup way we serialize this
 	if err != nil {
 		vm.ctx.Log.Debug("AppGossip: failed unmarshalling message from Node %v, err %v", nodeID, err)
 		return err
@@ -835,7 +780,7 @@ func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	return earliest, nil
 }
 
-func (vm *VM) Codec() codec.Manager { return platformcodec.Codec }
+func (vm *VM) Codec() codec.Manager { return Codec }
 
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 

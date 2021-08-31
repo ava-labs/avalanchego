@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -39,7 +38,7 @@ func (tx VerifiableUnsignedImportTx) InputUTXOs() ids.Set {
 	return set
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedImportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
@@ -47,7 +46,7 @@ func (tx VerifiableUnsignedImportTx) SemanticVerify(
 ) (VersionedState, TxError) {
 	syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
 		Ctx:        vm.ctx,
-		C:          platformcodec.Codec,
+		C:          Codec,
 		AvmID:      vm.ctx.XChainID,
 		FeeAssetID: vm.ctx.AVAXAssetID,
 		FeeAmount:  vm.TxFee,
@@ -82,7 +81,7 @@ func (tx VerifiableUnsignedImportTx) SemanticVerify(
 
 		for i, utxoBytes := range allUTXOBytes {
 			utxo := &avax.UTXO{}
-			if _, err := platformcodec.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+			if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return nil, tempError{
 					fmt.Errorf("failed to unmarshal UTXO: %w", err),
 				}
@@ -113,10 +112,10 @@ func (tx VerifiableUnsignedImportTx) SemanticVerify(
 	return newState, nil
 }
 
-// Accept this transactions.and spend imported inputs
+// Accept this transaction and spend imported inputs
 // We spend imported UTXOs here rather than in semanticVerify because
 // we don't want to remove an imported UTXO in semanticVerify
-// only to have the transactions.not be Accepted. This would be inconsistent.
+// only to have the transaction not be Accepted. This would be inconsistent.
 // Recall that imported UTXOs are not kept in a versionDB.
 func (tx VerifiableUnsignedImportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
@@ -219,13 +218,13 @@ func (vm *VM) newImportTx(
 		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
-	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
 		Ctx:        vm.ctx,
-		C:          platformcodec.Codec,
+		C:          Codec,
 		AvmID:      vm.ctx.XChainID,
 		FeeAssetID: vm.ctx.AVAXAssetID,
 		FeeAmount:  vm.TxFee,

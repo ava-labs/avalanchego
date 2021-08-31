@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	sts "github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -862,7 +861,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	if vm.mempool.unissuedProposalTxs.Len() > 0 {
-		t.Fatalf("Expected there to be 0 unissued proposal transactions. after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
+		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
 	}
 }
 
@@ -1631,7 +1630,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 	vm.ctx.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
-	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, platformcodec.Codec)
+	vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(vm.ctx.SharedMemory, Codec)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
 	if _, err := vm.newImportTx(
@@ -1656,7 +1655,7 @@ func TestAtomicImport(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
+	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1730,7 +1729,7 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			}},
 		},
 	}}
-	if err := tx.Sign(platformcodec.Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
+	if err := tx.Sign(Codec, [][]*crypto.PrivateKeySECP256K1R{{}}); err != nil {
 		t.Fatal(err)
 	}
 

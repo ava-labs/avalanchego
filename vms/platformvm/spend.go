@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -62,7 +61,7 @@ func (vm *VM) stake(
 		kc.Add(key)
 	}
 
-	// Minimum time this transactions.will be issued at
+	// Minimum time this transaction will be issued at
 	now := uint64(vm.clock.Time().Unix())
 
 	ins := []*avax.TransferableInput{}
@@ -271,9 +270,9 @@ func (vm *VM) stake(
 			amountBurned, amountStaked, fee, amount)
 	}
 
-	avax.SortTransferableInputsWithSigners(ins, signers)            // sort inputs and keys
-	avax.SortTransferableOutputs(returnedOuts, platformcodec.Codec) // sort outputs
-	avax.SortTransferableOutputs(stakedOuts, platformcodec.Codec)   // sort outputs
+	avax.SortTransferableInputsWithSigners(ins, signers) // sort inputs and keys
+	avax.SortTransferableOutputs(returnedOuts, Codec)    // sort outputs
+	avax.SortTransferableOutputs(stakedOuts, Codec)      // sort outputs
 
 	return ins, returnedOuts, stakedOuts, signers, nil
 }
@@ -386,7 +385,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 		}
 	}
 
-	// Time this transactions.is being verified
+	// Time this transaction is being verified
 	now := uint64(vm.clock.Time().Unix())
 
 	// Track the amount of unlocked transfers
@@ -453,7 +452,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
+		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),
@@ -501,7 +500,7 @@ func (vm *VM) semanticVerifySpendUTXOs(
 			return permError{errUnknownOwners}
 		}
 		owner := owned.Owners()
-		ownerBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, owner)
+		ownerBytes, err := Codec.Marshal(CodecVersion, owner)
 		if err != nil {
 			return tempError{
 				fmt.Errorf("couldn't marshal owner: %w", err),

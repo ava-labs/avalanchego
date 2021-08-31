@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -72,7 +71,7 @@ func TestNewImportTx(t *testing.T) {
 				},
 			},
 		}
-		utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
+		utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,7 +107,7 @@ func TestNewImportTx(t *testing.T) {
 
 	to := ids.GenerateTestShortID()
 	for _, tt := range tests {
-		vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, platformcodec.Codec)
+		vm.AtomicUTXOManager = avax.NewAtomicUTXOManager(tt.sharedMemory, Codec)
 		tx, err := vm.newImportTx(avmID, to, tt.recipientKeys, ids.ShortEmpty)
 		if err != nil {
 			if !tt.shouldErr {

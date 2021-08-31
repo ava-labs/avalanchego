@@ -23,7 +23,6 @@ const (
 	Syncing
 )
 
-// MarshalJSON ...
 func (s BlockchainStatus) MarshalJSON() ([]byte, error) {
 	if err := s.Valid(); err != nil {
 		return nil, err
@@ -31,7 +30,6 @@ func (s BlockchainStatus) MarshalJSON() ([]byte, error) {
 	return []byte("\"" + s.String() + "\""), nil
 }
 
-// UnmarshalJSON ...
 func (s *BlockchainStatus) UnmarshalJSON(b []byte) error {
 	str := string(b)
 	if str == "null" {
@@ -47,7 +45,7 @@ func (s *BlockchainStatus) UnmarshalJSON(b []byte) error {
 	case "\"Syncing\"":
 		*s = Syncing
 	default:
-		return ErrUnknown
+		return errUnknownBlockchainStatus
 	}
 	return nil
 }

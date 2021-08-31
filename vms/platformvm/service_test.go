@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -219,7 +218,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := platformcodec.Codec.Marshal(platformcodec.Version, utxo)
+	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +234,7 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	oldAtomicUTXOManager := service.vm.AtomicUTXOManager
-	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, platformcodec.Codec)
+	newAtomicUTXOManager := avax.NewAtomicUTXOManager(sm, Codec)
 
 	service.vm.AtomicUTXOManager = newAtomicUTXOManager
 	tx, err := service.vm.newImportTx(avmID, ids.ShortEmpty, []*crypto.PrivateKeySECP256K1R{recipientKey}, ids.ShortEmpty)
@@ -501,7 +500,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = platformcodec.Codec.Unmarshal(outputBytes, &output)
+		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -528,7 +527,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = platformcodec.Codec.Unmarshal(outputBytes, &output)
+		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -574,7 +573,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = platformcodec.Codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
@@ -616,7 +615,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = platformcodec.Codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected

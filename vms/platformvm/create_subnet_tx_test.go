@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
@@ -73,7 +72,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 				},
 			}
 			tx := &transactions.SignedTx{UnsignedTx: utx}
-			err = tx.Sign(platformcodec.Codec, signers)
+			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
 			vs := newVersionedState(

@@ -7,7 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
 
-// UnsignedAdvanceTimeTx is a transactions.to increase the chain's timestamp.
+// UnsignedAdvanceTimeTx is a transaction to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
 // followed by a commit block) the staker set is also updated accordingly.
 // It must be that:

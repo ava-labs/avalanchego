@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -22,7 +21,7 @@ type VerifiableUnsignedCreateChainTx struct {
 	*transactions.UnsignedCreateChainTx `serialize:"true"`
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx VerifiableUnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
@@ -31,7 +30,7 @@ func (tx VerifiableUnsignedCreateChainTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	// Make sure this transactions.is well formed.
+	// Make sure this transaction is well formed.
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}
@@ -40,7 +39,7 @@ func (tx VerifiableUnsignedCreateChainTx) SemanticVerify(
 	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
 	syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
 		Ctx:        vm.ctx,
-		C:          platformcodec.Codec,
+		C:          Codec,
 		FeeAmount:  createBlockchainTxFee,
 		FeeAssetID: vm.ctx.AVAXAssetID,
 	}
@@ -138,13 +137,13 @@ func (vm *VM) newCreateChainTx(
 		},
 	}
 	tx := &transactions.SignedTx{UnsignedTx: utx}
-	if err := tx.Sign(platformcodec.Codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
 		Ctx:        vm.ctx,
-		C:          platformcodec.Codec,
+		C:          Codec,
 		FeeAmount:  createBlockchainTxFee,
 		FeeAssetID: vm.ctx.AVAXAssetID,
 	}

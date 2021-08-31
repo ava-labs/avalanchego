@@ -15,12 +15,12 @@ var (
 	ErrInputsNotSortedUnique = errors.New("inputs not sorted and unique")
 )
 
-// BaseTx contains fields common to many transactions.types. It should be
-// embedded in transactions.implementations.
+// BaseTx contains fields common to many transaction types. It should be
+// embedded in transaction implementations.
 type BaseTx struct {
 	avax.BaseTx `serialize:"true" json:"inputs"`
 
-	// true iff this transactions.has already passed syntactic verification
+	// true iff this transaction has already passed syntactic verification
 	SyntacticallyVerified bool
 }
 

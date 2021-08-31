@@ -7,7 +7,7 @@ import (
 	"errors"
 )
 
-var ErrUnknown = errors.New("unknown status")
+var errUnknownStatus = errors.New("unknown status")
 
 type Status uint32
 
@@ -16,7 +16,7 @@ type Status uint32
 // [Committed] Reached finality
 // [Aborted] Block proposal was aborted
 // [Processing] Not found in the db but is in the preferred blocks db
-// [Dropped] The transactions.was dropped most likely because it was invalid
+// [Dropped] The transaction was dropped most likely because it was invalid
 const (
 	Unknown    Status = 0
 	Committed  Status = 4
@@ -49,7 +49,7 @@ func (s *Status) UnmarshalJSON(b []byte) error {
 	case "\"Dropped\"":
 		*s = Dropped
 	default:
-		return ErrUnknown
+		return errUnknownStatus
 	}
 	return nil
 }
@@ -60,7 +60,7 @@ func (s Status) Valid() error {
 	case Unknown, Committed, Aborted, Processing, Dropped:
 		return nil
 	default:
-		return ErrUnknown
+		return errUnknownStatus
 	}
 }
 

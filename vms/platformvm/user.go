@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/encdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 )
 
 // Key in the database whose corresponding value is the list of
@@ -48,7 +47,7 @@ func (u *user) getAddresses() ([]ids.ShortID, error) {
 		return nil, err
 	}
 	addresses := []ids.ShortID{}
-	if _, err := platformcodec.GenesisCodec.Unmarshal(bytes, &addresses); err != nil {
+	if _, err := GenesisCodec.Unmarshal(bytes, &addresses); err != nil {
 		return nil, err
 	}
 	return addresses, nil
@@ -92,7 +91,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		}
 	}
 	addresses = append(addresses, address)
-	bytes, err := platformcodec.Codec.Marshal(platformcodec.Version, addresses)
+	bytes, err := Codec.Marshal(CodecVersion, addresses)
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,7 @@ type UnsignedCreateSubnetTx struct {
 	Owner verify.Verifiable `serialize:"true" json:"owner"`
 }
 
-// Verify this transactions.is well-formed
+// Verify this transaction is well-formed
 func (tx *UnsignedCreateSubnetTx) SyntacticVerify(synCtx DecisionTxSyntacticVerificationContext,
 ) error {
 	switch {

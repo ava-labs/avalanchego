@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/platformcodec"
 	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
@@ -25,7 +24,7 @@ type TimedTx interface {
 // their startTime or their endTime. If SortByStartTime == true, the first
 // element of [Txs] is the tx in the heap with the earliest startTime. Otherwise
 // the first element is the tx with earliest endTime. The default value of this
-// struct will order transactions. by endTime. This struct implements the heap
+// struct will order transactions by endTime. This struct implements the heap
 // interface.
 // Transactions must be syntactically verified before adding to EventHeap to
 // ensure that EventHeap can always by marshalled.
@@ -65,7 +64,7 @@ func (h *EventHeap) Less(i, j int) bool {
 }
 func (h *EventHeap) Swap(i, j int) { h.Txs[i], h.Txs[j] = h.Txs[j], h.Txs[i] }
 
-// Timestamp returns the timestamp on the top transactions.on the heap
+// Timestamp returns the timestamp on the top transaction on the heap
 func (h *EventHeap) Timestamp() time.Time {
 	tx := h.Txs[0].UnsignedTx.(TimedTx)
 	if h.SortByStartTime {
@@ -93,5 +92,5 @@ func (h *EventHeap) Pop() interface{} {
 
 // Bytes returns the byte representation of this heap
 func (h *EventHeap) Bytes() ([]byte, error) {
-	return platformcodec.Codec.Marshal(platformcodec.Version, h)
+	return Codec.Marshal(CodecVersion, h)
 }
