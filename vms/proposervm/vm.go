@@ -179,7 +179,12 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 	// reset scheduler
 	minDelay, err := vm.Windower.Delay(prefBlk.Height()+1, pChainHeight, vm.ctx.NodeID)
 	if err != nil {
-		return err
+		vm.ctx.Log.Debug("failed to fetch the expected delay due to: %s", err)
+		// A nil error is returned here because it is possible that
+		// bootstrapping caused the last accepted block to move past the latest
+		// P-chain height. This will cause building blocks to return an error
+		// until the P-chain's height has advanced.
+		return nil
 	}
 
 	nextStartTime := prefBlk.Timestamp().Add(minDelay)

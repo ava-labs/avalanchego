@@ -71,19 +71,6 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return errPChainHeightNotMonotonic
 	}
 
-	childID := child.ID()
-	currentPChainHeight, err := p.vm.PChainHeight()
-	if err != nil {
-		p.vm.ctx.Log.Error("Snowman++ verify - dropped post-fork block %s; could not retrieve current P-Chain height",
-			childID)
-		return err
-	}
-	if childPChainHeight > currentPChainHeight {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
-			currentPChainHeight, childPChainHeight)
-		return errPChainHeightNotReached
-	}
-
 	expectedInnerParentID := p.innerBlk.ID()
 	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
@@ -106,26 +93,43 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return errTimeTooAdvanced
 	}
 
-	childHeight := child.Height()
-	proposerID := child.Proposer()
-	minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-	if err != nil {
-		return err
-	}
+	// If the node is currently bootstrapping - we don't assume that the P-chain
+	// has been synced up to this point yet.
+	if p.vm.ctx.IsBootstrapped() {
+		childID := child.ID()
+		currentPChainHeight, err := p.vm.PChainHeight()
+		if err != nil {
+			p.vm.ctx.Log.Error("Snowman++ verify - dropped post-fork block %s; could not retrieve current P-Chain height",
+				childID)
+			return err
+		}
+		if childPChainHeight > currentPChainHeight {
+			p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
+				currentPChainHeight, childPChainHeight)
+			return errPChainHeightNotReached
+		}
 
-	minTimestamp := parentTimestamp.Add(minDelay)
-	p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		childID, parentTimestamp, minDelay, childTimestamp)
+		childHeight := child.Height()
+		proposerID := child.Proposer()
+		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
+		if err != nil {
+			return err
+		}
 
-	if childTimestamp.Before(minTimestamp) {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose until %s",
-			childTimestamp, constants.NodeIDPrefix, proposerID, minTimestamp)
-		return errProposerWindowNotStarted
-	}
+		minTimestamp := parentTimestamp.Add(minDelay)
+		p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
+			childID, parentTimestamp, minDelay, childTimestamp)
 
-	// Verify the signature of the node
-	if err := child.Block.Verify(); err != nil {
-		return err
+		if childTimestamp.Before(minTimestamp) {
+			p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose until %s",
+				childTimestamp, constants.NodeIDPrefix, proposerID, minTimestamp)
+			return errProposerWindowNotStarted
+		}
+
+		// Verify the signature of the node
+		if err := child.Block.Verify(); err != nil {
+			return err
+		}
 	}
 
 	return p.vm.verifyAndRecordInnerBlk(child)
