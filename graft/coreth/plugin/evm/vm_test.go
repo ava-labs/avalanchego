@@ -3731,3 +3731,27 @@ func TestBuildInvalidBlockHead(t *testing.T) {
 		t.Fatal("current block changed")
 	}
 }
+
+func TestInvalidAndValidLogLevel(t *testing.T) {
+	issuer, vm2, dbManager, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "{\"log-level\": \"info\"}", "")
+
+	vm := &VM{}
+	if err := vm.Initialize(
+		NewContext(),
+		dbManager,
+		[]byte(genesisJSONApricotPhase2),
+		[]byte(""),
+		[]byte("{\"log-level\":\"cchain\"}"),
+		issuer,
+		[]*engCommon.Fx{},
+	); err == nil {
+		t.Fatal("should fail initialize due to invalid log level")
+	}
+
+	defer func() {
+		if err := vm2.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+}

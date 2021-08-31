@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -325,6 +326,22 @@ func (vm *VM) Initialize(
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
+
+	//Set log level
+
+	defaultLogLevel := log.LvlDebug
+	if vm.config.LogLevel != "" {
+		logLevel, err := log.LvlFromString(vm.config.LogLevel)
+
+		if err != nil {
+			return fmt.Errorf("failed to initialize logger due to: %w ", err)
+		}
+
+		defaultLogLevel = logLevel
+
+	}
+
+	log.Root().SetHandler(log.LvlFilterHandler(defaultLogLevel, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
