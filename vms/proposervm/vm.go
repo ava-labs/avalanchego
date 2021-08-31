@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -58,7 +59,6 @@ func New(vm block.ChainVM, activationTime time.Time) *VM {
 	}
 }
 
-// common.VM interface implementation
 func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
@@ -86,7 +86,7 @@ func (vm *VM) Initialize(
 
 	vm.verifiedBlocks = make(map[ids.ID]Block)
 
-	return vm.ChainVM.Initialize(
+	err := vm.ChainVM.Initialize(
 		ctx,
 		dbManager,
 		genesisBytes,
@@ -96,6 +96,70 @@ func (vm *VM) Initialize(
 		fxs,
 		appSender,
 	)
+	if err != nil {
+		return err
+	}
+
+	return vm.repairAcceptedChain()
+}
+
+func (vm *VM) repairAcceptedChain() error {
+	lastAcceptedID, err := vm.GetLastAccepted()
+	if err == database.ErrNotFound {
+		// If the last accepted block isn't indexed yet, then the underlying
+		// chain is the only chain and there is nothing to repair.
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	var toAccept []snowman.Block
+	for {
+		var (
+			shouldBeAccepted snowman.Block
+			parentID         ids.ID
+		)
+
+		// We fetch the proposervm blocks rather than relying on the underlying
+		// VM blocks to ensure that we don't run into the case that the
+		// proposervm has accepted a block where the underlying vm doesn't have
+		// a reference to the inner block.
+		lastAcceptedPostForkBlock, err := vm.getPostForkBlock(lastAcceptedID)
+		switch err {
+		case nil:
+			shouldBeAccepted = lastAcceptedPostForkBlock.getInnerBlk()
+			parentID = lastAcceptedPostForkBlock.Parent()
+		case errUnexpectedBlockType, database.ErrNotFound:
+			lastAcceptedPostForkOption, err := vm.getPostForkOption(lastAcceptedID)
+			if err != nil {
+				return err
+			}
+			shouldBeAccepted = lastAcceptedPostForkOption.getInnerBlk()
+			parentID = lastAcceptedPostForkOption.Parent()
+		default:
+			return err
+		}
+
+		// If the inner block is accepted, then we shouldn't need to accept any
+		// of its parents.
+		if shouldBeAccepted.Status() == choices.Accepted {
+			break
+		}
+		toAccept = append(toAccept, shouldBeAccepted)
+		lastAcceptedID = parentID
+	}
+
+	for i := len(toAccept) - 1; i >= 0; i-- {
+		innerBlock := toAccept[i]
+		if err := innerBlock.Verify(); err != nil {
+			return fmt.Errorf("repairing failed due to failed verification with: %w", err)
+		}
+		if err := innerBlock.Accept(); err != nil {
+			return fmt.Errorf("repairing failed due to failed acceptance with: %w", err)
+		}
+	}
+	return nil
 }
 
 func (vm *VM) verifyAndRecordInnerBlk(postFork Block) error {
@@ -115,7 +179,6 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork Block) error {
 	return nil
 }
 
-// block.ChainVM interface implementation
 func (vm *VM) BuildBlock() (snowman.Block, error) {
 	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now())
 	preferredBlock, err := vm.getBlock(vm.preferred)
