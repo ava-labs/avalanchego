@@ -67,7 +67,7 @@ type Config struct {
 	KeystoreExternalSigner        string `json:"keystore-external-signer"`
 	KeystoreInsecureUnlockAllowed bool   `json:"keystore-insecure-unlock-allowed"`
 
-	//Log level
+	// Log level
 	LogLevel string `json:"log-level"`
 }
 
