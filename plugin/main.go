@@ -24,7 +24,6 @@ func main() {
 		fmt.Println(evm.Version)
 		os.Exit(0)
 	}
-
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: rpcchainvm.Handshake,
 		Plugins: map[string]plugin.Plugin{
