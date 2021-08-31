@@ -39,3 +39,24 @@ func TestBuild(t *testing.T) {
 	err = builtBlock.Verify()
 	assert.NoError(err)
 }
+
+func TestBuildUnsigned(t *testing.T) {
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	innerBlockBytes := []byte{3}
+
+	assert := assert.New(t)
+
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	assert.NoError(err)
+
+	assert.Equal(parentID, builtBlock.ParentID())
+	assert.Equal(pChainHeight, builtBlock.PChainHeight())
+	assert.Equal(timestamp, builtBlock.Timestamp())
+	assert.Equal(innerBlockBytes, builtBlock.Block())
+	assert.Equal(ids.ShortEmpty, builtBlock.Proposer())
+
+	err = builtBlock.Verify()
+	assert.NoError(err)
+}

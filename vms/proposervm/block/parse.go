@@ -25,6 +25,10 @@ func Parse(bytes []byte) (Block, error) {
 	}
 
 	block.timestamp = time.Unix(block.StatelessBlock.Timestamp, 0)
+	if len(block.StatelessBlock.Certificate) == 0 {
+		return &block, nil
+	}
+
 	cert, err := x509.ParseCertificate(block.StatelessBlock.Certificate)
 	if err != nil {
 		return nil, err
