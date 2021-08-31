@@ -13,7 +13,7 @@ import (
 var (
 	errNoValidators = errors.New("no validators")
 
-	_ validators.VM = &testVM{}
+	_ validators.State = &testVM{}
 )
 
 type testVM struct {

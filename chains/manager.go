@@ -193,7 +193,7 @@ type manager struct {
 	chains map[ids.ID]*router.Handler
 
 	// snowman++ related interface to allow validators retrival
-	validatorVM validators.VM
+	validatorVM validators.State
 }
 
 // New returns a new Manager
@@ -654,12 +654,18 @@ func (m *manager) createSnowmanChain(
 
 	// first vm to be init is P-Chain once, which provides validator interface to all ProposerVMs
 	if m.validatorVM == nil {
-		if valVM, ok := vm.(validators.VM); ok {
-			m.validatorVM = valVM
-			ctx.ValidatorVM = valVM
-		} else {
+		valVM, ok := vm.(validators.State)
+		if !ok {
 			return nil, fmt.Errorf("could not record validator vm interface")
 		}
+
+		// Initialize the validator state for future chains.
+		m.validatorVM = validators.NewLockedState(&ctx.Lock, valVM)
+
+		// Notice that this context is left unlocked. This is because the
+		// lock will already be held when accessing these values on the
+		// P-chain.
+		ctx.ValidatorVM = valVM
 	}
 
 	if vmPlus, ok := vm.(block.SnowmanPlusPlusVM); ok {

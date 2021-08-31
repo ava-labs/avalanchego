@@ -44,7 +44,7 @@ func init() {
 	}
 }
 
-func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *validators.TestVM, *VM, *snowman.TestBlock) {
+func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *validators.TestState, *VM, *snowman.TestBlock) {
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -80,7 +80,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 
 	proVM := New(coreVM, proBlkStartTime)
 
-	valVM := &validators.TestVM{
+	valVM := &validators.TestState{
 		T: t,
 	}
 	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }

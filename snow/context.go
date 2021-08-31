@@ -79,7 +79,7 @@ type Context struct {
 	bootstrapped uint32
 
 	// snowman++ attributes
-	ValidatorVM       validators.VM     // interface for P-Chain validators
+	ValidatorVM       validators.State  // interface for P-Chain validators
 	StakingLeafSigner crypto.Signer     // block signer
 	StakingCertLeaf   *x509.Certificate // block certificate
 }
