@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/option"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 var _ Block = &postForkOption{}
@@ -150,14 +151,24 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	// Build the child
-	statelessChild, err := block.Build(
-		parentID,
-		newTimestamp,
-		pChainHeight,
-		b.vm.ctx.StakingCertLeaf,
-		innerBlock.Bytes(),
-		b.vm.ctx.StakingLeafSigner,
-	)
+	var statelessChild block.Block
+	if minDelay < proposer.MaxDelay {
+		statelessChild, err = block.Build(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			b.vm.ctx.StakingCertLeaf,
+			innerBlock.Bytes(),
+			b.vm.ctx.StakingLeafSigner,
+		)
+	} else {
+		statelessChild, err = block.BuildUnsigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			innerBlock.Bytes(),
+		)
+	}
 	if err != nil {
 		return nil, err
 	}

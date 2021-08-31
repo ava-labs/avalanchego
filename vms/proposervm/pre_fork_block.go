@@ -173,13 +173,11 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		return nil, err
 	}
 
-	statelessBlock, err := block.Build(
+	statelessBlock, err := block.BuildUnsigned(
 		parentID,
 		newTimestamp,
 		pChainHeight,
-		b.vm.ctx.StakingCertLeaf,
 		innerBlock.Bytes(),
-		b.vm.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		return nil, err
