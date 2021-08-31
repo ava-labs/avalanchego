@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -54,19 +53,11 @@ func New(ctx *snow.Context, subnetID, chainID ids.ID) Windower {
 }
 
 func (w *windower) PChainHeight() (uint64, error) {
-	if w.subnetID != constants.PrimaryNetworkID || w.chainID != constants.PlatformChainID {
-		w.ctx.Lock.Lock()
-		defer w.ctx.Lock.Unlock()
-	}
 	return w.ctx.ValidatorVM.GetCurrentHeight()
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
 	// get the validator set by the p-chain height
-	if w.subnetID != constants.PrimaryNetworkID || w.chainID != constants.PlatformChainID {
-		w.ctx.Lock.Lock()
-		defer w.ctx.Lock.Unlock()
-	}
 	validatorsMap, err := w.ctx.ValidatorVM.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {
 		return 0, err
