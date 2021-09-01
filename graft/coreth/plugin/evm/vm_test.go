@@ -3790,24 +3790,22 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 				}
 			}
 			if vm != nil {
-				func() {
-					shutdownChan := make(chan error, 1)
-					shutdownFunc := func() {
-						err := vm.Shutdown()
-						shutdownChan <- err
+				shutdownChan := make(chan error, 1)
+				shutdownFunc := func() {
+					err := vm.Shutdown()
+					shutdownChan <- err
+				}
+				go shutdownFunc()
+				shutdownTimeout := 50 * time.Millisecond
+				ticker := time.NewTicker(shutdownTimeout)
+				select {
+				case <-ticker.C:
+					t.Fatalf("VM shutdown took longer than timeout: %v", shutdownTimeout)
+				case err := <-shutdownChan:
+					if err != nil {
+						t.Fatalf("Shutdown errored: %s", err)
 					}
-					go shutdownFunc()
-					shutdownTimeout := 50 * time.Millisecond
-					ticker := time.NewTicker(shutdownTimeout)
-					select {
-					case <-ticker.C:
-						t.Fatalf("VM shutdown took longer than timeout: %v", shutdownTimeout)
-					case err := <-shutdownChan:
-						if err != nil {
-							t.Fatalf("Shutdown errored: %s", err)
-						}
-					}
-				}()
+				}
 			}
 
 		})
