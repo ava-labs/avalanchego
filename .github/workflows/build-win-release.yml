@@ -44,8 +44,11 @@ jobs:
         mv .\build\plugins\evm .\build\plugins\evm.exe
         Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
     - name: Copy to s3
       run: aws s3 cp .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip s3://${{ secrets.BUCKET }}/windows/avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
