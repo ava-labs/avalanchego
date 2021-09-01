@@ -42,6 +42,12 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+var (
+	key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	addr   = crypto.PubkeyToAddress(key.PublicKey)
+	bal, _ = new(big.Int).SetString("100000000000000000000000", 10)
+)
+
 type testBackend struct {
 	chain *core.BlockChain
 }
@@ -64,63 +70,18 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 	return b.chain.Config()
 }
 
-func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int, numTxs int) *testBackend {
-	var (
-		key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		addr   = crypto.PubkeyToAddress(key.PublicKey)
-		bal, _ = new(big.Int).SetString("100000000000000000000000", 10)
-		gspec  = &core.Genesis{
-			Config: params.TestChainConfig,
-			Alloc:  core.GenesisAlloc{addr: {Balance: bal}},
-		}
-		signer = types.LatestSigner(gspec.Config)
-	)
-	if apricotPhase3BlockTimestamp != nil {
-		gspec.Config.ApricotPhase3BlockTimestamp = apricotPhase3BlockTimestamp
-		signer = types.LatestSigner(gspec.Config)
-	} else {
-		gspec.Config.ApricotPhase3BlockTimestamp = nil
-		gspec.Config.ApricotPhase4BlockTimestamp = nil
+func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
+	var gspec = &core.Genesis{
+		Config: config,
+		Alloc:  core.GenesisAlloc{addr: core.GenesisAccount{Balance: bal}},
 	}
+
 	engine := dummy.NewFakerSkipBlockFee()
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
 
 	// Generate testing blocks
-	blocks, _ := core.GenerateChain(gspec.Config, genesis, engine, db, 32, func(i int, b *core.BlockGen) {
-		b.SetCoinbase(common.Address{1})
-
-		for tc := 0; tc < numTxs; tc++ {
-			var tx *types.Transaction
-			if apricotPhase3BlockTimestamp != nil && b.Number().Cmp(apricotPhase3BlockTimestamp) >= 0 {
-				txdata := &types.DynamicFeeTx{
-					ChainID:   gspec.Config.ChainID,
-					Nonce:     b.TxNonce(addr),
-					To:        &common.Address{},
-					Gas:       params.TxGas,
-					GasFeeCap: big.NewInt(500 * params.GWei),
-					GasTipCap: big.NewInt(int64(i+1) * params.GWei),
-					Data:      []byte{},
-				}
-				tx = types.NewTx(txdata)
-			} else {
-				txdata := &types.LegacyTx{
-					Nonce:    b.TxNonce(addr),
-					To:       &common.Address{},
-					Gas:      params.TxGas,
-					GasPrice: big.NewInt(int64(i+500) * params.GWei),
-					Value:    big.NewInt(100),
-					Data:     []byte{},
-				}
-				tx = types.NewTx(txdata)
-			}
-			tx, err := types.SignTx(tx, signer, key)
-			if err != nil {
-				t.Fatalf("failed to create tx: %v", err)
-			}
-			b.AddTx(tx)
-		}
-	})
+	blocks, _ := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, genBlocks)
 	// Construct testing chain
 	diskdb := rawdb.NewMemoryDatabase()
 	gspec.Commit(diskdb)
@@ -142,63 +103,60 @@ func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {
 	return b.chain.GetBlockByNumber(number)
 }
 
-func TestSuggestTipCapSmallBlocks(t *testing.T) {
-	config := Config{
-		Blocks:     3,
-		Percentile: 60,
-	}
-	var cases = []struct {
-		fork   *big.Int // ApricotPhase3BlockTimestamp
-		expect *big.Int // Expected gasprice suggestion
-	}{
-		{nil, big.NewInt(params.GWei * int64(225))},
-		{big.NewInt(0), big.NewInt(0)},  // Fork point in genesis
-		{big.NewInt(1), big.NewInt(0)},  // Fork point in first block
-		{big.NewInt(32), big.NewInt(0)}, // Fork point in last block
-		{big.NewInt(33), big.NewInt(0)}, // Fork point in the future
-	}
-	for _, c := range cases {
-		backend := newTestBackend(t, c.fork, 1)
-		oracle := NewOracle(backend, config)
-
-		// The gas price sampled is: 32G, 31G, 30G, 29G, 28G, 27G
-		got, err := oracle.SuggestTipCap(context.Background())
-		if err != nil {
-			t.Fatalf("Failed to retrieve recommended gas price: %v", err)
-		}
-		if got.Cmp(c.expect) != 0 {
-			t.Fatalf("Gas price mismatch, want %d, got %d, with fork: %d", c.expect, got, c.fork)
-		}
-	}
+type suggestTipCapTest struct {
+	chainConfig *params.ChainConfig
+	numBlocks   int
+	genBlock    func(i int, b *core.BlockGen)
+	expectedTip *big.Int
 }
 
-func TestSuggestTipCapLargeBlocks(t *testing.T) {
+func TestSuggestTipCap(t *testing.T) {
 	config := Config{
 		Blocks:     3,
 		Percentile: 60,
 	}
-	// TODO(aaronbuchwald) review modified test cases
-	var cases = []struct {
-		fork   *big.Int // ApricotPhase3BlockTimestamp
-		expect *big.Int // Expected gasprice suggestion
-	}{
-		{nil, big.NewInt(params.GWei * int64(225))},
-		{big.NewInt(0), big.NewInt(31000000000)},   // Fork point in genesis
-		{big.NewInt(1), big.NewInt(31000000000)},   // Fork point in first block
-		{big.NewInt(32), big.NewInt(150000000000)}, // Fork point in last block
-		{big.NewInt(33), big.NewInt(150000000000)}, // Fork point in the future
+	tests := map[string]suggestTipCapTest{
+		"apricot phase 4": {
+			chainConfig: params.TestChainConfig,
+			expectedTip: big.NewInt(0),
+		},
+		"apricot phase 3": {
+			chainConfig: params.TestApricotPhase3Config,
+			expectedTip: big.NewInt(0),
+		},
+		"apricot phase 2": {
+			chainConfig: params.TestApricotPhase2Config,
+			expectedTip: big.NewInt(params.ApricotPhase1MinGasPrice),
+		},
+		"apricot phase 1": {
+			chainConfig: params.TestApricotPhase1Config,
+			expectedTip: big.NewInt(params.ApricotPhase1MinGasPrice),
+		},
+		"launch": {
+			chainConfig: params.TestLaunchConfig,
+			expectedTip: big.NewInt(params.LaunchMinGasPrice),
+		},
+		// TODO
+		// ensure tips below ignore price are not included
+		// ensure average of tips is correct
+		// ensure legacy transactions are handled correctly
+		// ensure tips are time based - this should be updated in the actual calculation as well
 	}
-	for _, c := range cases {
-		backend := newTestBackend(t, c.fork, 40)
-		oracle := NewOracle(backend, config)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if test.genBlock == nil {
+				test.genBlock = func(i int, b *core.BlockGen) {}
+			}
+			backend := newTestBackend(t, test.chainConfig, test.numBlocks, test.genBlock)
+			oracle := NewOracle(backend, config)
 
-		// The gas price sampled is: 32G, 31G, 30G, 29G, 28G, 27G
-		got, err := oracle.SuggestTipCap(context.Background())
-		if err != nil {
-			t.Fatalf("Failed to retrieve recommended gas price: %v", err)
-		}
-		if got.Cmp(c.expect) != 0 {
-			t.Fatalf("Gas price mismatch, want %d, got %d, with fork: %d", c.expect, got, c.fork)
-		}
+			got, err := oracle.SuggestTipCap(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Cmp(test.expectedTip) != 0 {
+				t.Fatalf("Expected tip (%d), got tip (%d)", test.expectedTip, got)
+			}
+		})
 	}
 }
