@@ -16,11 +16,16 @@ import (
 )
 
 var (
-	MaxBaseFee          = big.NewInt(params.ApricotPhase3MaxBaseFee)
-	MinBaseFee          = big.NewInt(params.ApricotPhase3MinBaseFee)
-	TargetGas    uint64 = 10_000_000
-	BlockGasFee  uint64 = 1_000_000
-	rollupWindow uint64 = 10
+	MaxBaseFee                         = big.NewInt(params.ApricotPhase3MaxBaseFee)
+	MinBaseFee                         = big.NewInt(params.ApricotPhase3MinBaseFee)
+	TargetGas                   uint64 = 10_000_000
+	ApricotPhase3BlockGasFee    uint64 = 1_000_000
+	ApricotPhase4MaxBlockGasFee uint64 = 1_000_000
+	rollupWindow                uint64 = 10
+	// the amount of time after a parent block was issued that a block fee
+	// exists
+	ApricotPhase4BlockGasFeeDuration uint64 = 20 // in seconds
+	ApricotPhase4MaxBlockFee                = new(big.Int).SetUint64(ApricotPhase4MaxBlockGasFee)
 )
 
 // CalcBaseFee takes the previous header and the timestamp of its child block
@@ -30,7 +35,8 @@ var (
 func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
-	if !config.IsApricotPhase3(new(big.Int).SetUint64(parent.Time)) || parent.Number.Cmp(common.Big0) == 0 {
+	bigTimestamp := new(big.Int).SetUint64(parent.Time)
+	if !config.IsApricotPhase3(bigTimestamp) || parent.Number.Cmp(common.Big0) == 0 {
 		initialSlice := make([]byte, params.ApricotPhase3ExtraDataSize)
 		initialBaseFee := big.NewInt(params.ApricotPhase3InitialBaseFee)
 		return initialSlice, initialBaseFee, nil
@@ -62,7 +68,16 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// If the parent consumed gas within the rollup window, add the consumed
 	// gas in.
 	if roll < rollupWindow {
-		addedGas, overflow := math.SafeAdd(parent.GasUsed, BlockGasFee)
+		var blockFee uint64
+		switch {
+		// If ApricotPhase4 is enabled, use the updated block fee calculation.
+		case config.IsApricotPhase4(bigTimestamp):
+			blockFee = calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp).Uint64()
+		// Otherwise, use the constant
+		default:
+			blockFee = ApricotPhase3BlockGasFee
+		}
+		addedGas, overflow := math.SafeAdd(parent.GasUsed, blockFee)
 		if overflow {
 			addedGas = math.MaxUint64
 		}
@@ -197,4 +212,30 @@ func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
 		totalGasConsumed = math.MaxUint64
 	}
 	binary.BigEndian.PutUint64(window[start:], totalGasConsumed)
+}
+
+// calcBlockFee calculates the required block fee
+// assumes that [currentTime >= parentTime]
+func calcBlockFee(maxBlockFee *big.Int, blockFeeDuration, parentTime, currentTime uint64) *big.Int {
+	timeElapsed := currentTime - parentTime
+	// If [blockFeeDuration] has already expired, set the block fee to 0
+	if timeElapsed > blockFeeDuration {
+		return big.NewInt(0)
+	}
+
+	// requiredBlockGasFee = (maxBlockGasFee * (blockFeeDuration - timeElapsed)) / blockFeeDuration
+	bigBlockFeeDuration := new(big.Int).SetUint64(blockFeeDuration)
+	feeTimeRemaining := new(big.Int).Sub(
+		bigBlockFeeDuration,
+		new(big.Int).SetUint64(timeElapsed),
+	)
+	requiredBlockGasFeeNum := new(big.Int).Mul(
+		maxBlockFee,
+		feeTimeRemaining,
+	)
+	requiredBlockGasFee := new(big.Int).Div(
+		requiredBlockGasFeeNum,
+		bigBlockFeeDuration,
+	)
+	return requiredBlockGasFee
 }
