@@ -940,7 +940,7 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 	newErrs, dirtyAddrs := pool.addTxsLocked(news, local)
 	pool.mu.Unlock()
 
-	nilSlot := 0
+	var nilSlot = 0
 	for _, err := range newErrs {
 		for errs[nilSlot] != nil {
 			nilSlot++
