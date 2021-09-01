@@ -6,6 +6,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ State = &lockedState{}
+
 // State allows the lookup of validator sets on specified subnets at the
 // requested P-chain height.
 type State interface {
