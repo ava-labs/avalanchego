@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -484,7 +483,7 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 	return append(allNodeAllocations, currentNodeAllocation)
 }
 
-func VMGenesis(genesisBytes []byte, vmID ids.ID) (*transactions.SignedTx, error) {
+func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platformvm.Tx, error) {
 	genesis := platformvm.Genesis{}
 	if _, err := platformvm.GenesisCodec.Unmarshal(genesisBytes, &genesis); err != nil {
 		return nil, fmt.Errorf("couldn't unmarshal genesis bytes due to: %w", err)
@@ -493,7 +492,7 @@ func VMGenesis(genesisBytes []byte, vmID ids.ID) (*transactions.SignedTx, error)
 		return nil, err
 	}
 	for _, chain := range genesis.Chains {
-		uChain := chain.UnsignedTx.(platformvm.VerifiableUnsignedCreateChainTx)
+		uChain := chain.UnsignedTx.(*platformvm.UnsignedCreateChainTx)
 		if uChain.VMID == vmID {
 			return chain, nil
 		}

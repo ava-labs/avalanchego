@@ -19,7 +19,7 @@ import (
 // times must be in the future.
 //
 // When one wants to start staking:
-// * They issue a transaction to that effect to an existing staker.
+// * They issue a transactions.to that effect to an existing staker.
 // * The staker checks whether the specified "start staking time" is in the past relative to
 //   their wall clock.
 //   ** If so, the staker ignores the transaction
