@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var errUnknownBlockType = errors.New("unknown block type")
@@ -148,25 +147,25 @@ func (m *metrics) AcceptBlock(b snowman.Block) error {
 	return nil
 }
 
-func (m *metrics) AcceptTx(tx *transactions.SignedTx) error {
+func (m *metrics) AcceptTx(tx *Tx) error {
 	switch tx.UnsignedTx.(type) {
-	case VerifiableUnsignedAddDelegatorTx:
+	case *UnsignedAddDelegatorTx:
 		m.numAddDelegatorTxs.Inc()
-	case VerifiableUnsignedAddSubnetValidatorTx:
+	case *UnsignedAddSubnetValidatorTx:
 		m.numAddSubnetValidatorTxs.Inc()
-	case VerifiableUnsignedAddValidatorTx:
+	case *UnsignedAddValidatorTx:
 		m.numAddValidatorTxs.Inc()
-	case VerifiableUnsignedAdvanceTimeTx:
+	case *UnsignedAdvanceTimeTx:
 		m.numAdvanceTimeTxs.Inc()
-	case VerifiableUnsignedCreateChainTx:
+	case *UnsignedCreateChainTx:
 		m.numCreateChainTxs.Inc()
-	case VerifiableUnsignedCreateSubnetTx:
+	case *UnsignedCreateSubnetTx:
 		m.numCreateSubnetTxs.Inc()
-	case VerifiableUnsignedImportTx:
+	case *UnsignedImportTx:
 		m.numImportTxs.Inc()
-	case VerifiableUnsignedExportTx:
+	case *UnsignedExportTx:
 		m.numExportTxs.Inc()
-	case VerifiableUnsignedRewardValidatorTx:
+	case *UnsignedRewardValidatorTx:
 		m.numRewardValidatorTxs.Inc()
 	default:
 		return errUnknownTxType

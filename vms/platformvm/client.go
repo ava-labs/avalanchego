@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	cjson "github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	sts "github.com/ava-labs/avalanchego/vms/platformvm/status"
 )
 
 type Client struct {
@@ -164,8 +163,7 @@ func (c *Client) GetCurrentSupply() (uint64, error) {
 	return uint64(res.Supply), err
 }
 
-// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators
-// from the current validator set for subnet with ID [subnetID]
+// SampleValidators returns the nodeIDs of a sample of [sampleSize] validators from the current validator set for subnet with ID [subnetID]
 func (c *Client) SampleValidators(subnetID ids.ID, sampleSize uint16) ([]string, error) {
 	res := &SampleValidatorsReply{}
 	err := c.requester.SendRequest("sampleValidators", &SampleValidatorsArgs{
@@ -290,7 +288,7 @@ func (c *Client) CreateSubnet(
 	return res.TxID, err
 }
 
-// ExportAVAX issues an ExportAVAX transaction and returns the txID
+// ExportAVAX issues an ExportTx transaction and returns the txID
 func (c *Client) ExportAVAX(
 	user api.UserPass,
 	from []string,
@@ -311,7 +309,7 @@ func (c *Client) ExportAVAX(
 	return res.TxID, err
 }
 
-// ImportAVAX issues an ImportAVAX transaction and returns the txID
+// ImportAVAX issues an ImportTx transaction and returns the txID
 func (c *Client) ImportAVAX(
 	user api.UserPass,
 	from []string,
@@ -366,7 +364,7 @@ func (c *Client) CreateBlockchain(
 }
 
 // GetBlockchainStatus returns the current status of blockchain with ID: [blockchainID]
-func (c *Client) GetBlockchainStatus(blockchainID string) (sts.BlockchainStatus, error) {
+func (c *Client) GetBlockchainStatus(blockchainID string) (BlockchainStatus, error) {
 	res := &GetBlockchainStatusReply{}
 	err := c.requester.SendRequest("getBlockchainStatus", &GetBlockchainStatusArgs{
 		BlockchainID: blockchainID,
@@ -399,7 +397,7 @@ func (c *Client) GetBlockchains() ([]APIBlockchain, error) {
 	return res.Blockchains, err
 }
 
-// IssueTx issues the transaction and returns the txID
+// IssueTx issues the transaction and returns its txID
 func (c *Client) IssueTx(txBytes []byte) (ids.ID, error) {
 	txStr, err := formatting.EncodeWithChecksum(formatting.Hex, txBytes)
 	if err != nil {
