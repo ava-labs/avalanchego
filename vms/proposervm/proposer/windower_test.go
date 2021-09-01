@@ -25,7 +25,7 @@ func TestWindowerNoValidators(t *testing.T) {
 		return nil, nil
 	}}
 	ctx := &snow.Context{
-		ValidatorVM: vm,
+		ValidatorState: vm,
 	}
 
 	w := New(ctx, subnetID, chainID)
@@ -48,7 +48,7 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 		}, nil
 	}}
 	ctx := &snow.Context{
-		ValidatorVM: vm,
+		ValidatorState: vm,
 	}
 
 	w := New(ctx, subnetID, chainID)
@@ -81,7 +81,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 		return validators, nil
 	}}
 	ctx := &snow.Context{
-		ValidatorVM: vm,
+		ValidatorState: vm,
 	}
 
 	w := New(ctx, subnetID, chainID)
@@ -139,7 +139,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 		return validators, nil
 	}}
 	ctx := &snow.Context{
-		ValidatorVM: vm,
+		ValidatorState: vm,
 	}
 
 	w0 := New(ctx, subnetID, chainID0)

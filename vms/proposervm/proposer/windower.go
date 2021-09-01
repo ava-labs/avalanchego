@@ -53,12 +53,12 @@ func New(ctx *snow.Context, subnetID, chainID ids.ID) Windower {
 }
 
 func (w *windower) PChainHeight() (uint64, error) {
-	return w.ctx.ValidatorVM.GetCurrentHeight()
+	return w.ctx.ValidatorState.GetCurrentHeight()
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
 	// get the validator set by the p-chain height
-	validatorsMap, err := w.ctx.ValidatorVM.GetValidatorSet(pChainHeight, w.subnetID)
+	validatorsMap, err := w.ctx.ValidatorState.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {
 		return 0, err
 	}
