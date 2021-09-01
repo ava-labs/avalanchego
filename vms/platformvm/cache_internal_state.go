@@ -1141,7 +1141,7 @@ func (st *internalStateImpl) writeRewardUTXOs() error {
 		txDB := linkeddb.NewDefault(rawTxDB)
 
 		for _, utxo := range utxos {
-			utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+			utxoBytes, err := GenesisCodec.Marshal(codecVersion, utxo)
 			if err != nil {
 				return err
 			}

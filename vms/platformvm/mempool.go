@@ -373,7 +373,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		}
 
 		// If the chain timestamp is too far in the past to issue this
-		// transactions.but according to local time, it's ready to be issued,
+		// transaction but according to local time, it's ready to be issued,
 		// then attempt to advance the timestamp, so it can be issued.
 		maxChainStartTime := currentChainTimestamp.Add(maxFutureStartTime)
 		if startTime.After(maxChainStartTime) {
@@ -415,7 +415,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
 // consensus engine.
 func (m *Mempool) ResetTimer() {
-	// If there is a pending transactions. trigger building of a block with that
+	// If there is a pending transaction trigger building of a block with that
 	// transaction
 	if len(m.unissuedDecisionTxs) > 0 || len(m.unissuedAtomicTxs) > 0 {
 		m.vm.NotifyBlockReady()

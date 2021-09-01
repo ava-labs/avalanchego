@@ -52,7 +52,7 @@ func newTxMetrics(namespace string, name string) prometheus.Counter {
 	return prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespace,
 		Name:      fmt.Sprintf("%s_txs_accepted", name),
-		Help:      fmt.Sprintf("Number of %s transactions. accepted", name),
+		Help:      fmt.Sprintf("Number of %s transactions accepted", name),
 	})
 }
 

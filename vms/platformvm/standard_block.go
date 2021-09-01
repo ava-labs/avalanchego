@@ -15,7 +15,7 @@ var (
 	_ decision = &StandardBlock{}
 )
 
-// StandardBlock being accepted results in the transaction contained in the
+// StandardBlock being accepted results in the transactions contained in the
 // block to be accepted and committed to the chain.
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
