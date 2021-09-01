@@ -105,10 +105,8 @@ func (nm *nodeManager) stop(path string) error {
 		return nil
 	}
 	delete(nm.nodes, nodeProcess.path)
-	if err := nodeProcess.stop(); err != nil {
-		return err
-	}
-	return nil
+
+	return nodeProcess.stop()
 }
 
 func newNodeManager(path string, log logging.Logger) *nodeManager {

@@ -1039,10 +1039,8 @@ func (st *internalStateImpl) load() error {
 	if err := st.loadCurrentValidators(); err != nil {
 		return err
 	}
-	if err := st.loadPendingValidators(); err != nil {
-		return err
-	}
-	return nil
+
+	return st.loadPendingValidators()
 }
 
 func (st *internalStateImpl) loadSingletons() error {

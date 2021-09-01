@@ -95,10 +95,8 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 	if err != nil {
 		return err
 	}
-	if err := u.db.Put(addressesKey, bytes); err != nil {
-		return err
-	}
-	return nil
+
+	return u.db.Put(addressesKey, bytes)
 }
 
 // Key returns the private key that controls the given address
