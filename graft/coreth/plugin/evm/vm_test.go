@@ -3790,7 +3790,7 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 				}
 			}
 			if vm != nil {
-				defer func() {
+				func() {
 					shutdownChan := make(chan error, 1)
 					shutdownFunc := func() {
 						err := vm.Shutdown()
