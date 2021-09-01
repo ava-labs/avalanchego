@@ -15,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -148,12 +146,12 @@ type GenesisUTXO struct {
 
 // Genesis represents a genesis state of the platform chain
 type Genesis struct {
-	UTXOs         []*GenesisUTXO           `serialize:"true"`
-	Validators    []*transactions.SignedTx `serialize:"true"`
-	Chains        []*transactions.SignedTx `serialize:"true"`
-	Timestamp     uint64                   `serialize:"true"`
-	InitialSupply uint64                   `serialize:"true"`
-	Message       string                   `serialize:"true"`
+	UTXOs         []*GenesisUTXO `serialize:"true"`
+	Validators    []*Tx          `serialize:"true"`
+	Chains        []*Tx          `serialize:"true"`
+	Timestamp     uint64         `serialize:"true"`
+	InitialSupply uint64         `serialize:"true"`
+	Message       string         `serialize:"true"`
 }
 
 func (g *Genesis) Initialize() error {
@@ -208,7 +206,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			},
 		}
 		if apiUTXO.Locktime > args.Time {
-			utxo.Out = &entities.StakeableLockOut{
+			utxo.Out = &StakeableLockOut{
 				Locktime:        uint64(apiUTXO.Locktime),
 				TransferableOut: utxo.Out.(avax.TransferableOut),
 			}
@@ -247,7 +245,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 				},
 			}
 			if apiUTXO.Locktime > args.Time {
-				utxo.Out = &entities.StakeableLockOut{
+				utxo.Out = &StakeableLockOut{
 					Locktime:        uint64(apiUTXO.Locktime),
 					TransferableOut: utxo.Out,
 				}
@@ -290,22 +288,20 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 			delegationFee = uint32(*validator.ExactDelegationFee)
 		}
 
-		tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedAddValidatorTx{
-			UnsignedAddValidatorTx: &transactions.UnsignedAddValidatorTx{
-				BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				}},
-				Validator: entities.Validator{
-					NodeID: nodeID,
-					Start:  uint64(args.Time),
-					End:    uint64(validator.EndTime),
-					Wght:   weight,
-				},
-				Stake:        stake,
-				RewardsOwner: owner,
-				Shares:       delegationFee,
+		tx := &Tx{UnsignedTx: &UnsignedAddValidatorTx{
+			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}},
+			Validator: Validator{
+				NodeID: nodeID,
+				Start:  uint64(args.Time),
+				End:    uint64(validator.EndTime),
+				Wght:   weight,
 			},
+			Stake:        stake,
+			RewardsOwner: owner,
+			Shares:       delegationFee,
 		}}
 		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
@@ -315,25 +311,23 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Specify the chains that exist at genesis.
-	chains := []*transactions.SignedTx{}
+	chains := []*Tx{}
 	for _, chain := range args.Chains {
 		genesisBytes, err := formatting.Decode(args.Encoding, chain.GenesisData)
 		if err != nil {
 			return fmt.Errorf("problem decoding chain genesis data: %w", err)
 		}
-		tx := &transactions.SignedTx{UnsignedTx: VerifiableUnsignedCreateChainTx{
-			UnsignedCreateChainTx: &transactions.UnsignedCreateChainTx{
-				BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-					NetworkID:    uint32(args.NetworkID),
-					BlockchainID: ids.Empty,
-				}},
-				SubnetID:    chain.SubnetID,
-				ChainName:   chain.Name,
-				VMID:        chain.VMID,
-				FxIDs:       chain.FxIDs,
-				GenesisData: genesisBytes,
-				SubnetAuth:  &secp256k1fx.Input{},
-			},
+		tx := &Tx{UnsignedTx: &UnsignedCreateChainTx{
+			BaseTx: BaseTx{BaseTx: avax.BaseTx{
+				NetworkID:    uint32(args.NetworkID),
+				BlockchainID: ids.Empty,
+			}},
+			SubnetID:    chain.SubnetID,
+			ChainName:   chain.Name,
+			VMID:        chain.VMID,
+			FxIDs:       chain.FxIDs,
+			GenesisData: genesisBytes,
+			SubnetAuth:  &secp256k1fx.Input{},
 		}}
 		if err := tx.Sign(GenesisCodec, nil); err != nil {
 			return err
@@ -353,7 +347,7 @@ func (ss *StaticService) BuildGenesis(_ *http.Request, args *BuildGenesisArgs, r
 	}
 
 	// Marshal genesis to bytes
-	bytes, err := GenesisCodec.Marshal(CodecVersion, genesis)
+	bytes, err := GenesisCodec.Marshal(codecVersion, genesis)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal genesis: %w", err)
 	}

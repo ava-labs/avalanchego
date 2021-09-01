@@ -10,13 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/codec/reflectcodec"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// CodecVersion that is currently used by default
 const (
-	CodecVersion = 0
+	codecVersion = 0
 )
 
 // Codecs do serialization and deserialization
@@ -51,26 +49,26 @@ func init() {
 			c.RegisterType(&secp256k1fx.Input{}),
 			c.RegisterType(&secp256k1fx.OutputOwners{}),
 
-			c.RegisterType(VerifiableUnsignedAddValidatorTx{}),
-			c.RegisterType(VerifiableUnsignedAddSubnetValidatorTx{}),
-			c.RegisterType(VerifiableUnsignedAddDelegatorTx{}),
+			c.RegisterType(&UnsignedAddValidatorTx{}),
+			c.RegisterType(&UnsignedAddSubnetValidatorTx{}),
+			c.RegisterType(&UnsignedAddDelegatorTx{}),
 
-			c.RegisterType(VerifiableUnsignedCreateChainTx{}),
-			c.RegisterType(VerifiableUnsignedCreateSubnetTx{}),
+			c.RegisterType(&UnsignedCreateChainTx{}),
+			c.RegisterType(&UnsignedCreateSubnetTx{}),
 
-			c.RegisterType(VerifiableUnsignedImportTx{}),
-			c.RegisterType(VerifiableUnsignedExportTx{}),
+			c.RegisterType(&UnsignedImportTx{}),
+			c.RegisterType(&UnsignedExportTx{}),
 
-			c.RegisterType(VerifiableUnsignedAdvanceTimeTx{}),
-			c.RegisterType(VerifiableUnsignedRewardValidatorTx{}),
+			c.RegisterType(&UnsignedAdvanceTimeTx{}),
+			c.RegisterType(&UnsignedRewardValidatorTx{}),
 
-			c.RegisterType(&entities.StakeableLockIn{}),
-			c.RegisterType(&entities.StakeableLockOut{}),
+			c.RegisterType(&StakeableLockIn{}),
+			c.RegisterType(&StakeableLockOut{}),
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(CodecVersion, c),
-		GenesisCodec.RegisterCodec(CodecVersion, gc),
+		Codec.RegisterCodec(codecVersion, c),
+		GenesisCodec.RegisterCodec(codecVersion, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

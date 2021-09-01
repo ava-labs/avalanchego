@@ -8,8 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var (
@@ -22,7 +20,7 @@ var (
 type StandardBlock struct {
 	SingleDecisionBlock `serialize:"true"`
 
-	Txs []*transactions.SignedTx `serialize:"true" json:"txs"`
+	Txs []*Tx `serialize:"true" json:"txs"`
 }
 
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
@@ -30,7 +28,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return fmt.Errorf("failed to initialize: %w", err)
 	}
 	for _, tx := range sb.Txs {
-		if err := tx.Sign(Codec, nil); err != nil {
+		if err := tx.Sign(vm.codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
 	}
@@ -84,7 +82,7 @@ func (sb *StandardBlock) Verify() error {
 
 	funcs := make([]func() error, 0, len(sb.Txs))
 	for _, tx := range sb.Txs {
-		utx, ok := tx.UnsignedTx.(VerifiableUnsignedDecisionTx)
+		utx, ok := tx.UnsignedTx.(UnsignedDecisionTx)
 		if !ok {
 			return errWrongTxType
 		}
@@ -101,7 +99,7 @@ func (sb *StandardBlock) Verify() error {
 			}
 			return err
 		}
-		sb.onAcceptState.AddTx(tx, status.Committed)
+		sb.onAcceptState.AddTx(tx, Committed)
 		if onAccept != nil {
 			funcs = append(funcs, onAccept)
 		}
@@ -149,7 +147,7 @@ func (sb *StandardBlock) Reject() error {
 
 // newStandardBlock returns a new *StandardBlock where the block's parent, a
 // decision block, has ID [parentID].
-func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*transactions.SignedTx) (*StandardBlock, error) {
+func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*StandardBlock, error) {
 	sb := &StandardBlock{
 		SingleDecisionBlock: SingleDecisionBlock{
 			CommonDecisionBlock: CommonDecisionBlock{
@@ -165,7 +163,7 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*transactio
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(sb)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := vm.codec.Marshal(codecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
