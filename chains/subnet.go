@@ -25,19 +25,14 @@ type Subnet interface {
 }
 
 type subnet struct {
-	lock          sync.RWMutex
-	bootstrapping ids.Set
-
-	once sync.Once
-	// If not nil, called when this subnet becomes marked as bootstrapped for
-	// the first time
-	onBootstrapped   func()
+	lock             sync.RWMutex
+	bootstrapping    ids.Set
+	once             sync.Once
 	bootstrappedSema chan struct{}
 }
 
-func newSubnet(onBootstrapped func()) Subnet {
+func newSubnet() Subnet {
 	sb := &subnet{
-		onBootstrapped:   onBootstrapped,
 		bootstrappedSema: make(chan struct{}),
 	}
 	return sb
@@ -60,9 +55,6 @@ func (s *subnet) Bootstrapped(chainID ids.ID) {
 	}
 
 	s.once.Do(func() {
-		if s.onBootstrapped != nil {
-			s.onBootstrapped()
-		}
 		close(s.bootstrappedSema)
 	})
 }

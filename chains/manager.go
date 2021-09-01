@@ -246,7 +246,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		sb = newSubnet(nil)
+		sb = newSubnet()
 		m.subnets[chainParams.SubnetID] = sb
 	}
 
