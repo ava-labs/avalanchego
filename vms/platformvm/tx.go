@@ -69,7 +69,7 @@ type UnsignedAtomicTx interface {
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)
 
-	// Accept this transactions.with the additionally provided state transitions.
+	// Accept this transaction with the additionally provided state transitions.
 	Accept(ctx *snow.Context, batch database.Batch) error
 }
 

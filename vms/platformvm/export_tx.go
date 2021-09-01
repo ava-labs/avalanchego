@@ -41,7 +41,7 @@ type UnsignedExportTx struct {
 // InputUTXOs returns an empty set
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 
-// Verify this transactions.is well-formed
+// SyntacticVerify this transaction is well-formed
 func (tx *UnsignedExportTx) SyntacticVerify(
 	avmID ids.ID,
 	ctx *snow.Context,
@@ -81,7 +81,7 @@ func (tx *UnsignedExportTx) SyntacticVerify(
 	return nil
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx *UnsignedExportTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
@@ -123,7 +123,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	return newState, nil
 }
 
-// Accept this transactions.
+// Accept this transaction.
 func (tx *UnsignedExportTx) Accept(ctx *snow.Context, batch database.Batch) error {
 	txID := tx.ID()
 

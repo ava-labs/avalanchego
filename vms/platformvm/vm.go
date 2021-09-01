@@ -120,9 +120,10 @@ type VM struct {
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
 	bootstrapped bool
 
-	// Contains the IDs of transactions. recently dropped because they failed verification.
-	// These txs may be re-issued and put into accepted blocks, so check the database
-	// to see if it was later committed/aborted before reporting that it's dropped.
+	// Contains the IDs of transactions recently dropped because they failed
+	// verification. These txs may be re-issued and put into accepted blocks, so
+	// check the database to see if it was later committed/aborted before
+	// reporting that it's dropped.
 	// Key: Tx ID
 	// Value: String repr. of the verification error
 	droppedTxCache cache.LRU

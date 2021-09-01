@@ -14,7 +14,7 @@ import (
 
 var _ UnsignedProposalTx = &UnsignedAdvanceTimeTx{}
 
-// UnsignedAdvanceTimeTx is a transactions.to increase the chain's timestamp.
+// UnsignedAdvanceTimeTx is a transaction to increase the chain's timestamp.
 // When the chain's timestamp is updated (a AdvanceTimeTx is accepted and
 // followed by a commit block) the staker set is also updated accordingly.
 // It must be that:
@@ -32,7 +32,7 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,

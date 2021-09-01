@@ -19,7 +19,7 @@ const (
 	// syncBound is the synchrony bound used for safe decision making
 	syncBound = 10 * time.Second
 
-	// BatchSize is the number of decision transactions.to place into a block
+	// BatchSize is the number of decision transactions to place into a block
 	BatchSize = 30
 
 	MaxMempoolByteSize   = 3 * units.GiB // TODO: Should be default, configurable by users
@@ -365,7 +365,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 		maxLocalStartTime := localTime.Add(maxFutureStartTime)
 		// If the start time is too far in the future relative to local time
-		// drop the transactions.and continue
+		// drop the transaction and continue
 		if startTime.After(maxLocalStartTime) {
 			m.unissuedProposalTxs.Remove()
 			m.deregister(tx)

@@ -128,7 +128,7 @@ func (tx *UnsignedAddValidatorTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,

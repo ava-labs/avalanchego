@@ -18,19 +18,19 @@ import (
 
 var (
 	errShouldBeDSValidator = errors.New("expected validator to be in the primary network")
-	errWrongTxType         = errors.New("wrong transactions.type")
+	errWrongTxType         = errors.New("wrong transaction type")
 
 	_ UnsignedProposalTx = &UnsignedRewardValidatorTx{}
 )
 
-// UnsignedRewardValidatorTx is a transactions.that represents a proposal to
+// UnsignedRewardValidatorTx is a transaction that represents a proposal to
 // remove a validator that is currently validating from the validator set.
 //
-// If this transactions.is accepted and the next block accepted is a Commit
+// If this transaction is accepted and the next block accepted is a Commit
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX as well as a validating reward.
 //
-// If this transactions.is accepted and the next block accepted is an Abort
+// If this transaction is accepted and the next block accepted is an Abort
 // block, the validator is removed and the address that the validator specified
 // receives the staked AVAX but no reward.
 type UnsignedRewardValidatorTx struct {
@@ -43,7 +43,7 @@ type UnsignedRewardValidatorTx struct {
 	shouldPreferCommit bool
 }
 
-// SemanticVerify this transactions.performs a valid state transition.
+// SemanticVerify this transaction performs a valid state transition.
 //
 // The current validating set must have at least one member.
 // The next validator to be removed must be the validator specified in this block.
@@ -298,7 +298,7 @@ func (tx *UnsignedRewardValidatorTx) InitiallyPrefersCommit(*VM) bool {
 	return tx.shouldPreferCommit
 }
 
-// RewardStakerTx creates a new transactions.that proposes to remove the staker
+// RewardStakerTx creates a new transaction that proposes to remove the staker
 // [validatorID] from the default validator set.
 func (vm *VM) newRewardValidatorTx(txID ids.ID) (*Tx, error) {
 	tx := &Tx{UnsignedTx: &UnsignedRewardValidatorTx{

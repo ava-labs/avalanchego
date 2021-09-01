@@ -53,7 +53,7 @@ type UnsignedCreateChainTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-// Verify this transactions.is well-formed
+// Verify this transaction is well-formed
 func (tx *UnsignedCreateChainTx) Verify(
 	ctx *snow.Context,
 	c codec.Manager,
@@ -94,7 +94,7 @@ func (tx *UnsignedCreateChainTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx *UnsignedCreateChainTx) SemanticVerify(
 	vm *VM,
 	vs VersionedState,
@@ -103,7 +103,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	// Make sure this transactions.is well formed.
+	// Make sure this transaction is well formed.
 	if len(stx.Creds) == 0 {
 		return nil, permError{errWrongNumberOfCredentials}
 	}

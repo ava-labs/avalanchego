@@ -86,7 +86,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 	return nil
 }
 
-// SemanticVerify this transactions.is valid.
+// SemanticVerify this transaction is valid.
 func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	vm *VM,
 	parentState MutableState,
@@ -155,7 +155,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			// validing node.
 			vdrTx = currentValidator.AddValidatorTx()
 
-			// Ensure that this transactions.isn't a duplicate add validator tx.
+			// Ensure that this transaction isn't a duplicate add validator tx.
 			subnets := currentValidator.SubnetValidators()
 			if _, validates := subnets[tx.Validator.Subnet]; validates {
 				return nil, nil, nil, nil, permError{
@@ -189,7 +189,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 			return nil, nil, nil, nil, permError{errDSValidatorSubset}
 		}
 
-		// Ensure that this transactions.isn't a duplicate add validator tx.
+		// Ensure that this transaction isn't a duplicate add validator tx.
 		pendingValidator := pendingStakers.GetValidator(tx.Validator.NodeID)
 		subnets := pendingValidator.SubnetValidators()
 		if _, validates := subnets[tx.Validator.Subnet]; validates {
