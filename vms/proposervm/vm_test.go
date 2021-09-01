@@ -44,7 +44,7 @@ func init() {
 	}
 }
 
-func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *validators.TestVM, *VM, *snowman.TestBlock) {
+func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *validators.TestState, *VM, *snowman.TestBlock) {
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -80,11 +80,11 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 
 	proVM := New(coreVM, proBlkStartTime)
 
-	valVM := &validators.TestVM{
+	valState := &validators.TestState{
 		T: t,
 	}
-	valVM.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
-	valVM.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+	valState.GetCurrentHeightF = func() (uint64, error) { return 2000, nil }
+	valState.GetValidatorSetF = func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 		res := make(map[ids.ShortID]uint64)
 		res[proVM.ctx.NodeID] = uint64(10)
 		res[ids.ShortID{1}] = uint64(5)
@@ -98,7 +98,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		Log:               logging.NoLog{},
 		StakingCertLeaf:   pTestCert.Leaf,
 		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
-		ValidatorVM:       valVM,
+		ValidatorState:    valState,
 	}
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
@@ -115,7 +115,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		t.Fatal(err)
 	}
 
-	return coreVM, valVM, proVM, coreGenBlk
+	return coreVM, valState, proVM, coreGenBlk
 }
 
 // VM.BuildBlock tests section

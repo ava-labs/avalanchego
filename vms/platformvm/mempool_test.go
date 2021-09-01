@@ -7,10 +7,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/avm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
-func getTheValidTx(vm *VM, t *testing.T) *transactions.SignedTx {
+func getTheValidTx(vm *VM, t *testing.T) *Tx {
 	res, err := vm.newCreateChainTx(
 		testSubnet1.ID(),
 		nil,
@@ -329,7 +328,7 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, t)
-	txID, err := Codec.Marshal(CodecVersion, tx.ID())
+	txID, err := Codec.Marshal(codecVersion, tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -393,7 +392,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 
 	// show that the invalid tx is not requested
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	rejectedTxID, err := Codec.Marshal(CodecVersion, rejectedTx.ID())
+	rejectedTxID, err := Codec.Marshal(codecVersion, rejectedTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -432,7 +431,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, t)
-	txID, err := Codec.Marshal(CodecVersion, tx.ID())
+	txID, err := Codec.Marshal(codecVersion, tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -488,7 +487,7 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 
 	// create a tx
 	rejectedTx := getTheValidTx(vm, t)
-	rejectedTxID, err := Codec.Marshal(CodecVersion, rejectedTx.ID())
+	rejectedTxID, err := Codec.Marshal(codecVersion, rejectedTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}

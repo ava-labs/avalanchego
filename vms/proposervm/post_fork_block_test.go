@@ -88,10 +88,10 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 
 // ProposerBlock.Verify tests section
 func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(100)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valState.CantGetCurrentHeight = true
+	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
@@ -188,10 +188,10 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(100)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valState.CantGetCurrentHeight = true
+	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
@@ -373,10 +373,10 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(100)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valState.CantGetCurrentHeight = true
+	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
 	prntCoreBlk := &snowman.TestBlock{
@@ -524,10 +524,10 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(100)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valState.CantGetCurrentHeight = true
+	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 	// proVM.SetStartTime(timer.MaxTime) // switch off scheduler for current test
 
 	// create post fork oracle block ...
@@ -717,10 +717,10 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Verify a block once (in this test by building it).
 	// Show that other verify call would not call coreBlk.Verify()
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valState.CantGetCurrentHeight = true
+	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -781,10 +781,10 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 // ProposerBlock.Accept tests section
 func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	pChainHeight := uint64(2000)
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valState.CantGetCurrentHeight = true
+	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -844,10 +844,10 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 }
 
 func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
-	coreVM, valVM, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
 	var pChainHeight uint64
-	valVM.CantGetCurrentHeight = true
-	valVM.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
+	valState.CantGetCurrentHeight = true
+	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// generate two blocks with the same core block and store them
 	coreVM.CantBuildBlock = true

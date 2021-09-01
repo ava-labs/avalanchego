@@ -33,7 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/request"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/platformvm/uptime"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -42,6 +41,7 @@ import (
 
 const (
 	// PercentDenominator is the denominator used to calculate percentages
+	PercentDenominator = 1000000
 
 	droppedTxCacheSize = 50
 
@@ -69,6 +69,7 @@ const (
 
 var (
 	errInvalidID         = errors.New("invalid ID")
+	errDSCantValidate    = errors.New("new blockchain can't be validated by primary network")
 	errStartTimeTooEarly = errors.New("start time is before the current chain time")
 	errStartAfterEndTime = errors.New("start time is after the end time")
 
@@ -113,6 +114,7 @@ type VM struct {
 	lastAcceptedID ids.ID
 
 	fx            Fx
+	codec         codec.Manager
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
@@ -169,7 +171,9 @@ func (vm *VM) Initialize(
 	vm.dbManager = dbManager
 	vm.toEngine = msgs
 
+	vm.codec = Codec
 	vm.codecRegistry = linearcodec.NewDefault()
+
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
@@ -242,8 +246,8 @@ func (vm *VM) initBlockchains() error {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func (vm *VM) createChain(tx *transactions.SignedTx) error {
-	unsignedTx, ok := tx.UnsignedTx.(VerifiableUnsignedCreateChainTx)
+func (vm *VM) createChain(tx *Tx) error {
+	unsignedTx, ok := tx.UnsignedTx.(*UnsignedCreateChainTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -454,7 +458,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 	}
 
 	// send response
-	response, err := Codec.Marshal(CodecVersion, *resTx)
+	response, err := Codec.Marshal(codecVersion, *resTx)
 	if err != nil {
 		return err
 	}
@@ -479,14 +483,14 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	}
 
 	// decode single tx
-	tx := &transactions.SignedTx{}
+	tx := &Tx{}
 	_, err := Codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
 	if err != nil {
 		vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
 		return err
 	}
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := Codec.Marshal(codecVersion, &tx.UnsignedTx)
 	if err != nil {
 		vm.ctx.Log.Debug("AppResponse: failed unmarshalling unsignedTx from Node %v, reqID %v, err %v",
 			nodeID, requestID, err)
@@ -506,40 +510,39 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 
 	// validate tx
 	switch typedTx := tx.UnsignedTx.(type) {
-	case VerifiableUnsignedDecisionTx:
-		syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
-			Ctx:        vm.ctx,
-			C:          Codec,
-			FeeAmount:  vm.TxFee, // TODO: check/fix usage of TxFee below.
-			FeeAssetID: vm.ctx.AVAXAssetID,
-		}
-		if err := typedTx.SyntacticVerify(syntacticCtx); err != nil {
-			vm.ctx.Log.Warn("AppResponse: UnsignedDecisionTx %v is syntactically invalid, err %v. Rejecting it.",
-				tx.ID(), err)
-			return vm.mempool.markReject(tx)
-		}
-	case VerifiableUnsignedProposalTx:
-		syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
-			Ctx:               vm.ctx,
-			C:                 Codec,
-			MinDelegatorStake: vm.MinDelegatorStake,
-			MinStakeDuration:  vm.MinStakeDuration,
-			MaxStakeDuration:  vm.MaxStakeDuration,
-		}
-		if err := typedTx.SyntacticVerify(syntacticCtx); err != nil {
-			vm.ctx.Log.Warn("AppResponse: UnsignedProposalTx %v is syntactically invalid, err %v. Rejecting it.",
-				tx.ID(), err)
-			return vm.mempool.markReject(tx)
-		}
-	case VerifiableUnsignedAtomicTx:
-		syntacticCtx := transactions.AtomicTxSyntacticVerificationContext{
-			Ctx:        vm.ctx,
-			C:          Codec,
-			AvmID:      vm.ctx.XChainID,
-			FeeAssetID: vm.ctx.AVAXAssetID,
-			FeeAmount:  vm.TxFee,
-		}
-		if err := typedTx.SyntacticVerify(syntacticCtx); err != nil {
+	case UnsignedDecisionTx:
+		// syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
+		// 	Ctx:        vm.ctx,
+		// 	C:          Codec,
+		// 	FeeAmount:  vm.TxFee, // TODO: check/fix usage of TxFee below.
+		// 	FeeAssetID: vm.ctx.AVAXAssetID,
+		// }
+		// if err := typedTx.SyntacticVerify(syntacticCtx); err != nil {
+		// 	vm.ctx.Log.Warn("AppResponse: UnsignedDecisionTx %v is syntactically invalid, err %v. Rejecting it.",
+		// 		tx.ID(), err)
+		// 	return vm.mempool.markReject(tx)
+		// }
+	case UnsignedProposalTx:
+		// syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
+		// 	Ctx:               vm.ctx,
+		// 	C:                 Codec,
+		// 	MinDelegatorStake: vm.MinDelegatorStake,
+		// 	MinStakeDuration:  vm.MinStakeDuration,
+		// 	MaxStakeDuration:  vm.MaxStakeDuration,
+		// }
+		// if err := typedTx.SyntacticVerify(syntacticCtx); err != nil {
+		// 	vm.ctx.Log.Warn("AppResponse: UnsignedProposalTx %v is syntactically invalid, err %v. Rejecting it.",
+		// 		tx.ID(), err)
+		// 	return vm.mempool.markReject(tx)
+		// }
+	case UnsignedAtomicTx:
+		if err := typedTx.SyntacticVerify(
+			vm.ctx.XChainID,
+			vm.ctx,
+			Codec,
+			vm.TxFee,
+			vm.ctx.AVAXAssetID,
+		); err != nil {
 			vm.ctx.Log.Warn("AppResponse: UnsignedAtomicTx %v is syntactically invalid, err %v. Rejecting it.",
 				tx.ID(), err)
 			return vm.mempool.markReject(tx)
@@ -553,7 +556,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	case nil:
 		txID := tx.ID()
 		vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		txIDBytes, err := Codec.Marshal(CodecVersion, txID)
+		txIDBytes, err := Codec.Marshal(codecVersion, txID)
 		if err != nil {
 			return err
 		}
@@ -780,7 +783,7 @@ func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	return earliest, nil
 }
 
-func (vm *VM) Codec() codec.Manager { return Codec }
+func (vm *VM) Codec() codec.Manager { return vm.codec }
 
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 

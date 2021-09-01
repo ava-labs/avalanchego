@@ -7,7 +7,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/entities"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -176,7 +175,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			description: "locked one input, no outputs, no fee",
 			utxos: []*avax.UTXO{{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-				Out: &entities.StakeableLockOut{
+				Out: &StakeableLockOut{
 					Locktime: uint64(now.Unix()) + 1,
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt: 1,
@@ -185,7 +184,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			}},
 			ins: []*avax.TransferableInput{{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-				In: &entities.StakeableLockIn{
+				In: &StakeableLockIn{
 					Locktime: uint64(now.Unix()) + 1,
 					TransferableIn: &secp256k1fx.TransferInput{
 						Amt: 1,
@@ -204,7 +203,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			description: "locked one input, no outputs, positive fee",
 			utxos: []*avax.UTXO{{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-				Out: &entities.StakeableLockOut{
+				Out: &StakeableLockOut{
 					Locktime: uint64(now.Unix()) + 1,
 					TransferableOut: &secp256k1fx.TransferOutput{
 						Amt: 1,
@@ -213,7 +212,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			}},
 			ins: []*avax.TransferableInput{{
 				Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-				In: &entities.StakeableLockIn{
+				In: &StakeableLockIn{
 					Locktime: uint64(now.Unix()) + 1,
 					TransferableIn: &secp256k1fx.TransferInput{
 						Amt: 1,
@@ -233,7 +232,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-					Out: &entities.StakeableLockOut{
+					Out: &StakeableLockOut{
 						Locktime: uint64(now.Unix()) + 1,
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -250,7 +249,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			ins: []*avax.TransferableInput{
 				{
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-					In: &entities.StakeableLockIn{
+					In: &StakeableLockIn{
 						Locktime: uint64(now.Unix()) + 1,
 						TransferableIn: &secp256k1fx.TransferInput{
 							Amt: 1,
@@ -267,7 +266,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			outs: []*avax.TransferableOutput{
 				{
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-					Out: &entities.StakeableLockOut{
+					Out: &StakeableLockOut{
 						Locktime: uint64(now.Unix()) + 1,
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -288,7 +287,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-					Out: &entities.StakeableLockOut{
+					Out: &StakeableLockOut{
 						Locktime: uint64(now.Unix()) + 1,
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
@@ -305,7 +304,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			ins: []*avax.TransferableInput{
 				{
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-					In: &entities.StakeableLockIn{
+					In: &StakeableLockIn{
 						Locktime: uint64(now.Unix()) + 1,
 						TransferableIn: &secp256k1fx.TransferInput{
 							Amt: 1,
@@ -322,7 +321,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			outs: []*avax.TransferableOutput{
 				{
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-					Out: &entities.StakeableLockOut{
+					Out: &StakeableLockOut{
 						Locktime: uint64(now.Unix()) + 1,
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 2,
@@ -343,7 +342,7 @@ func TestSemanticVerifySpendUTXOs(t *testing.T) {
 			utxos: []*avax.UTXO{
 				{
 					Asset: avax.Asset{ID: vm.ctx.AVAXAssetID},
-					Out: &entities.StakeableLockOut{
+					Out: &StakeableLockOut{
 						Locktime: uint64(now.Unix()) - 1,
 						TransferableOut: &secp256k1fx.TransferOutput{
 							Amt: 1,
