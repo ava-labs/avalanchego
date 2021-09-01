@@ -77,7 +77,7 @@ func (vm *VM) newAbortBlock(parentID ids.ID, height uint64) (*AbortBlock, error)
 	// We serialize this block as a Block so that it can be deserialized into a
 	// Block
 	blk := Block(abort)
-	bytes, err := Codec.Marshal(CodecVersion, &blk)
+	bytes, err := Codec.Marshal(codecVersion, &blk)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't marshal abort block: %w", err)
 	}

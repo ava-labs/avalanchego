@@ -91,7 +91,7 @@ func (u *user) putAddress(privKey *crypto.PrivateKeySECP256K1R) error {
 		}
 	}
 	addresses = append(addresses, address)
-	bytes, err := Codec.Marshal(CodecVersion, addresses)
+	bytes, err := Codec.Marshal(codecVersion, addresses)
 	if err != nil {
 		return err
 	}

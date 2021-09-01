@@ -9,8 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 var _ Block = &ProposalBlock{}
@@ -28,7 +26,7 @@ var _ Block = &ProposalBlock{}
 type ProposalBlock struct {
 	CommonBlock `serialize:"true"`
 
-	Tx transactions.SignedTx `serialize:"true" json:"tx"`
+	Tx Tx `serialize:"true" json:"tx"`
 
 	// The state that the chain will have if this block's proposal is committed
 	onCommitState VersionedState
@@ -87,11 +85,11 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return err
 	}
 
-	unsignedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx.UnsignedTx)
+	unsignedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal unsigned tx: %w", err)
 	}
-	signedBytes, err := Codec.Marshal(CodecVersion, &pb.Tx)
+	signedBytes, err := pb.vm.codec.Marshal(codecVersion, &pb.Tx)
 	if err != nil {
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
@@ -148,7 +146,7 @@ func (pb *ProposalBlock) Verify() error {
 		return err
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(VerifiableUnsignedProposalTx)
+	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
 	if !ok {
 		return errWrongTxType
 	}
@@ -195,8 +193,8 @@ func (pb *ProposalBlock) Verify() error {
 		}
 		return err
 	}
-	pb.onCommitState.AddTx(&pb.Tx, status.Committed)
-	pb.onAbortState.AddTx(&pb.Tx, status.Aborted)
+	pb.onCommitState.AddTx(&pb.Tx, Committed)
+	pb.onAbortState.AddTx(&pb.Tx, Aborted)
 
 	pb.timestamp = parentState.GetTimestamp()
 
@@ -235,7 +233,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 		)
 	}
 
-	tx, ok := pb.Tx.UnsignedTx.(VerifiableUnsignedProposalTx)
+	tx, ok := pb.Tx.UnsignedTx.(UnsignedProposalTx)
 	if !ok {
 		return [2]snowman.Block{}, errWrongTxType
 	}
@@ -251,7 +249,7 @@ func (pb *ProposalBlock) Options() ([2]snowman.Block, error) {
 // The parent of this block has ID [parentID].
 //
 // The parent must be a decision block.
-func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx transactions.SignedTx) (*ProposalBlock, error) {
+func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx Tx) (*ProposalBlock, error) {
 	pb := &ProposalBlock{
 		CommonBlock: CommonBlock{
 			PrntID: parentID,
@@ -263,7 +261,7 @@ func (vm *VM) newProposalBlock(parentID ids.ID, height uint64, tx transactions.S
 	// We marshal the block in this way (as a Block) so that we can unmarshal
 	// it into a Block (rather than a *ProposalBlock)
 	block := Block(pb)
-	bytes, err := Codec.Marshal(CodecVersion, &block)
+	bytes, err := Codec.Marshal(codecVersion, &block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}

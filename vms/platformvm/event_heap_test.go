@@ -35,7 +35,7 @@ func TestTxHeapStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr0Tx := validator0.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
+	vdr0Tx := validator0.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	validator1, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -50,7 +50,7 @@ func TestTxHeapStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr1Tx := validator1.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
+	vdr1Tx := validator1.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	validator2, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -65,7 +65,7 @@ func TestTxHeapStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr2Tx := validator2.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
+	vdr2Tx := validator2.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	txHeap.Add(validator2)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.StartTime()) {
@@ -110,7 +110,7 @@ func TestTxHeapStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr0Tx := validator0.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
+	vdr0Tx := validator0.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	validator1, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -125,7 +125,7 @@ func TestTxHeapStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr1Tx := validator1.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
+	vdr1Tx := validator1.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	validator2, err := vm.newAddValidatorTx(
 		vm.MinValidatorStake,                                               // stake amount
@@ -140,7 +140,7 @@ func TestTxHeapStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	vdr2Tx := validator2.UnsignedTx.(VerifiableUnsignedAddValidatorTx)
+	vdr2Tx := validator2.UnsignedTx.(*UnsignedAddValidatorTx)
 
 	txHeap.Add(validator2)
 	if timestamp := txHeap.Timestamp(); !timestamp.Equal(vdr2Tx.EndTime()) {

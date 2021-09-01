@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/stretchr/testify/assert"
 )
@@ -60,18 +59,16 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			assert.NoError(err)
 
 			// Create the tx
-			utx := VerifiableUnsignedCreateSubnetTx{
-				UnsignedCreateSubnetTx: &transactions.UnsignedCreateSubnetTx{
-					BaseTx: transactions.BaseTx{BaseTx: avax.BaseTx{
-						NetworkID:    vm.ctx.NetworkID,
-						BlockchainID: vm.ctx.ChainID,
-						Ins:          ins,
-						Outs:         outs,
-					}},
-					Owner: &secp256k1fx.OutputOwners{},
-				},
+			utx := &UnsignedCreateSubnetTx{
+				BaseTx: BaseTx{BaseTx: avax.BaseTx{
+					NetworkID:    vm.ctx.NetworkID,
+					BlockchainID: vm.ctx.ChainID,
+					Ins:          ins,
+					Outs:         outs,
+				}},
+				Owner: &secp256k1fx.OutputOwners{},
 			}
-			tx := &transactions.SignedTx{UnsignedTx: utx}
+			tx := &Tx{UnsignedTx: utx}
 			err = tx.Sign(Codec, signers)
 			assert.NoError(err)
 
@@ -82,7 +79,7 @@ func TestCreateSubnetTxAP3FeeChange(t *testing.T) {
 			)
 			vs.SetTimestamp(test.time)
 
-			_, err = tx.UnsignedTx.(VerifiableUnsignedCreateSubnetTx).SemanticVerify(vm, vs, tx)
+			_, err = utx.SemanticVerify(vm, vs, tx)
 			assert.Equal(test.expectsError, err != nil)
 		})
 	}

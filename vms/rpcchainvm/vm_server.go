@@ -424,7 +424,7 @@ func (vm *VMServer) AppRequest(_ context.Context, req *vmproto.AppRequestMsg) (*
 	if err != nil {
 		return nil, err
 	}
-	return nil, vm.vm.AppRequest(nodeID, req.RequestID, req.Request)
+	return &vmproto.EmptyMsg{}, vm.vm.AppRequest(nodeID, req.RequestID, req.Request)
 }
 
 func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestFailedMsg) (*vmproto.EmptyMsg, error) {
@@ -432,7 +432,7 @@ func (vm *VMServer) AppRequestFailed(_ context.Context, req *vmproto.AppRequestF
 	if err != nil {
 		return nil, err
 	}
-	return nil, vm.vm.AppRequestFailed(nodeID, req.RequestID)
+	return &vmproto.EmptyMsg{}, vm.vm.AppRequestFailed(nodeID, req.RequestID)
 }
 
 func (vm *VMServer) AppResponse(_ context.Context, req *vmproto.AppResponseMsg) (*vmproto.EmptyMsg, error) {
@@ -440,7 +440,7 @@ func (vm *VMServer) AppResponse(_ context.Context, req *vmproto.AppResponseMsg) 
 	if err != nil {
 		return nil, err
 	}
-	return nil, vm.vm.AppResponse(nodeID, req.RequestID, req.Response)
+	return &vmproto.EmptyMsg{}, vm.vm.AppResponse(nodeID, req.RequestID, req.Response)
 }
 
 func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*vmproto.EmptyMsg, error) {
@@ -448,7 +448,7 @@ func (vm *VMServer) AppGossip(_ context.Context, req *vmproto.AppGossipMsg) (*vm
 	if err != nil {
 		return nil, err
 	}
-	return nil, vm.vm.AppGossip(nodeID, req.Msg)
+	return &vmproto.EmptyMsg{}, vm.vm.AppGossip(nodeID, req.Msg)
 }
 
 func (vm *VMServer) BlockVerify(_ context.Context, req *vmproto.BlockVerifyRequest) (*vmproto.BlockVerifyResponse, error) {

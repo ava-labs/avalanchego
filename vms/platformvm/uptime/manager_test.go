@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-var errDB = errors.New("db error")
-
 type uptime struct {
 	upDuration  time.Duration
 	lastUpdated time.Time
@@ -86,7 +84,7 @@ func TestStartTrackingDBError(t *testing.T) {
 	startTime := time.Now()
 
 	s := newTestState()
-	s.dbWriteError = errDB
+	s.dbWriteError = errors.New("err")
 	s.addNode(nodeID0, startTime)
 
 	up := NewManager(s).(*manager)
@@ -234,7 +232,7 @@ func TestShutdownConnectedDBError(t *testing.T) {
 	err = up.Connect(nodeID0)
 	assert.NoError(err)
 
-	s.dbReadError = errDB
+	s.dbReadError = errors.New("err")
 	err = up.Shutdown([]ids.ShortID{nodeID0})
 	assert.Error(err)
 }
@@ -284,7 +282,7 @@ func TestShutdownNonConnectedDBError(t *testing.T) {
 	currentTime = currentTime.Add(time.Second)
 	up.clock.Set(currentTime)
 
-	s.dbWriteError = errDB
+	s.dbWriteError = errors.New("err")
 	err = up.Shutdown([]ids.ShortID{nodeID0})
 	assert.Error(err)
 }

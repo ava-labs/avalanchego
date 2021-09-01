@@ -13,14 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/transactions"
 )
 
 const (
 	// syncBound is the synchrony bound used for safe decision making
 	syncBound = 10 * time.Second
 
-	// BatchSize is the number of decision transaction to place into a block
+	// BatchSize is the number of decision transactions to place into a block
 	BatchSize = 30
 
 	MaxMempoolByteSize   = 3 * units.GiB // TODO: Should be default, configurable by users
@@ -41,6 +40,7 @@ type Mempool struct {
 
 	// TODO: factor out VM into separable interfaces
 
+	// vm.codec
 	// vm.ctx.Log
 	// vm.ctx.Lock
 
@@ -73,14 +73,14 @@ type Mempool struct {
 	dropIncoming bool
 
 	unissuedProposalTxs *EventHeap
-	unissuedDecisionTxs []*transactions.SignedTx
-	unissuedAtomicTxs   []*transactions.SignedTx
+	unissuedDecisionTxs []*Tx
+	unissuedAtomicTxs   []*Tx
 
 	rejectedProposalTxs *cache.LRU
 	rejectedDecisionTxs *cache.LRU
 	rejectedAtomicTxs   *cache.LRU
 
-	unissuedTxs    map[ids.ID]*transactions.SignedTx
+	unissuedTxs    map[ids.ID]*Tx
 	totalBytesSize int
 }
 
@@ -89,17 +89,17 @@ func (m *Mempool) has(txID ids.ID) bool {
 	return ok
 }
 
-func (m *Mempool) hasRoomFor(tx *transactions.SignedTx) bool {
+func (m *Mempool) hasRoomFor(tx *Tx) bool {
 	return m.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
 }
 
-func (m *Mempool) markReject(tx *transactions.SignedTx) error {
+func (m *Mempool) markReject(tx *Tx) error {
 	switch tx.UnsignedTx.(type) {
-	case VerifiableUnsignedProposalTx:
+	case TimedTx:
 		m.rejectedProposalTxs.Put(tx.ID(), struct{}{})
-	case VerifiableUnsignedDecisionTx:
+	case UnsignedDecisionTx:
 		m.rejectedDecisionTxs.Put(tx.ID(), struct{}{})
-	case VerifiableUnsignedAtomicTx:
+	case UnsignedAtomicTx:
 		m.rejectedAtomicTxs.Put(tx.ID(), struct{}{})
 	default:
 		return errUnknownTxType
@@ -120,12 +120,12 @@ func (m *Mempool) isAlreadyRejected(txID ids.ID) bool {
 	return res
 }
 
-func (m *Mempool) register(tx *transactions.SignedTx) {
+func (m *Mempool) register(tx *Tx) {
 	m.unissuedTxs[tx.ID()] = tx
 	m.totalBytesSize += len(tx.Bytes())
 }
 
-func (m *Mempool) deregister(tx *transactions.SignedTx) {
+func (m *Mempool) deregister(tx *Tx) {
 	delete(m.unissuedTxs, tx.ID())
 	m.totalBytesSize -= len(tx.Bytes())
 }
@@ -138,7 +138,7 @@ func (m *Mempool) Initialize(vm *VM) {
 
 	// Transactions from clients that have not yet been put into blocks and
 	// added to consensus
-	m.unissuedTxs = make(map[ids.ID]*transactions.SignedTx)
+	m.unissuedTxs = make(map[ids.ID]*Tx)
 	m.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
 
 	m.rejectedProposalTxs = &cache.LRU{Size: rejectedTxsCacheSize}
@@ -155,13 +155,13 @@ func (m *Mempool) Initialize(vm *VM) {
 }
 
 // IssueTx enqueues the [tx] to be put into a block
-func (m *Mempool) IssueTx(tx *transactions.SignedTx) error {
+func (m *Mempool) IssueTx(tx *Tx) error {
 	if m.dropIncoming {
 		return nil
 	}
 
 	// Initialize the transaction
-	if err := tx.Sign(Codec, nil); err != nil {
+	if err := tx.Sign(m.vm.codec, nil); err != nil {
 		return err
 	}
 
@@ -174,7 +174,7 @@ func (m *Mempool) IssueTx(tx *transactions.SignedTx) error {
 
 		txID := tx.ID()
 		m.vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		txIDBytes, err := Codec.Marshal(CodecVersion, txID)
+		txIDBytes, err := Codec.Marshal(codecVersion, txID)
 		if err != nil {
 			return err
 		}
@@ -186,7 +186,7 @@ func (m *Mempool) IssueTx(tx *transactions.SignedTx) error {
 	}
 }
 
-func (m *Mempool) AddUncheckedTx(tx *transactions.SignedTx) error {
+func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 	txID := tx.ID()
 	if m.has(txID) {
 		return errAttemptReRegisterTx
@@ -198,9 +198,9 @@ func (m *Mempool) AddUncheckedTx(tx *transactions.SignedTx) error {
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
 		m.unissuedProposalTxs.Add(tx)
-	case VerifiableUnsignedDecisionTx:
+	case UnsignedDecisionTx:
 		m.unissuedDecisionTxs = append(m.unissuedDecisionTxs, tx)
-	case VerifiableUnsignedAtomicTx:
+	case UnsignedAtomicTx:
 		m.unissuedAtomicTxs = append(m.unissuedAtomicTxs, tx)
 	default:
 		return errUnknownTxType
@@ -240,7 +240,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if numTxs > len(m.unissuedDecisionTxs) {
 			numTxs = len(m.unissuedDecisionTxs)
 		}
-		var txs []*transactions.SignedTx
+		var txs []*Tx
 		txs, m.unissuedDecisionTxs = m.unissuedDecisionTxs[:numTxs], m.unissuedDecisionTxs[numTxs:]
 		for _, tx := range txs {
 			m.deregister(tx)
