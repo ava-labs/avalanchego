@@ -3732,30 +3732,7 @@ func TestBuildInvalidBlockHead(t *testing.T) {
 	}
 }
 
-func initVM(t *testing.T, test struct {
-	name                     string
-	logConfig                string
-	genesisJSON, upgradeJSON string
-	expectedErr              string
-}) (*VM, error) {
-	vm, ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
-	if err := vm.Initialize(
-		ctx,
-		dbManager,
-		genesisBytes,
-		[]byte(""),
-		[]byte(test.logConfig),
-		issuer,
-		[]*engCommon.Fx{},
-	); err != nil {
-		return nil, err
-	}
-
-	return vm, nil
-}
-
 func TestInvalidAndValidLogLevel(t *testing.T) {
-
 	configTests := []struct {
 		name                     string
 		logConfig                string
@@ -3779,7 +3756,16 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 	}
 	for _, test := range configTests {
 		t.Run(test.name, func(t *testing.T) {
-			vm, err := initVM(t, test)
+			vm, ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
+			err := vm.Initialize(
+				ctx,
+				dbManager,
+				genesisBytes,
+				[]byte(""),
+				[]byte(test.logConfig),
+				issuer,
+				[]*engCommon.Fx{},
+			)
 			if len(test.expectedErr) == 0 && err != nil {
 				t.Fatal(err)
 			} else if len(test.expectedErr) > 0 {
@@ -3789,6 +3775,7 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 					t.Fatalf("Expected initialize to fail due to %s, but failed with %s", test.expectedErr, err.Error())
 				}
 			}
+
 			if vm != nil {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {
@@ -3796,6 +3783,7 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 					shutdownChan <- err
 				}
 				go shutdownFunc()
+
 				shutdownTimeout := 50 * time.Millisecond
 				ticker := time.NewTicker(shutdownTimeout)
 				select {
@@ -3807,7 +3795,6 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 					}
 				}
 			}
-
 		})
 	}
 
