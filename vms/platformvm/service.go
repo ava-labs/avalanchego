@@ -40,17 +40,28 @@ const (
 )
 
 var (
-	errMissingDecisionBlock  = errors.New("should have a decision block within the past two blocks")
-	errNoFunds               = errors.New("no spendable funds were found")
-	errNoSubnetID            = errors.New("argument 'subnetID' not provided")
-	errNoRewardAddress       = errors.New("argument 'rewardAddress' not provided")
-	errInvalidDelegationRate = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
-	errNoAddresses           = errors.New("no addresses provided")
-	errNoKeys                = errors.New("user has no keys or funds")
-	errNoPrimaryValidators   = errors.New("no default subnet validators")
-	errCorruptedReason       = errors.New("tx validity corrupted")
-	errStartTimeTooSoon      = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
-	errStartTimeTooLate      = errors.New("start time is too far in the future")
+	errMissingDecisionBlock       = errors.New("should have a decision block within the past two blocks")
+	errNoFunds                    = errors.New("no spendable funds were found")
+	errNoSubnetID                 = errors.New("argument 'subnetID' not provided")
+	errNoRewardAddress            = errors.New("argument 'rewardAddress' not provided")
+	errInvalidDelegationRate      = errors.New("argument 'delegationFeeRate' must be between 0 and 100, inclusive")
+	errNoAddresses                = errors.New("no addresses provided")
+	errNoKeys                     = errors.New("user has no keys or funds")
+	errNoPrimaryValidators        = errors.New("no default subnet validators")
+	errCorruptedReason            = errors.New("tx validity corrupted")
+	errStartTimeTooSoon           = fmt.Errorf("start time must be at least %s in the future", minAddStakerDelay)
+	errStartTimeTooLate           = errors.New("start time is too far in the future")
+	errTotalOverflow              = errors.New("overflow while calculating total balance")
+	errUnlockedOverflow           = errors.New("overflow while calculating unlocked balance")
+	errLockedOverflow             = errors.New("overflow while calculating locked balance")
+	errNotStakeableOverflow       = errors.New("overflow while calculating locked not stakeable balance")
+	errLockedNotStakeableOverflow = errors.New("overflow while calculating locked not stakeable balance")
+	errUnlockedStakeableOverflow  = errors.New("overflow while calculating unlocked stakeable balance")
+	errNamedSubnetCantBePrimary   = errors.New("subnet validator attempts to validate primary network")
+	errNoAmount                   = errors.New("argument 'amount' must be > 0")
+	errMissingName                = errors.New("argument 'name' not given")
+	errMissingVMID                = errors.New("argument 'vmID' not given")
+	errMissingBlockchainID        = errors.New("argument 'blockchainID' not given")
 )
 
 // Service defines the API calls that can be made to the platform chain
@@ -213,13 +224,13 @@ utxoFor:
 			if out.Locktime <= currentTime {
 				newBalance, err := math.Add64(unlocked, out.Amount())
 				if err != nil {
-					return errors.New("overflow while calculating unlocked balance")
+					return errUnlockedOverflow
 				}
 				unlocked = newBalance
 			} else {
 				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
 				if err != nil {
-					return errors.New("overflow while calculating locked not stakeable balance")
+					return errNotStakeableOverflow
 				}
 				lockedNotStakeable = newBalance
 			}
@@ -233,19 +244,19 @@ utxoFor:
 			case innerOut.Locktime > currentTime:
 				newBalance, err := math.Add64(lockedNotStakeable, out.Amount())
 				if err != nil {
-					return errors.New("overflow while calculating locked not stakeable balance")
+					return errLockedNotStakeableOverflow
 				}
 				lockedNotStakeable = newBalance
 			case out.Locktime <= currentTime:
 				newBalance, err := math.Add64(unlocked, out.Amount())
 				if err != nil {
-					return errors.New("overflow while calculating unlocked balance")
+					return errUnlockedOverflow
 				}
 				unlocked = newBalance
 			default:
 				newBalance, err := math.Add64(lockedStakeable, out.Amount())
 				if err != nil {
-					return errors.New("overflow while calculating unlocked stakeable balance")
+					return errUnlockedStakeableOverflow
 				}
 				lockedStakeable = newBalance
 			}
@@ -258,11 +269,11 @@ utxoFor:
 
 	lockedBalance, err := math.Add64(lockedStakeable, lockedNotStakeable)
 	if err != nil {
-		return errors.New("overflow while calculating locked balance")
+		return errLockedOverflow
 	}
 	balance, err := math.Add64(unlocked, lockedBalance)
 	if err != nil {
-		return errors.New("overflow while calculating total balance")
+		return errTotalOverflow
 	}
 
 	response.Balance = json.Uint64(balance)
@@ -1260,7 +1271,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 		return fmt.Errorf("problem parsing subnetID %q: %w", args.SubnetID, err)
 	}
 	if subnetID == constants.PrimaryNetworkID {
-		return errors.New("subnet validator attempts to validate primary network")
+		return errNamedSubnetCantBePrimary
 	}
 
 	// Get the keys controlled by the user
@@ -1449,7 +1460,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	service.vm.ctx.Log.Debug("Platform: ExportAVAX called")
 
 	if args.Amount == 0 {
-		return errors.New("argument 'amount' must be > 0")
+		return errNoAmount
 	}
 
 	// Parse the to address
@@ -1654,9 +1665,9 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 
 	switch {
 	case args.Name == "":
-		return errors.New("argument 'name' not given")
+		return errMissingName
 	case args.VMID == "":
-		return errors.New("argument 'vmID' not given")
+		return errMissingVMID
 	}
 
 	genesisBytes, err := formatting.Decode(args.Encoding, args.GenesisData)
@@ -1780,7 +1791,7 @@ func (service *Service) GetBlockchainStatus(_ *http.Request, args *GetBlockchain
 	service.vm.ctx.Log.Debug("Platform: GetBlockchainStatus called")
 
 	if args.BlockchainID == "" {
-		return errors.New("argument 'blockchainID' not given")
+		return errMissingBlockchainID
 	}
 
 	// if its aliased then vm created this chain.

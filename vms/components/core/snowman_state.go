@@ -13,7 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/state"
 )
 
-var errWrongType = errors.New("got unexpected type from database")
+var (
+	errWrongType    = errors.New("got unexpected type from database")
+	errNotBlockType = errors.New("expected snowman.Block but got unexpected type")
+)
 
 // state.Get(Db, IDTypeID, lastAcceptedID) == ID of last accepted block
 var lastAcceptedID = ids.ID{'l', 'a', 's', 't'}
@@ -80,7 +83,7 @@ func NewSnowmanState(unmarshalBlockFunc func([]byte) (snowman.Block, error)) (Sn
 			if block, ok := b.(snowman.Block); ok {
 				return block.Bytes(), nil
 			}
-			return nil, errors.New("expected snowman.Block but got unexpected type")
+			return nil, errNotBlockType
 		},
 		func(bytes []byte) (interface{}, error) {
 			return unmarshalBlockFunc(bytes)

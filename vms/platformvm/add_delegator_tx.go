@@ -386,7 +386,7 @@ func maxStakeAmount(
 
 	var (
 		err      error
-		maxStake uint64 = 0
+		maxStake uint64
 	)
 
 	// Iterate through time until [endTime].

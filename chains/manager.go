@@ -49,8 +49,9 @@ const (
 )
 
 var (
-	BootstrappedKey         = []byte{0x00}
-	_               Manager = &manager{}
+	errUnknownChainID = errors.New("unknown chain ID")
+
+	_ Manager = &manager{}
 )
 
 // Manager manages the chains running on this node.
@@ -245,19 +246,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		var onBootstrapped func()
-		if chainParams.SubnetID == constants.PrimaryNetworkID {
-			onBootstrapped = func() {
-				// When this subnet is done bootstrapping, mark that we have
-				// bootstrapped this database version. If running in fetch only
-				// mode, shut down node since fetching is complete.
-				if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
-					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
-					go m.ShutdownNodeFunc(1)
-				}
-			}
-		}
-		sb = newSubnet(onBootstrapped)
+		sb = newSubnet(nil)
 		m.subnets[chainParams.SubnetID] = sb
 	}
 
@@ -732,7 +721,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 
 	chain, exists := m.chains[chainID]
 	if !exists {
-		return ids.ID{}, errors.New("unknown chain ID")
+		return ids.ID{}, errUnknownChainID
 	}
 	return chain.Context().SubnetID, nil
 }
