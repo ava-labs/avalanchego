@@ -147,7 +147,6 @@ func TestSuggestTipCapSmallBlocks(t *testing.T) {
 		Blocks:     3,
 		Percentile: 60,
 	}
-	// TODO(aaronbuchwald) review modified test cases
 	var cases = []struct {
 		fork   *big.Int // ApricotPhase3BlockTimestamp
 		expect *big.Int // Expected gasprice suggestion
