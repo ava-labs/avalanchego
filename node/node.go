@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/go-plugin"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/auth"
@@ -148,6 +149,9 @@ type Node struct {
 	// Incremented only once on initialization.
 	// Decremented when node is done shutting down.
 	DoneShuttingDown sync.WaitGroup
+
+	// Metrics Registerer
+	MetricsRegisterer *prometheus.Registry
 }
 
 /*
@@ -239,7 +243,7 @@ func (n *Node) initNetworking() error {
 	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
 		n.Log,
 		networkNamespace,
-		n.Config.NetworkConfig.MetricsRegisterer,
+		n.MetricsRegisterer,
 		primaryNetworkValidators,
 		n.Config.NetworkConfig.InboundThrottlerConfig,
 	)
@@ -250,7 +254,7 @@ func (n *Node) initNetworking() error {
 	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
 		n.Log,
 		networkNamespace,
-		n.Config.NetworkConfig.MetricsRegisterer,
+		n.MetricsRegisterer,
 		primaryNetworkValidators,
 		n.Config.NetworkConfig.OutboundThrottlerConfig,
 	)
@@ -260,7 +264,7 @@ func (n *Node) initNetworking() error {
 
 	n.Net, err = network.NewDefaultNetwork(
 		networkNamespace,
-		n.Config.ConsensusParams.Metrics,
+		n.MetricsRegisterer,
 		n.Log,
 		n.ID,
 		n.Config.IP,
@@ -610,7 +614,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		requestsNamespace,
-		n.Config.NetworkConfig.MetricsRegisterer,
+		n.MetricsRegisterer,
 	); err != nil {
 		return err
 	}
@@ -627,7 +631,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		n.Shutdown,
 		n.Config.RouterHealthConfig,
 		requestsNamespace,
-		n.Config.NetworkConfig.MetricsRegisterer,
+		n.MetricsRegisterer,
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
@@ -797,8 +801,10 @@ func (n *Node) initMetricsAPI() error {
 	registry, handler := metrics.NewService()
 	// It is assumed by components of the system that the Metrics interface is
 	// non-nil. So, it is set regardless of if the metrics API is available or not.
-	n.Config.ConsensusParams.Metrics = registry
-	n.Config.NetworkConfig.MetricsRegisterer = registry
+	n.MetricsRegisterer = registry
+
+	// TODO: remove metrics field from consensus params.
+	n.Config.ConsensusParams.Metrics = n.MetricsRegisterer
 
 	if !n.Config.MetricsAPIEnabled {
 		n.Log.Info("skipping metrics API initialization because it has been disabled")
@@ -908,7 +914,7 @@ func (n *Node) initHealthAPI() error {
 		n.Config.HealthCheckFreq,
 		n.Log,
 		fmt.Sprintf("%s_health", constants.PlatformName),
-		n.Config.ConsensusParams.Metrics,
+		n.MetricsRegisterer,
 	)
 	if err != nil {
 		return err

@@ -245,9 +245,7 @@ type Config struct {
 	InboundThrottlerConfig      throttling.MsgThrottlerConfig         `json:"inboundThrottlerConfig"`
 	OutboundThrottlerConfig     throttling.MsgThrottlerConfig         `json:"outboundThrottlerConfig"`
 	DialerConfig                dialer.Config                         `json:"dialerConfig"`
-	// [Registerer] is set in node's initMetricsAPI method
-	MetricsRegisterer  prometheus.Registerer `json:"-"`
-	CompressionEnabled bool                  `json:"compressionEnabled"`
+	CompressionEnabled          bool                                  `json:"compressionEnabled"`
 	// Peer alias configuration
 	PeerAliasTimeout time.Duration `json:"peerAliasTimeout"`
 }
