@@ -13,7 +13,7 @@ type Fx interface {
 	// Notify this Fx that the VM is bootstrapped
 	Bootstrapped() error
 
-	// VerifyTransfer verifies that the specified transaction can spend the
+	// VerifyTransfer verifies that the specified transactions.can spend the
 	// provided utxo with no restrictions on the destination. If the transaction
 	// can't spend the output based on the input and credential, a non-nil error
 	// should be returned.

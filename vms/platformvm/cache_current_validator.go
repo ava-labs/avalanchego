@@ -8,7 +8,7 @@ var _ currentValidator = &currentValidatorImpl{}
 type currentValidator interface {
 	validator
 
-	AddValidatorTx() VerifiableUnsignedAddValidatorTx
+	AddValidatorTx() *UnsignedAddValidatorTx
 
 	// Weight of delegations to this validator. Doesn't include the stake
 	// provided by this validator.
@@ -21,12 +21,12 @@ type currentValidatorImpl struct {
 	// delegators are sorted in order of removal.
 	validatorImpl
 
-	addValidatorTx  VerifiableUnsignedAddValidatorTx
+	addValidatorTx  *UnsignedAddValidatorTx
 	delegatorWeight uint64
 	potentialReward uint64
 }
 
-func (v *currentValidatorImpl) AddValidatorTx() VerifiableUnsignedAddValidatorTx {
+func (v *currentValidatorImpl) AddValidatorTx() *UnsignedAddValidatorTx {
 	return v.addValidatorTx
 }
 
