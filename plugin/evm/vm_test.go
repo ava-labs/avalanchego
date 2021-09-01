@@ -3732,7 +3732,7 @@ func TestBuildInvalidBlockHead(t *testing.T) {
 	}
 }
 
-func TestInvalidAndValidLogLevel(t *testing.T) {
+func TestConfigureLogLevel(t *testing.T) {
 	configTests := []struct {
 		name                     string
 		logConfig                string
@@ -3747,7 +3747,7 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 			expectedErr: "",
 		},
 		{
-			name:        "Wrong log level",
+			name:        "Invalid log level",
 			logConfig:   "{\"log-level\": \"cchain\"}",
 			genesisJSON: genesisJSONApricotPhase3,
 			upgradeJSON: "",
@@ -3776,7 +3776,8 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 				}
 			}
 
-			if vm != nil {
+			// If the VM was not initialized, do not attept to shut it down
+			if err == nil {
 				shutdownChan := make(chan error, 1)
 				shutdownFunc := func() {
 					err := vm.Shutdown()
