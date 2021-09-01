@@ -336,7 +336,6 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("failed to initialize logger due to: %w ", err)
 		}
 		logLevel = configLogLevel
-
 	}
 
 	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
