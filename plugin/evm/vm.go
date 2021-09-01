@@ -332,11 +332,9 @@ func (vm *VM) Initialize(
 	logLevel := defaultLogLevel
 	if vm.config.LogLevel != "" {
 		configLogLevel, err := log.LvlFromString(vm.config.LogLevel)
-
 		if err != nil {
 			return fmt.Errorf("failed to initialize logger due to: %w ", err)
 		}
-
 		logLevel = configLogLevel
 
 	}
