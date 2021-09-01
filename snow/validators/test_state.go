@@ -12,7 +12,7 @@ var (
 	errGetValidatorSet = errors.New("unexpectedly called GetValidatorSet")
 )
 
-type TestVM struct {
+type TestState struct {
 	T *testing.T
 
 	CantGetCurrentHeight,
@@ -22,7 +22,7 @@ type TestVM struct {
 	GetValidatorSetF  func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error)
 }
 
-func (vm *TestVM) GetCurrentHeight() (uint64, error) {
+func (vm *TestState) GetCurrentHeight() (uint64, error) {
 	if vm.GetCurrentHeightF != nil {
 		return vm.GetCurrentHeightF()
 	}
@@ -32,7 +32,7 @@ func (vm *TestVM) GetCurrentHeight() (uint64, error) {
 	return 0, errCurrentHeight
 }
 
-func (vm *TestVM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
+func (vm *TestState) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 	if vm.GetValidatorSetF != nil {
 		return vm.GetValidatorSetF(height, subnetID)
 	}
