@@ -165,7 +165,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			extraStateContribution: nil,
 			shouldErr:              false,
 		},
-		"tx covers exactly block fee after delay": {
+		"tx covers exactly block fee after half block fee duration": {
 			baseFee:          big.NewInt(100),
 			maxGasBlockFee:   big.NewInt(1000),
 			blockFeeDuration: 2,
@@ -179,7 +179,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			extraStateContribution: nil,
 			shouldErr:              false,
 		},
-		"tx covers exactly block fee after delay obo": {
+		"tx covers less than block fee after half block fee duration": {
 			baseFee:          big.NewInt(100),
 			maxGasBlockFee:   big.NewInt(1000),
 			blockFeeDuration: 2,

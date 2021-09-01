@@ -183,6 +183,10 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 }
 
 func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.Int, blockFeeDuration, timeElapsed uint64, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
+	if baseFee.Cmp(common.Big0) <= 0 {
+		return fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
+	}
+
 	var (
 		gasUsed              = new(big.Int)
 		blockFeeContribution = new(big.Int)
@@ -199,9 +203,6 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 		}
 		blockFeeContribution = blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
 		totalBlockFee = totalBlockFee.Add(totalBlockFee, blockFeeContribution)
-	}
-	if baseFee.Cmp(common.Big0) <= 0 {
-		return fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
 	}
 	// Calculate how much gas the [totalBlockFee] would purchase at the price level
 	// set by this block.
@@ -269,7 +270,7 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 	return nil
 }
 
-func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, parentHeader *types.Header, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var (
 		contribution *big.Int
@@ -284,15 +285,11 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		contribution = extraStateChangeContribution
 	}
 	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-		parent := chain.GetHeaderByHash(header.ParentHash)
-		if parent == nil {
-			return nil, errMissingParent
-		}
 		if err := self.verifyBlockFee(
 			header.BaseFee,
 			apricotPhase4MaxRequiredBlockGasFee,
 			apricotPhase4BlockGasFeeDuration,
-			header.Time-parent.Time,
+			header.Time-parentHeader.Time,
 			txs,
 			receipts,
 			contribution,
