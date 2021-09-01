@@ -679,27 +679,27 @@ func (vm *VM) listenAndGossip() {
 }
 
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	vm.ctx.Log.Verbo("called AppRequestFailed")
+	log.Trace("called AppRequestFailed")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		vm.ctx.Log.Verbo("called AppRequestFailed before activation time. Doing nothing")
+		log.Trace("called AppRequestFailed before activation time. Doing nothing")
 		return nil
 	}
 
-	vm.ctx.Log.Warn("AppRequestFailed to node %v, reqID %v", nodeID, requestID)
+	log.Warn(fmt.Sprintf("AppRequestFailed to node %s, reqID %d", nodeID, requestID))
 	return nil
 }
 
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	vm.ctx.Log.Verbo("called AppRequest")
+	log.Trace("called AppRequest")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		vm.ctx.Log.Verbo("called AppRequest before activation time. Doing nothing")
+		log.Trace("called AppRequest before activation time. Doing nothing")
 		return nil
 	}
 
 	if txID, err := vm.bytesToAtmTxID(request); err == nil {
-		vm.ctx.Log.Debug("called AppRequest with txID %v", txID)
+		log.Debug(fmt.Sprintf("called AppRequest with txID %s", txID))
 
 		if !vm.mempool.has(txID) {
 			return nil
@@ -721,7 +721,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 
 		return vm.appSender.SendAppResponse(nodeID, requestID, response)
 	} else if hashList, err := vm.bytesToEthTxHashes(request); err == nil {
-		vm.ctx.Log.Debug("called AppRequest with coreth hashes list")
+		log.Debug("called AppRequest with coreth hashes list")
 
 		txsToRespondTo := make([]*types.Transaction, 0)
 		for _, txHash := range hashList {
@@ -743,23 +743,21 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		return vm.appSender.SendAppResponse(nodeID, requestID, response)
 	}
 
-	vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v",
-		nodeID, requestID)
+	log.Debug(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d", nodeID, requestID))
 	return fmt.Errorf("failed unmarshalling AppGossipRequest")
 }
 
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	vm.ctx.Log.Verbo("called AppResponse")
+	log.Trace("called AppResponse")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		vm.ctx.Log.Verbo("called AppResponse before activation time. Doing nothing")
+		log.Trace("called AppResponse before activation time. Doing nothing")
 		return nil
 	}
 
 	// check requestID
 	if err := vm.ReclaimID(requestID); err != nil {
-		vm.ctx.Log.Debug("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %v",
-			nodeID, requestID)
+		log.Debug(fmt.Sprintf("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %d", nodeID, requestID))
 		return nil
 	}
 
@@ -768,12 +766,12 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	if _, err := vm.codec.Unmarshal(response, tx); err == nil {
 		unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
 		if err != nil {
-			vm.ctx.Log.Debug("AppResponse: failed unmarshalling UnsignedAtomicTx from Node %v, reqID %v, err %v",
-				nodeID, requestID, err)
+			log.Debug(fmt.Sprintf("AppResponse: failed unmarshalling UnsignedAtomicTx from Node %v, reqID %v, err %v",
+				nodeID, requestID, err))
 			return err
 		}
 		tx.Initialize(unsignedBytes, response)
-		vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
+		log.Debug(fmt.Sprintf("called AppResponse with txID %s", tx.ID()))
 
 		// Note: we currently do not check whether nodes send us exactly the tx matching
 		// the txID we asked for. At least we should check we do not receive total garbage
@@ -785,8 +783,8 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 
 		err = vm.issueTx(tx /*local*/, false)
 		if err != nil {
-			vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
-				nodeID, requestID, err)
+			log.Debug(fmt.Sprintf("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
+				nodeID, requestID, err))
 		}
 
 		return err
@@ -797,14 +795,15 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		errs := vm.chain.GetTxPool().AddRemotes(corethTxs)
 		for _, err := range errs {
 			if err != nil {
-				vm.ctx.Log.Debug("AppResponse: failed AddRemotes response from Node %v, reqID %v, err %v",
-					nodeID, requestID, err)
+				log.Debug(fmt.Sprintf("AppResponse: failed AddRemotes response from Node %v, reqID %v, err %v",
+					nodeID, requestID, err))
 			}
 		}
 		return nil
 	}
 
-	vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v")
+	log.Debug(fmt.Sprintf("AppResponse: failed unmarshalling response from Node %v, reqID %v",
+		nodeID, requestID))
 	return fmt.Errorf("failed unmarshalling AppGossipResponse")
 }
 
@@ -816,15 +815,15 @@ func (vm *VM) bytesToAtmTxID(b []byte) (ids.ID, error) {
 }
 
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	vm.ctx.Log.Verbo("called AppGossip")
+	log.Trace("called AppGossip")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		vm.ctx.Log.Verbo("called AppGossip before activation time. Doing nothing")
+		log.Trace("called AppGossip before activation time. Doing nothing")
 		return nil
 	}
 
 	if txID, err := vm.bytesToAtmTxID(msg); err == nil {
-		vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
+		log.Debug(fmt.Sprintf("called AppGossip with txID %s", txID))
 
 		_, dropped, found := vm.mempool.GetTx(txID)
 		switch {
@@ -838,7 +837,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		nodesSet.Add(nodeID)
 		return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
 	} else if hashList, err := vm.bytesToEthTxHashes(msg); err == nil {
-		vm.ctx.Log.Debug("called AppGossip with coreth hashes list")
+		log.Debug("called AppGossip with coreth hashes list")
 
 		hashesToRequest := make([]common.Hash, 0)
 		for _, txHash := range hashList {
@@ -1164,7 +1163,7 @@ func (vm *VM) awaitSubmittedTxs() {
 			vm.signalTxsReady()
 
 			if time.Now().Before(vm.gossipActivationTime) {
-				vm.ctx.Log.Verbo("issued coreth tx before gossiping activation time. Not gossiping it")
+				log.Trace("issued coreth tx before gossiping activation time. Not gossiping it")
 				continue
 			}
 
@@ -1184,7 +1183,7 @@ func (vm *VM) awaitSubmittedTxs() {
 				}
 
 				// gossip them
-				vm.ctx.Log.Debug("AppGossip: gossiping %v coreth txs", len(ethHashes))
+				log.Debug(fmt.Sprintf("AppGossip: gossiping %v coreth txs", len(ethHashes)))
 				vm.appGossipBytesCh <- ethTxsBytes
 			}
 		case <-vm.mempool.Pending:
@@ -1240,11 +1239,11 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	switch err := vm.mempool.AddTx(tx); err {
 	case nil:
 		if time.Now().Before(vm.gossipActivationTime) {
-			vm.ctx.Log.Verbo("issued tx before gossiping activation time. Not gossiping it")
+			log.Trace("issued tx before gossiping activation time. Not gossiping it")
 			return nil
 		}
 		txID := tx.ID()
-		vm.ctx.Log.Debug("Gossiping txID %v", txID)
+		log.Debug(fmt.Sprintf("AppGossip: gossiping txID %s", txID))
 		txIDBytes, err := vm.codec.Marshal(codecVersion, txID)
 		if err != nil {
 			return err
