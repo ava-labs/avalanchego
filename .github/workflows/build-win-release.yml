@@ -5,8 +5,10 @@ name: build-win-release
 # Controls when the action will run.
 on:
   push:
-    tags:
-      - '*' # Push events to every tag
+#    tags:
+#      - '*' # Push events to every tag
+    branches:
+      - 'master'
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -39,7 +41,8 @@ jobs:
         mv .\build\plugins\evm .\build\plugins\evm.exe
         Compress-Archive -Path .\build\avalanchego.exe,.\build\plugins -DestinationPath .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
 
-    - uses: chrislennon/action-aws-cli@v1.1
+    - name: Install awscli
+      run: msiexec.exe /passive /i /n https://awscli.amazonaws.com/AWSCLIV2.msi 
     
     - name: Copy to s3
       run: aws s3 cp .\build\avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip s3://${{ secrets.BUCKET }}/windows/avalanchego-win-${{ steps.get_version.outputs.VERSION }}-experimental.zip
