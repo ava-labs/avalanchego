@@ -48,7 +48,7 @@ const (
 
 var (
 	DefaultMaxPrice    = big.NewInt(150 * params.GWei)
-	DefaultIgnorePrice = big.NewInt(2 * params.Wei)
+	DefaultIgnorePrice = big.NewInt(params.GWei)
 )
 
 type Config struct {
