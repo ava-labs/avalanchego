@@ -3779,9 +3779,7 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 	}
 	for _, test := range configTests {
 		t.Run(test.name, func(t *testing.T) {
-
 			vm, err := initVM(t, test)
-
 			if len(test.expectedErr) == 0 && err != nil {
 				t.Fatal(err)
 			} else if len(test.expectedErr) > 0 {
@@ -3791,7 +3789,6 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 					t.Fatalf("Expected initialize to fail due to %s, but failed with %s", test.expectedErr, err.Error())
 				}
 			}
-
 			if vm != nil {
 				defer func() {
 					shutdownChan := make(chan error, 1)
@@ -3799,7 +3796,6 @@ func TestInvalidAndValidLogLevel(t *testing.T) {
 						err := vm.Shutdown()
 						shutdownChan <- err
 					}
-
 					go shutdownFunc()
 					shutdownTimeout := 50 * time.Millisecond
 					ticker := time.NewTicker(shutdownTimeout)
