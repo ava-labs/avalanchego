@@ -614,7 +614,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 			},
 			BytesV:     []byte{1},
 			ParentV:    coreGenBlk.ID(),
-			TimestampV: coreGenBlk.Timestamp(),
+			TimestampV: postActivationTime,
 		},
 		opts: [2]snowman.Block{
 			&snowman.TestBlock{
@@ -624,7 +624,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 				},
 				BytesV:     []byte{2},
 				ParentV:    coreBlkID,
-				TimestampV: coreGenBlk.Timestamp(),
+				TimestampV: postActivationTime,
 			},
 			&snowman.TestBlock{
 				TestDecidable: choices.TestDecidable{
@@ -633,7 +633,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 				},
 				BytesV:     []byte{3},
 				ParentV:    coreBlkID,
-				TimestampV: coreGenBlk.Timestamp(),
+				TimestampV: postActivationTime,
 			},
 		},
 	}
