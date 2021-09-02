@@ -14,16 +14,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 type TestOptionsBlock struct {
 	snowman.TestBlock
-	opts [2]snowman.Block
+	opts    [2]snowman.Block
+	optsErr error
 }
 
 func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
-	return tob.opts, nil
+	return tob.opts, tob.optsErr
 }
 
 // ProposerBlock.Verify tests section
@@ -499,5 +501,95 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 	if proOpt.innerBlk.Status() == choices.Rejected {
 		t.Fatal("block rejection unduly changed inner block status")
+	}
+}
+
+func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
+	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	proVM.Set(coreGenBlk.Timestamp())
+
+	coreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: coreGenBlk.Timestamp(),
+		},
+		optsErr: snowman.ErrNotOracle,
+	}
+
+	coreChildBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{2},
+		ParentV:    coreBlk.ID(),
+		HeightV:    coreBlk.Height() + 1,
+		TimestampV: coreBlk.Timestamp(),
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		case coreChildBlk.ID():
+			return coreChildBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreChildBlk.Bytes()):
+			return coreChildBlk, nil
+		default:
+			return nil, fmt.Errorf("Unknown block")
+		}
+	}
+
+	parentBlk, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build post fork oracle block")
+	}
+
+	postForkBlk, ok := parentBlk.(*postForkBlock)
+	if !ok {
+		t.Fatal("expected post fork block")
+	}
+	_, err = postForkBlk.Options()
+	if err != snowman.ErrNotOracle {
+		t.Fatal("should have reported that the block isn't an oracle block")
+	}
+
+	// Build the child
+	statelessChild, err := option.Build(
+		postForkBlk.ID(),
+		coreChildBlk.Bytes(),
+	)
+	if err != nil {
+		t.Fatal("failed to build new child block")
+	}
+
+	invalidChild, err := proVM.ParseBlock(statelessChild.Bytes())
+	if err != nil {
+		// A failure to parse is okay here
+		return
+	}
+
+	err = invalidChild.Verify()
+	if err == nil {
+		t.Fatal("Should have failed to verify a child that should have been signed")
 	}
 }
