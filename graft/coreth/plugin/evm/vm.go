@@ -1158,11 +1158,11 @@ func (vm *VM) awaitSubmittedTxs() {
 			}
 
 			// pick hashes and serialize them
-			ethHashes := make([]common.Hash, len(ethTxsEvent.Txs))
-			for idx, ethTx := range ethTxsEvent.Txs {
+			ethHashes := make([]common.Hash, 0)
+			for _, ethTx := range ethTxsEvent.Txs {
 				txStatus := vm.chain.GetTxPool().Status([]common.Hash{ethTx.Hash()})[0]
 				if txStatus == core.TxStatusPending {
-					ethHashes[idx] = ethTx.Hash()
+					ethHashes = append(ethHashes, ethTx.Hash())
 				}
 			}
 

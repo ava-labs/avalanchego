@@ -10,16 +10,18 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
+type appMsgType byte
+
 const (
-	atomicTxIDType byte = 0
-	atomicTxType   byte = 1
-	ethHashesType  byte = 2
-	ethTxListType  byte = 3
+	atomicTxIDType appMsgType = iota + 1
+	atomicTxType
+	ethHashesType
+	ethTxListType
 )
 
 type AppMsg struct {
-	MsgType      uint8  `serialize:"true"`
-	Bytes        []byte `serialize:"true"`
+	MsgType      appMsgType `serialize:"true"`
+	Bytes        []byte     `serialize:"true"`
 	appGossipObj interface{}
 }
 
@@ -32,6 +34,10 @@ func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
 
 	switch appMsg.MsgType {
 	case atomicTxIDType:
+		if len(appMsg.Bytes) != 32 {
+			log.Debug("TxID bytes cannot be decoded into txID")
+			return nil, fmt.Errorf("bad atomicTxID AppMsg")
+		}
 		txID := ids.ID{}
 		copy(txID[:], appMsg.Bytes)
 		appMsg.appGossipObj = txID
@@ -77,9 +83,11 @@ func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
 }
 
 func (vm *VM) encodeTxID(txID ids.ID) ([]byte, error) {
-	am := &AppMsg{}
-	am.MsgType = atomicTxIDType
-	am.Bytes = txID[:]
+	am := &AppMsg{
+		MsgType: atomicTxIDType,
+		Bytes:   txID[:],
+	}
+
 	return vm.codec.Marshal(codecVersion, am)
 }
 
