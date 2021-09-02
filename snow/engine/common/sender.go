@@ -83,12 +83,20 @@ type Gossiper interface {
 	SendGossip(containerID ids.ID, container []byte)
 }
 
-// AppSender sends app-level messages.
+// AppSender sends application (VM) level messages.
+// See also common.AppHandler.
 type AppSender interface {
 	// Send an application-level request.
+	// A nil return value guarantees that for each nodeID in [nodeIDs],
+	// the VM corresponding to this AppSender eventually receives either:
+	// * An AppResponse from nodeID with ID [requestID]
+	// * An AppRequestFailed from nodeID with ID [requestID]
+	// Exactly one of the above messages will eventually be received per nodeID.
 	// A non-nil error should be considered fatal.
 	SendAppRequest(nodeIDs ids.ShortSet, requestID uint32, appRequestBytes []byte) error
 	// Send an application-level response to a request.
+	// This response must be in response to an AppRequest that the VM corresponding
+	// to this AppSender received from [nodeID] with ID [requestID].
 	// A non-nil error should be considered fatal.
 	SendAppResponse(nodeID ids.ShortID, requestID uint32, appResponseBytes []byte) error
 	// Gossip an application-level message.
