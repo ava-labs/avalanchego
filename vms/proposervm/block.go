@@ -58,12 +58,15 @@ func (p *postForkCommonComponents) Height() uint64 {
 }
 
 // Verify returns nil if:
-// 1) [child]'s P-Chain height >= [parentPChainHeight]
-// 2) [childPChainHeight] <= the current P-Chain height
+// 1) [p]'s inner block is not an oracle block
+// 2) [child]'s P-Chain height >= [parentPChainHeight]
 // 3) [p]'s inner block is the parent of [c]'s inner block
-// 4) [child]'s timestamp is within the synchrony bound, after [p]'s timestamp, and within its proposer's window
-// 5) [child] has a valid signature from its proposer
-// 6) [child]'s inner block is valid
+// 4) [child]'s timestamp isn't before [p]'s timestamp
+// 5) [child]'s timestamp is within the skew bound
+// 6) [childPChainHeight] <= the current P-Chain height
+// 7) [child]'s timestamp is within its proposer's window
+// 8) [child] has a valid signature from its proposer
+// 9) [child]'s inner block is valid
 func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
 	if err := verifyIsNotOracleBlock(p.innerBlk); err != nil {
 		p.vm.ctx.Log.Debug("oracle block shouldn't have a signed child")
