@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 func TestOptionState(t *testing.T) {
@@ -20,7 +20,7 @@ func TestOptionState(t *testing.T) {
 
 	parentID := ids.ID{1}
 	innerBlockBytes := []byte{3}
-	opt, err := option.Build(parentID, innerBlockBytes)
+	opt, err := block.BuildOption(parentID, innerBlockBytes)
 	assert.NoError(err)
 
 	db := memdb.New()

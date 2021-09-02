@@ -55,3 +55,19 @@ func ParseHeader(bytes []byte) (Header, error) {
 	header.bytes = bytes
 	return &header, nil
 }
+
+func ParseOption(bytes []byte) (Option, error) {
+	block := option{
+		id:    hashing.ComputeHash256Array(bytes),
+		bytes: bytes,
+	}
+	parsedVersion, err := c.Unmarshal(bytes, &block)
+	if err != nil {
+		return nil, err
+	}
+	if parsedVersion != version {
+		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
+	}
+
+	return &block, nil
+}

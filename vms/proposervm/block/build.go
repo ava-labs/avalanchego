@@ -98,3 +98,25 @@ func BuildHeader(
 	header.bytes = bytes
 	return &header, err
 }
+
+// BuildOption the option block
+// [parentID] is the ID of this option's wrapper parent block
+// [innerBytes] is the byte representation of a child option block
+func BuildOption(
+	parentID ids.ID,
+	innerBytes []byte,
+) (Option, error) {
+	opt := option{
+		PrntID:     parentID,
+		InnerBytes: innerBytes,
+	}
+
+	bytes, err := c.Marshal(version, &opt)
+	if err != nil {
+		return nil, err
+	}
+	opt.bytes = bytes
+
+	opt.id = hashing.ComputeHash256Array(opt.bytes)
+	return &opt, nil
+}

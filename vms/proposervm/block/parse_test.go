@@ -70,6 +70,23 @@ func TestParseHeader(t *testing.T) {
 	equalHeader(assert, builtHeader, parsedHeader)
 }
 
+func TestParseOption(t *testing.T) {
+	assert := assert.New(t)
+
+	parentID := ids.ID{1}
+	innerBlockBytes := []byte{3}
+
+	builtOption, err := BuildOption(parentID, innerBlockBytes)
+	assert.NoError(err)
+
+	builtOptionBytes := builtOption.Bytes()
+
+	parsedOption, err := ParseOption(builtOptionBytes)
+	assert.NoError(err)
+
+	equalOption(assert, builtOption, parsedOption)
+}
+
 func TestParseUnsigned(t *testing.T) {
 	assert := assert.New(t)
 

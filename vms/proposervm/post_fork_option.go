@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -18,7 +17,7 @@ var _ Block = &postForkOption{}
 
 // The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {
-	option.Option
+	block.Option
 	postForkCommonComponents
 }
 

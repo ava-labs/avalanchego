@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 const (
@@ -28,8 +28,8 @@ var (
 )
 
 type OptionState interface {
-	GetOption(blkID ids.ID) (option.Option, choices.Status, error)
-	PutOption(opt option.Option, status choices.Status) error
+	GetOption(blkID ids.ID) (block.Option, choices.Status, error)
+	PutOption(opt block.Option, status choices.Status) error
 	DeleteOption(blkID ids.ID) error
 
 	WipeCache() // useful for UTs
@@ -51,7 +51,7 @@ type optionWrapper struct {
 	Option []byte         `serialize:"true"`
 	Status choices.Status `serialize:"true"`
 
-	option option.Option
+	option block.Option
 }
 
 func NewOptionState(db database.Database) OptionState {
@@ -74,7 +74,7 @@ func NewMeteredOptionState(db database.Database, namespace string, metrics prome
 	}, err
 }
 
-func (s *optionState) GetOption(optID ids.ID) (option.Option, choices.Status, error) {
+func (s *optionState) GetOption(optID ids.ID) (block.Option, choices.Status, error) {
 	if optIntf, found := s.optCache.Get(optID); found {
 		if optIntf == nil {
 			return nil, choices.Unknown, database.ErrNotFound
@@ -105,7 +105,7 @@ func (s *optionState) GetOption(optID ids.ID) (option.Option, choices.Status, er
 	}
 
 	// The key was in the database
-	opt, err := option.Parse(optWrapper.Option)
+	opt, err := block.ParseOption(optWrapper.Option)
 	if err != nil {
 		return nil, choices.Unknown, err
 	}
@@ -115,7 +115,7 @@ func (s *optionState) GetOption(optID ids.ID) (option.Option, choices.Status, er
 	return opt, optWrapper.Status, nil
 }
 
-func (s *optionState) PutOption(opt option.Option, status choices.Status) error {
+func (s *optionState) PutOption(opt block.Option, status choices.Status) error {
 	optWrapper := optionWrapper{
 		Option: opt.Bytes(),
 		Status: status,

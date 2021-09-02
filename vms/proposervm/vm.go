@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
@@ -379,7 +378,7 @@ func (vm *VM) parsePostForkBlock(b []byte) (*postForkBlock, error) {
 }
 
 func (vm *VM) parsePostForkOption(b []byte) (*postForkOption, error) {
-	option, err := option.Parse(b)
+	option, err := statelessblock.ParseOption(b)
 	if err != nil {
 		return nil, err
 	}

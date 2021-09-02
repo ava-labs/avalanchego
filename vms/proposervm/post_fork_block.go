@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -97,7 +96,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 	outerOptions := [2]snowman.Block{}
 	for i, innerOption := range innerOptions {
 		// Wrap the inner block's child option
-		statelessOuterOption, err := option.Build(
+		statelessOuterOption, err := block.BuildOption(
 			parentID,
 			innerOption.Bytes(),
 		)
