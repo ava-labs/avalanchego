@@ -49,7 +49,7 @@ Install AvalancheGo using an `apt` repository.
 
 If you have already added the APT repository, you do not need to add it again.
 
-To add the repository on Ubuntu Bionic distributions, run:
+To add the repository on Ubuntu 18.04 (Bionic), run:
 
 ```sh
 sudo su -
@@ -58,7 +58,7 @@ echo "deb https://downloads.avax.network/apt bionic main" > /etc/apt/sources.lis
 exit
 ```
 
-To add the repository on Ubuntu Focal distributions, run:
+To add the repository on Ubuntu 20.04 (Focal), run:
 
 ```sh
 sudo su -
