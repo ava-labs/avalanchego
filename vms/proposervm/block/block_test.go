@@ -7,11 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
-func equal(assert *assert.Assertions, want, have Block) {
+func equal(assert *assert.Assertions, chainID ids.ID, want, have Block) {
 	assert.Equal(want.ID(), have.ID())
 	assert.Equal(want.ParentID(), have.ParentID())
 	assert.Equal(want.PChainHeight(), have.PChainHeight())
@@ -19,7 +20,7 @@ func equal(assert *assert.Assertions, want, have Block) {
 	assert.Equal(want.Block(), have.Block())
 	assert.Equal(want.Proposer(), have.Proposer())
 	assert.Equal(want.Bytes(), have.Bytes())
-	assert.Equal(want.Verify(), have.Verify())
+	assert.Equal(want.Verify(chainID), have.Verify(chainID))
 }
 
 func TestVerifyNoCertWithSignature(t *testing.T) {
@@ -36,6 +37,6 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	builtBlock := builtBlockIntf.(*statelessBlock)
 	builtBlock.Signature = []byte{0}
 
-	err = builtBlock.Verify()
+	err = builtBlock.Verify(ids.Empty)
 	assert.Error(err)
 }

@@ -25,6 +25,7 @@ func TestBlockState(t *testing.T) {
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
 
 	tlsCert, err := staking.NewTLSCert()
 	assert.NoError(err)
@@ -32,7 +33,15 @@ func TestBlockState(t *testing.T) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	b, err := block.Build(parentID, timestamp, pChainHeight, cert, innerBlockBytes, key)
+	b, err := block.Build(
+		parentID,
+		timestamp,
+		pChainHeight,
+		cert,
+		innerBlockBytes,
+		chainID,
+		key,
+	)
 	assert.NoError(err)
 
 	db := memdb.New()

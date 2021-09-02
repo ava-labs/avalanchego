@@ -64,6 +64,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		0, // pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		innerOracleBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -145,6 +146,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -251,6 +253,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -283,6 +286,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -303,6 +307,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -323,6 +328,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -358,6 +364,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -435,6 +442,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		prntBlkPChainHeight-1,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -626,6 +634,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		prntBlkPChainHeight-1,
 		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -1030,6 +1039,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		postForkOracleBlk.PChainHeight(),
 		proVM.ctx.StakingCertLeaf,
 		oracleCoreBlk.opts[0].Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {

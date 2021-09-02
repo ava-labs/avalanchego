@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var errUnexpectedSignature = errors.New("expected no signature but one was provided")
@@ -24,7 +25,7 @@ type Block interface {
 
 	Bytes() []byte
 
-	Verify() error
+	Verify(chainID ids.ID) error
 }
 
 type statelessUnsignedBlock struct {
@@ -58,7 +59,7 @@ func (b *statelessBlock) Proposer() ids.ShortID { return b.proposer }
 // Bytes returns the byte representation of the whole wrapped block
 func (b *statelessBlock) Bytes() []byte { return b.bytes }
 
-func (b *statelessBlock) Verify() error {
+func (b *statelessBlock) Verify(chainID ids.ID) error {
 	if b.cert == nil {
 		if len(b.Signature) != 0 {
 			return errUnexpectedSignature
@@ -70,5 +71,13 @@ func (b *statelessBlock) Verify() error {
 	if err != nil {
 		return err
 	}
-	return b.cert.CheckSignature(b.cert.SignatureAlgorithm, unsignedBytes, b.Signature)
+
+	unsignedHash := hashing.ComputeHash256Array(unsignedBytes)
+	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, unsignedHash)
+	if err != nil {
+		return err
+	}
+
+	headerBytes := header.Bytes()
+	return b.cert.CheckSignature(b.cert.SignatureAlgorithm, headerBytes, b.Signature)
 }

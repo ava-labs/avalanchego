@@ -171,6 +171,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 			pChainHeight,
 			b.vm.ctx.StakingCertLeaf,
 			innerBlock.Bytes(),
+			b.vm.ctx.ChainID,
 			b.vm.ctx.StakingLeafSigner,
 		)
 		if err != nil {

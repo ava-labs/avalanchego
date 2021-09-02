@@ -137,7 +137,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		}
 
 		// Verify the signature of the node
-		if err := child.Block.Verify(); err != nil {
+		if err := child.Block.Verify(p.vm.ctx.ChainID); err != nil {
 			return err
 		}
 	}

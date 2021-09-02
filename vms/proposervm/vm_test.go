@@ -434,6 +434,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		100, // pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -479,6 +480,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		100, // pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
@@ -499,6 +501,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		200, // pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
