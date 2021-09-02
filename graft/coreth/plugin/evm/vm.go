@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth/ethconfig"
-	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/node"
 	"github.com/ava-labs/coreth/params"
 
@@ -96,8 +95,6 @@ const (
 	decidedCacheSize    = 100
 	missingCacheSize    = 50
 	unverifiedCacheSize = 50
-
-	defaultClientRequestTimeout = 3 * time.Second
 )
 
 var (
@@ -339,22 +336,6 @@ func (vm *VM) Initialize(
 	ethConfig.SnapshotAsync = vm.config.SnapshotAsync
 	ethConfig.SnapshotVerify = vm.config.SnapshotVerify
 
-	chainAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
-	if err != nil {
-		return err
-	}
-
-	var eclient *ethclient.Client
-	if vm.config.APIPassthoughEnabled {
-		clientURL := fmt.Sprintf("%s/ext/bc/%s/rpc", vm.config.APIPassthoughURL, chainAlias)
-		client, err := rpc.Dial(clientURL)
-		if err != nil {
-			return err
-		}
-		log.Info("client connected to", "url", clientURL)
-		eclient = ethclient.NewClient(client)
-	}
-
 	vm.chainConfig = g.Config
 	vm.networkID = ethConfig.NetworkId
 	vm.secpFactory = crypto.FactorySECP256K1R{Cache: cache.LRU{Size: secpFactoryCacheSize}}
@@ -368,16 +349,8 @@ func (vm *VM) Initialize(
 
 	vm.codec = Codec
 
-	var client *Client
-	if vm.config.APIPassthoughEnabled {
-		client = NewClient(
-			vm.config.APIPassthoughURL,
-			chainAlias,
-			defaultClientRequestTimeout,
-		)
-	}
 	// TODO: read size from settings
-	vm.mempool = NewMempool(defaultMempoolSize, client)
+	vm.mempool = NewMempool(defaultMempoolSize)
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -394,7 +367,7 @@ func (vm *VM) Initialize(
 	default:
 		lastAcceptedHash = common.BytesToHash(lastAcceptedBytes)
 	}
-	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), vm.createConsensusCallbacks(), lastAcceptedHash, eclient)
+	ethChain, err := coreth.NewETHChain(&ethConfig, &nodecfg, vm.chaindb, vm.config.EthBackendSettings(), vm.createConsensusCallbacks(), lastAcceptedHash)
 	if err != nil {
 		return err
 	}
