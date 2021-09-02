@@ -45,7 +45,17 @@ var (
 	errClosed  = errors.New("closed")
 	errRefused = errors.New("connection refused")
 
-	testSubnetID = ids.GenerateTestID()
+	testSubnetID          = ids.GenerateTestID()
+	defaulAppVersion      = version.NewDefaultApplication("app", 0, 1, 0)
+	defaultVersionManager = version.NewCompatibility(
+		defaulAppVersion,
+		defaulAppVersion,
+		time.Now(),
+		defaulAppVersion,
+		defaulAppVersion,
+		time.Now(),
+		defaulAppVersion,
+	)
 )
 
 type testListener struct {
@@ -306,7 +316,6 @@ func TestNewDefaultNetwork(t *testing.T) {
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
@@ -330,16 +339,6 @@ func TestNewDefaultNetwork(t *testing.T) {
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -347,7 +346,7 @@ func TestNewDefaultNetwork(t *testing.T) {
 		id,
 		ip,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener,
 		caller,
@@ -386,7 +385,6 @@ func TestEstablishConnection(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -465,16 +463,6 @@ func TestEstablishConnection(t *testing.T) {
 		},
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -482,7 +470,7 @@ func TestEstablishConnection(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -515,7 +503,7 @@ func TestEstablishConnection(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -566,7 +554,6 @@ func TestDoubleTrack(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -644,16 +631,6 @@ func TestDoubleTrack(t *testing.T) {
 		},
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -661,7 +638,7 @@ func TestDoubleTrack(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -694,7 +671,7 @@ func TestDoubleTrack(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -746,7 +723,6 @@ func TestDoubleClose(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -824,16 +800,6 @@ func TestDoubleClose(t *testing.T) {
 		},
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -841,7 +807,7 @@ func TestDoubleClose(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -874,7 +840,7 @@ func TestDoubleClose(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -931,7 +897,6 @@ func TestTrackConnected(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -1009,16 +974,6 @@ func TestTrackConnected(t *testing.T) {
 		},
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -1026,7 +981,7 @@ func TestTrackConnected(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -1059,7 +1014,7 @@ func TestTrackConnected(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -1112,7 +1067,6 @@ func TestTrackConnectedRace(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -1168,16 +1122,6 @@ func TestTrackConnectedRace(t *testing.T) {
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -1185,7 +1129,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -1218,7 +1162,7 @@ func TestTrackConnectedRace(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -1275,7 +1219,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -1458,16 +1401,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -1475,7 +1408,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -1508,7 +1441,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -1541,7 +1474,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		id1,
 		ip2,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener2,
 		caller2,
@@ -1574,7 +1507,7 @@ func TestPeerAliasesTicker(t *testing.T) {
 		id2,
 		ip2,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener3,
 		caller3,
@@ -1691,7 +1624,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	vdrs := validators.NewSet()
@@ -1911,16 +1843,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -1928,7 +1850,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -1961,7 +1883,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -1994,7 +1916,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		id1,
 		ip2,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener2,
 		caller2,
@@ -2027,7 +1949,7 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		id2,
 		ip2,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener3,
 		caller3,
@@ -2148,7 +2070,6 @@ func TestPeerSignature(t *testing.T) {
 
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
@@ -2280,16 +2201,6 @@ func TestPeerSignature(t *testing.T) {
 		},
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	net0, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -2297,7 +2208,7 @@ func TestPeerSignature(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -2330,7 +2241,7 @@ func TestPeerSignature(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -2363,7 +2274,7 @@ func TestPeerSignature(t *testing.T) {
 		id2,
 		ip2,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener2,
 		caller2,
@@ -2454,7 +2365,7 @@ func TestPeerSignature(t *testing.T) {
 
 func TestValidatorIPs(t *testing.T) {
 	dummyNetwork := network{}
-	dummyNetwork.peerListSize = 50
+	dummyNetwork.config.PeerListSize = 50
 
 	appVersion := version.NewDefaultApplication("app", 1, 1, 0)
 	versionManager := version.NewCompatibility(
@@ -2492,9 +2403,9 @@ func TestValidatorIPs(t *testing.T) {
 	thirdValidatorPeer := createPeer(ids.ShortID{0x03}, thirdValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, thirdValidatorPeer, true)
 
-	assert.True(t, dummyNetwork.vdrs.Contains(firstValidatorPeer.nodeID))
-	assert.True(t, dummyNetwork.vdrs.Contains(secondValidatorPeer.nodeID))
-	assert.True(t, dummyNetwork.vdrs.Contains(thirdValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.config.Validators.Contains(firstValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.config.Validators.Contains(secondValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.config.Validators.Contains(thirdValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err := dummyNetwork.validatorIPs()
@@ -2527,7 +2438,7 @@ func TestValidatorIPs(t *testing.T) {
 	disconnectedValidatorPeer := createPeer(ids.ShortID{0x01}, disconnectedValidatorIPDesc, appVersion)
 	disconnectedValidatorPeer.finishedHandshake.SetValue(false)
 	addPeerToNetwork(&dummyNetwork, disconnectedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(disconnectedValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.config.Validators.Contains(disconnectedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2545,7 +2456,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	zeroValidatorPeer := createPeer(ids.ShortID{0x01}, zeroIPValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, zeroValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(zeroValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.config.Validators.Contains(zeroValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2564,7 +2475,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	nonValidatorPeer := createPeer(ids.ShortID{0x04}, nonValidatorIPDesc, appVersion)
 	addPeerToNetwork(&dummyNetwork, nonValidatorPeer, false)
-	assert.False(t, dummyNetwork.vdrs.Contains(nonValidatorPeer.nodeID))
+	assert.False(t, dummyNetwork.config.Validators.Contains(nonValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2584,7 +2495,7 @@ func TestValidatorIPs(t *testing.T) {
 	}
 	maskedValidatorPeer := createPeer(ids.ShortID{0x01}, maskedValidatorIPDesc, maskedVersion)
 	addPeerToNetwork(&dummyNetwork, maskedValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(maskedValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.config.Validators.Contains(maskedValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2610,7 +2521,7 @@ func TestValidatorIPs(t *testing.T) {
 		time: uint64(0),
 	})
 	addPeerToNetwork(&dummyNetwork, wrongCertValidatorPeer, true)
-	assert.True(t, dummyNetwork.vdrs.Contains(wrongCertValidatorPeer.nodeID))
+	assert.True(t, dummyNetwork.config.Validators.Contains(wrongCertValidatorPeer.nodeID))
 
 	// test
 	validatorIPs, err = dummyNetwork.validatorIPs()
@@ -2622,9 +2533,9 @@ func TestValidatorIPs(t *testing.T) {
 	// SCENARIO: At most peerListSize validators are picked
 	// context
 	clearPeersData(&dummyNetwork)
-	dummyNetwork.peerListSize = 2
+	dummyNetwork.config.PeerListSize = 2
 
-	validPeerCount := dummyNetwork.peerListSize * 2
+	validPeerCount := dummyNetwork.config.PeerListSize * 2
 	for i := 0; i < validPeerCount; i++ {
 		ipDesc := utils.IPDesc{
 			IP:   net.IPv4(172, 17, 0, byte(i)),
@@ -2632,7 +2543,7 @@ func TestValidatorIPs(t *testing.T) {
 		}
 		peer := createPeer(ids.ShortID{byte(i)}, ipDesc, appVersion)
 		addPeerToNetwork(&dummyNetwork, peer, true)
-		assert.True(t, dummyNetwork.vdrs.Contains(peer.nodeID))
+		assert.True(t, dummyNetwork.config.Validators.Contains(peer.nodeID))
 	}
 
 	// test
@@ -2640,7 +2551,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(IPs) == dummyNetwork.peerListSize)
+	assert.True(t, len(IPs) == dummyNetwork.config.PeerListSize)
 }
 
 // Test that a node will not finish the handshake if the peer's version
@@ -2830,7 +2741,6 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	initCerts(t)
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
@@ -2907,15 +2817,6 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		},
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
 	subnetSet := ids.Set{}
 	subnetSet.Add(testSubnetID)
 	net0, err := NewDefaultNetwork(
@@ -2925,7 +2826,7 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -2958,7 +2859,7 @@ func TestPeerTrackedSubnets(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -3023,7 +2924,6 @@ func TestPeerGossip(t *testing.T) {
 
 	log := logging.NoLog{}
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
@@ -3159,16 +3059,6 @@ func TestPeerGossip(t *testing.T) {
 		},
 	}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	subnetSet := ids.Set{}
 	subnetSet.Add(testSubnetID)
 
@@ -3179,7 +3069,7 @@ func TestPeerGossip(t *testing.T) {
 		id0,
 		ip0,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener0,
 		caller0,
@@ -3212,7 +3102,7 @@ func TestPeerGossip(t *testing.T) {
 		id1,
 		ip1,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener1,
 		caller1,
@@ -3245,7 +3135,7 @@ func TestPeerGossip(t *testing.T) {
 		id2,
 		ip2,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener2,
 		caller2,
@@ -3329,15 +3219,15 @@ func addPeerToNetwork(targetNetwork *network, peerToAdd *peer, isValidator bool)
 
 	if isValidator {
 		validator := validators.NewValidator(peerToAdd.nodeID, uint64(10))
-		currentValidators := targetNetwork.vdrs.List()
+		currentValidators := targetNetwork.config.Validators.List()
 		currentValidators = append(currentValidators, validator)
-		_ = targetNetwork.vdrs.Set(currentValidators)
+		_ = targetNetwork.config.Validators.Set(currentValidators)
 	}
 }
 
 func clearPeersData(targetNetwork *network) {
 	targetNetwork.peers.reset()
-	targetNetwork.vdrs = validators.NewSet()
+	targetNetwork.config.Validators = validators.NewSet()
 }
 
 func isIPDescIn(targetIP utils.IPDesc, ipDescList []utils.IPCertDesc) bool {

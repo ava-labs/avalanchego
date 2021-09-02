@@ -5,7 +5,6 @@ import (
 	"crypto"
 	"net"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/message"
@@ -55,7 +54,6 @@ func TestPeer_Close(t *testing.T) {
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
 	networkID := uint32(0)
-	appVersion := version.NewDefaultApplication("app", 0, 1, 0)
 	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
@@ -79,16 +77,6 @@ func TestPeer_Close(t *testing.T) {
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
 
-	versionManager := version.NewCompatibility(
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-		appVersion,
-		time.Now(),
-		appVersion,
-	)
-
 	netwrk, err := NewDefaultNetwork(
 		"",
 		prometheus.NewRegistry(),
@@ -96,7 +84,7 @@ func TestPeer_Close(t *testing.T) {
 		id,
 		ip,
 		networkID,
-		versionManager,
+		defaultVersionManager,
 		versionParser,
 		listener,
 		caller,

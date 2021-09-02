@@ -62,11 +62,6 @@ import (
 	ipcsapi "github.com/ava-labs/avalanchego/api/ipcs"
 )
 
-// Networking constants
-const (
-	TCP = "tcp"
-)
-
 var (
 	genesisHashKey  = []byte("genesisID")
 	indexerDBPrefix = []byte{0x00}
@@ -161,7 +156,7 @@ type Node struct {
  */
 
 func (n *Node) initNetworking() error {
-	listener, err := net.Listen(TCP, fmt.Sprintf(":%d", n.Config.IP.Port))
+	listener, err := net.Listen(constants.NetworkType, fmt.Sprintf(":%d", n.Config.IP.Port))
 	if err != nil {
 		return err
 	}
@@ -237,7 +232,7 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	versionManager := version.GetCompatibility(n.Config.NetworkID)
+	dialer := dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log)
 
 	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
 	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
@@ -245,7 +240,7 @@ func (n *Node) initNetworking() error {
 		networkNamespace,
 		n.MetricsRegisterer,
 		primaryNetworkValidators,
-		n.Config.NetworkConfig.InboundThrottlerConfig,
+		n.Config.NetworkConfig.InboundMsgThrottlerConfig,
 	)
 	if err != nil {
 		return fmt.Errorf("initializing inbound message throttler failed with: %s", err)
@@ -256,11 +251,13 @@ func (n *Node) initNetworking() error {
 		networkNamespace,
 		n.MetricsRegisterer,
 		primaryNetworkValidators,
-		n.Config.NetworkConfig.OutboundThrottlerConfig,
+		n.Config.NetworkConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
 		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
 	}
+
+	versionCompatibility := version.GetCompatibility(n.Config.NetworkID)
 
 	n.Net, err = network.NewDefaultNetwork(
 		networkNamespace,
@@ -269,10 +266,10 @@ func (n *Node) initNetworking() error {
 		n.ID,
 		n.Config.IP,
 		n.Config.NetworkID,
-		versionManager,
+		versionCompatibility,
 		version.NewDefaultApplicationParser(),
 		listener,
-		dialer.NewDialer(TCP, n.Config.NetworkConfig.DialerConfig, n.Log),
+		dialer,
 		serverUpgrader,
 		clientUpgrader,
 		primaryNetworkValidators,
@@ -319,23 +316,24 @@ type beaconManager struct {
 	timer          *timer.Timer
 	beacons        validators.Set
 	requiredWeight uint64
-	weight         uint64
+	totalWeight    uint64
 }
 
 func (b *beaconManager) Connected(vdrID ids.ShortID) {
+	// TODO: this is always 1, beacons can be reduced to ShortSet?
 	weight, ok := b.beacons.GetWeight(vdrID)
 	if !ok {
 		b.Router.Connected(vdrID)
 		return
 	}
-	weight, err := math.Add64(weight, b.weight)
+	weight, err := math.Add64(weight, b.totalWeight)
 	if err != nil {
 		b.timer.Cancel()
 		b.Router.Connected(vdrID)
 		return
 	}
-	b.weight = weight
-	if b.weight >= b.requiredWeight {
+	b.totalWeight = weight
+	if b.totalWeight >= b.requiredWeight {
 		b.timer.Cancel()
 	}
 	b.Router.Connected(vdrID)
@@ -349,7 +347,7 @@ func (b *beaconManager) Disconnected(vdrID ids.ShortID) {
 		// weight can become disconnected. Because it is possible that there are
 		// changes to the validators set, we utilize that Sub64 returns 0 on
 		// error.
-		b.weight, _ = math.Sub64(b.weight, weight)
+		b.totalWeight, _ = math.Sub64(b.totalWeight, weight)
 	}
 	b.Router.Disconnected(vdrID)
 }

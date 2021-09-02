@@ -239,12 +239,12 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
 			MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
 		},
-		InboundThrottlerConfig: throttling.MsgThrottlerConfig{
+		InboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
 			AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
 			VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
 			NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
 		},
-		OutboundThrottlerConfig: throttling.MsgThrottlerConfig{
+		OutboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
 			AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
 			VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
 			NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
