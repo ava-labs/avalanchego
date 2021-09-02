@@ -45,7 +45,6 @@ import (
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/eth/tracers"
-	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
@@ -109,7 +108,6 @@ func New(stack *node.Node, config *Config,
 	chainDb ethdb.Database,
 	settings Settings,
 	lastAcceptedHash common.Hash,
-	client *ethclient.Client,
 ) (*Ethereum, error) {
 	if chainDb == nil {
 		return nil, errors.New("chainDb cannot be nil")
@@ -201,7 +199,7 @@ func New(stack *node.Node, config *Config,
 	// FIXME use node config to pass in config param on whether or not to allow unprotected
 	// currently defaults to false.
 	allowUnprotectedTxs := false
-	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), false, eth, nil, client}
+	eth.APIBackend = &EthAPIBackend{stack.Config().ExtRPCEnabled(), false, eth, nil}
 	if allowUnprotectedTxs {
 		log.Info("Unprotected transactions allowed")
 	}
