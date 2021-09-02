@@ -19,10 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-var (
-	errMissingParent = errors.New("missing parent")
-)
-
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, err error)
@@ -219,7 +215,7 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 	return nil
 }
 
-func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, state *state.StateDB, receipts []*types.Receipt) error {
+func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error {
 	// Perform extra state change while finalizing the block
 	var contribution *big.Int
 	if self.cb.OnExtraStateChange != nil {
@@ -230,10 +226,6 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		contribution = extraStateChangeContribution
 	}
 	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
-		parent := chain.GetHeaderByHash(block.ParentHash())
-		if parent == nil {
-			return errMissingParent
-		}
 		if err := self.verifyBlockFee(
 			block.BaseFee(),
 			ApricotPhase4MaxBlockFee,
