@@ -595,3 +595,102 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 		t.Fatal("block rejection did not set state properly")
 	}
 }
+
+func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
+	activationTime := genesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime)
+	if !coreGenBlk.Timestamp().Before(activationTime) {
+		t.Fatal("This test requires parent block 's timestamp to be before fork activation time")
+	}
+	postActivationTime := activationTime.Add(time.Second)
+	proVM.Set(postActivationTime)
+
+	coreBlkID := ids.GenerateTestID()
+	coreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     coreBlkID,
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: coreGenBlk.Timestamp(),
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    coreBlkID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    coreBlkID,
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+		},
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		case coreBlk.opts[0].ID():
+			return coreBlk.opts[0], nil
+		case coreBlk.opts[1].ID():
+			return coreBlk.opts[1], nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk.opts[0].Bytes()):
+			return coreBlk.opts[0], nil
+		case bytes.Equal(b, coreBlk.opts[1].Bytes()):
+			return coreBlk.opts[1], nil
+		default:
+			return nil, fmt.Errorf("Unknown block")
+		}
+	}
+
+	firstBlock, err := proVM.ParseBlock(coreBlk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	oracleBlock, ok := firstBlock.(snowman.OracleBlock)
+	if !ok {
+		t.Fatal("should have returned an oracle block")
+	}
+
+	options, err := oracleBlock.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := options[0].Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := options[1].Verify(); err != nil {
+		t.Fatal(err)
+	}
+}
