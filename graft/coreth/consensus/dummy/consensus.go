@@ -174,6 +174,9 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 }
 
 func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.Int, blockFeeDuration, parent, current uint64, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
+	if parent > current {
+		return fmt.Errorf("parent timestamp (%d) > current timestamp (%d)", parent, current)
+	}
 	if baseFee.Cmp(common.Big0) <= 0 {
 		return fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
 	}
@@ -208,8 +211,8 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 
 	requiredBlockGasFee := calcBlockFee(maxBlockGasFee, blockFeeDuration, parent, current)
 
-	// We require that [blockGas] covers at least [requiredBlockGasFee] to ensure that it
-	// costs a minimum amount to produce a valid block.
+	// Require that the amount of gas purchased by the effective tips within the block, [blockGas],
+	// covers at least [requiredBlockGasFee].
 	if blockGas.Cmp(requiredBlockGasFee) < 0 {
 		return fmt.Errorf("insufficient gas (%d) to cover the block fee (%d) at base fee (%d) (total block fee: %d) (parent: %d, current: %d)", blockGas, requiredBlockGasFee, baseFee, totalBlockFee, parent, current)
 	}
@@ -248,26 +251,25 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 	return nil
 }
 
-func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, parentHeader *types.Header, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, parent *types.Header, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var (
 		contribution *big.Int
-		extdata      []byte
+		extraData    []byte
+		err          error
 	)
 	if self.cb.OnFinalizeAndAssemble != nil {
-		ret, extraStateChangeContribution, err := self.cb.OnFinalizeAndAssemble(header, state, txs)
-		extdata = ret
+		extraData, contribution, err = self.cb.OnFinalizeAndAssemble(header, state, txs)
 		if err != nil {
 			return nil, err
 		}
-		contribution = extraStateChangeContribution
 	}
 	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		if err := self.verifyBlockFee(
 			header.BaseFee,
 			ApricotPhase4MaxBlockFee,
 			ApricotPhase4BlockGasFeeDuration,
-			parentHeader.Time,
+			parent.Time,
 			header.Time,
 			txs,
 			receipts,
@@ -281,7 +283,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 
 	// Header seems complete, assemble into a block and return
 	return types.NewBlock(
-		header, txs, uncles, receipts, new(trie.Trie), extdata,
+		header, txs, uncles, receipts, new(trie.Trie), extraData,
 		chain.Config().IsApricotPhase1(new(big.Int).SetUint64(header.Time)),
 	), nil
 }

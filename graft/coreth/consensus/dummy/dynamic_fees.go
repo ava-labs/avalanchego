@@ -22,8 +22,7 @@ var (
 	ApricotPhase3BlockGasFee    uint64 = 1_000_000
 	ApricotPhase4MaxBlockGasFee uint64 = 1_000_000
 	rollupWindow                uint64 = 10
-	// the amount of time after a parent block was issued that a block fee
-	// exists
+	// The amount of time between consecutive blocks for the block fee to drop to 0.
 	ApricotPhase4BlockGasFeeDuration uint64 = 20 // in seconds
 	ApricotPhase4MaxBlockFee                = new(big.Int).SetUint64(ApricotPhase4MaxBlockGasFee)
 )
