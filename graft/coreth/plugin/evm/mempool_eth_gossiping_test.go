@@ -328,6 +328,10 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 	}
 
 	// received tx and check it is accepted and re-gossiped
+	reqContent := make(map[common.Hash]struct{})
+	reqContent[ethTxs[0].Hash()] = struct{}{}
+	reqContent[ethTxs[1].Hash()] = struct{}{}
+	vm.requestsContent[reqID] = reqContent
 	if err := vm.AppResponse(nodeID, reqID, responseBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}

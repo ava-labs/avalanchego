@@ -92,8 +92,9 @@ func (vm *VM) encodeTxID(txID ids.ID) ([]byte, error) {
 }
 
 func (vm *VM) encodeAtomicTx(tx *Tx) ([]byte, error) {
-	am := &AppMsg{}
-	am.MsgType = atomicTxType
+	am := &AppMsg{
+		MsgType: atomicTxType,
+	}
 
 	bytes, err := vm.codec.Marshal(codecVersion, tx)
 	if err != nil {
@@ -105,23 +106,29 @@ func (vm *VM) encodeAtomicTx(tx *Tx) ([]byte, error) {
 }
 
 func (vm *VM) encodeEthHashes(ethTxHashes []common.Hash) ([]byte, error) {
-	am := &AppMsg{}
+	am := &AppMsg{
+		MsgType: ethHashesType,
+	}
+
 	bytes, err := rlp.EncodeToBytes(ethTxHashes)
 	if err != nil {
 		return nil, err
 	}
-	am.MsgType = ethHashesType
+
 	am.Bytes = bytes
 	return vm.codec.Marshal(codecVersion, am)
 }
 
 func (vm *VM) encodeEthTxs(ethTxs []*types.Transaction) ([]byte, error) {
-	am := &AppMsg{}
+	am := &AppMsg{
+		MsgType: ethTxListType,
+	}
+
 	bytes, err := rlp.EncodeToBytes(ethTxs)
 	if err != nil {
 		return nil, err
 	}
-	am.MsgType = ethTxListType
+
 	am.Bytes = bytes
 	return vm.codec.Marshal(codecVersion, am)
 }

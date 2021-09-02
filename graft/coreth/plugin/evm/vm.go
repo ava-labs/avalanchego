@@ -225,14 +225,17 @@ type VM struct {
 	// [building] indicates the VM has sent a request to the engine to build a block.
 	buildStatus buildingBlkStatus
 
-	baseCodec            codec.Registry
-	codec                codec.Manager
-	clock                timer.Clock
-	mempool              *Mempool
+	baseCodec codec.Registry
+	codec     codec.Manager
+	clock     timer.Clock
+	mempool   *Mempool
+
+	// gossip related attributes
 	gossipActivationTime time.Time
 	appSender            commonEng.AppSender
 	gossipReq.Handler
 	appGossipBytesCh chan []byte
+	requestsContent  map[ /*requestID*/ uint32]interface{}
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -368,6 +371,7 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 	vm.Handler = gossipReq.NewHandler()
 	vm.appGossipBytesCh = make(chan []byte, 1024) // TODO: pick proper size
+	vm.requestsContent = make(map[uint32]interface{})
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -798,8 +802,18 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		tx := appMsg.appGossipObj.(*Tx)
 		log.Debug(fmt.Sprintf("AppResponse: received txID %s", tx.ID()))
 
-		// Note: we currently do not check whether nodes send us exactly the tx matching
-		// the txID we asked for. At least we should check we do not receive total garbage
+		// check that content matched with what previously requested
+		contentIntf, ok := vm.requestsContent[requestID]
+		if !ok {
+			log.Warn(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
+			return nil
+		}
+
+		expectedTxID := contentIntf.(ids.ID)
+		if tx.ID() != expectedTxID {
+			log.Warn("AppResponse: unrequested transaction ID. Dropping it")
+			return nil
+		}
 
 		// check if  tx is already known
 		if _, dropped, found := vm.mempool.GetTx(tx.ID()); found || dropped {
@@ -815,10 +829,28 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 
 		return nil
 	case ethTxListType:
-		ethTxs := appMsg.appGossipObj.([]*types.Transaction)
+		rcvdTxs := appMsg.appGossipObj.([]*types.Transaction)
 		log.Debug("AppResponse: received eth txs")
 
-		errs := vm.chain.GetTxPool().AddRemotes(ethTxs)
+		// check that content matched with what previously requested
+		contentIntf, ok := vm.requestsContent[requestID]
+		if !ok {
+			log.Warn(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
+			return nil
+		}
+
+		expectedHashes := contentIntf.(map[common.Hash]struct{})
+		expectedTxs := make([]*types.Transaction, 0)
+		for _, tx := range rcvdTxs {
+			if _, ok := expectedHashes[tx.Hash()]; !ok {
+				log.Warn(fmt.Sprintf("AppResponse: received unexpected eth tx %d. Dropping it", tx.Hash()))
+			}
+
+			expectedTxs = append(expectedTxs, tx)
+		}
+
+		// submit to mempool expected transactions only
+		errs := vm.chain.GetTxPool().AddRemotes(expectedTxs)
 		for _, err := range errs {
 			if err != nil {
 				log.Debug(fmt.Sprintf("AppResponse: failed AddRemotes response from Node %v, reqID %v, err %v",
@@ -861,10 +893,14 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 
 		nodesSet := ids.NewShortSet(1)
 		nodesSet.Add(nodeID)
-		if err := vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg); err != nil {
+		reqID := vm.IssueID()
+		if err := vm.appSender.SendAppRequest(nodesSet, reqID, msg); err != nil {
 			log.Warn(fmt.Sprintf("AppGossip: failed sending AppResponse with error %s", err))
 			return nil
 		}
+
+		// record content to check response later on
+		vm.requestsContent[reqID] = txID
 		return nil
 	case ethHashesType:
 		hashList := appMsg.appGossipObj.([]common.Hash)
@@ -890,10 +926,19 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 
 		nodesSet := ids.NewShortSet(1)
 		nodesSet.Add(nodeID)
-		if err := vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg); err != nil {
+		reqID := vm.IssueID()
+		if err := vm.appSender.SendAppRequest(nodesSet, reqID, msg); err != nil {
 			log.Warn(fmt.Sprintf("AppGossip: failed sending AppResponse with error %s", err))
 			return nil
 		}
+
+		// record content to check response later on
+		reqContent := make(map[common.Hash]struct{})
+		for _, hash := range hashesToRequest {
+			reqContent[hash] = struct{}{}
+		}
+		vm.requestsContent[reqID] = reqContent
+
 		return nil
 	default:
 		log.Warn(fmt.Sprintf("AppGossip: unexpected appMsgType %v. Doing nothing", appMsg.MsgType))
