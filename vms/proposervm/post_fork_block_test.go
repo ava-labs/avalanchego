@@ -34,7 +34,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	}
 
 	// setup
-	_, _, proVM, _ := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	_, _, proVM, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	innerOracleBlk := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
@@ -88,7 +88,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 
 // ProposerBlock.Verify tests section
 func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
-	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
@@ -189,7 +189,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
-	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
@@ -379,7 +379,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
-	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
@@ -529,7 +529,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {
-	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
 	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
@@ -721,7 +721,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Verify a block once (in this test by building it).
 	// Show that other verify call would not call coreBlk.Verify()
-	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(2000)
 	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
@@ -785,7 +785,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 // ProposerBlock.Accept tests section
 func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(2000)
 	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
@@ -848,7 +848,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 }
 
 func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
-	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	var pChainHeight uint64
 	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
@@ -899,7 +899,7 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 
 // ProposerBlock.Reject tests section
 func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -936,7 +936,7 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	// create post fork oracle block ...
@@ -1041,6 +1041,63 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
+	)
+	if err != nil {
+		t.Fatal("failed to build new child block")
+	}
+
+	invalidChild, err := proVM.ParseBlock(statelessChild.Bytes())
+	if err != nil {
+		// A failure to parse is okay here
+		return
+	}
+
+	err = invalidChild.Verify()
+	if err == nil {
+		t.Fatal("Should have failed to verify a child that was signed when it should be an oracle block")
+	}
+}
+
+func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 5)
+	proVM.Set(coreGenBlk.Timestamp())
+
+	coreBlk := &snowman.TestBlock{
+		TestDecidable: choices.TestDecidable{
+			IDV:     ids.GenerateTestID(),
+			StatusV: choices.Processing,
+		},
+		BytesV:     []byte{1},
+		ParentV:    coreGenBlk.ID(),
+		TimestampV: coreGenBlk.Timestamp(),
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, fmt.Errorf("Unknown block")
+		}
+	}
+
+	statelessChild, err := block.BuildUnsigned(
+		coreGenBlk.ID(),
+		coreGenBlk.Timestamp(),
+		4,
+		coreBlk.Bytes(),
 	)
 	if err != nil {
 		t.Fatal("failed to build new child block")

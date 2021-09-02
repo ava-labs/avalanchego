@@ -35,7 +35,8 @@ var (
 
 type VM struct {
 	block.ChainVM
-	activationTime time.Time
+	activationTime      time.Time
+	minimumPChainHeight uint64
 
 	state.State
 	proposer.Windower
@@ -52,10 +53,11 @@ type VM struct {
 	preferred      ids.ID
 }
 
-func New(vm block.ChainVM, activationTime time.Time) *VM {
+func New(vm block.ChainVM, activationTime time.Time, minimumPChainHeight uint64) *VM {
 	return &VM{
-		ChainVM:        vm,
-		activationTime: activationTime,
+		ChainVM:             vm,
+		activationTime:      activationTime,
+		minimumPChainHeight: minimumPChainHeight,
 	}
 }
 

@@ -30,7 +30,7 @@ func (tob TestOptionsBlock) Options() ([2]snowman.Block, error) {
 
 // ProposerBlock.Verify tests section
 func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	// create post fork oracle block ...
@@ -156,7 +156,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 // ProposerBlock.Accept tests section
 func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	// create post fork oracle block ...
@@ -267,7 +267,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 
 func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	// create post fork oracle block ...
@@ -387,7 +387,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 // ProposerBlock.Reject tests section
 func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	// create post fork oracle block ...
@@ -506,7 +506,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 
 func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	coreBlk := &TestOptionsBlock{

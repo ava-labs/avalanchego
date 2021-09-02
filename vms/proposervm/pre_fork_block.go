@@ -15,6 +15,7 @@ import (
 
 var (
 	errExpectedNoProposer = errors.New("expected no proposer to be named")
+	errPChainHeightTooLow = errors.New("block P-chain height is too low")
 
 	_ Block = &preForkBlock{}
 )
@@ -97,6 +98,11 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
 			currentPChainHeight, childPChainHeight)
 		return errPChainHeightNotReached
+	}
+	if childPChainHeight < b.vm.minimumPChainHeight {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be >=%d but got %d",
+			b.vm.minimumPChainHeight, childPChainHeight)
+		return errPChainHeightTooLow
 	}
 
 	// Make sure [b] is the parent of [child]'s inner block
