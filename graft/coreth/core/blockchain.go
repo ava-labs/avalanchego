@@ -1154,7 +1154,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// If we have a followup block, run that against the current state to pre-cache
 	// transactions and probabilistically some of the account/storage trie nodes.
 	// Process block using the parent state as reference point
-	receipts, logs, usedGas, err := bc.processor.Process(block, statedb, bc.vmConfig)
+	receipts, logs, usedGas, err := bc.processor.Process(block, parent, statedb, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
@@ -1609,11 +1609,12 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report
 			logged = time.Now()
 		}
 		// Retrieve the next block to regenerate and process it
+		parent := current
 		next := current.NumberU64() + 1
 		if current = bc.GetBlockByNumber(next); current == nil {
 			return fmt.Errorf("failed to retrieve block %d while re-generating state", next)
 		}
-		receipts, _, usedGas, err := bc.processor.Process(current, statedb, vm.Config{})
+		receipts, _, usedGas, err := bc.processor.Process(current, parent.Header(), statedb, vm.Config{})
 		if err != nil {
 			return fmt.Errorf("failed to re-process block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
 		}
