@@ -479,20 +479,23 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 	if err != nil {
 		return nil, err
 	}
-	// If [tx] is nil, avoid returning a nil value, but consider the extra state change to have
-	// contributed nothing to the block fee.
+	// If [tx] is nil, we can return nil for the extra state contribution instead of allocating
+	// a big Int for 0.
 	if tx == nil {
 		return nil, nil
 	}
 	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
 		return nil, err
 	}
-	// If ApricotPhase4 has not activated yet, there is no contribution
-	if !vm.chainConfig.IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
+
+	switch {
+	// If ApricotPahse4 is enabled, calculate the block fee contribution
+	case vm.chainConfig.IsApricotPhase4(new(big.Int).SetUint64(block.Time())):
+		return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
+	default:
+		// Otherwise, there is no contribution
 		return nil, nil
 	}
-	// Calculate the block fee contribution
-	return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
 }
 
 func (vm *VM) pruneChain() error {
