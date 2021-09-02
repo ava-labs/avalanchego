@@ -36,10 +36,6 @@ type Config struct {
 	CorethAdminAPIEnabled bool `json:"coreth-admin-api-enabled"`
 	NetAPIEnabled         bool `json:"net-api-enabled"`
 
-	// API passthrough
-	APIPassthoughEnabled bool   `json:"api-passthrough-enabled"`
-	APIPassthoughURL     string `json:"api-passthrough-url"`
-
 	// Continuous Profiler
 	ContinuousProfilerDir       string   `json:"continuous-profiler-dir"`       // If set to non-empty string creates a continuous profiler
 	ContinuousProfilerFrequency Duration `json:"continuous-profiler-frequency"` // Frequency to run continuous profiler if enabled

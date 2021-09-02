@@ -63,7 +63,6 @@ func newTestChain(name string, config *eth.Config,
 			},
 		},
 		common.Hash{},
-		nil,
 	)
 	if err != nil {
 		t.Fatal(err)
