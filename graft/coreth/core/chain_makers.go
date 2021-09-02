@@ -234,7 +234,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, err := b.engine.FinalizeAndAssemble(chainreader, parent.Header(), b.header, statedb, b.txs, b.uncles, b.receipts)
+			block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, parent.Header(), statedb, b.txs, b.uncles, b.receipts)
 			if err != nil {
 				panic(fmt.Sprintf("Failed to finalize and assemble block at index %d: %s", i, err))
 			}

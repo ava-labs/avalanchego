@@ -284,7 +284,7 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 func (w *worker) commit(env *environment) (*types.Block, error) {
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := copyReceipts(env.receipts)
-	block, err := w.engine.FinalizeAndAssemble(w.chain, env.parent, env.header, env.state, env.txs, nil, receipts)
+	block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.parent, env.state, env.txs, nil, receipts)
 	if err != nil {
 		return nil, err
 	}

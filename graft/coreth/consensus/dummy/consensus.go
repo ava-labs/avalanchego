@@ -243,7 +243,7 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 	return nil
 }
 
-func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, parent *types.Header, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	var (
 		contribution *big.Int
