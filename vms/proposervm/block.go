@@ -64,6 +64,18 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 5) [child] has a valid signature from its proposer
 // 6) [child]'s inner block is valid
 func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
+	if oracle, ok := p.innerBlk.(snowman.OracleBlock); ok {
+		_, err := oracle.Options()
+		switch err {
+		case nil:
+			p.vm.ctx.Log.Debug("option block shouldn't have a signed child")
+			return errUnexpectedBlockType
+		case snowman.ErrNotOracle:
+		default:
+			return err
+		}
+	}
+
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
 		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected child's P-Chain height to be >=%d but got %d",

@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -347,7 +347,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 
 	// postFork block does NOT verify if parent is before fork activation time
-	postForkStatelessChild, err := statelessblock.Build(
+	postForkStatelessChild, err := block.Build(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
