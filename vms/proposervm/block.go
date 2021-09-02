@@ -154,14 +154,7 @@ func verifyIsOracleBlock(b snowman.Block) error {
 		return errUnexpectedBlockType
 	}
 	_, err := oracle.Options()
-	switch err {
-	case nil:
-		return nil
-	case snowman.ErrNotOracle:
-		return errUnexpectedBlockType
-	default:
-		return err
-	}
+	return err
 }
 
 func verifyIsNotOracleBlock(b snowman.Block) error {
