@@ -206,6 +206,17 @@ func TestVerifyBlockFee(t *testing.T) {
 			extraStateContribution: nil,
 			shouldErr:              true,
 		},
+		"parent time > current time": {
+			baseFee:                big.NewInt(100),
+			maxGasBlockFee:         big.NewInt(1000),
+			blockFeeDuration:       1,
+			parentTime:             11,
+			currentTime:            10,
+			txs:                    nil,
+			receipts:               nil,
+			extraStateContribution: big.NewInt(1000),
+			shouldErr:              true,
+		},
 	}
 
 	for name, test := range tests {
