@@ -60,9 +60,11 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if !parentTimestamp.Before(b.vm.activationTime) {
-		// If this block's timestamp is at or after activation time,
-		// it's child must be a post-fork block
-		return errProposersActivated
+		if err := verifyIsOracleBlock(b.Block); err != nil {
+			b.vm.ctx.Log.Debug("a pre-fork block is only allowed after the fork time if the parent is an oracle block")
+			return err
+		}
+		b.vm.ctx.Log.Debug("allowing pre-fork block after the fork time because the parent is an oracle block")
 	}
 
 	return child.Block.Verify()
@@ -74,6 +76,11 @@ func (b *preForkBlock) getInnerBlk() snowman.Block {
 
 // This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
+	if err := verifyIsNotOracleBlock(b.Block); err != nil {
+		b.vm.ctx.Log.Debug("option block shouldn't have a signed child")
+		return err
+	}
+
 	childID := child.ID()
 	childPChainHeight := child.PChainHeight()
 	currentPChainHeight, err := b.vm.PChainHeight()

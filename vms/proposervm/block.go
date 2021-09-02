@@ -64,16 +64,9 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 5) [child] has a valid signature from its proposer
 // 6) [child]'s inner block is valid
 func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
-	if oracle, ok := p.innerBlk.(snowman.OracleBlock); ok {
-		_, err := oracle.Options()
-		switch err {
-		case nil:
-			p.vm.ctx.Log.Debug("option block shouldn't have a signed child")
-			return errUnexpectedBlockType
-		case snowman.ErrNotOracle:
-		default:
-			return err
-		}
+	if err := verifyIsNotOracleBlock(p.innerBlk); err != nil {
+		p.vm.ctx.Log.Debug("oracle block shouldn't have a signed child")
+		return err
 	}
 
 	childPChainHeight := child.PChainHeight()
@@ -141,4 +134,36 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 	}
 
 	return p.vm.verifyAndRecordInnerBlk(child)
+}
+
+func verifyIsOracleBlock(b snowman.Block) error {
+	oracle, ok := b.(snowman.OracleBlock)
+	if !ok {
+		return errUnexpectedBlockType
+	}
+	_, err := oracle.Options()
+	switch err {
+	case nil:
+		return nil
+	case snowman.ErrNotOracle:
+		return errUnexpectedBlockType
+	default:
+		return err
+	}
+}
+
+func verifyIsNotOracleBlock(b snowman.Block) error {
+	oracle, ok := b.(snowman.OracleBlock)
+	if !ok {
+		return nil
+	}
+	_, err := oracle.Options()
+	switch err {
+	case nil:
+		return errUnexpectedBlockType
+	case snowman.ErrNotOracle:
+		return nil
+	default:
+		return err
+	}
 }
