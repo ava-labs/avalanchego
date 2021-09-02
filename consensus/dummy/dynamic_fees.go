@@ -72,7 +72,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		// If ApricotPhase4 is enabled, use the updated block fee calculation.
 		case config.IsApricotPhase4(bigTimestamp):
 			blockFee = calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp).Uint64()
-		// Otherwise, use the constant
+		// Otherwise, we must be in ApricotPhas3 and use the constant [ApricotPhase3BlockGasFee].
 		default:
 			blockFee = ApricotPhase3BlockGasFee
 		}
