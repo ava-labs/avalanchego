@@ -134,25 +134,25 @@ func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
 
 func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 	tests := map[string]suggestTipCapTest{
-		"apricot phase 4": {
-			chainConfig: params.TestChainConfig,
-			expectedTip: big.NewInt(0),
-		},
-		"apricot phase 3": {
-			chainConfig: params.TestApricotPhase3Config,
-			expectedTip: big.NewInt(0),
-		},
-		"apricot phase 2": {
-			chainConfig: params.TestApricotPhase2Config,
-			expectedTip: big.NewInt(params.ApricotPhase1MinGasPrice),
+		"launch": {
+			chainConfig: params.TestLaunchConfig,
+			expectedTip: big.NewInt(params.LaunchMinGasPrice),
 		},
 		"apricot phase 1": {
 			chainConfig: params.TestApricotPhase1Config,
 			expectedTip: big.NewInt(params.ApricotPhase1MinGasPrice),
 		},
-		"launch": {
-			chainConfig: params.TestLaunchConfig,
-			expectedTip: big.NewInt(params.LaunchMinGasPrice),
+		"apricot phase 2": {
+			chainConfig: params.TestApricotPhase2Config,
+			expectedTip: big.NewInt(params.ApricotPhase1MinGasPrice),
+		},
+		"apricot phase 3": {
+			chainConfig: params.TestApricotPhase3Config,
+			expectedTip: big.NewInt(0),
+		},
+		"apricot phase 4": {
+			chainConfig: params.TestChainConfig,
+			expectedTip: big.NewInt(0),
 		},
 	}
 
@@ -214,6 +214,8 @@ func TestSuggestTipCapDifferentTips(t *testing.T) {
 			feeCap := new(big.Int).Add(baseFee, highTip)
 			// Need to add 50 transactions, so that the block consumes more than the skip block
 			// gas limit
+			// Add 50 transactions each at the low and high tip amount. This should result in the high tip
+			// being selected, since we select the 60th percentile.
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   params.TestChainConfig.ChainID,
