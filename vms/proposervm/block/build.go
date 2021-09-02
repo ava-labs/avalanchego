@@ -13,6 +13,33 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
+func BuildUnsigned(
+	parentID ids.ID,
+	timestamp time.Time,
+	pChainHeight uint64,
+	blockBytes []byte,
+) (Block, error) {
+	block := statelessBlock{
+		StatelessBlock: statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  nil,
+			Block:        blockBytes,
+		},
+		timestamp: timestamp,
+	}
+
+	bytes, err := c.Marshal(version, &block)
+	if err != nil {
+		return nil, err
+	}
+	block.bytes = bytes
+
+	block.id = hashing.ComputeHash256Array(bytes)
+	return &block, nil
+}
+
 func Build(
 	parentID ids.ID,
 	timestamp time.Time,

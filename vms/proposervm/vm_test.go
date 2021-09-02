@@ -100,6 +100,8 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
 		ValidatorState:    valState,
 	}
+	ctx.Bootstrapped()
+
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
@@ -600,13 +602,11 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		t.Fatal("could not retrieve pChain height")
 	}
 
-	netSlb, err := statelessblock.Build(
+	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		netcoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")

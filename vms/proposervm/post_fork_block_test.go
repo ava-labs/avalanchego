@@ -167,13 +167,11 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	}
 
 	// child block referring known parent does verify
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		prntProBlk.ID(), // refer known parent
 		prntProBlk.Timestamp().Add(proposer.MaxDelay),
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -339,13 +337,11 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	// block can arrive within submission window
 	AtSubWindowEnd := proVM.Time().Add(proposer.MaxDelay)
 	proVM.Clock.Set(AtSubWindowEnd)
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		prntProBlk.ID(),
 		AtSubWindowEnd,
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -461,13 +457,11 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// child P-Chain height can be equal to parent P-Chain height
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -481,13 +475,11 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	// child P-Chain height may follow parent P-Chain height
 	pChainHeight = prntBlkPChainHeight * 2 // move ahead pChainHeight
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight+1,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -499,13 +491,11 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	// block P-Chain height can be equal to current P-Chain height
 	currPChainHeight, _ := proVM.PChainHeight()
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -516,13 +506,11 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// block P-Chain height cannot be at higher than current P-Chain height
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight*2,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -658,13 +646,11 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// child P-Chain height can be equal to parent P-Chain height
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -678,13 +664,11 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 
 	// child P-Chain height may follow parent P-Chain height
 	pChainHeight = prntBlkPChainHeight * 2 // move ahead pChainHeight
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		prntBlkPChainHeight+1,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -696,13 +680,11 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 
 	// block P-Chain height can be equal to current P-Chain height
 	currPChainHeight, _ := proVM.PChainHeight()
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
@@ -713,13 +695,11 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// block P-Chain height cannot be at higher than current P-Chain height
-	childSlb, err = statelessblock.Build(
+	childSlb, err = statelessblock.BuildUnsigned(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),
 		currPChainHeight*2,
-		proVM.ctx.StakingCertLeaf,
 		childCoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")

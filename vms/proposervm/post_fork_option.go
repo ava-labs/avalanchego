@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/option"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 var _ Block = &postForkOption{}
@@ -120,46 +121,61 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		newTimestamp = parentTimestamp
 	}
 
-	// The following [minTimestamp] check should be able to be removed, but this
-	// is left here as a sanity check
-	childHeight := innerBlock.Height()
-	parentPChainHeight, err := b.pChainHeight()
-	if err != nil {
-		return nil, err
-	}
-
-	proposerID := b.vm.ctx.NodeID
-	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-	if err != nil {
-		return nil, err
-	}
-
-	minTimestamp := parentTimestamp.Add(minDelay)
-	if newTimestamp.Before(minTimestamp) {
-		// It's not our turn to propose a block yet
-		b.vm.ctx.Log.Warn("Snowman++ build post-fork option - dropped option; parent timestamp %s, expected delay %s, block timestamp %s.",
-			parentTimestamp, minDelay, newTimestamp)
-		return nil, errProposerWindowNotStarted
-	}
-
-	// The child's P-Chain height is the P-Chain's height when it
-	// was proposed (i.e. now)
+	// The child's P-Chain height is the P-Chain's height when it was proposed
+	// (i.e. now)
 	pChainHeight, err := b.vm.PChainHeight()
 	if err != nil {
 		return nil, err
 	}
 
+	delay := newTimestamp.Sub(parentTimestamp)
+
 	// Build the child
-	statelessChild, err := block.Build(
-		parentID,
-		newTimestamp,
-		pChainHeight,
-		b.vm.ctx.StakingCertLeaf,
-		innerBlock.Bytes(),
-		b.vm.ctx.StakingLeafSigner,
-	)
-	if err != nil {
-		return nil, err
+	var statelessChild block.Block
+	if delay >= proposer.MaxDelay {
+		statelessChild, err = block.BuildUnsigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			innerBlock.Bytes(),
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// The following [minTimestamp] check should be able to be removed, but
+		// this is left here as a sanity check
+		childHeight := innerBlock.Height()
+		parentPChainHeight, err := b.pChainHeight()
+		if err != nil {
+			return nil, err
+		}
+
+		proposerID := b.vm.ctx.NodeID
+		minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
+		if err != nil {
+			return nil, err
+		}
+
+		minTimestamp := parentTimestamp.Add(minDelay)
+		if newTimestamp.Before(minTimestamp) {
+			// It's not our turn to propose a block yet
+			b.vm.ctx.Log.Warn("Snowman++ build post-fork option - dropped option; parent timestamp %s, expected delay %s, block timestamp %s.",
+				parentTimestamp, minDelay, newTimestamp)
+			return nil, errProposerWindowNotStarted
+		}
+
+		statelessChild, err = block.Build(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			b.vm.ctx.StakingCertLeaf,
+			innerBlock.Bytes(),
+			b.vm.ctx.StakingLeafSigner,
+		)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	child := &postForkBlock{
@@ -171,8 +187,8 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 		},
 	}
 
-	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		child.ID(), parentTimestamp, minDelay, newTimestamp)
+	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, block timestamp %v.",
+		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
 	return child, b.vm.storePostForkBlock(child)
 }

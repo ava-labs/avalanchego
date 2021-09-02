@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,7 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Block = &preForkBlock{}
+var (
+	errExpectedNoProposer = errors.New("expected no proposer to be named")
+
+	_ Block = &preForkBlock{}
+)
 
 // preForkBlock implements proposervm.Block
 type preForkBlock struct {
@@ -120,7 +125,12 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return errTimeTooAdvanced
 	}
 
-	// Verify the signature of the node
+	proposer := child.Block.Proposer()
+	if proposer != ids.ShortEmpty {
+		return errExpectedNoProposer
+	}
+
+	// Verify the lack of signature on the node
 	if err := child.Block.Verify(); err != nil {
 		return err
 	}
@@ -173,13 +183,11 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		return nil, err
 	}
 
-	statelessBlock, err := block.Build(
+	statelessBlock, err := block.BuildUnsigned(
 		parentID,
 		newTimestamp,
 		pChainHeight,
-		b.vm.ctx.StakingCertLeaf,
 		innerBlock.Bytes(),
-		b.vm.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		return nil, err

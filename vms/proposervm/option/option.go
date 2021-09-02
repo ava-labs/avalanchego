@@ -25,8 +25,8 @@ type option struct {
 func (b *option) ID() ids.ID       { return b.id }
 func (b *option) ParentID() ids.ID { return b.PrntID }
 
-// Block returns the byte representation of inner block, while ...
+// Block returns the byte representation of inner block
 func (b *option) Block() []byte { return b.InnerBytes }
 
-// ... Bytes returns the byte representation of the whole wrapped block
+// Bytes returns the byte representation of the whole wrapped block
 func (b *option) Bytes() []byte { return b.bytes }

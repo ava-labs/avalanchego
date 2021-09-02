@@ -57,6 +57,10 @@ func (w *windower) PChainHeight() (uint64, error) {
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
+	if validatorID == ids.ShortEmpty {
+		return MaxDelay, nil
+	}
+
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.ctx.ValidatorState.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {

@@ -38,3 +38,31 @@ func TestParse(t *testing.T) {
 
 	equal(assert, builtBlock, parsedBlock)
 }
+
+func TestParseUnsigned(t *testing.T) {
+	assert := assert.New(t)
+
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	innerBlockBytes := []byte{3}
+
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	assert.NoError(err)
+
+	builtBlockBytes := builtBlock.Bytes()
+
+	parsedBlock, err := Parse(builtBlockBytes)
+	assert.NoError(err)
+
+	equal(assert, builtBlock, parsedBlock)
+}
+
+func TestParseGibberish(t *testing.T) {
+	assert := assert.New(t)
+
+	bytes := []byte{0, 1, 2, 3, 4, 5}
+
+	_, err := Parse(bytes)
+	assert.Error(err)
+}
