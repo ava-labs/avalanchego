@@ -8,7 +8,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
-// [parentID] is the ID of this option's wrapper block parent (i.e. *postForkBlock)
+// Build the option block
+// [parentID] is the ID of this option's wrapper parent block
 // [innerBytes] is the byte representation of a child option block
 func Build(
 	parentID ids.ID,

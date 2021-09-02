@@ -14,10 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+// Proposer list constants
 const (
-	maxWindows     = 5
+	MaxWindows     = 5
 	WindowDuration = 3 * time.Second
-	MaxDelay       = maxWindows * WindowDuration
+	MaxDelay       = MaxWindows * WindowDuration
 )
 
 var _ Windower = &windower{}
@@ -97,7 +98,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 		return 0, err
 	}
 
-	numToSample := maxWindows
+	numToSample := MaxWindows
 	if weight < uint64(numToSample) {
 		numToSample = int(weight)
 	}

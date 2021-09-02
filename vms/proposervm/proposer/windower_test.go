@@ -82,7 +82,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 
 	subnetID := ids.ID{0, 1}
 	chainID := ids.ID{0, 2}
-	validatorIDs := make([]ids.ShortID, maxWindows)
+	validatorIDs := make([]ids.ShortID, MaxWindows)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.ShortID{byte(i + 1)}
 	}
@@ -92,7 +92,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 			return 0, nil
 		},
 		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-			validators := make(map[ids.ShortID]uint64, maxWindows)
+			validators := make(map[ids.ShortID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
 				validators[id] = 1
 			}
@@ -146,7 +146,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 	chainID1 := ids.ID{}
 	_, _ = rand.Read(chainID1[:]) // #nosec G404
 
-	validatorIDs := make([]ids.ShortID, maxWindows)
+	validatorIDs := make([]ids.ShortID, MaxWindows)
 	for i := range validatorIDs {
 		validatorIDs[i] = ids.ShortID{byte(i + 1)}
 	}
@@ -156,7 +156,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 			return 0, nil
 		},
 		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
-			validators := make(map[ids.ShortID]uint64, maxWindows)
+			validators := make(map[ids.ShortID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
 				validators[id] = 1
 			}
