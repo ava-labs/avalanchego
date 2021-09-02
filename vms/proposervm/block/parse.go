@@ -13,7 +13,6 @@ import (
 
 func Parse(bytes []byte) (Block, error) {
 	block := statelessBlock{
-		id:    hashing.ComputeHash256Array(bytes),
 		bytes: bytes,
 	}
 	parsedVersion, err := c.Unmarshal(bytes, &block)
@@ -23,6 +22,12 @@ func Parse(bytes []byte) (Block, error) {
 	if parsedVersion != version {
 		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
 	}
+
+	unsignedBytes, err := c.Marshal(version, &block.StatelessBlock)
+	if err != nil {
+		return nil, err
+	}
+	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
 	block.timestamp = time.Unix(block.StatelessBlock.Timestamp, 0)
 	if len(block.StatelessBlock.Certificate) == 0 {

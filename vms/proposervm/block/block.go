@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var errUnexpectedSignature = errors.New("expected no signature but one was provided")
@@ -67,13 +66,7 @@ func (b *statelessBlock) Verify(chainID ids.ID) error {
 		return nil
 	}
 
-	unsignedBytes, err := c.Marshal(version, &b.StatelessBlock)
-	if err != nil {
-		return err
-	}
-
-	unsignedHash := hashing.ComputeHash256Array(unsignedBytes)
-	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, unsignedHash)
+	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)
 	if err != nil {
 		return err
 	}

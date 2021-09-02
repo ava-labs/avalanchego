@@ -30,14 +30,14 @@ func BuildUnsigned(
 		timestamp: timestamp,
 	}
 
-	bytes, err := c.Marshal(version, &block)
+	unsignedBytes, err := c.Marshal(version, &block.StatelessBlock)
 	if err != nil {
 		return nil, err
 	}
-	block.bytes = bytes
+	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	block.id = hashing.ComputeHash256Array(bytes)
-	return &block, nil
+	block.bytes, err = c.Marshal(version, &block)
+	return &block, err
 }
 
 func Build(
@@ -66,9 +66,9 @@ func Build(
 	if err != nil {
 		return nil, err
 	}
+	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	unsignedHash := hashing.ComputeHash256Array(unsignedBytes)
-	header, err := BuildHeader(chainID, parentID, unsignedHash)
+	header, err := BuildHeader(chainID, parentID, block.id)
 	if err != nil {
 		return nil, err
 	}
@@ -80,12 +80,7 @@ func Build(
 	}
 
 	block.bytes, err = c.Marshal(version, &block)
-	if err != nil {
-		return nil, err
-	}
-
-	block.id = hashing.ComputeHash256Array(block.bytes)
-	return &block, nil
+	return &block, err
 }
 
 func BuildHeader(
