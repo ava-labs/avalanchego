@@ -215,7 +215,9 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
-	if err := vm.AppResponse(nodeID, vm.IssueID(), txBytes); err != nil {
+	reqID := vm.IssueID()
+	vm.requestsContent[reqID] = tx.ID()
+	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	<-issuer
@@ -391,6 +393,7 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 	}
 
 	// received tx and check it is accepted and re-gossiped
+	vm.requestsContent[reqID] = tx.ID()
 	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -411,7 +414,9 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 
 	// case 1: reinsertion attempt
 	isTxReGossiped = false
-	if err := vm.AppResponse(nodeID, vm.IssueID(), txBytes); err != nil {
+	reqID = vm.IssueID()
+	vm.requestsContent[reqID] = tx.ID()
+	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	time.Sleep(5 * time.Second)
@@ -450,6 +455,7 @@ func TestMempool_AtmTxs_AppResponseHandling_InvalidTx(t *testing.T) {
 		t.Fatal("could not encode atomic tx")
 	}
 
+	vm.requestsContent[reqID] = illFormedTx.ID()
 	if err := vm.AppResponse(nodeID, reqID, illFormedTxBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -613,7 +619,8 @@ func TestMempool_AtmTxs_AppRequestHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	if err := vm.AppRequest(nodeID, vm.IssueID(), txIDBytes); err != nil {
+	reqID := vm.IssueID()
+	if err := vm.AppRequest(nodeID, reqID, txIDBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !isResponseIssued {
@@ -621,7 +628,7 @@ func TestMempool_AtmTxs_AppRequestHandling(t *testing.T) {
 	}
 
 	// show that responded bytes can be duly decoded
-	if err := vm.AppResponse(nodeID, vm.IssueID(), respondedBytes); err != nil {
+	if err := vm.AppResponse(nodeID, reqID, respondedBytes); err != nil {
 		t.Fatal("bytes sent in response of AppRequest cannot be decoded")
 	}
 }
