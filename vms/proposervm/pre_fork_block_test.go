@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package proposervm
 
 import (
@@ -11,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -347,7 +350,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 
 	// postFork block does NOT verify if parent is before fork activation time
-	postForkStatelessChild, err := statelessblock.Build(
+	postForkStatelessChild, err := block.Build(
 		coreGenBlk.ID(),
 		coreBlk.Timestamp(),
 		0, // pChainHeight
@@ -593,5 +596,208 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 
 	if proBlk.Block.Status() != choices.Rejected {
 		t.Fatal("block rejection did not set state properly")
+	}
+}
+
+func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
+	activationTime := genesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime)
+	if !coreGenBlk.Timestamp().Before(activationTime) {
+		t.Fatal("This test requires parent block 's timestamp to be before fork activation time")
+	}
+	postActivationTime := activationTime.Add(time.Second)
+	proVM.Set(postActivationTime)
+
+	coreBlkID := ids.GenerateTestID()
+	coreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     coreBlkID,
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: postActivationTime,
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    coreBlkID,
+				TimestampV: postActivationTime,
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    coreBlkID,
+				TimestampV: postActivationTime,
+			},
+		},
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		case coreBlk.opts[0].ID():
+			return coreBlk.opts[0], nil
+		case coreBlk.opts[1].ID():
+			return coreBlk.opts[1], nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk.opts[0].Bytes()):
+			return coreBlk.opts[0], nil
+		case bytes.Equal(b, coreBlk.opts[1].Bytes()):
+			return coreBlk.opts[1], nil
+		default:
+			return nil, fmt.Errorf("Unknown block")
+		}
+	}
+
+	firstBlock, err := proVM.ParseBlock(coreBlk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	oracleBlock, ok := firstBlock.(snowman.OracleBlock)
+	if !ok {
+		t.Fatal("should have returned an oracle block")
+	}
+
+	options, err := oracleBlock.Options()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := options[0].Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := options[1].Verify(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
+	activationTime := genesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, activationTime)
+	if !coreGenBlk.Timestamp().Before(activationTime) {
+		t.Fatal("This test requires parent block 's timestamp to be before fork activation time")
+	}
+	postActivationTime := activationTime.Add(time.Second)
+	proVM.Set(postActivationTime)
+
+	coreBlkID := ids.GenerateTestID()
+	coreBlk := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     coreBlkID,
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: postActivationTime,
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    coreBlkID,
+				TimestampV: postActivationTime,
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    coreBlkID,
+				TimestampV: postActivationTime,
+			},
+		},
+	}
+
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		case coreBlk.opts[0].ID():
+			return coreBlk.opts[0], nil
+		case coreBlk.opts[1].ID():
+			return coreBlk.opts[1], nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		case bytes.Equal(b, coreBlk.opts[0].Bytes()):
+			return coreBlk.opts[0], nil
+		case bytes.Equal(b, coreBlk.opts[1].Bytes()):
+			return coreBlk.opts[1], nil
+		default:
+			return nil, fmt.Errorf("Unknown block")
+		}
+	}
+
+	firstBlock, err := proVM.ParseBlock(coreBlk.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := firstBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	slb, err := block.Build(
+		firstBlock.ID(), // refer unknown parent
+		firstBlock.Timestamp(),
+		0, // pChainHeight,
+		proVM.ctx.StakingCertLeaf,
+		coreBlk.opts[0].Bytes(),
+		proVM.ctx.StakingLeafSigner,
+	)
+	if err != nil {
+		t.Fatal("could not build stateless block")
+	}
+
+	invalidChild, err := proVM.ParseBlock(slb.Bytes())
+	if err != nil {
+		// A failure to parse is okay here
+		return
+	}
+
+	err = invalidChild.Verify()
+	if err == nil {
+		t.Fatal("Should have failed to verify a child that was signed when it should be a pre fork block")
 	}
 }

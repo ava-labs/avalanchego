@@ -143,9 +143,9 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
-	if _, ok := b.innerBlk.(snowman.OracleBlock); !ok {
+	if err := verifyIsOracleBlock(b.innerBlk); err != nil {
 		b.vm.ctx.Log.Debug("post-fork option block's parent is not an oracle block")
-		return errUnexpectedBlockType
+		return err
 	}
 
 	// Make sure [b]'s inner block is the parent of [child]'s inner block

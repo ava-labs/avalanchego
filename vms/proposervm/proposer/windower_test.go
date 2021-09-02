@@ -84,7 +84,7 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	chainID := ids.ID{0, 2}
 	validatorIDs := make([]ids.ShortID, maxWindows)
 	for i := range validatorIDs {
-		validatorIDs[i] = ids.ShortID{byte(i)}
+		validatorIDs[i] = ids.ShortID{byte(i + 1)}
 	}
 	vdrState := &validators.TestState{
 		T: t,
@@ -148,7 +148,7 @@ func TestWindowerChangeByChain(t *testing.T) {
 
 	validatorIDs := make([]ids.ShortID, maxWindows)
 	for i := range validatorIDs {
-		validatorIDs[i] = ids.ShortID{byte(i)}
+		validatorIDs[i] = ids.ShortID{byte(i + 1)}
 	}
 	vdrState := &validators.TestState{
 		T: t,
