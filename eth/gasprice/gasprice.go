@@ -42,8 +42,8 @@ import (
 )
 
 const (
-	sampleNumber       = 3 // Number of transactions sampled in a block
-	ignoreGasThreshold = uint64(750_000)
+	defaultSampleNumber = 3 // Number of transactions sampled in a block by default
+	ignoreGasThreshold  = uint64(750_000)
 )
 
 var (
@@ -53,6 +53,7 @@ var (
 
 type Config struct {
 	Blocks      int
+	TxsPerBlock int
 	Percentile  int
 	MaxPrice    *big.Int `toml:",omitempty"`
 	IgnorePrice *big.Int `toml:",omitempty"`
@@ -79,7 +80,7 @@ type Oracle struct {
 	// clock to decide what set of rules to use when recommending a gas price
 	clock timer.Clock
 
-	checkBlocks, percentile int
+	checkBlocks, txsPerBlock, percentile int
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
@@ -89,6 +90,11 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	if blocks < 1 {
 		blocks = 1
 		log.Warn("Sanitizing invalid gasprice oracle sample blocks", "provided", config.Blocks, "updated", blocks)
+	}
+	txsPerBlock := config.TxsPerBlock
+	if txsPerBlock < 1 {
+		txsPerBlock = defaultSampleNumber
+		log.Warn("Sanitizing invalid txsPerBlock", "provided", config.TxsPerBlock, "updated", txsPerBlock)
 	}
 	percent := config.Percentile
 	if percent < 0 {
@@ -117,6 +123,7 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		maxPrice:    maxPrice,
 		ignorePrice: ignorePrice,
 		checkBlocks: blocks,
+		txsPerBlock: txsPerBlock,
 		percentile:  percent,
 	}
 }
@@ -217,7 +224,7 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 		results   []*big.Int
 	)
 	for sent < oracle.checkBlocks && number > 0 {
-		go oracle.getBlockValues(ctx, types.MakeSigner(oracle.backend.ChainConfig(), big.NewInt(int64(number)), new(big.Int).SetUint64(timestamp)), number, sampleNumber, oracle.ignorePrice, result, quit)
+		go oracle.getBlockValues(ctx, types.MakeSigner(oracle.backend.ChainConfig(), big.NewInt(int64(number)), new(big.Int).SetUint64(timestamp)), number, oracle.txsPerBlock, oracle.ignorePrice, result, quit)
 		sent++
 		exp++
 		number--
@@ -240,7 +247,7 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 		// meaningful returned, try to query more blocks. But the maximum
 		// is 2*checkBlocks.
 		if len(res.values) == 1 && len(results)+1+exp < oracle.checkBlocks*2 && number > 0 {
-			go oracle.getBlockValues(ctx, res.signer, number, sampleNumber, oracle.ignorePrice, result, quit)
+			go oracle.getBlockValues(ctx, res.signer, number, oracle.txsPerBlock, oracle.ignorePrice, result, quit)
 			sent++
 			exp++
 			number--
@@ -320,12 +327,10 @@ func (oracle *Oracle) getBlockValues(ctx context.Context, signer types.Signer, b
 		if ignoreUnder != nil && tip.Cmp(ignoreUnder) == -1 {
 			continue
 		}
-		sender, err := types.Sender(signer, tx)
-		if err == nil && sender != block.Coinbase() {
-			prices = append(prices, tip)
-			if len(prices) >= limit {
-				break
-			}
+
+		prices = append(prices, tip)
+		if len(prices) >= limit {
+			break
 		}
 	}
 	select {
