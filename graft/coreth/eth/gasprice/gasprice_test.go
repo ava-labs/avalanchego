@@ -110,11 +110,29 @@ type suggestTipCapTest struct {
 	expectedTip *big.Int
 }
 
-func TestSuggestTipCap(t *testing.T) {
+func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
 	config := Config{
-		Blocks:     3,
-		Percentile: 60,
+		Blocks:      3,
+		TxsPerBlock: 100,
+		Percentile:  60,
 	}
+
+	if test.genBlock == nil {
+		test.genBlock = func(i int, b *core.BlockGen) {}
+	}
+	backend := newTestBackend(t, test.chainConfig, test.numBlocks, test.genBlock)
+	oracle := NewOracle(backend, config)
+
+	got, err := oracle.SuggestTipCap(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Cmp(test.expectedTip) != 0 {
+		t.Fatalf("Expected tip (%d), got tip (%d)", test.expectedTip, got)
+	}
+}
+
+func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 	tests := map[string]suggestTipCapTest{
 		"apricot phase 4": {
 			chainConfig: params.TestChainConfig,
@@ -136,27 +154,178 @@ func TestSuggestTipCap(t *testing.T) {
 			chainConfig: params.TestLaunchConfig,
 			expectedTip: big.NewInt(params.LaunchMinGasPrice),
 		},
-		// TODO
-		// ensure tips below ignore price are not included
-		// ensure average of tips is correct
-		// ensure legacy transactions are handled correctly
-		// ensure tips are time based - this should be updated in the actual calculation as well
 	}
+
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if test.genBlock == nil {
-				test.genBlock = func(i int, b *core.BlockGen) {}
-			}
-			backend := newTestBackend(t, test.chainConfig, test.numBlocks, test.genBlock)
-			oracle := NewOracle(backend, config)
-
-			got, err := oracle.SuggestTipCap(context.Background())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got.Cmp(test.expectedTip) != 0 {
-				t.Fatalf("Expected tip (%d), got tip (%d)", test.expectedTip, got)
-			}
+			applyGasPriceTest(t, test)
 		})
 	}
+}
+
+func TestSuggestTipCapIdenticalTip(t *testing.T) {
+	tip := big.NewInt(10 * params.GWei)
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig: params.TestChainConfig,
+		numBlocks:   3,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, tip)
+			// Need to add 50 transactions, so that the block consumes more than the skip block
+			// gas limit
+			for j := 0; j < 50; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: tip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: tip,
+	})
+}
+
+func TestSuggestTipCapDifferentTips(t *testing.T) {
+	tip := big.NewInt(10 * params.GWei)
+	signer := types.LatestSigner(params.TestChainConfig)
+
+	highTip := new(big.Int).Add(tip, common.Big1)
+	lowTip := new(big.Int).Sub(tip, common.Big1)
+
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig: params.TestChainConfig,
+		numBlocks:   3,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, highTip)
+			// Need to add 50 transactions, so that the block consumes more than the skip block
+			// gas limit
+			for j := 0; j < 50; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: highTip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+				tx = types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: lowTip,
+					Data:      []byte{},
+				})
+				tx, err = types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: highTip,
+	})
+}
+
+func TestSuggestTipCapIgnoreSmallTips(t *testing.T) {
+	tip := big.NewInt(10 * params.GWei)
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig: params.TestChainConfig,
+		numBlocks:   3,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, tip)
+			// Need to add 50 transactions, so that the block consumes more than the skip block
+			// gas limit
+			for j := 0; j < 25; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: tip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+				tx = types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: common.Big1,
+					Data:      []byte{},
+				})
+				tx, err = types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: tip,
+	})
+}
+func TestSuggestTipcapLegacyTxs(t *testing.T) {
+	tip := big.NewInt(10 * params.GWei)
+
+	// what should we do if we reach further than 20s back when retrieving block values
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig: params.TestChainConfig,
+		numBlocks:   3,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, tip)
+			// Need to add 50 transactions, so that the block consumes more than the skip block
+			// gas limit
+			for j := 0; j < 50; j++ {
+				tx := types.NewTx(&types.LegacyTx{
+					Nonce:    b.TxNonce(addr),
+					To:       &common.Address{},
+					Gas:      params.TxGas,
+					GasPrice: feeCap,
+					Data:     []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: tip,
+	})
 }
