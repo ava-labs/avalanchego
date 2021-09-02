@@ -672,7 +672,9 @@ func (vm *VM) listenAndGossip() {
 	for {
 		select {
 		case bytes := <-vm.appGossipBytesCh:
-			vm.appSender.SendAppGossip(bytes) // TODO check for errors
+			if err := vm.appSender.SendAppGossip(bytes); err != nil {
+				log.Warn(fmt.Sprintf("SendAppGossip: failure with err %s", err))
+			}
 		case <-vm.shutdownChan:
 			return
 		}
@@ -692,10 +694,12 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 }
 
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	log.Trace("called AppRequest")
+	// Note: errors returned by AppRequest are treated as fatal. Currently there is hardly a reason
+	// for a failed AppRequest handling to cause a node shutdown.
+	log.Trace("AppRequest: called")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		log.Trace("called AppRequest before activation time. Doing nothing")
+		log.Trace("AppRequest: called before activation time, doing nothing")
 		return nil
 	}
 
@@ -703,30 +707,40 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 	if err != nil {
 		log.Warn(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d",
 			nodeID, requestID))
-		return err
+		return nil
 	}
 
 	switch appMsg.MsgType {
 	case atomicTxIDType:
 		txID := appMsg.appGossipObj.(ids.ID)
-		log.Debug(fmt.Sprintf("called AppRequest with txID %s", txID))
+		log.Debug(fmt.Sprintf("AppRequest: called with txID %s", txID))
 
 		resTx, dropped, found := vm.mempool.GetTx(txID)
 		if !dropped && !found {
-			return nil // tx not in mempool. Possibly already included in blocks
+			// tx not in mempool. Possibly already included in blocks
+			log.Debug(fmt.Sprintf("AppRequest: txID %s not in mempool. Doing nothing", txID))
+			return nil
 		}
 
 		// send response
 		response, err := vm.encodeAtomicTx(resTx)
 		if err != nil {
-			return err
+			log.Warn(fmt.Sprintf("AppRequest: failed creating AppResponse carrying atomic tx %s, error %s",
+				txID, err))
+			return nil
 		}
 
-		return vm.appSender.SendAppResponse(nodeID, requestID, response)
+		if err := vm.appSender.SendAppResponse(nodeID, requestID, response); err != nil {
+			log.Warn(fmt.Sprintf("AppRequest: failed sending AppResponse with error %s", err))
+			return nil
+		}
+
+		return nil
 	case ethHashesType:
 		hashList := appMsg.appGossipObj.([]common.Hash)
-		log.Debug("called AppRequest with coreth hashes list")
+		log.Debug("AppRequest: called with eth hashes list")
 
+		// select tx to respond with
 		txsToRespondTo := make([]*types.Transaction, 0)
 		for _, txHash := range hashList {
 			if tx := vm.chain.GetTxPool().Get(txHash); tx != nil {
@@ -734,46 +748,55 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 			}
 		}
 		if len(txsToRespondTo) == 0 {
-			// TODO: send back an empty message?
-			return nil // txes no more in mempool
+			log.Debug("AppRequest: no requested eth txs in mempool. Doing nothing")
+			return nil
 		}
 
 		response, err := vm.encodeEthTxs(txsToRespondTo)
 		if err != nil {
-			return err
+			log.Warn(fmt.Sprintf("AppRequest: failed creating AppResponse carrying eth txs, error %s",
+				err))
+			return nil
 		}
-		return vm.appSender.SendAppResponse(nodeID, requestID, response)
+		if err := vm.appSender.SendAppResponse(nodeID, requestID, response); err != nil {
+			log.Warn(fmt.Sprintf("AppRequest: failed sending AppResponse with error %s", err))
+			return nil
+		}
+
+		return nil
 	default:
-		log.Debug(fmt.Sprintf("Unknown AppRequest msg type %v", appMsg.MsgType))
-		return fmt.Errorf("unknown AppMsg type ID")
+		log.Warn(fmt.Sprintf("AppRequest: unexpected appMsgType %v. Doing nothing", appMsg.MsgType))
+		return nil
 	}
 }
 
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	log.Trace("called AppResponse")
+	// Note: errors returned by AppResponse are treated as fatal. Currently there is hardly a reason
+	// for a failed AppResponse handling to cause a node shutdown.
+	log.Trace("AppResponse: called")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		log.Trace("called AppResponse before activation time. Doing nothing")
+		log.Trace("AppResponse: called before activation time. Doing nothing")
 		return nil
 	}
 
 	// check requestID
 	if err := vm.ReclaimID(requestID); err != nil {
-		log.Debug(fmt.Sprintf("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %d", nodeID, requestID))
+		log.Debug(fmt.Sprintf("AppRequest: out-of-Sync AppRequest - nodeID: %v - requestID: %d", nodeID, requestID))
 		return nil
 	}
 
 	// decode response
 	appMsg, err := vm.decodeToAppMsg(response)
 	if err != nil {
-		log.Debug(fmt.Sprintf("AppResponse: failed unmarshalling response from Node %v, reqID %v",
+		log.Warn(fmt.Sprintf("AppResponse: failed unmarshalling response from Node %v, reqID %d",
 			nodeID, requestID))
-		return fmt.Errorf("failed unmarshalling AppGossipResponse")
+		return nil
 	}
 	switch appMsg.MsgType {
 	case atomicTxType:
 		tx := appMsg.appGossipObj.(*Tx)
-		log.Debug(fmt.Sprintf("called AppResponse with txID %s", tx.ID()))
+		log.Debug(fmt.Sprintf("AppResponse: received txID %s", tx.ID()))
 
 		// Note: we currently do not check whether nodes send us exactly the tx matching
 		// the txID we asked for. At least we should check we do not receive total garbage
@@ -787,11 +810,13 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		if err != nil {
 			log.Debug(fmt.Sprintf("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
 				nodeID, requestID, err))
+			return nil
 		}
 
-		return err
+		return nil
 	case ethTxListType:
 		ethTxs := appMsg.appGossipObj.([]*types.Transaction)
+		log.Debug("AppResponse: received eth txs")
 
 		errs := vm.chain.GetTxPool().AddRemotes(ethTxs)
 		for _, err := range errs {
@@ -802,29 +827,32 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		}
 		return nil
 	default:
-		log.Debug(fmt.Sprintf("Unknown AppGossip msg type %v", appMsg.MsgType))
-		return fmt.Errorf("unknown AppMsg type ID")
+		log.Warn(fmt.Sprintf("AppResponse: unexpected appMsgType %v. Doing nothing", appMsg.MsgType))
+		return nil
 	}
 }
 
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	// Note: errors returned by AppGossip are treated as fatal. Currently there is hardly a reason
+	// for a failed AppGossip handling to cause a node shutdown.
 	log.Trace("called AppGossip")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		log.Trace("called AppGossip before activation time. Doing nothing")
+		log.Trace("AppGossip: called before activation time. Doing nothing")
 		return nil
 	}
 
 	appMsg, err := vm.decodeToAppMsg(msg)
 	if err != nil {
-		log.Warn(fmt.Sprintf("could not decode AppGossip msg, error %v", err))
-		return err
+		log.Warn(fmt.Sprintf("AppGossip: failed unmarshalling gossip from Node %v, error %s",
+			nodeID, err))
+		return nil
 	}
 
 	switch appMsg.MsgType {
 	case atomicTxIDType:
 		txID := appMsg.appGossipObj.(ids.ID)
-		log.Debug(fmt.Sprintf("called AppGossip with txID %s", txID))
+		log.Debug(fmt.Sprintf("AppGossip: received txID %s", txID))
 
 		if _, _, found := vm.mempool.GetTx(txID); found {
 			// already known tx. Not requesting it
@@ -833,10 +861,14 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 
 		nodesSet := ids.NewShortSet(1)
 		nodesSet.Add(nodeID)
-		return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
+		if err := vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg); err != nil {
+			log.Warn(fmt.Sprintf("AppGossip: failed sending AppResponse with error %s", err))
+			return nil
+		}
+		return nil
 	case ethHashesType:
 		hashList := appMsg.appGossipObj.([]common.Hash)
-		log.Debug("called AppGossip with coreth hashes list")
+		log.Debug("AppGossip: received eth hashes list")
 
 		hashesToRequest := make([]common.Hash, 0)
 		for _, txHash := range hashList {
@@ -851,15 +883,21 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 
 		msg, err := vm.encodeEthHashes(hashesToRequest)
 		if err != nil {
-			return err
+			log.Warn(fmt.Sprintf("AppGossip: failed creating AppResponse carrying eth txs, error %s",
+				err))
+			return nil
 		}
 
 		nodesSet := ids.NewShortSet(1)
 		nodesSet.Add(nodeID)
-		return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
+		if err := vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg); err != nil {
+			log.Warn(fmt.Sprintf("AppGossip: failed sending AppResponse with error %s", err))
+			return nil
+		}
+		return nil
 	default:
-		log.Debug(fmt.Sprintf("Unknown AppGossip msg txIDType %v", appMsg.MsgType))
-		return fmt.Errorf("unknown AppMsg type ID")
+		log.Warn(fmt.Sprintf("AppGossip: unexpected appMsgType %v. Doing nothing", appMsg.MsgType))
+		return nil
 	}
 }
 
@@ -1173,7 +1211,7 @@ func (vm *VM) awaitSubmittedTxs() {
 				}
 
 				// gossip them
-				log.Debug(fmt.Sprintf("AppGossip: gossiping %v coreth txs", len(ethHashes)))
+				log.Debug(fmt.Sprintf("SendAppGossip: gossiping %v coreth txs", len(ethHashes)))
 				vm.appGossipBytesCh <- ethTxsBytes
 			}
 		case <-vm.mempool.Pending:
@@ -1229,7 +1267,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	switch err := vm.mempool.AddTx(tx); err {
 	case nil:
 		if time.Now().Before(vm.gossipActivationTime) {
-			log.Trace("issued tx before gossiping activation time. Not gossiping it")
+			log.Trace("SendAppGossip: issued tx before gossiping activation time. Doing nothing")
 			return nil
 		}
 		txIDBytes, err := vm.encodeTxID(tx.ID())
@@ -1237,7 +1275,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 			return err
 		}
 
-		log.Debug(fmt.Sprintf("AppGossip: gossiping txID %s", tx.ID()))
+		log.Debug(fmt.Sprintf("SendAppGossip: gossiping txID %s", tx.ID()))
 		vm.appGossipBytesCh <- txIDBytes
 		return nil
 	case errTooManyAtomicTx:
