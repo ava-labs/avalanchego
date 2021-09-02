@@ -121,7 +121,7 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	}
 
 	// Verify the signature of the node
-	if err := child.Block.Verify(); err != nil {
+	if err := child.Block.Verify(b.vm.ctx.ChainID); err != nil {
 		return err
 	}
 
@@ -179,6 +179,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		pChainHeight,
 		b.vm.ctx.StakingCertLeaf,
 		innerBlock.Bytes(),
+		b.vm.ctx.ChainID,
 		b.vm.ctx.StakingLeafSigner,
 	)
 	if err != nil {

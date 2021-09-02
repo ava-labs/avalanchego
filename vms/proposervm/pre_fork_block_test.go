@@ -353,6 +353,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		0, // pChainHeight
 		proVM.ctx.StakingCertLeaf,
 		coreBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {

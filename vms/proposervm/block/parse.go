@@ -33,3 +33,16 @@ func Parse(bytes []byte) (Block, error) {
 	block.proposer = hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw))
 	return &block, nil
 }
+
+func ParseHeader(bytes []byte) (Header, error) {
+	header := statelessHeader{}
+	parsedVersion, err := c.Unmarshal(bytes, &header)
+	if err != nil {
+		return nil, err
+	}
+	if parsedVersion != version {
+		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
+	}
+	header.bytes = bytes
+	return &header, nil
+}

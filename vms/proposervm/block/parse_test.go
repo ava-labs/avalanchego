@@ -21,6 +21,7 @@ func TestParse(t *testing.T) {
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
 	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
 
 	tlsCert, err := staking.NewTLSCert()
 	assert.NoError(err)
@@ -28,7 +29,15 @@ func TestParse(t *testing.T) {
 	cert := tlsCert.Leaf
 	key := tlsCert.PrivateKey.(crypto.Signer)
 
-	builtBlock, err := Build(parentID, timestamp, pChainHeight, cert, innerBlockBytes, key)
+	builtBlock, err := Build(
+		parentID,
+		timestamp,
+		pChainHeight,
+		cert,
+		innerBlockBytes,
+		chainID,
+		key,
+	)
 	assert.NoError(err)
 
 	builtBlockBytes := builtBlock.Bytes()
@@ -36,5 +45,27 @@ func TestParse(t *testing.T) {
 	parsedBlock, err := Parse(builtBlockBytes)
 	assert.NoError(err)
 
-	equal(assert, builtBlock, parsedBlock)
+	equal(assert, chainID, builtBlock, parsedBlock)
+}
+
+func TestParseHeader(t *testing.T) {
+	assert := assert.New(t)
+
+	chainID := ids.ID{1}
+	parentID := ids.ID{2}
+	bodyID := ids.ID{3}
+
+	builtHeader, err := BuildHeader(
+		chainID,
+		parentID,
+		bodyID,
+	)
+	assert.NoError(err)
+
+	builtHeaderBytes := builtHeader.Bytes()
+
+	parsedHeader, err := ParseHeader(builtHeaderBytes)
+	assert.NoError(err)
+
+	equalHeader(assert, builtHeader, parsedHeader)
 }

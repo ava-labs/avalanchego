@@ -19,6 +19,7 @@ func Build(
 	pChainHeight uint64,
 	cert *x509.Certificate,
 	blockBytes []byte,
+	chainID ids.ID,
 	key crypto.Signer,
 ) (Block, error) {
 	block := statelessBlock{
@@ -39,8 +40,14 @@ func Build(
 		return nil, err
 	}
 
-	unsignedHash := hashing.ComputeHash256(unsignedBytes)
-	block.Signature, err = key.Sign(rand.Reader, unsignedHash, crypto.SHA256)
+	unsignedHash := hashing.ComputeHash256Array(unsignedBytes)
+	header, err := BuildHeader(chainID, parentID, unsignedHash)
+	if err != nil {
+		return nil, err
+	}
+
+	headerHash := hashing.ComputeHash256(header.Bytes())
+	block.Signature, err = key.Sign(rand.Reader, headerHash, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
@@ -52,4 +59,20 @@ func Build(
 
 	block.id = hashing.ComputeHash256Array(block.bytes)
 	return &block, nil
+}
+
+func BuildHeader(
+	chainID ids.ID,
+	parentID ids.ID,
+	bodyID ids.ID,
+) (Header, error) {
+	header := statelessHeader{
+		Chain:  chainID,
+		Parent: parentID,
+		Body:   bodyID,
+	}
+
+	bytes, err := c.Marshal(version, &header)
+	header.bytes = bytes
+	return &header, err
 }
