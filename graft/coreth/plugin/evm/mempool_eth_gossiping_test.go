@@ -14,8 +14,6 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 func fundAddressByGenesis(addr common.Address) (string, error) {
@@ -111,7 +109,7 @@ func TestMempool_EthTxs_AddedTxesGossipedAfterActivation(t *testing.T) {
 		}
 	}
 
-	time.Sleep(10 * time.Second) // TODO: cleanup this to avoid sleep
+	time.Sleep(5 * time.Second) // TODO: cleanup this to avoid sleep
 
 	if len(gossipedBytes) == 0 {
 		t.Fatal("expected call to SendAppGossip not issued")
@@ -157,7 +155,7 @@ func TestMempool_EthTxs_AddedTxesNotGossipedBeforeActivation(t *testing.T) {
 		}
 	}
 
-	time.Sleep(10 * time.Second) // TODO: cleanup this to avoid sleep
+	time.Sleep(5 * time.Second) // TODO: cleanup this to avoid sleep
 
 	if len(gossipedBytes) != 0 {
 		t.Fatal("unexpected call to SendAppGossip issued")
@@ -165,7 +163,7 @@ func TestMempool_EthTxs_AddedTxesNotGossipedBeforeActivation(t *testing.T) {
 }
 
 func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
-	vm := VM{
+	vm := &VM{
 		codec: Codec,
 	}
 
@@ -175,15 +173,21 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 	for idx, ethTx := range ethTxs {
 		ethHashes[idx] = ethTx.Hash()
 	}
-	bytes, err := vm.ethTxHashesToBytes(ethHashes)
+
+	bytes, err := vm.encodeEthHashes(ethHashes)
 	if err != nil {
-		t.Fatal("Could no duly encode eth tx hashes")
+		t.Fatal("Could not encode eth tx hashes")
 	}
 
-	hashList, err := vm.bytesToEthTxHashes(bytes)
+	appMsg, err := vm.decodeToAppMsg(bytes)
 	if err != nil {
-		t.Fatal("Could no duly decode eth tx hashes")
-	} else if len(hashList) != 2 {
+		t.Fatal("Could not decode eth tx hashes")
+	} else if appMsg.MsgType != ethHashesType {
+		t.Fatal("decided wrong app message")
+	}
+	hashList := appMsg.appGossipObj.([]common.Hash)
+
+	if len(hashList) != 2 {
 		t.Fatal("decoded hashes list has unexpected length")
 	}
 
@@ -234,9 +238,9 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 	ethTx := getEThValidTxs(key)[0]
 
 	// show that unknown coreth hashes is requested
-	unknownEthTxsBytes, err := vm.ethTxHashesToBytes([]common.Hash{ethTx.Hash()})
+	unknownEthTxsBytes, err := vm.encodeEthHashes([]common.Hash{ethTx.Hash()})
 	if err != nil {
-		log.Trace("Could not parse ethTxIDs. Understand what to do")
+		t.Fatal("Could not encode eth tx hashes")
 	}
 
 	if err := vm.AppGossip(nodeID, unknownEthTxsBytes); err != nil {
@@ -255,10 +259,11 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	knownEthTxsBytes, err := vm.ethTxHashesToBytes([]common.Hash{ethTx.Hash()})
+	knownEthTxsBytes, err := vm.encodeEthHashes([]common.Hash{ethTx.Hash()})
 	if err != nil {
-		log.Trace("Could not parse ethTxIDs. Understand what to do")
+		t.Fatal("Could not encode eth tx hashes")
 	}
+
 	if err := vm.AppGossip(nodeID, knownEthTxsBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -298,9 +303,9 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 
 	// prepare a couple of txes
 	ethTxs := getEThValidTxs(key)
-	responseBytes, err := rlp.EncodeToBytes(ethTxs)
+	responseBytes, err := vm.encodeEthTxs(ethTxs)
 	if err != nil {
-		t.Fatal("could not encode coreth txs")
+		t.Fatal("could not encode eth txs list")
 	}
 
 	// responses with unknown requestID are rejected
@@ -326,7 +331,7 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 	if err := vm.AppResponse(nodeID, reqID, responseBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
-	time.Sleep(10 * time.Second)
+	time.Sleep(5 * time.Second)
 	if !vm.chain.GetTxPool().Has(ethTxs[0].Hash()) {
 		t.Fatal("responses with unknown requestID should not affect mempool")
 	}
@@ -370,9 +375,10 @@ func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 	ethTx := getEThValidTxs(key)[0]
-	ethHashBytes, err := vm.ethTxHashesToBytes([]common.Hash{ethTx.Hash()})
+
+	ethHashBytes, err := vm.encodeEthHashes([]common.Hash{ethTx.Hash()})
 	if err != nil {
-		t.Fatal("Could no duly encode eth tx hashes")
+		t.Fatal("Could not encode eth tx hashes")
 	}
 
 	// show that there is no response if tx is unknown
@@ -396,7 +402,7 @@ func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
 		t.Fatal("there should be a response with known tx")
 	}
 
-	// show that responded bytes can be duly decoded
+	// show that responded bytes can be decoded
 	if err := vm.AppResponse(nodeID, vm.IssueID(), respondedBytes); err != nil {
 		t.Fatal("bytes sent in response of AppRequest cannot be decoded")
 	}
