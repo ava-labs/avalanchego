@@ -156,6 +156,86 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 	return p.vm.verifyAndRecordInnerBlk(child)
 }
 
+// Return the child (a *postForkBlock) of this block
+func (p *postForkCommonComponents) buildChild(
+	parentID ids.ID,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	innerBlock snowman.Block,
+) (Block, error) {
+	// Child's timestamp is the later of now and this block's timestamp
+	newTimestamp := p.vm.Time().Truncate(time.Second)
+	if newTimestamp.Before(parentTimestamp) {
+		newTimestamp = parentTimestamp
+	}
+
+	// The child's P-Chain height is the P-Chain's height when it was proposed
+	// (i.e. now)
+	pChainHeight, err := p.vm.PChainHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	delay := newTimestamp.Sub(parentTimestamp)
+
+	// Build the child
+	var statelessChild block.SignedBlock
+	if delay >= proposer.MaxDelay {
+		statelessChild, err = block.BuildUnsigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			innerBlock.Bytes(),
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// The following [minTimestamp] check should be able to be removed, but
+		// this is left here as a sanity check
+		childHeight := innerBlock.Height()
+		proposerID := p.vm.ctx.NodeID
+		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
+		if err != nil {
+			return nil, err
+		}
+
+		if delay < minDelay {
+			// It's not our turn to propose a block yet
+			p.vm.ctx.Log.Warn("Snowman++ build post-fork block - dropped block; parent timestamp %s, expected delay %s, block timestamp %s.",
+				parentTimestamp, minDelay, newTimestamp)
+			return nil, errProposerWindowNotStarted
+		}
+
+		statelessChild, err = block.Build(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			p.vm.ctx.StakingCertLeaf,
+			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.ctx.StakingLeafSigner,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	child := &postForkBlock{
+		SignedBlock: statelessChild,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       p.vm,
+			innerBlk: innerBlock,
+			status:   choices.Processing,
+		},
+	}
+
+	p.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, block timestamp %v.",
+		child.ID(), parentTimestamp, newTimestamp)
+	// Persist the child
+	return child, p.vm.storePostForkBlock(child)
+}
+
 func verifyIsOracleBlock(b snowman.Block) error {
 	oracle, ok := b.(snowman.OracleBlock)
 	if !ok {

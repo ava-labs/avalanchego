@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 var _ Block = &postForkOption{}
@@ -112,84 +111,16 @@ func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
 }
 
 func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
-	parentID := b.ID()
-	parentTimestamp := b.Timestamp()
-	newTimestamp := b.vm.Time().Truncate(time.Second)
-	// The child's timestamp is the later of now and this block's timestamp
-	if newTimestamp.Before(parentTimestamp) {
-		newTimestamp = parentTimestamp
-	}
-
-	// The child's P-Chain height is the P-Chain's height when it was proposed
-	// (i.e. now)
-	pChainHeight, err := b.vm.PChainHeight()
+	parentPChainHeight, err := b.pChainHeight()
 	if err != nil {
 		return nil, err
 	}
-
-	delay := newTimestamp.Sub(parentTimestamp)
-
-	// Build the child
-	var statelessChild block.SignedBlock
-	if delay >= proposer.MaxDelay {
-		statelessChild, err = block.BuildUnsigned(
-			parentID,
-			newTimestamp,
-			pChainHeight,
-			innerBlock.Bytes(),
-		)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// The following [minTimestamp] check should be able to be removed, but
-		// this is left here as a sanity check
-		childHeight := innerBlock.Height()
-		parentPChainHeight, err := b.pChainHeight()
-		if err != nil {
-			return nil, err
-		}
-
-		proposerID := b.vm.ctx.NodeID
-		minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-		if err != nil {
-			return nil, err
-		}
-
-		if delay < minDelay {
-			// It's not our turn to propose a block yet
-			b.vm.ctx.Log.Warn("Snowman++ build post-fork option - dropped option; parent timestamp %s, expected delay %s, block timestamp %s.",
-				parentTimestamp, minDelay, newTimestamp)
-			return nil, errProposerWindowNotStarted
-		}
-
-		statelessChild, err = block.Build(
-			parentID,
-			newTimestamp,
-			pChainHeight,
-			b.vm.ctx.StakingCertLeaf,
-			innerBlock.Bytes(),
-			b.vm.ctx.ChainID,
-			b.vm.ctx.StakingLeafSigner,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	child := &postForkBlock{
-		SignedBlock: statelessChild,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       b.vm,
-			innerBlk: innerBlock,
-			status:   choices.Processing,
-		},
-	}
-
-	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, block timestamp %v.",
-		child.ID(), parentTimestamp, newTimestamp)
-	// Persist the child
-	return child, b.vm.storePostForkBlock(child)
+	return b.postForkCommonComponents.buildChild(
+		b.ID(),
+		b.Timestamp(),
+		parentPChainHeight,
+		innerBlock,
+	)
 }
 
 // This block's P-Chain height is its parent's P-Chain height
