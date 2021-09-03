@@ -211,12 +211,12 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 
 	// gossip tx and check it is accepted
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	txBytes, err := vm.encodeAtmTx(tx)
+	txBytes, err := encodeAtmTx(vm.codec, tx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
 	reqID := vm.IssueID()
-	vm.requestsContent[reqID] = tx.ID()
+	vm.requestsAtmContent[reqID] = tx.ID()
 	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -375,7 +375,7 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 	// responses with unknown requestID are rejected
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	txBytes, err := vm.encodeAtmTx(tx)
+	txBytes, err := encodeAtmTx(vm.codec, tx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -393,7 +393,7 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 	}
 
 	// received tx and check it is accepted and re-gossiped
-	vm.requestsContent[reqID] = tx.ID()
+	vm.requestsAtmContent[reqID] = tx.ID()
 	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -415,7 +415,7 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 	// case 1: reinsertion attempt
 	isTxReGossiped = false
 	reqID = vm.IssueID()
-	vm.requestsContent[reqID] = tx.ID()
+	vm.requestsAtmContent[reqID] = tx.ID()
 	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -450,12 +450,12 @@ func TestMempool_AtmTxs_AppResponseHandling_InvalidTx(t *testing.T) {
 	// gossip tx and check it is accepted and re-gossiped
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	illFormedTxBytes, err := vm.encodeAtmTx(illFormedTx)
+	illFormedTxBytes, err := encodeAtmTx(vm.codec, illFormedTx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
 
-	vm.requestsContent[reqID] = illFormedTx.ID()
+	vm.requestsAtmContent[reqID] = illFormedTx.ID()
 	if err := vm.AppResponse(nodeID, reqID, illFormedTxBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -499,7 +499,7 @@ func TestMempool_AtmTxs_AppGossipHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, sharedMemory, t)
-	txIDBytes, err := vm.encodeAtmData(tx.ID())
+	txIDBytes, err := encodeAtmData(vm.codec, tx.ID())
 	if err != nil {
 		t.Fatal("Could not encode atomic tx ID")
 	}
@@ -564,7 +564,7 @@ func TestMempool_AtmTxs_AppGossipHandling_InvalidTx(t *testing.T) {
 
 	// show that the invalid tx is not requested
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	rejectedTxMsg, err := vm.encodeAtmData(rejectedTx.ID())
+	rejectedTxMsg, err := encodeAtmData(vm.codec, rejectedTx.ID())
 	if err != nil {
 		t.Fatal("could not encode atomic tx ID")
 	}
@@ -600,7 +600,7 @@ func TestMempool_AtmTxs_AppRequestHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, sharedMemory, t)
-	txIDBytes, err := vm.encodeAtmData(tx.ID())
+	txIDBytes, err := encodeAtmData(vm.codec, tx.ID())
 	if err != nil {
 		t.Fatal("could not encode atomic tx ID")
 	}
@@ -655,7 +655,7 @@ func TestMempool_AtmTxs_AppRequestHandling_InvalidTx(t *testing.T) {
 
 	// create a tx
 	rejectedTx := getTheValidTx(vm, sharedMemory, t)
-	rejectedTxIDBytes, err := vm.encodeAtmData(rejectedTx.ID())
+	rejectedTxIDBytes, err := encodeAtmData(vm.codec, rejectedTx.ID())
 	if err != nil {
 		t.Fatal("could not encode atomic tx ID")
 	}

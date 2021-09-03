@@ -186,12 +186,12 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 		}
 	}
 
-	bytes, err := vm.encodeEthData(ethData)
+	bytes, err := encodeEthData(vm.codec, ethData)
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
 
-	appMsg, err := vm.decodeToAppMsg(bytes)
+	appMsg, err := decodeToAppMsg(vm.codec, bytes)
 	if err != nil {
 		t.Fatal("Could not decode eth tx hashes")
 	} else if appMsg.MsgType != ethDataType {
@@ -259,7 +259,7 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 		TxAddress: TxAddress,
 		TxNonce:   ethTx.Nonce(),
 	}
-	unknownEthTxsBytes, err := vm.encodeEthData([]EthData{ethData})
+	unknownEthTxsBytes, err := encodeEthData(vm.codec, []EthData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
@@ -280,7 +280,7 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	knownEthTxsBytes, err := vm.encodeEthData([]EthData{ethData})
+	knownEthTxsBytes, err := encodeEthData(vm.codec, []EthData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
@@ -324,7 +324,7 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 
 	// prepare a couple of txes
 	ethTxs := getEThValidTxs(key)
-	responseBytes, err := vm.encodeEthTxs(ethTxs)
+	responseBytes, err := encodeEthTxs(vm.codec, ethTxs)
 	if err != nil {
 		t.Fatal("could not encode eth txs list")
 	}
@@ -352,7 +352,7 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 	reqContent := make(map[common.Hash]struct{})
 	reqContent[ethTxs[0].Hash()] = struct{}{}
 	reqContent[ethTxs[1].Hash()] = struct{}{}
-	vm.requestsContent[reqID] = reqContent
+	vm.requestsEthContent[reqID] = reqContent
 	if err := vm.AppResponse(nodeID, reqID, responseBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
@@ -411,7 +411,7 @@ func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
 		TxNonce:   ethTx.Nonce(),
 	}
 
-	ethHashBytes, err := vm.encodeEthData([]EthData{ethData})
+	ethHashBytes, err := encodeEthData(vm.codec, []EthData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
