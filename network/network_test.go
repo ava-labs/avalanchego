@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -309,14 +310,11 @@ var (
 func TestNewDefaultNetwork(t *testing.T) {
 	initCerts(t)
 
-	log := logging.NoLog{}
 	ip := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
 		0,
 	)
 	id := ids.ShortID(hashing.ComputeHash160Array([]byte(ip.IP().String())))
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	listener := &testListener{
 		addr: &net.TCPAddr{
@@ -326,38 +324,18 @@ func TestNewDefaultNetwork(t *testing.T) {
 		inbound: make(chan net.Conn, 1<<10),
 		closed:  make(chan struct{}),
 	}
-	caller := &testDialer{
-		addr: &net.TCPAddr{
-			IP:   net.IPv6loopback,
-			Port: 0,
-		},
-		outbounds: make(map[string]*testListener),
-	}
-	serverUpgrader := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader := NewTLSClientUpgrader(tlsConfig0)
 
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
-
-	net, err := NewDefaultNetwork(
+	netConfig := NewDefaultConfig(
 		"",
-		prometheus.NewRegistry(),
-		log,
 		id,
 		ip,
-		networkID,
-		defaultVersionManager,
-		versionParser,
-		listener,
-		caller,
-		serverUpgrader,
-		clientUpgrader,
+		uint32(0),
 		vdrs,
 		vdrs,
-		handler,
 		throttling.InboundConnThrottlerConfig{},
 		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
 		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
 		defaultPeerListSize,
@@ -366,9 +344,10 @@ func TestNewDefaultNetwork(t *testing.T) {
 		defaultGossipAcceptedFrontierSize,
 		defaultGossipOnAcceptSize,
 		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
+		ids.Set{},
 	)
+
+	net, err := NewNetwork(prometheus.NewRegistry(), logging.NoLog{}, listener, handler, benchlist.NewManager(&benchlist.Config{}), tlsConfig0, netConfig)
 	assert.NoError(t, err)
 	assert.NotNil(t, net)
 
@@ -383,9 +362,6 @@ func TestNewDefaultNetwork(t *testing.T) {
 
 func TestEstablishConnection(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -432,12 +408,6 @@ func TestEstablishConnection(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
 	vdrs := validators.NewSet()
 
 	var (
@@ -463,68 +433,32 @@ func TestEstablishConnection(t *testing.T) {
 		},
 	}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -552,9 +486,6 @@ func TestEstablishConnection(t *testing.T) {
 
 func TestDoubleTrack(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -601,11 +532,6 @@ func TestDoubleTrack(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
 	vdrs := validators.NewSet()
 
 	var (
@@ -631,68 +557,32 @@ func TestDoubleTrack(t *testing.T) {
 		},
 	}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -721,9 +611,6 @@ func TestDoubleTrack(t *testing.T) {
 
 func TestDoubleClose(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -770,11 +657,6 @@ func TestDoubleClose(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
 	vdrs := validators.NewSet()
 
 	var (
@@ -800,68 +682,32 @@ func TestDoubleClose(t *testing.T) {
 		},
 	}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -895,9 +741,6 @@ func TestDoubleClose(t *testing.T) {
 
 func TestTrackConnected(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -944,11 +787,6 @@ func TestTrackConnected(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
 	vdrs := validators.NewSet()
 
 	var (
@@ -974,68 +812,32 @@ func TestTrackConnected(t *testing.T) {
 		},
 	}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1065,9 +867,6 @@ func TestTrackConnected(t *testing.T) {
 
 func TestTrackConnectedRace(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -1114,76 +913,35 @@ func TestTrackConnectedRace(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -1217,9 +975,6 @@ func assertEqualPeers(t *testing.T, expected map[string]ids.ShortID, actual []Pe
 
 func TestPeerAliasesTicker(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -1316,8 +1071,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 			ip2.IP().String(): cert2.Leaf,
 		},
 	}
-	serverUpgrader := upgrader
-	clientUpgrader := upgrader
 
 	vdrs := validators.NewSet()
 
@@ -1401,137 +1154,83 @@ func TestPeerAliasesTicker(t *testing.T) {
 		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
 	}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
+	netw0 := net0.(*network)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	netw0.serverUpgrader = upgrader
+	netw0.clientUpgrader = upgrader
+
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
+	netw1 := net1.(*network)
 
-	net2, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
-		id1,
+	netw1.serverUpgrader = upgrader
+	netw1.clientUpgrader = upgrader
+
+	net2, err := newTestNetwork(
+		id2,
 		ip2,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert2.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig2,
 		listener2,
 		caller2,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler2,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert2.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
 
-	net3, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	netw2 := net2.(*network)
+
+	netw2.serverUpgrader = upgrader
+	netw2.clientUpgrader = upgrader
+
+	net3, err := newTestNetwork(
 		id2,
 		ip2,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert2.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig2,
 		listener3,
 		caller3,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler3,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert2.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net3)
+
+	netw3 := net3.(*network)
+
+	netw3.serverUpgrader = upgrader
+	netw3.clientUpgrader = upgrader
 
 	go func() {
 		err := net0.Dispatch()
@@ -1622,9 +1321,6 @@ func TestPeerAliasesTicker(t *testing.T) {
 
 func TestPeerAliasesDisconnect(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	vdrs := validators.NewSet()
 
@@ -1738,8 +1434,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 			ip2.IP().String(): cert2.Leaf,
 		},
 	}
-	serverUpgrader := upgrader
-	clientUpgrader := upgrader
 
 	var (
 		wg0     sync.WaitGroup
@@ -1843,137 +1537,81 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 		assert.Fail(t, "caller 0 unauthorized close", local.String(), remote.String())
 	}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	netw0 := net0.(*network)
+	netw0.serverUpgrader = upgrader
+	netw0.clientUpgrader = upgrader
+
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
-	net2, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	netw1 := net1.(*network)
+	netw1.serverUpgrader = upgrader
+	netw1.clientUpgrader = upgrader
+
+	net2, err := newTestNetwork(
 		id1,
 		ip2,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert2.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig2,
 		listener2,
 		caller2,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler2,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert2.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
 
-	net3, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	netw2 := net2.(*network)
+	netw2.serverUpgrader = upgrader
+	netw2.clientUpgrader = upgrader
+
+	net3, err := newTestNetwork(
 		id2,
 		ip2,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert2.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig2,
 		listener3,
 		caller3,
-		serverUpgrader,
-		clientUpgrader,
-		vdrs,
-		vdrs,
 		handler3,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert2.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net3)
+
+	netw3 := net3.(*network)
+	netw3.serverUpgrader = upgrader
+	netw3.clientUpgrader = upgrader
 
 	go func() {
 		err := net0.Dispatch()
@@ -2067,19 +1705,6 @@ func TestPeerAliasesDisconnect(t *testing.T) {
 
 func TestPeerSignature(t *testing.T) {
 	initCerts(t)
-
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
-
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
-	serverUpgrader2 := NewTLSServerUpgrader(tlsConfig2)
-	clientUpgrader2 := NewTLSClientUpgrader(tlsConfig2)
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -2201,101 +1826,47 @@ func TestPeerSignature(t *testing.T) {
 		},
 	}
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
-	net2, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net2, err := newTestNetwork(
 		id2,
 		ip2,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert2.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig2,
 		listener2,
 		caller2,
-		serverUpgrader2,
-		clientUpgrader2,
-		vdrs,
-		vdrs,
 		handler2,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert2.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -2335,7 +1906,6 @@ func TestPeerSignature(t *testing.T) {
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-
 	wg0.Wait()
 	wg1.Wait()
 	wg2.Wait()
@@ -2559,20 +2129,12 @@ func TestValidatorIPs(t *testing.T) {
 func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 	initCerts(t)
 
-	log := logging.NoLog{}
-	networkID := uint32(0)
 	// Node 0 considers node 1  incompatible
 	net0Version := version.NewDefaultApplication("app", 1, 4, 7)
 	net0MinCompatibleVersion := version.NewDefaultApplication("app", 1, 4, 5)
 	// Node 1 considers node 0 compatible
 	net1Version := version.NewDefaultApplication("app", 1, 4, 4)
 	net1MinCompatibleVersion := version.NewDefaultApplication("app", 1, 4, 4)
-
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -2644,68 +2206,32 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 		net1MinCompatibleVersion,
 	)
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		net0Compatibility,
-		version.NewDefaultApplicationParser(),
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		&testHandler{},
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		net1Compatibility,
-		version.NewDefaultApplicationParser(),
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		ids.Set{},
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		&testHandler{},
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -2739,9 +2265,6 @@ func TestDontFinishHandshakeOnIncompatibleVersion(t *testing.T) {
 
 func TestPeerTrackedSubnets(t *testing.T) {
 	initCerts(t)
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -2788,12 +2311,6 @@ func TestPeerTrackedSubnets(t *testing.T) {
 	caller0.outbounds[ip1.IP().String()] = listener1
 	caller1.outbounds[ip0.IP().String()] = listener0
 
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
 	vdrs := validators.NewSet()
 
 	var (
@@ -2819,68 +2336,32 @@ func TestPeerTrackedSubnets(t *testing.T) {
 
 	subnetSet := ids.Set{}
 	subnetSet.Add(testSubnetID)
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		subnetSet,
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, subnetSet,
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		subnetSet,
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, subnetSet,
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
@@ -2921,19 +2402,6 @@ func TestPeerTrackedSubnets(t *testing.T) {
 
 func TestPeerGossip(t *testing.T) {
 	initCerts(t)
-
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	versionParser := version.NewDefaultApplicationParser()
-
-	serverUpgrader0 := NewTLSServerUpgrader(tlsConfig0)
-	clientUpgrader0 := NewTLSClientUpgrader(tlsConfig0)
-
-	serverUpgrader1 := NewTLSServerUpgrader(tlsConfig1)
-	clientUpgrader1 := NewTLSClientUpgrader(tlsConfig1)
-
-	serverUpgrader2 := NewTLSServerUpgrader(tlsConfig2)
-	clientUpgrader2 := NewTLSClientUpgrader(tlsConfig2)
 
 	ip0 := utils.NewDynamicIPDesc(
 		net.IPv6loopback,
@@ -3062,101 +2530,47 @@ func TestPeerGossip(t *testing.T) {
 	subnetSet := ids.Set{}
 	subnetSet.Add(testSubnetID)
 
-	net0, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net0, err := newTestNetwork(
 		id0,
 		ip0,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert0.PrivateKey.(crypto.Signer),
+		subnetSet,
+		tlsConfig0,
 		listener0,
 		caller0,
-		serverUpgrader0,
-		clientUpgrader0,
-		vdrs,
-		vdrs,
 		handler0,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, subnetSet,
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net0)
 
-	net1, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net1, err := newTestNetwork(
 		id1,
 		ip1,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert1.PrivateKey.(crypto.Signer),
+		subnetSet,
+		tlsConfig1,
 		listener1,
 		caller1,
-		serverUpgrader1,
-		clientUpgrader1,
-		vdrs,
-		vdrs,
 		handler1,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert1.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, subnetSet,
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net1)
 
-	net2, err := NewDefaultNetwork(
-		"",
-		prometheus.NewRegistry(),
-		log,
+	net2, err := newTestNetwork(
 		id2,
 		ip2,
-		networkID,
 		defaultVersionManager,
-		versionParser,
+		vdrs,
+		cert2.PrivateKey.(crypto.Signer),
+		ids.Set{}, // tracks no subnet
+		tlsConfig2,
 		listener2,
 		caller2,
-		serverUpgrader2,
-		clientUpgrader2,
-		vdrs,
-		vdrs,
 		handler2,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		benchlist.NewManager(&benchlist.Config{}),
-		defaultAliasTimeout,
-		cert2.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		defaultInboundMsgThrottler,
-		defaultOutboundMsgThrottler, ids.Set{},
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, net2)
@@ -3239,4 +2653,49 @@ func isIPDescIn(targetIP utils.IPDesc, ipDescList []utils.IPCertDesc) bool {
 	return false
 }
 
-// End of Helper method for TestValidatorIPs
+func newTestNetwork(
+	id ids.ShortID,
+	ip utils.DynamicIPDesc,
+	versionCompatibility version.Compatibility,
+	vdrs validators.Set,
+	tlsKey crypto.Signer,
+	subnetSet ids.Set,
+	tlsConfig *tls.Config,
+	listener net.Listener,
+	dialer dialer.Dialer,
+	router router.Router,
+) (Network, error) {
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	benchlistManager := benchlist.NewManager(&benchlist.Config{})
+
+	netConfig := NewDefaultConfig(
+		"",
+		id,
+		ip,
+		networkID,
+		vdrs,
+		vdrs,
+		throttling.InboundConnThrottlerConfig{},
+		HealthConfig{},
+		defaultAliasTimeout,
+		tlsKey,
+		defaultPeerListSize,
+		defaultGossipPeerListTo,
+		defaultGossipPeerListFreq,
+		defaultGossipAcceptedFrontierSize,
+		defaultGossipOnAcceptSize,
+		true,
+		subnetSet,
+	)
+	n, err := NewNetwork(prometheus.NewRegistry(), log, listener, router, benchlistManager, tlsConfig, netConfig)
+	if err != nil {
+		return nil, err
+	}
+	netw := n.(*network)
+	netw.dialer = dialer
+	netw.versionCompatibility = versionCompatibility
+	netw.inboundMsgThrottler = defaultInboundMsgThrottler
+	netw.outboundMsgThrottler = defaultOutboundMsgThrottler
+	return n, nil
+}

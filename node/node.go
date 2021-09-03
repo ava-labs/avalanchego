@@ -33,8 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/indexer"
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -179,9 +177,6 @@ func (n *Node) initNetworking() error {
 
 	tlsConfig := network.TLSConfig(n.Config.StakingTLSCert)
 
-	serverUpgrader := network.NewTLSServerUpgrader(tlsConfig)
-	clientUpgrader := network.NewTLSClientUpgrader(tlsConfig)
-
 	// Initialize validator manager and primary network's validator set
 	primaryNetworkValidators := validators.NewSet()
 	n.vdrs = validators.NewManager()
@@ -232,52 +227,17 @@ func (n *Node) initNetworking() error {
 		}
 	}
 
-	dialer := dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log)
-
 	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
-	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
-		n.Log,
-		networkNamespace,
-		n.MetricsRegisterer,
-		primaryNetworkValidators,
-		n.Config.NetworkConfig.InboundMsgThrottlerConfig,
-	)
-	if err != nil {
-		return fmt.Errorf("initializing inbound message throttler failed with: %s", err)
-	}
 
-	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
-		n.Log,
+	netConfig := network.NewDefaultConfig(
 		networkNamespace,
-		n.MetricsRegisterer,
-		primaryNetworkValidators,
-		n.Config.NetworkConfig.OutboundMsgThrottlerConfig,
-	)
-	if err != nil {
-		return fmt.Errorf("initializing outbound message throttler failed with: %s", err)
-	}
-
-	versionCompatibility := version.GetCompatibility(n.Config.NetworkID)
-
-	n.Net, err = network.NewDefaultNetwork(
-		networkNamespace,
-		n.MetricsRegisterer,
-		n.Log,
 		n.ID,
 		n.Config.IP,
 		n.Config.NetworkID,
-		versionCompatibility,
-		version.NewDefaultApplicationParser(),
-		listener,
-		dialer,
-		serverUpgrader,
-		clientUpgrader,
 		primaryNetworkValidators,
 		n.beacons,
-		consensusRouter,
 		n.Config.NetworkConfig.InboundConnThrottlerConfig,
 		n.Config.NetworkConfig.HealthConfig,
-		n.benchlistManager,
 		n.Config.NetworkConfig.PeerAliasTimeout,
 		tlsKey,
 		int(n.Config.PeerListSize),
@@ -286,10 +246,19 @@ func (n *Node) initNetworking() error {
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
 		n.Config.NetworkConfig.CompressionEnabled,
-		inboundMsgThrottler,
-		outboundMsgThrottler,
 		n.Config.WhitelistedSubnets,
 	)
+
+	n.Net, err = network.NewNetwork(
+		n.MetricsRegisterer,
+		n.Log,
+		listener,
+		consensusRouter,
+		n.benchlistManager,
+		tlsConfig,
+		netConfig,
+	)
+
 	return err
 }
 

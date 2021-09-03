@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"crypto"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -246,27 +247,17 @@ type Config struct {
 	Validators validators.Set `json:"validators"`
 }
 
-// NewDefaultNetwork returns a new Network implementation with the provided
+// NewDefaultConfig returns a new Network Config with the provided
 // parameters and some reasonable default values.
-func NewDefaultNetwork(
+func NewDefaultConfig(
 	namespace string,
-	registerer prometheus.Registerer,
-	log logging.Logger,
 	id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	networkID uint32,
-	versionCompatibility version.Compatibility,
-	parser version.ApplicationParser,
-	listener net.Listener,
-	dialer dialer.Dialer,
-	serverUpgrader,
-	clientUpgrader Upgrader,
 	vdrs validators.Set,
 	beacons validators.Set,
-	router router.Router,
 	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
 	healthConfig HealthConfig,
-	benchlistManager benchlist.Manager,
 	peerAliasTimeout time.Duration,
 	tlsKey crypto.Signer,
 	peerListSize int,
@@ -275,11 +266,9 @@ func NewDefaultNetwork(
 	gossipAcceptedFrontierSize uint,
 	gossipOnAcceptSize uint,
 	compressionEnabled bool,
-	inboundMsgThrottler throttling.InboundMsgThrottler,
-	outboundMsgThrottler throttling.OutboundMsgThrottler,
 	whitelistedSubnets ids.Set,
-) (Network, error) {
-	config := Config{
+) Config {
+	return Config{
 		PeerListGossipConfig: PeerListGossipConfig{
 			PeerListSize:                 peerListSize,
 			PeerListGossipSize:           peerListGossipSize,
@@ -310,49 +299,25 @@ func NewDefaultNetwork(
 		NetworkID:                  networkID,
 		Namespace:                  namespace,
 	}
-	return NewNetwork(
-		registerer,
-		log,
-		versionCompatibility,
-		parser,
-		listener,
-		dialer,
-		serverUpgrader,
-		clientUpgrader,
-		router,
-		benchlistManager,
-		inboundMsgThrottler,
-		outboundMsgThrottler,
-		config,
-	)
 }
 
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
-	registerer prometheus.Registerer,
+	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
-	versionCompatibility version.Compatibility,
-	parser version.ApplicationParser,
 	listener net.Listener,
-	dialer dialer.Dialer,
-	serverUpgrader,
-	clientUpgrader Upgrader,
 	router router.Router,
 	benchlistManager benchlist.Manager,
-	inboundMsgThrottler throttling.InboundMsgThrottler,
-	outboundMsgThrottler throttling.OutboundMsgThrottler,
+	tlsConfig *tls.Config,
 	config Config,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
-		log:            log,
-		currentIP:      config.IP,
-		parser:         parser,
-		listener:       listener,
-		dialer:         dialer,
-		serverUpgrader: serverUpgrader,
-		clientUpgrader: clientUpgrader,
-		router:         router,
+		log:       log,
+		currentIP: config.IP,
+		parser:    version.NewDefaultApplicationParser(),
+		listener:  listener,
+		router:    router,
 		// This field just makes sure we don't connect to ourselves when TLS is
 		// disabled. So, cryptographically secure random number generation isn't
 		// used here.
@@ -370,15 +335,42 @@ func NewNetwork(
 				return make([]byte, 0, defaultByteSliceCap)
 			},
 		},
-		inboundMsgThrottler:  inboundMsgThrottler,
-		outboundMsgThrottler: outboundMsgThrottler,
-		versionCompatibility: versionCompatibility,
+		versionCompatibility: version.GetCompatibility(config.NetworkID),
 		config:               config,
 	}
 
+	netw.serverUpgrader = NewTLSServerUpgrader(tlsConfig)
+	netw.clientUpgrader = NewTLSClientUpgrader(tlsConfig)
+
+	netw.dialer = dialer.NewDialer(constants.NetworkType, config.DialerConfig, log)
+
+	inboundMsgThrottler, err := throttling.NewSybilInboundMsgThrottler(
+		log,
+		config.Namespace,
+		metricsRegisterer,
+		config.Validators,
+		config.InboundMsgThrottlerConfig,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initializing inbound message throttler failed with: %s", err)
+	}
+	netw.inboundMsgThrottler = inboundMsgThrottler
+
+	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
+		log,
+		config.Namespace,
+		metricsRegisterer,
+		config.Validators,
+		config.OutboundMsgThrottlerConfig,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("initializing outbound message throttler failed with: %s", err)
+	}
+	netw.outboundMsgThrottler = outboundMsgThrottler
+
 	codec, err := message.NewCodecWithAllocator(
 		fmt.Sprintf("%s_codec", config.Namespace),
-		registerer,
+		metricsRegisterer,
 		func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
 		},
@@ -391,7 +383,7 @@ func NewNetwork(
 	netw.b = message.NewBuilder(codec)
 	netw.peers.initialize()
 	netw.sendFailRateCalculator = math.NewSyncAverager(math.NewAverager(0, config.MaxSendFailRateHalflife, netw.clock.Time()))
-	if err := netw.initialize(config.Namespace, registerer); err != nil {
+	if err := netw.initializeMetrics(config.Namespace, metricsRegisterer); err != nil {
 		return nil, fmt.Errorf("initializing network failed with: %s", err)
 	}
 	return netw, nil
