@@ -171,7 +171,7 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 	}()
 	key, _ := crypto.GenerateKey()
 	ethTxs := getEThValidTxs(key)
-	ethData := make([]EthData, len(ethTxs))
+	ethData := make([]EthTxData, len(ethTxs))
 
 	for idx, ethTx := range ethTxs {
 		TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
@@ -179,10 +179,10 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 			t.Fatal("Could not retrieve address from eth tx")
 		}
 
-		ethData[idx] = EthData{
-			TxHash:    ethTx.Hash(),
-			TxAddress: TxAddress,
-			TxNonce:   ethTx.Nonce(),
+		ethData[idx] = EthTxData{
+			Hash:   ethTx.Hash(),
+			Sender: TxAddress,
+			Nonce:  ethTx.Nonce(),
 		}
 	}
 
@@ -194,19 +194,19 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 	am, err := decodeToAppMsg(vm.codec, bytes)
 	if err != nil {
 		t.Fatal("Could not decode eth tx hashes")
-	} else if am.MsgType != ethDataType {
+	} else if am.ContentType != ethTxsData {
 		t.Fatal("decided wrong app message")
 	}
-	dataList := am.ethData
+	dataList := am.ethTxData
 
 	if len(dataList) != 2 {
 		t.Fatal("decoded hashes list has unexpected length")
 	}
 
-	if ethTxs[0].Hash() != dataList[0].TxHash {
+	if ethTxs[0].Hash() != dataList[0].Hash {
 		t.Fatal("first decoded hash is unexpected")
 	}
-	if ethTxs[1].Hash() != dataList[1].TxHash {
+	if ethTxs[1].Hash() != dataList[1].Hash {
 		t.Fatal("second decoded hash is unexpected")
 	}
 }
@@ -254,12 +254,12 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 	}
 
 	// show that unknown coreth hashes is requested
-	ethData := EthData{
-		TxHash:    ethTx.Hash(),
-		TxAddress: TxAddress,
-		TxNonce:   ethTx.Nonce(),
+	ethData := EthTxData{
+		Hash:   ethTx.Hash(),
+		Sender: TxAddress,
+		Nonce:  ethTx.Nonce(),
 	}
-	unknownEthTxsBytes, err := encodeEthData(vm.codec, []EthData{ethData})
+	unknownEthTxsBytes, err := encodeEthData(vm.codec, []EthTxData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
@@ -280,7 +280,7 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	knownEthTxsBytes, err := encodeEthData(vm.codec, []EthData{ethData})
+	knownEthTxsBytes, err := encodeEthData(vm.codec, []EthTxData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
@@ -405,13 +405,13 @@ func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not retrieve tx address")
 	}
-	ethData := EthData{
-		TxHash:    ethTx.Hash(),
-		TxAddress: TxAddress,
-		TxNonce:   ethTx.Nonce(),
+	ethData := EthTxData{
+		Hash:   ethTx.Hash(),
+		Sender: TxAddress,
+		Nonce:  ethTx.Nonce(),
 	}
 
-	ethHashBytes, err := encodeEthData(vm.codec, []EthData{ethData})
+	ethHashBytes, err := encodeEthData(vm.codec, []EthTxData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
