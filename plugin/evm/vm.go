@@ -62,7 +62,7 @@ import (
 )
 
 const (
-	x2cRateInt64         int64 = 1000000000
+	x2cRateInt64         int64 = 1_000_000_000
 	x2cRateMinus1Int64   int64 = x2cRateInt64 - 1
 	maxGossipEthDataSize int   = 100 // TODO choose a sensible value
 	maxGossipEthTxsSize  int   = 10  // TODO choose a sensible value
@@ -236,7 +236,10 @@ type VM struct {
 	gossipActivationTime time.Time
 	appSender            commonEng.AppSender
 	request.Handler
-	appGossipBytesCh   chan []byte
+	appGossipBytesCh chan []byte
+
+	// requestMaps allow checking that solicited content matched the requested one
+	// They are populated upon sending an AppRequest and cleaned up upon AppResponse (also failed ones)
 	requestsAtmContent map[ /*requestID*/ uint32]ids.ID
 	requestsEthContent map[ /*requestID*/ uint32]map[common.Hash]struct{}
 
@@ -698,7 +701,7 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 		return nil
 	}
 
-	log.Info(fmt.Sprintf("AppRequestFailed to node %s, reqID %d", nodeID, requestID))
+	log.Debug(fmt.Sprintf("AppRequestFailed to node %s, reqID %d", nodeID, requestID))
 	delete(vm.requestsAtmContent, requestID)
 	delete(vm.requestsEthContent, requestID)
 
@@ -717,13 +720,13 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 
 	am, err := decodeToAppMsg(vm.codec, request)
 	if err != nil {
-		log.Warn(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d",
-			nodeID, requestID))
+		log.Debug(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d. Error %s",
+			nodeID, requestID, err))
 		return nil
 	}
 
-	switch am.MsgType {
-	case atmDataType:
+	switch am.ContentType {
+	case atomicTxID:
 		log.Debug(fmt.Sprintf("AppRequest: called with txID %s", am.txID))
 
 		resTx, dropped, found := vm.mempool.GetTx(am.txID)
@@ -746,13 +749,13 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		}
 
 		return nil
-	case ethDataType:
+	case ethTxsData:
 		log.Debug("AppRequest: called with eth hashes list")
 
 		// select tx to respond with
-		txsToRespondTo := make([]*types.Transaction, 0)
-		for _, data := range am.ethData {
-			if tx := vm.chain.GetTxPool().Get(data.TxHash); tx != nil {
+		txsToRespondTo := make([]*types.Transaction, 0, len(am.ethTxData))
+		for _, data := range am.ethTxData {
+			if tx := vm.chain.GetTxPool().Get(data.Hash); tx != nil {
 				txsToRespondTo = append(txsToRespondTo, tx)
 			}
 		}
@@ -773,7 +776,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 
 		return nil
 	default:
-		log.Warn(fmt.Sprintf("AppRequest: unexpected appMsgType %v. Doing nothing", am.MsgType))
+		log.Warn(fmt.Sprintf("AppRequest: unexpected appMsgType %v. Doing nothing", am.ContentType))
 		return nil
 	}
 }
@@ -801,14 +804,14 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 			nodeID, requestID))
 		return nil
 	}
-	switch am.MsgType {
-	case atmTxType:
+	switch am.ContentType {
+	case atomicTx:
 		log.Debug(fmt.Sprintf("AppResponse: received txID %s", am.tx.ID()))
 
 		// check that content matched with what previously requested
 		expectedTxID, ok := vm.requestsAtmContent[requestID]
 		if !ok {
-			log.Warn(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
+			log.Debug(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
 			return nil
 		}
 		delete(vm.requestsAtmContent, requestID)
@@ -830,7 +833,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		}
 
 		return nil
-	case ethTxsType:
+	case ethTxList:
 		rcvdTxs := am.txs
 		log.Debug("AppResponse: received eth txs")
 
@@ -840,7 +843,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 			log.Warn(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
 			return nil
 		}
-		requestedTxs := make([]*types.Transaction, 0)
+		requestedTxs := make([]*types.Transaction, 0, len(expectedHashes))
 		for _, tx := range rcvdTxs {
 			if _, ok := expectedHashes[tx.Hash()]; !ok {
 				log.Warn(fmt.Sprintf("AppResponse: received unexpected eth tx %d. Dropping it", tx.Hash()))
@@ -864,7 +867,8 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		}
 		return nil
 	default:
-		log.Warn(fmt.Sprintf("AppResponse: unexpected appMsgType %v. Doing nothing", am.MsgType))
+		// atomicTxID, ethTxsData or unknown appMsgTypes are rejected here
+		log.Warn(fmt.Sprintf("AppResponse: unexpected appMsgType %v. Doing nothing", am.ContentType))
 		return nil
 	}
 }
@@ -886,8 +890,8 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 
-	switch am.MsgType {
-	case atmDataType:
+	switch am.ContentType {
+	case atomicTxID:
 		log.Debug(fmt.Sprintf("AppGossip: received txID %s", am.txID))
 
 		if _, _, found := vm.mempool.GetTx(am.txID); found {
@@ -905,21 +909,21 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		// record content to check response later on
 		vm.requestsAtmContent[reqID] = am.txID
 		return nil
-	case ethDataType:
-		dataList := am.ethData
+	case ethTxsData:
+		dataList := am.ethTxData
 		log.Debug("AppGossip: received eth hashes list")
 
-		dataToRequest := make([]EthData, 0)
+		dataToRequest := make([]EthTxData, 0)
 		for _, data := range dataList {
-			if vm.chain.GetTxPool().Has(data.TxHash) {
+			if vm.chain.GetTxPool().Has(data.Hash) {
 				log.Debug(fmt.Sprintf("AppGossip: eth hash %s already known to mempool. Not requesting it.",
-					data.TxHash))
+					data.Hash))
 				continue
 			}
 
-			if err := vm.chain.GetTxPool().CheckNonceOrdering(data.TxAddress, data.TxNonce); err != nil {
+			if err := vm.chain.GetTxPool().CheckNonceOrdering(data.Sender, data.Nonce); err != nil {
 				log.Debug(fmt.Sprintf("AppGossip: eth hash %s nonce is too old. Not requesting it.",
-					data.TxHash))
+					data.Hash))
 				continue
 			}
 
@@ -958,14 +962,15 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 			// record content to check response later on
 			reqContent := make(map[common.Hash]struct{}, len(chunkToRequest))
 			for _, data := range chunkToRequest {
-				reqContent[data.TxHash] = struct{}{}
+				reqContent[data.Hash] = struct{}{}
 			}
 			vm.requestsEthContent[reqID] = reqContent
 		}
 
 		return nil
 	default:
-		log.Warn(fmt.Sprintf("AppGossip: unexpected appMsgType %v. Doing nothing", am.MsgType))
+		// atomicTx, ethTxList or unknown appMsgTypes are rejected here
+		log.Warn(fmt.Sprintf("AppGossip: unexpected appMsgType %v. Doing nothing", am.ContentType))
 		return nil
 	}
 }
@@ -1267,23 +1272,24 @@ func (vm *VM) awaitSubmittedTxs() {
 			}
 
 			// pick data from eth txs
-			ethData := make([]EthData, 0)
+			ethData := make([]EthTxData, 0)
 			for _, ethTx := range ethTxsEvent.Txs {
 				txStatus := vm.chain.GetTxPool().Status([]common.Hash{ethTx.Hash()})[0]
-				if txStatus == core.TxStatusPending {
-					TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
-					if err != nil {
-						log.Warn(fmt.Sprintf("Could not retrieve address for eth tx %s. Dropping attempt to gossip it",
-							ethTx.Hash()))
-					}
-					data := EthData{
-						TxHash:    ethTx.Hash(),
-						TxAddress: TxAddress,
-						TxNonce:   ethTx.Nonce(),
-					}
-
-					ethData = append(ethData, data)
+				if txStatus != core.TxStatusPending {
+					continue
 				}
+				TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
+				if err != nil {
+					log.Warn(fmt.Sprintf("Could not retrieve address for eth tx %s. Dropping attempt to gossip it",
+						ethTx.Hash()))
+				}
+				data := EthTxData{
+					Hash:   ethTx.Hash(),
+					Sender: TxAddress,
+					Nonce:  ethTx.Nonce(),
+				}
+
+				ethData = append(ethData, data)
 			}
 
 			// split it into chuncks and gossip them around
