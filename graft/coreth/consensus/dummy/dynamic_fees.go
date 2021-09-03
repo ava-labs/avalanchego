@@ -20,7 +20,7 @@ var (
 	MinBaseFee                         = big.NewInt(params.ApricotPhase3MinBaseFee)
 	TargetGas                   uint64 = 10_000_000
 	ApricotPhase3BlockGasFee    uint64 = 1_000_000
-	ApricotPhase4MaxBlockGasFee uint64 = 1_000_000
+	ApricotPhase4MaxBlockGasFee uint64 = 500_000
 	rollupWindow                uint64 = 10
 	// The amount of time between consecutive blocks for the block fee to drop to 0.
 	ApricotPhase4BlockGasFeeDuration uint64 = 20 // in seconds
