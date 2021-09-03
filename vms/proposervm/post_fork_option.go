@@ -74,8 +74,6 @@ func (b *postForkOption) Parent() ids.ID {
 // If Verify returns nil, Accept or Reject is eventually called on
 // [b] a
 func (b *postForkOption) Verify() error {
-	b.vm.ctx.Log.Debug("Snowman++ calling verify on %s", b.ID())
-
 	parent, err := b.vm.getBlock(b.ParentID())
 	if err != nil {
 		return err

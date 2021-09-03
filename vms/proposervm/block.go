@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -77,36 +76,27 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 9) [child]'s inner block is valid
 func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
 	if err := verifyIsNotOracleBlock(p.innerBlk); err != nil {
-		p.vm.ctx.Log.Debug("oracle block shouldn't have a signed child")
 		return err
 	}
 
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected child's P-Chain height to be >=%d but got %d",
-			parentPChainHeight, childPChainHeight)
 		return errPChainHeightNotMonotonic
 	}
 
 	expectedInnerParentID := p.innerBlk.ID()
 	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected inner parent %s but got %s",
-			expectedInnerParentID, innerParentID)
 		return errInnerParentMismatch
 	}
 
 	childTimestamp := child.Timestamp()
 	if childTimestamp.Before(parentTimestamp) {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected child's timestamp (%s) to be at or after parent's timestamp (%s)",
-			childTimestamp, parentTimestamp)
 		return errTimeNotMonotonic
 	}
 
 	maxTimestamp := p.vm.Time().Add(maxSkew)
 	if childTimestamp.After(maxTimestamp) {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; block's timestamp (%s) is after the synchrony bound (%s)",
-			childTimestamp, maxTimestamp)
 		return errTimeTooAdvanced
 	}
 
@@ -116,13 +106,11 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		childID := child.ID()
 		currentPChainHeight, err := p.vm.PChainHeight()
 		if err != nil {
-			p.vm.ctx.Log.Error("Snowman++ verify - dropped post-fork block %s; could not retrieve current P-Chain height",
-				childID)
+			p.vm.ctx.Log.Error("failed to get current P-Chain height while processing %s: %s",
+				childID, err)
 			return err
 		}
 		if childPChainHeight > currentPChainHeight {
-			p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
-				currentPChainHeight, childPChainHeight)
 			return errPChainHeightNotReached
 		}
 
@@ -133,13 +121,8 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 			return err
 		}
 
-		p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-			childID, parentTimestamp, minDelay, childTimestamp)
-
 		delay := childTimestamp.Sub(parentTimestamp)
 		if delay < minDelay {
-			p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose yet",
-				childTimestamp, constants.NodeIDPrefix, proposerID)
 			return errProposerWindowNotStarted
 		}
 
@@ -148,6 +131,9 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
 			return err
 		}
+
+		p.vm.ctx.Log.Debug("verified post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v",
+			childID, parentTimestamp, minDelay, childTimestamp)
 	}
 
 	return p.vm.verifyAndRecordInnerBlk(child)
@@ -199,7 +185,7 @@ func (p *postForkCommonComponents) buildChild(
 
 		if delay < minDelay {
 			// It's not our turn to propose a block yet
-			p.vm.ctx.Log.Warn("Snowman++ build post-fork block - dropped block; parent timestamp %s, expected delay %s, block timestamp %s.",
+			p.vm.ctx.Log.Warn("build block dropped; parent timestamp %s, expected delay %s, block timestamp %s",
 				parentTimestamp, minDelay, newTimestamp)
 			return nil, errProposerWindowNotStarted
 		}
@@ -227,7 +213,7 @@ func (p *postForkCommonComponents) buildChild(
 		},
 	}
 
-	p.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, block timestamp %v.",
+	p.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
 		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
 	return child, p.vm.storePostForkBlock(child)

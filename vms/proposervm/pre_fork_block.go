@@ -30,8 +30,6 @@ func (b *preForkBlock) Parent() ids.ID {
 }
 
 func (b *preForkBlock) Verify() error {
-	b.vm.ctx.Log.Debug("Snowman++ calling verify on %s", b.ID())
-
 	parent, err := b.vm.getBlock(b.Block.Parent())
 	if err != nil {
 		return err
@@ -70,10 +68,11 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if !parentTimestamp.Before(b.vm.activationTime) {
 		if err := verifyIsOracleBlock(b.Block); err != nil {
-			b.vm.ctx.Log.Debug("a pre-fork block is only allowed after the fork time if the parent is an oracle block")
 			return err
 		}
-		b.vm.ctx.Log.Debug("allowing pre-fork block after the fork time because the parent is an oracle block")
+
+		b.vm.ctx.Log.Debug("allowing pre-fork block %s after the fork time because the parent is an oracle block",
+			b.ID())
 	}
 
 	return child.Block.Verify()
@@ -82,7 +81,6 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 // This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	if err := verifyIsNotOracleBlock(b.Block); err != nil {
-		b.vm.ctx.Log.Debug("option block shouldn't have a signed child")
 		return err
 	}
 
@@ -94,13 +92,9 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return err
 	}
 	if childPChainHeight > currentPChainHeight {
-		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
-			currentPChainHeight, childPChainHeight)
 		return errPChainHeightNotReached
 	}
 	if childPChainHeight < b.vm.minimumPChainHeight {
-		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be >=%d but got %d",
-			b.vm.minimumPChainHeight, childPChainHeight)
 		return errPChainHeightTooLow
 	}
 
@@ -108,8 +102,6 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	expectedInnerParentID := b.ID()
 	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
-		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected inner parent %s but got %s",
-			expectedInnerParentID, innerParentID)
 		return errInnerParentMismatch
 	}
 
@@ -124,16 +116,12 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 	// Child's timestamp must be at or after its parent's timestamp
 	childTimestamp := child.Timestamp()
 	if childTimestamp.Before(parentTimestamp) {
-		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected child's timestamp (%s) to be at or after parent's timestamp (%s)",
-			childTimestamp, parentTimestamp)
 		return errTimeNotMonotonic
 	}
 
 	// Child timestamp can't be too far in the future
 	maxTimestamp := b.vm.Time().Add(maxSkew)
 	if childTimestamp.After(maxTimestamp) {
-		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; block's timestamp (%s) is after the synchrony bound (%s)",
-			childTimestamp, maxTimestamp)
 		return errTimeTooAdvanced
 	}
 
@@ -159,7 +147,6 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *preForkBlock) verifyPostForkOption(child *postForkOption) error {
-	b.vm.ctx.Log.Debug("post-fork option has pre-fork block as parent")
 	return errUnexpectedBlockType
 }
 
@@ -171,9 +158,9 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 			Block: innerBlock,
 			vm:    b.vm,
 		}
-		b.vm.ctx.Log.Debug("Snowman++ build pre-fork block %s - timestamp parent block %v",
-			res.ID(), b.Timestamp())
 
+		b.vm.ctx.Log.Info("built block %s - parent timestamp %v",
+			res.ID(), parentTimestamp)
 		return res, nil
 	}
 
@@ -209,7 +196,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		},
 	}
 
-	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay NA, block timestamp %v.",
+	b.vm.ctx.Log.Info("built block %s - parent timestamp %v, block timestamp %v",
 		blk.ID(), parentTimestamp, newTimestamp)
 	return blk, b.vm.storePostForkBlock(blk)
 }

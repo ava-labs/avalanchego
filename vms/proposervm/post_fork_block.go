@@ -66,8 +66,6 @@ func (b *postForkBlock) Parent() ids.ID {
 // If Verify() returns nil, Accept() or Reject() will eventually be called
 // on [b] and [b.innerBlk]
 func (b *postForkBlock) Verify() error {
-	b.vm.ctx.Log.Debug("Snowman++ calling verify on %s", b.ID())
-
 	parent, err := b.vm.getBlock(b.ParentID())
 	if err != nil {
 		return err
@@ -140,7 +138,6 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 
 func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 	if err := verifyIsOracleBlock(b.innerBlk); err != nil {
-		b.vm.ctx.Log.Debug("post-fork option block's parent is not an oracle block")
 		return err
 	}
 
@@ -148,8 +145,6 @@ func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 	expectedInnerParentID := b.innerBlk.ID()
 	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
-		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork option; expected inner parent %s but got %s",
-			expectedInnerParentID, innerParentID)
 		return errInnerParentMismatch
 	}
 
