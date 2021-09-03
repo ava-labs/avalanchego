@@ -14,7 +14,6 @@ import (
 )
 
 var (
-	errExpectedNoProposer = errors.New("expected no proposer to be named")
 	errPChainHeightTooLow = errors.New("block P-chain height is too low")
 
 	_ Block = &preForkBlock{}
@@ -138,13 +137,8 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return errTimeTooAdvanced
 	}
 
-	proposer := child.SignedBlock.Proposer()
-	if proposer != ids.ShortEmpty {
-		return errExpectedNoProposer
-	}
-
 	// Verify the lack of signature on the node
-	if err := child.SignedBlock.Verify(b.vm.ctx.ChainID); err != nil {
+	if err := child.SignedBlock.Verify(false, b.vm.ctx.ChainID); err != nil {
 		return err
 	}
 

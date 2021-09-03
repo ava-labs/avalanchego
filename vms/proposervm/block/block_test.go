@@ -20,7 +20,8 @@ func equal(assert *assert.Assertions, chainID ids.ID, want, have SignedBlock) {
 	assert.Equal(want.Block(), have.Block())
 	assert.Equal(want.Proposer(), have.Proposer())
 	assert.Equal(want.Bytes(), have.Bytes())
-	assert.Equal(want.Verify(chainID), have.Verify(chainID))
+	assert.Equal(want.Verify(false, chainID), have.Verify(false, chainID))
+	assert.Equal(want.Verify(true, chainID), have.Verify(true, chainID))
 }
 
 func TestVerifyNoCertWithSignature(t *testing.T) {
@@ -37,6 +38,9 @@ func TestVerifyNoCertWithSignature(t *testing.T) {
 	builtBlock := builtBlockIntf.(*statelessBlock)
 	builtBlock.Signature = []byte{0}
 
-	err = builtBlock.Verify(ids.Empty)
+	err = builtBlock.Verify(false, ids.Empty)
+	assert.Error(err)
+
+	err = builtBlock.Verify(true, ids.Empty)
 	assert.Error(err)
 }

@@ -45,8 +45,11 @@ func TestBuild(t *testing.T) {
 	assert.Equal(timestamp, builtBlock.Timestamp())
 	assert.Equal(innerBlockBytes, builtBlock.Block())
 
-	err = builtBlock.Verify(chainID)
+	err = builtBlock.Verify(true, chainID)
 	assert.NoError(err)
+
+	err = builtBlock.Verify(false, chainID)
+	assert.Error(err)
 }
 
 func TestBuildUnsigned(t *testing.T) {
@@ -66,8 +69,11 @@ func TestBuildUnsigned(t *testing.T) {
 	assert.Equal(innerBlockBytes, builtBlock.Block())
 	assert.Equal(ids.ShortEmpty, builtBlock.Proposer())
 
-	err = builtBlock.Verify(ids.Empty)
+	err = builtBlock.Verify(false, ids.Empty)
 	assert.NoError(err)
+
+	err = builtBlock.Verify(true, ids.Empty)
+	assert.Error(err)
 }
 
 func TestBuildHeader(t *testing.T) {

@@ -13,7 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var errUnexpectedSignature = errors.New("expected no signature but one was provided")
+var (
+	errUnexpectedProposer = errors.New("expected no proposer but one was provided")
+	errMissingProposer    = errors.New("expected proposer but one was provided")
+)
 
 type Block interface {
 	ID() ids.ID
@@ -31,7 +34,7 @@ type SignedBlock interface {
 	Timestamp() time.Time
 	Proposer() ids.ShortID
 
-	Verify(chainID ids.ID) error
+	Verify(shouldHaveProposer bool, chainID ids.ID) error
 }
 
 type statelessUnsignedBlock struct {
@@ -81,12 +84,14 @@ func (b *statelessBlock) PChainHeight() uint64  { return b.StatelessBlock.PChain
 func (b *statelessBlock) Timestamp() time.Time  { return b.timestamp }
 func (b *statelessBlock) Proposer() ids.ShortID { return b.proposer }
 
-func (b *statelessBlock) Verify(chainID ids.ID) error {
-	if b.cert == nil {
-		if len(b.Signature) != 0 {
-			return errUnexpectedSignature
+func (b *statelessBlock) Verify(shouldHaveProposer bool, chainID ids.ID) error {
+	if !shouldHaveProposer {
+		if len(b.Signature) > 0 || len(b.StatelessBlock.Certificate) > 0 {
+			return errUnexpectedProposer
 		}
 		return nil
+	} else if b.cert == nil {
+		return errMissingProposer
 	}
 
 	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)

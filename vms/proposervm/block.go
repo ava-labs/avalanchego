@@ -110,12 +110,6 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return errTimeTooAdvanced
 	}
 
-	delay := childTimestamp.Sub(parentTimestamp)
-	proposerID := child.Proposer()
-	if delay >= proposer.MaxDelay && proposerID != ids.ShortEmpty {
-		return errExpectedNoProposer
-	}
-
 	// If the node is currently bootstrapping - we don't assume that the P-chain
 	// has been synced up to this point yet.
 	if p.vm.ctx.IsBootstrapped() {
@@ -133,6 +127,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		}
 
 		childHeight := child.Height()
+		proposerID := child.Proposer()
 		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
 		if err != nil {
 			return err
@@ -141,6 +136,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
 			childID, parentTimestamp, minDelay, childTimestamp)
 
+		delay := childTimestamp.Sub(parentTimestamp)
 		if delay < minDelay {
 			p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose yet",
 				childTimestamp, constants.NodeIDPrefix, proposerID)
@@ -148,7 +144,8 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		}
 
 		// Verify the signature of the node
-		if err := child.SignedBlock.Verify(p.vm.ctx.ChainID); err != nil {
+		shouldHaveProposer := delay < proposer.MaxDelay
+		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
 			return err
 		}
 	}
