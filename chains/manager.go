@@ -655,7 +655,7 @@ func (m *manager) createSnowmanChain(
 	}
 
 	if vmPlus, ok := vm.(block.SnowmanPlusPlusVM); ok {
-		vm = proposervm.New(vm, vmPlus.GetActivationTime()) // enable ProposerVM on this VM
+		vm = proposervm.New(vm, vmPlus.GetActivationTime(), 0) // enable ProposerVM on this VM
 	}
 
 	// Initialize the ProposerVM and the vm wrapped inside it

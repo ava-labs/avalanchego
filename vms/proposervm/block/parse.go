@@ -4,18 +4,11 @@
 package block
 
 import (
-	"crypto/x509"
 	"fmt"
-	"time"
-
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 func Parse(bytes []byte) (Block, error) {
-	block := statelessBlock{
-		id:    hashing.ComputeHash256Array(bytes),
-		bytes: bytes,
-	}
+	var block Block
 	parsedVersion, err := c.Unmarshal(bytes, &block)
 	if err != nil {
 		return nil, err
@@ -23,13 +16,18 @@ func Parse(bytes []byte) (Block, error) {
 	if parsedVersion != version {
 		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
 	}
+	return block, block.initialize(bytes)
+}
 
-	block.timestamp = time.Unix(block.StatelessBlock.Timestamp, 0)
-	cert, err := x509.ParseCertificate(block.StatelessBlock.Certificate)
+func ParseHeader(bytes []byte) (Header, error) {
+	header := statelessHeader{}
+	parsedVersion, err := c.Unmarshal(bytes, &header)
 	if err != nil {
 		return nil, err
 	}
-	block.cert = cert
-	block.proposer = hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw))
-	return &block, nil
+	if parsedVersion != version {
+		return nil, fmt.Errorf("expected codec version %d but got %d", version, parsedVersion)
+	}
+	header.bytes = bytes
+	return &header, nil
 }

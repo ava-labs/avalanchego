@@ -6,6 +6,7 @@ package block
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 const version = 0
@@ -16,8 +17,14 @@ func init() {
 	lc := linearcodec.NewDefault()
 	c = codec.NewDefaultManager()
 
-	err := c.RegisterCodec(version, lc)
-	if err != nil {
-		panic(err)
+	errs := wrappers.Errs{}
+	errs.Add(
+		lc.RegisterType(&statelessBlock{}),
+		lc.RegisterType(&option{}),
+
+		c.RegisterCodec(version, lc),
+	)
+	if errs.Errored() {
+		panic(errs.Err)
 	}
 }

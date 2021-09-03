@@ -4,20 +4,17 @@
 package proposervm
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 )
 
 var _ Block = &postForkBlock{}
 
 // postForkBlock implements proposervm.Block
 type postForkBlock struct {
-	block.Block
+	block.SignedBlock
 	postForkCommonComponents
 }
 
@@ -96,7 +93,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 	outerOptions := [2]snowman.Block{}
 	for i, innerOption := range innerOptions {
 		// Wrap the inner block's child option
-		statelessOuterOption, err := option.Build(
+		statelessOuterOption, err := block.BuildOption(
 			parentID,
 			innerOption.Bytes(),
 		)
@@ -105,7 +102,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		}
 
 		outerOption := &postForkOption{
-			Option: statelessOuterOption,
+			Block: statelessOuterOption,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       b.vm,
 				innerBlk: innerOption,
@@ -113,7 +110,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 			},
 		}
 		// Persist the wrapped child options
-		if err := b.vm.storePostForkOption(outerOption); err != nil {
+		if err := b.vm.storePostForkBlock(outerOption); err != nil {
 			return [2]snowman.Block{}, err
 		}
 
@@ -142,9 +139,9 @@ func (b *postForkBlock) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
-	if _, ok := b.innerBlk.(snowman.OracleBlock); !ok {
+	if err := verifyIsOracleBlock(b.innerBlk); err != nil {
 		b.vm.ctx.Log.Debug("post-fork option block's parent is not an oracle block")
-		return errUnexpectedBlockType
+		return err
 	}
 
 	// Make sure [b]'s inner block is the parent of [child]'s inner block
@@ -161,67 +158,22 @@ func (b *postForkBlock) verifyPostForkOption(child *postForkOption) error {
 
 // Return the child (a *postForkBlock) of this block
 func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
-	parentID := b.ID()
-	parentTimestamp := b.Timestamp()
-	// Child's timestamp is the later of now and this block's timestamp
-	newTimestamp := b.vm.Time().Truncate(time.Second)
-	if newTimestamp.Before(parentTimestamp) {
-		newTimestamp = parentTimestamp
-	}
-
-	// The following [minTimestamp] check should be able to be removed, but this
-	// is left here as a sanity check
-	childHeight := innerBlock.Height()
-	parentPChainHeight := b.PChainHeight()
-	proposerID := b.vm.ctx.NodeID
-	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-	if err != nil {
-		return nil, err
-	}
-
-	minTimestamp := parentTimestamp.Add(minDelay)
-	if newTimestamp.Before(minTimestamp) {
-		// It's not our turn to propose a block yet
-		b.vm.ctx.Log.Warn("Snowman++ build post-fork block - dropped block; parent timestamp %s, expected delay %s, block timestamp %s.",
-			parentTimestamp, minDelay, newTimestamp)
-		return nil, errProposerWindowNotStarted
-	}
-
-	// The child's P-Chain height is the P-Chain's height when it
-	// was proposed (i.e. now)
-	pChainHeight, err := b.vm.PChainHeight()
-	if err != nil {
-		return nil, err
-	}
-
-	// Build the child
-	statelessChild, err := block.Build(
-		parentID,
-		newTimestamp,
-		pChainHeight,
-		b.vm.ctx.StakingCertLeaf,
-		innerBlock.Bytes(),
-		b.vm.ctx.StakingLeafSigner,
+	return b.postForkCommonComponents.buildChild(
+		b.ID(),
+		b.Timestamp(),
+		b.PChainHeight(),
+		innerBlock,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	child := &postForkBlock{
-		Block: statelessChild,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       b.vm,
-			innerBlk: innerBlock,
-			status:   choices.Processing,
-		},
-	}
-
-	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		child.ID(), parentTimestamp, minDelay, newTimestamp)
-	// Persist the child
-	return child, b.vm.storePostForkBlock(child)
 }
 
 func (b *postForkBlock) pChainHeight() (uint64, error) {
 	return b.PChainHeight(), nil
+}
+
+func (b *postForkBlock) setStatus(status choices.Status) {
+	b.status = status
+}
+
+func (b *postForkBlock) getStatelessBlk() block.Block {
+	return b.SignedBlock
 }

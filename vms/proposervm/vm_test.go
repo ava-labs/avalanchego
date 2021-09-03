@@ -44,7 +44,7 @@ func init() {
 	}
 }
 
-func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM, *validators.TestState, *VM, *snowman.TestBlock) {
+func initTestProposerVM(t *testing.T, proBlkStartTime time.Time, minPChainHeight uint64) (*block.TestVM, *validators.TestState, *VM, *snowman.TestBlock) {
 	coreGenBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.GenerateTestID(),
@@ -78,7 +78,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		}
 	}
 
-	proVM := New(coreVM, proBlkStartTime)
+	proVM := New(coreVM, proBlkStartTime, minPChainHeight)
 
 	valState := &validators.TestState{
 		T: t,
@@ -100,6 +100,8 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 		StakingLeafSigner: pTestCert.PrivateKey.(crypto.Signer),
 		ValidatorState:    valState,
 	}
+	ctx.Bootstrapped()
+
 	dummyDBManager := manager.NewMemDB(version.DefaultVersion1_0_0)
 	// make sure that DBs are compressed correctly
 	dummyDBManager = dummyDBManager.NewPrefixDBManager([]byte{})
@@ -122,7 +124,7 @@ func initTestProposerVM(t *testing.T, proBlkStartTime time.Time) (*block.TestVM,
 
 func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	skewedTimestamp := time.Now().Truncate(time.Second).Add(time.Millisecond)
 	proVM.Set(skewedTimestamp)
 
@@ -152,7 +154,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 
 func TestBuildBlockIsIdempotent(t *testing.T) {
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -185,7 +187,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
@@ -219,7 +221,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 // both core blocks and pro blocks must be built on preferred
 func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// add two proBlks...
 	coreBlk1 := &snowman.TestBlock{
@@ -318,7 +320,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 }
 
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	coreBlk1 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -416,7 +418,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 
 // VM.ParseBlock tests section
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
-	coreVM, _, proVM, _ := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, _ := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	innerBlk := &snowman.TestBlock{
 		BytesV:     []byte{1},
@@ -432,13 +434,14 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		100, // pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk := postForkBlock{
-		Block: slb,
+		SignedBlock: slb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
@@ -454,7 +457,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 }
 
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
-	coreVM, _, proVM, gencoreBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, gencoreBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// create two Proposer blocks at the same height
 	innerBlk := &snowman.TestBlock{
@@ -477,13 +480,14 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		100, // pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk1 := postForkBlock{
-		Block: slb1,
+		SignedBlock: slb1,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
@@ -497,13 +501,14 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		200, // pChainHeight,
 		proVM.ctx.StakingCertLeaf,
 		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
 		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk2 := postForkBlock{
-		Block: slb2,
+		SignedBlock: slb2,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
@@ -551,7 +556,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 
 // VM.BuildBlock and VM.ParseBlock interoperability tests section
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// one block is built from this proVM
 	localcoreBlk := &snowman.TestBlock{
@@ -600,19 +605,17 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		t.Fatal("could not retrieve pChain height")
 	}
 
-	netSlb, err := statelessblock.Build(
+	netSlb, err := statelessblock.BuildUnsigned(
 		proVM.preferred,
 		netcoreBlk.Timestamp(),
 		pChainHeight,
-		proVM.ctx.StakingCertLeaf,
 		netcoreBlk.Bytes(),
-		proVM.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		t.Fatal("could not build stateless block")
 	}
 	netProBlk := postForkBlock{
-		Block: netSlb,
+		SignedBlock: netSlb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: netcoreBlk,
@@ -628,7 +631,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 
 // VM persistency test section
 func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}) // enable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 
 	// build two blocks on top of genesis
 	coreBlk1 := &snowman.TestBlock{
@@ -756,7 +759,7 @@ func TestProposerVMCacheCanBeRebuiltFromDB(t *testing.T) {
 
 // Pre Fork tests section
 func TestPreFork_Initialize(t *testing.T) {
-	_, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime) // disable ProBlks
+	_, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	// checks
 	blkID, err := proVM.LastAccepted()
@@ -779,7 +782,7 @@ func TestPreFork_Initialize(t *testing.T) {
 
 func TestPreFork_BuildBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -823,7 +826,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 
 func TestPreFork_ParseBlock(t *testing.T) {
 	// setup
-	coreVM, _, proVM, _ := initTestProposerVM(t, timer.MaxTime) // disable ProBlks
+	coreVM, _, proVM, _ := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -871,7 +874,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 }
 
 func TestPreFork_SetPreference(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime) // disable ProBlks
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
 
 	coreBlk0 := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{

@@ -10,14 +10,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 )
 
 var _ Block = &postForkOption{}
 
 // The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {
-	option.Option
+	block.Block
 	postForkCommonComponents
 }
 
@@ -39,7 +38,7 @@ func (b *postForkOption) Accept() error {
 	}
 
 	// Persist this block and its status
-	if err := b.vm.storePostForkOption(b); err != nil {
+	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
@@ -58,7 +57,7 @@ func (b *postForkOption) Reject() error {
 	b.status = choices.Rejected
 
 	// Persist this block and its status
-	if err := b.vm.storePostForkOption(b); err != nil {
+	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
@@ -112,69 +111,16 @@ func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
 }
 
 func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
-	parentID := b.ID()
-	parentTimestamp := b.Timestamp()
-	newTimestamp := b.vm.Time().Truncate(time.Second)
-	// The child's timestamp is the later of now and this block's timestamp
-	if newTimestamp.Before(parentTimestamp) {
-		newTimestamp = parentTimestamp
-	}
-
-	// The following [minTimestamp] check should be able to be removed, but this
-	// is left here as a sanity check
-	childHeight := innerBlock.Height()
 	parentPChainHeight, err := b.pChainHeight()
 	if err != nil {
 		return nil, err
 	}
-
-	proposerID := b.vm.ctx.NodeID
-	minDelay, err := b.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-	if err != nil {
-		return nil, err
-	}
-
-	minTimestamp := parentTimestamp.Add(minDelay)
-	if newTimestamp.Before(minTimestamp) {
-		// It's not our turn to propose a block yet
-		b.vm.ctx.Log.Warn("Snowman++ build post-fork option - dropped option; parent timestamp %s, expected delay %s, block timestamp %s.",
-			parentTimestamp, minDelay, newTimestamp)
-		return nil, errProposerWindowNotStarted
-	}
-
-	// The child's P-Chain height is the P-Chain's height when it
-	// was proposed (i.e. now)
-	pChainHeight, err := b.vm.PChainHeight()
-	if err != nil {
-		return nil, err
-	}
-
-	// Build the child
-	statelessChild, err := block.Build(
-		parentID,
-		newTimestamp,
-		pChainHeight,
-		b.vm.ctx.StakingCertLeaf,
-		innerBlock.Bytes(),
-		b.vm.ctx.StakingLeafSigner,
+	return b.postForkCommonComponents.buildChild(
+		b.ID(),
+		b.Timestamp(),
+		parentPChainHeight,
+		innerBlock,
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	child := &postForkBlock{
-		Block: statelessChild,
-		postForkCommonComponents: postForkCommonComponents{
-			vm:       b.vm,
-			innerBlk: innerBlock,
-			status:   choices.Processing,
-		},
-	}
-
-	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		child.ID(), parentTimestamp, minDelay, newTimestamp)
-	// Persist the child
-	return child, b.vm.storePostForkBlock(child)
 }
 
 // This block's P-Chain height is its parent's P-Chain height
@@ -184,4 +130,12 @@ func (b *postForkOption) pChainHeight() (uint64, error) {
 		return 0, err
 	}
 	return parent.pChainHeight()
+}
+
+func (b *postForkOption) setStatus(status choices.Status) {
+	b.status = status
+}
+
+func (b *postForkOption) getStatelessBlk() block.Block {
+	return b.Block
 }

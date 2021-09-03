@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"errors"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,7 +13,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Block = &preForkBlock{}
+var (
+	errPChainHeightTooLow = errors.New("block P-chain height is too low")
+
+	_ Block = &preForkBlock{}
+)
 
 // preForkBlock implements proposervm.Block
 type preForkBlock struct {
@@ -57,23 +62,30 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 	}, nil
 }
 
+func (b *preForkBlock) getInnerBlk() snowman.Block {
+	return b.Block
+}
+
 func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if !parentTimestamp.Before(b.vm.activationTime) {
-		// If this block's timestamp is at or after activation time,
-		// it's child must be a post-fork block
-		return errProposersActivated
+		if err := verifyIsOracleBlock(b.Block); err != nil {
+			b.vm.ctx.Log.Debug("a pre-fork block is only allowed after the fork time if the parent is an oracle block")
+			return err
+		}
+		b.vm.ctx.Log.Debug("allowing pre-fork block after the fork time because the parent is an oracle block")
 	}
 
 	return child.Block.Verify()
 }
 
-func (b *preForkBlock) getInnerBlk() snowman.Block {
-	return b.Block
-}
-
 // This method only returns nil once (during the transition)
 func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
+	if err := verifyIsNotOracleBlock(b.Block); err != nil {
+		b.vm.ctx.Log.Debug("option block shouldn't have a signed child")
+		return err
+	}
+
 	childID := child.ID()
 	childPChainHeight := child.PChainHeight()
 	currentPChainHeight, err := b.vm.PChainHeight()
@@ -85,6 +97,11 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
 			currentPChainHeight, childPChainHeight)
 		return errPChainHeightNotReached
+	}
+	if childPChainHeight < b.vm.minimumPChainHeight {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be >=%d but got %d",
+			b.vm.minimumPChainHeight, childPChainHeight)
+		return errPChainHeightTooLow
 	}
 
 	// Make sure [b] is the parent of [child]'s inner block
@@ -120,8 +137,8 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return errTimeTooAdvanced
 	}
 
-	// Verify the signature of the node
-	if err := child.Block.Verify(); err != nil {
+	// Verify the lack of signature on the node
+	if err := child.SignedBlock.Verify(false, b.vm.ctx.ChainID); err != nil {
 		return err
 	}
 
@@ -173,20 +190,18 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 		return nil, err
 	}
 
-	statelessBlock, err := block.Build(
+	statelessBlock, err := block.BuildUnsigned(
 		parentID,
 		newTimestamp,
 		pChainHeight,
-		b.vm.ctx.StakingCertLeaf,
 		innerBlock.Bytes(),
-		b.vm.ctx.StakingLeafSigner,
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	blk := &postForkBlock{
-		Block: statelessBlock,
+		SignedBlock: statelessBlock,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,

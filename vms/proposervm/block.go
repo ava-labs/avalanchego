@@ -7,9 +7,12 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
 const (
@@ -27,7 +30,6 @@ var (
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
-	errProposersActivated       = errors.New("proposers have been activated")
 )
 
 type Block interface {
@@ -44,6 +46,13 @@ type Block interface {
 	pChainHeight() (uint64, error)
 }
 
+type PostForkBlock interface {
+	Block
+
+	setStatus(choices.Status)
+	getStatelessBlk() block.Block
+}
+
 // field of postForkBlock and postForkOption
 type postForkCommonComponents struct {
 	vm       *VM
@@ -57,31 +66,26 @@ func (p *postForkCommonComponents) Height() uint64 {
 }
 
 // Verify returns nil if:
-// 1) [child]'s P-Chain height >= [parentPChainHeight]
-// 2) [childPChainHeight] <= the current P-Chain height
+// 1) [p]'s inner block is not an oracle block
+// 2) [child]'s P-Chain height >= [parentPChainHeight]
 // 3) [p]'s inner block is the parent of [c]'s inner block
-// 4) [child]'s timestamp is within the synchrony bound, after [p]'s timestamp, and within its proposer's window
-// 5) [child] has a valid signature from its proposer
-// 6) [child]'s inner block is valid
+// 4) [child]'s timestamp isn't before [p]'s timestamp
+// 5) [child]'s timestamp is within the skew bound
+// 6) [childPChainHeight] <= the current P-Chain height
+// 7) [child]'s timestamp is within its proposer's window
+// 8) [child] has a valid signature from its proposer
+// 9) [child]'s inner block is valid
 func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChainHeight uint64, child *postForkBlock) error {
+	if err := verifyIsNotOracleBlock(p.innerBlk); err != nil {
+		p.vm.ctx.Log.Debug("oracle block shouldn't have a signed child")
+		return err
+	}
+
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
 		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected child's P-Chain height to be >=%d but got %d",
 			parentPChainHeight, childPChainHeight)
 		return errPChainHeightNotMonotonic
-	}
-
-	childID := child.ID()
-	currentPChainHeight, err := p.vm.PChainHeight()
-	if err != nil {
-		p.vm.ctx.Log.Error("Snowman++ verify - dropped post-fork block %s; could not retrieve current P-Chain height",
-			childID)
-		return err
-	}
-	if childPChainHeight > currentPChainHeight {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
-			currentPChainHeight, childPChainHeight)
-		return errPChainHeightNotReached
 	}
 
 	expectedInnerParentID := p.innerBlk.ID()
@@ -106,27 +110,150 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 		return errTimeTooAdvanced
 	}
 
-	childHeight := child.Height()
-	proposerID := child.Proposer()
-	minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
-	if err != nil {
-		return err
-	}
+	// If the node is currently bootstrapping - we don't assume that the P-chain
+	// has been synced up to this point yet.
+	if p.vm.ctx.IsBootstrapped() {
+		childID := child.ID()
+		currentPChainHeight, err := p.vm.PChainHeight()
+		if err != nil {
+			p.vm.ctx.Log.Error("Snowman++ verify - dropped post-fork block %s; could not retrieve current P-Chain height",
+				childID)
+			return err
+		}
+		if childPChainHeight > currentPChainHeight {
+			p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be <=%d but got %d",
+				currentPChainHeight, childPChainHeight)
+			return errPChainHeightNotReached
+		}
 
-	minTimestamp := parentTimestamp.Add(minDelay)
-	p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
-		childID, parentTimestamp, minDelay, childTimestamp)
+		childHeight := child.Height()
+		proposerID := child.Proposer()
+		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
+		if err != nil {
+			return err
+		}
 
-	if childTimestamp.Before(minTimestamp) {
-		p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose until %s",
-			childTimestamp, constants.NodeIDPrefix, proposerID, minTimestamp)
-		return errProposerWindowNotStarted
-	}
+		p.vm.ctx.Log.Debug("Snowman++ verify post-fork block %s - parent timestamp %v, expected delay %v, block timestamp %v.",
+			childID, parentTimestamp, minDelay, childTimestamp)
 
-	// Verify the signature of the node
-	if err := child.Block.Verify(); err != nil {
-		return err
+		delay := childTimestamp.Sub(parentTimestamp)
+		if delay < minDelay {
+			p.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; timestamp is %s but proposer %s%s can't propose yet",
+				childTimestamp, constants.NodeIDPrefix, proposerID)
+			return errProposerWindowNotStarted
+		}
+
+		// Verify the signature of the node
+		shouldHaveProposer := delay < proposer.MaxDelay
+		if err := child.SignedBlock.Verify(shouldHaveProposer, p.vm.ctx.ChainID); err != nil {
+			return err
+		}
 	}
 
 	return p.vm.verifyAndRecordInnerBlk(child)
+}
+
+// Return the child (a *postForkBlock) of this block
+func (p *postForkCommonComponents) buildChild(
+	parentID ids.ID,
+	parentTimestamp time.Time,
+	parentPChainHeight uint64,
+	innerBlock snowman.Block,
+) (Block, error) {
+	// Child's timestamp is the later of now and this block's timestamp
+	newTimestamp := p.vm.Time().Truncate(time.Second)
+	if newTimestamp.Before(parentTimestamp) {
+		newTimestamp = parentTimestamp
+	}
+
+	// The child's P-Chain height is the P-Chain's height when it was proposed
+	// (i.e. now)
+	pChainHeight, err := p.vm.PChainHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	delay := newTimestamp.Sub(parentTimestamp)
+
+	// Build the child
+	var statelessChild block.SignedBlock
+	if delay >= proposer.MaxDelay {
+		statelessChild, err = block.BuildUnsigned(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			innerBlock.Bytes(),
+		)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// The following [minTimestamp] check should be able to be removed, but
+		// this is left here as a sanity check
+		childHeight := innerBlock.Height()
+		proposerID := p.vm.ctx.NodeID
+		minDelay, err := p.vm.Windower.Delay(childHeight, parentPChainHeight, proposerID)
+		if err != nil {
+			return nil, err
+		}
+
+		if delay < minDelay {
+			// It's not our turn to propose a block yet
+			p.vm.ctx.Log.Warn("Snowman++ build post-fork block - dropped block; parent timestamp %s, expected delay %s, block timestamp %s.",
+				parentTimestamp, minDelay, newTimestamp)
+			return nil, errProposerWindowNotStarted
+		}
+
+		statelessChild, err = block.Build(
+			parentID,
+			newTimestamp,
+			pChainHeight,
+			p.vm.ctx.StakingCertLeaf,
+			innerBlock.Bytes(),
+			p.vm.ctx.ChainID,
+			p.vm.ctx.StakingLeafSigner,
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	child := &postForkBlock{
+		SignedBlock: statelessChild,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       p.vm,
+			innerBlk: innerBlock,
+			status:   choices.Processing,
+		},
+	}
+
+	p.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, block timestamp %v.",
+		child.ID(), parentTimestamp, newTimestamp)
+	// Persist the child
+	return child, p.vm.storePostForkBlock(child)
+}
+
+func verifyIsOracleBlock(b snowman.Block) error {
+	oracle, ok := b.(snowman.OracleBlock)
+	if !ok {
+		return errUnexpectedBlockType
+	}
+	_, err := oracle.Options()
+	return err
+}
+
+func verifyIsNotOracleBlock(b snowman.Block) error {
+	oracle, ok := b.(snowman.OracleBlock)
+	if !ok {
+		return nil
+	}
+	_, err := oracle.Options()
+	switch err {
+	case nil:
+		return errUnexpectedBlockType
+	case snowman.ErrNotOracle:
+		return nil
+	default:
+		return err
+	}
 }

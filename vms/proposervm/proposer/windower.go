@@ -14,10 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+// Proposer list constants
 const (
-	maxWindows     = 5
+	MaxWindows     = 5
 	WindowDuration = 3 * time.Second
-	MaxDelay       = maxWindows * WindowDuration
+	MaxDelay       = MaxWindows * WindowDuration
 )
 
 var _ Windower = &windower{}
@@ -57,6 +58,10 @@ func (w *windower) PChainHeight() (uint64, error) {
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
+	if validatorID == ids.ShortEmpty {
+		return MaxDelay, nil
+	}
+
 	// get the validator set by the p-chain height
 	validatorsMap, err := w.ctx.ValidatorState.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {
@@ -93,7 +98,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 		return 0, err
 	}
 
-	numToSample := maxWindows
+	numToSample := MaxWindows
 	if weight < uint64(numToSample) {
 		numToSample = int(weight)
 	}
