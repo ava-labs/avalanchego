@@ -270,7 +270,9 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 			ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
 			ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
 		},
-		PeerAliasTimeout: v.GetDuration(PeerAliasTimeoutKey),
+		TimeoutConfig: network.TimeoutConfig{
+			PeerAliasTimeout: v.GetDuration(PeerAliasTimeoutKey),
+		},
 	}
 	switch {
 	case config.MinimumTimeout < 1:

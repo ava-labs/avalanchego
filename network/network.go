@@ -206,6 +206,27 @@ type PeerListGossipConfig struct {
 	PeerListGossipFreq           time.Duration `json:"peerListGossipFreq"`
 }
 
+type TimeoutConfig struct {
+	GetVersionTimeout    time.Duration `json:"getVersionTimeout"`
+	PingPongTimeout      time.Duration `json:"pingPongTimeout"`
+	PingFrequency        time.Duration `json:"pingFrequency"`
+	ReadHandshakeTimeout time.Duration `json:"readHandshakeTimeout"`
+	// peerAliasTimeout is the age a peer alias must
+	// be before we attempt to release it (so that we
+	// attempt to dial the IP again if gossiped to us).
+	PeerAliasTimeout time.Duration `json:"peerAliasTimeout"`
+}
+
+type DelayConfig struct {
+	InitialReconnectDelay time.Duration `json:"initialReconnectDelay"`
+	MaxReconnectDelay     time.Duration `json:"maxReconnectDelay"`
+}
+
+type GossipConfig struct {
+	GossipAcceptedFrontierSize uint `json:"gossipAcceptedFrontierSize"`
+	GossipOnAcceptSize         uint `json:"gossipOnAcceptSize"`
+}
+
 type Config struct {
 	HealthConfig                `json:"healthConfig"`
 	timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
@@ -213,32 +234,23 @@ type Config struct {
 	InboundMsgThrottlerConfig   throttling.MsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
 	OutboundMsgThrottlerConfig  throttling.MsgThrottlerConfig         `json:"outboundMsgThrottlerConfig"`
 	DialerConfig                dialer.Config                         `json:"dialerConfig"`
+	PeerListGossipConfig        `json:"peerListGossipConfig"`
+	GossipConfig                `json:"gossipConfig"`
+	TimeoutConfig               `json:"timeoutConfigs"`
+	DelayConfig                 `json:"delayConfig"`
+
+	Namespace          string              `json:"namespace"`
+	ID                 ids.ShortID         `json:"id"`
+	IP                 utils.DynamicIPDesc `json:"ip"`
+	NetworkID          uint32              `json:"networkID"`
+	MaxMessageSize     uint32              `json:"maxMessageSize"`
+	MaxClockDifference time.Duration       `json:"maxClockDifference"`
+	AllowPrivateIPs    bool                `json:"allowPrivateIPs"`
 	// If true, compress PushQuery, Put, MultiPut and PeerList messages sent to peers.
 	// Whether true or false, expect messages from peers with version >= [minVersionCanHandleCompressed]
 	// to send these types of messages with the isCompressed flag.
 	CompressionEnabled bool `json:"compressionEnabled"`
-	// peerAliasTimeout is the age a peer alias must
-	// be before we attempt to release it (so that we
-	// attempt to dial the IP again if gossiped to us).
-	PeerAliasTimeout     time.Duration `json:"peerAliasTimeout"`
-	PeerListGossipConfig `json:"peerListGossipConfig"`
-
-	Namespace                  string              `json:"namespace"`
-	ID                         ids.ShortID         `json:"id"`
-	IP                         utils.DynamicIPDesc `json:"ip"`
-	NetworkID                  uint32              `json:"networkID"`
-	InitialReconnectDelay      time.Duration       `json:"initialReconnectDelay"`
-	MaxReconnectDelay          time.Duration       `json:"maxReconnectDelay"`
-	MaxMessageSize             uint32              `json:"maxMessageSize"`
-	MaxClockDifference         time.Duration       `json:"maxClockDifference"`
-	GetVersionTimeout          time.Duration       `json:"getVersionTimeout"`
-	AllowPrivateIPs            bool                `json:"allowPrivateIPs"`
-	GossipAcceptedFrontierSize uint                `json:"gossipAcceptedFrontierSize"`
-	GossipOnAcceptSize         uint                `json:"gossipOnAcceptSize"`
-	PingPongTimeout            time.Duration       `json:"pingPongTimeout"`
-	PingFrequency              time.Duration       `json:"pingFrequency"`
-	ReadHandshakeTimeout       time.Duration       `json:"readHandshakeTimeout"`
-	// this node's TLS key
+	// This node's TLS key
 	TLSKey crypto.Signer `json:"-"`
 	// WhitelistedSubnets of the node
 	WhitelistedSubnets ids.Set        `json:"whitelistedSubnets"`
@@ -275,18 +287,24 @@ func NewDefaultConfig(
 			PeerListStakerGossipFraction: defaultPeerListStakerGossipFraction,
 			PeerListGossipFreq:           peerListGossipFreq,
 		},
-		MaxReconnectDelay:          defaultMaxReconnectDelay,
-		InitialReconnectDelay:      defaultInitialReconnectDelay,
+		GossipConfig: GossipConfig{
+			GossipAcceptedFrontierSize: gossipAcceptedFrontierSize,
+			GossipOnAcceptSize:         gossipOnAcceptSize,
+		},
+		DelayConfig: DelayConfig{
+			MaxReconnectDelay:     defaultMaxReconnectDelay,
+			InitialReconnectDelay: defaultInitialReconnectDelay,
+		},
+		TimeoutConfig: TimeoutConfig{
+			GetVersionTimeout:    defaultGetVersionTimeout,
+			PingPongTimeout:      defaultPingPongTimeout,
+			PingFrequency:        defaultPingFrequency,
+			ReadHandshakeTimeout: defaultReadHandshakeTimeout,
+			PeerAliasTimeout:     peerAliasTimeout,
+		},
 		MaxMessageSize:             constants.DefaultMaxMessageSize,
 		MaxClockDifference:         defaultMaxClockDifference,
-		GetVersionTimeout:          defaultGetVersionTimeout,
 		AllowPrivateIPs:            defaultAllowPrivateIPs,
-		GossipAcceptedFrontierSize: gossipAcceptedFrontierSize,
-		GossipOnAcceptSize:         gossipOnAcceptSize,
-		PingPongTimeout:            defaultPingPongTimeout,
-		PingFrequency:              defaultPingFrequency,
-		ReadHandshakeTimeout:       defaultReadHandshakeTimeout,
-		PeerAliasTimeout:           peerAliasTimeout,
 		CompressionEnabled:         compressionEnabled,
 		TLSKey:                     tlsKey,
 		WhitelistedSubnets:         whitelistedSubnets,
