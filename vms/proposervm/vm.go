@@ -77,7 +77,7 @@ func (vm *VM) Initialize(
 	vm.Windower = proposer.New(ctx, ctx.SubnetID, ctx.ChainID)
 	vm.Tree = tree.New()
 
-	scheduler, vmToEngine := scheduler.New(toEngine, vm.activationTime)
+	scheduler, vmToEngine := scheduler.New(vm.ctx.Log, toEngine, vm.activationTime)
 	vm.Scheduler = scheduler
 
 	go ctx.Log.RecoverAndPanic(func() {

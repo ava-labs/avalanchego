@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestDelayFromNew(t *testing.T) {
@@ -15,7 +16,7 @@ func TestDelayFromNew(t *testing.T) {
 	toEngine := make(chan common.Message, 10)
 	startTime := time.Now().Add(50 * time.Millisecond)
 
-	s, fromVM := New(toEngine, activationTime)
+	s, fromVM := New(logging.NoLog{}, toEngine, activationTime)
 	defer s.Close()
 	go s.Dispatch(startTime)
 
@@ -33,7 +34,7 @@ func TestDelayFromSetTime(t *testing.T) {
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(toEngine, activationTime)
+	s, fromVM := New(logging.NoLog{}, toEngine, activationTime)
 	defer s.Close()
 	go s.Dispatch(now)
 
@@ -53,7 +54,7 @@ func TestReceipt(t *testing.T) {
 	now := time.Now()
 	startTime := now.Add(50 * time.Millisecond)
 
-	s, fromVM := New(toEngine, activationTime)
+	s, fromVM := New(logging.NoLog{}, toEngine, activationTime)
 	defer s.Close()
 	go s.Dispatch(now)
 
