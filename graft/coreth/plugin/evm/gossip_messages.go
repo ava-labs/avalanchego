@@ -20,14 +20,23 @@ const (
 	ethTxsType
 )
 
-type AppMsg struct {
-	MsgType      appMsgType `serialize:"true"`
-	Bytes        []byte     `serialize:"true"`
-	appGossipObj interface{}
+type EthData struct {
+	TxHash    common.Hash
+	TxAddress common.Address
+	TxNonce   uint64
+}
+
+type appMsg struct {
+	MsgType appMsgType `serialize:"true"`
+	Bytes   []byte     `serialize:"true"`
+	txID    ids.ID
+	tx      *Tx
+	ethData []EthData
+	txs     []*types.Transaction
 }
 
 func encodeAtmData(c codec.Manager, txID ids.ID) ([]byte, error) {
-	am := &AppMsg{
+	am := &appMsg{
 		MsgType: atmDataType,
 		Bytes:   txID[:],
 	}
@@ -41,7 +50,7 @@ func encodeAtmTx(c codec.Manager, tx *Tx) ([]byte, error) {
 		return nil, err
 	}
 
-	am := &AppMsg{
+	am := &appMsg{
 		MsgType: atmTxType,
 		Bytes:   bytes,
 	}
@@ -49,19 +58,17 @@ func encodeAtmTx(c codec.Manager, tx *Tx) ([]byte, error) {
 	return c.Marshal(codecVersion, am)
 }
 
-type EthData struct {
-	TxHash    common.Hash
-	TxAddress common.Address
-	TxNonce   uint64
-}
-
 func encodeEthData(c codec.Manager, ethData []EthData) ([]byte, error) {
+	if len(ethData) > maxGossipEthDataSize {
+		return nil, fmt.Errorf("could not encodeEthData, too many tx hashes")
+	}
+
 	bytes, err := rlp.EncodeToBytes(ethData)
 	if err != nil {
 		return nil, err
 	}
 
-	am := &AppMsg{
+	am := &appMsg{
 		MsgType: ethDataType,
 		Bytes:   bytes,
 	}
@@ -70,12 +77,16 @@ func encodeEthData(c codec.Manager, ethData []EthData) ([]byte, error) {
 }
 
 func encodeEthTxs(c codec.Manager, ethTxs []*types.Transaction) ([]byte, error) {
+	if len(ethTxs) > maxGossipEthTxsSize {
+		return nil, fmt.Errorf("could not encodeEthTxs, too many txs")
+	}
+
 	bytes, err := rlp.EncodeToBytes(ethTxs)
 	if err != nil {
 		return nil, err
 	}
 
-	am := &AppMsg{
+	am := &appMsg{
 		MsgType: ethTxsType,
 		Bytes:   bytes,
 	}
@@ -83,58 +94,58 @@ func encodeEthTxs(c codec.Manager, ethTxs []*types.Transaction) ([]byte, error) 
 	return c.Marshal(codecVersion, am)
 }
 
-func decodeToAppMsg(c codec.Manager, bytes []byte) (*AppMsg, error) {
-	appMsg := &AppMsg{}
-	if _, err := c.Unmarshal(bytes, appMsg); err != nil {
+func decodeToAppMsg(c codec.Manager, bytes []byte) (*appMsg, error) {
+	am := &appMsg{}
+	if _, err := c.Unmarshal(bytes, am); err != nil {
 		log.Debug(fmt.Sprintf("could not decode AppRequest msg, error %v", err))
 		return nil, fmt.Errorf("could not decode AppRequest msg")
 	}
 
-	switch appMsg.MsgType {
+	switch am.MsgType {
 	case atmDataType:
-		txID, err := ids.ToID(appMsg.Bytes)
+		txID, err := ids.ToID(am.Bytes)
 		if err != nil {
-			log.Debug(fmt.Sprintf("TxID bytes cannot be decoded into txID, error %s", err))
-			return nil, fmt.Errorf("bad atomicTxID AppMsg")
+			return nil, fmt.Errorf("TxID bytes cannot be decoded into txID, error %s", err)
 		}
-		appMsg.appGossipObj = txID
-		return appMsg, nil
+		am.txID = txID
+		return am, nil
 
 	case atmTxType:
 		tx := &Tx{}
-		if _, err := c.Unmarshal(appMsg.Bytes, tx); err != nil {
-			log.Debug(fmt.Sprintf("could not decode atomic tx, error %v", err))
-			return nil, err
+		if _, err := c.Unmarshal(am.Bytes, tx); err != nil {
+			return nil, fmt.Errorf("could not decode atomic tx, error %v", err)
 		}
 		unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedAtomicTx)
 		if err != nil {
-			log.Debug(fmt.Sprintf("could not decode unsigned atomic tx, error %v", err))
-			return nil, err
+			return nil, fmt.Errorf("could not decode unsigned atomic tx, error %v", err)
 		}
-		tx.Initialize(unsignedBytes, appMsg.Bytes)
-		appMsg.appGossipObj = tx
-		return appMsg, nil
+		tx.Initialize(unsignedBytes, am.Bytes)
+		am.tx = tx
+		return am, nil
 
 	case ethDataType:
 		dataList := make([]EthData, 0)
-		if err := rlp.DecodeBytes(appMsg.Bytes, &dataList); err != nil {
-			log.Debug(fmt.Sprintf("could not decode AppRequest msg carrying eth hashes, error %v", err))
-			return nil, fmt.Errorf("could not decode AppRequest msg with eth hashes")
+		if err := rlp.DecodeBytes(am.Bytes, &dataList); err != nil {
+			return nil, fmt.Errorf("could not decode AppRequest msg carrying eth hashes, error %v", err)
 		}
-		appMsg.appGossipObj = dataList
-		return appMsg, nil
+		if len(dataList) > maxGossipEthDataSize {
+			return nil, fmt.Errorf("Invalid AppRequest msg, too many tx hashes")
+		}
+		am.ethData = dataList
+		return am, nil
 
 	case ethTxsType:
 		ethTxs := make([]*types.Transaction, 0)
-		if err := rlp.DecodeBytes(appMsg.Bytes, &ethTxs); err != nil {
-			log.Debug(fmt.Sprintf("could not decode AppRequest msg carrying eth txs, error %v", err))
-			return nil, fmt.Errorf("could not decode AppRequest msg with eth txs")
+		if err := rlp.DecodeBytes(am.Bytes, &ethTxs); err != nil {
+			return nil, fmt.Errorf("could not decode AppRequest msg carrying eth txs, error %v", err)
 		}
-		appMsg.appGossipObj = ethTxs
-		return appMsg, nil
+		if len(ethTxs) > maxGossipEthTxsSize {
+			return nil, fmt.Errorf("Invalid AppRequest msg, too many txs")
+		}
+		am.txs = ethTxs
+		return am, nil
 
 	default:
-		log.Debug(fmt.Sprintf("Unknown AppRequest msg txIDType %v", appMsg.MsgType))
-		return nil, fmt.Errorf("unknown AppRequest msg txIDType")
+		return nil, fmt.Errorf("unknown AppRequest msg type: %d", am.MsgType)
 	}
 }

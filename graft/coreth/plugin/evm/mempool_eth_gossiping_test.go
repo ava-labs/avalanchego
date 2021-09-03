@@ -191,13 +191,13 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 		t.Fatal("Could not encode eth tx hashes")
 	}
 
-	appMsg, err := decodeToAppMsg(vm.codec, bytes)
+	am, err := decodeToAppMsg(vm.codec, bytes)
 	if err != nil {
 		t.Fatal("Could not decode eth tx hashes")
-	} else if appMsg.MsgType != ethDataType {
+	} else if am.MsgType != ethDataType {
 		t.Fatal("decided wrong app message")
 	}
-	dataList := appMsg.appGossipObj.([]EthData)
+	dataList := am.ethData
 
 	if len(dataList) != 2 {
 		t.Fatal("decoded hashes list has unexpected length")
