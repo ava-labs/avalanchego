@@ -225,10 +225,12 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		return nil
 	}
 
-	nextStartTime := blk.Timestamp().Add(minDelay)
-	vm.ctx.Log.Debug("set preference to %s with timestamp %v; build time scheduled at %v",
-		blk.ID(), blk.Timestamp(), nextStartTime)
+	preferredTime := blk.Timestamp()
+	nextStartTime := preferredTime.Add(minDelay)
 	vm.Scheduler.SetStartTime(nextStartTime)
+
+	vm.ctx.Log.Debug("set preference to %s with timestamp %v; build time scheduled at %v",
+		blk.ID(), preferredTime, nextStartTime)
 	return nil
 }
 
