@@ -138,13 +138,13 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return errTimeTooAdvanced
 	}
 
-	proposer := child.Block.Proposer()
+	proposer := child.SignedBlock.Proposer()
 	if proposer != ids.ShortEmpty {
 		return errExpectedNoProposer
 	}
 
 	// Verify the lack of signature on the node
-	if err := child.Block.Verify(b.vm.ctx.ChainID); err != nil {
+	if err := child.SignedBlock.Verify(b.vm.ctx.ChainID); err != nil {
 		return err
 	}
 
@@ -207,7 +207,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	blk := &postForkBlock{
-		Block: statelessBlock,
+		SignedBlock: statelessBlock,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,
@@ -217,7 +217,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay NA, block timestamp %v.",
 		blk.ID(), parentTimestamp, newTimestamp)
-	return blk, b.vm.storePostForkBlock(blk)
+	return blk, b.vm.storePostForkBlock(blk.SignedBlock, blk.status)
 }
 
 func (b *preForkBlock) pChainHeight() (uint64, error) {

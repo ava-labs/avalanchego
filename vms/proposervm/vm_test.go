@@ -441,7 +441,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk := postForkBlock{
-		Block: slb,
+		SignedBlock: slb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
@@ -487,7 +487,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk1 := postForkBlock{
-		Block: slb1,
+		SignedBlock: slb1,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
@@ -508,7 +508,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	proBlk2 := postForkBlock{
-		Block: slb2,
+		SignedBlock: slb2,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: innerBlk,
@@ -615,7 +615,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		t.Fatal("could not build stateless block")
 	}
 	netProBlk := postForkBlock{
-		Block: netSlb,
+		SignedBlock: netSlb,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       proVM,
 			innerBlk: netcoreBlk,

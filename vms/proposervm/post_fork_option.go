@@ -10,7 +10,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	"github.com/ava-labs/avalanchego/vms/proposervm/option"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -18,7 +17,7 @@ var _ Block = &postForkOption{}
 
 // The parent of a *postForkOption must be a *postForkBlock.
 type postForkOption struct {
-	option.Option
+	block.Block
 	postForkCommonComponents
 }
 
@@ -40,7 +39,7 @@ func (b *postForkOption) Accept() error {
 	}
 
 	// Persist this block and its status
-	if err := b.vm.storePostForkOption(b); err != nil {
+	if err := b.vm.storePostForkBlock(b.Block, b.status); err != nil {
 		return err
 	}
 
@@ -59,7 +58,7 @@ func (b *postForkOption) Reject() error {
 	b.status = choices.Rejected
 
 	// Persist this block and its status
-	if err := b.vm.storePostForkOption(b); err != nil {
+	if err := b.vm.storePostForkBlock(b.Block, b.status); err != nil {
 		return err
 	}
 
@@ -131,7 +130,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	delay := newTimestamp.Sub(parentTimestamp)
 
 	// Build the child
-	var statelessChild block.Block
+	var statelessChild block.SignedBlock
 	if delay >= proposer.MaxDelay {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
@@ -180,7 +179,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	child := &postForkBlock{
-		Block: statelessChild,
+		SignedBlock: statelessChild,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,
@@ -191,7 +190,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, block timestamp %v.",
 		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
-	return child, b.vm.storePostForkBlock(child)
+	return child, b.vm.storePostForkBlock(child.SignedBlock, child.status)
 }
 
 // This block's P-Chain height is its parent's P-Chain height

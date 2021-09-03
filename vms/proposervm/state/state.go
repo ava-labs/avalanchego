@@ -11,38 +11,31 @@ import (
 )
 
 var (
-	chainStatePrefix  = []byte("chain")
-	blockStatePrefix  = []byte("block")
-	optionStatePrefix = []byte("option")
+	chainStatePrefix = []byte("chain")
+	blockStatePrefix = []byte("block")
 )
 
 type State interface {
 	ChainState
 	BlockState
-	OptionState
 }
 
 type state struct {
 	ChainState
 	BlockState
-	OptionState
 }
 
 func (s *state) WipeCache() {
 	s.ChainState.WipeCache()
 	s.BlockState.WipeCache()
-	s.OptionState.WipeCache()
 }
 
 func New(db database.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
-	optionDB := prefixdb.New(optionStatePrefix, db)
-
 	return &state{
-		ChainState:  NewChainState(chainDB),
-		BlockState:  NewBlockState(blockDB),
-		OptionState: NewOptionState(optionDB),
+		ChainState: NewChainState(chainDB),
+		BlockState: NewBlockState(blockDB),
 	}
 }
 
@@ -53,15 +46,9 @@ func NewMetered(db database.Database, namespace string, metrics prometheus.Regis
 	if err != nil {
 		return nil, err
 	}
-	optionDB := prefixdb.New(optionStatePrefix, db)
-	optionState, err := NewMeteredOptionState(optionDB, namespace, metrics)
-	if err != nil {
-		return nil, err
-	}
 
 	return &state{
-		ChainState:  NewChainState(chainDB),
-		BlockState:  blockState,
-		OptionState: optionState,
+		ChainState: NewChainState(chainDB),
+		BlockState: blockState,
 	}, nil
 }
