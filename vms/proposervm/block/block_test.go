@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-func equal(assert *assert.Assertions, chainID ids.ID, want, have Block) {
+func equal(assert *assert.Assertions, chainID ids.ID, want, have SignedBlock) {
 	assert.Equal(want.ID(), have.ID())
 	assert.Equal(want.ParentID(), have.ParentID())
 	assert.Equal(want.PChainHeight(), have.PChainHeight())

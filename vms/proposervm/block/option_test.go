@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func equalOption(assert *assert.Assertions, want, have Option) {
+func equalOption(assert *assert.Assertions, want, have Block) {
 	assert.Equal(want.ID(), have.ID())
 	assert.Equal(want.ParentID(), have.ParentID())
 	assert.Equal(want.Block(), have.Block())

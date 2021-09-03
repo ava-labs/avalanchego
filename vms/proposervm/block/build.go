@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func BuildUnsigned(
@@ -18,8 +19,8 @@ func BuildUnsigned(
 	timestamp time.Time,
 	pChainHeight uint64,
 	blockBytes []byte,
-) (Block, error) {
-	block := statelessBlock{
+) (SignedBlock, error) {
+	var block SignedBlock = &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -30,14 +31,11 @@ func BuildUnsigned(
 		timestamp: timestamp,
 	}
 
-	unsignedBytes, err := c.Marshal(version, &block.StatelessBlock)
+	bytes, err := c.Marshal(version, &block)
 	if err != nil {
 		return nil, err
 	}
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
-
-	block.bytes, err = c.Marshal(version, &block)
-	return &block, err
+	return block, block.initialize(bytes)
 }
 
 func Build(
@@ -48,8 +46,8 @@ func Build(
 	blockBytes []byte,
 	chainID ids.ID,
 	key crypto.Signer,
-) (Block, error) {
-	block := statelessBlock{
+) (SignedBlock, error) {
+	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -61,11 +59,13 @@ func Build(
 		cert:      cert,
 		proposer:  hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw)),
 	}
+	var blockIntf SignedBlock = block
 
-	unsignedBytes, err := c.Marshal(version, &block.StatelessBlock)
+	unsignedBytes, err := c.Marshal(version, &blockIntf)
 	if err != nil {
 		return nil, err
 	}
+	unsignedBytes = unsignedBytes[:len(unsignedBytes)-wrappers.IntLen]
 	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
 	header, err := BuildHeader(chainID, parentID, block.id)
@@ -79,8 +79,8 @@ func Build(
 		return nil, err
 	}
 
-	block.bytes, err = c.Marshal(version, &block)
-	return &block, err
+	block.bytes, err = c.Marshal(version, &blockIntf)
+	return block, err
 }
 
 func BuildHeader(
@@ -105,18 +105,15 @@ func BuildHeader(
 func BuildOption(
 	parentID ids.ID,
 	innerBytes []byte,
-) (Option, error) {
-	opt := option{
+) (Block, error) {
+	var block Block = &option{
 		PrntID:     parentID,
 		InnerBytes: innerBytes,
 	}
 
-	bytes, err := c.Marshal(version, &opt)
+	bytes, err := c.Marshal(version, &block)
 	if err != nil {
 		return nil, err
 	}
-	opt.bytes = bytes
-
-	opt.id = hashing.ComputeHash256Array(opt.bytes)
-	return &opt, nil
+	return block, block.initialize(bytes)
 }

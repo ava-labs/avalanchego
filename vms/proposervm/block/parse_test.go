@@ -42,8 +42,11 @@ func TestParse(t *testing.T) {
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlock, err := Parse(builtBlockBytes)
+	parsedBlockIntf, err := Parse(builtBlockBytes)
 	assert.NoError(err)
+
+	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
+	assert.True(ok)
 
 	equal(assert, chainID, builtBlock, parsedBlock)
 }
@@ -81,7 +84,7 @@ func TestParseOption(t *testing.T) {
 
 	builtOptionBytes := builtOption.Bytes()
 
-	parsedOption, err := ParseOption(builtOptionBytes)
+	parsedOption, err := Parse(builtOptionBytes)
 	assert.NoError(err)
 
 	equalOption(assert, builtOption, parsedOption)
@@ -100,8 +103,11 @@ func TestParseUnsigned(t *testing.T) {
 
 	builtBlockBytes := builtBlock.Bytes()
 
-	parsedBlock, err := Parse(builtBlockBytes)
+	parsedBlockIntf, err := Parse(builtBlockBytes)
 	assert.NoError(err)
+
+	parsedBlock, ok := parsedBlockIntf.(SignedBlock)
+	assert.True(ok)
 
 	equal(assert, ids.Empty, builtBlock, parsedBlock)
 }

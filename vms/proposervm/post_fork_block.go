@@ -17,7 +17,7 @@ var _ Block = &postForkBlock{}
 
 // postForkBlock implements proposervm.Block
 type postForkBlock struct {
-	block.Block
+	block.SignedBlock
 	postForkCommonComponents
 }
 
@@ -32,7 +32,7 @@ func (b *postForkBlock) Accept() error {
 		return err
 	}
 	// Persist this block with its status
-	if err := b.vm.storePostForkBlock(b); err != nil {
+	if err := b.vm.storePostForkBlock(b.SignedBlock, b.status); err != nil {
 		return err
 	}
 
@@ -50,7 +50,7 @@ func (b *postForkBlock) Reject() error {
 	// may be accepted later
 	b.status = choices.Rejected
 	// Persist this block with its status
-	if err := b.vm.storePostForkBlock(b); err != nil {
+	if err := b.vm.storePostForkBlock(b.SignedBlock, b.status); err != nil {
 		return err
 	}
 
@@ -105,7 +105,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 		}
 
 		outerOption := &postForkOption{
-			Option: statelessOuterOption,
+			Block: statelessOuterOption,
 			postForkCommonComponents: postForkCommonComponents{
 				vm:       b.vm,
 				innerBlk: innerOption,
@@ -113,7 +113,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 			},
 		}
 		// Persist the wrapped child options
-		if err := b.vm.storePostForkOption(outerOption); err != nil {
+		if err := b.vm.storePostForkBlock(outerOption.Block, outerOption.status); err != nil {
 			return [2]snowman.Block{}, err
 		}
 
@@ -179,7 +179,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	delay := newTimestamp.Sub(parentTimestamp)
 
 	// Build the child
-	var statelessChild block.Block
+	var statelessChild block.SignedBlock
 	if delay >= proposer.MaxDelay {
 		statelessChild, err = block.BuildUnsigned(
 			parentID,
@@ -224,7 +224,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	child := &postForkBlock{
-		Block: statelessChild,
+		SignedBlock: statelessChild,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,
@@ -235,7 +235,7 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, block timestamp %v.",
 		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
-	return child, b.vm.storePostForkBlock(child)
+	return child, b.vm.storePostForkBlock(child.SignedBlock, child.status)
 }
 
 func (b *postForkBlock) pChainHeight() (uint64, error) {
