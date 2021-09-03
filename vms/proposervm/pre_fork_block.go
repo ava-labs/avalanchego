@@ -63,6 +63,10 @@ func (b *preForkBlock) Options() ([2]snowman.Block, error) {
 	}, nil
 }
 
+func (b *preForkBlock) getInnerBlk() snowman.Block {
+	return b.Block
+}
+
 func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	if !parentTimestamp.Before(b.vm.activationTime) {
@@ -74,10 +78,6 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	}
 
 	return child.Block.Verify()
-}
-
-func (b *preForkBlock) getInnerBlk() snowman.Block {
-	return b.Block
 }
 
 // This method only returns nil once (during the transition)
