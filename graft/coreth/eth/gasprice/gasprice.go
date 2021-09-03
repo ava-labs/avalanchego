@@ -43,7 +43,6 @@ import (
 
 const (
 	defaultSampleNumber = 3 // Number of transactions sampled in a block by default
-	ignoreGasThreshold  = uint64(750_000)
 )
 
 var (
@@ -306,9 +305,7 @@ func (s *txSorter) Less(i, j int) bool {
 // transaction prices for sampling), nil gasprice is returned.
 func (oracle *Oracle) getBlockValues(ctx context.Context, signer types.Signer, blockNum uint64, limit int, ignoreUnder *big.Int, result chan results, quit chan struct{}) {
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
-	// To avoid biasing the suggestion with transactions that chose to pay the full block
-	// fee on their own, we ignore blocks with less gas than [ignoreGasThreshold].
-	if block == nil || block.GasUsed() < ignoreGasThreshold {
+	if block == nil {
 		select {
 		case result <- results{nil, nil, err}:
 		case <-quit:
