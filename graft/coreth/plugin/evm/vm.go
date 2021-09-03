@@ -715,7 +715,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 	}
 
 	switch appMsg.MsgType {
-	case atomicTxIDType:
+	case atmDataType:
 		txID := appMsg.appGossipObj.(ids.ID)
 		log.Debug(fmt.Sprintf("AppRequest: called with txID %s", txID))
 
@@ -727,7 +727,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		}
 
 		// send response
-		response, err := vm.encodeAtomicTx(resTx)
+		response, err := vm.encodeAtmTx(resTx)
 		if err != nil {
 			log.Warn(fmt.Sprintf("AppRequest: failed creating AppResponse carrying atomic tx %s, error %s",
 				txID, err))
@@ -740,14 +740,14 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		}
 
 		return nil
-	case ethHashesType:
-		hashList := appMsg.appGossipObj.([]common.Hash)
+	case ethDataType:
+		dataList := appMsg.appGossipObj.([]EthData)
 		log.Debug("AppRequest: called with eth hashes list")
 
 		// select tx to respond with
 		txsToRespondTo := make([]*types.Transaction, 0)
-		for _, txHash := range hashList {
-			if tx := vm.chain.GetTxPool().Get(txHash); tx != nil {
+		for _, data := range dataList {
+			if tx := vm.chain.GetTxPool().Get(data.TxHash); tx != nil {
 				txsToRespondTo = append(txsToRespondTo, tx)
 			}
 		}
@@ -798,7 +798,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		return nil
 	}
 	switch appMsg.MsgType {
-	case atomicTxType:
+	case atmTxType:
 		tx := appMsg.appGossipObj.(*Tx)
 		log.Debug(fmt.Sprintf("AppResponse: received txID %s", tx.ID()))
 
@@ -828,7 +828,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		}
 
 		return nil
-	case ethTxListType:
+	case ethTxsType:
 		rcvdTxs := appMsg.appGossipObj.([]*types.Transaction)
 		log.Debug("AppResponse: received eth txs")
 
@@ -882,7 +882,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 	}
 
 	switch appMsg.MsgType {
-	case atomicTxIDType:
+	case atmDataType:
 		txID := appMsg.appGossipObj.(ids.ID)
 		log.Debug(fmt.Sprintf("AppGossip: received txID %s", txID))
 
@@ -902,22 +902,32 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		// record content to check response later on
 		vm.requestsContent[reqID] = txID
 		return nil
-	case ethHashesType:
-		hashList := appMsg.appGossipObj.([]common.Hash)
+	case ethDataType:
+		dataList := appMsg.appGossipObj.([]EthData)
 		log.Debug("AppGossip: received eth hashes list")
 
-		hashesToRequest := make([]common.Hash, 0)
-		for _, txHash := range hashList {
-			if !vm.chain.GetTxPool().Has(txHash) {
-				hashesToRequest = append(hashesToRequest, txHash)
+		dataToRequest := make([]EthData, 0)
+		for _, data := range dataList {
+			if vm.chain.GetTxPool().Has(data.TxHash) {
+				log.Debug(fmt.Sprintf("AppGossip: eth hash %s already known to mempool. Not requesting it.",
+					data.TxHash))
+				continue
 			}
+
+			if err := vm.chain.GetTxPool().CheckNonceOrdering(data.TxAddress, data.TxNonce); err != nil {
+				log.Debug(fmt.Sprintf("AppGossip: eth hash %s nonce is too old. Not requesting it.",
+					data.TxHash))
+				continue
+			}
+
+			dataToRequest = append(dataToRequest, data)
 		}
 
-		if len(hashesToRequest) == 0 {
+		if len(dataToRequest) == 0 {
 			return nil // nothing to ask
 		}
 
-		msg, err := vm.encodeEthHashes(hashesToRequest)
+		msg, err := vm.encodeEthData(dataToRequest)
 		if err != nil {
 			log.Warn(fmt.Sprintf("AppGossip: failed creating AppResponse carrying eth txs, error %s",
 				err))
@@ -934,8 +944,8 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 
 		// record content to check response later on
 		reqContent := make(map[common.Hash]struct{})
-		for _, hash := range hashesToRequest {
-			reqContent[hash] = struct{}{}
+		for _, data := range dataToRequest {
+			reqContent[data.TxHash] = struct{}{}
 		}
 		vm.requestsContent[reqID] = reqContent
 
@@ -1240,24 +1250,35 @@ func (vm *VM) awaitSubmittedTxs() {
 				continue
 			}
 
-			// pick hashes and serialize them
-			ethHashes := make([]common.Hash, 0)
+			// pick data from eth txs and serialize them
+			ethData := make([]EthData, 0)
 			for _, ethTx := range ethTxsEvent.Txs {
 				txStatus := vm.chain.GetTxPool().Status([]common.Hash{ethTx.Hash()})[0]
 				if txStatus == core.TxStatusPending {
-					ethHashes = append(ethHashes, ethTx.Hash())
+					TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
+					if err != nil {
+						log.Warn(fmt.Sprintf("Could not retrieve address for eth tx %s. Dropping attempt to gossip it",
+							ethTx.Hash()))
+					}
+					data := EthData{
+						TxHash:    ethTx.Hash(),
+						TxAddress: TxAddress,
+						TxNonce:   ethTx.Nonce(),
+					}
+
+					ethData = append(ethData, data)
 				}
 			}
 
-			if len(ethHashes) > 0 {
-				ethTxsBytes, err := vm.encodeEthHashes(ethHashes)
+			if len(ethData) > 0 {
+				ethTxsBytes, err := vm.encodeEthData(ethData)
 				if err != nil {
-					log.Trace("Could not parse ethTxIDs. Understand what to do")
+					log.Warn("Could not parse ethData. Dropping gossiping attempt")
+				} else {
+					// gossip them
+					log.Debug(fmt.Sprintf("SendAppGossip: gossiping %v coreth txs", len(ethData)))
+					vm.appGossipBytesCh <- ethTxsBytes
 				}
-
-				// gossip them
-				log.Debug(fmt.Sprintf("SendAppGossip: gossiping %v coreth txs", len(ethHashes)))
-				vm.appGossipBytesCh <- ethTxsBytes
 			}
 		case <-vm.mempool.Pending:
 			log.Trace("New atomic Tx detected, trying to generate a block")
@@ -1315,7 +1336,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 			log.Trace("SendAppGossip: issued tx before gossiping activation time. Doing nothing")
 			return nil
 		}
-		txIDBytes, err := vm.encodeTxID(tx.ID())
+		txIDBytes, err := vm.encodeAtmData(tx.ID())
 		if err != nil {
 			return err
 		}

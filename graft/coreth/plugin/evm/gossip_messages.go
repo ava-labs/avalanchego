@@ -13,16 +13,73 @@ import (
 type appMsgType byte
 
 const (
-	atomicTxIDType appMsgType = iota + 1
-	atomicTxType
-	ethHashesType
-	ethTxListType
+	atmDataType appMsgType = iota + 1
+	atmTxType
+	ethDataType
+	ethTxsType
 )
 
 type AppMsg struct {
 	MsgType      appMsgType `serialize:"true"`
 	Bytes        []byte     `serialize:"true"`
 	appGossipObj interface{}
+}
+
+func (vm *VM) encodeAtmData(txID ids.ID) ([]byte, error) {
+	am := &AppMsg{
+		MsgType: atmDataType,
+		Bytes:   txID[:],
+	}
+
+	return vm.codec.Marshal(codecVersion, am)
+}
+
+func (vm *VM) encodeAtmTx(tx *Tx) ([]byte, error) {
+	am := &AppMsg{
+		MsgType: atmTxType,
+	}
+
+	bytes, err := vm.codec.Marshal(codecVersion, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	am.Bytes = bytes
+	return vm.codec.Marshal(codecVersion, am)
+}
+
+type EthData struct {
+	TxHash    common.Hash
+	TxAddress common.Address
+	TxNonce   uint64
+}
+
+func (vm *VM) encodeEthData(ethData []EthData) ([]byte, error) {
+	am := &AppMsg{
+		MsgType: ethDataType,
+	}
+
+	bytes, err := rlp.EncodeToBytes(ethData)
+	if err != nil {
+		return nil, err
+	}
+
+	am.Bytes = bytes
+	return vm.codec.Marshal(codecVersion, am)
+}
+
+func (vm *VM) encodeEthTxs(ethTxs []*types.Transaction) ([]byte, error) {
+	am := &AppMsg{
+		MsgType: ethTxsType,
+	}
+
+	bytes, err := rlp.EncodeToBytes(ethTxs)
+	if err != nil {
+		return nil, err
+	}
+
+	am.Bytes = bytes
+	return vm.codec.Marshal(codecVersion, am)
 }
 
 func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
@@ -33,7 +90,7 @@ func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
 	}
 
 	switch appMsg.MsgType {
-	case atomicTxIDType:
+	case atmDataType:
 		if len(appMsg.Bytes) != 32 {
 			log.Debug("TxID bytes cannot be decoded into txID")
 			return nil, fmt.Errorf("bad atomicTxID AppMsg")
@@ -43,7 +100,7 @@ func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
 		appMsg.appGossipObj = txID
 		return appMsg, nil
 
-	case atomicTxType:
+	case atmTxType:
 		tx := &Tx{}
 		if _, err := vm.codec.Unmarshal(appMsg.Bytes, tx); err != nil {
 			log.Debug(fmt.Sprintf("could not decode atomic tx, error %v", err))
@@ -58,16 +115,16 @@ func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
 		appMsg.appGossipObj = tx
 		return appMsg, nil
 
-	case ethHashesType:
-		hashList := make([]common.Hash, 0)
-		if err := rlp.DecodeBytes(appMsg.Bytes, &hashList); err != nil {
+	case ethDataType:
+		dataList := make([]EthData, 0)
+		if err := rlp.DecodeBytes(appMsg.Bytes, &dataList); err != nil {
 			log.Debug(fmt.Sprintf("could not decode AppRequest msg carrying eth hashes, error %v", err))
 			return nil, fmt.Errorf("could not decode AppRequest msg with eth hashes")
 		}
-		appMsg.appGossipObj = hashList
+		appMsg.appGossipObj = dataList
 		return appMsg, nil
 
-	case ethTxListType:
+	case ethTxsType:
 		ethTxs := make([]*types.Transaction, 0)
 		if err := rlp.DecodeBytes(appMsg.Bytes, &ethTxs); err != nil {
 			log.Debug(fmt.Sprintf("could not decode AppRequest msg carrying eth txs, error %v", err))
@@ -80,55 +137,4 @@ func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
 		log.Debug(fmt.Sprintf("Unknown AppRequest msg txIDType %v", appMsg.MsgType))
 		return nil, fmt.Errorf("unknown AppRequest msg txIDType")
 	}
-}
-
-func (vm *VM) encodeTxID(txID ids.ID) ([]byte, error) {
-	am := &AppMsg{
-		MsgType: atomicTxIDType,
-		Bytes:   txID[:],
-	}
-
-	return vm.codec.Marshal(codecVersion, am)
-}
-
-func (vm *VM) encodeAtomicTx(tx *Tx) ([]byte, error) {
-	am := &AppMsg{
-		MsgType: atomicTxType,
-	}
-
-	bytes, err := vm.codec.Marshal(codecVersion, tx)
-	if err != nil {
-		return nil, err
-	}
-
-	am.Bytes = bytes
-	return vm.codec.Marshal(codecVersion, am)
-}
-
-func (vm *VM) encodeEthHashes(ethTxHashes []common.Hash) ([]byte, error) {
-	am := &AppMsg{
-		MsgType: ethHashesType,
-	}
-
-	bytes, err := rlp.EncodeToBytes(ethTxHashes)
-	if err != nil {
-		return nil, err
-	}
-
-	am.Bytes = bytes
-	return vm.codec.Marshal(codecVersion, am)
-}
-
-func (vm *VM) encodeEthTxs(ethTxs []*types.Transaction) ([]byte, error) {
-	am := &AppMsg{
-		MsgType: ethTxListType,
-	}
-
-	bytes, err := rlp.EncodeToBytes(ethTxs)
-	if err != nil {
-		return nil, err
-	}
-
-	am.Bytes = bytes
-	return vm.codec.Marshal(codecVersion, am)
 }

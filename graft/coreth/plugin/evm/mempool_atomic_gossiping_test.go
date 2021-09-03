@@ -211,7 +211,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 
 	// gossip tx and check it is accepted
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	txBytes, err := vm.encodeAtomicTx(tx)
+	txBytes, err := vm.encodeAtmTx(tx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -375,7 +375,7 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 	// responses with unknown requestID are rejected
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	txBytes, err := vm.encodeAtomicTx(tx)
+	txBytes, err := vm.encodeAtmTx(tx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -450,7 +450,7 @@ func TestMempool_AtmTxs_AppResponseHandling_InvalidTx(t *testing.T) {
 	// gossip tx and check it is accepted and re-gossiped
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	illFormedTxBytes, err := vm.encodeAtomicTx(illFormedTx)
+	illFormedTxBytes, err := vm.encodeAtmTx(illFormedTx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -499,7 +499,7 @@ func TestMempool_AtmTxs_AppGossipHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, sharedMemory, t)
-	txIDBytes, err := vm.encodeTxID(tx.ID())
+	txIDBytes, err := vm.encodeAtmData(tx.ID())
 	if err != nil {
 		t.Fatal("Could not encode atomic tx ID")
 	}
@@ -564,7 +564,7 @@ func TestMempool_AtmTxs_AppGossipHandling_InvalidTx(t *testing.T) {
 
 	// show that the invalid tx is not requested
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	rejectedTxMsg, err := vm.encodeTxID(rejectedTx.ID())
+	rejectedTxMsg, err := vm.encodeAtmData(rejectedTx.ID())
 	if err != nil {
 		t.Fatal("could not encode atomic tx ID")
 	}
@@ -600,7 +600,7 @@ func TestMempool_AtmTxs_AppRequestHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, sharedMemory, t)
-	txIDBytes, err := vm.encodeTxID(tx.ID())
+	txIDBytes, err := vm.encodeAtmData(tx.ID())
 	if err != nil {
 		t.Fatal("could not encode atomic tx ID")
 	}
@@ -655,7 +655,7 @@ func TestMempool_AtmTxs_AppRequestHandling_InvalidTx(t *testing.T) {
 
 	// create a tx
 	rejectedTx := getTheValidTx(vm, sharedMemory, t)
-	rejectedTxIDBytes, err := vm.encodeTxID(rejectedTx.ID())
+	rejectedTxIDBytes, err := vm.encodeAtmData(rejectedTx.ID())
 	if err != nil {
 		t.Fatal("could not encode atomic tx ID")
 	}

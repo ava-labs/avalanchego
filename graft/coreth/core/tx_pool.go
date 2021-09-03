@@ -608,6 +608,15 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 	return txs
 }
 
+func (pool *TxPool) CheckNonceOrdering(from common.Address, txNonce uint64) error {
+	// Ensure the transaction adheres to nonce ordering
+	if currentNonce, txNonce := pool.currentState.GetNonce(from), txNonce; currentNonce > txNonce {
+		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)",
+			ErrNonceTooLow, from.Hex(), currentNonce, txNonce)
+	}
+	return nil
+}
+
 // validateTx checks whether a transaction is valid according to the consensus
 // rules and adheres to some heuristic limits of the local node (price and size).
 func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
@@ -657,8 +666,8 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 		return fmt.Errorf("%w: address %s have gas fee cap (%d) < pool minimum fee cap (%d)", ErrUnderpriced, from.Hex(), tx.GasFeeCap(), pool.minimumFee)
 	}
 	// Ensure the transaction adheres to nonce ordering
-	if currentNonce, txNonce := pool.currentState.GetNonce(from), tx.Nonce(); currentNonce > txNonce {
-		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)", ErrNonceTooLow, from.Hex(), currentNonce, txNonce)
+	if err := pool.CheckNonceOrdering(from, tx.Nonce()); err != nil {
+		return err
 	}
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
