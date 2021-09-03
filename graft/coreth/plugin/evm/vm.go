@@ -53,10 +53,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/platformvm/request"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	gossipReq "github.com/ava-labs/avalanchego/vms/platformvm/request"
 
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -164,7 +164,6 @@ func init() {
 	)
 	c.SkipRegistrations(3)
 	errs.Add(
-		c.RegisterType(&AppMsg{}),
 		c.RegisterType(&secp256k1fx.TransferInput{}),
 		c.RegisterType(&secp256k1fx.MintOutput{}),
 		c.RegisterType(&secp256k1fx.TransferOutput{}),
@@ -172,6 +171,7 @@ func init() {
 		c.RegisterType(&secp256k1fx.Credential{}),
 		c.RegisterType(&secp256k1fx.Input{}),
 		c.RegisterType(&secp256k1fx.OutputOwners{}),
+		c.RegisterType(&AppMsg{}),
 		Codec.RegisterCodec(codecVersion, c),
 	)
 
@@ -233,9 +233,10 @@ type VM struct {
 	// gossip related attributes
 	gossipActivationTime time.Time
 	appSender            commonEng.AppSender
-	gossipReq.Handler
-	appGossipBytesCh chan []byte
-	requestsContent  map[ /*requestID*/ uint32]interface{}
+	request.Handler
+	appGossipBytesCh   chan []byte
+	requestsAtmContent map[ /*requestID*/ uint32]ids.ID
+	requestsEthContent map[ /*requestID*/ uint32]map[common.Hash]struct{}
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -369,9 +370,10 @@ func (vm *VM) Initialize(
 	vm.mempool = NewMempool(defaultMempoolSize) // TODO: read size from settings
 	vm.gossipActivationTime = time.Unix(0, 0)   // TODO: setup upon deploy
 	vm.appSender = appSender
-	vm.Handler = gossipReq.NewHandler()
+	vm.Handler = request.NewHandler()
 	vm.appGossipBytesCh = make(chan []byte, 1024) // TODO: pick proper size
-	vm.requestsContent = make(map[uint32]interface{})
+	vm.requestsAtmContent = make(map[uint32]ids.ID)
+	vm.requestsEthContent = make(map[uint32]map[common.Hash]struct{})
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -675,12 +677,12 @@ func (vm *VM) listenAndGossip() {
 
 	for {
 		select {
+		case <-vm.shutdownChan:
+			return
 		case bytes := <-vm.appGossipBytesCh:
 			if err := vm.appSender.SendAppGossip(bytes); err != nil {
 				log.Warn(fmt.Sprintf("SendAppGossip: failure with err %s", err))
 			}
-		case <-vm.shutdownChan:
-			return
 		}
 	}
 }
@@ -693,7 +695,10 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 		return nil
 	}
 
-	log.Warn(fmt.Sprintf("AppRequestFailed to node %s, reqID %d", nodeID, requestID))
+	log.Info(fmt.Sprintf("AppRequestFailed to node %s, reqID %d", nodeID, requestID))
+	delete(vm.requestsAtmContent, requestID)
+	delete(vm.requestsEthContent, requestID)
+
 	return nil
 }
 
@@ -707,7 +712,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		return nil
 	}
 
-	appMsg, err := vm.decodeToAppMsg(request)
+	appMsg, err := decodeToAppMsg(vm.codec, request)
 	if err != nil {
 		log.Warn(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d",
 			nodeID, requestID))
@@ -727,7 +732,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		}
 
 		// send response
-		response, err := vm.encodeAtmTx(resTx)
+		response, err := encodeAtmTx(vm.codec, resTx)
 		if err != nil {
 			log.Warn(fmt.Sprintf("AppRequest: failed creating AppResponse carrying atomic tx %s, error %s",
 				txID, err))
@@ -756,7 +761,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 			return nil
 		}
 
-		response, err := vm.encodeEthTxs(txsToRespondTo)
+		response, err := encodeEthTxs(vm.codec, txsToRespondTo)
 		if err != nil {
 			log.Warn(fmt.Sprintf("AppRequest: failed creating AppResponse carrying eth txs, error %s",
 				err))
@@ -791,7 +796,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	}
 
 	// decode response
-	appMsg, err := vm.decodeToAppMsg(response)
+	appMsg, err := decodeToAppMsg(vm.codec, response)
 	if err != nil {
 		log.Warn(fmt.Sprintf("AppResponse: failed unmarshalling response from Node %v, reqID %d",
 			nodeID, requestID))
@@ -803,13 +808,12 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		log.Debug(fmt.Sprintf("AppResponse: received txID %s", tx.ID()))
 
 		// check that content matched with what previously requested
-		contentIntf, ok := vm.requestsContent[requestID]
+		expectedTxID, ok := vm.requestsAtmContent[requestID]
 		if !ok {
 			log.Warn(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
 			return nil
 		}
-
-		expectedTxID := contentIntf.(ids.ID)
+		delete(vm.requestsAtmContent, requestID)
 		if tx.ID() != expectedTxID {
 			log.Warn("AppResponse: unrequested transaction ID. Dropping it")
 			return nil
@@ -833,24 +837,27 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		log.Debug("AppResponse: received eth txs")
 
 		// check that content matched with what previously requested
-		contentIntf, ok := vm.requestsContent[requestID]
+		expectedHashes, ok := vm.requestsEthContent[requestID]
 		if !ok {
 			log.Warn(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
 			return nil
 		}
-
-		expectedHashes := contentIntf.(map[common.Hash]struct{})
-		expectedTxs := make([]*types.Transaction, 0)
+		requestedTxs := make([]*types.Transaction, 0)
 		for _, tx := range rcvdTxs {
 			if _, ok := expectedHashes[tx.Hash()]; !ok {
 				log.Warn(fmt.Sprintf("AppResponse: received unexpected eth tx %d. Dropping it", tx.Hash()))
+				continue
 			}
-
-			expectedTxs = append(expectedTxs, tx)
+			requestedTxs = append(requestedTxs, tx)
+		}
+		delete(vm.requestsEthContent, requestID)
+		if len(requestedTxs) == 0 {
+			log.Warn("AppResponse: all eth hashes were undequested. Dropping response")
+			return nil
 		}
 
 		// submit to mempool expected transactions only
-		errs := vm.chain.GetTxPool().AddRemotes(expectedTxs)
+		errs := vm.chain.GetTxPool().AddRemotes(requestedTxs)
 		for _, err := range errs {
 			if err != nil {
 				log.Debug(fmt.Sprintf("AppResponse: failed AddRemotes response from Node %v, reqID %v, err %v",
@@ -874,7 +881,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 
-	appMsg, err := vm.decodeToAppMsg(msg)
+	appMsg, err := decodeToAppMsg(vm.codec, msg)
 	if err != nil {
 		log.Warn(fmt.Sprintf("AppGossip: failed unmarshalling gossip from Node %v, error %s",
 			nodeID, err))
@@ -900,7 +907,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		}
 
 		// record content to check response later on
-		vm.requestsContent[reqID] = txID
+		vm.requestsAtmContent[reqID] = txID
 		return nil
 	case ethDataType:
 		dataList := appMsg.appGossipObj.([]EthData)
@@ -927,7 +934,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 			return nil // nothing to ask
 		}
 
-		msg, err := vm.encodeEthData(dataToRequest)
+		msg, err := encodeEthData(vm.codec, dataToRequest)
 		if err != nil {
 			log.Warn(fmt.Sprintf("AppGossip: failed creating AppResponse carrying eth txs, error %s",
 				err))
@@ -943,11 +950,11 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		}
 
 		// record content to check response later on
-		reqContent := make(map[common.Hash]struct{})
+		reqContent := make(map[common.Hash]struct{}, len(dataToRequest))
 		for _, data := range dataToRequest {
 			reqContent[data.TxHash] = struct{}{}
 		}
-		vm.requestsContent[reqID] = reqContent
+		vm.requestsEthContent[reqID] = reqContent
 
 		return nil
 	default:
@@ -1241,6 +1248,8 @@ func (vm *VM) awaitSubmittedTxs() {
 
 	for {
 		select {
+		case <-vm.shutdownChan:
+			return
 		case ethTxsEvent := <-txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
 			vm.signalTxsReady()
@@ -1271,7 +1280,7 @@ func (vm *VM) awaitSubmittedTxs() {
 			}
 
 			if len(ethData) > 0 {
-				ethTxsBytes, err := vm.encodeEthData(ethData)
+				ethTxsBytes, err := encodeEthData(vm.codec, ethData)
 				if err != nil {
 					log.Warn("Could not parse ethData. Dropping gossiping attempt")
 				} else {
@@ -1283,8 +1292,6 @@ func (vm *VM) awaitSubmittedTxs() {
 		case <-vm.mempool.Pending:
 			log.Trace("New atomic Tx detected, trying to generate a block")
 			vm.signalTxsReady()
-		case <-vm.shutdownChan:
-			return
 		}
 	}
 }
@@ -1336,7 +1343,7 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 			log.Trace("SendAppGossip: issued tx before gossiping activation time. Doing nothing")
 			return nil
 		}
-		txIDBytes, err := vm.encodeAtmData(tx.ID())
+		txIDBytes, err := encodeAtmData(vm.codec, tx.ID())
 		if err != nil {
 			return err
 		}

@@ -3,6 +3,7 @@ package evm
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -25,27 +26,27 @@ type AppMsg struct {
 	appGossipObj interface{}
 }
 
-func (vm *VM) encodeAtmData(txID ids.ID) ([]byte, error) {
+func encodeAtmData(c codec.Manager, txID ids.ID) ([]byte, error) {
 	am := &AppMsg{
 		MsgType: atmDataType,
 		Bytes:   txID[:],
 	}
 
-	return vm.codec.Marshal(codecVersion, am)
+	return c.Marshal(codecVersion, am)
 }
 
-func (vm *VM) encodeAtmTx(tx *Tx) ([]byte, error) {
-	am := &AppMsg{
-		MsgType: atmTxType,
-	}
-
-	bytes, err := vm.codec.Marshal(codecVersion, tx)
+func encodeAtmTx(c codec.Manager, tx *Tx) ([]byte, error) {
+	bytes, err := c.Marshal(codecVersion, tx)
 	if err != nil {
 		return nil, err
 	}
 
-	am.Bytes = bytes
-	return vm.codec.Marshal(codecVersion, am)
+	am := &AppMsg{
+		MsgType: atmTxType,
+		Bytes:   bytes,
+	}
+
+	return c.Marshal(codecVersion, am)
 }
 
 type EthData struct {
@@ -54,59 +55,58 @@ type EthData struct {
 	TxNonce   uint64
 }
 
-func (vm *VM) encodeEthData(ethData []EthData) ([]byte, error) {
-	am := &AppMsg{
-		MsgType: ethDataType,
-	}
-
+func encodeEthData(c codec.Manager, ethData []EthData) ([]byte, error) {
 	bytes, err := rlp.EncodeToBytes(ethData)
 	if err != nil {
 		return nil, err
 	}
 
-	am.Bytes = bytes
-	return vm.codec.Marshal(codecVersion, am)
-}
-
-func (vm *VM) encodeEthTxs(ethTxs []*types.Transaction) ([]byte, error) {
 	am := &AppMsg{
-		MsgType: ethTxsType,
+		MsgType: ethDataType,
+		Bytes:   bytes,
 	}
 
+	return c.Marshal(codecVersion, am)
+}
+
+func encodeEthTxs(c codec.Manager, ethTxs []*types.Transaction) ([]byte, error) {
 	bytes, err := rlp.EncodeToBytes(ethTxs)
 	if err != nil {
 		return nil, err
 	}
 
-	am.Bytes = bytes
-	return vm.codec.Marshal(codecVersion, am)
+	am := &AppMsg{
+		MsgType: ethTxsType,
+		Bytes:   bytes,
+	}
+
+	return c.Marshal(codecVersion, am)
 }
 
-func (vm *VM) decodeToAppMsg(bytes []byte) (*AppMsg, error) {
+func decodeToAppMsg(c codec.Manager, bytes []byte) (*AppMsg, error) {
 	appMsg := &AppMsg{}
-	if _, err := vm.codec.Unmarshal(bytes, appMsg); err != nil {
+	if _, err := c.Unmarshal(bytes, appMsg); err != nil {
 		log.Debug(fmt.Sprintf("could not decode AppRequest msg, error %v", err))
 		return nil, fmt.Errorf("could not decode AppRequest msg")
 	}
 
 	switch appMsg.MsgType {
 	case atmDataType:
-		if len(appMsg.Bytes) != 32 {
-			log.Debug("TxID bytes cannot be decoded into txID")
+		txID, err := ids.ToID(appMsg.Bytes)
+		if err != nil {
+			log.Debug(fmt.Sprintf("TxID bytes cannot be decoded into txID, error %s", err))
 			return nil, fmt.Errorf("bad atomicTxID AppMsg")
 		}
-		txID := ids.ID{}
-		copy(txID[:], appMsg.Bytes)
 		appMsg.appGossipObj = txID
 		return appMsg, nil
 
 	case atmTxType:
 		tx := &Tx{}
-		if _, err := vm.codec.Unmarshal(appMsg.Bytes, tx); err != nil {
+		if _, err := c.Unmarshal(appMsg.Bytes, tx); err != nil {
 			log.Debug(fmt.Sprintf("could not decode atomic tx, error %v", err))
 			return nil, err
 		}
-		unsignedBytes, err := vm.codec.Marshal(codecVersion, &tx.UnsignedAtomicTx)
+		unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedAtomicTx)
 		if err != nil {
 			log.Debug(fmt.Sprintf("could not decode unsigned atomic tx, error %v", err))
 			return nil, err
