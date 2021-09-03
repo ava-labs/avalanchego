@@ -88,3 +88,16 @@ func TestBuildHeader(t *testing.T) {
 	assert.Equal(parentID, builtHeader.ParentID())
 	assert.Equal(bodyID, builtHeader.BodyID())
 }
+
+func TestBuildOption(t *testing.T) {
+	assert := assert.New(t)
+
+	parentID := ids.ID{1}
+	innerBlockBytes := []byte{3}
+
+	builtOption, err := BuildOption(parentID, innerBlockBytes)
+	assert.NoError(err)
+
+	assert.Equal(parentID, builtOption.ParentID())
+	assert.Equal(innerBlockBytes, builtOption.Block())
+}

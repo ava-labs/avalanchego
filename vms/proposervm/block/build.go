@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 func BuildUnsigned(
@@ -18,8 +19,8 @@ func BuildUnsigned(
 	timestamp time.Time,
 	pChainHeight uint64,
 	blockBytes []byte,
-) (Block, error) {
-	block := statelessBlock{
+) (SignedBlock, error) {
+	var block SignedBlock = &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -34,10 +35,7 @@ func BuildUnsigned(
 	if err != nil {
 		return nil, err
 	}
-	block.bytes = bytes
-
-	block.id = hashing.ComputeHash256Array(bytes)
-	return &block, nil
+	return block, block.initialize(bytes)
 }
 
 func Build(
@@ -48,8 +46,8 @@ func Build(
 	blockBytes []byte,
 	chainID ids.ID,
 	key crypto.Signer,
-) (Block, error) {
-	block := statelessBlock{
+) (SignedBlock, error) {
+	block := &statelessBlock{
 		StatelessBlock: statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -61,14 +59,16 @@ func Build(
 		cert:      cert,
 		proposer:  hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw)),
 	}
+	var blockIntf SignedBlock = block
 
-	unsignedBytes, err := c.Marshal(version, &block.StatelessBlock)
+	unsignedBytes, err := c.Marshal(version, &blockIntf)
 	if err != nil {
 		return nil, err
 	}
+	unsignedBytes = unsignedBytes[:len(unsignedBytes)-wrappers.IntLen]
+	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	unsignedHash := hashing.ComputeHash256Array(unsignedBytes)
-	header, err := BuildHeader(chainID, parentID, unsignedHash)
+	header, err := BuildHeader(chainID, parentID, block.id)
 	if err != nil {
 		return nil, err
 	}
@@ -79,13 +79,8 @@ func Build(
 		return nil, err
 	}
 
-	block.bytes, err = c.Marshal(version, &block)
-	if err != nil {
-		return nil, err
-	}
-
-	block.id = hashing.ComputeHash256Array(block.bytes)
-	return &block, nil
+	block.bytes, err = c.Marshal(version, &blockIntf)
+	return block, err
 }
 
 func BuildHeader(
@@ -102,4 +97,23 @@ func BuildHeader(
 	bytes, err := c.Marshal(version, &header)
 	header.bytes = bytes
 	return &header, err
+}
+
+// BuildOption the option block
+// [parentID] is the ID of this option's wrapper parent block
+// [innerBytes] is the byte representation of a child option block
+func BuildOption(
+	parentID ids.ID,
+	innerBytes []byte,
+) (Block, error) {
+	var block Block = &option{
+		PrntID:     parentID,
+		InnerBytes: innerBytes,
+	}
+
+	bytes, err := c.Marshal(version, &block)
+	if err != nil {
+		return nil, err
+	}
+	return block, block.initialize(bytes)
 }

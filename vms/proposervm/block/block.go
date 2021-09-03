@@ -10,20 +10,26 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 var errUnexpectedSignature = errors.New("expected no signature but one was provided")
 
 type Block interface {
 	ID() ids.ID
-
 	ParentID() ids.ID
+	Block() []byte
+	Bytes() []byte
+
+	initialize(bytes []byte) error
+}
+
+type SignedBlock interface {
+	Block
+
 	PChainHeight() uint64
 	Timestamp() time.Time
-	Block() []byte
 	Proposer() ids.ShortID
-
-	Bytes() []byte
 
 	Verify(chainID ids.ID) error
 }
@@ -47,17 +53,33 @@ type statelessBlock struct {
 	bytes     []byte
 }
 
-func (b *statelessBlock) ID() ids.ID           { return b.id }
-func (b *statelessBlock) ParentID() ids.ID     { return b.StatelessBlock.ParentID }
-func (b *statelessBlock) PChainHeight() uint64 { return b.StatelessBlock.PChainHeight }
-func (b *statelessBlock) Timestamp() time.Time { return b.timestamp }
+func (b *statelessBlock) ID() ids.ID       { return b.id }
+func (b *statelessBlock) ParentID() ids.ID { return b.StatelessBlock.ParentID }
+func (b *statelessBlock) Block() []byte    { return b.StatelessBlock.Block }
+func (b *statelessBlock) Bytes() []byte    { return b.bytes }
 
-// Block returns the byte representation of inner block
-func (b *statelessBlock) Block() []byte         { return b.StatelessBlock.Block }
+func (b *statelessBlock) initialize(bytes []byte) error {
+	b.bytes = bytes
+	unsignedBytes := bytes[:len(bytes)-wrappers.IntLen-len(b.Signature)]
+	b.id = hashing.ComputeHash256Array(unsignedBytes)
+
+	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
+	if len(b.StatelessBlock.Certificate) == 0 {
+		return nil
+	}
+
+	cert, err := x509.ParseCertificate(b.StatelessBlock.Certificate)
+	if err != nil {
+		return err
+	}
+	b.cert = cert
+	b.proposer = hashing.ComputeHash160Array(hashing.ComputeHash256(cert.Raw))
+	return nil
+}
+
+func (b *statelessBlock) PChainHeight() uint64  { return b.StatelessBlock.PChainHeight }
+func (b *statelessBlock) Timestamp() time.Time  { return b.timestamp }
 func (b *statelessBlock) Proposer() ids.ShortID { return b.proposer }
-
-// Bytes returns the byte representation of the whole wrapped block
-func (b *statelessBlock) Bytes() []byte { return b.bytes }
 
 func (b *statelessBlock) Verify(chainID ids.ID) error {
 	if b.cert == nil {
@@ -67,13 +89,7 @@ func (b *statelessBlock) Verify(chainID ids.ID) error {
 		return nil
 	}
 
-	unsignedBytes, err := c.Marshal(version, &b.StatelessBlock)
-	if err != nil {
-		return err
-	}
-
-	unsignedHash := hashing.ComputeHash256Array(unsignedBytes)
-	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, unsignedHash)
+	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)
 	if err != nil {
 		return err
 	}
