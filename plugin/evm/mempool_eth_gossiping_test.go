@@ -163,18 +163,30 @@ func TestMempool_EthTxs_AddedTxesNotGossipedBeforeActivation(t *testing.T) {
 }
 
 func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
-	vm := &VM{
-		codec: Codec,
-	}
-
+	_, vm, _, _, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 	key, _ := crypto.GenerateKey()
 	ethTxs := getEThValidTxs(key)
-	ethHashes := make([]common.Hash, len(ethTxs))
+	ethData := make([]EthData, len(ethTxs))
+
 	for idx, ethTx := range ethTxs {
-		ethHashes[idx] = ethTx.Hash()
+		TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
+		if err != nil {
+			t.Fatal("Could not retrieve address from eth tx")
+		}
+
+		ethData[idx] = EthData{
+			TxHash:    ethTx.Hash(),
+			TxAddress: TxAddress,
+			TxNonce:   ethTx.Nonce(),
+		}
 	}
 
-	bytes, err := vm.encodeEthHashes(ethHashes)
+	bytes, err := vm.encodeEthData(ethData)
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
@@ -182,19 +194,19 @@ func TestMempool_EthTxs_EncodeDecodeBytes(t *testing.T) {
 	appMsg, err := vm.decodeToAppMsg(bytes)
 	if err != nil {
 		t.Fatal("Could not decode eth tx hashes")
-	} else if appMsg.MsgType != ethHashesType {
+	} else if appMsg.MsgType != ethDataType {
 		t.Fatal("decided wrong app message")
 	}
-	hashList := appMsg.appGossipObj.([]common.Hash)
+	dataList := appMsg.appGossipObj.([]EthData)
 
-	if len(hashList) != 2 {
+	if len(dataList) != 2 {
 		t.Fatal("decoded hashes list has unexpected length")
 	}
 
-	if ethTxs[0].Hash() != hashList[0] {
+	if ethTxs[0].Hash() != dataList[0].TxHash {
 		t.Fatal("first decoded hash is unexpected")
 	}
-	if ethTxs[1].Hash() != hashList[1] {
+	if ethTxs[1].Hash() != dataList[1].TxHash {
 		t.Fatal("second decoded hash is unexpected")
 	}
 }
@@ -236,9 +248,18 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 
 	// prepare a couple of txes
 	ethTx := getEThValidTxs(key)[0]
+	TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
+	if err != nil {
+		t.Fatal("could not retrieve tx address")
+	}
 
 	// show that unknown coreth hashes is requested
-	unknownEthTxsBytes, err := vm.encodeEthHashes([]common.Hash{ethTx.Hash()})
+	ethData := EthData{
+		TxHash:    ethTx.Hash(),
+		TxAddress: TxAddress,
+		TxNonce:   ethTx.Nonce(),
+	}
+	unknownEthTxsBytes, err := vm.encodeEthData([]EthData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
@@ -259,7 +280,7 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	knownEthTxsBytes, err := vm.encodeEthHashes([]common.Hash{ethTx.Hash()})
+	knownEthTxsBytes, err := vm.encodeEthData([]EthData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
@@ -380,7 +401,17 @@ func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 	ethTx := getEThValidTxs(key)[0]
 
-	ethHashBytes, err := vm.encodeEthHashes([]common.Hash{ethTx.Hash()})
+	TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
+	if err != nil {
+		t.Fatal("could not retrieve tx address")
+	}
+	ethData := EthData{
+		TxHash:    ethTx.Hash(),
+		TxAddress: TxAddress,
+		TxNonce:   ethTx.Nonce(),
+	}
+
+	ethHashBytes, err := vm.encodeEthData([]EthData{ethData})
 	if err != nil {
 		t.Fatal("Could not encode eth tx hashes")
 	}
