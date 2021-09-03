@@ -39,7 +39,7 @@ func (b *postForkOption) Accept() error {
 	}
 
 	// Persist this block and its status
-	if err := b.vm.storePostForkBlock(b.Block, b.status); err != nil {
+	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
@@ -58,7 +58,7 @@ func (b *postForkOption) Reject() error {
 	b.status = choices.Rejected
 
 	// Persist this block and its status
-	if err := b.vm.storePostForkBlock(b.Block, b.status); err != nil {
+	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
@@ -189,7 +189,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork option %s - parent timestamp %v, block timestamp %v.",
 		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
-	return child, b.vm.storePostForkBlock(child.SignedBlock, child.status)
+	return child, b.vm.storePostForkBlock(child)
 }
 
 // This block's P-Chain height is its parent's P-Chain height
@@ -199,4 +199,12 @@ func (b *postForkOption) pChainHeight() (uint64, error) {
 		return 0, err
 	}
 	return parent.pChainHeight()
+}
+
+func (b *postForkOption) setStatus(status choices.Status) {
+	b.status = status
+}
+
+func (b *postForkOption) getStatelessBlk() block.Block {
+	return b.Block
 }

@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -48,7 +47,7 @@ type VM struct {
 	// Block ID --> Block
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
-	verifiedBlocks map[ids.ID]Block
+	verifiedBlocks map[ids.ID]PostForkBlock
 	preferred      ids.ID
 }
 
@@ -85,7 +84,7 @@ func (vm *VM) Initialize(
 		scheduler.Dispatch(time.Now())
 	})
 
-	vm.verifiedBlocks = make(map[ids.ID]Block)
+	vm.verifiedBlocks = make(map[ids.ID]PostForkBlock)
 
 	err := vm.ChainVM.Initialize(
 		ctx,
@@ -115,41 +114,45 @@ func (vm *VM) repairAcceptedChain() error {
 		return err
 	}
 
-	var toAccept []snowman.Block
+	// Revert accepted blocks that weren't committed to the database.
 	for {
-		// We fetch the proposervm blocks rather than relying on the underlying
-		// VM blocks to ensure that we don't run into the case that the
-		// proposervm has accepted a block where the underlying vm doesn't have
-		// a reference to the inner block.
 		lastAccepted, err := vm.getPostForkBlock(lastAcceptedID)
+		if err == database.ErrNotFound {
+			// If the post fork block can't be found, it's because we're
+			// reverting past the fork boundary. If this is the case, then there
+			// is only one database to keep consistent, so there is nothing to
+			// repair anymore.
+			if err := vm.State.DeleteLastAccepted(); err != nil {
+				return err
+			}
+			return vm.db.Commit()
+		}
 		if err != nil {
 			return err
 		}
 
 		shouldBeAccepted := lastAccepted.getInnerBlk()
 
-		// If the inner block is accepted, then we shouldn't need to accept any
-		// of its parents.
+		// If the inner block is accepted, then we don't need to revert any more
+		// blocks.
 		if shouldBeAccepted.Status() == choices.Accepted {
-			break
+			return vm.db.Commit()
 		}
-		toAccept = append(toAccept, shouldBeAccepted)
-		lastAcceptedID = lastAccepted.Parent()
-	}
 
-	for i := len(toAccept) - 1; i >= 0; i-- {
-		innerBlock := toAccept[i]
-		if err := innerBlock.Verify(); err != nil {
-			return fmt.Errorf("repairing failed due to failed verification with: %w", err)
+		// Advance to the parent block
+		lastAcceptedID = lastAccepted.Parent()
+
+		lastAccepted.setStatus(choices.Processing)
+		if err := vm.State.SetLastAccepted(lastAcceptedID); err != nil {
+			return err
 		}
-		if err := innerBlock.Accept(); err != nil {
-			return fmt.Errorf("repairing failed due to failed acceptance with: %w", err)
+		if err := vm.State.PutBlock(lastAccepted.getStatelessBlk(), choices.Processing); err != nil {
+			return err
 		}
 	}
-	return nil
 }
 
-func (vm *VM) verifyAndRecordInnerBlk(postFork Block) error {
+func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 	// If inner block's Verify returned true, don't call it again.
 	// Note that if [postFork.getInnerBlk().Verify] returns nil,
 	// this method returns nil. This must always remain the case to
@@ -245,7 +248,7 @@ func (vm *VM) getBlock(id ids.ID) (Block, error) {
 	return vm.getPreForkBlock(id)
 }
 
-func (vm *VM) getPostForkBlock(blkID ids.ID) (Block, error) {
+func (vm *VM) getPostForkBlock(blkID ids.ID) (PostForkBlock, error) {
 	block, exists := vm.verifiedBlocks[blkID]
 	if exists {
 		return block, nil
@@ -290,7 +293,7 @@ func (vm *VM) getPreForkBlock(blkID ids.ID) (*preForkBlock, error) {
 	}, err
 }
 
-func (vm *VM) parsePostForkBlock(b []byte) (Block, error) {
+func (vm *VM) parsePostForkBlock(b []byte) (PostForkBlock, error) {
 	statelessBlock, err := statelessblock.Parse(b)
 	if err != nil {
 		return nil, err
@@ -331,7 +334,7 @@ func (vm *VM) parsePostForkBlock(b []byte) (Block, error) {
 			},
 		}
 	}
-	return blk, vm.storePostForkBlock(statelessBlock, choices.Processing)
+	return blk, vm.storePostForkBlock(blk)
 }
 
 func (vm *VM) parsePreForkBlock(b []byte) (*preForkBlock, error) {
@@ -342,8 +345,8 @@ func (vm *VM) parsePreForkBlock(b []byte) (*preForkBlock, error) {
 	}, err
 }
 
-func (vm *VM) storePostForkBlock(blk statelessblock.Block, status choices.Status) error {
-	if err := vm.State.PutBlock(blk, status); err != nil {
+func (vm *VM) storePostForkBlock(blk PostForkBlock) error {
+	if err := vm.State.PutBlock(blk.getStatelessBlk(), blk.Status()); err != nil {
 		return err
 	}
 	return vm.db.Commit()

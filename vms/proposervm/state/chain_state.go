@@ -20,6 +20,7 @@ var (
 
 type ChainState interface {
 	SetLastAccepted(blkID ids.ID) error
+	DeleteLastAccepted() error
 	GetLastAccepted() (ids.ID, error)
 	WipeCache() // useful for UTs
 }
@@ -45,6 +46,11 @@ func (s *chainState) SetLastAccepted(blkID ids.ID) error {
 	return s.db.Put(lastAcceptedKey, blkID[:])
 }
 
+func (s *chainState) DeleteLastAccepted() error {
+	s.lastAccepted = ids.Empty
+	return s.db.Delete(lastAcceptedKey)
+}
+
 func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	if s.lastAccepted != ids.Empty {
 		return s.lastAccepted, nil
@@ -53,5 +59,10 @@ func (s *chainState) GetLastAccepted() (ids.ID, error) {
 	if err != nil {
 		return ids.ID{}, err
 	}
-	return ids.ToID(lastAcceptedBytes)
+	lastAccepted, err := ids.ToID(lastAcceptedBytes)
+	if err != nil {
+		return ids.ID{}, err
+	}
+	s.lastAccepted = lastAccepted
+	return lastAccepted, nil
 }

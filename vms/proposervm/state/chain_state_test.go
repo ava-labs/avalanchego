@@ -40,4 +40,10 @@ func TestChainState(t *testing.T) {
 	fetchedLastAccepted, err = cs.GetLastAccepted()
 	assert.NoError(err)
 	assert.Equal(lastAccepted, fetchedLastAccepted)
+
+	err = cs.DeleteLastAccepted()
+	assert.NoError(err)
+
+	_, err = cs.GetLastAccepted()
+	assert.Equal(database.ErrNotFound, err)
 }

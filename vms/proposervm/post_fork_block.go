@@ -32,7 +32,7 @@ func (b *postForkBlock) Accept() error {
 		return err
 	}
 	// Persist this block with its status
-	if err := b.vm.storePostForkBlock(b.SignedBlock, b.status); err != nil {
+	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
@@ -50,7 +50,7 @@ func (b *postForkBlock) Reject() error {
 	// may be accepted later
 	b.status = choices.Rejected
 	// Persist this block with its status
-	if err := b.vm.storePostForkBlock(b.SignedBlock, b.status); err != nil {
+	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
@@ -113,7 +113,7 @@ func (b *postForkBlock) Options() ([2]snowman.Block, error) {
 			},
 		}
 		// Persist the wrapped child options
-		if err := b.vm.storePostForkBlock(outerOption.Block, outerOption.status); err != nil {
+		if err := b.vm.storePostForkBlock(outerOption); err != nil {
 			return [2]snowman.Block{}, err
 		}
 
@@ -234,9 +234,17 @@ func (b *postForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, block timestamp %v.",
 		child.ID(), parentTimestamp, newTimestamp)
 	// Persist the child
-	return child, b.vm.storePostForkBlock(child.SignedBlock, child.status)
+	return child, b.vm.storePostForkBlock(child)
 }
 
 func (b *postForkBlock) pChainHeight() (uint64, error) {
 	return b.PChainHeight(), nil
+}
+
+func (b *postForkBlock) setStatus(status choices.Status) {
+	b.status = status
+}
+
+func (b *postForkBlock) getStatelessBlk() block.Block {
+	return b.SignedBlock
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
 
@@ -43,6 +44,13 @@ type Block interface {
 	buildChild(innerBlock snowman.Block) (Block, error)
 
 	pChainHeight() (uint64, error)
+}
+
+type PostForkBlock interface {
+	Block
+
+	setStatus(choices.Status)
+	getStatelessBlk() block.Block
 }
 
 // field of postForkBlock and postForkOption

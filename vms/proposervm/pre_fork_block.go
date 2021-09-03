@@ -217,7 +217,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay NA, block timestamp %v.",
 		blk.ID(), parentTimestamp, newTimestamp)
-	return blk, b.vm.storePostForkBlock(blk.SignedBlock, blk.status)
+	return blk, b.vm.storePostForkBlock(blk)
 }
 
 func (b *preForkBlock) pChainHeight() (uint64, error) {
