@@ -170,7 +170,6 @@ func (vm *VM) verifyAndRecordInnerBlk(postFork PostForkBlock) error {
 }
 
 func (vm *VM) BuildBlock() (snowman.Block, error) {
-	vm.ctx.Log.Debug("Snowman++ build - call at time %v", time.Now())
 	preferredBlock, err := vm.getBlock(vm.preferred)
 	if err != nil {
 		return nil, err
@@ -226,10 +225,12 @@ func (vm *VM) SetPreference(preferred ids.ID) error {
 		return nil
 	}
 
-	nextStartTime := blk.Timestamp().Add(minDelay)
-	vm.ctx.Log.Debug("Snowman++ set preference - preferred block ID %s,  timestamp %v; next start time scheduled at %v",
-		blk.ID(), blk.Timestamp(), nextStartTime)
+	preferredTime := blk.Timestamp()
+	nextStartTime := preferredTime.Add(minDelay)
 	vm.Scheduler.SetStartTime(nextStartTime)
+
+	vm.ctx.Log.Debug("set preference to %s with timestamp %v; build time scheduled at %v",
+		blk.ID(), preferredTime, nextStartTime)
 	return nil
 }
 
