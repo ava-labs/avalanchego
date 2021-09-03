@@ -128,7 +128,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 			// Note: roll/rollupWindow must be greater than 1 since we've checked that roll > rollupWindow
 			baseFeeDelta = baseFeeDelta.Mul(baseFeeDelta, new(big.Int).SetUint64(roll/rollupWindow))
 		}
-		baseFee = baseFee.Sub(baseFee, baseFeeDelta)
+		baseFee.Sub(baseFee, baseFeeDelta)
 	}
 
 	switch {
