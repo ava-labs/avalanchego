@@ -15,6 +15,7 @@ import (
 
 var (
 	errExpectedNoProposer = errors.New("expected no proposer to be named")
+	errPChainHeightTooLow = errors.New("block P-chain height is too low")
 
 	_ Block = &preForkBlock{}
 )
@@ -98,6 +99,11 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 			currentPChainHeight, childPChainHeight)
 		return errPChainHeightNotReached
 	}
+	if childPChainHeight < b.vm.minimumPChainHeight {
+		b.vm.ctx.Log.Warn("Snowman++ verify - dropped post-fork block; expected chid's P-Chain height to be >=%d but got %d",
+			b.vm.minimumPChainHeight, childPChainHeight)
+		return errPChainHeightTooLow
+	}
 
 	// Make sure [b] is the parent of [child]'s inner block
 	expectedInnerParentID := b.ID()
@@ -132,13 +138,13 @@ func (b *preForkBlock) verifyPostForkChild(child *postForkBlock) error {
 		return errTimeTooAdvanced
 	}
 
-	proposer := child.Block.Proposer()
+	proposer := child.SignedBlock.Proposer()
 	if proposer != ids.ShortEmpty {
 		return errExpectedNoProposer
 	}
 
 	// Verify the lack of signature on the node
-	if err := child.Block.Verify(b.vm.ctx.ChainID); err != nil {
+	if err := child.SignedBlock.Verify(b.vm.ctx.ChainID); err != nil {
 		return err
 	}
 
@@ -201,7 +207,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 	}
 
 	blk := &postForkBlock{
-		Block: statelessBlock,
+		SignedBlock: statelessBlock,
 		postForkCommonComponents: postForkCommonComponents{
 			vm:       b.vm,
 			innerBlk: innerBlock,
@@ -211,7 +217,7 @@ func (b *preForkBlock) buildChild(innerBlock snowman.Block) (Block, error) {
 
 	b.vm.ctx.Log.Debug("Snowman++ build post-fork block %s - parent timestamp %v, expected delay NA, block timestamp %v.",
 		blk.ID(), parentTimestamp, newTimestamp)
-	return blk, b.vm.storePostForkBlock(blk)
+	return blk, b.vm.storePostForkBlock(blk.SignedBlock, blk.status)
 }
 
 func (b *preForkBlock) pChainHeight() (uint64, error) {

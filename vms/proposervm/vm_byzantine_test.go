@@ -28,7 +28,7 @@ var errUnknownBlock = errors.New("unknown block")
 //     Y
 func TestInvalidByzantineProposerParent(t *testing.T) {
 	forkTime := time.Unix(0, 0) // enable ProBlks
-	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime)
+	coreVM, _, proVM, gBlock := initTestProposerVM(t, forkTime, 0)
 
 	xBlock := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
@@ -89,7 +89,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 }
 
 func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
-	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{})
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
 	// create post fork oracle block ...
