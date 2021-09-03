@@ -156,8 +156,7 @@ func (b *postForkOption) buildChild(innerBlock snowman.Block) (Block, error) {
 			return nil, err
 		}
 
-		minTimestamp := parentTimestamp.Add(minDelay)
-		if newTimestamp.Before(minTimestamp) {
+		if delay < minDelay {
 			// It's not our turn to propose a block yet
 			b.vm.ctx.Log.Warn("Snowman++ build post-fork option - dropped option; parent timestamp %s, expected delay %s, block timestamp %s.",
 				parentTimestamp, minDelay, newTimestamp)
