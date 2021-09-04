@@ -174,11 +174,11 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 
 		txID := tx.ID()
 		m.vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		txIDBytes, err := Codec.Marshal(codecVersion, txID)
+		msgAppBytes, err := encodeTxID(m.vm.codec, txID)
 		if err != nil {
 			return err
 		}
-		return m.vm.appSender.SendAppGossip(txIDBytes)
+		return m.vm.appSender.SendAppGossip(msgAppBytes)
 	case errAttemptReRegisterTx:
 		return nil // backward compatibility
 	default:
