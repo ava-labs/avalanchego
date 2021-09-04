@@ -71,7 +71,6 @@ waitloop:
 		// At this point, we know [timer.C] has been drained so it's
 		// safe to call [timer.Reset] below
 		for {
-			gotNewBuildBlockTime := false
 			select {
 			case msg := <-s.fromVM:
 				// Give the engine the message from the VM asking the engine to build a block
@@ -88,9 +87,6 @@ waitloop:
 					// s.Close() was called
 					return
 				}
-				gotNewBuildBlockTime = true
-			}
-			if gotNewBuildBlockTime {
 				timer.Reset(time.Until(buildBlockTime))
 				continue waitloop
 			}
