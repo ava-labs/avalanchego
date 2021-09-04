@@ -71,6 +71,7 @@ waitloop:
 		// At this point, we know [timer.C] has been drained so it's
 		// safe to call [timer.Reset] below
 		for {
+			gotNewBuildBlockTime := false
 			select {
 			case msg := <-s.fromVM:
 				// Give the engine the message from the VM asking the engine to build a block
@@ -80,14 +81,16 @@ waitloop:
 					// If the channel to the engine is full, drop the message from the VM to avoid deadlock
 					s.log.Debug("dropping message from VM because channel to engine is full")
 				}
-				timer.Reset(time.Until(buildBlockTime))
-			case buildBlockTime, ok := <-s.newBuildBlockTime:
+			case buildBlockTime, ok = <-s.newBuildBlockTime:
 				// The time at which we should notify the engine that
 				// it should try to build a block has changed
 				if !ok {
 					// s.Close() was called
 					return
 				}
+				gotNewBuildBlockTime = true
+			}
+			if gotNewBuildBlockTime {
 				timer.Reset(time.Until(buildBlockTime))
 				continue waitloop
 			}
