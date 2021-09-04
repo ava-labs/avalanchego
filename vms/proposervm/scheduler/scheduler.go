@@ -68,8 +68,6 @@ waitloop:
 			continue waitloop
 		}
 
-		// At this point, we know [timer.C] has been drained so it's
-		// safe to call [timer.Reset] below
 		for {
 			select {
 			case msg := <-s.fromVM:
@@ -87,6 +85,8 @@ waitloop:
 					// s.Close() was called
 					return
 				}
+				// We know [timer.C] was drained in the first select
+				// statement so its safe to call [timer.Reset]
 				timer.Reset(time.Until(buildBlockTime))
 				continue waitloop
 			}
