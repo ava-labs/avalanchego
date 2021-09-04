@@ -32,6 +32,12 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
+func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(
+	ctx ProposalSyntacticVerificationContext,
+) error {
+	return nil
+}
+
 // SemanticVerify this transaction is valid.
 func (tx *UnsignedAdvanceTimeTx) SemanticVerify(
 	vm *VM,

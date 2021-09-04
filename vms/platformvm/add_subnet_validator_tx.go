@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -51,13 +49,8 @@ func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
 }
 
 // Verify return nil iff [tx] is valid
-func (tx *UnsignedAddSubnetValidatorTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
-	minStakeDuration time.Duration,
-	maxStakeDuration time.Duration,
+func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(
+	synCtx ProposalSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
@@ -68,13 +61,13 @@ func (tx *UnsignedAddSubnetValidatorTx) Verify(
 
 	duration := tx.Validator.Duration()
 	switch {
-	case duration < minStakeDuration: // Ensure staking length is not too short
+	case duration < synCtx.minStakeDuration: // Ensure staking length is not too short
 		return errStakeTooShort
-	case duration > maxStakeDuration: // Ensure staking length is not too long
+	case duration > synCtx.maxStakeDuration: // Ensure staking length is not too long
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.SubnetAuth); err != nil {
@@ -98,14 +91,15 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	if err := tx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.TxFee,
-		vm.ctx.AVAXAssetID,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-	); err != nil {
+	synCtx := ProposalSyntacticVerificationContext{
+		ctx:              vm.ctx,
+		c:                vm.codec,
+		feeAmount:        vm.TxFee,
+		feeAssetID:       vm.ctx.AVAXAssetID,
+		minStakeDuration: vm.MinStakeDuration,
+		maxStakeDuration: vm.MaxStakeDuration,
+	}
+	if err := tx.SyntacticVerify(synCtx); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
@@ -309,12 +303,14 @@ func (vm *VM) newAddSubnetValidatorTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(
-		vm.ctx,
-		vm.codec,
-		vm.TxFee,
-		vm.ctx.AVAXAssetID,
-		vm.MinStakeDuration,
-		vm.MaxStakeDuration,
-	)
+
+	synCtx := ProposalSyntacticVerificationContext{
+		ctx:              vm.ctx,
+		c:                vm.codec,
+		feeAmount:        vm.TxFee,
+		feeAssetID:       vm.ctx.AVAXAssetID,
+		minStakeDuration: vm.MinStakeDuration,
+		maxStakeDuration: vm.MaxStakeDuration,
+	}
+	return tx, utx.SyntacticVerify(synCtx)
 }

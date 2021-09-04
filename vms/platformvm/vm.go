@@ -93,10 +93,16 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	mempool              Mempool
+	mempool Mempool
+
+	// gossip related attributes
 	gossipActivationTime time.Time
 	appSender            common.AppSender
 	request.Handler
+
+	// requestMaps allow checking that solicited content matched the requested one
+	// They are populated upon sending an AppRequest and cleaned up upon AppResponse (also failed ones)
+	requestsContent map[ /*requestID*/ uint32]ids.ID
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -185,6 +191,7 @@ func (vm *VM) Initialize(
 	vm.gossipActivationTime = timer.MaxTime // TODO: setup upon deploy
 	vm.appSender = appSender
 	vm.Handler = request.NewHandler()
+	vm.requestsContent = make(map[uint32]ids.ID)
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
 	if err != nil {
@@ -414,7 +421,6 @@ func (vm *VM) Version() (string, error) {
 	return version.Current.String(), nil
 }
 
-// AppRequestFailed this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 	vm.ctx.Log.Verbo("called AppRequestFailed")
 
@@ -422,186 +428,232 @@ func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
 		vm.ctx.Log.Verbo("called AppRequestFailed before activation time. Doing nothing")
 		return nil
 	}
-	vm.ctx.Log.Warn("Failed AppRequest to node %v, reqID %v", nodeID, requestID)
+
+	delete(vm.requestsContent, requestID)
+
+	vm.ctx.Log.Warn("AppRequestFailed to node %s, reqID %d", nodeID, requestID)
 	return nil
 }
 
-// AppRequest this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	// Note: errors returned by AppRequest are treated as fatal. Currently there is hardly a reason
+	// for a failed AppRequest handling to cause a node shutdown.
 	vm.ctx.Log.Verbo("called AppRequest")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		vm.ctx.Log.Verbo("called AppRequest before activation time. Doing nothing")
+		vm.ctx.Log.Verbo("AppRequest: called before activation time, doing nothing")
 		return nil
 	}
 
-	// decode single id
-	txID := ids.ID{}
-	_, err := Codec.Unmarshal(request, &txID) // TODO: cleanup way we serialize this
+	am, err := decodeToAppMsg(vm.codec, request)
 	if err != nil {
-		vm.ctx.Log.Debug("AppRequest: failed unmarshalling request from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
-		return err
-	}
-	vm.ctx.Log.Debug("called AppRequest with txID %v", txID)
-
-	if !vm.mempool.has(txID) {
+		vm.ctx.Log.Debug(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d. Error %s",
+			nodeID, requestID, err))
 		return nil
 	}
-	// Note: rejected tx do not need to be explicitly handled,
-	// since they are not added to mempool
 
-	// fetch tx
-	resTx, ok := vm.mempool.unissuedTxs[txID]
-	if !ok {
-		return fmt.Errorf("incoherent mempool. Could not find registered tx")
+	switch am.ContentType {
+	case txIDType:
+		vm.ctx.Log.Debug("AppRequest: called with txID %s", am.txID)
+
+		// fetch tx
+		resTx, ok := vm.mempool.unissuedTxs[am.txID]
+		if !ok {
+			vm.ctx.Log.Debug("AppRequest: txID %s not in mempool. Doing nothing", am.txID)
+			return nil
+		}
+
+		// send response
+		response, err := encodeTx(vm.codec, resTx)
+		if err != nil {
+			vm.ctx.Log.Warn("AppRequest: failed creating AppResponse carrying atomic tx %s, error %s",
+				am.txID, err)
+			return nil
+		}
+
+		if err := vm.appSender.SendAppResponse(nodeID, requestID, response); err != nil {
+			return fmt.Errorf("AppRequest: failed sending AppResponse with error %s", err)
+		}
+
+		return nil
+	default:
+		vm.ctx.Log.Warn(fmt.Sprintf("AppRequest: unexpected appMsgType %v. Doing nothing", am.ContentType))
+		return nil
 	}
-
-	// send response
-	response, err := Codec.Marshal(codecVersion, *resTx)
-	if err != nil {
-		return err
-	}
-
-	return vm.appSender.SendAppResponse(nodeID, requestID, response)
 }
 
-// AppResponse this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	vm.ctx.Log.Verbo("called AppResponse")
+	// Note: errors returned by AppResponse are treated as fatal. Currently there is hardly a reason
+	// for a failed AppResponse handling to cause a node shutdown.
+	vm.ctx.Log.Verbo("AppResponse: called")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		vm.ctx.Log.Verbo("called AppResponse before activation time. Doing nothing")
+		vm.ctx.Log.Verbo("AppResponse: called before activation time. Doing nothing")
 		return nil
 	}
 
 	// check requestID
 	if err := vm.ReclaimID(requestID); err != nil {
-		vm.ctx.Log.Debug("Received an Out-of-Sync AppRequest - nodeID: %v - requestID: %v",
+		vm.ctx.Log.Debug("AppRequest: out-of-Sync AppRequest - nodeID: %v - requestID: %d",
 			nodeID, requestID)
 		return nil
 	}
 
-	// decode single tx
-	tx := &Tx{}
-	_, err := Codec.Unmarshal(response, tx) // TODO: cleanup way we serialize this
+	// decode response
+	am, err := decodeToAppMsg(vm.codec, response)
 	if err != nil {
-		vm.ctx.Log.Debug("AppResponse: failed unmarshalling response from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
-		return err
-	}
-	unsignedBytes, err := Codec.Marshal(codecVersion, &tx.UnsignedTx)
-	if err != nil {
-		vm.ctx.Log.Debug("AppResponse: failed unmarshalling unsignedTx from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
-		return err
-	}
-	tx.Initialize(unsignedBytes, response)
-	vm.ctx.Log.Debug("called AppResponse with txID %v", tx.ID())
-
-	// Note: we currently do not check whether nodes send us exactly the tx matching
-	// the txID we asked for. At least we should check we do not receive total garbage
-	switch {
-	case vm.mempool.has(tx.ID()):
-		return nil
-	case vm.mempool.isAlreadyRejected(tx.ID()):
+		vm.ctx.Log.Warn(fmt.Sprintf("AppResponse: failed unmarshalling response from Node %v, reqID %d",
+			nodeID, requestID))
 		return nil
 	}
 
-	// validate tx
-	switch typedTx := tx.UnsignedTx.(type) {
-	case UnsignedDecisionTx:
-		// syntacticCtx := transactions.DecisionTxSyntacticVerificationContext{
-		// 	Ctx:        vm.ctx,
-		// 	C:          Codec,
-		// 	FeeAmount:  vm.TxFee, // TODO: check/fix usage of TxFee below.
-		// 	FeeAssetID: vm.ctx.AVAXAssetID,
-		// }
-		// if err := typedTx.SyntacticVerify(syntacticCtx); err != nil {
-		// 	vm.ctx.Log.Warn("AppResponse: UnsignedDecisionTx %v is syntactically invalid, err %v. Rejecting it.",
-		// 		tx.ID(), err)
-		// 	return vm.mempool.markReject(tx)
-		// }
-	case UnsignedProposalTx:
-		// syntacticCtx := transactions.ProposalTxSyntacticVerificationContext{
-		// 	Ctx:               vm.ctx,
-		// 	C:                 Codec,
-		// 	MinDelegatorStake: vm.MinDelegatorStake,
-		// 	MinStakeDuration:  vm.MinStakeDuration,
-		// 	MaxStakeDuration:  vm.MaxStakeDuration,
-		// }
-		// if err := typedTx.SyntacticVerify(syntacticCtx); err != nil {
-		// 	vm.ctx.Log.Warn("AppResponse: UnsignedProposalTx %v is syntactically invalid, err %v. Rejecting it.",
-		// 		tx.ID(), err)
-		// 	return vm.mempool.markReject(tx)
-		// }
-	case UnsignedAtomicTx:
-		if err := typedTx.SyntacticVerify(
-			vm.ctx.XChainID,
-			vm.ctx,
-			Codec,
-			vm.TxFee,
-			vm.ctx.AVAXAssetID,
-		); err != nil {
-			vm.ctx.Log.Warn("AppResponse: UnsignedAtomicTx %v is syntactically invalid, err %v. Rejecting it.",
-				tx.ID(), err)
-			return vm.mempool.markReject(tx)
+	switch am.ContentType {
+	case txType:
+		tx := am.tx
+		vm.ctx.Log.Debug(fmt.Sprintf("AppResponse: received txID %s", tx.ID()))
+
+		// check that content matched with what previously requested
+		expectedTxID, ok := vm.requestsContent[requestID]
+		if !ok {
+			vm.ctx.Log.Debug(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
+			return nil
 		}
-	default:
-		return errUnknownTxType
-	}
-
-	// add to mempool and possibly re-gossip
-	switch err := vm.mempool.AddUncheckedTx(tx); err {
-	case nil:
-		txID := tx.ID()
-		vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		txIDBytes, err := Codec.Marshal(codecVersion, txID)
-		if err != nil {
-			return err
+		delete(vm.requestsContent, requestID)
+		if tx.ID() != expectedTxID {
+			vm.ctx.Log.Warn("AppResponse: unrequested transaction ID. Dropping it")
+			return nil
 		}
 
-		return vm.appSender.SendAppGossip(txIDBytes)
-	case errTxExceedingMempoolSize:
-		// tx has not been accepted to mempool due to size
-		// do not gossip since we cannot serve it
-		return nil
+		switch {
+		case vm.mempool.has(tx.ID()):
+			return nil
+		case vm.mempool.isAlreadyRejected(tx.ID()):
+			return nil
+		}
+
+		// validate tx
+		switch typedTx := tx.UnsignedTx.(type) {
+		case UnsignedDecisionTx:
+			synCtx := DecisionSyntacticVerificationContext{
+				ctx:        vm.ctx,
+				c:          Codec,
+				feeAmount:  vm.TxFee,
+				feeAssetID: vm.ctx.AVAXAssetID,
+			}
+			if err := typedTx.SyntacticVerify(synCtx); err != nil {
+				vm.ctx.Log.Warn("AppResponse: UnsignedDecisionTx %v is syntactically invalid, err %v. Rejecting it.",
+					tx.ID(), err)
+				return vm.mempool.markReject(tx)
+			}
+		case UnsignedProposalTx:
+			synCtx := ProposalSyntacticVerificationContext{
+				ctx:               vm.ctx,
+				c:                 vm.codec,
+				minStakeDuration:  vm.MinStakeDuration,
+				maxStakeDuration:  vm.MaxStakeDuration,
+				minStake:          vm.MinValidatorStake,
+				maxStake:          vm.MaxValidatorStake,
+				minDelegationFee:  vm.MinDelegationFee,
+				minDelegatorStake: vm.MinDelegatorStake,
+				feeAmount:         vm.TxFee,
+				feeAssetID:        vm.ctx.AVAXAssetID,
+			}
+			if err := typedTx.SyntacticVerify(synCtx); err != nil {
+				vm.ctx.Log.Warn(
+					"AppResponse: UnsignedProposalTx %v is syntactically invalid, err %v. Rejecting it.",
+					tx.ID(), err)
+				return vm.mempool.markReject(tx)
+			}
+		case UnsignedAtomicTx:
+			synCtx := AtomicSyntacticVerificationContext{
+				ctx:        vm.ctx,
+				c:          vm.codec,
+				avmID:      vm.ctx.XChainID,
+				feeAmount:  vm.TxFee,
+				feeAssetID: vm.ctx.AVAXAssetID,
+			}
+			if err := typedTx.SyntacticVerify(synCtx); err != nil {
+				vm.ctx.Log.Warn(
+					"AppResponse: UnsignedAtomicTx %v is syntactically invalid, err %v. Rejecting it.",
+					tx.ID(), err)
+				return vm.mempool.markReject(tx)
+			}
+		}
+
+		// add to mempool and possibly re-gossip
+		switch err := vm.mempool.AddUncheckedTx(tx); err {
+		case nil:
+			txID := tx.ID()
+			vm.ctx.Log.Debug("Gossiping txID %v", txID)
+			appMsgBytes, err := encodeTxID(vm.codec, txID)
+			if err != nil {
+				vm.ctx.Log.Warn(
+					"AppResponse: Could not encode txID %v, error: %v. Dropping gossiping.",
+					txID, err)
+				return nil
+			}
+
+			return vm.appSender.SendAppGossip(appMsgBytes)
+		case errTxExceedingMempoolSize:
+			// tx has not been accepted to mempool due to size
+			// do not gossip since we cannot serve it
+			return nil
+		default:
+			vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
+				nodeID, requestID, err)
+			_ = vm.mempool.markReject(tx)
+			return nil
+		}
 	default:
-		vm.ctx.Log.Debug("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
-			nodeID, requestID, err)
-		_ = vm.mempool.markReject(tx)
-		return err
+		// txIDType or unknown appMsgTypes are rejected here
+		vm.ctx.Log.Warn("AppResponse: unexpected appMsgType %v. Doing nothing", am.ContentType)
+		return nil
 	}
 }
 
-// AppGossip this VM doesn't (currently) have any app-specific messages
 func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	// Note: errors returned by AppGossip are treated as fatal. Currently there is hardly a reason
+	// for a failed AppGossip handling to cause a node shutdown.
 	vm.ctx.Log.Verbo("called AppGossip")
 
 	if time.Now().Before(vm.gossipActivationTime) {
-		vm.ctx.Log.Verbo("called AppGossip before activation time. Doing nothing")
+		vm.ctx.Log.Verbo("AppGossip: called before activation time. Doing nothing")
 		return nil
 	}
 
-	// decode single id
-	txID := ids.ID{}
-	_, err := Codec.Unmarshal(msg, &txID) // TODO: cleanup way we serialize this
+	am, err := decodeToAppMsg(vm.codec, msg)
 	if err != nil {
-		vm.ctx.Log.Debug("AppGossip: failed unmarshalling message from Node %v, err %v", nodeID, err)
-		return err
-	}
-	vm.ctx.Log.Debug("called AppGossip with txID %v", txID)
-
-	switch {
-	case vm.mempool.has(txID):
-		return nil
-	case vm.mempool.isAlreadyRejected(txID):
+		vm.ctx.Log.Warn("AppGossip: failed unmarshalling gossip from Node %v, error %s",
+			nodeID, err)
 		return nil
 	}
 
-	nodesSet := ids.NewShortSet(1)
-	nodesSet.Add(nodeID)
-	return vm.appSender.SendAppRequest(nodesSet, vm.IssueID(), msg)
+	switch am.ContentType {
+	case txIDType:
+		vm.ctx.Log.Debug("AppGossip: received txID %s", am.txID)
+
+		switch {
+		case vm.mempool.has(am.txID):
+			return nil
+		case vm.mempool.isAlreadyRejected(am.txID):
+			return nil
+		}
+
+		nodesSet := ids.NewShortSet(1)
+		nodesSet.Add(nodeID)
+		reqID := vm.IssueID()
+		if err := vm.appSender.SendAppRequest(nodesSet, reqID, msg); err != nil {
+			return fmt.Errorf("AppGossip: failed sending AppResponse with error %s", err)
+		}
+
+		// record content to check response later on
+		vm.requestsContent[reqID] = am.txID
+		return nil
+	default:
+		// atomicTx, ethTxList or unknown appMsgTypes are rejected here
+		vm.ctx.Log.Warn("AppGossip: unexpected appMsgType %v. Doing nothing", am.ContentType)
+		return nil
+	}
 }
 
 // CreateHandlers returns a map where:
