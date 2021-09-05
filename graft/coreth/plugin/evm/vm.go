@@ -146,6 +146,8 @@ const (
 
 // VM implements the snowman.ChainVM interface
 type VM struct {
+	*network
+
 	ctx *snow.Context
 	// *chain.State helps to implement the VM interface by wrapping blocks
 	// with an efficient caching layer.
@@ -321,14 +323,6 @@ func (vm *VM) Initialize(
 
 	vm.mempool = NewMempool(defaultMempoolSize) // TODO: read size from settings
 
-	// TODO: initialize gossiper
-	// vm.gossipActivationTime = time.Unix(0, 0)   // TODO: setup upon deploy
-	// vm.appSender = appSender
-	// vm.Handler = request.NewHandler()
-	// vm.appGossipBytesCh = make(chan []byte, 1024) // TODO: pick proper size
-	// vm.requestsAtmContent = make(map[uint32]ids.ID)
-	// vm.requestsEthContent = make(map[uint32]map[common.Hash]struct{})
-
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
 	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)
@@ -362,6 +356,15 @@ func (vm *VM) Initialize(
 	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
 
 	vm.chain.Start()
+
+	vm.network = newNetwork(
+		time.Unix(0, 0), // TODO: setup upon deploy
+		appSender,
+		ethChain,
+		vm.mempool,
+		types.LatestSigner(g.Config),
+		vm,
+	)
 
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
@@ -914,56 +917,11 @@ func (vm *VM) awaitSubmittedTxs() {
 			log.Trace("New tx detected, trying to generate a block")
 			vm.signalTxsReady()
 
-			if time.Now().Before(vm.gossipActivationTime) {
-				log.Trace("issued coreth tx before gossiping activation time. Not gossiping it")
-				continue
-			}
-
-			// pick data from eth txs
-			ethData := make([]EthTxData, 0)
-			for _, ethTx := range ethTxsEvent.Txs {
-				txStatus := vm.chain.GetTxPool().Status([]common.Hash{ethTx.Hash()})[0]
-				if txStatus != core.TxStatusPending {
-					continue
-				}
-				TxAddress, err := types.Sender(types.LatestSigner(vm.chainConfig), ethTx)
-				if err != nil {
-					log.Warn(fmt.Sprintf("Could not retrieve address for eth tx %s. Dropping attempt to gossip it",
-						ethTx.Hash()))
-				}
-				data := EthTxData{
-					Hash:   ethTx.Hash(),
-					Sender: TxAddress,
-					Nonce:  ethTx.Nonce(),
-				}
-
-				ethData = append(ethData, data)
-			}
-
-			// split it into chuncks and gossip them around
-			maxSize := maxGossipEthDataSize
-			for {
-				// break data into slices of valid length
-				if len(ethData) == 0 {
-					break
-				}
-
-				if len(ethData) < maxSize {
-					maxSize = len(ethData)
-				}
-
-				chunkToSend := ethData[0:maxSize]
-				ethData = ethData[maxSize:]
-
-				// serialize and gossip current chunk
-				ethTxsBytes, err := encodeEthData(vm.codec, chunkToSend)
-				if err != nil {
-					log.Warn("Could not parse ethData. Dropping current chunk")
-					continue
-				}
-
-				log.Debug(fmt.Sprintf("SendAppGossip: gossiping %v coreth txs", len(ethData)))
-				vm.appGossipBytesCh <- ethTxsBytes
+			if err := vm.GossipEthTxs(ethTxsEvent.Txs); err != nil {
+				log.Warn(
+					"failed to gossip new eth transactions",
+					"err", err,
+				)
 			}
 
 		case <-vm.mempool.Pending:
@@ -1016,18 +974,8 @@ func (vm *VM) issueTx(tx *Tx, local bool) error {
 	// add to mempool and possibly re-gossip
 	switch err := vm.mempool.AddTx(tx); err {
 	case nil:
-		if time.Now().Before(vm.gossipActivationTime) {
-			log.Trace("SendAppGossip: issued tx before gossiping activation time. Doing nothing")
-			return nil
-		}
-		txIDBytes, err := encodeAtmData(vm.codec, tx.ID())
-		if err != nil {
-			return err
-		}
+		return vm.GossipAtomicTx(tx)
 
-		log.Debug(fmt.Sprintf("SendAppGossip: gossiping txID %s", tx.ID()))
-		vm.appGossipBytesCh <- txIDBytes
-		return nil
 	case errTooManyAtomicTx:
 		if !local {
 			// tx has not been accepted to mempool due to size
