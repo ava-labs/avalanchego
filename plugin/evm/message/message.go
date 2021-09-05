@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package message
 
 import (
@@ -24,12 +27,10 @@ type Message interface {
 	Bytes() []byte
 }
 
-type message struct {
-	bytes []byte
-}
+type message []byte
 
-func (m *message) initialize(bytes []byte) { m.bytes = bytes }
-func (m *message) Bytes() []byte           { return m.bytes }
+func (m *message) initialize(bytes []byte) { *m = bytes }
+func (m *message) Bytes() []byte           { return *m }
 
 type AtomicTxNotify struct {
 	message
