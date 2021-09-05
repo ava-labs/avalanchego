@@ -51,7 +51,7 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.B
 	}
 
 	if timestamp < parent.Time() {
-		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp (%d) prior to parent timestamp (%d)", timestamp, parent.Time)
+		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp (%d) prior to parent timestamp (%d)", timestamp, parent.Time())
 	}
 	roll := timestamp - parent.Time()
 

@@ -75,7 +75,7 @@ type Engine interface {
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
 	// via the VerifySeal method.
-	VerifyHeader(chain ChainHeaderReader, header *types.Header) error
+	VerifyHeader(chain ChainReader, header *types.Header) error
 
 	// VerifyUncles verifies that the given block's uncles conform to the consensus
 	// rules of a given engine.
@@ -116,4 +116,6 @@ type Engine interface {
 
 	// TODO: add comment
 	MinRequiredTip(chain ChainHeaderReader, block *types.Block) (*big.Int, error)
+
+	CalcBaseFee(config *params.ChainConfig, parent *types.Block, timestamp uint64) ([]byte, *big.Int, error)
 }

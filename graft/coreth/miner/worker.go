@@ -37,7 +37,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/consensus"
-	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -138,7 +137,7 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	bigTimestamp := big.NewInt(timestamp)
 	if w.chainConfig.IsApricotPhase3(bigTimestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
+		header.Extra, header.BaseFee, err = w.engine.CalcBaseFee(w.chainConfig, parent, uint64(timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
