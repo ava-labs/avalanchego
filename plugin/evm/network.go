@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
@@ -32,6 +33,7 @@ type network struct {
 	appSender commonEng.AppSender
 	chain     *coreth.ETHChain
 	mempool   *Mempool
+	signer    types.Signer
 
 	requestID uint32
 	// TODO: prevent a different peer from responding and canceling a request of
@@ -51,6 +53,7 @@ func newNetwork(
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
+	signer types.Signer,
 	vm *VM,
 ) *network {
 	net := &network{
@@ -58,6 +61,7 @@ func newNetwork(
 		appSender:            appSender,
 		chain:                chain,
 		mempool:              mempool,
+		signer:               signer,
 		requestsAtmContent:   make(map[uint32]ids.ID),
 		requestsEthContent:   make(map[uint32]map[common.Hash]struct{}),
 	}
@@ -111,6 +115,89 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 		0,
 		msgBytes,
 	)
+}
+
+func (n *network) GossipAtomicTx(tx *Tx) error {
+	txID := tx.ID()
+	if time.Now().Before(n.gossipActivationTime) {
+		log.Debug(
+			"not gossiping atomic tx before the gossiping activation time",
+			"txID", txID,
+		)
+		return nil
+	}
+
+	msg := message.AtomicTxNotify{
+		TxID: txID,
+	}
+	msgBytes, err := message.Build(&msg)
+	if err != nil {
+		return err
+	}
+
+	log.Debug(
+		"gossiping atomic tx",
+		"txID", txID,
+	)
+	return n.appSender.SendAppGossip(msgBytes)
+}
+
+func (n *network) GossipEthTxs(txs []*types.Transaction) error {
+	if time.Now().Before(n.gossipActivationTime) {
+		log.Debug(
+			"not gossiping eth txs before the gossiping activation time",
+			"len(txs)", len(txs),
+		)
+		return nil
+	}
+
+	pool := n.chain.GetTxPool()
+	txsData := make([]message.EthTxNotify, 0)
+	for _, tx := range txs {
+		txStatus := pool.Status([]common.Hash{tx.Hash()})[0]
+		if txStatus != core.TxStatusPending {
+			continue
+		}
+
+		sender, err := types.Sender(n.signer, tx)
+		if err != nil {
+			log.Debug(
+				"couldn't retrieve sender for eth tx",
+				"err", err,
+			)
+			continue
+		}
+
+		txsData = append(txsData, message.EthTxNotify{
+			Hash:   tx.Hash(),
+			Sender: sender,
+			Nonce:  tx.Nonce(),
+		})
+	}
+
+	for start, end := 0, maxGossipEthDataSize; start < len(txsData); start, end = end, end+maxGossipEthDataSize {
+		if end > len(txsData) {
+			end = len(txsData)
+		}
+
+		data := txsData[start:end]
+		msg := message.EthTxsNotify{
+			Txs: data,
+		}
+		msgBytes, err := message.Build(&msg)
+		if err != nil {
+			return err
+		}
+
+		log.Debug(
+			"gossiping eth txs",
+			"len(txs)", len(data),
+		)
+		if err := n.appSender.SendAppGossip(msgBytes); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (n *network) handle(
