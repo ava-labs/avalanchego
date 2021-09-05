@@ -82,6 +82,7 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 		default:
 			blockGasCost = ApricotPhase3BlockGasFee
 		}
+		// TODO: include atomic gas usage here in AP4
 		addedGas, overflow := math.SafeAdd(parent.GasUsed, blockGasCost)
 		if overflow {
 			addedGas = math.MaxUint64
