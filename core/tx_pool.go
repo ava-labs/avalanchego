@@ -35,7 +35,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -237,14 +237,16 @@ type TxPool struct {
 	config      TxPoolConfig
 	chainconfig *params.ChainConfig
 	chain       blockChain
-	gasPrice    *big.Int
-	minimumFee  *big.Int
-	txFeed      event.Feed
-	headFeed    event.Feed
-	reorgFeed   event.Feed
-	scope       event.SubscriptionScope
-	signer      types.Signer
-	mu          sync.RWMutex
+	// TODO: populate engine
+	engine     consensus.Engine
+	gasPrice   *big.Int
+	minimumFee *big.Int
+	txFeed     event.Feed
+	headFeed   event.Feed
+	reorgFeed  event.Feed
+	scope      event.SubscriptionScope
+	signer     types.Signer
+	mu         sync.RWMutex
 
 	istanbul bool // Fork indicator whether we are in the istanbul stage.
 	eip2718  bool // Fork indicator whether we are using EIP-2718 type transactions.
@@ -1196,9 +1198,12 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	if reset != nil {
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsApricotPhase3(new(big.Int).SetUint64(reset.newHead.Time)) {
-			_, baseFeeEstimate, err := dummy.CalcBaseFee(pool.chainconfig, reset.newHead, uint64(time.Now().Unix()))
-			if err == nil {
-				pool.priced.SetBaseFee(baseFeeEstimate)
+			newHeadBlock := pool.chain.GetBlock(reset.newHead.Hash(), reset.newHead.Number.Uint64())
+			if newHeadBlock != nil {
+				_, baseFeeEstimate, err := pool.engine.CalcBaseFee(pool.chainconfig, newHeadBlock, uint64(time.Now().Unix()))
+				if err == nil {
+					pool.priced.SetBaseFee(baseFeeEstimate)
+				}
 			}
 		}
 	}
@@ -1626,7 +1631,13 @@ func (pool *TxPool) updateBaseFee() {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	_, baseFeeEstimate, err := dummy.CalcBaseFee(pool.chainconfig, pool.currentHead, uint64(time.Now().Unix()))
+	currentBlock := pool.chain.GetBlock(pool.currentHead.Hash(), pool.currentHead.Number.Uint64())
+	if currentBlock == nil {
+		log.Error("failed to update base fee", "currentHead", pool.currentHead.Hash(), "err", "could not fetch current block")
+		return
+	}
+
+	_, baseFeeEstimate, err := pool.engine.CalcBaseFee(pool.chainconfig, currentBlock, uint64(time.Now().Unix()))
 	if err == nil {
 		pool.priced.SetBaseFee(baseFeeEstimate)
 	} else {

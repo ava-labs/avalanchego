@@ -33,7 +33,7 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
@@ -64,6 +64,7 @@ type OracleBackend interface {
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	ChainConfig() *params.ChainConfig
 	MinRequiredTip(ctx context.Context, block *types.Block) (*big.Int, error)
+	Engine() consensus.Engine
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -146,7 +147,7 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 	// If the block does have a baseFee, calculate the next base fee
 	// based on the current time and add it to the tip to estimate the
 	// total gas price estimate.
-	_, nextBaseFee, err := dummy.CalcBaseFee(oracle.backend.ChainConfig(), block.Header(), oracle.clock.Unix())
+	_, nextBaseFee, err := oracle.backend.Engine().CalcBaseFee(oracle.backend.ChainConfig(), block, oracle.clock.Unix())
 	return nextBaseFee, err
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/state"
@@ -187,4 +188,8 @@ func (self *ETHChain) GetTxAcceptedSubmitCh() <-chan core.NewTxsEvent {
 
 func (self *ETHChain) GetTxPool() *core.TxPool {
 	return self.backend.TxPool()
+}
+
+func (self *ETHChain) Engine() consensus.Engine {
+	return self.backend.Engine()
 }

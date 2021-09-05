@@ -63,7 +63,7 @@ var (
 )
 
 // modified from consensus.go
-func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header, parent *types.Header, uncle bool) error {
+func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Block, uncle bool) error {
 	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
@@ -83,7 +83,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 			return fmt.Errorf("expected extra-data field to be: %d, but found %d", params.ApricotPhase3ExtraDataSize, len(header.Extra))
 		}
 		// Verify baseFee and rollupWindow encoding as part of header verification
-		expectedRollupWindowBytes, expectedBaseFee, err := CalcBaseFee(chain.Config(), parent, header.Time)
+		expectedRollupWindowBytes, expectedBaseFee, err := self.CalcBaseFee(chain.Config(), parent, header.Time)
 		if err != nil {
 			return fmt.Errorf("failed to calculate base fee: %w", err)
 		}
@@ -100,7 +100,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		return consensus.ErrFutureBlock
 	}
 	//if header.Time <= parent.Time {
-	if header.Time < parent.Time {
+	if header.Time < parent.Time() {
 		return errInvalidBlockTime
 	}
 	// Verify that the gas limit is <= 2^63-1
@@ -118,11 +118,11 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 		}
 	} else {
 		// Verify that the gas limit remains within allowed bounds
-		diff := int64(parent.GasLimit) - int64(header.GasLimit)
+		diff := int64(parent.GasLimit()) - int64(header.GasLimit)
 		if diff < 0 {
 			diff *= -1
 		}
-		limit := parent.GasLimit / params.GasLimitBoundDivisor
+		limit := parent.GasLimit() / params.GasLimitBoundDivisor
 
 		if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
 			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
@@ -130,7 +130,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header,
 	}
 
 	// Verify that the block number is parent's +1
-	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
+	if diff := new(big.Int).Sub(header.Number, parent.Number()); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
 	}
 	// Verify the engine specific seal securing the block
@@ -141,13 +141,13 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
-func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
+func (self *DummyEngine) VerifyHeader(chain consensus.ChainReader, header *types.Header) error {
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
 		return nil
 	}
-	parent := chain.GetHeader(header.ParentHash, number-1)
+	parent := chain.GetBlock(header.ParentHash, number-1)
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
