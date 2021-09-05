@@ -63,7 +63,7 @@ type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	ChainConfig() *params.ChainConfig
-	MinimumTip(ctx context.Context, block *types.Block) (*big.Int, error)
+	MinRequiredTip(ctx context.Context, block *types.Block) (*big.Int, error)
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -308,7 +308,7 @@ func (oracle *Oracle) getBlockValues(ctx context.Context, blockNum uint64, resul
 
 	// Compute required block fee
 	// TODO: add back in "ignore txs"? (what if large contract deploy)
-	minTip, err := oracle.backend.MinimumTip(ctx, block)
+	minTip, err := oracle.backend.MinRequiredTip(ctx, block)
 	select {
 	case result <- results{minTip, err}:
 	case <-quit:

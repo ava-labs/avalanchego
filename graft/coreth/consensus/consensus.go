@@ -115,5 +115,5 @@ type Engine interface {
 	Close() error
 
 	// TODO: add comment
-	RequiredTip(chain ChainHeaderReader, block *types.Block, receipts types.Receipts) (*big.Int, error)
+	MinRequiredTip(chain ChainHeaderReader, block *types.Block) (*big.Int, error)
 }

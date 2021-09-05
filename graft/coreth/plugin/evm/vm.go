@@ -429,9 +429,9 @@ func (vm *VM) Initialize(
 
 func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 	return &dummy.ConsensusCallbacks{
-		OnFinalizeAndAssemble:   vm.onFinalizeAndAssemble,
-		OnExtraStateChange:      vm.onExtraStateChange,
-		OnAtomicTipContribution: vm.atomicTipContribution,
+		OnFinalizeAndAssemble: vm.onFinalizeAndAssemble,
+		OnExtraStateChange:    vm.onExtraStateChange,
+		OnAtomicGasCost:       vm.onAtomicGasCost,
 	}
 }
 
@@ -499,25 +499,16 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 	}
 }
 
-// TODO: same as extra but with no validation
-func (vm *VM) atomicTipContribution(block *types.Block) (*big.Int, error) {
+// TODO: add comment
+func (vm *VM) onAtomicGasCost(block *types.Block) (uint64, error) {
 	tx, err := vm.extractAtomicTx(block)
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	// If [tx] is nil, we can return nil for the extra state contribution instead of allocating
-	// a big Int for 0.
 	if tx == nil {
-		return nil, nil
+		return 0, nil
 	}
-	switch {
-	// If ApricotPahse4 is enabled, calculate the block fee contribution
-	case vm.chainConfig.IsApricotPhase4(new(big.Int).SetUint64(block.Time())):
-		return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
-	default:
-		// Otherwise, there is no contribution
-		return nil, nil
-	}
+	return tx.Cost()
 }
 
 func (vm *VM) pruneChain() error {
