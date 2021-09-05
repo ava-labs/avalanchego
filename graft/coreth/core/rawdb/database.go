@@ -28,62 +28,20 @@ package rawdb
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/ava-labs/coreth/ethdb"
+	"github.com/ava-labs/coreth/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/ethdb/leveldb"
-	"github.com/ethereum/go-ethereum/ethdb/memorydb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/olekukonko/tablewriter"
-)
-
-var (
-	// errNotSupported is returned if the database doesn't support the required operation.
-	errNotSupported = errors.New("this operation is not supported")
 )
 
 // nofreezedb is a database wrapper that disables freezer data retrievals.
 type nofreezedb struct {
 	ethdb.KeyValueStore
-}
-
-// HasAncient returns an error as we don't have a backing chain freezer.
-func (db *nofreezedb) HasAncient(kind string, number uint64) (bool, error) {
-	return false, errNotSupported
-}
-
-// Ancient returns an error as we don't have a backing chain freezer.
-func (db *nofreezedb) Ancient(kind string, number uint64) ([]byte, error) {
-	return nil, errNotSupported
-}
-
-// Ancients returns an error as we don't have a backing chain freezer.
-func (db *nofreezedb) Ancients() (uint64, error) {
-	return 0, errNotSupported
-}
-
-// AncientSize returns an error as we don't have a backing chain freezer.
-func (db *nofreezedb) AncientSize(kind string) (uint64, error) {
-	return 0, errNotSupported
-}
-
-// AppendAncient returns an error as we don't have a backing chain freezer.
-func (db *nofreezedb) AppendAncient(number uint64, hash, header, body, receipts, td []byte) error {
-	return errNotSupported
-}
-
-// TruncateAncients returns an error as we don't have a backing chain freezer.
-func (db *nofreezedb) TruncateAncients(items uint64) error {
-	return errNotSupported
-}
-
-// Sync returns an error as we don't have a backing chain freezer.
-func (db *nofreezedb) Sync() error {
-	return errNotSupported
 }
 
 // NewDatabase creates a high level database on top of a given key-value data
@@ -105,16 +63,6 @@ func NewMemoryDatabase() ethdb.Database {
 // chain segments into cold storage.
 func NewMemoryDatabaseWithCap(size int) ethdb.Database {
 	return NewDatabase(memorydb.NewWithCap(size))
-}
-
-// NewLevelDBDatabase creates a persistent key-value database without a freezer
-// moving immutable chain segments into cold storage.
-func NewLevelDBDatabase(file string, cache int, handles int, namespace string, readonly bool) (ethdb.Database, error) {
-	db, err := leveldb.New(file, cache, handles, namespace, readonly)
-	if err != nil {
-		return nil, err
-	}
-	return NewDatabase(db), nil
 }
 
 type counter uint64
@@ -173,13 +121,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		preimages       stat
 		bloomBits       stat
 		cliqueSnaps     stat
-
-		// Ancient store statistics
-		ancientHeadersSize  common.StorageSize
-		ancientBodiesSize   common.StorageSize
-		ancientReceiptsSize common.StorageSize
-		ancientTdsSize      common.StorageSize
-		ancientHashesSize   common.StorageSize
 
 		// Les statistic
 		chtTrieNodes   stat
@@ -264,19 +205,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 			logged = time.Now()
 		}
 	}
-	// Inspect append-only file store then.
-	ancientSizes := []*common.StorageSize{&ancientHeadersSize, &ancientBodiesSize, &ancientReceiptsSize, &ancientHashesSize, &ancientTdsSize}
-	for i, category := range []string{freezerHeaderTable, freezerBodiesTable, freezerReceiptTable, freezerHashTable, freezerDifficultyTable} {
-		if size, err := db.AncientSize(category); err == nil {
-			*ancientSizes[i] += common.StorageSize(size)
-			total += common.StorageSize(size)
-		}
-	}
-	// Get number of ancient rows inside the freezer
-	ancients := counter(0)
-	if count, err := db.Ancients(); err == nil {
-		ancients = counter(count)
-	}
 	// Display the database statistic.
 	stats := [][]string{
 		{"Key-Value store", "Headers", headers.Size(), headers.Count()},
@@ -294,11 +222,6 @@ func InspectDatabase(db ethdb.Database, keyPrefix, keyStart []byte) error {
 		{"Key-Value store", "Storage snapshot", storageSnaps.Size(), storageSnaps.Count()},
 		{"Key-Value store", "Clique snapshots", cliqueSnaps.Size(), cliqueSnaps.Count()},
 		{"Key-Value store", "Singleton metadata", metadata.Size(), metadata.Count()},
-		{"Ancient store", "Headers", ancientHeadersSize.String(), ancients.String()},
-		{"Ancient store", "Bodies", ancientBodiesSize.String(), ancients.String()},
-		{"Ancient store", "Receipt lists", ancientReceiptsSize.String(), ancients.String()},
-		{"Ancient store", "Difficulties", ancientTdsSize.String(), ancients.String()},
-		{"Ancient store", "Block number->hash", ancientHashesSize.String(), ancients.String()},
 		{"Light client", "CHT trie nodes", chtTrieNodes.Size(), chtTrieNodes.Count()},
 		{"Light client", "Bloom trie nodes", bloomTrieNodes.Size(), bloomTrieNodes.Count()},
 	}

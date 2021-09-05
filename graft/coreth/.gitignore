@@ -29,8 +29,6 @@ awscpu
 
 *.pb*
 
-db*
-
 *cpu[0-9]*
 *mem[0-9]*
 *lock[0-9]*
