@@ -99,7 +99,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			receipts: []*types.Receipt{
 				{GasUsed: 1000},
 			},
-			extraStateContribution: big.NewInt(500),
+			extraStateContribution: big.NewInt(50000),
 			shouldErr:              false,
 		},
 		"extra state contribution insufficient": {
@@ -110,7 +110,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(999),
+			extraStateContribution: big.NewInt(99999),
 			shouldErr:              true,
 		},
 		"negative extra state contribution": {
@@ -132,7 +132,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(1000),
+			extraStateContribution: big.NewInt(100000),
 			shouldErr:              false,
 		},
 		"extra state contribution covers more than block fee": {
@@ -143,7 +143,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(1001),
+			extraStateContribution: big.NewInt(100001),
 			shouldErr:              false,
 		},
 		"tx only base fee after full time window": {
@@ -214,7 +214,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			currentTime:            10,
 			txs:                    nil,
 			receipts:               nil,
-			extraStateContribution: big.NewInt(1000),
+			extraStateContribution: big.NewInt(100000),
 			shouldErr:              true,
 		},
 	}
