@@ -148,6 +148,7 @@ type blockChain interface {
 	CurrentBlock() *types.Block
 	GetBlock(hash common.Hash, number uint64) *types.Block
 	StateAt(root common.Hash) (*state.StateDB, error)
+	Engine() consensus.Engine
 
 	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
 }
@@ -237,16 +238,14 @@ type TxPool struct {
 	config      TxPoolConfig
 	chainconfig *params.ChainConfig
 	chain       blockChain
-	// TODO: populate engine
-	engine     consensus.Engine
-	gasPrice   *big.Int
-	minimumFee *big.Int
-	txFeed     event.Feed
-	headFeed   event.Feed
-	reorgFeed  event.Feed
-	scope      event.SubscriptionScope
-	signer     types.Signer
-	mu         sync.RWMutex
+	gasPrice    *big.Int
+	minimumFee  *big.Int
+	txFeed      event.Feed
+	headFeed    event.Feed
+	reorgFeed   event.Feed
+	scope       event.SubscriptionScope
+	signer      types.Signer
+	mu          sync.RWMutex
 
 	istanbul bool // Fork indicator whether we are in the istanbul stage.
 	eip2718  bool // Fork indicator whether we are using EIP-2718 type transactions.
@@ -1200,7 +1199,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		if reset.newHead != nil && pool.chainconfig.IsApricotPhase3(new(big.Int).SetUint64(reset.newHead.Time)) {
 			newHeadBlock := pool.chain.GetBlock(reset.newHead.Hash(), reset.newHead.Number.Uint64())
 			if newHeadBlock != nil {
-				_, baseFeeEstimate, err := pool.engine.CalcBaseFee(pool.chainconfig, newHeadBlock, uint64(time.Now().Unix()))
+				_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, newHeadBlock, uint64(time.Now().Unix()))
 				if err == nil {
 					pool.priced.SetBaseFee(baseFeeEstimate)
 				}
@@ -1637,7 +1636,7 @@ func (pool *TxPool) updateBaseFee() {
 		return
 	}
 
-	_, baseFeeEstimate, err := pool.engine.CalcBaseFee(pool.chainconfig, currentBlock, uint64(time.Now().Unix()))
+	_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, currentBlock, uint64(time.Now().Unix()))
 	if err == nil {
 		pool.priced.SetBaseFee(baseFeeEstimate)
 	} else {
