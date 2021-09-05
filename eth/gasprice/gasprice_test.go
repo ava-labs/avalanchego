@@ -101,7 +101,7 @@ func (b *testBackend) Engine() consensus.Engine {
 }
 
 func (b *testBackend) MinRequiredTip(ctx context.Context, block *types.Block) (*big.Int, error) {
-	return big.NewInt(0), nil
+	return b.chain.Engine().MinRequiredTip(b.chain, block)
 }
 
 func (b *testBackend) CurrentHeader() *types.Header {
@@ -160,7 +160,7 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 		},
 		"apricot phase 4": {
 			chainConfig: params.TestChainConfig,
-			expectedTip: big.NewInt(0),
+			expectedTip: DefaultStartPrice,
 		},
 	}
 
@@ -220,6 +220,7 @@ func TestSuggestTipCapDifferentTips(t *testing.T) {
 
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, highTip)
+			// TODO: fix description
 			// Need to add 50 transactions, so that the block consumes more than the skip block
 			// gas limit
 			// Add 50 transactions each at the low and high tip amount. This should result in the high tip
@@ -255,7 +256,7 @@ func TestSuggestTipCapDifferentTips(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: highTip,
+		expectedTip: tip,
 	})
 }
 

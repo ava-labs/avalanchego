@@ -301,11 +301,11 @@ func (self *DummyEngine) Close() error {
 
 func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block *types.Block) (*big.Int, error) {
 	if self.skipBlockFee || !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
-		return big.NewInt(0), nil
+		return nil, nil
 	}
 
 	if block.Number().Int64() == 0 {
-		return big.NewInt(0), nil
+		return nil, nil
 	}
 
 	parentHdr := chain.GetHeaderByNumber(block.Number().Uint64() - 1)
