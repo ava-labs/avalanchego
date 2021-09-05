@@ -22,11 +22,13 @@ import (
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, err error)
+type OnAtomicTipContributionType = func(block *types.Block) (blockFeeContribution *big.Int, err error)
 
 type ConsensusCallbacks struct {
-	OnAPIs                OnAPIsCallbackType
-	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
-	OnExtraStateChange    OnExtraStateChangeType
+	OnAPIs                  OnAPIsCallbackType
+	OnFinalizeAndAssemble   OnFinalizeAndAssembleCallbackType
+	OnExtraStateChange      OnExtraStateChangeType
+	OnAtomicTipContribution OnAtomicTipContributionType
 }
 
 type DummyEngine struct {
@@ -295,4 +297,82 @@ func (self *DummyEngine) APIs(chain consensus.ChainHeaderReader) (res []rpc.API)
 
 func (self *DummyEngine) Close() error {
 	return nil
+}
+
+// TODO: change name to required block fee
+func (self *DummyEngine) RequiredTip(chain consensus.ChainHeaderReader, block *types.Block, receipts types.Receipts) (*big.Int, error) {
+	if block.Number().Int64() == 0 {
+		return big.NewInt(0), nil
+	}
+
+	var (
+		gasUsed              = new(big.Int)
+		blockFeeContribution = new(big.Int)
+		totalBlockFee        = new(big.Int)
+
+		baseFee   = block.BaseFee()
+		txs       = block.Transactions()
+		current   = block.Time()
+		parentHdr = chain.GetHeaderByNumber(block.Number().Uint64() - 1)
+		parent    = parentHdr.Time
+	)
+
+	// get parent block
+	// compute
+	// -> add a method in consensus?
+	// -> add a method on the block?
+	// -> need to get all effective tips + parent time diff + atomic txs
+	// -> -> tx, err := vm.extractAtomicTx
+	// -> -> tx.BlockFeeContribution
+
+	// TODO: add callback to get block fee contribution (without validation) from
+	// vm
+
+	// TODO: get synthetic gas usage from extra data
+
+	// handle case where parent is available
+	if parent > current {
+		return nil, fmt.Errorf("invalid timestamp (%d) < parent timestamp (%d)", current, parent)
+	}
+	if baseFee.Cmp(common.Big0) <= 0 {
+		return nil, fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
+	}
+
+	// Add in the external contribution
+	extraStateChangeContribution, err := self.cb.OnAtomicTipContribution(block)
+	if err != nil {
+		return nil, err
+	}
+	if extraStateChangeContribution != nil {
+		if extraStateChangeContribution.Cmp(common.Big0) < 0 {
+			return nil, fmt.Errorf("invalid extra state change contribution: %d", extraStateChangeContribution)
+		}
+		totalBlockFee.Add(totalBlockFee, extraStateChangeContribution)
+	}
+
+	// Calculate the total excess over the base fee that was paid towards the block fee
+	for i, receipt := range receipts {
+		// Each transaction contributes the excess over the baseFee towards the totalBlockFee
+		// This should be equivalent to the sum of the "priority fees" within EIP-1559.
+		txFeePremium, err := txs[i].EffectiveGasTip(baseFee)
+		if err != nil {
+			return nil, err
+		}
+		blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
+		totalBlockFee.Add(totalBlockFee, blockFeeContribution)
+	}
+	// Calculate how much gas the [totalBlockFee] would purchase at the price level
+	// set by this block.
+	blockGas := new(big.Int).Div(totalBlockFee, baseFee)
+	// Calculate the required amount of gas to pay the block fee
+	requiredBlockGasFee := calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent, current)
+
+	// requiredBlockFee = blockGasUsage * (minTip+baseFee)
+	// requiredBlockFee/blockGasUsage - baseFee = minTip
+
+	requiredBlockFee := new(big.Int).Mul(requiredBlockGasFee, baseFee)
+	blockGasUsage := new(big.Int).SetUint64(block.GasUsed()) // + atomic gas used
+
+	averageGasPrice := new(big.Int).Div(requiredBlockFee, blockGasUsage)
+	return new(big.Int).Sub(averageGasPrice, baseFee), nil
 }

@@ -307,11 +307,7 @@ func (oracle *Oracle) getBlockValues(ctx context.Context, blockNum uint64, resul
 	}
 
 	// Compute required block fee
-	// -> add a method in consensus?
-	// -> add a method on the block?
-	// -> need to get all effective tips + parent time diff + atomic txs
-	// -> -> tx, err := vm.extractAtomicTx
-	// -> -> tx.BlockFeeContribution
+	// TODO: add back in "ignore txs"? (what if large contract deploy)
 	minTip, err := oracle.backend.MinimumTip(ctx, block)
 	select {
 	case result <- results{minTip, err}:

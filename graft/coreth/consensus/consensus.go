@@ -113,4 +113,7 @@ type Engine interface {
 
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
+
+	// TODO: add comment
+	RequiredTip(chain ChainHeaderReader, block *types.Block, receipts types.Receipts) (*big.Int, error)
 }
