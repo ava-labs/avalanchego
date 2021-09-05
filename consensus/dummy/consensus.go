@@ -171,7 +171,7 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 
 func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.Int, blockFeeDuration, parent, current uint64, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
 	if parent > current {
-		return fmt.Errorf("parent timestamp (%d) > current timestamp (%d)", parent, current)
+		return fmt.Errorf("invalid timestamp (%d) < parent timestamp (%d)", current, parent)
 	}
 	if baseFee.Cmp(common.Big0) <= 0 {
 		return fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
@@ -191,8 +191,8 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 		if err != nil {
 			return err
 		}
-		blockFeeContribution = blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
-		totalBlockFee = totalBlockFee.Add(totalBlockFee, blockFeeContribution)
+		blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
+		totalBlockFee.Add(totalBlockFee, blockFeeContribution)
 	}
 	// Calculate how much gas the [totalBlockFee] would purchase at the price level
 	// set by this block.
