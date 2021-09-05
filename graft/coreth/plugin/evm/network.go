@@ -297,9 +297,13 @@ func (h *RequestHandler) HandleEthTxsNotify(nodeID ids.ShortID, requestID uint32
 
 	txBytes, err := rlp.EncodeToBytes(txs)
 	if err != nil {
+		txHashes := make([]common.Hash, len(txs))
+		for i, tx := range txs {
+			txHashes[i] = tx.Hash()
+		}
 		log.Warn(
 			"failed to encode eth transactions",
-			"len(txs)", len(txs),
+			"hashes", txHashes,
 			"err", err,
 		)
 		return nil
