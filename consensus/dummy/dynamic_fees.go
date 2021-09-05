@@ -73,12 +73,12 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.B
 	// If the parent consumed gas within the rollup window, add the consumed
 	// gas in.
 	if roll < rollupWindow {
-		var blockGasCost, parentAtomicGasCost uint64
+		var blockGasCost, parentAtomicGasUsed uint64
 		switch {
 		// If ApricotPhase4 is enabled, use the updated block fee calculation.
 		case isApricotPhase4:
 			blockGasCost = calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time(), timestamp).Uint64()
-			parentAtomicGasCost, err = self.cb.OnAtomicGasCost(parent)
+			parentAtomicGasUsed, err = self.cb.OnAtomicGasUsed(parent)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -86,7 +86,7 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.B
 		default:
 			blockGasCost = ApricotPhase3BlockGasFee
 		}
-		addedGas, overflow := math.SafeAdd(parent.GasUsed()+parentAtomicGasCost, blockGasCost)
+		addedGas, overflow := math.SafeAdd(parent.GasUsed()+parentAtomicGasUsed, blockGasCost)
 		if overflow {
 			addedGas = math.MaxUint64
 		}

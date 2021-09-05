@@ -431,7 +431,7 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 	return &dummy.ConsensusCallbacks{
 		OnFinalizeAndAssemble: vm.onFinalizeAndAssemble,
 		OnExtraStateChange:    vm.onExtraStateChange,
-		OnAtomicGasCost:       vm.onAtomicGasCost,
+		OnAtomicGasUsed:       vm.onAtomicGasUsed,
 	}
 }
 
@@ -499,8 +499,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 	}
 }
 
-// TODO: add comment
-func (vm *VM) onAtomicGasCost(block *types.Block) (uint64, error) {
+func (vm *VM) onAtomicGasUsed(block *types.Block) (uint64, error) {
 	tx, err := vm.extractAtomicTx(block)
 	if err != nil {
 		return 0, err

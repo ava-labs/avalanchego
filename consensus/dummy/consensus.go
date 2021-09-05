@@ -22,13 +22,13 @@ import (
 type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
 type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
 type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, err error)
-type OnAtomicGasCostType = func(block *types.Block) (gasCost uint64, err error)
+type OnAtomicGasUsedType = func(block *types.Block) (gasUsed uint64, err error)
 
 type ConsensusCallbacks struct {
 	OnAPIs                OnAPIsCallbackType
 	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
 	OnExtraStateChange    OnExtraStateChangeType
-	OnAtomicGasCost       OnAtomicGasCostType
+	OnAtomicGasUsed       OnAtomicGasUsedType
 }
 
 type DummyEngine struct {
@@ -314,7 +314,7 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 	}
 
 	// Calculate the gas used by atomic transactions
-	atomicGasCost, err := self.cb.OnAtomicGasCost(block)
+	atomicGasUsed, err := self.cb.OnAtomicGasUsed(block)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +324,7 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 
 	// minTip = requiredBlockFee/blockGasUsage - baseFee
 	requiredBlockFee := new(big.Int).Mul(requiredBlockGasFee, block.BaseFee())
-	blockGasUsage := new(big.Int).SetUint64(block.GasUsed() + atomicGasCost)
+	blockGasUsage := new(big.Int).SetUint64(block.GasUsed() + atomicGasUsed)
 	averageGasPrice := new(big.Int).Div(requiredBlockFee, blockGasUsage)
 	return new(big.Int).Sub(averageGasPrice, block.BaseFee()), nil
 }
