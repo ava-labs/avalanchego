@@ -29,6 +29,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
@@ -63,6 +65,7 @@ type testBlockChain struct {
 	gasLimit      uint64
 	chainHeadFeed *event.Feed
 	lock          sync.Mutex
+	engine        consensus.Engine
 }
 
 func newTestBlockchain(statedb *state.StateDB, gasLimit uint64, chainHeadFeed *event.Feed) *testBlockChain {
@@ -70,7 +73,12 @@ func newTestBlockchain(statedb *state.StateDB, gasLimit uint64, chainHeadFeed *e
 		statedb:       statedb,
 		gasLimit:      gasLimit,
 		chainHeadFeed: chainHeadFeed,
+		engine:        dummy.NewFakerSkipBlockFee(),
 	}
+}
+
+func (bc *testBlockChain) Engine() consensus.Engine {
+	return bc.engine
 }
 
 func (bc *testBlockChain) reset(statedb *state.StateDB, gasLimit uint64, chainHeadFeed *event.Feed) {
