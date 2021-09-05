@@ -183,8 +183,10 @@ func (oracle *Oracle) suggestTipCap(ctx context.Context) (*big.Int, error) {
 	bigTimestamp := big.NewInt(oracle.clock.Time().Unix())
 
 	switch {
-	case oracle.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
+	case oracle.backend.ChainConfig().IsApricotPhase4(bigTimestamp):
 		return oracle.suggestDynamicTipCap(ctx)
+	case oracle.backend.ChainConfig().IsApricotPhase3(bigTimestamp):
+		return common.Big0, nil
 	case oracle.backend.ChainConfig().IsApricotPhase1(bigTimestamp):
 		return big.NewInt(params.ApricotPhase1MinGasPrice), nil
 	default:
