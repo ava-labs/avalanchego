@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/trie"
 
 	"github.com/stretchr/testify/assert"
 

@@ -31,8 +31,8 @@ import (
 	"math/rand"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 )
 
 const (

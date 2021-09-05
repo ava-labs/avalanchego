@@ -32,27 +32,16 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/types"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 // ReadCanonicalHash retrieves the hash assigned to a canonical block number.
 func ReadCanonicalHash(db ethdb.Reader, number uint64) common.Hash {
-	data, _ := db.Ancient(freezerHashTable, number)
-	if len(data) == 0 {
-		data, _ = db.Get(headerHashKey(number))
-		// In the background freezer is moving data from leveldb to flatten files.
-		// So during the first check for ancient db, the data is not yet in there,
-		// but when we reach into leveldb, the data was already moved. That would
-		// result in a not found error.
-		if len(data) == 0 {
-			data, _ = db.Ancient(freezerHashTable, number)
-		}
-	}
+	data, _ := db.Get(headerHashKey(number))
 	if len(data) == 0 {
 		return common.Hash{}
 	}
@@ -254,24 +243,9 @@ func WriteFastTxLookupLimit(db ethdb.KeyValueWriter, number uint64) {
 
 // ReadHeaderRLP retrieves a block header in its raw RLP database encoding.
 func ReadHeaderRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue {
-	// First try to look up the data in ancient database. Extra hash
-	// comparison is necessary since ancient database only maintains
-	// the canonical data.
-	data, _ := db.Ancient(freezerHeaderTable, number)
-	if len(data) > 0 && crypto.Keccak256Hash(data) == hash {
-		return data
-	}
 	// Then try to look up the data in leveldb.
-	data, _ = db.Get(headerKey(number, hash))
+	data, _ := db.Get(headerKey(number, hash))
 	if len(data) > 0 {
-		return data
-	}
-	// In the background freezer is moving data from leveldb to flatten files.
-	// So during the first check for ancient db, the data is not yet in there,
-	// but when we reach into leveldb, the data was already moved. That would
-	// result in a not found error.
-	data, _ = db.Ancient(freezerHeaderTable, number)
-	if len(data) > 0 && crypto.Keccak256Hash(data) == hash {
 		return data
 	}
 	return nil // Can't find the data anywhere.
@@ -279,9 +253,6 @@ func ReadHeaderRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValu
 
 // HasHeader verifies the existence of a block header corresponding to the hash.
 func HasHeader(db ethdb.Reader, hash common.Hash, number uint64) bool {
-	if has, err := db.Ancient(freezerHashTable, number); err == nil && common.BytesToHash(has) == hash {
-		return true
-	}
 	if has, err := db.Has(headerKey(number, hash)); !has || err != nil {
 		return false
 	}
@@ -341,31 +312,10 @@ func deleteHeaderWithoutNumber(db ethdb.KeyValueWriter, hash common.Hash, number
 
 // ReadBodyRLP retrieves the block body (transactions and uncles) in RLP encoding.
 func ReadBodyRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue {
-	// First try to look up the data in ancient database. Extra hash
-	// comparison is necessary since ancient database only maintains
-	// the canonical data.
-	data, _ := db.Ancient(freezerBodiesTable, number)
-	if len(data) > 0 {
-		h, _ := db.Ancient(freezerHashTable, number)
-		if common.BytesToHash(h) == hash {
-			return data
-		}
-	}
 	// Then try to look up the data in leveldb.
-	data, _ = db.Get(blockBodyKey(number, hash))
+	data, _ := db.Get(blockBodyKey(number, hash))
 	if len(data) > 0 {
 		return data
-	}
-	// In the background freezer is moving data from leveldb to flatten files.
-	// So during the first check for ancient db, the data is not yet in there,
-	// but when we reach into leveldb, the data was already moved. That would
-	// result in a not found error.
-	data, _ = db.Ancient(freezerBodiesTable, number)
-	if len(data) > 0 {
-		h, _ := db.Ancient(freezerHashTable, number)
-		if common.BytesToHash(h) == hash {
-			return data
-		}
 	}
 	return nil // Can't find the data anywhere.
 }
@@ -373,20 +323,12 @@ func ReadBodyRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue 
 // ReadCanonicalBodyRLP retrieves the block body (transactions and uncles) for the canonical
 // block at number, in RLP encoding.
 func ReadCanonicalBodyRLP(db ethdb.Reader, number uint64) rlp.RawValue {
-	// If it's an ancient one, we don't need the canonical hash
-	data, _ := db.Ancient(freezerBodiesTable, number)
-	if len(data) == 0 {
-		// Need to get the hash
-		data, _ = db.Get(blockBodyKey(number, ReadCanonicalHash(db, number)))
-		// In the background freezer is moving data from leveldb to flatten files.
-		// So during the first check for ancient db, the data is not yet in there,
-		// but when we reach into leveldb, the data was already moved. That would
-		// result in a not found error.
-		if len(data) == 0 {
-			data, _ = db.Ancient(freezerBodiesTable, number)
-		}
+	// Need to get the hash
+	data, _ := db.Get(blockBodyKey(number, ReadCanonicalHash(db, number)))
+	if len(data) > 0 {
+		return data
 	}
-	return data
+	return nil
 }
 
 // WriteBodyRLP stores an RLP encoded block body into the database.
@@ -398,9 +340,6 @@ func WriteBodyRLP(db ethdb.KeyValueWriter, hash common.Hash, number uint64, rlp 
 
 // HasBody verifies the existence of a block body corresponding to the hash.
 func HasBody(db ethdb.Reader, hash common.Hash, number uint64) bool {
-	if has, err := db.Ancient(freezerHashTable, number); err == nil && common.BytesToHash(has) == hash {
-		return true
-	}
 	if has, err := db.Has(blockBodyKey(number, hash)); !has || err != nil {
 		return false
 	}
@@ -439,31 +378,10 @@ func DeleteBody(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
 
 // ReadTdRLP retrieves a block's total difficulty corresponding to the hash in RLP encoding.
 func ReadTdRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue {
-	// First try to look up the data in ancient database. Extra hash
-	// comparison is necessary since ancient database only maintains
-	// the canonical data.
-	data, _ := db.Ancient(freezerDifficultyTable, number)
-	if len(data) > 0 {
-		h, _ := db.Ancient(freezerHashTable, number)
-		if common.BytesToHash(h) == hash {
-			return data
-		}
-	}
 	// Then try to look up the data in leveldb.
-	data, _ = db.Get(headerTDKey(number, hash))
+	data, _ := db.Get(headerTDKey(number, hash))
 	if len(data) > 0 {
 		return data
-	}
-	// In the background freezer is moving data from leveldb to flatten files.
-	// So during the first check for ancient db, the data is not yet in there,
-	// but when we reach into leveldb, the data was already moved. That would
-	// result in a not found error.
-	data, _ = db.Ancient(freezerDifficultyTable, number)
-	if len(data) > 0 {
-		h, _ := db.Ancient(freezerHashTable, number)
-		if common.BytesToHash(h) == hash {
-			return data
-		}
 	}
 	return nil // Can't find the data anywhere.
 }
@@ -503,9 +421,6 @@ func DeleteTd(db ethdb.KeyValueWriter, hash common.Hash, number uint64) {
 // HasReceipts verifies the existence of all the transaction receipts belonging
 // to a block.
 func HasReceipts(db ethdb.Reader, hash common.Hash, number uint64) bool {
-	if has, err := db.Ancient(freezerHashTable, number); err == nil && common.BytesToHash(has) == hash {
-		return true
-	}
 	if has, err := db.Has(blockReceiptsKey(number, hash)); !has || err != nil {
 		return false
 	}
@@ -514,31 +429,10 @@ func HasReceipts(db ethdb.Reader, hash common.Hash, number uint64) bool {
 
 // ReadReceiptsRLP retrieves all the transaction receipts belonging to a block in RLP encoding.
 func ReadReceiptsRLP(db ethdb.Reader, hash common.Hash, number uint64) rlp.RawValue {
-	// First try to look up the data in ancient database. Extra hash
-	// comparison is necessary since ancient database only maintains
-	// the canonical data.
-	data, _ := db.Ancient(freezerReceiptTable, number)
-	if len(data) > 0 {
-		h, _ := db.Ancient(freezerHashTable, number)
-		if common.BytesToHash(h) == hash {
-			return data
-		}
-	}
 	// Then try to look up the data in leveldb.
-	data, _ = db.Get(blockReceiptsKey(number, hash))
+	data, _ := db.Get(blockReceiptsKey(number, hash))
 	if len(data) > 0 {
 		return data
-	}
-	// In the background freezer is moving data from leveldb to flatten files.
-	// So during the first check for ancient db, the data is not yet in there,
-	// but when we reach into leveldb, the data was already moved. That would
-	// result in a not found error.
-	data, _ = db.Ancient(freezerReceiptTable, number)
-	if len(data) > 0 {
-		h, _ := db.Ancient(freezerHashTable, number)
-		if common.BytesToHash(h) == hash {
-			return data
-		}
 	}
 	return nil // Can't find the data anywhere.
 }
@@ -640,37 +534,6 @@ func ReadBlock(db ethdb.Reader, hash common.Hash, number uint64) *types.Block {
 func WriteBlock(db ethdb.KeyValueWriter, block *types.Block) {
 	WriteBody(db, block.Hash(), block.NumberU64(), block.Body())
 	WriteHeader(db, block.Header())
-}
-
-// WriteAncientBlock writes entire block data into ancient store and returns the total written size.
-func WriteAncientBlock(db ethdb.AncientWriter, block *types.Block, receipts types.Receipts, td *big.Int) int {
-	// Encode all block components to RLP format.
-	headerBlob, err := rlp.EncodeToBytes(block.Header())
-	if err != nil {
-		log.Crit("Failed to RLP encode block header", "err", err)
-	}
-	bodyBlob, err := rlp.EncodeToBytes(block.Body())
-	if err != nil {
-		log.Crit("Failed to RLP encode body", "err", err)
-	}
-	storageReceipts := make([]*types.ReceiptForStorage, len(receipts))
-	for i, receipt := range receipts {
-		storageReceipts[i] = (*types.ReceiptForStorage)(receipt)
-	}
-	receiptBlob, err := rlp.EncodeToBytes(storageReceipts)
-	if err != nil {
-		log.Crit("Failed to RLP encode block receipts", "err", err)
-	}
-	tdBlob, err := rlp.EncodeToBytes(td)
-	if err != nil {
-		log.Crit("Failed to RLP encode block total difficulty", "err", err)
-	}
-	// Write all blob to flatten files.
-	err = db.AppendAncient(block.NumberU64(), block.Hash().Bytes(), headerBlob, bodyBlob, receiptBlob, tdBlob)
-	if err != nil {
-		log.Crit("Failed to write block data to ancient store", "err", err)
-	}
-	return len(headerBlob) + len(bodyBlob) + len(receiptBlob) + len(tdBlob) + common.HashLength
 }
 
 // DeleteBlock removes all block data associated with a hash.

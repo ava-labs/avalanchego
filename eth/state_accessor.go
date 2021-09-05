@@ -36,9 +36,9 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/trie"
 )
 
 // stateAtBlock retrieves the state database associated with a certain block.

@@ -41,11 +41,11 @@ import (
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/eth/gasprice"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 )
 
