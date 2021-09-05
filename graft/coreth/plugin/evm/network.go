@@ -22,11 +22,6 @@ import (
 	coreth "github.com/ava-labs/coreth/chain"
 )
 
-const (
-	maxGossipEthDataSize int = 100 // TODO choose a sensible value
-	maxGossipEthTxsSize  int = 10  // TODO choose a sensible value
-)
-
 type network struct {
 	gossipActivationTime time.Time
 
@@ -174,7 +169,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		})
 	}
 
-	for start, end := 0, maxGossipEthDataSize; start < len(txsData); start, end = end, end+maxGossipEthDataSize {
+	for start, end := 0, message.MaxEthTxsNotifyLen; start < len(txsData); start, end = end, end+message.MaxEthTxsNotifyLen {
 		if end > len(txsData) {
 			end = len(txsData)
 		}
@@ -243,11 +238,10 @@ func (h *RequestHandler) HandleAtomicTxNotify(nodeID ids.ShortID, requestID uint
 	)
 
 	resTx, dropped, found := h.net.mempool.GetTx(msg.TxID)
-	// TODO: why isn't this just `!found`?
-	if !dropped && !found {
-		// tx isn't in the mempool
+	if dropped || !found {
+		// tx is either invalid or isn't in the mempool
 		log.Trace(
-			"AppRequest asked for tx that isn't in the mempool",
+			"AppRequest asked for tx that is either invalid or not in the mempool",
 			"peerID", nodeID,
 			"requestID", requestID,
 			"txID", msg.TxID,
@@ -422,9 +416,9 @@ func (h *ResponseHandler) HandleEthTxs(nodeID ids.ShortID, requestID uint32, msg
 		)
 		return nil
 	}
-	if len(txs) > maxGossipEthTxsSize {
+	if len(txs) > message.MaxEthTxsLen {
 		log.Trace(
-			"AppResponse provided too many",
+			"AppResponse provided too many txs",
 			"len(txs)", len(txs),
 		)
 		return nil

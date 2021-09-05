@@ -11,6 +11,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+const (
+	// TODO choose a sensible value
+
+	// MaxEthTxsLen must be updated inside of EthTxsNotify's struct definition
+	// as well when changed
+	MaxEthTxsLen int = 10
+)
+
 var (
 	_ Message = &AtomicTxNotify{}
 	_ Message = &AtomicTx{}
@@ -21,9 +29,15 @@ var (
 )
 
 type Message interface {
+	// Handle this message with the correct message handler
 	Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error
 
+	// initialize should be called whenever a message is built or parsed
 	initialize([]byte)
+
+	// Bytes returns the binary representation of this message
+	//
+	// Bytes should only be called after being initialized
 	Bytes() []byte
 }
 
@@ -55,7 +69,7 @@ func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint3
 type EthTxsNotify struct {
 	message
 
-	Txs []EthTxNotify `serialize:"true"`
+	Txs []EthTxNotify `serialize:"true" len:"10"`
 }
 
 // Information about an Ethereum transaction for gossiping
