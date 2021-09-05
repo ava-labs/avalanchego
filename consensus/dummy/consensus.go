@@ -125,7 +125,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		limit := parent.GasLimit() / params.GasLimitBoundDivisor
 
 		if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
-			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
+			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit(), limit)
 		}
 	}
 
@@ -299,20 +299,21 @@ func (self *DummyEngine) Close() error {
 	return nil
 }
 
-// TODO: change name to
 func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block *types.Block) (*big.Int, error) {
-	if block.Number().Int64() == 0 {
+	if self.skipBlockFee || !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
 		return big.NewInt(0), nil
 	}
 
-	// TODO: add ap4 + minSkip switch
+	if block.Number().Int64() == 0 {
+		return big.NewInt(0), nil
+	}
 
 	parentHdr := chain.GetHeaderByNumber(block.Number().Uint64() - 1)
 	if parentHdr == nil {
 		return nil, errors.New("parent is nil")
 	}
 
-	// Add in the atomic gas contribution
+	// Calculate the gas used by atomic transactions
 	atomicGasCost, err := self.cb.OnAtomicGasCost(block)
 	if err != nil {
 		return nil, err
