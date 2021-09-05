@@ -31,6 +31,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -95,6 +96,14 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 	return &testBackend{chain: chain}
 }
 
+func (b *testBackend) Engine() consensus.Engine {
+	return b.chain.Engine()
+}
+
+func (b *testBackend) MinRequiredTip(ctx context.Context, block *types.Block) (*big.Int, error) {
+	return big.NewInt(0), nil
+}
+
 func (b *testBackend) CurrentHeader() *types.Header {
 	return b.chain.CurrentHeader()
 }
@@ -112,9 +121,8 @@ type suggestTipCapTest struct {
 
 func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
 	config := Config{
-		Blocks:      3,
-		TxsPerBlock: 100,
-		Percentile:  60,
+		Blocks:     3,
+		Percentile: 60,
 	}
 
 	if test.genBlock == nil {
