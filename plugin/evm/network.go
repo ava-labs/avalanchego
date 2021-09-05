@@ -169,7 +169,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		})
 	}
 
-	for start, end := 0, message.MaxEthTxsNotifyLen; start < len(txsData); start, end = end, end+message.MaxEthTxsNotifyLen {
+	for start, end := 0, message.MaxEthTxsLen; start < len(txsData); start, end = end, end+message.MaxEthTxsLen {
 		if end > len(txsData) {
 			end = len(txsData)
 		}
