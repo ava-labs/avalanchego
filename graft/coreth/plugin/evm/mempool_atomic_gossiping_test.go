@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+
 	"github.com/stretchr/testify/assert"
 )
 

@@ -14,9 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/stretchr/testify/assert"
 )
 
 func getTheValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
