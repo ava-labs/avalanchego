@@ -12,14 +12,17 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/rlp"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/stretchr/testify/assert"
 )
 
 func fundAddressByGenesis(addr common.Address) (string, error) {
