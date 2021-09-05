@@ -41,21 +41,16 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
-const (
-	defaultSampleNumber = 3 // Number of transactions sampled in a block by default
-)
-
 var (
-	DefaultMaxPrice    = big.NewInt(150 * params.GWei)
-	DefaultIgnorePrice = big.NewInt(params.GWei)
+	DefaultMaxPrice   = big.NewInt(50 * params.GWei)
+	DefaultStartPrice = big.NewInt(10 * params.GWei)
 )
 
 type Config struct {
-	Blocks      int
-	TxsPerBlock int
-	Percentile  int
-	MaxPrice    *big.Int `toml:",omitempty"`
-	IgnorePrice *big.Int `toml:",omitempty"`
+	Blocks     int
+	Percentile int
+	MaxPrice   *big.Int `toml:",omitempty"`
+	StartPrice *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -69,20 +64,18 @@ type OracleBackend interface {
 
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
-// TODO: cleanup struct + default GPO
 type Oracle struct {
-	backend     OracleBackend
-	lastHead    common.Hash
-	lastPrice   *big.Int
-	maxPrice    *big.Int
-	ignorePrice *big.Int
-	cacheLock   sync.RWMutex
-	fetchLock   sync.Mutex
+	backend   OracleBackend
+	lastHead  common.Hash
+	lastPrice *big.Int
+	maxPrice  *big.Int
+	cacheLock sync.RWMutex
+	fetchLock sync.Mutex
 
 	// clock to decide what set of rules to use when recommending a gas price
 	clock timer.Clock
 
-	checkBlocks, txsPerBlock, percentile int
+	checkBlocks, percentile int
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
@@ -92,11 +85,6 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	if blocks < 1 {
 		blocks = 1
 		log.Warn("Sanitizing invalid gasprice oracle sample blocks", "provided", config.Blocks, "updated", blocks)
-	}
-	txsPerBlock := config.TxsPerBlock
-	if txsPerBlock < 1 {
-		txsPerBlock = defaultSampleNumber
-		log.Warn("Sanitizing invalid txsPerBlock", "provided", config.TxsPerBlock, "updated", txsPerBlock)
 	}
 	percent := config.Percentile
 	if percent < 0 {
@@ -112,20 +100,16 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 		maxPrice = DefaultMaxPrice
 		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", config.MaxPrice, "updated", maxPrice)
 	}
-	ignorePrice := config.IgnorePrice
-	if ignorePrice == nil || ignorePrice.Int64() <= 0 {
-		ignorePrice = DefaultIgnorePrice
-		log.Warn("Sanitizing invalid gasprice oracle ignore price", "provided", config.IgnorePrice, "updated", ignorePrice)
-	} else if ignorePrice.Int64() > 0 {
-		log.Info("Gasprice oracle is ignoring threshold set", "threshold", ignorePrice)
+	startPrice := config.StartPrice
+	if startPrice == nil || startPrice.Int64() <= 0 {
+		startPrice = DefaultStartPrice
+		log.Warn("Sanitizing invalid gasprice oracle start price", "provided", config.StartPrice, "updated", startPrice)
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   common.Big0,
+		lastPrice:   startPrice,
 		maxPrice:    maxPrice,
-		ignorePrice: ignorePrice,
 		checkBlocks: blocks,
-		txsPerBlock: txsPerBlock,
 		percentile:  percent,
 	}
 }
@@ -227,7 +211,7 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 		results   []*big.Int
 	)
 	for sent < oracle.checkBlocks && number > 0 {
-		go oracle.getBlockValues(ctx, number, result, quit)
+		go oracle.getBlockTips(ctx, number, result, quit)
 		sent++
 		exp++
 		number--
@@ -239,35 +223,25 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 			return new(big.Int).Set(lastPrice), res.err
 		}
 		exp--
-		// TODO: fix comment
-		// Nothing returned. There are two special cases here:
-		// - The block is empty
-		// - All the transactions included are sent by the miner itself.
-		// In these cases, use the latest calculated price for sampling.
-		// if res.value == nil {
-		// 	continue
-		// }
-		// Besides, in order to collect enough data for sampling, if nothing
-		// meaningful returned, try to query more blocks. But the maximum
-		// is 2*checkBlocks.
 		if res.value != nil {
 			results = append(results, res.value)
 			continue
 		}
+		// In order to collect enough data for sampling, if nothing
+		// meaningful returned, try to query more blocks. But the maximum
+		// is 2*checkBlocks.
 		if len(results)+1+exp < oracle.checkBlocks*2 && number > 0 {
-			go oracle.getBlockValues(ctx, number, result, quit)
+			go oracle.getBlockTips(ctx, number, result, quit)
 			sent++
 			exp++
 			number--
 		}
 	}
-	// Default last price to 10 instead of 0 (otherwise will never get in)
 	price := lastPrice
 	if len(results) > 0 {
 		sort.Sort(bigIntArray(results))
 		price = results[(len(results)-1)*oracle.percentile/100]
 	}
-	// TODO: set back to 10 gwei
 	if price.Cmp(oracle.maxPrice) > 0 {
 		price = new(big.Int).Set(oracle.maxPrice)
 	}
@@ -284,12 +258,9 @@ type results struct {
 	err   error
 }
 
-// TODO: fix comment
-// getBlockPrices calculates the lowest transaction gas price in a given block
-// and sends it to the result channel. If the block is empty or all transactions
-// are sent by the miner itself(it doesn't make any sense to include this kind of
-// transaction prices for sampling), nil gasprice is returned.
-func (oracle *Oracle) getBlockValues(ctx context.Context, blockNum uint64, result chan results, quit chan struct{}) {
+// getBlockTips calculates the minimum required tip to be included in a given
+// block and sends the value to the result channel.
+func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result chan results, quit chan struct{}) {
 	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
 	if block == nil {
 		select {
@@ -299,16 +270,7 @@ func (oracle *Oracle) getBlockValues(ctx context.Context, blockNum uint64, resul
 		return
 	}
 
-	if !oracle.backend.ChainConfig().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
-		select {
-		case result <- results{nil, nil}:
-		case <-quit:
-		}
-		return
-	}
-
-	// Compute required block fee
-	// TODO: add back in "ignore txs"? (what if large contract deploy)
+	// Compute minimum required tip to be included in previous block
 	minTip, err := oracle.backend.MinRequiredTip(ctx, block)
 	select {
 	case result <- results{minTip, err}:
