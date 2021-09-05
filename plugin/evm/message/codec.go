@@ -6,17 +6,23 @@ package message
 import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/codec/reflectcodec"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const codecVersion uint16 = 0
+const (
+	codecVersion   uint16 = 0
+	maxMessageSize        = 512 * units.KiB
+	maxSliceLen           = maxMessageSize
+)
 
 // Codec does serialization and deserialization
 var c codec.Manager
 
 func init() {
-	c = codec.NewDefaultManager()
-	lc := linearcodec.NewDefault()
+	c = codec.NewManager(maxMessageSize)
+	lc := linearcodec.New(reflectcodec.DefaultTagName, maxSliceLen)
 
 	errs := wrappers.Errs{}
 	errs.Add(
