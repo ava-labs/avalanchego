@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package evm
@@ -36,10 +36,9 @@ type network struct {
 	signer    types.Signer
 
 	requestID uint32
-	// TODO: prevent a different peer from responding and canceling a request of
-	//       another peer
-	// requestMaps allow checking that solicited content matched the requested one
-	// They are populated upon sending an AppRequest and cleaned up upon AppResponse (also failed ones)
+	// requestMaps allow checking that provided content matches the requested
+	// content. They are populated upon sending an AppRequest and cleaned up
+	// upon receipt of the corresponding AppResponse or AppRequestFailed.
 	requestsAtmContent map[uint32]ids.ID
 	requestsEthContent map[uint32]map[common.Hash]struct{}
 
@@ -211,6 +210,7 @@ func (n *network) handle(
 		"App message handler called",
 		"handler", handlerName,
 		"peerID", nodeID,
+		"requestID", requestID,
 		"len(msg)", len(msgBytes),
 	)
 
@@ -248,6 +248,8 @@ func (h *RequestHandler) HandleAtomicTxNotify(nodeID ids.ShortID, requestID uint
 		// tx isn't in the mempool
 		log.Trace(
 			"AppRequest asked for tx that isn't in the mempool",
+			"peerID", nodeID,
+			"requestID", requestID,
 			"txID", msg.TxID,
 		)
 		return nil
@@ -260,6 +262,8 @@ func (h *RequestHandler) HandleAtomicTxNotify(nodeID ids.ShortID, requestID uint
 	if err != nil {
 		log.Warn(
 			"failed to build response AtomicTx message",
+			"peerID", nodeID,
+			"requestID", requestID,
 			"txID", msg.TxID,
 			"err", err,
 		)
@@ -341,7 +345,7 @@ func (h *ResponseHandler) HandleAtomicTx(nodeID ids.ShortID, requestID uint32, m
 		"len(tx)", len(msg.Tx),
 	)
 
-	// check that content matched with what previously requested
+	// check that the received transaction matches the requested transaction
 	expectedTxID, ok := h.net.requestsAtmContent[requestID]
 	if !ok {
 		log.Trace("AppResponse provided unrequested tx")
@@ -400,7 +404,7 @@ func (h *ResponseHandler) HandleEthTxs(nodeID ids.ShortID, requestID uint32, msg
 		"len(txsBytes)", len(msg.TxsBytes),
 	)
 
-	// check that content matched with what previously requested
+	// check that the received transactions matches the requested transactions
 	expectedHashes, ok := h.net.requestsEthContent[requestID]
 	if !ok {
 		log.Trace("AppResponse provided unrequested txs")
@@ -412,6 +416,8 @@ func (h *ResponseHandler) HandleEthTxs(nodeID ids.ShortID, requestID uint32, msg
 	if err := rlp.DecodeBytes(msg.TxsBytes, &txs); err != nil {
 		log.Trace(
 			"AppResponse provided invalid txs",
+			"peerID", nodeID,
+			"requestID", requestID,
 			"err", err,
 		)
 		return nil
@@ -491,7 +497,7 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 	)
 
 	pool := h.net.chain.GetTxPool()
-	dataToRequest := make([]message.EthTxNotify, 0)
+	dataToRequest := make([]message.EthTxNotify, 0, len(msg.Txs))
 	for _, txData := range msg.Txs {
 		if pool.Has(txData.Hash) {
 			continue
