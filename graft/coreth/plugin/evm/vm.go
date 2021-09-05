@@ -53,7 +53,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/platformvm/request"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -62,10 +61,8 @@ import (
 )
 
 const (
-	x2cRateInt64         int64 = 1_000_000_000
-	x2cRateMinus1Int64   int64 = x2cRateInt64 - 1
-	maxGossipEthDataSize int   = 100 // TODO choose a sensible value
-	maxGossipEthTxsSize  int   = 10  // TODO choose a sensible value
+	x2cRateInt64       int64 = 1_000_000_000
+	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
 )
 
 var (
@@ -75,11 +72,6 @@ var (
 	// places on the X and P chains, but is 18 decimal places within the EVM.
 	x2cRate       = big.NewInt(x2cRateInt64)
 	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
-
-	// GitCommit is set by the build script
-	GitCommit string
-	// Version is the version of Coreth
-	Version string
 
 	_ block.ChainVM = &VM{}
 )
@@ -152,40 +144,6 @@ const (
 	building
 )
 
-// Codec does serialization and deserialization
-var Codec codec.Manager
-
-func init() {
-	Codec = codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&UnsignedImportTx{}),
-		c.RegisterType(&UnsignedExportTx{}),
-	)
-	c.SkipRegistrations(3)
-	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		c.RegisterType(&appMsg{}),
-		Codec.RegisterCodec(codecVersion, c),
-	)
-
-	if len(GitCommit) != 0 {
-		Version = fmt.Sprintf("%s@%s", Version, GitCommit)
-	}
-
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-}
-
 // VM implements the snowman.ChainVM interface
 type VM struct {
 	ctx *snow.Context
@@ -231,17 +189,6 @@ type VM struct {
 	codec     codec.Manager
 	clock     timer.Clock
 	mempool   *Mempool
-
-	// gossip related attributes
-	gossipActivationTime time.Time
-	appSender            commonEng.AppSender
-	request.Handler
-	appGossipBytesCh chan []byte
-
-	// requestMaps allow checking that solicited content matched the requested one
-	// They are populated upon sending an AppRequest and cleaned up upon AppResponse (also failed ones)
-	requestsAtmContent map[ /*requestID*/ uint32]ids.ID
-	requestsEthContent map[ /*requestID*/ uint32]map[common.Hash]struct{}
 
 	shutdownChan chan struct{}
 	shutdownWg   sync.WaitGroup
@@ -373,12 +320,14 @@ func (vm *VM) Initialize(
 	vm.codec = Codec
 
 	vm.mempool = NewMempool(defaultMempoolSize) // TODO: read size from settings
-	vm.gossipActivationTime = time.Unix(0, 0)   // TODO: setup upon deploy
-	vm.appSender = appSender
-	vm.Handler = request.NewHandler()
-	vm.appGossipBytesCh = make(chan []byte, 1024) // TODO: pick proper size
-	vm.requestsAtmContent = make(map[uint32]ids.ID)
-	vm.requestsEthContent = make(map[uint32]map[common.Hash]struct{})
+
+	// TODO: initialize gossiper
+	// vm.gossipActivationTime = time.Unix(0, 0)   // TODO: setup upon deploy
+	// vm.appSender = appSender
+	// vm.Handler = request.NewHandler()
+	// vm.appGossipBytesCh = make(chan []byte, 1024) // TODO: pick proper size
+	// vm.requestsAtmContent = make(map[uint32]ids.ID)
+	// vm.requestsEthContent = make(map[uint32]map[common.Hash]struct{})
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -432,8 +381,6 @@ func (vm *VM) Initialize(
 		UnmarshalBlock:     vm.parseBlock,
 		BuildBlock:         vm.buildBlock,
 	})
-
-	go vm.listenAndGossip()
 
 	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
@@ -674,305 +621,6 @@ func (vm *VM) getBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 
 func (vm *VM) Version() (string, error) {
 	return Version, nil
-}
-
-func (vm *VM) listenAndGossip() {
-	defer vm.shutdownWg.Done()
-	vm.shutdownWg.Add(1)
-
-	for {
-		select {
-		case <-vm.shutdownChan:
-			return
-		case bytes := <-vm.appGossipBytesCh:
-			if err := vm.appSender.SendAppGossip(bytes); err != nil {
-				log.Warn(fmt.Sprintf("SendAppGossip: failure with err %s. Shutting down.", err))
-				vm.Shutdown()
-			}
-		}
-	}
-}
-
-func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
-	log.Trace("called AppRequestFailed")
-
-	if time.Now().Before(vm.gossipActivationTime) {
-		log.Trace("called AppRequestFailed before activation time. Doing nothing")
-		return nil
-	}
-
-	log.Debug(fmt.Sprintf("AppRequestFailed to node %s, reqID %d", nodeID, requestID))
-	delete(vm.requestsAtmContent, requestID)
-	delete(vm.requestsEthContent, requestID)
-
-	return nil
-}
-
-func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
-	// Note: errors returned by AppRequest are treated as fatal. Currently there is hardly a reason
-	// for a failed AppRequest handling to cause a node shutdown.
-	log.Trace("AppRequest: called")
-
-	if time.Now().Before(vm.gossipActivationTime) {
-		log.Trace("AppRequest: called before activation time, doing nothing")
-		return nil
-	}
-
-	am, err := decodeToAppMsg(vm.codec, request)
-	if err != nil {
-		log.Debug(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d. Error %s",
-			nodeID, requestID, err))
-		return nil
-	}
-
-	switch am.ContentType {
-	case atomicTxID:
-		log.Debug(fmt.Sprintf("AppRequest: called with txID %s", am.txID))
-
-		resTx, dropped, found := vm.mempool.GetTx(am.txID)
-		if !dropped && !found {
-			// tx not in mempool. Possibly already included in blocks
-			log.Debug(fmt.Sprintf("AppRequest: txID %s not in mempool. Doing nothing", am.txID))
-			return nil
-		}
-
-		// send response
-		response, err := encodeAtmTx(vm.codec, resTx)
-		if err != nil {
-			log.Warn(fmt.Sprintf("AppRequest: failed creating AppResponse carrying atomic tx %s, error %s",
-				am.txID, err))
-			return nil
-		}
-
-		if err := vm.appSender.SendAppResponse(nodeID, requestID, response); err != nil {
-			return fmt.Errorf("AppRequest: failed sending AppResponse with error %s", err)
-		}
-
-		return nil
-	case ethTxsData:
-		log.Debug("AppRequest: called with eth hashes list")
-
-		// select tx to respond with
-		txsToRespondTo := make([]*types.Transaction, 0, len(am.ethTxData))
-		for _, data := range am.ethTxData {
-			if tx := vm.chain.GetTxPool().Get(data.Hash); tx != nil {
-				txsToRespondTo = append(txsToRespondTo, tx)
-			}
-		}
-		if len(txsToRespondTo) == 0 {
-			log.Debug("AppRequest: no requested eth txs in mempool. Doing nothing")
-			return nil
-		}
-
-		response, err := encodeEthTxs(vm.codec, txsToRespondTo)
-		if err != nil {
-			log.Warn(fmt.Sprintf("AppRequest: failed creating AppResponse carrying eth txs, error %s",
-				err))
-			return nil
-		}
-		if err := vm.appSender.SendAppResponse(nodeID, requestID, response); err != nil {
-			return fmt.Errorf("AppRequest: failed sending AppResponse with error %s", err)
-		}
-
-		return nil
-	default:
-		log.Warn(fmt.Sprintf("AppRequest: unexpected appMsgType %v. Doing nothing", am.ContentType))
-		return nil
-	}
-}
-
-func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
-	// Note: errors returned by AppResponse are treated as fatal. Currently there is hardly a reason
-	// for a failed AppResponse handling to cause a node shutdown.
-	log.Trace("AppResponse: called")
-
-	if time.Now().Before(vm.gossipActivationTime) {
-		log.Trace("AppResponse: called before activation time. Doing nothing")
-		return nil
-	}
-
-	// check requestID
-	if err := vm.ReclaimID(requestID); err != nil {
-		log.Debug(fmt.Sprintf("AppRequest: out-of-Sync AppRequest - nodeID: %v - requestID: %d", nodeID, requestID))
-		return nil
-	}
-
-	// decode response
-	am, err := decodeToAppMsg(vm.codec, response)
-	if err != nil {
-		log.Warn(fmt.Sprintf("AppResponse: failed unmarshalling response from Node %v, reqID %d",
-			nodeID, requestID))
-		return nil
-	}
-	switch am.ContentType {
-	case atomicTx:
-		log.Debug(fmt.Sprintf("AppResponse: received txID %s", am.tx.ID()))
-
-		// check that content matched with what previously requested
-		expectedTxID, ok := vm.requestsAtmContent[requestID]
-		if !ok {
-			log.Debug(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
-			return nil
-		}
-		delete(vm.requestsAtmContent, requestID)
-		if am.tx.ID() != expectedTxID {
-			log.Warn("AppResponse: unrequested transaction ID. Dropping it")
-			return nil
-		}
-
-		// check if  tx is already known
-		if _, dropped, found := vm.mempool.GetTx(am.tx.ID()); found || dropped {
-			return nil // nothing to do
-		}
-
-		err = vm.issueTx(am.tx /*local*/, false)
-		if err != nil {
-			log.Debug(fmt.Sprintf("AppResponse: failed AddUnchecked response from Node %v, reqID %v, err %v",
-				nodeID, requestID, err))
-			return nil
-		}
-
-		return nil
-	case ethTxList:
-		rcvdTxs := am.txs
-		log.Debug("AppResponse: received eth txs")
-
-		// check that content matched with what previously requested
-		expectedHashes, ok := vm.requestsEthContent[requestID]
-		if !ok {
-			log.Warn(fmt.Sprintf("AppResponse: could not retrieve content of AppRequest %d ", requestID))
-			return nil
-		}
-		requestedTxs := make([]*types.Transaction, 0, len(expectedHashes))
-		for _, tx := range rcvdTxs {
-			if _, ok := expectedHashes[tx.Hash()]; !ok {
-				log.Warn(fmt.Sprintf("AppResponse: received unexpected eth tx %d. Dropping it", tx.Hash()))
-				continue
-			}
-			requestedTxs = append(requestedTxs, tx)
-		}
-		delete(vm.requestsEthContent, requestID)
-		if len(requestedTxs) == 0 {
-			log.Warn("AppResponse: all eth hashes were undequested. Dropping response")
-			return nil
-		}
-
-		// submit to mempool expected transactions only
-		errs := vm.chain.GetTxPool().AddRemotes(requestedTxs)
-		for _, err := range errs {
-			if err != nil {
-				log.Debug(fmt.Sprintf("AppResponse: failed AddRemotes response from Node %v, reqID %v, err %v",
-					nodeID, requestID, err))
-			}
-		}
-		return nil
-	default:
-		// atomicTxID, ethTxsData or unknown appMsgTypes are rejected here
-		log.Warn(fmt.Sprintf("AppResponse: unexpected appMsgType %v. Doing nothing", am.ContentType))
-		return nil
-	}
-}
-
-func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
-	// Note: errors returned by AppGossip are treated as fatal. Currently there is hardly a reason
-	// for a failed AppGossip handling to cause a node shutdown.
-	log.Trace("called AppGossip")
-
-	if time.Now().Before(vm.gossipActivationTime) {
-		log.Trace("AppGossip: called before activation time. Doing nothing")
-		return nil
-	}
-
-	am, err := decodeToAppMsg(vm.codec, msg)
-	if err != nil {
-		log.Warn(fmt.Sprintf("AppGossip: failed unmarshalling gossip from Node %v, error %s",
-			nodeID, err))
-		return nil
-	}
-
-	switch am.ContentType {
-	case atomicTxID:
-		log.Debug(fmt.Sprintf("AppGossip: received txID %s", am.txID))
-
-		if _, _, found := vm.mempool.GetTx(am.txID); found {
-			// already known tx. Not requesting it
-			return nil
-		}
-
-		nodesSet := ids.NewShortSet(1)
-		nodesSet.Add(nodeID)
-		reqID := vm.IssueID()
-		if err := vm.appSender.SendAppRequest(nodesSet, reqID, msg); err != nil {
-			return fmt.Errorf("AppGossip: failed sending AppResponse with error %s", err)
-		}
-
-		// record content to check response later on
-		vm.requestsAtmContent[reqID] = am.txID
-		return nil
-	case ethTxsData:
-		dataList := am.ethTxData
-		log.Debug("AppGossip: received eth hashes list")
-
-		dataToRequest := make([]EthTxData, 0)
-		for _, data := range dataList {
-			if vm.chain.GetTxPool().Has(data.Hash) {
-				log.Debug(fmt.Sprintf("AppGossip: eth hash %s already known to mempool. Not requesting it.",
-					data.Hash))
-				continue
-			}
-
-			if err := vm.chain.GetTxPool().CheckNonceOrdering(data.Sender, data.Nonce); err != nil {
-				log.Debug(fmt.Sprintf("AppGossip: eth hash %s nonce is too old. Not requesting it.",
-					data.Hash))
-				continue
-			}
-
-			dataToRequest = append(dataToRequest, data)
-		}
-
-		maxSize := maxGossipEthTxsSize
-		for {
-			// break data into slices of valid length
-			if len(dataToRequest) == 0 {
-				break
-			}
-
-			if len(dataToRequest) < maxSize {
-				maxSize = len(dataToRequest)
-			}
-
-			chunkToRequest := dataToRequest[0:maxSize]
-			dataToRequest = dataToRequest[maxSize:]
-
-			// send AppRequest msg with current chunk
-			msg, err := encodeEthData(vm.codec, chunkToRequest)
-			if err != nil {
-				log.Warn(fmt.Sprintf("AppGossip: failed creating AppResponse carrying eth txs, error %s",
-					err))
-				return nil
-			}
-
-			nodesSet := ids.NewShortSet(1)
-			nodesSet.Add(nodeID)
-			reqID := vm.IssueID()
-			if err := vm.appSender.SendAppRequest(nodesSet, reqID, msg); err != nil {
-				return fmt.Errorf("AppGossip: failed sending AppResponse with error %s", err)
-			}
-
-			// record content to check response later on
-			reqContent := make(map[common.Hash]struct{}, len(chunkToRequest))
-			for _, data := range chunkToRequest {
-				reqContent[data.Hash] = struct{}{}
-			}
-			vm.requestsEthContent[reqID] = reqContent
-		}
-
-		return nil
-	default:
-		// atomicTx, ethTxList or unknown appMsgTypes are rejected here
-		log.Warn(fmt.Sprintf("AppGossip: unexpected appMsgType %v. Doing nothing", am.ContentType))
-		return nil
-	}
 }
 
 // NewHandler returns a new Handler for a service where:
