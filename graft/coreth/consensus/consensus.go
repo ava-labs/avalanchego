@@ -114,8 +114,10 @@ type Engine interface {
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
 
-	// TODO: add comment
+	// MinRequiredTip is the minimum tip a transaction must pay to be included in
+	// a block. This is 0 prior to Apricot Phase 4.
 	MinRequiredTip(chain ChainHeaderReader, block *types.Block) (*big.Int, error)
 
+	// CalcBaseFee computes the BaseFee of a block produced at [timestamp].
 	CalcBaseFee(config *params.ChainConfig, parent *types.Block, timestamp uint64) ([]byte, *big.Int, error)
 }
