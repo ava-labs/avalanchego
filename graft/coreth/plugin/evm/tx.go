@@ -153,8 +153,9 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) er
 	return nil
 }
 
-// BlockFeeContribution calculates how much gas towards the block fee contribution was paid
-// for via this transaction denominated in [avaxAssetID] at [baseFee].
+// BlockFeeContribution calculates how much AVAX towards the block fee contribution was paid
+// for via this transaction denominated in [avaxAssetID] with [baseFee] used to calculate the
+// cost of this transaction.
 func (tx *Tx) BlockFeeContribution(avaxAssetID ids.ID, baseFee *big.Int) (*big.Int, error) {
 	if baseFee == nil {
 		return nil, errNilBaseFee
@@ -182,9 +183,6 @@ func (tx *Tx) BlockFeeContribution(avaxAssetID ids.ID, baseFee *big.Int) (*big.I
 	// Calculate the amount of AVAX that has been burned above the required fee denominated
 	// in C-Chain native 18 decimal places
 	blockFeeContribution := new(big.Int).Mul(new(big.Int).SetUint64(excessBurned), x2cRate)
-	// Divide by [baseFee] to calculate how much gas was paid for at the block's rate by this transaction
-	blockFeeContribution.Div(blockFeeContribution, baseFee)
-
 	return blockFeeContribution, nil
 }
 

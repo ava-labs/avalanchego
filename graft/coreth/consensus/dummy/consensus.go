@@ -183,6 +183,14 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 		totalBlockFee        = new(big.Int)
 	)
 
+	// Add in the external contribution
+	if extraStateChangeContribution != nil {
+		if extraStateChangeContribution.Cmp(common.Big0) < 0 {
+			return fmt.Errorf("invalid extra state change contribution: %d", extraStateChangeContribution)
+		}
+		totalBlockFee.Add(totalBlockFee, extraStateChangeContribution)
+	}
+
 	// Calculate the total excess over the base fee that was paid towards the block fee
 	for i, receipt := range receipts {
 		// Each transaction contributes the excess over the baseFee towards the totalBlockFee
@@ -197,14 +205,7 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 	// Calculate how much gas the [totalBlockFee] would purchase at the price level
 	// set by this block.
 	blockGas := new(big.Int).Div(totalBlockFee, baseFee)
-	// Add in the external contribution
-	if extraStateChangeContribution != nil {
-		if extraStateChangeContribution.Cmp(common.Big0) < 0 {
-			return fmt.Errorf("invalid extra state change contribution: %d", extraStateChangeContribution)
-		}
-		blockGas.Add(blockGas, extraStateChangeContribution)
-	}
-
+	// Calculate the required amount of gas to pay the block fee
 	requiredBlockGasFee := calcBlockFee(maxBlockGasFee, blockFeeDuration, parent, current)
 
 	// Require that the amount of gas purchased by the effective tips within the block, [blockGas],
