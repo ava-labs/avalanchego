@@ -73,16 +73,16 @@ func CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uin
 	// If the parent consumed gas within the rollup window, add the consumed
 	// gas in.
 	if roll < rollupWindow {
-		var blockFee uint64
+		var blockGasCost uint64
 		switch {
 		// If ApricotPhase4 is enabled, use the updated block fee calculation.
 		case isApricotPhase4:
-			blockFee = calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp).Uint64()
+			blockGasCost = calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp).Uint64()
 		// Otherwise, we must be in ApricotPhase3 and use the constant [ApricotPhase3BlockGasFee].
 		default:
-			blockFee = ApricotPhase3BlockGasFee
+			blockGasCost = ApricotPhase3BlockGasFee
 		}
-		addedGas, overflow := math.SafeAdd(parent.GasUsed, blockFee)
+		addedGas, overflow := math.SafeAdd(parent.GasUsed, blockGasCost)
 		if overflow {
 			addedGas = math.MaxUint64
 		}

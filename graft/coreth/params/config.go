@@ -150,9 +150,9 @@ type ChainConfig struct {
 	// Apricot Phase 2 Block Timestamp (nil = no fork, 0 = already activated)
 	// Apricot Phase 2 includes a modified version of the Berlin Hard Fork from Ethereum
 	ApricotPhase2BlockTimestamp *big.Int `json:"apricotPhase2BlockTimestamp,omitempty"`
-	// Apricot Phase 3 introduces dynamic fees and batching of atomic transactions (nil = no fork, 0 = already activated)
+	// Apricot Phase 3 introduces dynamic fees and a modified version of the London Hard Fork from Ethereum (nil = no fork, 0 = already activated)
 	ApricotPhase3BlockTimestamp *big.Int `json:"apricotPhase3BlockTimestamp,omitempty"`
-	// Apricot Phase 4 introduces a modified version of the London Hard Fork from Ethereum (nil = no fork, 0 = already activated)
+	// Apricot Phase 4 introduces the notion of a block fee to the dynamic fee algorithm (nil = no fork, 0 = already activated)
 	ApricotPhase4BlockTimestamp *big.Int `json:"apricotPhase4BlockTimestamp,omitempty"`
 }
 
