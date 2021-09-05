@@ -372,8 +372,22 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
+	// store block and cleanup mempool
 	vm.internalState.AddBlock(blk)
-	return blk, vm.internalState.Commit()
+	err := vm.internalState.Commit()
+
+	switch typedBlk := blk.(type) {
+	case *StandardBlock:
+		vm.mempool.RemoveDecisionTxs(typedBlk.Txs)
+	case *AtomicBlock:
+		vm.mempool.RemoveAtomicTx(&typedBlk.Tx)
+	case *ProposalBlock:
+		vm.mempool.RemoveProposalTx(&typedBlk.Tx)
+	default:
+		vm.ctx.Log.Warn("Unknown tx type. Could not cleanup mempool")
+	}
+
+	return blk, err
 }
 
 // GetBlock implements the snowman.ChainVM interface
@@ -457,8 +471,8 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		vm.ctx.Log.Debug("AppRequest: called with txID %s", am.txID)
 
 		// fetch tx
-		resTx, ok := vm.mempool.unissuedTxs[am.txID]
-		if !ok {
+		resTx := vm.mempool.get(am.txID)
+		if resTx == nil {
 			vm.ctx.Log.Debug("AppRequest: txID %s not in mempool. Doing nothing", am.txID)
 			return nil
 		}

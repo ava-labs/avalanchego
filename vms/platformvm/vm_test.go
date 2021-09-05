@@ -858,8 +858,9 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		t.Fatal("Expected BuildBlock to error due to adding a validator with a nodeID that is already in the validator set.")
 	}
 
-	if vm.mempool.unissuedProposalTxs.Len() > 0 {
-		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d", vm.mempool.unissuedProposalTxs.Len())
+	if vm.mempool.HasProposalTxs() {
+		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d",
+			len(vm.mempool.unissuedProposalTxs))
 	}
 }
 

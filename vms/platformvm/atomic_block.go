@@ -30,6 +30,15 @@ type AtomicBlock struct {
 	inputs ids.Set
 }
 
+func (ab *AtomicBlock) ToString() string {
+	var res string
+
+	res += fmt.Sprintf("BlockID: %s, height %v \n", ab.ID(), ab.Height())
+	res += fmt.Sprintf("TxID: %s \n", ab.Tx.ID())
+
+	return res
+}
+
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)

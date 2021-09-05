@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -72,62 +70,7 @@ type Mempool struct {
 	// Transactions that have not been put into blocks yet
 	dropIncoming bool
 
-	unissuedProposalTxs *EventHeap
-	unissuedDecisionTxs []*Tx
-	unissuedAtomicTxs   []*Tx
-
-	rejectedProposalTxs *cache.LRU
-	rejectedDecisionTxs *cache.LRU
-	rejectedAtomicTxs   *cache.LRU
-
-	unissuedTxs    map[ids.ID]*Tx
-	totalBytesSize int
-}
-
-func (m *Mempool) has(txID ids.ID) bool {
-	_, ok := m.unissuedTxs[txID]
-	return ok
-}
-
-func (m *Mempool) hasRoomFor(tx *Tx) bool {
-	return m.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
-}
-
-func (m *Mempool) markReject(tx *Tx) error {
-	switch tx.UnsignedTx.(type) {
-	case TimedTx:
-		m.rejectedProposalTxs.Put(tx.ID(), struct{}{})
-	case UnsignedDecisionTx:
-		m.rejectedDecisionTxs.Put(tx.ID(), struct{}{})
-	case UnsignedAtomicTx:
-		m.rejectedAtomicTxs.Put(tx.ID(), struct{}{})
-	default:
-		return errUnknownTxType
-	}
-	return nil
-}
-
-func (m *Mempool) isAlreadyRejected(txID ids.ID) bool {
-	res := false
-	if _, exist := m.rejectedProposalTxs.Get(txID); exist {
-		res = true
-	} else if _, exist := m.rejectedDecisionTxs.Get(txID); exist {
-		res = true
-	} else if _, exist := m.rejectedAtomicTxs.Get(txID); exist {
-		res = true
-	}
-
-	return res
-}
-
-func (m *Mempool) register(tx *Tx) {
-	m.unissuedTxs[tx.ID()] = tx
-	m.totalBytesSize += len(tx.Bytes())
-}
-
-func (m *Mempool) deregister(tx *Tx) {
-	delete(m.unissuedTxs, tx.ID())
-	m.totalBytesSize -= len(tx.Bytes())
+	*mempoolContent
 }
 
 // Initialize this mempool.
@@ -135,15 +78,7 @@ func (m *Mempool) Initialize(vm *VM) {
 	m.vm = vm
 
 	m.vm.ctx.Log.Verbo("initializing platformVM mempool")
-
-	// Transactions from clients that have not yet been put into blocks and
-	// added to consensus
-	m.unissuedTxs = make(map[ids.ID]*Tx)
-	m.unissuedProposalTxs = &EventHeap{SortByStartTime: true}
-
-	m.rejectedProposalTxs = &cache.LRU{Size: rejectedTxsCacheSize}
-	m.rejectedDecisionTxs = &cache.LRU{Size: rejectedTxsCacheSize}
-	m.rejectedAtomicTxs = &cache.LRU{Size: rejectedTxsCacheSize}
+	m.mempoolContent = newMempoolContent()
 
 	m.timer = timer.NewTimer(func() {
 		m.vm.ctx.Lock.Lock()
@@ -197,16 +132,42 @@ func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
-		m.unissuedProposalTxs.Add(tx)
+		if err := m.AddProposalTx(tx); err != nil {
+			return err
+		}
 	case UnsignedDecisionTx:
-		m.unissuedDecisionTxs = append(m.unissuedDecisionTxs, tx)
+		if err := m.AddDecisionTx(tx); err != nil {
+			return err
+		}
 	case UnsignedAtomicTx:
-		m.unissuedAtomicTxs = append(m.unissuedAtomicTxs, tx)
+		if err := m.AddAtomicTx(tx); err != nil {
+			return err
+		}
 	default:
 		return errUnknownTxType
 	}
-	m.register(tx)
 	m.ResetTimer()
+	return nil
+}
+
+func (m *Mempool) RemoveTx(txs []*Tx) error {
+	for _, tx := range txs {
+		if !m.has(tx.ID()) {
+			continue
+		}
+
+		switch tx.UnsignedTx.(type) {
+		case TimedTx:
+			m.RemoveProposalTx(tx)
+		case UnsignedDecisionTx:
+			m.RemoveDecisionTxs([]*Tx{tx})
+		case UnsignedAtomicTx:
+			m.RemoveAtomicTx(tx)
+		default:
+			return errUnknownTxType
+		}
+	}
+
 	return nil
 }
 
@@ -235,21 +196,14 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	nextHeight := preferred.Height() + 1
 
 	// If there are pending decision txs, build a block with a batch of them
-	if len(m.unissuedDecisionTxs) > 0 {
-		numTxs := BatchSize
-		if numTxs > len(m.unissuedDecisionTxs) {
-			numTxs = len(m.unissuedDecisionTxs)
-		}
-		var txs []*Tx
-		txs, m.unissuedDecisionTxs = m.unissuedDecisionTxs[:numTxs], m.unissuedDecisionTxs[numTxs:]
-		for _, tx := range txs {
-			m.deregister(tx)
-		}
+	if m.HasDecisionTxs() {
+		txs := m.ExtractNextDecisionTxs(BatchSize)
 		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			m.ResetTimer()
 			return nil, err
 		}
+		m.vm.ctx.Log.Debug("Build Standard Block %v", blk.ToString())
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -261,16 +215,15 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	}
 
 	// If there is a pending atomic tx, build a block with it
-	if len(m.unissuedAtomicTxs) > 0 {
-		tx := m.unissuedAtomicTxs[0]
-		m.unissuedAtomicTxs = m.unissuedAtomicTxs[1:]
-		m.deregister(tx)
+	if m.HasAtomicTxs() {
+		tx := m.ExtractNextAtomicTx()
 
 		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
 		if err != nil {
 			m.ResetTimer()
 			return nil, err
 		}
+		m.vm.ctx.Log.Debug("Build Atomic Block %v", blk.ToString())
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -313,6 +266,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
+		m.vm.ctx.Log.Debug("Build Proposal Block %v", blk.ToString())
 
 		m.vm.internalState.AddBlock(blk)
 		return blk, m.vm.internalState.Commit()
@@ -344,14 +298,13 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	// Propose adding a new validator but only if their start time is in the
 	// future relative to local time (plus Delta)
 	syncTime := localTime.Add(syncBound)
-	for m.unissuedProposalTxs.Len() > 0 {
-		tx := m.unissuedProposalTxs.Peek()
+	for m.HasProposalTxs() {
+		tx := m.PeekProposalTx()
 		txID := tx.ID()
 		utx := tx.UnsignedTx.(TimedTx)
 		startTime := utx.StartTime()
 		if startTime.Before(syncTime) {
-			m.unissuedProposalTxs.Remove()
-			m.deregister(tx)
+			m.RemoveProposalTx(tx)
 
 			errMsg := fmt.Sprintf(
 				"synchrony bound (%s) is later than staker start time (%s)",
@@ -367,8 +320,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		// If the start time is too far in the future relative to local time
 		// drop the transaction and continue
 		if startTime.After(maxLocalStartTime) {
-			m.unissuedProposalTxs.Remove()
-			m.deregister(tx)
+			m.RemoveProposalTx(tx)
 			continue
 		}
 
@@ -391,8 +343,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		}
 
 		// Attempt to issue the transaction
-		m.unissuedProposalTxs.Remove()
-		m.deregister(tx)
+		m.RemoveProposalTx(tx)
 		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *tx)
 		if err != nil {
 			m.ResetTimer()
@@ -417,7 +368,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 func (m *Mempool) ResetTimer() {
 	// If there is a pending transaction trigger building of a block with that
 	// transaction
-	if len(m.unissuedDecisionTxs) > 0 || len(m.unissuedAtomicTxs) > 0 {
+	if m.HasDecisionTxs() || m.HasAtomicTxs() {
 		m.vm.NotifyBlockReady()
 		return
 	}
@@ -464,16 +415,16 @@ func (m *Mempool) ResetTimer() {
 	}
 
 	syncTime := localTime.Add(syncBound)
-	for m.unissuedProposalTxs.Len() > 0 {
-		startTime := m.unissuedProposalTxs.Peek().UnsignedTx.(TimedTx).StartTime()
+	for m.HasProposalTxs() {
+		tx := m.PeekProposalTx()
+		startTime := tx.UnsignedTx.(TimedTx).StartTime()
 		if !syncTime.After(startTime) {
 			m.vm.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
-		tx := m.unissuedProposalTxs.Remove()
+		m.RemoveProposalTx(tx)
 		txID := tx.ID()
-		m.deregister(tx)
 		errMsg := fmt.Sprintf(
 			"synchrony bound (%s) is later than staker start time (%s)",
 			syncTime,
