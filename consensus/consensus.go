@@ -77,7 +77,8 @@ type Engine interface {
 	// via the VerifySeal method.
 	//
 	// NOTE: VerifyHeader does not validate the correctness of fields that rely
-	// on the ExtData component of the block.
+	// on the contents of the block (as opposed to the current and/or parent
+	// header).
 	VerifyHeader(chain ChainHeaderReader, header *types.Header) error
 
 	// VerifyUncles verifies that the given block's uncles conform to the consensus
