@@ -2,11 +2,9 @@ module github.com/ava-labs/coreth
 
 go 1.15
 
-replace github.com/ava-labs/avalanchego => /home/stephen/go/src/github.com/ava-labs/avalanchego
-
 require (
 	github.com/VictoriaMetrics/fastcache v1.6.0
-	github.com/ava-labs/avalanchego v1.4.13-rc.0.0.20210810160007-5bac885b4998
+	github.com/ava-labs/avalanchego v1.5.3-rc.6
 	github.com/btcsuite/btcd v0.21.0-beta // indirect
 	github.com/cespare/cp v0.1.0
 	github.com/davecgh/go-spew v1.1.1
