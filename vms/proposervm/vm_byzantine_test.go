@@ -125,9 +125,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		},
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():

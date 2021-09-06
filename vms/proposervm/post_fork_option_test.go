@@ -66,9 +66,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 		},
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -194,9 +192,7 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		coreOpt1,
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -303,9 +299,7 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 		},
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -423,9 +417,7 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 		},
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():

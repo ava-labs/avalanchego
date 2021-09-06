@@ -90,7 +90,6 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
@@ -103,9 +102,7 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -116,7 +113,6 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -191,7 +187,6 @@ func TestBlockVerify_PostForkBlock_ParentChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
@@ -204,9 +199,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -217,7 +210,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -381,7 +373,6 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// create parent block ...
@@ -394,9 +385,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -407,7 +396,6 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -531,7 +519,6 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(100)
-	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 	// proVM.SetStartTime(timer.MaxTime) // switch off scheduler for current test
 
@@ -568,9 +555,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		},
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -723,7 +708,6 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Show that other verify call would not call coreBlk.Verify()
 	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(2000)
-	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	coreBlk := &snowman.TestBlock{
@@ -735,9 +719,7 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -748,7 +730,6 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -787,7 +768,6 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
 	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	pChainHeight := uint64(2000)
-	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	coreBlk := &snowman.TestBlock{
@@ -799,9 +779,7 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp().Add(proposer.MaxDelay),
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -812,7 +790,6 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -850,11 +827,9 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t *testing.T) {
 	coreVM, valState, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
 	var pChainHeight uint64
-	valState.CantGetCurrentHeight = true
 	valState.GetCurrentHeightF = func() (uint64, error) { return pChainHeight, nil }
 
 	// generate two blocks with the same core block and store them
-	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
@@ -900,7 +875,6 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 // ProposerBlock.Reject tests section
 func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0) // enable ProBlks
-	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
@@ -974,9 +948,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		coreOpt1,
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():

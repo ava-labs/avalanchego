@@ -75,9 +75,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		},
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -176,9 +174,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		},
 	}
 
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -256,9 +252,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		ParentV:    coreGenBlk.ID(),
 		TimestampV: coreGenBlk.Timestamp(),
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return prntCoreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -269,7 +263,6 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -334,7 +327,6 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		TimestampV: preActivationTime,
 		VerifyV:    nil,
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
 
 	// preFork block verifies if parent is before fork activation time
@@ -382,7 +374,6 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	postActivationTime := activationTime.Add(time.Second)
 	proVM.Set(postActivationTime)
 
-	coreVM.CantSetPreference = true
 	coreVM.SetPreferenceF = func(id ids.ID) error { return nil }
 	if err := proVM.SetPreference(preForkChild.ID()); err != nil {
 		t.Fatal("could not set preference")
@@ -397,7 +388,6 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		TimestampV: postActivationTime,
 		VerifyV:    nil,
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return secondCoreBlk, nil }
 	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch id {
@@ -434,7 +424,6 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		TimestampV: postActivationTime,
 		VerifyV:    nil,
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return thirdCoreBlk, nil }
 	coreVM.GetBlockF = func(id ids.ID) (snowman.Block, error) {
 		switch id {
@@ -478,7 +467,6 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 		TimestampV: coreGenBlk.Timestamp(),
 		VerifyV:    nil,
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlock, nil }
 
 	// postFork block verifies if parent is after fork activation time
@@ -515,9 +503,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 		BytesV:  []byte{1},
 		ParentV: coreGenBlk.ID(),
 	}
-	coreVM.CantBuildBlock = true
 	coreVM.BuildBlockF = func() (snowman.Block, error) { return coreBlk, nil }
-	coreVM.CantGetBlock = true
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
@@ -528,7 +514,6 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 			return nil, database.ErrNotFound
 		}
 	}
-	coreVM.CantParseBlock = true
 	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
@@ -566,7 +551,6 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 // ProposerBlock.Reject tests section
 func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, timer.MaxTime, 0) // disable ProBlks
-	coreVM.CantBuildBlock = true
 	coreBlk := &snowman.TestBlock{
 		TestDecidable: choices.TestDecidable{
 			IDV:     ids.Empty.Prefix(111),
