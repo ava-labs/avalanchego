@@ -202,7 +202,7 @@ func testDynamicFeesStaysWithinRange(t *testing.T, test test) {
 	engine := NewFakerSkipBlockFee()
 
 	for index, block := range blocks[1:] {
-		nextExtraData, nextBaseFee, err := engine.CalcBaseFee(params.TestApricotPhase3Config, types.NewBlockWithHeader(header), block.timestamp)
+		nextExtraData, nextBaseFee, err := engine.CalcBaseFee(params.TestApricotPhase3Config, header, block.timestamp)
 		if err != nil {
 			t.Fatalf("Failed to calculate base fee at index %d: %s", index, err)
 		}
