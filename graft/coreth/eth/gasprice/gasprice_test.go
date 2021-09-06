@@ -100,8 +100,8 @@ func (b *testBackend) Engine() consensus.Engine {
 	return b.chain.Engine()
 }
 
-func (b *testBackend) MinRequiredTip(ctx context.Context, block *types.Block) (*big.Int, error) {
-	return b.chain.Engine().MinRequiredTip(b.chain, block)
+func (b *testBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
+	return b.chain.Engine().MinRequiredTip(b.chain, header)
 }
 
 func (b *testBackend) CurrentHeader() *types.Header {

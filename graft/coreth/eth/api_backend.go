@@ -427,6 +427,6 @@ func (b *EthAPIBackend) StateAtTransaction(ctx context.Context, block *types.Blo
 	return b.eth.stateAtTransaction(block, txIndex, reexec)
 }
 
-func (b *EthAPIBackend) MinRequiredTip(ctx context.Context, block *types.Block) (*big.Int, error) {
-	return b.eth.engine.MinRequiredTip(b.eth.blockchain, block)
+func (b *EthAPIBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
+	return b.eth.engine.MinRequiredTip(b.eth.blockchain, header)
 }
