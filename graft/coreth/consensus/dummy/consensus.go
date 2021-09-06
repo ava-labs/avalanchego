@@ -341,10 +341,6 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, heade
 		return nil, nil
 	}
 
-	if self.ethFaker {
-		return big.NewInt(0), nil
-	}
-
 	if header.Number.Int64() == 0 {
 		return nil, nil
 	}
@@ -361,7 +357,18 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, heade
 		header.ExtDataGasUsed,
 	)
 	averageGasPrice := new(big.Int).Div(requiredBlockFee, blockGasUsage)
-	return new(big.Int).Sub(averageGasPrice, header.BaseFee), nil
+	minRequiredTip := new(big.Int).Sub(averageGasPrice, header.BaseFee)
+
+	// The minimum required tip can be negative when the block fee is not
+	// satisified and block fee verification is disabled.
+	if minRequiredTip.Sign() < 0 {
+		if self.ethFaker {
+			minRequiredTip = common.Big0
+		} else {
+			return nil, errors.New("minimum required tip is negative")
+		}
+	}
+	return minRequiredTip, nil
 }
 
 func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *types.Header, timestamp uint64) *big.Int {
