@@ -96,7 +96,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	}
 
 	// Initialize the transaction
-	if err := tx.Sign(m.vm.codec, nil); err != nil {
+	if err := tx.Sign(Codec, nil); err != nil {
 		return err
 	}
 
@@ -109,7 +109,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 
 		txID := tx.ID()
 		m.vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		msgAppBytes, err := encodeTxID(m.vm.codec, txID)
+		msgAppBytes, err := encodeTxID(txID)
 		if err != nil {
 			return err
 		}

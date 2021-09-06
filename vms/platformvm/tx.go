@@ -28,7 +28,6 @@ type UnsignedTx interface {
 // UnsignedDecisionTx is an unsigned operation that can be immediately decided
 type DecisionSyntacticVerificationContext struct {
 	ctx        *snow.Context
-	c          codec.Manager
 	feeAmount  uint64
 	feeAssetID ids.ID
 }
@@ -49,7 +48,6 @@ type UnsignedDecisionTx interface {
 // UnsignedProposalTx is an unsigned operation that can be proposed
 type ProposalSyntacticVerificationContext struct {
 	ctx              *snow.Context
-	c                codec.Manager
 	minStakeDuration time.Duration
 	maxStakeDuration time.Duration
 
@@ -83,7 +81,6 @@ type UnsignedProposalTx interface {
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type AtomicSyntacticVerificationContext struct {
 	ctx        *snow.Context
-	c          codec.Manager
 	avmID      ids.ID
 	feeAmount  uint64
 	feeAssetID ids.ID
@@ -116,7 +113,7 @@ type Tx struct {
 
 // Sign this transaction with the provided signers
 func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) error {
-	unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedTx)
+	unsignedBytes, err := c.Marshal(CodecVersion, &tx.UnsignedTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal UnsignedTx: %w", err)
 	}
@@ -137,7 +134,7 @@ func (tx *Tx) Sign(c codec.Manager, signers [][]*crypto.PrivateKeySECP256K1R) er
 		tx.Creds = append(tx.Creds, cred) // Attach credential
 	}
 
-	signedBytes, err := c.Marshal(codecVersion, tx)
+	signedBytes, err := c.Marshal(CodecVersion, tx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal ProposalTx: %w", err)
 	}

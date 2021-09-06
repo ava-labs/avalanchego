@@ -216,7 +216,7 @@ func TestGetTxStatus(t *testing.T) {
 			},
 		},
 	}
-	utxoBytes, err := Codec.Marshal(codecVersion, utxo)
+	utxoBytes, err := Codec.Marshal(CodecVersion, utxo)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +498,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[0])
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -525,7 +525,7 @@ func TestGetStake(t *testing.T) {
 		outputBytes, err := formatting.Decode(args.Encoding, outputStr)
 		assert.NoError(err)
 		var output avax.TransferableOutput
-		_, err = service.vm.codec.Unmarshal(outputBytes, &output)
+		_, err = Codec.Unmarshal(outputBytes, &output)
 		assert.NoError(err)
 		out, ok := output.Out.(*secp256k1fx.TransferOutput)
 		assert.True(ok)
@@ -571,7 +571,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected
@@ -613,7 +613,7 @@ func TestGetStake(t *testing.T) {
 	for i := range outputs {
 		outputBytes, err := formatting.Decode(args.Encoding, response.Outputs[i])
 		assert.NoError(err)
-		_, err = service.vm.codec.Unmarshal(outputBytes, &outputs[i])
+		_, err = Codec.Unmarshal(outputBytes, &outputs[i])
 		assert.NoError(err)
 	}
 	// Make sure the stake amount is as expected

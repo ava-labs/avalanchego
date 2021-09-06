@@ -62,7 +62,7 @@ func (tx *UnsignedImportTx) SyntacticVerify(
 		return errNoImportInputs
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
 		return err
 	}
 
@@ -87,7 +87,6 @@ func (tx *UnsignedImportTx) SemanticVerify(
 ) (VersionedState, TxError) {
 	synCtx := AtomicSyntacticVerificationContext{
 		ctx:        vm.ctx,
-		c:          vm.codec,
 		avmID:      vm.ctx.XChainID,
 		feeAmount:  vm.TxFee,
 		feeAssetID: vm.ctx.AVAXAssetID,
@@ -122,7 +121,7 @@ func (tx *UnsignedImportTx) SemanticVerify(
 
 		for i, utxoBytes := range allUTXOBytes {
 			utxo := &avax.UTXO{}
-			if _, err := vm.codec.Unmarshal(utxoBytes, utxo); err != nil {
+			if _, err := Codec.Unmarshal(utxoBytes, utxo); err != nil {
 				return nil, tempError{
 					fmt.Errorf("failed to unmarshal UTXO: %w", err),
 				}
@@ -257,13 +256,12 @@ func (vm *VM) newImportTx(
 		ImportedInputs: importedInputs,
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	synCtx := AtomicSyntacticVerificationContext{
 		ctx:        vm.ctx,
-		c:          vm.codec,
 		avmID:      vm.ctx.XChainID,
 		feeAmount:  vm.TxFee,
 		feeAssetID: vm.ctx.AVAXAssetID,

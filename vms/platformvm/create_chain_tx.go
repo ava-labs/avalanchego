@@ -77,7 +77,7 @@ func (tx *UnsignedCreateChainTx) SyntacticVerify(
 		}
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
 		return err
 	}
 	if err := tx.SubnetAuth.Verify(); err != nil {
@@ -106,7 +106,6 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
 	synCtx := DecisionSyntacticVerificationContext{
 		ctx:        vm.ctx,
-		c:          vm.codec,
 		feeAmount:  createBlockchainTxFee,
 		feeAssetID: vm.ctx.AVAXAssetID,
 	}
@@ -202,13 +201,12 @@ func (vm *VM) newCreateChainTx(
 		SubnetAuth:  subnetAuth,
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	synCtx := DecisionSyntacticVerificationContext{
 		ctx:        vm.ctx,
-		c:          vm.codec,
 		feeAmount:  createBlockchainTxFee,
 		feeAssetID: vm.ctx.AVAXAssetID,
 	}

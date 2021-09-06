@@ -232,5 +232,5 @@ func (vm *VM) newAdvanceTimeTx(timestamp time.Time) (*Tx, error) {
 	tx := &Tx{UnsignedTx: &UnsignedAdvanceTimeTx{
 		Time: uint64(timestamp.Unix()),
 	}}
-	return tx, tx.Sign(vm.codec, nil)
+	return tx, tx.Sign(Codec, nil)
 }

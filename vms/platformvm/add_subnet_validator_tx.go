@@ -67,7 +67,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.SubnetAuth); err != nil {
@@ -93,7 +93,6 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 ) {
 	synCtx := ProposalSyntacticVerificationContext{
 		ctx:              vm.ctx,
-		c:                vm.codec,
 		feeAmount:        vm.TxFee,
 		feeAssetID:       vm.ctx.AVAXAssetID,
 		minStakeDuration: vm.MinStakeDuration,
@@ -300,13 +299,12 @@ func (vm *VM) newAddSubnetValidatorTx(
 		SubnetAuth: subnetAuth,
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	synCtx := ProposalSyntacticVerificationContext{
 		ctx:              vm.ctx,
-		c:                vm.codec,
 		feeAmount:        vm.TxFee,
 		feeAssetID:       vm.ctx.AVAXAssetID,
 		minStakeDuration: vm.MinStakeDuration,

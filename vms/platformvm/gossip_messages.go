@@ -3,7 +3,6 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
@@ -26,17 +25,17 @@ type appMsg struct {
 	tx *Tx
 }
 
-func encodeTxID(c codec.Manager, txID ids.ID) ([]byte, error) {
+func encodeTxID(txID ids.ID) ([]byte, error) {
 	am := &appMsg{
 		ContentType: txIDType,
 		Bytes:       txID[:],
 	}
 
-	return c.Marshal(codecVersion, am)
+	return Codec.Marshal(CodecVersion, am)
 }
 
-func encodeTx(c codec.Manager, tx *Tx) ([]byte, error) {
-	bytes, err := c.Marshal(codecVersion, tx)
+func encodeTx(tx *Tx) ([]byte, error) {
+	bytes, err := Codec.Marshal(CodecVersion, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -46,12 +45,12 @@ func encodeTx(c codec.Manager, tx *Tx) ([]byte, error) {
 		Bytes:       bytes,
 	}
 
-	return c.Marshal(codecVersion, am)
+	return Codec.Marshal(CodecVersion, am)
 }
 
-func decodeToAppMsg(c codec.Manager, bytes []byte) (*appMsg, error) {
+func decodeToAppMsg(bytes []byte) (*appMsg, error) {
 	am := &appMsg{}
-	if _, err := c.Unmarshal(bytes, am); err != nil {
+	if _, err := Codec.Unmarshal(bytes, am); err != nil {
 		return nil, fmt.Errorf(fmt.Sprintf("could not decode AppMsg, error %v", err))
 	}
 
@@ -66,11 +65,11 @@ func decodeToAppMsg(c codec.Manager, bytes []byte) (*appMsg, error) {
 
 	case txType:
 		tx := &Tx{}
-		_, err := c.Unmarshal(am.Bytes, tx)
+		_, err := Codec.Unmarshal(am.Bytes, tx)
 		if err != nil {
 			return nil, fmt.Errorf("could not decode tx, error %v", err)
 		}
-		unsignedBytes, err := c.Marshal(codecVersion, &tx.UnsignedTx)
+		unsignedBytes, err := Codec.Marshal(CodecVersion, &tx.UnsignedTx)
 		if err != nil {
 			return nil, fmt.Errorf("could not decode unsignedTx, error %v", err)
 		}

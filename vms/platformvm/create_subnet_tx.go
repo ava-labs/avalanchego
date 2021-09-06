@@ -35,7 +35,7 @@ func (tx *UnsignedCreateSubnetTx) SyntacticVerify(
 		return nil
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
 		return err
 	}
 	if err := tx.Owner.Verify(); err != nil {
@@ -60,7 +60,6 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	synCtx := DecisionSyntacticVerificationContext{
 		ctx:        vm.ctx,
-		c:          vm.codec,
 		feeAmount:  createSubnetTxFee,
 		feeAssetID: vm.ctx.AVAXAssetID,
 	}
@@ -116,13 +115,12 @@ func (vm *VM) newCreateSubnetTx(
 		},
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	synCtx := DecisionSyntacticVerificationContext{
 		ctx:        vm.ctx,
-		c:          vm.codec,
 		feeAmount:  createSubnetTxFee,
 		feeAssetID: vm.ctx.AVAXAssetID,
 	}

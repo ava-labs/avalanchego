@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	codecVersion = 0
+	CodecVersion = 0
 )
 
 // Codecs do serialization and deserialization
@@ -67,8 +67,8 @@ func init() {
 		)
 	}
 	errs.Add(
-		Codec.RegisterCodec(codecVersion, c),
-		GenesisCodec.RegisterCodec(codecVersion, gc),
+		Codec.RegisterCodec(CodecVersion, c),
+		GenesisCodec.RegisterCodec(CodecVersion, gc),
 	)
 	if errs.Errored() {
 		panic(errs.Err)

@@ -145,7 +145,6 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		tx.UnsignedTx = test.setup(tx.UnsignedTx.(*UnsignedCreateChainTx))
 		synCtx := DecisionSyntacticVerificationContext{
 			ctx:        vm.ctx,
-			c:          vm.codec,
 			feeAmount:  vm.TxFee,
 			feeAssetID: vm.ctx.AVAXAssetID,
 		}
