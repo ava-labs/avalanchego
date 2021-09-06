@@ -366,14 +366,3 @@ func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *ty
 	}
 	return calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp)
 }
-
-func (self *DummyEngine) CalcExtDataGasUsed(config *params.ChainConfig, block *types.Block) (*big.Int, error) {
-	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(block.Time())) || self.cb.ExtraStateGasUsed == nil {
-		return nil, nil
-	}
-	gasUsed, err := self.cb.ExtraStateGasUsed(block)
-	if err != nil {
-		return nil, err
-	}
-	return new(big.Int).SetUint64(gasUsed), nil
-}
