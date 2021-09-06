@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -41,6 +42,8 @@ type UnsignedRewardValidatorTx struct {
 	// Marks if this validator should be rewarded according to this node.
 	shouldPreferCommit bool
 }
+
+func (t *UnsignedRewardValidatorTx) InitCtx(*snow.Context) {}
 
 func (tx *UnsignedRewardValidatorTx) SyntacticVerify(
 	ctx ProposalSyntacticVerificationContext,

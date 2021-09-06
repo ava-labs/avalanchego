@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -26,6 +27,8 @@ type UnsignedAdvanceTimeTx struct {
 	// Unix time this block proposes increasing the timestamp to
 	Time uint64 `serialize:"true" json:"time"`
 }
+
+func (t *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
 
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -21,7 +21,15 @@ type UnsignedCreateSubnetTx struct {
 	// Metadata, inputs and outputs
 	BaseTx `serialize:"true"`
 	// Who is authorized to manage this subnet
-	Owner verify.Verifiable `serialize:"true" json:"owner"`
+	Owner Owner `serialize:"true" json:"owner"`
+}
+
+// InitCtx sets the FxID fields in the inputs and outputs of this
+// [UnsignedCreateSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so that
+// the addresses can be json marshalled into human readable format
+func (t *UnsignedCreateSubnetTx) InitCtx(ctx *snow.Context) {
+	t.BaseTx.InitCtx(ctx)
+	t.Owner.InitCtx(ctx)
 }
 
 // Verify this transaction is well-formed

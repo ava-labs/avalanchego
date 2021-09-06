@@ -37,6 +37,16 @@ type UnsignedImportTx struct {
 	ImportedInputs []*avax.TransferableInput `serialize:"true" json:"importedInputs"`
 }
 
+// InitCtx sets the FxID fields in the inputs and outputs of this
+// [UnsignedImportTx]. Also sets the [ctx] to the given [vm.ctx] so that
+// the addresses can be json marshalled into human readable format
+func (t *UnsignedImportTx) InitCtx(ctx *snow.Context) {
+	t.BaseTx.InitCtx(ctx)
+	for _, in := range t.ImportedInputs {
+		in.FxID = secp256k1fx.ID
+	}
+}
+
 // InputUTXOs returns the UTXOIDs of the imported funds
 func (tx *UnsignedImportTx) InputUTXOs() ids.Set {
 	set := ids.NewSet(len(tx.ImportedInputs))

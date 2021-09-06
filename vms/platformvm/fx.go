@@ -1,5 +1,10 @@
 package platformvm
 
+import (
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
+)
+
 // Fx is the interface a feature extension must implement to support the
 // Platform Chain.
 type Fx interface {
@@ -26,6 +31,11 @@ type Fx interface {
 	// CreateOutput creates a new output with the provided control group worth
 	// the specified amount
 	CreateOutput(amount uint64, controlGroup interface{}) (interface{}, error)
+}
+
+type Owner interface {
+	verify.Verifiable
+	snow.ContextInitializable
 }
 
 type Owned interface {

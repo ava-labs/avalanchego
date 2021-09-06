@@ -23,17 +23,6 @@ type StandardBlock struct {
 	Txs []*Tx `serialize:"true" json:"txs"`
 }
 
-func (sb *StandardBlock) ToString() string {
-	var res string
-
-	res += fmt.Sprintf("BlockID: %s, height %v \n", sb.ID(), sb.Height())
-	for _, tx := range sb.Txs {
-		res += fmt.Sprintf("TxID: %s \n", tx.ID())
-	}
-
-	return res
-}
-
 func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status, blk Block) error {
 	if err := sb.SingleDecisionBlock.initialize(vm, bytes, status, blk); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
@@ -42,6 +31,7 @@ func (sb *StandardBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		if err := tx.Sign(Codec, nil); err != nil {
 			return fmt.Errorf("failed to sign block: %w", err)
 		}
+		tx.InitCtx(vm.ctx)
 	}
 	return nil
 }
@@ -178,5 +168,5 @@ func (vm *VM) newStandardBlock(parentID ids.ID, height uint64, txs []*Tx) (*Stan
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	return sb, sb.SingleDecisionBlock.initialize(vm, bytes, choices.Processing, sb)
+	return sb, sb.initialize(vm, bytes, choices.Processing, sb)
 }

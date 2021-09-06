@@ -203,7 +203,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			m.ResetTimer()
 			return nil, err
 		}
-		m.vm.ctx.Log.Debug("Build Standard Block %v", blk.ToString())
+		m.vm.ctx.Log.Debug("Built Standard Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -223,7 +223,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 			m.ResetTimer()
 			return nil, err
 		}
-		m.vm.ctx.Log.Debug("Build Atomic Block %v", blk.ToString())
+		m.vm.ctx.Log.Debug("Built Atomic Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
 
 		if err := blk.Verify(); err != nil {
 			m.ResetTimer()
@@ -266,7 +266,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 		if err != nil {
 			return nil, err
 		}
-		m.vm.ctx.Log.Debug("Build Proposal Block %v", blk.ToString())
+		m.vm.ctx.Log.Debug("Built Proposal Block %s: %s", blk.ID(), jsonFormatter{obj: blk})
 
 		m.vm.internalState.AddBlock(blk)
 		return blk, m.vm.internalState.Commit()

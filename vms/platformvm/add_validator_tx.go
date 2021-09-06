@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -41,10 +42,22 @@ type UnsignedAddValidatorTx struct {
 	// Where to send staked tokens when done validating
 	Stake []*avax.TransferableOutput `serialize:"true" json:"stake"`
 	// Where to send staking rewards when done validating
-	RewardsOwner verify.Verifiable `serialize:"true" json:"rewardsOwner"`
+	RewardsOwner Owner `serialize:"true" json:"rewardsOwner"`
 	// Fee this validator charges delegators as a percentage, times 10,000
 	// For example, if this validator has Shares=300,000 then they take 30% of rewards from delegators
 	Shares uint32 `serialize:"true" json:"shares"`
+}
+
+// InitCtx sets the FxID fields in the inputs and outputs of this
+// [UnsignedAddValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
+// the addresses can be json marshalled into human readable format
+func (t *UnsignedAddValidatorTx) InitCtx(ctx *snow.Context) {
+	t.BaseTx.InitCtx(ctx)
+	for _, out := range t.Stake {
+		out.FxID = secp256k1fx.ID
+		out.InitCtx(ctx)
+	}
+	t.RewardsOwner.InitCtx(ctx)
 }
 
 // StartTime of this validator

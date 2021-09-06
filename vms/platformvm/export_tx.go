@@ -37,6 +37,17 @@ type UnsignedExportTx struct {
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
+// InitCtx sets the FxID fields in the inputs and outputs of this
+// [UnsignedExportTx]. Also sets the [ctx] to the given [vm.ctx] so that
+// the addresses can be json marshalled into human readable format
+func (t *UnsignedExportTx) InitCtx(ctx *snow.Context) {
+	t.BaseTx.InitCtx(ctx)
+	for _, out := range t.ExportedOutputs {
+		out.FxID = secp256k1fx.ID
+		out.InitCtx(ctx)
+	}
+}
+
 // InputUTXOs returns an empty set
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 

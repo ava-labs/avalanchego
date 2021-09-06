@@ -30,15 +30,6 @@ type AtomicBlock struct {
 	inputs ids.Set
 }
 
-func (ab *AtomicBlock) ToString() string {
-	var res string
-
-	res += fmt.Sprintf("BlockID: %s, height %v \n", ab.ID(), ab.Height())
-	res += fmt.Sprintf("TxID: %s \n", ab.Tx.ID())
-
-	return res
-}
-
 func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, self Block) error {
 	if err := ab.CommonDecisionBlock.initialize(vm, bytes, status, self); err != nil {
 		return fmt.Errorf("failed to initialize: %w", err)
@@ -52,6 +43,7 @@ func (ab *AtomicBlock) initialize(vm *VM, bytes []byte, status choices.Status, s
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
 	ab.Tx.Initialize(unsignedBytes, signedBytes)
+	ab.Tx.InitCtx(vm.ctx)
 	return nil
 }
 
@@ -228,5 +220,5 @@ func (vm *VM) newAtomicBlock(parentID ids.ID, height uint64, tx Tx) (*AtomicBloc
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal block: %w", err)
 	}
-	return ab, ab.CommonDecisionBlock.initialize(vm, bytes, choices.Processing, ab)
+	return ab, ab.initialize(vm, bytes, choices.Processing, ab)
 }

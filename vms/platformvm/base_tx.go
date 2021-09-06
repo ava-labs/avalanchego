@@ -5,6 +5,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // BaseTx contains fields common to many transaction types. It should be
@@ -14,6 +15,19 @@ type BaseTx struct {
 
 	// true iff this transaction has already passed syntactic verification
 	syntacticallyVerified bool
+}
+
+// InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
+// sets the [ctx] to the given [vm.ctx] so that the addresses can be json
+// marshalled into human readable format
+func (t *BaseTx) InitCtx(ctx *snow.Context) {
+	for _, in := range t.BaseTx.Ins {
+		in.FxID = secp256k1fx.ID
+	}
+	for _, out := range t.BaseTx.Outs {
+		out.FxID = secp256k1fx.ID
+		out.InitCtx(ctx)
+	}
 }
 
 // Verify returns nil iff this tx is well formed

@@ -19,6 +19,10 @@ import (
 
 // UnsignedTx is an unsigned transaction
 type UnsignedTx interface {
+	// TODO: Remove this initialization pattern from both the platformvm and the
+	// avm.
+	snow.ContextInitializable
+
 	Initialize(unsignedBytes, signedBytes []byte)
 	ID() ids.ID
 	UnsignedBytes() []byte

@@ -38,15 +38,6 @@ type ProposalBlock struct {
 	onAbortFunc func() error
 }
 
-func (pb *ProposalBlock) ToString() string {
-	var res string
-
-	res += fmt.Sprintf("BlockID: %s, height %v \n", pb.ID(), pb.Height())
-	res += fmt.Sprintf("TxID: %s \n", pb.Tx.ID())
-
-	return res
-}
-
 func (pb *ProposalBlock) free() {
 	pb.CommonBlock.free()
 	pb.onCommitState = nil
@@ -103,6 +94,7 @@ func (pb *ProposalBlock) initialize(vm *VM, bytes []byte, status choices.Status,
 		return fmt.Errorf("failed to marshal tx: %w", err)
 	}
 	pb.Tx.Initialize(unsignedBytes, signedBytes)
+	pb.Tx.InitCtx(vm.ctx)
 	return nil
 }
 
