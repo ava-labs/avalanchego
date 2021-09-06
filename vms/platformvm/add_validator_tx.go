@@ -89,7 +89,7 @@ func (tx *UnsignedAddValidatorTx) SyntacticVerify(
 		return errStakeTooLong
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -135,7 +135,6 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	// Verify the tx is well-formed
 	synCtx := ProposalSyntacticVerificationContext{
 		ctx:              vm.ctx,
-		c:                vm.codec,
 		minStake:         vm.MinValidatorStake,
 		maxStake:         vm.MaxValidatorStake,
 		minStakeDuration: vm.MinStakeDuration,
@@ -294,13 +293,12 @@ func (vm *VM) newAddValidatorTx(
 		Shares: shares,
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	synCtx := ProposalSyntacticVerificationContext{
 		ctx:              vm.ctx,
-		c:                vm.codec,
 		minStake:         vm.MinValidatorStake,
 		maxStake:         vm.MaxValidatorStake,
 		minStakeDuration: vm.MinStakeDuration,

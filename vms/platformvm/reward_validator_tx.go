@@ -10,10 +10,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -124,7 +123,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 
 	// If the reward is aborted, then the current supply should be decreased.
 	currentSupply := onAbortState.GetCurrentSupply()
-	newSupply, err := safemath.Sub64(currentSupply, stakerReward)
+	newSupply, err := math.Sub64(currentSupply, stakerReward)
 	if err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
@@ -213,7 +212,7 @@ func (tx *UnsignedRewardValidatorTx) SemanticVerify(
 		delegatorShares := PercentDenominator - uint64(vdrTx.Shares)             // parentTx.Shares <= PercentDenominator so no underflow
 		delegatorReward := delegatorShares * (stakerReward / PercentDenominator) // delegatorShares <= PercentDenominator so no overflow
 		// Delay rounding as long as possible for small numbers
-		if optimisticReward, err := safemath.Mul64(delegatorShares, stakerReward); err == nil {
+		if optimisticReward, err := math.Mul64(delegatorShares, stakerReward); err == nil {
 			delegatorReward = optimisticReward / PercentDenominator
 		}
 		delegateeReward := stakerReward - delegatorReward // delegatorReward <= reward so no underflow
@@ -310,5 +309,5 @@ func (vm *VM) newRewardValidatorTx(txID ids.ID) (*Tx, error) {
 	tx := &Tx{UnsignedTx: &UnsignedRewardValidatorTx{
 		TxID: txID,
 	}}
-	return tx, tx.Sign(vm.codec, nil)
+	return tx, tx.Sign(Codec, nil)
 }

@@ -33,7 +33,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	var unsignedTx *UnsignedAddDelegatorTx
 	synCtx := ProposalSyntacticVerificationContext{
 		ctx:               vm.ctx,
-		c:                 vm.codec,
 		minDelegatorStake: vm.MinDelegatorStake,
 		minStakeDuration:  defaultMinStakingDuration,
 		maxStakeDuration:  defaultMaxStakingDuration,
@@ -60,7 +59,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	synCtx = ProposalSyntacticVerificationContext{
 		ctx:               vm.ctx,
-		c:                 vm.codec,
 		minDelegatorStake: vm.MinDelegatorStake,
 		minStakeDuration:  defaultMinStakingDuration,
 		maxStakeDuration:  defaultMaxStakingDuration,
@@ -87,7 +85,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	synCtx = ProposalSyntacticVerificationContext{
 		ctx:               vm.ctx,
-		c:                 vm.codec,
 		minDelegatorStake: vm.MinDelegatorStake,
 		minStakeDuration:  defaultMinStakingDuration,
 		maxStakeDuration:  defaultMaxStakingDuration,
@@ -114,7 +111,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	synCtx = ProposalSyntacticVerificationContext{
 		ctx:               vm.ctx,
-		c:                 vm.codec,
 		minDelegatorStake: vm.MinDelegatorStake,
 		minStakeDuration:  defaultMinStakingDuration,
 		maxStakeDuration:  defaultMaxStakingDuration,
@@ -140,7 +136,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
 	synCtx = ProposalSyntacticVerificationContext{
 		ctx:               vm.ctx,
-		c:                 vm.codec,
 		minDelegatorStake: vm.MinDelegatorStake,
 		minStakeDuration:  defaultMinStakingDuration,
 		maxStakeDuration:  defaultMaxStakingDuration,
@@ -163,7 +158,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	} else {
 		synCtx = ProposalSyntacticVerificationContext{
 			ctx:               vm.ctx,
-			c:                 vm.codec,
 			minDelegatorStake: vm.MinDelegatorStake,
 			minStakeDuration:  defaultMinStakingDuration,
 			maxStakeDuration:  defaultMaxStakingDuration,

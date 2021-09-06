@@ -77,7 +77,7 @@ func (tx *UnsignedAddDelegatorTx) SyntacticVerify(
 		return errWeightTooSmall
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -97,7 +97,7 @@ func (tx *UnsignedAddDelegatorTx) SyntacticVerify(
 	}
 
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Stake, synCtx.c):
+	case !avax.IsSortedTransferableOutputs(tx.Stake, Codec):
 		return errOutputsNotSorted
 	case totalStakeWeight != tx.Validator.Wght:
 		return fmt.Errorf("delegator weight %d is not equal to total stake weight %d", tx.Validator.Wght, totalStakeWeight)
@@ -123,7 +123,6 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	// Verify the tx is well-formed
 	synCtx := ProposalSyntacticVerificationContext{
 		ctx:               vm.ctx,
-		c:                 vm.codec,
 		minDelegatorStake: vm.MinDelegatorStake,
 		minStakeDuration:  vm.MinStakeDuration,
 		maxStakeDuration:  vm.MaxStakeDuration,
@@ -317,13 +316,12 @@ func (vm *VM) newAddDelegatorTx(
 		},
 	}
 	tx := &Tx{UnsignedTx: utx}
-	if err := tx.Sign(vm.codec, signers); err != nil {
+	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
 
 	synCtx := ProposalSyntacticVerificationContext{
 		ctx:               vm.ctx,
-		c:                 vm.codec,
 		minDelegatorStake: vm.MinDelegatorStake,
 		minStakeDuration:  vm.MinStakeDuration,
 		maxStakeDuration:  vm.MaxStakeDuration,

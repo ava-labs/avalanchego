@@ -3,7 +3,6 @@ package platformvm
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 )
@@ -18,7 +17,7 @@ type BaseTx struct {
 }
 
 // Verify returns nil iff this tx is well formed
-func (tx *BaseTx) Verify(ctx *snow.Context, c codec.Manager) error {
+func (tx *BaseTx) Verify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -39,7 +38,7 @@ func (tx *BaseTx) Verify(ctx *snow.Context, c codec.Manager) error {
 		}
 	}
 	switch {
-	case !avax.IsSortedTransferableOutputs(tx.Outs, c):
+	case !avax.IsSortedTransferableOutputs(tx.Outs, Codec):
 		return errOutputsNotSorted
 	case !avax.IsSortedAndUniqueTransferableInputs(tx.Ins):
 		return errInputsNotSortedUnique

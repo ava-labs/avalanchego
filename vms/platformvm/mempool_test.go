@@ -93,7 +93,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	// gossip tx and check it is accepted
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	txBytes, err := encodeTx(vm.codec, tx)
+	txBytes, err := encodeTx(tx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -189,7 +189,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	// responses with unknown requestID are rejected
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	txBytes, err := encodeTx(vm.codec, tx)
+	txBytes, err := encodeTx(tx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -248,7 +248,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 		t.Fatal(err)
 	}
 	reqID = vm.IssueID()
-	txBytes, err = encodeTx(vm.codec, tx2)
+	txBytes, err = encodeTx(tx2)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -300,7 +300,7 @@ func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 	// gossip tx and check it is accepted and re-gossiped
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	txBytes, err := encodeTx(vm.codec, illFormedTx)
+	txBytes, err := encodeTx(illFormedTx)
 	if err != nil {
 		t.Fatal("could not encode atomic tx")
 	}
@@ -350,7 +350,7 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, t)
-	txIDMsg, err := encodeTxID(vm.codec, tx.ID())
+	txIDMsg, err := encodeTxID(tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -414,7 +414,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 
 	// show that the invalid tx is not requested
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	rejectedTxID, err := Codec.Marshal(codecVersion, rejectedTx.ID())
+	rejectedTxID, err := Codec.Marshal(CodecVersion, rejectedTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -453,7 +453,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, t)
-	txIDMsg, err := encodeTxID(vm.codec, tx.ID())
+	txIDMsg, err := encodeTxID(tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -510,7 +510,7 @@ func TestMempool_AppRequestHandling_InvalidTx(t *testing.T) {
 
 	// create a tx
 	rejectedTx := getTheValidTx(vm, t)
-	rejectedTxID, err := Codec.Marshal(codecVersion, rejectedTx.ID())
+	rejectedTxID, err := Codec.Marshal(CodecVersion, rejectedTx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}

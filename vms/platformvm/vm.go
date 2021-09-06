@@ -120,7 +120,6 @@ type VM struct {
 	lastAcceptedID ids.ID
 
 	fx            Fx
-	codec         codec.Manager
 	codecRegistry codec.Registry
 
 	// Bootstrapped remembers if this chain has finished bootstrapping or not
@@ -177,9 +176,7 @@ func (vm *VM) Initialize(
 	vm.dbManager = dbManager
 	vm.toEngine = msgs
 
-	vm.codec = Codec
 	vm.codecRegistry = linearcodec.NewDefault()
-
 	if err := vm.fx.Initialize(vm); err != nil {
 		return err
 	}
@@ -459,7 +456,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		return nil
 	}
 
-	am, err := decodeToAppMsg(vm.codec, request)
+	am, err := decodeToAppMsg(request)
 	if err != nil {
 		vm.ctx.Log.Debug(fmt.Sprintf("AppRequest: failed unmarshalling request from Node %v, reqID %d. Error %s",
 			nodeID, requestID, err))
@@ -478,7 +475,7 @@ func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) e
 		}
 
 		// send response
-		response, err := encodeTx(vm.codec, resTx)
+		response, err := encodeTx(resTx)
 		if err != nil {
 			vm.ctx.Log.Warn("AppRequest: failed creating AppResponse carrying atomic tx %s, error %s",
 				am.txID, err)
@@ -514,7 +511,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 	}
 
 	// decode response
-	am, err := decodeToAppMsg(vm.codec, response)
+	am, err := decodeToAppMsg(response)
 	if err != nil {
 		vm.ctx.Log.Warn(fmt.Sprintf("AppResponse: failed unmarshalling response from Node %v, reqID %d",
 			nodeID, requestID))
@@ -550,7 +547,6 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		case UnsignedDecisionTx:
 			synCtx := DecisionSyntacticVerificationContext{
 				ctx:        vm.ctx,
-				c:          Codec,
 				feeAmount:  vm.TxFee,
 				feeAssetID: vm.ctx.AVAXAssetID,
 			}
@@ -562,7 +558,6 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		case UnsignedProposalTx:
 			synCtx := ProposalSyntacticVerificationContext{
 				ctx:               vm.ctx,
-				c:                 vm.codec,
 				minStakeDuration:  vm.MinStakeDuration,
 				maxStakeDuration:  vm.MaxStakeDuration,
 				minStake:          vm.MinValidatorStake,
@@ -581,7 +576,6 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		case UnsignedAtomicTx:
 			synCtx := AtomicSyntacticVerificationContext{
 				ctx:        vm.ctx,
-				c:          vm.codec,
 				avmID:      vm.ctx.XChainID,
 				feeAmount:  vm.TxFee,
 				feeAssetID: vm.ctx.AVAXAssetID,
@@ -599,7 +593,7 @@ func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte)
 		case nil:
 			txID := tx.ID()
 			vm.ctx.Log.Debug("Gossiping txID %v", txID)
-			appMsgBytes, err := encodeTxID(vm.codec, txID)
+			appMsgBytes, err := encodeTxID(txID)
 			if err != nil {
 				vm.ctx.Log.Warn(
 					"AppResponse: Could not encode txID %v, error: %v. Dropping gossiping.",
@@ -635,7 +629,7 @@ func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
 		return nil
 	}
 
-	am, err := decodeToAppMsg(vm.codec, msg)
+	am, err := decodeToAppMsg(msg)
 	if err != nil {
 		vm.ctx.Log.Warn("AppGossip: failed unmarshalling gossip from Node %v, error %s",
 			nodeID, err)
@@ -848,8 +842,6 @@ func (vm *VM) nextStakerChangeTime(vs ValidatorState) (time.Time, error) {
 	}
 	return earliest, nil
 }
-
-func (vm *VM) Codec() codec.Manager { return vm.codec }
 
 func (vm *VM) CodecRegistry() codec.Registry { return vm.codecRegistry }
 
