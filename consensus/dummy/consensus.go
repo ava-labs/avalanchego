@@ -337,7 +337,7 @@ func (self *DummyEngine) Close() error {
 }
 
 func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block *types.Block) (*big.Int, error) {
-	if self.skipBlockFee || !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
+	if self.skipBlockFee || !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) || self.cb.ExtraStateGasUsed == nil {
 		return nil, nil
 	}
 
@@ -351,7 +351,6 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 	}
 
 	// Calculate the gas used by atomic transactions
-	// Check if nil
 	extraStateGasUsed, err := self.cb.ExtraStateGasUsed(block)
 	if err != nil {
 		return nil, err
@@ -371,7 +370,6 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 }
 
 func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *types.Block, timestamp uint64) *big.Int {
-	// TODO: return error?
 	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(timestamp)) {
 		return nil
 	}
@@ -379,12 +377,9 @@ func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *ty
 }
 
 func (self *DummyEngine) CalcExtDataGasUsed(config *params.ChainConfig, block *types.Block) (*big.Int, error) {
-	// TODO: return error?
-	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
+	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(block.Time())) || self.cb.ExtraStateGasUsed == nil {
 		return nil, nil
 	}
-	// TODO: check if nil
-	// TODO: change to return big.Int
 	gasUsed, err := self.cb.ExtraStateGasUsed(block)
 	if err != nil {
 		return nil, err
