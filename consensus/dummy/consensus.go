@@ -365,6 +365,7 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, heade
 		if self.ethFaker {
 			minRequiredTip = common.Big0
 		} else {
+			// This should never happen but we return an error in case it does.
 			return nil, errors.New("minimum required tip is negative")
 		}
 	}
