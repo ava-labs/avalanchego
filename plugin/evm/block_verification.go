@@ -470,12 +470,12 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 	if atomicTx != nil {
 		// We perform this check manually here to avoid the overhead of having to
 		// reparse the atomicTx in `CalcExtDataGasUsed`.
-		cost, err := atomicTx.Cost()
+		gasUsed, err := atomicTx.GasUsed()
 		if err != nil {
 			return err
 		}
-		if ethHeader.ExtDataGasUsed.Cmp(new(big.Int).SetUint64(cost)) != 0 {
-			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", ethHeader.ExtDataGasUsed, cost)
+		if ethHeader.ExtDataGasUsed.Cmp(new(big.Int).SetUint64(gasUsed)) != 0 {
+			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", ethHeader.ExtDataGasUsed, gasUsed)
 		}
 	}
 
