@@ -127,4 +127,10 @@ type Engine interface {
 
 	// CalcBaseFee computes the BaseFee of a block produced at [timestamp].
 	CalcBaseFee(config *params.ChainConfig, parent *types.Block, timestamp uint64) ([]byte, *big.Int, error)
+
+	// TODO: comment
+	CalcBlockGasCost(config *params.ChainConfig, parent *types.Block, timestamp uint64) *big.Int
+
+	// TODO: comment
+	CalcExtDataGasCost(config *params.ChainConfig, block *types.Block) (*big.Int, error)
 }
