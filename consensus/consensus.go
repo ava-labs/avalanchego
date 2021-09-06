@@ -132,5 +132,5 @@ type Engine interface {
 	CalcBlockGasCost(config *params.ChainConfig, parent *types.Block, timestamp uint64) *big.Int
 
 	// TODO: comment
-	CalcExtDataGasCost(config *params.ChainConfig, block *types.Block) (*big.Int, error)
+	CalcExtDataGasUsed(config *params.ChainConfig, block *types.Block) (*big.Int, error)
 }

@@ -105,7 +105,11 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 			if header.BlockGasCost.Cmp(expectedBlockGasCost) != 0 {
 				return fmt.Errorf("expected block gas cost (%d), found (%d)", expectedBlockGasCost, header.BlockGasCost)
 			}
-			// TODO: confirm ext data gas cost (need access to block)
+			// ExtDataGasUsed correctness is checked during syntactic validation
+			// (when the validator has access to the block contents)
+			if header.ExtDataGasUsed == nil {
+				return errors.New("expected extDataGasUsed to be non-nil")
+			}
 		} else {
 			if header.BlockGasCost != nil {
 				return fmt.Errorf("invalid blockGasCost before fork: have %d, want <nil>", header.BlockGasCost)
@@ -362,7 +366,7 @@ func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *ty
 	return calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time(), timestamp)
 }
 
-func (self *DummyEngine) CalcExtDataGasCost(config *params.ChainConfig, block *types.Block) (*big.Int, error) {
+func (self *DummyEngine) CalcExtDataGasUsed(config *params.ChainConfig, block *types.Block) (*big.Int, error) {
 	// TODO: return error?
 	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
 		return nil, nil
