@@ -92,7 +92,13 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 
 	// gossip tx and check it is accepted
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	if err := vm.AppResponse(nodeID, vm.IssueID(), tx.Bytes()); err != nil {
+	reqID := vm.IssueID()
+	txBytes, err := encodeTx(vm.codec, tx)
+	if err != nil {
+		t.Fatal("could not encode atomic tx")
+	}
+	vm.requestsContent[reqID] = tx.ID()
+	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !mempool.has(tx.ID()) {
@@ -183,9 +189,14 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	// responses with unknown requestID are rejected
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
+	txBytes, err := encodeTx(vm.codec, tx)
+	if err != nil {
+		t.Fatal("could not encode atomic tx")
+	}
+	vm.requestsContent[reqID] = tx.ID()
 
 	unknownReqID := reqID + 1
-	if err := vm.AppResponse(nodeID, unknownReqID, tx.Bytes()); err != nil {
+	if err := vm.AppResponse(nodeID, unknownReqID, txBytes); err != nil {
 		t.Fatal("responses with unknown requestID should be dropped")
 	}
 	if mempool.has(tx.ID()) {
@@ -196,7 +207,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	}
 
 	// received tx and check it is accepted and re-gossiped
-	if err := vm.AppResponse(nodeID, reqID, tx.Bytes()); err != nil {
+	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !mempool.has(tx.ID()) {
@@ -236,8 +247,14 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	reqID = vm.IssueID()
+	txBytes, err = encodeTx(vm.codec, tx2)
+	if err != nil {
+		t.Fatal("could not encode atomic tx")
+	}
+	vm.requestsContent[reqID] = tx.ID()
 	vm.mempool.totalBytesSize = MaxMempoolByteSize
-	if err := vm.AppResponse(nodeID, vm.IssueID(), tx2.Bytes()); err != nil {
+	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isTxReGossiped {
@@ -283,7 +300,12 @@ func TestMempool_AppResponseHandling_InvalidTx(t *testing.T) {
 	// gossip tx and check it is accepted and re-gossiped
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
 	reqID := vm.IssueID()
-	if err := vm.AppResponse(nodeID, reqID, illFormedTx.Bytes()); err != nil {
+	txBytes, err := encodeTx(vm.codec, illFormedTx)
+	if err != nil {
+		t.Fatal("could not encode atomic tx")
+	}
+	vm.requestsContent[reqID] = illFormedTx.ID()
+	if err := vm.AppResponse(nodeID, reqID, txBytes); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if mempool.has(illFormedTx.ID()) {
@@ -328,13 +350,13 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, t)
-	txID, err := Codec.Marshal(codecVersion, tx.ID())
+	txIDMsg, err := encodeTxID(vm.codec, tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// show that unknown txID is requested
-	if err := vm.AppGossip(nodeID, txID); err != nil {
+	if err := vm.AppGossip(nodeID, txIDMsg); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !isTxRequested {
@@ -355,7 +377,7 @@ func TestMempool_AppGossipHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	if err := vm.AppGossip(nodeID, txID); err != nil {
+	if err := vm.AppGossip(nodeID, txIDMsg); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isTxRequested {
@@ -431,14 +453,15 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 
 	// create a tx
 	tx := getTheValidTx(vm, t)
-	txID, err := Codec.Marshal(codecVersion, tx.ID())
+	txIDMsg, err := encodeTxID(vm.codec, tx.ID())
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// show that there is no response if tx is unknown
 	nodeID := ids.ShortID{'n', 'o', 'd', 'e'}
-	if err := vm.AppRequest(nodeID, vm.IssueID(), txID); err != nil {
+	reqID := vm.IssueID()
+	if err := vm.AppRequest(nodeID, reqID, txIDMsg); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if isResponseIssued {
@@ -450,7 +473,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 		t.Fatal("could not add tx to mempool")
 	}
 
-	if err := vm.AppRequest(nodeID, vm.IssueID(), txID); err != nil {
+	if err := vm.AppRequest(nodeID, reqID, txIDMsg); err != nil {
 		t.Fatal("error in reception of gossiped tx")
 	}
 	if !isResponseIssued {
@@ -458,7 +481,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	}
 
 	// show that responded bytes can be duly decoded
-	if err := vm.AppResponse(nodeID, vm.IssueID(), respondedBytes); err != nil {
+	if err := vm.AppResponse(nodeID, reqID, respondedBytes); err != nil {
 		t.Fatal("bytes sent in response of AppRequest cannot be decoded")
 	}
 }

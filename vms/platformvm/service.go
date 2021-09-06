@@ -2101,7 +2101,7 @@ type GetTxStatusResponse struct {
 
 // GetTxStatus gets a tx's status
 func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *GetTxStatusResponse) error {
-	service.vm.ctx.Log.Debug("Platform: GetTxStatus called")
+	service.vm.ctx.Log.Debug("Platform: GetTxStatus called, txID %v", args.TxID)
 
 	_, status, err := service.vm.internalState.GetTx(args.TxID)
 	if err == nil { // Found the status. Report it.
@@ -2133,6 +2133,15 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 	}
 	if err != database.ErrNotFound {
 		return err
+	}
+
+	// Following snowman++ activation, a tx may be in mempool, waiting to be included
+	// into a block or gossiped around.
+	if time.Now().After(service.vm.GetActivationTime()) {
+		if service.vm.mempool.has(args.TxID) {
+			response.Status = Processing
+			return nil
+		}
 	}
 
 	reason, ok := service.vm.droppedTxCache.Get(args.TxID)

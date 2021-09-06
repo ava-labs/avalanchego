@@ -43,6 +43,12 @@ type UnsignedRewardValidatorTx struct {
 	shouldPreferCommit bool
 }
 
+func (tx *UnsignedRewardValidatorTx) SyntacticVerify(
+	ctx ProposalSyntacticVerificationContext,
+) error {
+	return nil
+}
+
 // SemanticVerify this transaction performs a valid state transition.
 //
 // The current validating set must have at least one member.

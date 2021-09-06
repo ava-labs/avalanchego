@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -27,11 +25,8 @@ type UnsignedCreateSubnetTx struct {
 }
 
 // Verify this transaction is well-formed
-func (tx *UnsignedCreateSubnetTx) Verify(
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+func (tx *UnsignedCreateSubnetTx) SyntacticVerify(
+	synCtx DecisionSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
@@ -40,7 +35,7 @@ func (tx *UnsignedCreateSubnetTx) Verify(
 		return nil
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
 		return err
 	}
 	if err := tx.Owner.Verify(); err != nil {
@@ -60,10 +55,16 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
+	// Make sure this transaction is well formed.
 	timestamp := vs.GetTimestamp()
 	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	// Make sure this transaction is well formed.
-	if err := tx.Verify(vm.ctx, vm.codec, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
+	synCtx := DecisionSyntacticVerificationContext{
+		ctx:        vm.ctx,
+		c:          vm.codec,
+		feeAmount:  createSubnetTxFee,
+		feeAssetID: vm.ctx.AVAXAssetID,
+	}
+	if err := tx.SyntacticVerify(synCtx); err != nil {
 		return nil, permError{err}
 	}
 
@@ -118,7 +119,14 @@ func (vm *VM) newCreateSubnetTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.Verify(vm.ctx, vm.codec, createSubnetTxFee, vm.ctx.AVAXAssetID)
+
+	synCtx := DecisionSyntacticVerificationContext{
+		ctx:        vm.ctx,
+		c:          vm.codec,
+		feeAmount:  createSubnetTxFee,
+		feeAssetID: vm.ctx.AVAXAssetID,
+	}
+	return tx, utx.SyntacticVerify(synCtx)
 }
 
 func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {

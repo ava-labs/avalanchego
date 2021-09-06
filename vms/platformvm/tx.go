@@ -5,6 +5,7 @@ package platformvm
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -25,8 +26,18 @@ type UnsignedTx interface {
 }
 
 // UnsignedDecisionTx is an unsigned operation that can be immediately decided
+type DecisionSyntacticVerificationContext struct {
+	ctx        *snow.Context
+	c          codec.Manager
+	feeAmount  uint64
+	feeAssetID ids.ID
+}
+
 type UnsignedDecisionTx interface {
 	UnsignedTx
+
+	// Attempts to verify this transaction without any provided state.
+	SyntacticVerify(synCtx DecisionSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, vs VersionedState, stx *Tx) (
@@ -36,8 +47,27 @@ type UnsignedDecisionTx interface {
 }
 
 // UnsignedProposalTx is an unsigned operation that can be proposed
+type ProposalSyntacticVerificationContext struct {
+	ctx              *snow.Context
+	c                codec.Manager
+	minStakeDuration time.Duration
+	maxStakeDuration time.Duration
+
+	minStake         uint64
+	maxStake         uint64
+	minDelegationFee uint32
+
+	minDelegatorStake uint64
+
+	feeAmount  uint64
+	feeAssetID ids.ID
+}
+
 type UnsignedProposalTx interface {
 	UnsignedTx
+
+	// Attempts to verify this transaction without any provided state.
+	SyntacticVerify(synCtx ProposalSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, state MutableState, stx *Tx) (
@@ -51,6 +81,14 @@ type UnsignedProposalTx interface {
 }
 
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
+type AtomicSyntacticVerificationContext struct {
+	ctx        *snow.Context
+	c          codec.Manager
+	avmID      ids.ID
+	feeAmount  uint64
+	feeAssetID ids.ID
+}
+
 type UnsignedAtomicTx interface {
 	UnsignedTx
 
@@ -58,13 +96,7 @@ type UnsignedAtomicTx interface {
 	InputUTXOs() ids.Set
 
 	// Attempts to verify this transaction without any provided state.
-	SyntacticVerify(
-		avmID ids.ID,
-		ctx *snow.Context,
-		c codec.Manager,
-		feeAmount uint64,
-		feeAssetID ids.ID,
-	) error
+	SyntacticVerify(synCtx AtomicSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)

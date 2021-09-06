@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -43,25 +42,21 @@ func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 
 // SyntacticVerify this transaction is well-formed
 func (tx *UnsignedExportTx) SyntacticVerify(
-	avmID ids.ID,
-	ctx *snow.Context,
-	c codec.Manager,
-	feeAmount uint64,
-	feeAssetID ids.ID,
+	synCtx AtomicSyntacticVerificationContext,
 ) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DestinationChain != avmID:
+	case tx.DestinationChain != synCtx.avmID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	}
 
-	if err := tx.BaseTx.Verify(ctx, c); err != nil {
+	if err := tx.BaseTx.Verify(synCtx.ctx, synCtx.c); err != nil {
 		return err
 	}
 
@@ -87,7 +82,14 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	parentState MutableState,
 	stx *Tx,
 ) (VersionedState, TxError) {
-	if err := tx.SyntacticVerify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID); err != nil {
+	synCtx := AtomicSyntacticVerificationContext{
+		ctx:        vm.ctx,
+		c:          vm.codec,
+		avmID:      vm.ctx.XChainID,
+		feeAmount:  vm.TxFee,
+		feeAssetID: vm.ctx.AVAXAssetID,
+	}
+	if err := tx.SyntacticVerify(synCtx); err != nil {
 		return nil, permError{err}
 	}
 
@@ -203,5 +205,13 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(vm.codec, signers); err != nil {
 		return nil, err
 	}
-	return tx, utx.SyntacticVerify(vm.ctx.XChainID, vm.ctx, vm.codec, vm.TxFee, vm.ctx.AVAXAssetID)
+
+	synCtx := AtomicSyntacticVerificationContext{
+		ctx:        vm.ctx,
+		c:          vm.codec,
+		avmID:      vm.ctx.XChainID,
+		feeAmount:  vm.TxFee,
+		feeAssetID: vm.ctx.AVAXAssetID,
+	}
+	return tx, utx.SyntacticVerify(synCtx)
 }
