@@ -59,8 +59,8 @@ waitloop:
 				timer.Stop()
 				return
 			}
-			// The time at which we should notify the engine that
-			// it should try to build a block has changed
+			// The time at which we should notify the engine that it should try
+			// to build a block has changed
 			startTime = newStartTime
 			timer.Stop()
 			continue waitloop
@@ -79,9 +79,10 @@ waitloop:
 					s.log.Debug("dropping message from VM because channel to engine is full")
 				}
 			case newStartTime, ok := <-s.newStartTime:
-				// The time at which we should notify the engine that
-				// it should try to build a block has changed
+				// The time at which we should notify the engine that it should
+				// try to build a block has changed
 				if !ok {
+					// s.Close() was called
 					return
 				}
 				startTime = newStartTime
