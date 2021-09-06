@@ -32,7 +32,7 @@ type BlockState interface {
 	PutBlock(blk block.Block, status choices.Status) error
 	DeleteBlock(blkID ids.ID) error
 
-	WipeCache() // useful for UTs
+	clearCache() // useful for UTs
 }
 
 type blockState struct {
@@ -41,10 +41,6 @@ type blockState struct {
 	blkCache cache.Cacher
 
 	db database.Database
-}
-
-func (s *blockState) WipeCache() {
-	s.blkCache.Flush()
 }
 
 type blockWrapper struct {
@@ -135,4 +131,8 @@ func (s *blockState) PutBlock(blk block.Block, status choices.Status) error {
 func (s *blockState) DeleteBlock(blkID ids.ID) error {
 	s.blkCache.Put(blkID, nil)
 	return s.db.Delete(blkID[:])
+}
+
+func (s *blockState) clearCache() {
+	s.blkCache.Flush()
 }

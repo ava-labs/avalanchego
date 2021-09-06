@@ -62,7 +62,7 @@ func TestBlockState(t *testing.T) {
 	assert.Equal(choices.Accepted, fetchedStatus)
 	assert.Equal(b.Bytes(), fetchedBlock.Bytes())
 
-	bs.WipeCache()
+	bs.clearCache()
 
 	fetchedBlock, fetchedStatus, err = bs.GetBlock(b.ID())
 	assert.NoError(err)

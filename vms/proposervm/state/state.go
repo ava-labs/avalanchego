@@ -25,11 +25,6 @@ type state struct {
 	BlockState
 }
 
-func (s *state) WipeCache() {
-	s.ChainState.WipeCache()
-	s.BlockState.WipeCache()
-}
-
 func New(db database.Database) State {
 	chainDB := prefixdb.New(chainStatePrefix, db)
 	blockDB := prefixdb.New(blockStatePrefix, db)
@@ -51,4 +46,9 @@ func NewMetered(db database.Database, namespace string, metrics prometheus.Regis
 		ChainState: NewChainState(chainDB),
 		BlockState: blockState,
 	}, nil
+}
+
+func (s *state) clearCache() {
+	s.ChainState.clearCache()
+	s.BlockState.clearCache()
 }
