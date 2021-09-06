@@ -1197,12 +1197,9 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	if reset != nil {
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsApricotPhase3(new(big.Int).SetUint64(reset.newHead.Time)) {
-			newHeadBlock := pool.chain.GetBlock(reset.newHead.Hash(), reset.newHead.Number.Uint64())
-			if newHeadBlock != nil {
-				_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, newHeadBlock, uint64(time.Now().Unix()))
-				if err == nil {
-					pool.priced.SetBaseFee(baseFeeEstimate)
-				}
+			_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, reset.newHead, uint64(time.Now().Unix()))
+			if err == nil {
+				pool.priced.SetBaseFee(baseFeeEstimate)
 			}
 		}
 	}
@@ -1630,13 +1627,7 @@ func (pool *TxPool) updateBaseFee() {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	currentBlock := pool.chain.GetBlock(pool.currentHead.Hash(), pool.currentHead.Number.Uint64())
-	if currentBlock == nil {
-		log.Error("failed to update base fee", "currentHead", pool.currentHead.Hash(), "err", "could not fetch current block")
-		return
-	}
-
-	_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, currentBlock, uint64(time.Now().Unix()))
+	_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, pool.currentHead, uint64(time.Now().Unix()))
 	if err == nil {
 		pool.priced.SetBaseFee(baseFeeEstimate)
 	} else {

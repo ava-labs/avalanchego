@@ -336,37 +336,28 @@ func (self *DummyEngine) Close() error {
 	return nil
 }
 
-func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block *types.Block) (*big.Int, error) {
-	if self.skipBlockFee || !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) || self.cb.ExtraStateGasUsed == nil {
+func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, header *types.Header) (*big.Int, error) {
+	if self.skipBlockFee || !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) || self.cb.ExtraStateGasUsed == nil {
 		return nil, nil
 	}
 
-	if block.Number().Int64() == 0 {
+	if header.Number.Int64() == 0 {
 		return nil, nil
 	}
 
-	parentHdr := chain.GetHeaderByHash(block.ParentHash())
+	parentHdr := chain.GetHeaderByHash(header.ParentHash)
 	if parentHdr == nil {
 		return nil, errors.New("parent is nil")
 	}
 
-	// Calculate the gas used by atomic transactions
-	extraStateGasUsed, err := self.cb.ExtraStateGasUsed(block)
-	if err != nil {
-		return nil, err
-	}
-
-	// Calculate the required amount of gas to pay the block fee
-	blockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parentHdr.Time, block.Time())
-
 	// minTip = requiredBlockFee/blockGasUsage - baseFee
-	requiredBlockFee := new(big.Int).Mul(blockGasCost, block.BaseFee())
+	requiredBlockFee := new(big.Int).Mul(header.BlockGasCost, header.BaseFee)
 	blockGasUsage := new(big.Int).Add(
-		new(big.Int).SetUint64(block.GasUsed()),
-		new(big.Int).SetUint64(extraStateGasUsed),
+		new(big.Int).SetUint64(header.GasUsed),
+		header.ExtDataGasUsed,
 	)
 	averageGasPrice := new(big.Int).Div(requiredBlockFee, blockGasUsage)
-	return new(big.Int).Sub(averageGasPrice, block.BaseFee()), nil
+	return new(big.Int).Sub(averageGasPrice, header.BaseFee), nil
 }
 
 func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *types.Header, timestamp uint64) *big.Int {

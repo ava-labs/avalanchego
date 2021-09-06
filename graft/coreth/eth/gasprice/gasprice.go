@@ -58,7 +58,7 @@ type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
 	ChainConfig() *params.ChainConfig
-	MinRequiredTip(ctx context.Context, block *types.Block) (*big.Int, error)
+	MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error)
 	Engine() consensus.Engine
 }
 
@@ -131,7 +131,7 @@ func (oracle *Oracle) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 	// If the block does have a baseFee, calculate the next base fee
 	// based on the current time and add it to the tip to estimate the
 	// total gas price estimate.
-	_, nextBaseFee, err := oracle.backend.Engine().CalcBaseFee(oracle.backend.ChainConfig(), block, oracle.clock.Unix())
+	_, nextBaseFee, err := oracle.backend.Engine().CalcBaseFee(oracle.backend.ChainConfig(), block.Header(), oracle.clock.Unix())
 	return nextBaseFee, err
 }
 
@@ -261,8 +261,8 @@ type results struct {
 // getBlockTips calculates the minimum required tip to be included in a given
 // block and sends the value to the result channel.
 func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result chan results, quit chan struct{}) {
-	block, err := oracle.backend.BlockByNumber(ctx, rpc.BlockNumber(blockNum))
-	if block == nil {
+	header, err := oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(blockNum))
+	if header == nil {
 		select {
 		case result <- results{nil, err}:
 		case <-quit:
@@ -271,7 +271,7 @@ func (oracle *Oracle) getBlockTips(ctx context.Context, blockNum uint64, result 
 	}
 
 	// Compute minimum required tip to be included in previous block
-	minTip, err := oracle.backend.MinRequiredTip(ctx, block)
+	minTip, err := oracle.backend.MinRequiredTip(ctx, header)
 	select {
 	case result <- results{minTip, err}:
 	case <-quit:

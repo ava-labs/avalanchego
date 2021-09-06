@@ -295,10 +295,14 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 	}
 	if chain.Config().IsApricotPhase3(timestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = engine.CalcBaseFee(chain.Config(), parent, time)
+		header.Extra, header.BaseFee, err = engine.CalcBaseFee(chain.Config(), parent.Header(), time)
 		if err != nil {
 			panic(err)
 		}
+	}
+	if chain.Config().IsApricotPhase4(timestamp) {
+		// header.ExtDataGasUsed should be populated by callbacks
+		header.BlockGasCost = engine.CalcBlockGasCost(chain.Config(), parent.Header(), time)
 	}
 	return header
 }

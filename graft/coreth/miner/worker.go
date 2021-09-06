@@ -137,13 +137,13 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 	bigTimestamp := big.NewInt(timestamp)
 	if w.chainConfig.IsApricotPhase3(bigTimestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = w.engine.CalcBaseFee(w.chainConfig, parent, uint64(timestamp))
+		header.Extra, header.BaseFee, err = w.engine.CalcBaseFee(w.chainConfig, parent.Header(), uint64(timestamp))
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
 	}
 	if w.chainConfig.IsApricotPhase4(bigTimestamp) {
-		header.BlockGasCost = w.engine.CalcBlockGasCost(w.chainConfig, parent, uint64(timestamp))
+		header.BlockGasCost = w.engine.CalcBlockGasCost(w.chainConfig, parent.Header(), uint64(timestamp))
 	}
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
