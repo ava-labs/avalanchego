@@ -357,3 +357,5 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 	}
 	return nil
 }
+
+// TODO: phase 4 validator to confirm ext data gas cost
