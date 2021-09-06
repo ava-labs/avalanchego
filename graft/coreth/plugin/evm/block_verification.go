@@ -309,7 +309,7 @@ func (blockValidatorPhase3) SyntacticVerify(b *Block) error {
 		)
 	}
 	if ethHeader.BaseFee == nil {
-		return fmt.Errorf("base fee is not set with apricot phase 3 enabled for block: %s", ethHeader.Hash())
+		return errNilBaseFeeApricotPhase3
 	}
 	if bfLen := ethHeader.BaseFee.BitLen(); bfLen > 256 {
 		return fmt.Errorf("too large base fee: bitlen %d", bfLen)
@@ -412,7 +412,7 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 		)
 	}
 	if ethHeader.BaseFee == nil {
-		return fmt.Errorf("base fee is not set with apricot phase 3 enabled for block: %s", ethHeader.Hash())
+		return errNilBaseFeeApricotPhase3
 	}
 	if bfLen := ethHeader.BaseFee.BitLen(); bfLen > 256 {
 		return fmt.Errorf("too large base fee: bitlen %d", bfLen)
@@ -464,6 +464,9 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 	if ethHeader.ExtDataGasUsed == nil {
 		return errNilExtDataGasUsedApricotPhase4
 	}
+	if edguLen := ethHeader.ExtDataGasUsed.BitLen(); edguLen > 256 {
+		return fmt.Errorf("too large extDataGasUsed : bitlen %d", edguLen)
+	}
 	if atomicTx != nil {
 		// We perform this check manually here to avoid the overhead of having to
 		// reparse the atomicTx in `CalcExtDataGasUsed`.
@@ -480,6 +483,9 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 	// NOTE: ethHeader.BlockGasCost correctness is checked in header verification
 	if ethHeader.BlockGasCost == nil {
 		return errNilBlockGasCostApricotPhase4
+	}
+	if bgcLen := ethHeader.BlockGasCost.BitLen(); bgcLen > 256 {
+		return fmt.Errorf("too large blockGasCost: bitlen %d", bgcLen)
 	}
 
 	return nil

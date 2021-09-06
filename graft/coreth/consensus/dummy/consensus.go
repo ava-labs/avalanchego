@@ -96,12 +96,18 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		if !bytes.Equal(expectedRollupWindowBytes, header.Extra) {
 			return fmt.Errorf("expected rollup window bytes: %x, found %x", expectedRollupWindowBytes, header.Extra)
 		}
+		if header.BaseFee == nil {
+			return errors.New("expected baseFee to be non-nil")
+		}
 		if header.BaseFee.Cmp(expectedBaseFee) != 0 {
 			return fmt.Errorf("expected base fee (%d), found (%d)", expectedBaseFee, header.BaseFee)
 		}
 
 		if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 			expectedBlockGasCost := self.CalcBlockGasCost(chain.Config(), parent, header.Time)
+			if header.BlockGasCost == nil {
+				return errors.New("expected blockGasCost to be non-nil")
+			}
 			if header.BlockGasCost.Cmp(expectedBlockGasCost) != 0 {
 				return fmt.Errorf("expected block gas cost (%d), found (%d)", expectedBlockGasCost, header.BlockGasCost)
 			}
