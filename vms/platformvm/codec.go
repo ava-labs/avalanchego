@@ -14,6 +14,7 @@ import (
 )
 
 const (
+	// CodecVersion is the current default codec version
 	CodecVersion = 0
 )
 
