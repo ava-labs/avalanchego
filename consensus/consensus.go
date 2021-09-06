@@ -75,7 +75,10 @@ type Engine interface {
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
 	// via the VerifySeal method.
-	VerifyHeader(chain ChainReader, header *types.Header) error
+	//
+	// NOTE: VerifyHeader does not validate the correctness of fields that rely
+	// on the ExtData component of the block.
+	VerifyHeader(chain ChainHeaderReader, header *types.Header) error
 
 	// VerifyUncles verifies that the given block's uncles conform to the consensus
 	// rules of a given engine.
@@ -123,14 +126,15 @@ type Engine interface {
 	// required block fee.
 	//
 	// This function will return nil for all return values prior to Apricot Phase 4.
-	MinRequiredTip(chain ChainHeaderReader, block *types.Block) (*big.Int, error)
+	MinRequiredTip(chain ChainHeaderReader, header *types.Header) (*big.Int, error)
 
 	// CalcBaseFee computes the BaseFee of a block produced at [timestamp].
-	CalcBaseFee(config *params.ChainConfig, parent *types.Block, timestamp uint64) ([]byte, *big.Int, error)
+	CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error)
 
-	// TODO: comment
-	CalcBlockGasCost(config *params.ChainConfig, parent *types.Block, timestamp uint64) *big.Int
+	// CalcBlockGasCost computed the block gas cost of a block produced at
+	// [timestamp].
+	CalcBlockGasCost(config *params.ChainConfig, parent *types.Header, timestamp uint64) *big.Int
 
-	// TODO: comment
+	// TODO: remove
 	CalcExtDataGasUsed(config *params.ChainConfig, block *types.Block) (*big.Int, error)
 }
