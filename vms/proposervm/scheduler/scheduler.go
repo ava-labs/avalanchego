@@ -20,14 +20,12 @@ type Scheduler interface {
 	Close()
 }
 
-// Scheduler receives notifications from a VM that it wants its engine to
-// call the VM's BuildBlock method, and delivers the notification to the
-// engine only when the engine should call BuildBlock. Namely, when this node is
-// allowed to propose a block under the congestion control mechanism.
+// Scheduler receives notifications from a VM that it wants its engine to call
+// the VM's BuildBlock method, and delivers the notification to the engine only
+// when the engine should call BuildBlock. Namely, when this node is allowed to
+// propose a block under the congestion control mechanism.
 type scheduler struct {
 	log logging.Logger
-	// TODO this isn't used. Do we need this?
-	activationTime time.Time
 	// The VM sends a message on this channel when it wants to tell the engine
 	// that the engine should call the VM's BuildBlock method
 	fromVM <-chan common.Message
@@ -35,17 +33,17 @@ type scheduler struct {
 	// it should call its VM's BuildBlock method
 	toEngine chan<- common.Message
 	// When we receive a message on this channel, it means that we must refrain
-	// from telling the engine to call its VM's BuildBlock method until the given time
+	// from telling the engine to call its VM's BuildBlock method until the
+	// given time
 	newStartTime chan time.Time
 }
 
-func New(log logging.Logger, toEngine chan<- common.Message, activationTime time.Time) (Scheduler, chan<- common.Message) {
+func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
 	vmToEngine := make(chan common.Message, fromVMSize)
 	return &scheduler{
-		activationTime: activationTime,
-		fromVM:         vmToEngine,
-		toEngine:       toEngine,
-		newStartTime:   make(chan time.Time),
+		fromVM:       vmToEngine,
+		toEngine:     toEngine,
+		newStartTime: make(chan time.Time),
 	}, vmToEngine
 }
 
@@ -71,11 +69,13 @@ waitloop:
 		for {
 			select {
 			case msg := <-s.fromVM:
-				// Give the engine the message from the VM asking the engine to build a block
+				// Give the engine the message from the VM asking the engine to
+				// build a block
 				select {
 				case s.toEngine <- msg:
 				default:
-					// If the channel to the engine is full, drop the message from the VM to avoid deadlock
+					// If the channel to the engine is full, drop the message
+					// from the VM to avoid deadlock
 					s.log.Debug("dropping message from VM because channel to engine is full")
 				}
 			case newStartTime, ok := <-s.newStartTime:
