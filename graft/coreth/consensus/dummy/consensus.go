@@ -63,7 +63,7 @@ func NewFaker() *DummyEngine {
 }
 
 // modified from consensus.go
-func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Block, uncle bool) error {
+func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Header, uncle bool) error {
 	// Ensure that we do not verify an uncle
 	if uncle {
 		return errUnclesUnsupported
@@ -131,7 +131,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		return consensus.ErrFutureBlock
 	}
 	//if header.Time <= parent.Time {
-	if header.Time < parent.Time() {
+	if header.Time < parent.Time {
 		return errInvalidBlockTime
 	}
 	// Verify that the gas limit is <= 2^63-1
@@ -149,19 +149,19 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		}
 	} else {
 		// Verify that the gas limit remains within allowed bounds
-		diff := int64(parent.GasLimit()) - int64(header.GasLimit)
+		diff := int64(parent.GasLimit) - int64(header.GasLimit)
 		if diff < 0 {
 			diff *= -1
 		}
-		limit := parent.GasLimit() / params.GasLimitBoundDivisor
+		limit := parent.GasLimit / params.GasLimitBoundDivisor
 
 		if uint64(diff) >= limit || header.GasLimit < params.MinGasLimit {
-			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit(), limit)
+			return fmt.Errorf("invalid gas limit: have %d, want %d += %d", header.GasLimit, parent.GasLimit, limit)
 		}
 	}
 
 	// Verify that the block number is parent's +1
-	if diff := new(big.Int).Sub(header.Number, parent.Number()); diff.Cmp(big.NewInt(1)) != 0 {
+	if diff := new(big.Int).Sub(header.Number, parent.Number); diff.Cmp(big.NewInt(1)) != 0 {
 		return consensus.ErrInvalidNumber
 	}
 	// Verify the engine specific seal securing the block
@@ -172,13 +172,13 @@ func (self *DummyEngine) Author(header *types.Header) (common.Address, error) {
 	return header.Coinbase, nil
 }
 
-func (self *DummyEngine) VerifyHeader(chain consensus.ChainReader, header *types.Header) error {
+func (self *DummyEngine) VerifyHeader(chain consensus.ChainHeaderReader, header *types.Header) error {
 	// Short circuit if the header is known, or it's parent not
 	number := header.Number.Uint64()
 	if chain.GetHeader(header.Hash(), number) != nil {
 		return nil
 	}
-	parent := chain.GetBlock(header.ParentHash, number-1)
+	parent := chain.GetHeader(header.ParentHash, number-1)
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
@@ -239,12 +239,12 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.In
 	// set by this block.
 	blockGas := new(big.Int).Div(totalBlockFee, baseFee)
 	// Calculate the required amount of gas to pay the block fee
-	requiredBlockGasFee := calcBlockFee(maxBlockGasFee, blockFeeDuration, parent, current)
+	blockGasCost := calcBlockGasCost(maxBlockGasFee, blockFeeDuration, parent, current)
 
 	// Require that the amount of gas purchased by the effective tips within the block, [blockGas],
-	// covers at least [requiredBlockGasFee].
-	if blockGas.Cmp(requiredBlockGasFee) < 0 {
-		return fmt.Errorf("insufficient gas (%d) to cover the block fee (%d) at base fee (%d) (total block fee: %d) (parent: %d, current: %d)", blockGas, requiredBlockGasFee, baseFee, totalBlockFee, parent, current)
+	// covers at least [blockGasCost].
+	if blockGas.Cmp(blockGasCost) < 0 {
+		return fmt.Errorf("insufficient gas (%d) to cover the block cost (%d) at base fee (%d) (total block fee: %d) (parent: %d, current: %d)", blockGas, blockGasCost, baseFee, totalBlockFee, parent, current)
 	}
 	return nil
 }
@@ -357,10 +357,10 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 	}
 
 	// Calculate the required amount of gas to pay the block fee
-	requiredBlockGasFee := calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parentHdr.Time, block.Time())
+	blockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parentHdr.Time, block.Time())
 
 	// minTip = requiredBlockFee/blockGasUsage - baseFee
-	requiredBlockFee := new(big.Int).Mul(requiredBlockGasFee, block.BaseFee())
+	requiredBlockFee := new(big.Int).Mul(blockGasCost, block.BaseFee())
 	blockGasUsage := new(big.Int).Add(
 		new(big.Int).SetUint64(block.GasUsed()),
 		new(big.Int).SetUint64(extraStateGasUsed),
@@ -369,11 +369,11 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 	return new(big.Int).Sub(averageGasPrice, block.BaseFee()), nil
 }
 
-func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *types.Block, timestamp uint64) *big.Int {
+func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *types.Header, timestamp uint64) *big.Int {
 	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(timestamp)) {
 		return nil
 	}
-	return calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time(), timestamp)
+	return calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp)
 }
 
 func (self *DummyEngine) CalcExtDataGasUsed(config *params.ChainConfig, block *types.Block) (*big.Int, error) {

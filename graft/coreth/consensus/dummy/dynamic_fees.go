@@ -33,31 +33,31 @@ var (
 // and calculates the expected base fee as well as the encoding of the past
 // pricing information for the child block.
 // CalcBaseFee should only be called if [timestamp] >= [config.ApricotPhase3Timestamp]
-func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.Block, timestamp uint64) ([]byte, *big.Int, error) {
+func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
-	bigTimestamp := new(big.Int).SetUint64(parent.Time())
+	bigTimestamp := new(big.Int).SetUint64(parent.Time)
 	var (
 		isApricotPhase3 = config.IsApricotPhase3(bigTimestamp)
 		isApricotPhase4 = config.IsApricotPhase4(bigTimestamp)
 	)
-	if !isApricotPhase3 || parent.Number().Cmp(common.Big0) == 0 {
+	if !isApricotPhase3 || parent.Number.Cmp(common.Big0) == 0 {
 		initialSlice := make([]byte, params.ApricotPhase3ExtraDataSize)
 		initialBaseFee := big.NewInt(params.ApricotPhase3InitialBaseFee)
 		return initialSlice, initialBaseFee, nil
 	}
-	if len(parent.Extra()) != params.ApricotPhase3ExtraDataSize {
-		return nil, nil, fmt.Errorf("expected length of parent extra data to be %d, but found %d", params.ApricotPhase3ExtraDataSize, len(parent.Extra()))
+	if len(parent.Extra) != params.ApricotPhase3ExtraDataSize {
+		return nil, nil, fmt.Errorf("expected length of parent extra data to be %d, but found %d", params.ApricotPhase3ExtraDataSize, len(parent.Extra))
 	}
 
-	if timestamp < parent.Time() {
-		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp (%d) prior to parent timestamp (%d)", timestamp, parent.Time())
+	if timestamp < parent.Time {
+		return nil, nil, fmt.Errorf("cannot calculate base fee for timestamp (%d) prior to parent timestamp (%d)", timestamp, parent.Time)
 	}
-	roll := timestamp - parent.Time()
+	roll := timestamp - parent.Time
 
 	// roll the window over by the difference between the timestamps to generate
 	// the new rollup window.
-	newRollupWindow, err := rollLongWindow(parent.Extra(), int(roll))
+	newRollupWindow, err := rollLongWindow(parent.Extra, int(roll))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -66,7 +66,7 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.B
 		parentGasTarget          = TargetGas
 		parentGasTargetBig       = new(big.Int).SetUint64(parentGasTarget)
 		baseFeeChangeDenominator = new(big.Int).SetUint64(params.BaseFeeChangeDenominator)
-		baseFee                  = new(big.Int).Set(parent.BaseFee())
+		baseFee                  = new(big.Int).Set(parent.BaseFee)
 	)
 
 	// Add in the gas used by the parent block in the correct place
@@ -77,16 +77,13 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.B
 		switch {
 		// If ApricotPhase4 is enabled, use the updated block fee calculation.
 		case isApricotPhase4:
-			blockGasCost = calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time(), timestamp).Uint64()
-			parentExtraStateGasUsed, err = self.cb.ExtraStateGasUsed(parent)
-			if err != nil {
-				return nil, nil, err
-			}
+			blockGasCost = calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp).Uint64()
+			parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
 		// Otherwise, we must be in ApricotPhase3 and use the constant [ApricotPhase3BlockGasFee].
 		default:
 			blockGasCost = ApricotPhase3BlockGasFee
 		}
-		addedGas, overflow := math.SafeAdd(parent.GasUsed()+parentExtraStateGasUsed, blockGasCost)
+		addedGas, overflow := math.SafeAdd(parent.GasUsed+parentExtraStateGasUsed, blockGasCost)
 		if overflow {
 			addedGas = math.MaxUint64
 		}
@@ -105,7 +102,7 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.B
 	if totalGas > parentGasTarget {
 		// If the parent block used more gas than its target, the baseFee should increase.
 		gasUsedDelta := new(big.Int).SetUint64(totalGas - parentGasTarget)
-		x := new(big.Int).Mul(parent.BaseFee(), gasUsedDelta)
+		x := new(big.Int).Mul(parent.BaseFee, gasUsedDelta)
 		y := x.Div(x, parentGasTargetBig)
 		baseFeeDelta := math.BigMax(
 			x.Div(y, baseFeeChangeDenominator),
@@ -117,7 +114,7 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.B
 	} else {
 		// Otherwise if the parent block used less gas than its target, the baseFee should decrease.
 		gasUsedDelta := new(big.Int).SetUint64(parentGasTarget - totalGas)
-		x := new(big.Int).Mul(parent.BaseFee(), gasUsedDelta)
+		x := new(big.Int).Mul(parent.BaseFee, gasUsedDelta)
 		y := x.Div(x, parentGasTargetBig)
 		baseFeeDelta := math.BigMax(
 			x.Div(y, baseFeeChangeDenominator),
@@ -229,9 +226,9 @@ func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
 	binary.BigEndian.PutUint64(window[start:], totalGasConsumed)
 }
 
-// calcBlockFee calculates the required block fee
+// calcBlockGasCost calculates the required block gas cost
 // assumes that [currentTime >= parentTime]
-func calcBlockFee(maxBlockFee *big.Int, blockFeeDuration, parentTime, currentTime uint64) *big.Int {
+func calcBlockGasCost(maxBlockFee *big.Int, blockFeeDuration, parentTime, currentTime uint64) *big.Int {
 	timeElapsed := currentTime - parentTime
 	// If [blockFeeDuration] has already expired, set the block fee to 0
 	if timeElapsed > blockFeeDuration {
@@ -248,9 +245,8 @@ func calcBlockFee(maxBlockFee *big.Int, blockFeeDuration, parentTime, currentTim
 		maxBlockFee,
 		feeTimeRemaining,
 	)
-	requiredBlockGasFee := new(big.Int).Div(
+	return new(big.Int).Div(
 		requiredBlockGasFeeNum,
 		bigBlockFeeDuration,
 	)
-	return requiredBlockGasFee
 }
