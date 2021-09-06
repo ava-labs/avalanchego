@@ -385,7 +385,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -427,7 +427,7 @@ func TestIssueAtomicTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(exportTx /*local*/, true); err != nil {
+	if err := vm.issueTx(exportTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -535,7 +535,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -741,7 +741,7 @@ func TestConflictingImportTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i, tx := range importTxs {
-		if err := vm.issueTx(tx /*local*/, true); err != nil {
+		if err := vm.issueTx(tx, true /*=local*/); err != nil {
 			t.Fatal(err)
 		}
 
@@ -771,7 +771,7 @@ func TestConflictingImportTxs(t *testing.T) {
 	}
 
 	for i, tx := range conflictTxs {
-		if err := vm.issueTx(tx /*local*/, true); err == nil {
+		if err := vm.issueTx(tx, true /*=local*/); err == nil {
 			t.Fatal("Expected issueTx to fail due to conflicting transaction")
 		}
 		// Force issue transaction directly to the mempool
@@ -879,7 +879,7 @@ func TestSetPreferenceRace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm1.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1181,7 +1181,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx0A /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx0A, true /*=local*/); err != nil {
 		t.Fatalf("Failed to issue importTx0A: %s", err)
 	}
 
@@ -1239,7 +1239,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatalf("Failed to issue importTx1 due to: %s", err)
 	}
 
-	if err := vm.issueTx(importTx1 /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx1, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1258,7 +1258,7 @@ func TestConflictingTransitiveAncestryWithGap(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx0B /*local*/, true); err == nil {
+	if err := vm.issueTx(importTx0B, true /*=local*/); err == nil {
 		t.Fatalf("Should not have been able to issue import tx with conflict")
 	}
 	// Force issue transaction directly into the mempool
@@ -1326,7 +1326,7 @@ func TestBonusBlocksTxs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1465,7 +1465,7 @@ func TestReorgProtection(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm1.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1692,7 +1692,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm1.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1912,7 +1912,7 @@ func TestStickyPreference(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm1.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2230,7 +2230,7 @@ func TestUncleBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm1.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2455,7 +2455,7 @@ func TestEmptyBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2582,7 +2582,7 @@ func TestAcceptReorg(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm1.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2820,7 +2820,7 @@ func TestFutureBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -2925,7 +2925,7 @@ func TestBuildApricotPhase1Block(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3099,7 +3099,7 @@ func TestApricotPhase1Transition(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm1.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm1.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3382,7 +3382,7 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3492,7 +3492,7 @@ func TestReissueAtomicTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3612,7 +3612,7 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx /*local*/, true); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3658,7 +3658,7 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(exportTx1 /*local*/, true); err != nil {
+	if err := vm.issueTx(exportTx1, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 	<-issuer
@@ -3674,7 +3674,7 @@ func TestAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(exportTx2 /*local*/, true); err == nil {
+	if err := vm.issueTx(exportTx2, true /*=local*/); err == nil {
 		t.Fatal("Should have failed to issue due to an invalid export tx")
 	}
 	// Force add transaction directly to the mempool to ensure it fails during build block
@@ -3733,7 +3733,7 @@ func TestBuildInvalidBlockHead(t *testing.T) {
 
 	// Verify that the transaction fails verification when attempting to issue
 	// it into the atomic mempool.
-	if err := vm.issueTx(tx /*local*/, true); err == nil {
+	if err := vm.issueTx(tx, true /*=local*/); err == nil {
 		t.Fatal("Should have failed to issue invalid transaction")
 	}
 	// Force issue the transaction directly to the mempool

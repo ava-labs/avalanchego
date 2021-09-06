@@ -373,9 +373,6 @@ func TestMempool_AtmTxs_AppResponseHandling_InvalidTx(t *testing.T) {
 	has := mempool.has(txID)
 	assert.False(has, "invalid tx should not be issued to mempool")
 
-	rejected := mempool.isRejected(txID)
-	assert.True(rejected, "invalid tx should be marked as rejected")
-
 	assert.False(wasGossiped, "invalid tx should not be re-gossiped")
 }
 
@@ -468,8 +465,8 @@ func TestMempool_AtmTxs_AppGossipHandling_InvalidTx(t *testing.T) {
 	mempool.NextTx()
 	mempool.DiscardCurrentTx()
 
-	rejected := mempool.isRejected(txID)
-	assert.True(rejected)
+	has := mempool.has(txID)
+	assert.False(has)
 
 	// gossip tx and check it is accepted and re-gossiped
 	nodeID := ids.GenerateTestShortID()
