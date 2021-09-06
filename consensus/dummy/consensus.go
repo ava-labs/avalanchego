@@ -78,6 +78,12 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		if header.BaseFee != nil {
 			return fmt.Errorf("invalid baseFee before fork: have %d, want <nil>", header.BaseFee)
 		}
+		if header.BlockGasCost != nil {
+			return fmt.Errorf("invalid blockGasCost before fork: have %d, want <nil>", header.BlockGasCost)
+		}
+		if header.ExtDataGasUsed != nil {
+			return fmt.Errorf("invalid extDataGasUsed before fork: have %d, want <nil>", header.ExtDataGasUsed)
+		}
 	} else {
 		if len(header.Extra) != params.ApricotPhase3ExtraDataSize {
 			return fmt.Errorf("expected extra-data field to be: %d, but found %d", params.ApricotPhase3ExtraDataSize, len(header.Extra))
@@ -92,6 +98,21 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		}
 		if header.BaseFee.Cmp(expectedBaseFee) != 0 {
 			return fmt.Errorf("expected base fee (%d), found (%d)", expectedBaseFee, header.BaseFee)
+		}
+
+		if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
+			expectedBlockGasCost := self.CalcBlockGasCost(chain.Config(), parent, header.Time)
+			if header.BlockGasCost.Cmp(expectedBlockGasCost) != 0 {
+				return fmt.Errorf("expected block gas cost (%d), found (%d)", expectedBlockGasCost, header.BlockGasCost)
+			}
+			// TODO: confirm ext data gas cost (need access to block)
+		} else {
+			if header.BlockGasCost != nil {
+				return fmt.Errorf("invalid blockGasCost before fork: have %d, want <nil>", header.BlockGasCost)
+			}
+			if header.ExtDataGasUsed != nil {
+				return fmt.Errorf("invalid extDataGasUsed before fork: have %d, want <nil>", header.ExtDataGasUsed)
+			}
 		}
 	}
 
@@ -314,6 +335,7 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 	}
 
 	// Calculate the gas used by atomic transactions
+	// Check if nil
 	extraStateGasUsed, err := self.cb.ExtraStateGasUsed(block)
 	if err != nil {
 		return nil, err
@@ -330,4 +352,26 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 	)
 	averageGasPrice := new(big.Int).Div(requiredBlockFee, blockGasUsage)
 	return new(big.Int).Sub(averageGasPrice, block.BaseFee()), nil
+}
+
+func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *types.Block, timestamp uint64) *big.Int {
+	// TODO: return error?
+	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(timestamp)) {
+		return nil
+	}
+	return calcBlockFee(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time(), timestamp)
+}
+
+func (self *DummyEngine) CalcExtDataGasCost(config *params.ChainConfig, block *types.Block) (*big.Int, error) {
+	// TODO: return error?
+	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
+		return nil, nil
+	}
+	// TODO: check if nil
+	// TODO: change to return big.Int
+	gasUsed, err := self.cb.ExtraStateGasUsed(block)
+	if err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetUint64(gasUsed), nil
 }
