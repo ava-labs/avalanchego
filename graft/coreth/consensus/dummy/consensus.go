@@ -341,6 +341,10 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, heade
 		return nil, nil
 	}
 
+	if self.ethFaker {
+		return big.NewInt(0), nil
+	}
+
 	if header.Number.Int64() == 0 {
 		return nil, nil
 	}

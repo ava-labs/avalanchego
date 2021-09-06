@@ -172,7 +172,7 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 }
 
 func TestSuggestTipCapIdenticalTip(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
+	tip := big.NewInt(0)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
@@ -206,7 +206,7 @@ func TestSuggestTipCapIdenticalTip(t *testing.T) {
 }
 
 func TestSuggestTipCapDifferentTips(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
+	tip := big.NewInt(0)
 	signer := types.LatestSigner(params.TestChainConfig)
 
 	highTip := new(big.Int).Add(tip, common.Big1)
@@ -220,7 +220,6 @@ func TestSuggestTipCapDifferentTips(t *testing.T) {
 
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, highTip)
-			// TODO: fix description
 			// Need to add 50 transactions, so that the block consumes more than the skip block
 			// gas limit
 			// Add 50 transactions each at the low and high tip amount. This should result in the high tip
@@ -261,7 +260,7 @@ func TestSuggestTipCapDifferentTips(t *testing.T) {
 }
 
 func TestSuggestTipCapIgnoreSmallTips(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
+	tip := big.NewInt(0)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
@@ -308,7 +307,7 @@ func TestSuggestTipCapIgnoreSmallTips(t *testing.T) {
 	})
 }
 func TestSuggestTipcapLegacyTxs(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
+	tip := big.NewInt(0)
 
 	// what should we do if we reach further than 20s back when retrieving block values
 	applyGasPriceTest(t, suggestTipCapTest{
