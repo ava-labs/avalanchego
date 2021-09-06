@@ -23,36 +23,31 @@ type postForkBlock struct {
 // 2) Persists this block in storage
 // 3) Calls Reject() on siblings of this block and their descendants.
 func (b *postForkBlock) Accept() error {
-	b.status = choices.Accepted
 	blkID := b.ID()
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
-	// Persist this block with its status
-	if err := b.vm.storePostForkBlock(b); err != nil {
-		return err
-	}
 
-	// mark the inner block as accepted and all conflicting inner blocks as rejected
-	if err := b.vm.Tree.Accept(b.innerBlk); err != nil {
+	// Persist this block with its status
+	b.status = choices.Accepted
+	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
 	delete(b.vm.verifiedBlocks, blkID)
-	return nil
+
+	// mark the inner block as accepted and all conflicting inner blocks as
+	// rejected
+	return b.vm.Tree.Accept(b.innerBlk)
 }
 
 func (b *postForkBlock) Reject() error {
-	// We do not reject the inner block here because it
-	// may be accepted later
-	b.status = choices.Rejected
-	// Persist this block with its status
-	if err := b.vm.storePostForkBlock(b); err != nil {
-		return err
-	}
-
+	// We do not reject the inner block here because it may be accepted later
 	delete(b.vm.verifiedBlocks, b.ID())
-	return nil
+
+	// Persist this block with its status
+	b.status = choices.Rejected
+	return b.vm.storePostForkBlock(b)
 }
 
 func (b *postForkBlock) Status() choices.Status { return b.status }

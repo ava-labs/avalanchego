@@ -31,38 +31,33 @@ func (b *postForkOption) Timestamp() time.Time {
 }
 
 func (b *postForkOption) Accept() error {
-	b.status = choices.Accepted
 	blkID := b.ID()
 	if err := b.vm.State.SetLastAccepted(blkID); err != nil {
 		return err
 	}
 
 	// Persist this block and its status
+	b.status = choices.Accepted
 	if err := b.vm.storePostForkBlock(b); err != nil {
 		return err
 	}
 
-	// mark the inner block as accepted and all conflicting inner blocks as rejected
-	if err := b.vm.Tree.Accept(b.innerBlk); err != nil {
-		return err
-	}
-
 	delete(b.vm.verifiedBlocks, blkID)
-	return nil
+
+	// mark the inner block as accepted and all conflicting inner blocks as
+	// rejected
+	return b.vm.Tree.Accept(b.innerBlk)
 }
 
 func (b *postForkOption) Reject() error {
 	// we do not reject the inner block here because that block may be contained
 	// in the proposer block that causing this block to be rejected.
-	b.status = choices.Rejected
-
-	// Persist this block and its status
-	if err := b.vm.storePostForkBlock(b); err != nil {
-		return err
-	}
 
 	delete(b.vm.verifiedBlocks, b.ID())
-	return nil
+
+	// Persist this block and its status
+	b.status = choices.Rejected
+	return b.vm.storePostForkBlock(b)
 }
 
 func (b *postForkOption) Status() choices.Status { return b.status }
