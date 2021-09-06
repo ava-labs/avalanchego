@@ -38,7 +38,7 @@ type FrontierSender interface {
 // accepted containers
 type AcceptedSender interface {
 	// SendGetAccepted requests that every node in [nodeIDs] sends an Accepted
-	// message with all the IDs in [containerIDs] that the node thinks is
+	// message with all the IDs in [containerIDs] that the node thinks are
 	// accepted.
 	SendGetAccepted(
 		nodeIDs ids.ShortSet,
