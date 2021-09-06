@@ -104,7 +104,7 @@ func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header 
 		}
 
 		if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-			expectedBlockGasCost := self.CalcBlockGasCost(chain.Config(), parent, header.Time)
+			expectedBlockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, header.Time)
 			if header.BlockGasCost == nil {
 				return errors.New("expected blockGasCost to be non-nil")
 			}
