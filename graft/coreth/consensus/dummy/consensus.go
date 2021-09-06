@@ -38,13 +38,21 @@ type (
 	}
 
 	DummyEngine struct {
-		cb *ConsensusCallbacks
+		cb           *ConsensusCallbacks
+		skipBlockFee bool
 	}
 )
 
 func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
 		cb: cb,
+	}
+}
+
+func NewFakerSkipBlockFee() *DummyEngine {
+	return &DummyEngine{
+		cb:           new(ConsensusCallbacks),
+		skipBlockFee: true,
 	}
 }
 
@@ -193,6 +201,9 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 }
 
 func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.Int, blockFeeDuration, parent, current uint64, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
+	if self.skipBlockFee {
+		return nil
+	}
 	if parent > current {
 		return fmt.Errorf("invalid timestamp (%d) < parent timestamp (%d)", current, parent)
 	}
