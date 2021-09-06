@@ -63,11 +63,6 @@ func (m *Mempool) has(txID ids.ID) bool {
 	return found && !dropped
 }
 
-func (m *Mempool) isRejected(txID ids.ID) bool {
-	_, dropped, found := m.GetTx(txID)
-	return found && dropped
-}
-
 // Add attempts to add [tx] to the mempool and returns an error if
 // it could not be addeed to the mempool.
 func (m *Mempool) AddTx(tx *Tx) error {

@@ -477,7 +477,7 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if err := vm.issueTx(tx /*local*/, true); err != nil {
+			if err := vm.issueTx(tx, true /*=local*/); err != nil {
 				t.Fatal(err)
 			}
 
