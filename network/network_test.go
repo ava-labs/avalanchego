@@ -327,27 +327,17 @@ func TestNewDefaultNetwork(t *testing.T) {
 
 	vdrs := validators.NewSet()
 	handler := &testHandler{}
-	netConfig := NewDefaultConfig(
-		"",
+	net, err := newDefaultNetwork(
 		id,
 		ip,
-		uint32(0),
 		vdrs,
-		vdrs,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		defaultAliasTimeout,
 		cert0.PrivateKey.(crypto.Signer),
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
 		ids.Set{},
+		tlsConfig0,
+		listener,
+		handler,
 	)
 
-	net, err := NewNetwork(prometheus.NewRegistry(), logging.NoLog{}, listener, handler, benchlist.NewManager(&benchlist.Config{}), tlsConfig0, netConfig)
 	assert.NoError(t, err)
 	assert.NotNil(t, net)
 
@@ -1934,7 +1924,8 @@ func TestPeerSignature(t *testing.T) {
 }
 
 func TestValidatorIPs(t *testing.T) {
-	dummyNetwork := network{}
+	netConfig := NewDefaultConfig()
+	dummyNetwork := network{config: &netConfig}
 	dummyNetwork.config.PeerListSize = 50
 
 	appVersion := version.NewDefaultApplication("app", 1, 1, 0)
@@ -2106,7 +2097,7 @@ func TestValidatorIPs(t *testing.T) {
 	dummyNetwork.config.PeerListSize = 2
 
 	validPeerCount := dummyNetwork.config.PeerListSize * 2
-	for i := 0; i < validPeerCount; i++ {
+	for i := 0; i < int(validPeerCount); i++ {
 		ipDesc := utils.IPDesc{
 			IP:   net.IPv4(172, 17, 0, byte(i)),
 			Port: uint16(i),
@@ -2121,7 +2112,7 @@ func TestValidatorIPs(t *testing.T) {
 
 	// checks
 	assert.NoError(t, err)
-	assert.True(t, len(IPs) == dummyNetwork.config.PeerListSize)
+	assert.True(t, len(IPs) == int(dummyNetwork.config.PeerListSize))
 }
 
 // Test that a node will not finish the handshake if the peer's version
@@ -2653,8 +2644,47 @@ func isIPDescIn(targetIP utils.IPDesc, ipDescList []utils.IPCertDesc) bool {
 	return false
 }
 
-func newTestNetwork(
+func newDefaultNetwork(
 	id ids.ShortID,
+	ip utils.DynamicIPDesc,
+	vdrs validators.Set,
+	tlsKey crypto.Signer,
+	subnetSet ids.Set,
+	tlsConfig *tls.Config,
+	listener net.Listener,
+	router router.Router,
+) (Network, error) {
+	log := logging.NoLog{}
+	networkID := uint32(0)
+	benchlistManager := benchlist.NewManager(&benchlist.Config{})
+
+	netConfig := NewDefaultConfig()
+	netConfig.Namespace = ""
+	netConfig.ID = id
+	netConfig.IP = ip
+	netConfig.NetworkID = networkID
+	netConfig.Validators = vdrs
+	netConfig.Beacons = vdrs
+	netConfig.TLSKey = tlsKey
+	netConfig.TLSConfig = tlsConfig
+	netConfig.PeerAliasTimeout = defaultAliasTimeout
+	netConfig.PeerListSize = defaultPeerListSize
+	netConfig.PeerListGossipSize = defaultGossipPeerListTo
+	netConfig.PeerListGossipFreq = defaultGossipPeerListFreq
+	netConfig.GossipAcceptedFrontierSize = defaultGossipAcceptedFrontierSize
+	netConfig.GossipOnAcceptSize = defaultGossipOnAcceptSize
+	netConfig.CompressionEnabled = true
+	netConfig.WhitelistedSubnets = subnetSet
+
+	n, err := NewNetwork(prometheus.NewRegistry(), log, listener, router, benchlistManager, &netConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return n, nil
+}
+
+func newTestNetwork(id ids.ShortID,
 	ip utils.DynamicIPDesc,
 	versionCompatibility version.Compatibility,
 	vdrs validators.Set,
@@ -2663,32 +2693,8 @@ func newTestNetwork(
 	tlsConfig *tls.Config,
 	listener net.Listener,
 	dialer dialer.Dialer,
-	router router.Router,
-) (Network, error) {
-	log := logging.NoLog{}
-	networkID := uint32(0)
-	benchlistManager := benchlist.NewManager(&benchlist.Config{})
-
-	netConfig := NewDefaultConfig(
-		"",
-		id,
-		ip,
-		networkID,
-		vdrs,
-		vdrs,
-		throttling.InboundConnThrottlerConfig{},
-		HealthConfig{},
-		defaultAliasTimeout,
-		tlsKey,
-		defaultPeerListSize,
-		defaultGossipPeerListTo,
-		defaultGossipPeerListFreq,
-		defaultGossipAcceptedFrontierSize,
-		defaultGossipOnAcceptSize,
-		true,
-		subnetSet,
-	)
-	n, err := NewNetwork(prometheus.NewRegistry(), log, listener, router, benchlistManager, tlsConfig, netConfig)
+	router router.Router) (Network, error) {
+	n, err := newDefaultNetwork(id, ip, vdrs, tlsKey, subnetSet, tlsConfig, listener, router)
 	if err != nil {
 		return nil, err
 	}
@@ -2697,5 +2703,5 @@ func newTestNetwork(
 	netw.versionCompatibility = versionCompatibility
 	netw.inboundMsgThrottler = defaultInboundMsgThrottler
 	netw.outboundMsgThrottler = defaultOutboundMsgThrottler
-	return n, nil
+	return netw, nil
 }

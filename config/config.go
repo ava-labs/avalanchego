@@ -25,8 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/ipcs"
 	"github.com/ava-labs/avalanchego/nat"
 	"github.com/ava-labs/avalanchego/network"
-	"github.com/ava-labs/avalanchego/network/dialer"
-	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -39,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/profiler"
-	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 )
 
@@ -233,47 +230,50 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 }
 
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
-	config := network.Config{
-		// Throttling
-		InboundConnThrottlerConfig: throttling.InboundConnThrottlerConfig{
-			AllowCooldown:  v.GetDuration(InboundConnThrottlerCooldownKey),
-			MaxRecentConns: v.GetInt(InboundConnThrottlerMaxRecentConnsKey),
-		},
-		InboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
-			AtLargeAllocSize:    v.GetUint64(InboundThrottlerAtLargeAllocSizeKey),
-			VdrAllocSize:        v.GetUint64(InboundThrottlerVdrAllocSizeKey),
-			NodeMaxAtLargeBytes: v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey),
-		},
-		OutboundMsgThrottlerConfig: throttling.MsgThrottlerConfig{
-			AtLargeAllocSize:    v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey),
-			VdrAllocSize:        v.GetUint64(OutboundThrottlerVdrAllocSizeKey),
-			NodeMaxAtLargeBytes: v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey),
-		},
-		// Network Health Check
-		HealthConfig: network.HealthConfig{
-			MaxTimeSinceMsgSent:          v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey),
-			MaxTimeSinceMsgReceived:      v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey),
-			MaxPortionSendQueueBytesFull: v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey),
-			MinConnectedPeers:            v.GetUint(NetworkHealthMinPeersKey),
-			MaxSendFailRate:              v.GetFloat64(NetworkHealthMaxSendFailRateKey),
-			MaxSendFailRateHalflife:      halflife,
-		},
-		AdaptiveTimeoutConfig: timer.AdaptiveTimeoutConfig{
-			InitialTimeout:     v.GetDuration(NetworkInitialTimeoutKey),
-			MinimumTimeout:     v.GetDuration(NetworkMinimumTimeoutKey),
-			MaximumTimeout:     v.GetDuration(NetworkMaximumTimeoutKey),
-			TimeoutHalflife:    v.GetDuration(NetworkTimeoutHalflifeKey),
-			TimeoutCoefficient: v.GetFloat64(NetworkTimeoutCoefficientKey),
-		},
-		CompressionEnabled: v.GetBool(NetworkCompressionEnabledKey),
-		DialerConfig: dialer.Config{
-			ThrottleRps:       v.GetUint32(OutboundConnectionThrottlingRps),
-			ConnectionTimeout: v.GetDuration(OutboundConnectionTimeout),
-		},
-		TimeoutConfig: network.TimeoutConfig{
-			PeerAliasTimeout: v.GetDuration(PeerAliasTimeoutKey),
-		},
-	}
+	config := network.NewDefaultConfig()
+
+	// Throttling
+	config.InboundConnThrottlerConfig.AllowCooldown = v.GetDuration(InboundConnThrottlerCooldownKey)
+	config.InboundConnThrottlerConfig.MaxRecentConns = v.GetInt(InboundConnThrottlerMaxRecentConnsKey)
+
+	config.InboundMsgThrottlerConfig.AtLargeAllocSize = v.GetUint64(InboundThrottlerAtLargeAllocSizeKey)
+	config.InboundMsgThrottlerConfig.VdrAllocSize = v.GetUint64(InboundThrottlerVdrAllocSizeKey)
+	config.InboundMsgThrottlerConfig.NodeMaxAtLargeBytes = v.GetUint64(InboundThrottlerNodeMaxAtLargeBytesKey)
+
+	config.OutboundMsgThrottlerConfig.AtLargeAllocSize = v.GetUint64(OutboundThrottlerAtLargeAllocSizeKey)
+	config.OutboundMsgThrottlerConfig.VdrAllocSize = v.GetUint64(OutboundThrottlerVdrAllocSizeKey)
+	config.OutboundMsgThrottlerConfig.NodeMaxAtLargeBytes = v.GetUint64(OutboundThrottlerNodeMaxAtLargeBytesKey)
+
+	// Network Health Check
+	config.HealthConfig.MaxTimeSinceMsgSent = v.GetDuration(NetworkHealthMaxTimeSinceMsgSentKey)
+	config.HealthConfig.MaxTimeSinceMsgReceived = v.GetDuration(NetworkHealthMaxTimeSinceMsgReceivedKey)
+	config.HealthConfig.MaxPortionSendQueueBytesFull = v.GetFloat64(NetworkHealthMaxPortionSendQueueFillKey)
+	config.HealthConfig.MinConnectedPeers = v.GetUint(NetworkHealthMinPeersKey)
+	config.HealthConfig.MaxSendFailRate = v.GetFloat64(NetworkHealthMaxSendFailRateKey)
+	config.HealthConfig.MaxSendFailRateHalflife = halflife
+
+	// Adaptive Timeouts
+	config.AdaptiveTimeoutConfig.InitialTimeout = v.GetDuration(NetworkInitialTimeoutKey)
+	config.AdaptiveTimeoutConfig.MinimumTimeout = v.GetDuration(NetworkMinimumTimeoutKey)
+	config.AdaptiveTimeoutConfig.MaximumTimeout = v.GetDuration(NetworkMaximumTimeoutKey)
+	config.AdaptiveTimeoutConfig.TimeoutHalflife = v.GetDuration(NetworkTimeoutHalflifeKey)
+	config.AdaptiveTimeoutConfig.TimeoutCoefficient = v.GetFloat64(NetworkTimeoutCoefficientKey)
+
+	config.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
+
+	config.DialerConfig.ThrottleRps = v.GetUint32(OutboundConnectionThrottlingRps)
+	config.DialerConfig.ConnectionTimeout = v.GetDuration(OutboundConnectionTimeout)
+
+	config.TimeoutConfig.PeerAliasTimeout = v.GetDuration(PeerAliasTimeoutKey)
+
+	// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every [PeerListGossipFreq]
+	config.PeerListGossipConfig.PeerListSize = v.GetUint32(NetworkPeerListSizeKey)
+	config.PeerListGossipConfig.PeerListGossipFreq = v.GetDuration(NetworkPeerListGossipFreqKey)
+	config.PeerListGossipConfig.PeerListGossipSize = v.GetUint32(NetworkPeerListGossipSizeKey)
+
+	config.GossipConfig.GossipAcceptedFrontierSize = uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey))
+	config.GossipConfig.GossipOnAcceptSize = uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey))
+
 	switch {
 	case config.MinimumTimeout < 1:
 		return network.Config{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
@@ -297,7 +297,10 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 		return network.Config{}, fmt.Errorf("%q must be >= 0", OutboundConnectionTimeout)
 	case config.PeerAliasTimeout < 0:
 		return network.Config{}, fmt.Errorf("%q must be >= 0", PeerAliasTimeoutKey)
+	case config.PeerListGossipFreq < 0:
+		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	}
+
 	return config, nil
 }
 
@@ -355,29 +358,6 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 			return node.BootstrapConfig{}, fmt.Errorf("couldn't parse bootstrap peer id: %w", err)
 		}
 		config.BootstrapIDs = append(config.BootstrapIDs, nodeID)
-	}
-	return config, nil
-}
-
-func getGossipConfig(v *viper.Viper) (node.GossipConfig, error) {
-	config := node.GossipConfig{
-		ConsensusGossipConfig: node.ConsensusGossipConfig{
-			ConsensusGossipFrequency:            v.GetDuration(ConsensusGossipFrequencyKey),
-			ConsensusGossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-			ConsensusGossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		},
-		PeerListGossipConfig: node.PeerListGossipConfig{
-			// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every [PeerListGossipFreq]
-			PeerListSize:       v.GetUint32(NetworkPeerListSizeKey),
-			PeerListGossipFreq: v.GetDuration(NetworkPeerListGossipFreqKey),
-			PeerListGossipSize: v.GetUint32(NetworkPeerListGossipSizeKey),
-		},
-	}
-	switch {
-	case config.ConsensusGossipFrequency < 0:
-		return node.GossipConfig{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
-	case config.PeerListGossipFreq < 0:
-		return node.GossipConfig{}, fmt.Errorf("%s must be >= 0", NetworkPeerListGossipFreqKey)
 	}
 	return config, nil
 }
@@ -749,12 +729,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 	}
 
 	// Gossiping
-	var err error
-	nodeConfig.GossipConfig, err = getGossipConfig(v)
-	if err != nil {
-		return node.Config{}, err
+	nodeConfig.ConsensusGossipFrequency = v.GetDuration(ConsensusGossipFrequencyKey)
+	if nodeConfig.ConsensusGossipFrequency < 0 {
+		return node.Config{}, fmt.Errorf("%s must be >= 0", ConsensusGossipFrequencyKey)
 	}
 
+	var err error
 	// Logging
 	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
 	if err != nil {

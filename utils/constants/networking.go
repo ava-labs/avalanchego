@@ -5,6 +5,7 @@ package constants
 
 import (
 	"math"
+	"time"
 
 	"github.com/ava-labs/avalanchego/utils/units"
 )
@@ -18,7 +19,17 @@ const (
 	// The network must be "tcp", "tcp4", "tcp6", "unix" or "unixpacket".
 	NetworkType = "tcp"
 
-	DefaultMaxMessageSize uint32 = 2 * units.MiB
+	DefaultMaxMessageSize               = 2 * units.MiB
+	DefaultInitialReconnectDelay        = time.Second
+	DefaultMaxReconnectDelay            = time.Hour
+	DefaultMaxClockDifference           = time.Minute
+	DefaultPeerListStakerGossipFraction = 2
+	DefaultGetVersionTimeout            = 10 * time.Second
+	DefaultAllowPrivateIPs              = true
+	DefaultPingPongTimeout              = 30 * time.Second
+	DefaultPingFrequency                = 3 * DefaultPingPongTimeout / 4
+	DefaultReadHandshakeTimeout         = 15 * time.Second
+	DefaultByteSliceCap                 = 128
 
 	MaxContainersLen = int(4 * DefaultMaxMessageSize / 5)
 )

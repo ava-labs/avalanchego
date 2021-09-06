@@ -229,25 +229,16 @@ func (n *Node) initNetworking() error {
 
 	networkNamespace := fmt.Sprintf("%s_network", constants.PlatformName)
 
-	netConfig := network.NewDefaultConfig(
-		networkNamespace,
-		n.ID,
-		n.Config.IP,
-		n.Config.NetworkID,
-		primaryNetworkValidators,
-		n.beacons,
-		n.Config.NetworkConfig.InboundConnThrottlerConfig,
-		n.Config.NetworkConfig.HealthConfig,
-		n.Config.NetworkConfig.PeerAliasTimeout,
-		tlsKey,
-		int(n.Config.PeerListSize),
-		int(n.Config.PeerListGossipSize),
-		n.Config.PeerListGossipFreq,
-		n.Config.ConsensusGossipAcceptedFrontierSize,
-		n.Config.ConsensusGossipOnAcceptSize,
-		n.Config.NetworkConfig.CompressionEnabled,
-		n.Config.WhitelistedSubnets,
-	)
+	// add node configs to network config
+	n.Config.NetworkConfig.Namespace = networkNamespace
+	n.Config.NetworkConfig.ID = n.ID
+	n.Config.NetworkConfig.IP = n.Config.IP
+	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
+	n.Config.NetworkConfig.Validators = primaryNetworkValidators
+	n.Config.NetworkConfig.Beacons = n.beacons
+	n.Config.NetworkConfig.TLSConfig = tlsConfig
+	n.Config.NetworkConfig.TLSKey = tlsKey
+	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 
 	n.Net, err = network.NewNetwork(
 		n.MetricsRegisterer,
@@ -255,8 +246,7 @@ func (n *Node) initNetworking() error {
 		listener,
 		consensusRouter,
 		n.benchlistManager,
-		tlsConfig,
-		netConfig,
+		&n.Config.NetworkConfig,
 	)
 
 	return err

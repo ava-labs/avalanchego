@@ -40,20 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 )
 
-// reasonable default values
-const (
-	defaultInitialReconnectDelay        = time.Second
-	defaultMaxReconnectDelay            = time.Hour
-	defaultMaxClockDifference           = time.Minute
-	defaultPeerListStakerGossipFraction = 2
-	defaultGetVersionTimeout            = 10 * time.Second
-	defaultAllowPrivateIPs              = true
-	defaultPingPongTimeout              = 30 * time.Second
-	defaultPingFrequency                = 3 * defaultPingPongTimeout / 4
-	defaultReadHandshakeTimeout         = 15 * time.Second
-	defaultByteSliceCap                 = 128
-)
-
 var (
 	errNetworkClosed         = errors.New("network closed")
 	errPeerIsMyself          = errors.New("peer is myself")
@@ -196,13 +182,13 @@ type network struct {
 	// Rate-limits outgoing messages
 	outboundMsgThrottler throttling.OutboundMsgThrottler
 
-	config Config
+	config *Config
 }
 
 type PeerListGossipConfig struct {
-	PeerListSize                 int           `json:"peerListSize"`
-	PeerListGossipSize           int           `json:"peerListGossipSize"`
-	PeerListStakerGossipFraction int           `json:"peerListStakerGossipFraction"`
+	PeerListSize                 uint32        `json:"peerListSize"`
+	PeerListGossipSize           uint32        `json:"peerListGossipSize"`
+	PeerListStakerGossipFraction uint32        `json:"peerListStakerGossipFraction"`
 	PeerListGossipFreq           time.Duration `json:"peerListGossipFreq"`
 }
 
@@ -238,6 +224,7 @@ type Config struct {
 	GossipConfig                `json:"gossipConfig"`
 	TimeoutConfig               `json:"timeoutConfigs"`
 	DelayConfig                 `json:"delayConfig"`
+	TLSConfig                   *tls.Config `json:"-"`
 
 	Namespace          string              `json:"namespace"`
 	ID                 ids.ShortID         `json:"id"`
@@ -259,63 +246,25 @@ type Config struct {
 	Validators validators.Set `json:"validators"`
 }
 
-// NewDefaultConfig returns a new Network Config with the provided
-// parameters and some reasonable default values.
-func NewDefaultConfig(
-	namespace string,
-	id ids.ShortID,
-	ip utils.DynamicIPDesc,
-	networkID uint32,
-	vdrs validators.Set,
-	beacons validators.Set,
-	inboundConnThrottlerConfig throttling.InboundConnThrottlerConfig,
-	healthConfig HealthConfig,
-	peerAliasTimeout time.Duration,
-	tlsKey crypto.Signer,
-	peerListSize int,
-	peerListGossipSize int,
-	peerListGossipFreq time.Duration,
-	gossipAcceptedFrontierSize uint,
-	gossipOnAcceptSize uint,
-	compressionEnabled bool,
-	whitelistedSubnets ids.Set,
-) Config {
+// NewDefaultConfig returns a new Network Config some reasonable default values.
+func NewDefaultConfig() Config {
 	return Config{
 		PeerListGossipConfig: PeerListGossipConfig{
-			PeerListSize:                 peerListSize,
-			PeerListGossipSize:           peerListGossipSize,
-			PeerListStakerGossipFraction: defaultPeerListStakerGossipFraction,
-			PeerListGossipFreq:           peerListGossipFreq,
-		},
-		GossipConfig: GossipConfig{
-			GossipAcceptedFrontierSize: gossipAcceptedFrontierSize,
-			GossipOnAcceptSize:         gossipOnAcceptSize,
+			PeerListStakerGossipFraction: constants.DefaultPeerListStakerGossipFraction,
 		},
 		DelayConfig: DelayConfig{
-			MaxReconnectDelay:     defaultMaxReconnectDelay,
-			InitialReconnectDelay: defaultInitialReconnectDelay,
+			MaxReconnectDelay:     constants.DefaultMaxReconnectDelay,
+			InitialReconnectDelay: constants.DefaultInitialReconnectDelay,
 		},
 		TimeoutConfig: TimeoutConfig{
-			GetVersionTimeout:    defaultGetVersionTimeout,
-			PingPongTimeout:      defaultPingPongTimeout,
-			PingFrequency:        defaultPingFrequency,
-			ReadHandshakeTimeout: defaultReadHandshakeTimeout,
-			PeerAliasTimeout:     peerAliasTimeout,
+			GetVersionTimeout:    constants.DefaultGetVersionTimeout,
+			PingPongTimeout:      constants.DefaultPingPongTimeout,
+			PingFrequency:        constants.DefaultPingFrequency,
+			ReadHandshakeTimeout: constants.DefaultReadHandshakeTimeout,
 		},
-		MaxMessageSize:             constants.DefaultMaxMessageSize,
-		MaxClockDifference:         defaultMaxClockDifference,
-		AllowPrivateIPs:            defaultAllowPrivateIPs,
-		CompressionEnabled:         compressionEnabled,
-		TLSKey:                     tlsKey,
-		WhitelistedSubnets:         whitelistedSubnets,
-		InboundConnThrottlerConfig: inboundConnThrottlerConfig,
-		HealthConfig:               healthConfig,
-		Beacons:                    beacons,
-		Validators:                 vdrs,
-		ID:                         id,
-		IP:                         ip,
-		NetworkID:                  networkID,
-		Namespace:                  namespace,
+		MaxMessageSize:     constants.DefaultMaxMessageSize,
+		MaxClockDifference: constants.DefaultMaxClockDifference,
+		AllowPrivateIPs:    constants.DefaultAllowPrivateIPs,
 	}
 }
 
@@ -326,8 +275,7 @@ func NewNetwork(
 	listener net.Listener,
 	router router.Router,
 	benchlistManager benchlist.Manager,
-	tlsConfig *tls.Config,
-	config Config,
+	config *Config,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
@@ -350,15 +298,15 @@ func NewNetwork(
 		latestPeerIP:         make(map[ids.ShortID]signedPeerIP),
 		byteSlicePool: sync.Pool{
 			New: func() interface{} {
-				return make([]byte, 0, defaultByteSliceCap)
+				return make([]byte, 0, constants.DefaultByteSliceCap)
 			},
 		},
 		versionCompatibility: version.GetCompatibility(config.NetworkID),
 		config:               config,
 	}
 
-	netw.serverUpgrader = NewTLSServerUpgrader(tlsConfig)
-	netw.clientUpgrader = NewTLSClientUpgrader(tlsConfig)
+	netw.serverUpgrader = NewTLSServerUpgrader(config.TLSConfig)
+	netw.clientUpgrader = NewTLSClientUpgrader(config.TLSConfig)
 
 	netw.dialer = dialer.NewDialer(constants.NetworkType, config.DialerConfig, log)
 
@@ -1170,11 +1118,11 @@ func (n *network) gossipPeerList() {
 			}
 		}
 
-		numStakersToSend := (n.config.PeerListGossipSize + n.config.PeerListStakerGossipFraction - 1) / n.config.PeerListStakerGossipFraction
+		numStakersToSend := int((n.config.PeerListGossipSize + n.config.PeerListStakerGossipFraction - 1) / n.config.PeerListStakerGossipFraction)
 		if len(stakers) < numStakersToSend {
 			numStakersToSend = len(stakers)
 		}
-		numNonStakersToSend := n.config.PeerListGossipSize - numStakersToSend
+		numNonStakersToSend := int(n.config.PeerListGossipSize) - numStakersToSend
 		if len(nonStakers) < numNonStakersToSend {
 			numNonStakersToSend = len(nonStakers)
 		}
@@ -1472,7 +1420,7 @@ func (n *network) validatorIPs() ([]utils.IPCertDesc, error) {
 
 	totalNumPeers := n.peers.size()
 
-	numToSend := n.config.PeerListSize
+	numToSend := int(n.config.PeerListSize)
 	if totalNumPeers < numToSend {
 		numToSend = totalNumPeers
 	}
