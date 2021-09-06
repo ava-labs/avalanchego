@@ -114,8 +114,9 @@ type Engine interface {
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
 
-	// MinRequiredTip is the minimum tip a transaction must pay to be included in
-	// a block. This is 0 prior to Apricot Phase 4.
+	// MinRequiredTip is the estimated minimum tip a transaction would have
+	// needed to pay to be included in a given block. This function will return nil for
+	// all return values prior to Apricot Phase 4.
 	MinRequiredTip(chain ChainHeaderReader, block *types.Block) (*big.Int, error)
 
 	// CalcBaseFee computes the BaseFee of a block produced at [timestamp].

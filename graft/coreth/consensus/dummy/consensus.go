@@ -19,22 +19,31 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-type OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
-type OnAPIsCallbackType = func(consensus.ChainHeaderReader) []rpc.API
-type OnExtraStateChangeType = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, err error)
-type OnAtomicGasUsedType = func(block *types.Block) (gasUsed uint64, err error)
+var (
+	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 
-type ConsensusCallbacks struct {
-	OnAPIs                OnAPIsCallbackType
-	OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
-	OnExtraStateChange    OnExtraStateChangeType
-	OnAtomicGasUsed       OnAtomicGasUsedType
-}
+	errInvalidBlockTime  = errors.New("timestamp less than parent's")
+	errUnclesUnsupported = errors.New("uncles unsupported")
+)
 
-type DummyEngine struct {
-	cb           *ConsensusCallbacks
-	skipBlockFee bool
-}
+type (
+	OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, err error)
+	OnAPIsCallbackType                = func(consensus.ChainHeaderReader) []rpc.API
+	OnExtraStateChangeType            = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, err error)
+	ExtraStateGasUsedType             = func(block *types.Block) (gasUsed uint64, err error)
+
+	ConsensusCallbacks struct {
+		OnAPIs                OnAPIsCallbackType
+		OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
+		OnExtraStateChange    OnExtraStateChangeType
+		ExtraStateGasUsed     ExtraStateGasUsedType
+	}
+
+	DummyEngine struct {
+		cb           *ConsensusCallbacks
+		skipBlockFee bool
+	}
+)
 
 func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
@@ -52,15 +61,6 @@ func NewFakerSkipBlockFee() *DummyEngine {
 func NewFaker() *DummyEngine {
 	return NewDummyEngine(new(ConsensusCallbacks))
 }
-
-var (
-	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
-)
-
-var (
-	errInvalidBlockTime  = errors.New("timestamp less than parent's")
-	errUnclesUnsupported = errors.New("uncles unsupported")
-)
 
 // modified from consensus.go
 func (self *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *types.Header, parent *types.Block, uncle bool) error {
@@ -308,13 +308,13 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 		return nil, nil
 	}
 
-	parentHdr := chain.GetHeaderByNumber(block.Number().Uint64() - 1)
+	parentHdr := chain.GetHeaderByHash(block.ParentHash())
 	if parentHdr == nil {
 		return nil, errors.New("parent is nil")
 	}
 
 	// Calculate the gas used by atomic transactions
-	atomicGasUsed, err := self.cb.OnAtomicGasUsed(block)
+	extraStateGasUsed, err := self.cb.ExtraStateGasUsed(block)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +324,10 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, block
 
 	// minTip = requiredBlockFee/blockGasUsage - baseFee
 	requiredBlockFee := new(big.Int).Mul(requiredBlockGasFee, block.BaseFee())
-	blockGasUsage := new(big.Int).SetUint64(block.GasUsed() + atomicGasUsed)
+	blockGasUsage := new(big.Int).Add(
+		new(big.Int).SetUint64(block.GasUsed()),
+		new(big.Int).SetUint64(extraStateGasUsed),
+	)
 	averageGasPrice := new(big.Int).Div(requiredBlockFee, blockGasUsage)
 	return new(big.Int).Sub(averageGasPrice, block.BaseFee()), nil
 }
