@@ -36,7 +36,7 @@ func TestDelayFromSetTime(t *testing.T) {
 	defer s.Close()
 	go s.Dispatch(now)
 
-	s.SetStartTime(startTime)
+	s.SetBuildBlockTime(startTime)
 
 	fromVM <- common.PendingTxs
 
@@ -57,7 +57,7 @@ func TestReceipt(t *testing.T) {
 
 	fromVM <- common.PendingTxs
 
-	s.SetStartTime(startTime)
+	s.SetBuildBlockTime(startTime)
 
 	<-toEngine
 }

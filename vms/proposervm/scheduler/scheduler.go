@@ -16,7 +16,7 @@ const (
 
 type Scheduler interface {
 	Dispatch(startTime time.Time)
-	SetStartTime(t time.Time)
+	SetBuildBlockTime(t time.Time)
 	Close()
 }
 
@@ -35,34 +35,38 @@ type scheduler struct {
 	// When we receive a message on this channel, it means that we must refrain
 	// from telling the engine to call its VM's BuildBlock method until the
 	// given time
-	newStartTime chan time.Time
+	newBuildBlockTime chan time.Time
 }
 
 func New(log logging.Logger, toEngine chan<- common.Message) (Scheduler, chan<- common.Message) {
 	vmToEngine := make(chan common.Message, fromVMSize)
 	return &scheduler{
-		fromVM:       vmToEngine,
-		toEngine:     toEngine,
-		newStartTime: make(chan time.Time),
+		fromVM:            vmToEngine,
+		toEngine:          toEngine,
+		newBuildBlockTime: make(chan time.Time),
 	}, vmToEngine
 }
 
-func (s *scheduler) Dispatch(startTime time.Time) {
+func (s *scheduler) Dispatch(buildBlockTime time.Time) {
+	timer := time.NewTimer(time.Until(buildBlockTime))
 waitloop:
 	for {
-		timer := time.NewTimer(time.Until(startTime))
 		select {
 		case <-timer.C: // It's time to tell the engine to try to build a block
-		case newStartTime, ok := <-s.newStartTime:
+		case buildBlockTime, ok := <-s.newBuildBlockTime:
+			// Stop the timer and clear [timer.C] if needed
+			if !timer.Stop() {
+				<-timer.C
+			}
+
 			if !ok {
 				// s.Close() was called
-				timer.Stop()
 				return
 			}
+
 			// The time at which we should notify the engine that it should try
 			// to build a block has changed
-			startTime = newStartTime
-			timer.Stop()
+			timer.Reset(time.Until(buildBlockTime))
 			continue waitloop
 		}
 
@@ -78,24 +82,26 @@ waitloop:
 					// from the VM to avoid deadlock
 					s.log.Debug("dropping message from VM because channel to engine is full")
 				}
-			case newStartTime, ok := <-s.newStartTime:
+			case buildBlockTime, ok := <-s.newBuildBlockTime:
 				// The time at which we should notify the engine that it should
 				// try to build a block has changed
 				if !ok {
 					// s.Close() was called
 					return
 				}
-				startTime = newStartTime
+				// We know [timer.C] was drained in the first select statement
+				// so its safe to call [timer.Reset]
+				timer.Reset(time.Until(buildBlockTime))
 				continue waitloop
 			}
 		}
 	}
 }
 
-func (s *scheduler) SetStartTime(t time.Time) {
-	s.newStartTime <- t
+func (s *scheduler) SetBuildBlockTime(t time.Time) {
+	s.newBuildBlockTime <- t
 }
 
 func (s *scheduler) Close() {
-	close(s.newStartTime)
+	close(s.newBuildBlockTime)
 }
