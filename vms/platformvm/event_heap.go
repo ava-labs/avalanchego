@@ -33,13 +33,11 @@ type EventHeap struct {
 }
 
 func (h *EventHeap) Len() int { return len(h.Txs) }
-func (h *EventHeap) Less(i, j int) bool {
-	iTx := h.Txs[i].UnsignedTx.(TimedTx)
-	jTx := h.Txs[j].UnsignedTx.(TimedTx)
 
+func less(iTx TimedTx, jTx TimedTx, sortByStartTime bool) bool {
 	iTime := iTx.EndTime()
 	jTime := jTx.EndTime()
-	if h.SortByStartTime {
+	if sortByStartTime {
 		iTime = iTx.StartTime()
 		jTime = jTx.StartTime()
 	}
@@ -52,7 +50,7 @@ func (h *EventHeap) Less(i, j int) bool {
 		_, jOk := jTx.(*UnsignedAddValidatorTx)
 
 		if iOk != jOk {
-			return iOk == h.SortByStartTime
+			return iOk == sortByStartTime
 		}
 		id1 := iTx.ID()
 		id2 := jTx.ID()
@@ -61,6 +59,13 @@ func (h *EventHeap) Less(i, j int) bool {
 		return false
 	}
 }
+
+func (h *EventHeap) Less(i, j int) bool {
+	iTx := h.Txs[i].UnsignedTx.(TimedTx)
+	jTx := h.Txs[j].UnsignedTx.(TimedTx)
+	return less(iTx, jTx, h.SortByStartTime)
+}
+
 func (h *EventHeap) Swap(i, j int) { h.Txs[i], h.Txs[j] = h.Txs[j], h.Txs[i] }
 
 // Timestamp returns the timestamp on the top transaction on the heap

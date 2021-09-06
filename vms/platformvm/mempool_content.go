@@ -1,16 +1,14 @@
 package platformvm
 
 import (
-	"bytes"
 	"sort"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// Txs should be retrieveable by their ID. Also we need to retrieve N of them
-// ordered by their insertion
-
+// poolOrderedTx can be ordered by the time they enter mempool. They can also be removed randomly
+// by ID as it happens when mempool needs to be cleaned up following block reception
 type poolOrderedTx struct {
 	tx            *Tx
 	entryPosition int
@@ -21,7 +19,7 @@ func (p poolOrderedTxs) Len() int           { return len(p) }
 func (p poolOrderedTxs) Less(i, j int) bool { return p[i].entryPosition < p[j].entryPosition }
 func (p poolOrderedTxs) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-// TODO: remove code duplication with EventHeap
+// timeOrderedTx are TimedTx ordered by starTime
 type timeOrderedTx struct {
 	tx *Tx
 }
@@ -31,26 +29,7 @@ func (t timeOrderedTxs) Len() int { return len(t) }
 func (t timeOrderedTxs) Less(i, j int) bool {
 	iTx := t[i].tx.UnsignedTx.(TimedTx)
 	jTx := t[j].tx.UnsignedTx.(TimedTx)
-
-	iTime := iTx.StartTime()
-	jTime := jTx.StartTime()
-
-	switch {
-	case iTime.Unix() < jTime.Unix():
-		return true
-	case iTime == jTime:
-		_, iOk := iTx.(*UnsignedAddValidatorTx)
-		_, jOk := jTx.(*UnsignedAddValidatorTx)
-
-		if iOk != jOk {
-			return iOk
-		}
-		id1 := iTx.ID()
-		id2 := jTx.ID()
-		return bytes.Compare(id1[:], id2[:]) == -1
-	default:
-		return false
-	}
+	return less(iTx, jTx, true /*=sortByStartTime*/)
 }
 func (t timeOrderedTxs) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 
@@ -59,9 +38,12 @@ func (t timeOrderedTxs) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 type mempoolContent struct {
 	unissuedProposalTxs map[ids.ID]timeOrderedTx
 	unissuedDecisionTxs map[ids.ID]poolOrderedTx
+	decisionTxCounter   int
 	unissuedAtomicTxs   map[ids.ID]poolOrderedTx
-	unissuedTxs         map[ids.ID]struct{}
-	totalBytesSize      int
+	atomicTxCounter     int
+
+	unissuedTxs    map[ids.ID]struct{}
+	totalBytesSize int
 
 	rejectedProposalTxs *cache.LRU
 	rejectedDecisionTxs *cache.LRU
@@ -119,8 +101,9 @@ func (mc *mempoolContent) hasRoomFor(tx *Tx) bool {
 func (mc *mempoolContent) AddDecisionTx(tx *Tx) error {
 	mc.unissuedDecisionTxs[tx.ID()] = poolOrderedTx{
 		tx:            tx,
-		entryPosition: len(mc.unissuedDecisionTxs),
+		entryPosition: mc.decisionTxCounter,
 	}
+	mc.decisionTxCounter++
 	mc.register(tx)
 	return nil
 }
@@ -169,8 +152,9 @@ func (mc *mempoolContent) HasDecisionTxs() bool { return len(mc.unissuedDecision
 func (mc *mempoolContent) AddAtomicTx(tx *Tx) error {
 	mc.unissuedAtomicTxs[tx.ID()] = poolOrderedTx{
 		tx:            tx,
-		entryPosition: len(mc.unissuedAtomicTxs),
+		entryPosition: mc.atomicTxCounter,
 	}
+	mc.atomicTxCounter++
 	mc.register(tx)
 	return nil
 }
