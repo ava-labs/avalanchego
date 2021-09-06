@@ -38,8 +38,8 @@ type (
 	}
 
 	DummyEngine struct {
-		cb           *ConsensusCallbacks
-		skipBlockFee bool
+		cb       *ConsensusCallbacks
+		ethFaker bool
 	}
 )
 
@@ -49,10 +49,10 @@ func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	}
 }
 
-func NewFakerSkipBlockFee() *DummyEngine {
+func NewETHFaker() *DummyEngine {
 	return &DummyEngine{
-		cb:           new(ConsensusCallbacks),
-		skipBlockFee: true,
+		cb:       new(ConsensusCallbacks),
+		ethFaker: true,
 	}
 }
 
@@ -201,7 +201,7 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 }
 
 func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, maxBlockGasFee *big.Int, blockFeeDuration, parent, current uint64, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
-	if self.skipBlockFee {
+	if self.ethFaker {
 		return nil
 	}
 	if parent > current {
@@ -285,19 +285,18 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 		extDataGasUsed *big.Int
 		extraData      []byte
 		err            error
-
-		isAP4 = chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time))
 	)
 	if self.cb.OnFinalizeAndAssemble != nil {
 		extraData, contribution, extDataGasUsed, err = self.cb.OnFinalizeAndAssemble(header, state, txs)
 		if err != nil {
 			return nil, err
 		}
-		if isAP4 {
-			header.ExtDataGasUsed = extDataGasUsed
-		}
 	}
-	if isAP4 {
+	if self.ethFaker {
+		extDataGasUsed = common.Big0
+	}
+	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
+		header.ExtDataGasUsed = extDataGasUsed
 		if err := self.verifyBlockFee(
 			header.BaseFee,
 			ApricotPhase4MaxBlockFee,

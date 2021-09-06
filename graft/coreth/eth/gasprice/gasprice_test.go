@@ -77,7 +77,7 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 		Alloc:  core.GenesisAlloc{addr: core.GenesisAccount{Balance: bal}},
 	}
 
-	engine := dummy.NewFakerSkipBlockFee()
+	engine := dummy.NewETHFaker()
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
 
