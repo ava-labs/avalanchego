@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -24,7 +24,6 @@ const (
 var _ Windower = &windower{}
 
 type Windower interface {
-	PChainHeight() (uint64, error)
 	Delay(
 		chainHeight,
 		pChainHeight uint64,
@@ -35,26 +34,20 @@ type Windower interface {
 // windower interfaces with P-Chain and it is responsible for calculating the
 // delay for the block submission window of a given validator
 type windower struct {
-	ctx         *snow.Context
+	state       validators.State
 	subnetID    ids.ID
-	chainID     ids.ID
 	chainSource uint64
 	sampler     sampler.WeightedWithoutReplacement
 }
 
-func New(ctx *snow.Context, subnetID, chainID ids.ID) Windower {
+func New(state validators.State, subnetID, chainID ids.ID) Windower {
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
-		ctx:         ctx,
+		state:       state,
 		subnetID:    subnetID,
-		chainID:     chainID,
 		chainSource: w.UnpackLong(),
 		sampler:     sampler.NewDeterministicWeightedWithoutReplacement(),
 	}
-}
-
-func (w *windower) PChainHeight() (uint64, error) {
-	return w.ctx.ValidatorState.GetCurrentHeight()
 }
 
 func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.ShortID) (time.Duration, error) {
@@ -63,7 +56,7 @@ func (w *windower) Delay(chainHeight, pChainHeight uint64, validatorID ids.Short
 	}
 
 	// get the validator set by the p-chain height
-	validatorsMap, err := w.ctx.ValidatorState.GetValidatorSet(pChainHeight, w.subnetID)
+	validatorsMap, err := w.state.GetValidatorSet(pChainHeight, w.subnetID)
 	if err != nil {
 		return 0, err
 	}

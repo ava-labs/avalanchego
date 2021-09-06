@@ -485,7 +485,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	// block P-Chain height can be equal to current P-Chain height
-	currPChainHeight, _ := proVM.PChainHeight()
+	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight()
 	childSlb, err = block.BuildUnsigned(
 		prntProBlk.ID(),
 		childCoreBlk.Timestamp(),
@@ -672,7 +672,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	}
 
 	// block P-Chain height can be equal to current P-Chain height
-	currPChainHeight, _ := proVM.PChainHeight()
+	currPChainHeight, _ := proVM.ctx.ValidatorState.GetCurrentHeight()
 	childSlb, err = block.BuildUnsigned(
 		parentBlk.ID(),
 		childCoreBlk.Timestamp(),

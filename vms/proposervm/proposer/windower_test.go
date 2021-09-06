@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 )
 
@@ -24,18 +23,12 @@ func TestWindowerNoValidators(t *testing.T) {
 	nodeID := ids.GenerateTestShortID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetCurrentHeightF: func() (uint64, error) {
-			return 0, nil
-		},
 		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 			return nil, nil
 		},
 	}
-	ctx := &snow.Context{
-		ValidatorState: vdrState,
-	}
 
-	w := New(ctx, subnetID, chainID)
+	w := New(vdrState, subnetID, chainID)
 
 	delay, err := w.Delay(1, 0, nodeID)
 	assert.NoError(err)
@@ -51,20 +44,14 @@ func TestWindowerRepeatedValidator(t *testing.T) {
 	nonValidatorID := ids.GenerateTestShortID()
 	vdrState := &validators.TestState{
 		T: t,
-		GetCurrentHeightF: func() (uint64, error) {
-			return 0, nil
-		},
 		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 			return map[ids.ShortID]uint64{
 				validatorID: 10,
 			}, nil
 		},
 	}
-	ctx := &snow.Context{
-		ValidatorState: vdrState,
-	}
 
-	w := New(ctx, subnetID, chainID)
+	w := New(vdrState, subnetID, chainID)
 
 	validatorDelay, err := w.Delay(1, 0, validatorID)
 	assert.NoError(err)
@@ -88,9 +75,6 @@ func TestWindowerChangeByHeight(t *testing.T) {
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetCurrentHeightF: func() (uint64, error) {
-			return 0, nil
-		},
 		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 			validators := make(map[ids.ShortID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
@@ -99,11 +83,8 @@ func TestWindowerChangeByHeight(t *testing.T) {
 			return validators, nil
 		},
 	}
-	ctx := &snow.Context{
-		ValidatorState: vdrState,
-	}
 
-	w := New(ctx, subnetID, chainID)
+	w := New(vdrState, subnetID, chainID)
 
 	expectedDelays1 := []time.Duration{
 		6 * time.Second,
@@ -152,9 +133,6 @@ func TestWindowerChangeByChain(t *testing.T) {
 	}
 	vdrState := &validators.TestState{
 		T: t,
-		GetCurrentHeightF: func() (uint64, error) {
-			return 0, nil
-		},
 		GetValidatorSetF: func(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 			validators := make(map[ids.ShortID]uint64, MaxWindows)
 			for _, id := range validatorIDs {
@@ -163,12 +141,9 @@ func TestWindowerChangeByChain(t *testing.T) {
 			return validators, nil
 		},
 	}
-	ctx := &snow.Context{
-		ValidatorState: vdrState,
-	}
 
-	w0 := New(ctx, subnetID, chainID0)
-	w1 := New(ctx, subnetID, chainID1)
+	w0 := New(vdrState, subnetID, chainID0)
+	w1 := New(vdrState, subnetID, chainID1)
 
 	expectedDelays0 := []time.Duration{
 		6 * time.Second,

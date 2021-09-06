@@ -104,7 +104,7 @@ func (p *postForkCommonComponents) Verify(parentTimestamp time.Time, parentPChai
 	// has been synced up to this point yet.
 	if p.vm.ctx.IsBootstrapped() {
 		childID := child.ID()
-		currentPChainHeight, err := p.vm.PChainHeight()
+		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight()
 		if err != nil {
 			p.vm.ctx.Log.Error("failed to get current P-Chain height while processing %s: %s",
 				childID, err)
@@ -154,7 +154,7 @@ func (p *postForkCommonComponents) buildChild(
 
 	// The child's P-Chain height is the P-Chain's height when it was proposed
 	// (i.e. now)
-	pChainHeight, err := p.vm.PChainHeight()
+	pChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight()
 	if err != nil {
 		return nil, err
 	}

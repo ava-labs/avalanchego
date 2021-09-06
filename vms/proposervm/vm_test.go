@@ -581,7 +581,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		}
 	}
 
-	pChainHeight, err := proVM.PChainHeight()
+	pChainHeight, err := proVM.ctx.ValidatorState.GetCurrentHeight()
 	if err != nil {
 		t.Fatal("could not retrieve pChain height")
 	}
