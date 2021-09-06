@@ -433,7 +433,6 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 	return &dummy.ConsensusCallbacks{
 		OnFinalizeAndAssemble: vm.onFinalizeAndAssemble,
 		OnExtraStateChange:    vm.onExtraStateChange,
-		ExtraStateGasUsed:     vm.extraStateGasUsed,
 	}
 }
 
@@ -500,17 +499,6 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		// Otherwise, there is no contribution
 		return nil, nil
 	}
-}
-
-func (vm *VM) extraStateGasUsed(block *types.Block) (uint64, error) {
-	tx, err := vm.extractAtomicTx(block)
-	if err != nil {
-		return 0, err
-	}
-	if tx == nil {
-		return 0, nil
-	}
-	return tx.GasUsed()
 }
 
 func (vm *VM) pruneChain() error {

@@ -30,31 +30,21 @@ type (
 	OnFinalizeAndAssembleCallbackType = func(header *types.Header, state *state.StateDB, txs []*types.Transaction) (extraData []byte, blockFeeContribution *big.Int, extDataGasUsed *big.Int, err error)
 	OnAPIsCallbackType                = func(consensus.ChainHeaderReader) []rpc.API
 	OnExtraStateChangeType            = func(block *types.Block, statedb *state.StateDB) (blockFeeContribution *big.Int, err error)
-	ExtraStateGasUsedType             = func(block *types.Block) (gasUsed uint64, err error)
 
 	ConsensusCallbacks struct {
 		OnAPIs                OnAPIsCallbackType
 		OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
 		OnExtraStateChange    OnExtraStateChangeType
-		ExtraStateGasUsed     ExtraStateGasUsedType
 	}
 
 	DummyEngine struct {
-		cb           *ConsensusCallbacks
-		skipBlockFee bool
+		cb *ConsensusCallbacks
 	}
 )
 
 func NewDummyEngine(cb *ConsensusCallbacks) *DummyEngine {
 	return &DummyEngine{
 		cb: cb,
-	}
-}
-
-func NewFakerSkipBlockFee() *DummyEngine {
-	return &DummyEngine{
-		cb:           new(ConsensusCallbacks),
-		skipBlockFee: true,
 	}
 }
 
@@ -259,7 +249,7 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		}
 		contribution = extraStateChangeContribution
 	}
-	if !self.skipBlockFee && chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
+	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(block.Time())) {
 		if err := self.verifyBlockFee(
 			block.BaseFee(),
 			ApricotPhase4MaxBlockFee,
@@ -296,7 +286,7 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 			header.ExtDataGasUsed = extDataGasUsed
 		}
 	}
-	if !self.skipBlockFee && isAP4 {
+	if isAP4 {
 		if err := self.verifyBlockFee(
 			header.BaseFee,
 			ApricotPhase4MaxBlockFee,
@@ -337,7 +327,7 @@ func (self *DummyEngine) Close() error {
 }
 
 func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, header *types.Header) (*big.Int, error) {
-	if self.skipBlockFee || !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) || self.cb.ExtraStateGasUsed == nil {
+	if !chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		return nil, nil
 	}
 
@@ -361,7 +351,7 @@ func (self *DummyEngine) MinRequiredTip(chain consensus.ChainHeaderReader, heade
 }
 
 func (self *DummyEngine) CalcBlockGasCost(config *params.ChainConfig, parent *types.Header, timestamp uint64) *big.Int {
-	if self.skipBlockFee || !config.IsApricotPhase4(new(big.Int).SetUint64(timestamp)) {
+	if !config.IsApricotPhase4(new(big.Int).SetUint64(timestamp)) {
 		return nil
 	}
 	return calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp)
