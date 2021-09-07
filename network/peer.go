@@ -561,7 +561,7 @@ func (p *peer) sendVersion() {
 	}
 	msg, err := p.net.b.Version(
 		p.net.config.NetworkID,
-		p.net.nodeID,
+		p.net.dummyNodeID,
 		p.net.clock.Unix(),
 		myIP,
 		p.net.versionCompatibility.Version().String(),
@@ -600,7 +600,7 @@ func (p *peer) sendVersionWithSubnets() {
 	whitelistedSubnets := p.net.config.WhitelistedSubnets
 	msg, err := p.net.b.VersionWithSubnets(
 		p.net.config.NetworkID,
-		p.net.nodeID,
+		p.net.dummyNodeID,
 		p.net.clock.Unix(),
 		myIP,
 		p.net.versionCompatibility.Version().String(),
@@ -748,7 +748,7 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 	case p.gotVersion.GetValue():
 		p.net.log.Verbo("dropping duplicated version message from %s%s at %s", constants.NodeIDPrefix, p.nodeID, p.getIP())
 		return
-	case msg.Get(message.NodeID).(uint32) == p.net.nodeID:
+	case msg.Get(message.NodeID).(uint32) == p.net.dummyNodeID:
 		p.net.log.Debug("peer at %s has same node ID as me", p.getIP())
 		p.discardMyIP()
 		return

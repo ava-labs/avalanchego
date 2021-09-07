@@ -113,11 +113,14 @@ type network struct {
 	serverUpgrader         Upgrader
 	clientUpgrader         Upgrader
 	router                 router.Router // router must be thread safe
-	nodeID                 uint32
-	clock                  timer.Clock
-	inboundConnThrottler   throttling.InboundConnThrottler
-	c                      message.Codec
-	b                      message.Builder
+	// This field just makes sure we don't connect to ourselves when TLS is
+	// disabled. So, cryptographically secure random number generation isn't
+	// used here.
+	dummyNodeID          uint32
+	clock                timer.Clock
+	inboundConnThrottler throttling.InboundConnThrottler
+	c                    message.Codec
+	b                    message.Builder
 
 	stateLock sync.RWMutex
 	closed    utils.AtomicBool
@@ -274,15 +277,12 @@ func NewNetwork(
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
-		log:       log,
-		currentIP: config.IP,
-		parser:    version.NewDefaultApplicationParser(),
-		listener:  listener,
-		router:    router,
-		// This field just makes sure we don't connect to ourselves when TLS is
-		// disabled. So, cryptographically secure random number generation isn't
-		// used here.
-		nodeID:               rand.Uint32(),
+		log:                  log,
+		currentIP:            config.IP,
+		parser:               version.NewDefaultApplicationParser(),
+		listener:             listener,
+		router:               router,
+		dummyNodeID:          rand.Uint32(),
 		disconnectedIPs:      make(map[string]struct{}),
 		connectedIPs:         make(map[string]struct{}),
 		peerAliasIPs:         make(map[string]struct{}),
