@@ -78,7 +78,11 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.H
 		// If ApricotPhase4 is enabled, use the updated block fee calculation.
 		case isApricotPhase4:
 			blockGasCost = calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, timestamp).Uint64()
-			parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
+			// On the boundary of AP3 and AP4, the parent may not have a populated
+			// [ExtDataGasUsed].
+			if parent.ExtDataGasUsed != nil {
+				parentExtraStateGasUsed = parent.ExtDataGasUsed.Uint64()
+			}
 		// Otherwise, we must be in ApricotPhase3 and use the constant [ApricotPhase3BlockGasFee].
 		default:
 			blockGasCost = ApricotPhase3BlockGasFee

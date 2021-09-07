@@ -300,10 +300,6 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 			panic(err)
 		}
 	}
-	if chain.Config().IsApricotPhase4(timestamp) {
-		// header.ExtDataGasUsed should be populated by callbacks
-		header.BlockGasCost = engine.CalcBlockGasCost(chain.Config(), parent.Header(), time)
-	}
 	return header
 }
 

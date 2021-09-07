@@ -118,21 +118,6 @@ type Engine interface {
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
 
-	// MinRequiredTip is the estimated minimum tip a transaction would have
-	// needed to pay to be included in a given block (assuming it paid a tip
-	// proportional to its gas usage). In reality, there is no minimum tip that
-	// is enforced by the consensus engine and high tip paying transactions can
-	// subsidize the inclusion of low tip paying transactions. The only
-	// correctness check performed is that the some of all tips is >= the
-	// required block fee.
-	//
-	// This function will return nil for all return values prior to Apricot Phase 4.
-	MinRequiredTip(chain ChainHeaderReader, header *types.Header) (*big.Int, error)
-
 	// CalcBaseFee computes the BaseFee of a block produced at [timestamp].
 	CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error)
-
-	// CalcBlockGasCost computed the block gas cost of a block produced at
-	// [timestamp].
-	CalcBlockGasCost(config *params.ChainConfig, parent *types.Header, timestamp uint64) *big.Int
 }
