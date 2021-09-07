@@ -27,6 +27,7 @@ var (
 	errMinRequiredTipNegative = errors.New("minimum required tip is negative")
 	errBlockGasCostNil        = errors.New("block gas cost is nil")
 	errBaseFeeNil             = errors.New("base fee is nil")
+	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
 )
 
 type (
@@ -371,6 +372,9 @@ func MinRequiredTip(config *params.ChainConfig, header *types.Header) (*big.Int,
 	}
 	if header.BlockGasCost == nil {
 		return nil, errBlockGasCostNil
+	}
+	if header.ExtDataGasUsed == nil {
+		return nil, errExtDataGasUsedNil
 	}
 
 	// minTip = requiredBlockFee/blockGasUsage - baseFee
