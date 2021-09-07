@@ -99,7 +99,7 @@ type metrics struct {
 	pushQuery, pullQuery, chits messageMetrics
 }
 
-func (m *metrics) initializeMetrics(namespace string, registerer prometheus.Registerer) error {
+func (m *metrics) initialize(namespace string, registerer prometheus.Registerer) error {
 	m.numPeers = prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "peers",
