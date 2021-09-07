@@ -102,18 +102,7 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 
 	switch err := m.AddUncheckedTx(tx); err {
 	case nil:
-		if time.Now().Before(m.vm.gossipActivationTime) {
-			m.vm.ctx.Log.Verbo("issued tx before gossiping activation time. Not gossiping it")
-			return nil
-		}
-
-		txID := tx.ID()
-		m.vm.ctx.Log.Debug("Gossiping txID %v", txID)
-		msgAppBytes, err := encodeTxID(txID)
-		if err != nil {
-			return err
-		}
-		return m.vm.appSender.SendAppGossip(msgAppBytes)
+		return m.vm.GossipTx(tx)
 	case errAttemptReRegisterTx:
 		return nil // backward compatibility
 	default:
