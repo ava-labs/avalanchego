@@ -9,14 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const (
-	// TODO choose a sensible value
-
-	// MaxEthTxsLen must be updated inside of EthTxsNotify's struct definition
-	// as well when changed
-	MaxEthTxsLen int = 10
-)
-
 var (
 	_ Message = &TxNotify{}
 	_ Message = &Tx{}
