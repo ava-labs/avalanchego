@@ -6,6 +6,7 @@ package core
 import (
 	"fmt"
 	"math/big"
+	"strings"
 	"testing"
 
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -1273,7 +1274,6 @@ func TestReprocessAcceptBlockIdenticalStateRoot(t *testing.T, create func(db eth
 	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
 }
 
-// TODO: add to running
 func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
@@ -1305,7 +1305,7 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	signer := types.LatestSigner(params.TestApricotPhase4Config)
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
-	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
+	_, _, err = GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   params.TestChainConfig.ChainID,
 			Nonce:     gen.TxNonce(addr1),
@@ -1322,43 +1322,10 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 		}
 		gen.AddTx(signedTx)
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err == nil {
+		t.Fatal("should not have been able to build a block because of insufficient block fee")
 	}
-
-	// Insert three blocks into the chain and accept only the first block.
-	if _, err := blockchain.InsertChain(chain); err != nil {
-		t.Fatal(err)
+	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (50000)") {
+		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
 	}
-	if err := blockchain.Accept(chain[0]); err != nil {
-		t.Fatal(err)
-	}
-
-	// check the state of the last accepted block
-	checkState := func(sdb *state.StateDB) error {
-		nonce := sdb.GetNonce(addr1)
-		if nonce != 1 {
-			return fmt.Errorf("expected nonce addr1: 1, found nonce: %d", nonce)
-		}
-		transferredFunds := big.NewInt(10000)
-		balance1 := sdb.GetBalance(addr1)
-		expectedBalance1 := new(big.Int).Sub(genesisBalance, transferredFunds)
-		if balance1.Cmp(expectedBalance1) != 0 {
-			return fmt.Errorf("expected addr1 balance: %d, found balance: %d", expectedBalance1, balance1)
-		}
-
-		balance2 := sdb.GetBalance(addr2)
-		expectedBalance2 := transferredFunds
-		if balance2.Cmp(expectedBalance2) != 0 {
-			return fmt.Errorf("expected addr2 balance: %d, found balance: %d", expectedBalance2, balance2)
-		}
-
-		nonce = sdb.GetNonce(addr2)
-		if nonce != 0 {
-			return fmt.Errorf("expected addr2 nonce: 0, found nonce: %d", nonce)
-		}
-		return nil
-	}
-
-	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
 }
