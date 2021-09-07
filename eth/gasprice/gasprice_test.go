@@ -86,7 +86,10 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, ext
 	genesis := gspec.MustCommit(db)
 
 	// Generate testing blocks
-	blocks, _ := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, genBlocks)
+	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, genBlocks)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Construct testing chain
 	diskdb := rawdb.NewMemoryDatabase()
 	gspec.Commit(diskdb)
