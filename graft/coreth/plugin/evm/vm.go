@@ -396,9 +396,27 @@ func (vm *VM) Initialize(
 	vm.notifyBuildBlockChan = toEngine
 
 	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
-	vm.buildBlockTimer = timer.NewStagedTimer(vm.buildBlockTwoStageTimer)
+	// TODO: create block builder class to avoid all these inits in initialize
 	vm.buildStatus = dontBuild
-	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
+	if !vm.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
+		// TODO: need to stop this timer after AP4 activation
+		vm.buildBlockTimer = timer.NewStagedTimer(vm.buildBlockTwoStageTimer)
+		go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
+
+		// TODO: goroutine to stop buildBlockTimer at activation
+		vm.shutdownWg.Add(1)
+		go func() {
+			defer vm.shutdownWg.Done()
+			timestamp := time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
+			duration := time.Until(timestamp)
+			select {
+			case <-time.After(duration):
+				vm.buildBlockTimer.Stop()
+				// TODO: get lock and signal ready to build to flush any bad statuses
+			case <-vm.shutdownChan:
+			}
+		}()
+	}
 
 	vm.chain.Start()
 
@@ -565,6 +583,8 @@ func (vm *VM) Shutdown() error {
 
 // buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock() (snowman.Block, error) {
+	// TODO: check to see if mempool has enough minimum tip to build rn
+	// -> don't check because had at some point and verification will fail
 	block, err := vm.chain.GenerateBlock()
 	// Set the buildStatus before calling Cancel or Issue on
 	// the mempool and after generating the block.
@@ -572,11 +592,19 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	// produced block will change whether or not we need to produce
 	// another block and also ensures that when the mempool adds a
 	// new item to Pending it will be handled appropriately by [signalTxsReady]
+
+	// TODO: bypass logic if AP4
 	vm.buildBlockLock.Lock()
-	if vm.needToBuild() {
-		vm.buildStatus = conditionalBuild
-		vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
+	timestamp := big.NewInt(time.Now().Unix())
+	if !vm.chainConfig.IsApricotPhase4(timestamp) {
+		if vm.needToBuild() {
+			vm.buildStatus = conditionalBuild
+			vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
+		} else {
+			vm.buildStatus = dontBuild
+		}
 	} else {
+		// TODO: DON'T SET TO RETRY IN AP4 as it could cause more contention
 		vm.buildStatus = dontBuild
 	}
 	vm.buildBlockLock.Unlock()
@@ -595,15 +623,17 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 
 	// Verify is called on a non-wrapped block here, such that this
 	// does not add [blk] to the processing blocks map in ChainState.
+	//
 	// TODO cache verification since Verify() will be called by the
 	// consensus engine as well.
+	//
 	// Note: this is only called when building a new block, so caching
 	// verification will only be a significant optimization for nodes
 	// that produce a large number of blocks.
 	// We call verify without writes here to avoid generating a reference
 	// to the blk state root in the triedb when we are going to call verify
 	// again from the consensus engine with writes enabled.
-	if err := blk.verify(false); err != nil {
+	if err := blk.verify( /*writes*/ false); err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}
@@ -886,6 +916,8 @@ func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
 // needToBuild returns true if there are outstanding transactions to be issued
 // into a block.
 func (vm *VM) needToBuild() bool {
+	// TODO: can modify to be sufficient tip in pool to pay fee...may not even
+	// need?
 	size, err := vm.chain.PendingSize()
 	if err != nil {
 		log.Error("Failed to get chain pending size", "error", err)
@@ -951,10 +983,26 @@ func (vm *VM) signalTxsReady() {
 	vm.buildBlockLock.Lock()
 	defer vm.buildBlockLock.Unlock()
 
-	// Set the build block timer in motion if it has not been started.
+	timestamp := big.NewInt(time.Now().Unix())
+	if !vm.chainConfig.IsApricotPhase4(timestamp) {
+		// Set the build block timer in motion if it has not been started.
+		if vm.buildStatus == dontBuild {
+			vm.buildStatus = conditionalBuild
+			vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
+		}
+		return
+	}
+
+	// Check to see if mempool could pay effective tip? Or just yolo build and
+	// leave all validation to build block time (could be some time)?
+	// -> don't re-signal if already signaled
 	if vm.buildStatus == dontBuild {
-		vm.buildStatus = conditionalBuild
-		vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
+		select {
+		case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
+			vm.buildStatus = building
+		default:
+			log.Error("Failed to push PendingTxs notification to the consensus engine.")
+		}
 	}
 }
 
@@ -962,10 +1010,15 @@ func (vm *VM) signalTxsReady() {
 // and notifies the VM when the tx pool has transactions to be
 // put into a new block.
 func (vm *VM) awaitSubmittedTxs() {
+	// TODO: entry point for signaling ready to build
 	defer vm.shutdownWg.Done()
+	// TODO: does this get called on reorg->yes?
 	txSubmitChan := vm.chain.GetTxSubmitCh()
 	for {
 		select {
+		// TODO: check if pool has sufficient tip, if yes than send notify block
+		// channel
+		// 	case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
 		case <-txSubmitChan:
 			log.Trace("New tx detected, trying to generate a block")
 			vm.signalTxsReady()
