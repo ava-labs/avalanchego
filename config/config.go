@@ -275,15 +275,15 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	config.GossipConfig.GossipOnAcceptSize = uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey))
 
 	switch {
-	case config.MinimumTimeout < 1:
+	case config.AdaptiveTimeoutConfig.MinimumTimeout < 1:
 		return network.Config{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
-	case config.MinimumTimeout > config.MaximumTimeout:
+	case config.AdaptiveTimeoutConfig.MinimumTimeout > config.AdaptiveTimeoutConfig.MaximumTimeout:
 		return network.Config{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
-	case config.InitialTimeout < config.MinimumTimeout || config.InitialTimeout > config.MaximumTimeout:
+	case config.AdaptiveTimeoutConfig.InitialTimeout < config.AdaptiveTimeoutConfig.MinimumTimeout || config.AdaptiveTimeoutConfig.InitialTimeout > config.AdaptiveTimeoutConfig.MaximumTimeout:
 		return network.Config{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
-	case config.TimeoutHalflife <= 0:
+	case config.AdaptiveTimeoutConfig.TimeoutHalflife <= 0:
 		return network.Config{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
-	case config.TimeoutCoefficient < 1:
+	case config.AdaptiveTimeoutConfig.TimeoutCoefficient < 1:
 		return network.Config{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
 	case config.HealthConfig.MaxTimeSinceMsgSent < 0:
 		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)

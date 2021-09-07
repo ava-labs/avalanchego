@@ -231,8 +231,8 @@ func (n *Node) initNetworking() error {
 
 	// add node configs to network config
 	n.Config.NetworkConfig.Namespace = networkNamespace
-	n.Config.NetworkConfig.ID = n.ID
-	n.Config.NetworkConfig.IP = n.Config.IP
+	n.Config.NetworkConfig.MyNodeID = n.ID
+	n.Config.NetworkConfig.MyIP = n.Config.IP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.Validators = primaryNetworkValidators
 	n.Config.NetworkConfig.Beacons = n.beacons
@@ -241,12 +241,12 @@ func (n *Node) initNetworking() error {
 	n.Config.NetworkConfig.WhitelistedSubnets = n.Config.WhitelistedSubnets
 
 	n.Net, err = network.NewNetwork(
+		&n.Config.NetworkConfig,
 		n.MetricsRegisterer,
 		n.Log,
 		listener,
 		consensusRouter,
 		n.benchlistManager,
-		&n.Config.NetworkConfig,
 	)
 
 	return err

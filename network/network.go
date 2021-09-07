@@ -91,6 +91,7 @@ type Network interface {
 }
 
 type network struct {
+	config *Config
 	// The metrics that this network tracks
 	metrics metrics
 	// Define the parameters used to determine whether
@@ -182,8 +183,6 @@ type network struct {
 
 	// Rate-limits outgoing messages
 	outboundMsgThrottler throttling.OutboundMsgThrottler
-
-	config *Config
 }
 
 type PeerListGossipConfig struct {
@@ -215,21 +214,22 @@ type GossipConfig struct {
 }
 
 type Config struct {
-	HealthConfig                `json:"healthConfig"`
-	timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
-	InboundConnThrottlerConfig  throttling.InboundConnThrottlerConfig `json:"inboundConnThrottlerConfig"`
-	InboundMsgThrottlerConfig   throttling.MsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
-	OutboundMsgThrottlerConfig  throttling.MsgThrottlerConfig         `json:"outboundMsgThrottlerConfig"`
-	DialerConfig                dialer.Config                         `json:"dialerConfig"`
-	PeerListGossipConfig        `json:"peerListGossipConfig"`
-	GossipConfig                `json:"gossipConfig"`
-	TimeoutConfig               `json:"timeoutConfigs"`
-	DelayConfig                 `json:"delayConfig"`
-	TLSConfig                   *tls.Config `json:"-"`
+	HealthConfig         `json:"healthConfig"`
+	PeerListGossipConfig `json:"peerListGossipConfig"`
+	GossipConfig         `json:"gossipConfig"`
+	TimeoutConfig        `json:"timeoutConfigs"`
+	DelayConfig          `json:"delayConfig"`
+
+	AdaptiveTimeoutConfig      timer.AdaptiveTimeoutConfig           `json:"adaptiveTimeoutConfig"`
+	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig `json:"inboundConnThrottlerConfig"`
+	InboundMsgThrottlerConfig  throttling.MsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
+	OutboundMsgThrottlerConfig throttling.MsgThrottlerConfig         `json:"outboundMsgThrottlerConfig"`
+	DialerConfig               dialer.Config                         `json:"dialerConfig"`
+	TLSConfig                  *tls.Config                           `json:"-"`
 
 	Namespace          string              `json:"namespace"`
-	ID                 ids.ShortID         `json:"id"`
-	IP                 utils.DynamicIPDesc `json:"ip"`
+	MyNodeID           ids.ShortID         `json:"myNodeID"`
+	MyIP               utils.DynamicIPDesc `json:"myIP"`
 	NetworkID          uint32              `json:"networkID"`
 	MaxMessageSize     uint32              `json:"maxMessageSize"`
 	MaxClockDifference time.Duration       `json:"maxClockDifference"`
@@ -268,17 +268,17 @@ func NewDefaultConfig() Config {
 
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
+	config *Config,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
 	router router.Router,
 	benchlistManager benchlist.Manager,
-	config *Config,
 ) (Network, error) {
 	// #nosec G404
 	netw := &network{
 		log:                  log,
-		currentIP:            config.IP,
+		currentIP:            config.MyIP,
 		parser:               version.NewDefaultApplicationParser(),
 		listener:             listener,
 		router:               router,
@@ -287,7 +287,7 @@ func NewNetwork(
 		connectedIPs:         make(map[string]struct{}),
 		peerAliasIPs:         make(map[string]struct{}),
 		retryDelay:           make(map[string]time.Duration),
-		myIPs:                map[string]struct{}{config.IP.IP().String(): {}},
+		myIPs:                map[string]struct{}{config.MyIP.IP().String(): {}},
 		inboundConnThrottler: throttling.NewInboundConnThrottler(log, config.InboundConnThrottlerConfig),
 		benchlistManager:     benchlistManager,
 		latestPeerIP:         make(map[ids.ShortID]signedPeerIP),
@@ -1372,7 +1372,7 @@ func (n *network) tryAddPeer(p *peer) error {
 
 	// if this connection is myself, then I should delete the connection and
 	// mark the IP as one of mine.
-	if p.nodeID == n.config.ID {
+	if p.nodeID == n.config.MyNodeID {
 		if !ip.IsZero() {
 			// if n.ip is less useful than p.ip set it to this IP
 			if n.currentIP.IP().IsZero() {

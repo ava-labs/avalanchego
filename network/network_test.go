@@ -2660,8 +2660,8 @@ func newDefaultNetwork(
 
 	netConfig := NewDefaultConfig()
 	netConfig.Namespace = ""
-	netConfig.ID = id
-	netConfig.IP = ip
+	netConfig.MyNodeID = id
+	netConfig.MyIP = ip
 	netConfig.NetworkID = networkID
 	netConfig.Validators = vdrs
 	netConfig.Beacons = vdrs
@@ -2676,7 +2676,7 @@ func newDefaultNetwork(
 	netConfig.CompressionEnabled = true
 	netConfig.WhitelistedSubnets = subnetSet
 
-	n, err := NewNetwork(prometheus.NewRegistry(), log, listener, router, benchlistManager, &netConfig)
+	n, err := NewNetwork(&netConfig, prometheus.NewRegistry(), log, listener, router, benchlistManager)
 	if err != nil {
 		return nil, err
 	}
