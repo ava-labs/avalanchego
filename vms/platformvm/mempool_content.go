@@ -82,9 +82,6 @@ func (mc *mempoolContent) get(txID ids.ID) *Tx {
 	if res, ok := mc.unissuedDecisionTxs[txID]; ok {
 		return res.tx
 	}
-	if res, ok := mc.unissuedDecisionTxs[txID]; ok {
-		return res.tx
-	}
 	if res, ok := mc.unissuedAtomicTxs[txID]; ok {
 		return res.tx
 	}
