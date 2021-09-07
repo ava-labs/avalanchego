@@ -60,9 +60,11 @@ var tests = []ChainTest{
 		TestReprocessAcceptBlockIdenticalStateRoot,
 	},
 	{
-		"InsertChainInvalidBlockFee",
-		TestInsertChainInvalidBlockFee,
+		"GenerateChainInvalidBlockFee",
+		TestGenerateChainInvalidBlockFee,
 	},
+	// TODO: InsertChain invalid (test correctness checking on import)
+	// TODO: Generate/Insert Valid
 }
 
 func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
@@ -1274,7 +1276,7 @@ func TestReprocessAcceptBlockIdenticalStateRoot(t *testing.T, create func(db eth
 	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
 }
 
-func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
+func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
 	var (
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
@@ -1307,7 +1309,7 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	// to the BlockChain's database while generating blocks.
 	_, _, err = GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
 		tx := types.NewTx(&types.DynamicFeeTx{
-			ChainID:   params.TestChainConfig.ChainID,
+			ChainID:   params.TestApricotPhase4Config.ChainID,
 			Nonce:     gen.TxNonce(addr1),
 			To:        &addr2,
 			Gas:       params.TxGas,
