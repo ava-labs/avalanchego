@@ -568,7 +568,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 	// Manages network timeouts
 	timeoutManager := &timeout.Manager{}
 	if err := timeoutManager.Initialize(
-		&n.Config.NetworkConfig.AdaptiveTimeoutConfig,
+		&n.Config.AdaptiveTimeoutConfig,
 		n.benchlistManager,
 		requestsNamespace,
 		n.MetricsRegisterer,

@@ -220,7 +220,6 @@ type Config struct {
 	TimeoutConfig        `json:"timeoutConfigs"`
 	DelayConfig          `json:"delayConfig"`
 
-	AdaptiveTimeoutConfig      timer.AdaptiveTimeoutConfig           `json:"adaptiveTimeoutConfig"`
 	InboundConnThrottlerConfig throttling.InboundConnThrottlerConfig `json:"inboundConnThrottlerConfig"`
 	InboundMsgThrottlerConfig  throttling.MsgThrottlerConfig         `json:"inboundMsgThrottlerConfig"`
 	OutboundMsgThrottlerConfig throttling.MsgThrottlerConfig         `json:"outboundMsgThrottlerConfig"`

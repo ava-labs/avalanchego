@@ -37,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/password"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 )
 
@@ -229,6 +230,30 @@ func getRouterHealthConfig(v *viper.Viper, halflife time.Duration) (router.Healt
 	return config, nil
 }
 
+func getAdaptiveTimeoutConfig(v *viper.Viper) (timer.AdaptiveTimeoutConfig, error) {
+	config := timer.AdaptiveTimeoutConfig{
+		InitialTimeout:     v.GetDuration(NetworkInitialTimeoutKey),
+		MinimumTimeout:     v.GetDuration(NetworkMinimumTimeoutKey),
+		MaximumTimeout:     v.GetDuration(NetworkMaximumTimeoutKey),
+		TimeoutHalflife:    v.GetDuration(NetworkTimeoutHalflifeKey),
+		TimeoutCoefficient: v.GetFloat64(NetworkTimeoutCoefficientKey),
+	}
+	switch {
+	case config.MinimumTimeout < 1:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
+	case config.MinimumTimeout > config.MaximumTimeout:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
+	case config.InitialTimeout < config.MinimumTimeout || config.InitialTimeout > config.MaximumTimeout:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
+	case config.TimeoutHalflife <= 0:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
+	case config.TimeoutCoefficient < 1:
+		return timer.AdaptiveTimeoutConfig{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
+	}
+
+	return config, nil
+}
+
 func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, error) {
 	config := network.NewDefaultConfig()
 
@@ -252,13 +277,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	config.HealthConfig.MaxSendFailRate = v.GetFloat64(NetworkHealthMaxSendFailRateKey)
 	config.HealthConfig.MaxSendFailRateHalflife = halflife
 
-	// Adaptive Timeouts
-	config.AdaptiveTimeoutConfig.InitialTimeout = v.GetDuration(NetworkInitialTimeoutKey)
-	config.AdaptiveTimeoutConfig.MinimumTimeout = v.GetDuration(NetworkMinimumTimeoutKey)
-	config.AdaptiveTimeoutConfig.MaximumTimeout = v.GetDuration(NetworkMaximumTimeoutKey)
-	config.AdaptiveTimeoutConfig.TimeoutHalflife = v.GetDuration(NetworkTimeoutHalflifeKey)
-	config.AdaptiveTimeoutConfig.TimeoutCoefficient = v.GetFloat64(NetworkTimeoutCoefficientKey)
-
 	config.CompressionEnabled = v.GetBool(NetworkCompressionEnabledKey)
 
 	config.DialerConfig.ThrottleRps = v.GetUint32(OutboundConnectionThrottlingRps)
@@ -275,16 +293,6 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	config.GossipConfig.GossipOnAcceptSize = uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey))
 
 	switch {
-	case config.AdaptiveTimeoutConfig.MinimumTimeout < 1:
-		return network.Config{}, fmt.Errorf("%q must be positive", NetworkMinimumTimeoutKey)
-	case config.AdaptiveTimeoutConfig.MinimumTimeout > config.AdaptiveTimeoutConfig.MaximumTimeout:
-		return network.Config{}, fmt.Errorf("%q must be >= %q", NetworkMaximumTimeoutKey, NetworkMinimumTimeoutKey)
-	case config.AdaptiveTimeoutConfig.InitialTimeout < config.AdaptiveTimeoutConfig.MinimumTimeout || config.AdaptiveTimeoutConfig.InitialTimeout > config.AdaptiveTimeoutConfig.MaximumTimeout:
-		return network.Config{}, fmt.Errorf("%q must be in [%q, %q]", NetworkInitialTimeoutKey, NetworkMinimumTimeoutKey, NetworkMaximumTimeoutKey)
-	case config.AdaptiveTimeoutConfig.TimeoutHalflife <= 0:
-		return network.Config{}, fmt.Errorf("%q must > 0", NetworkTimeoutHalflifeKey)
-	case config.AdaptiveTimeoutConfig.TimeoutCoefficient < 1:
-		return network.Config{}, fmt.Errorf("%q must be >= 1", NetworkTimeoutCoefficientKey)
 	case config.HealthConfig.MaxTimeSinceMsgSent < 0:
 		return network.Config{}, fmt.Errorf("%s must be > 0", NetworkHealthMaxTimeSinceMsgSentKey)
 	case config.HealthConfig.MaxTimeSinceMsgReceived < 0:
@@ -794,6 +802,12 @@ func GetNodeConfig(v *viper.Viper, buildDir string) (node.Config, error) {
 
 	// Metrics
 	nodeConfig.MeterVMEnabled = v.GetBool(MeterVMsEnabledKey)
+
+	// Adaptive Timeout Config
+	nodeConfig.AdaptiveTimeoutConfig, err = getAdaptiveTimeoutConfig(v)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Network Config
 	nodeConfig.NetworkConfig, err = getNetworkConfig(v, healthCheckAveragerHalflife)

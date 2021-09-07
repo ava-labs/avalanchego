@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/timer"
 )
 
 type IPCConfig struct {
@@ -144,6 +145,8 @@ type Config struct {
 
 	// Network configuration
 	NetworkConfig network.Config `json:"networkConfig"`
+
+	AdaptiveTimeoutConfig timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
 
 	// Benchlist Configuration
 	BenchlistConfig benchlist.Config `json:"benchlistConfig"`
