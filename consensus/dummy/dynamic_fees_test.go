@@ -320,6 +320,8 @@ func TestSelectBigWithinBounds(t *testing.T) {
 	}
 }
 
+// TestCalcBaseFeeAP4 confirms that the inclusion of ExtDataGasUsage increases
+// the base fee.
 func TestCalcBaseFeeAP4(t *testing.T) {
 	events := []struct {
 		block             blockDefinition
@@ -401,6 +403,8 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 		Number:  big.NewInt(0),
 		BaseFee: big.NewInt(225 * params.GWei),
 		Extra:   nil,
+		// ExtDataGasUsage is set to be nil to ensure CalcBaseFee can handle the
+		// AP3/AP4 boundary.
 	}
 
 	for index, event := range events {

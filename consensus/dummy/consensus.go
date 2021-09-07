@@ -22,12 +22,11 @@ import (
 var (
 	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 
-	errInvalidBlockTime       = errors.New("timestamp less than parent's")
-	errUnclesUnsupported      = errors.New("uncles unsupported")
-	errMinRequiredTipNegative = errors.New("minimum required tip is negative")
-	errBlockGasCostNil        = errors.New("block gas cost is nil")
-	errBaseFeeNil             = errors.New("base fee is nil")
-	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
+	errInvalidBlockTime  = errors.New("timestamp less than parent's")
+	errUnclesUnsupported = errors.New("uncles unsupported")
+	errBlockGasCostNil   = errors.New("block gas cost is nil")
+	errBaseFeeNil        = errors.New("base fee is nil")
+	errExtDataGasUsedNil = errors.New("extDataGasUsed is nil")
 )
 
 type (
