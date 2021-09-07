@@ -31,7 +31,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth/consensus"
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
@@ -94,10 +93,6 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 		t.Fatalf("Failed to insert chain, %v", err)
 	}
 	return &testBackend{chain: chain}
-}
-
-func (b *testBackend) Engine() consensus.Engine {
-	return b.chain.Engine()
 }
 
 func (b *testBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
