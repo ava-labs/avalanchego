@@ -73,7 +73,7 @@ func newTestBlockchain(statedb *state.StateDB, gasLimit uint64, chainHeadFeed *e
 		statedb:       statedb,
 		gasLimit:      gasLimit,
 		chainHeadFeed: chainHeadFeed,
-		engine:        dummy.NewFakerSkipBlockFee(),
+		engine:        dummy.NewETHFaker(),
 	}
 }
 

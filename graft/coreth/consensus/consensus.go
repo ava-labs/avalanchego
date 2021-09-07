@@ -75,7 +75,11 @@ type Engine interface {
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
 	// via the VerifySeal method.
-	VerifyHeader(chain ChainReader, header *types.Header) error
+	//
+	// NOTE: VerifyHeader does not validate the correctness of fields that rely
+	// on the contents of the block (as opposed to the current and/or parent
+	// header).
+	VerifyHeader(chain ChainHeaderReader, header *types.Header) error
 
 	// VerifyUncles verifies that the given block's uncles conform to the consensus
 	// rules of a given engine.
@@ -114,17 +118,6 @@ type Engine interface {
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
 
-	// MinRequiredTip is the estimated minimum tip a transaction would have
-	// needed to pay to be included in a given block (assuming it paid a tip
-	// proportional to its gas usage). In reality, there is no minimum tip that
-	// is enforced by the consensus engine and high tip paying transactions can
-	// subsidize the inclusion of low tip paying transactions. The only
-	// correctness check performed is that the some of all tips is >= the
-	// required block fee.
-	//
-	// This function will return nil for all return values prior to Apricot Phase 4.
-	MinRequiredTip(chain ChainHeaderReader, block *types.Block) (*big.Int, error)
-
 	// CalcBaseFee computes the BaseFee of a block produced at [timestamp].
-	CalcBaseFee(config *params.ChainConfig, parent *types.Block, timestamp uint64) ([]byte, *big.Int, error)
+	CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error)
 }
