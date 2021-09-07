@@ -215,7 +215,7 @@ func TestVerifyBlockFee(t *testing.T) {
 			txs:                    nil,
 			receipts:               nil,
 			extraStateContribution: big.NewInt(100000),
-			shouldErr:              true,
+			shouldErr:              false,
 		},
 	}
 

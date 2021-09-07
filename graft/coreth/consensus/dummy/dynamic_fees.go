@@ -234,10 +234,14 @@ func updateLongWindow(window []byte, start uint64, gasConsumed uint64) {
 	binary.BigEndian.PutUint64(window[start:], totalGasConsumed)
 }
 
-// calcBlockGasCost calculates the required block gas cost
-// assumes that [currentTime >= parentTime]
+// calcBlockGasCost calculates the required block gas cost. If [parentTime]
+// > [currentTime], the timeElapsed will be treated as 0.
 func calcBlockGasCost(maxBlockFee *big.Int, blockFeeDuration, parentTime, currentTime uint64) *big.Int {
-	timeElapsed := currentTime - parentTime
+	var timeElapsed uint64
+	if parentTime <= currentTime {
+		timeElapsed = currentTime - parentTime
+	}
+
 	// If [blockFeeDuration] has already expired, set the block fee to 0
 	if timeElapsed > blockFeeDuration {
 		return big.NewInt(0)
