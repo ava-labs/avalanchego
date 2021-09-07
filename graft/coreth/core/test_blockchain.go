@@ -58,6 +58,10 @@ var tests = []ChainTest{
 		"ReprocessAcceptBlockIdenticalStateRoot",
 		TestReprocessAcceptBlockIdenticalStateRoot,
 	},
+	{
+		"InsertChainInvalidBlockFee",
+		TestInsertChainInvalidBlockFee,
+	},
 }
 
 func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
@@ -251,7 +255,6 @@ func TestInsertLongForkedChain(t *testing.T, create func(db ethdb.Database, chai
 	// Ensure that key1 has some funds in the genesis block.
 	genesisBalance := big.NewInt(1000000000)
 	gspec := &Genesis{
-		// TODO: need to modify chain config to include block based fee
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
 		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
@@ -1218,6 +1221,93 @@ func TestReprocessAcceptBlockIdenticalStateRoot(t *testing.T, create func(db eth
 		balance2 := sdb.GetBalance(addr2)
 		if balance2.Cmp(genesisBalance) != 0 {
 			return fmt.Errorf("expected balance2: %d, found %d", genesisBalance, balance2)
+		}
+		return nil
+	}
+
+	checkBlockChainState(t, blockchain, gspec, chainDB, create, checkState)
+}
+
+// TODO: add to running
+func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		// We use two separate databases since GenerateChain commits the state roots to its underlying
+		// database.
+		genDB   = rawdb.NewMemoryDatabase()
+		chainDB = rawdb.NewMemoryDatabase()
+	)
+
+	// Ensure that key1 has some funds in the genesis block.
+	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
+	gspec := &Genesis{
+		Config: params.TestApricotPhase4Config,
+		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+	}
+	genesis := gspec.MustCommit(genDB)
+	_ = gspec.MustCommit(chainDB)
+
+	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockchain.Stop()
+
+	// This call generates a chain of 3 blocks.
+	signer := types.LatestSigner(params.TestApricotPhase4Config)
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain, _ := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
+		tx := types.NewTx(&types.DynamicFeeTx{
+			ChainID:   params.TestChainConfig.ChainID,
+			Nonce:     gen.TxNonce(addr1),
+			To:        &addr2,
+			Gas:       params.TxGas,
+			GasFeeCap: gen.BaseFee(),
+			GasTipCap: big.NewInt(0),
+			Data:      []byte{},
+		})
+
+		signedTx, err := types.SignTx(tx, signer, key1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gen.AddTx(signedTx)
+	})
+
+	// Insert three blocks into the chain and accept only the first block.
+	if _, err := blockchain.InsertChain(chain); err != nil {
+		t.Fatal(err)
+	}
+	if err := blockchain.Accept(chain[0]); err != nil {
+		t.Fatal(err)
+	}
+
+	// check the state of the last accepted block
+	checkState := func(sdb *state.StateDB) error {
+		nonce := sdb.GetNonce(addr1)
+		if nonce != 1 {
+			return fmt.Errorf("expected nonce addr1: 1, found nonce: %d", nonce)
+		}
+		transferredFunds := big.NewInt(10000)
+		balance1 := sdb.GetBalance(addr1)
+		expectedBalance1 := new(big.Int).Sub(genesisBalance, transferredFunds)
+		if balance1.Cmp(expectedBalance1) != 0 {
+			return fmt.Errorf("expected addr1 balance: %d, found balance: %d", expectedBalance1, balance1)
+		}
+
+		balance2 := sdb.GetBalance(addr2)
+		expectedBalance2 := transferredFunds
+		if balance2.Cmp(expectedBalance2) != 0 {
+			return fmt.Errorf("expected addr2 balance: %d, found balance: %d", expectedBalance2, balance2)
+		}
+
+		nonce = sdb.GetNonce(addr2)
+		if nonce != 0 {
+			return fmt.Errorf("expected addr2 nonce: 0, found nonce: %d", nonce)
 		}
 		return nil
 	}
