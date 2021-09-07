@@ -19,16 +19,12 @@ func (p poolOrderedTxs) Len() int           { return len(p) }
 func (p poolOrderedTxs) Less(i, j int) bool { return p[i].entryPosition < p[j].entryPosition }
 func (p poolOrderedTxs) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-// timeOrderedTx are TimedTx ordered by starTime
-type timeOrderedTx struct {
-	tx *Tx
-}
-type timeOrderedTxs []timeOrderedTx
+type timeOrderedTxs []*Tx
 
 func (t timeOrderedTxs) Len() int { return len(t) }
 func (t timeOrderedTxs) Less(i, j int) bool {
-	iTx := t[i].tx.UnsignedTx.(TimedTx)
-	jTx := t[j].tx.UnsignedTx.(TimedTx)
+	iTx := t[i].UnsignedTx.(TimedTx)
+	jTx := t[j].UnsignedTx.(TimedTx)
 	return less(iTx, jTx, true /*=sortByStartTime*/)
 }
 func (t timeOrderedTxs) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
@@ -36,7 +32,7 @@ func (t timeOrderedTxs) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 // Transactions from clients that have not yet been put into blocks and
 // added to consensus
 type mempoolContent struct {
-	unissuedProposalTxs map[ids.ID]timeOrderedTx
+	unissuedProposalTxs map[ids.ID]*Tx
 	unissuedDecisionTxs map[ids.ID]poolOrderedTx
 	unissuedAtomicTxs   map[ids.ID]poolOrderedTx
 	txCounter           int
@@ -49,7 +45,7 @@ type mempoolContent struct {
 
 func newMempoolContent() *mempoolContent {
 	return &mempoolContent{
-		unissuedProposalTxs: make(map[ids.ID]timeOrderedTx),
+		unissuedProposalTxs: make(map[ids.ID]*Tx),
 		unissuedDecisionTxs: make(map[ids.ID]poolOrderedTx),
 		unissuedAtomicTxs:   make(map[ids.ID]poolOrderedTx),
 		rejectedTxs:         &cache.LRU{Size: rejectedTxsCacheSize},
@@ -84,8 +80,8 @@ func (mc *mempoolContent) get(txID ids.ID) *Tx {
 	if res, ok := mc.unissuedAtomicTxs[txID]; ok {
 		return res.tx
 	}
-	if res, ok := mc.unissuedProposalTxs[txID]; ok {
-		return res.tx
+	if tx, ok := mc.unissuedProposalTxs[txID]; ok {
+		return tx
 	}
 	// This should never happen
 	return nil
@@ -132,10 +128,10 @@ func (mc *mempoolContent) ExtractNextDecisionTxs(numTxs int) []*Tx {
 
 	// return them
 	res := make([]*Tx, numTxs)
-	i = 0
-	for _, v := range orderedTxs {
+	for i, v := range orderedTxs {
 		res[i] = v.tx
-		delete(mc.unissuedDecisionTxs, v.tx.ID())
+		txID := v.tx.ID()
+		delete(mc.unissuedDecisionTxs, txID)
 		mc.deregister(v.tx)
 	}
 
@@ -177,9 +173,8 @@ func (mc *mempoolContent) HasAtomicTxs() bool { return len(mc.unissuedAtomicTxs)
 
 // ProposalTx-specific methods
 func (mc *mempoolContent) AddProposalTx(tx *Tx) error {
-	mc.unissuedProposalTxs[tx.ID()] = timeOrderedTx{
-		tx: tx,
-	}
+	txID := tx.ID()
+	mc.unissuedProposalTxs[txID] = tx
 	mc.register(tx)
 	return nil
 }
@@ -198,7 +193,7 @@ func (mc *mempoolContent) PeekProposalTx() *Tx {
 		i++
 	}
 	sort.Sort(timedTxs)
-	return timedTxs[0].tx
+	return timedTxs[0]
 }
 
 func (mc *mempoolContent) HasProposalTxs() bool { return len(mc.unissuedProposalTxs) > 0 }
