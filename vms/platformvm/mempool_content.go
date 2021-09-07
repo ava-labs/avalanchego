@@ -42,12 +42,10 @@ type mempoolContent struct {
 	unissuedAtomicTxs   map[ids.ID]poolOrderedTx
 	atomicTxCounter     int
 
-	unissuedTxs    map[ids.ID]struct{}
+	unissuedTxs    ids.Set
 	totalBytesSize int
 
-	rejectedProposalTxs *cache.LRU
-	rejectedDecisionTxs *cache.LRU
-	rejectedAtomicTxs   *cache.LRU
+	rejectedTxs *cache.LRU
 }
 
 func newMempoolContent() *mempoolContent {
@@ -55,26 +53,26 @@ func newMempoolContent() *mempoolContent {
 		unissuedProposalTxs: make(map[ids.ID]timeOrderedTx),
 		unissuedDecisionTxs: make(map[ids.ID]poolOrderedTx),
 		unissuedAtomicTxs:   make(map[ids.ID]poolOrderedTx),
-		unissuedTxs:         make(map[ids.ID]struct{}),
-		rejectedProposalTxs: &cache.LRU{Size: rejectedTxsCacheSize},
-		rejectedDecisionTxs: &cache.LRU{Size: rejectedTxsCacheSize},
-		rejectedAtomicTxs:   &cache.LRU{Size: rejectedTxsCacheSize},
+		rejectedTxs:         &cache.LRU{Size: rejectedTxsCacheSize},
 	}
 }
 
 func (mc *mempoolContent) register(tx *Tx) {
-	mc.unissuedTxs[tx.ID()] = struct{}{}
-	mc.totalBytesSize += len(tx.Bytes())
+	txID := tx.ID()
+	mc.unissuedTxs.Add(txID)
+	txBytes := tx.Bytes()
+	mc.totalBytesSize += len(txBytes)
 }
 
 func (mc *mempoolContent) deregister(tx *Tx) {
-	delete(mc.unissuedTxs, tx.ID())
-	mc.totalBytesSize -= len(tx.Bytes())
+	txID := tx.ID()
+	mc.unissuedTxs.Remove(txID)
+	txBytes := tx.Bytes()
+	mc.totalBytesSize -= len(txBytes)
 }
 
 func (mc *mempoolContent) has(txID ids.ID) bool {
-	_, ok := mc.unissuedTxs[txID]
-	return ok
+	return mc.unissuedTxs.Contains(txID)
 }
 
 func (mc *mempoolContent) get(txID ids.ID) *Tx {
@@ -97,7 +95,8 @@ func (mc *mempoolContent) get(txID ids.ID) *Tx {
 }
 
 func (mc *mempoolContent) hasRoomFor(tx *Tx) bool {
-	return mc.totalBytesSize+len(tx.Bytes()) <= MaxMempoolByteSize
+	txBytes := tx.Bytes()
+	return mc.totalBytesSize+len(txBytes) <= MaxMempoolByteSize
 }
 
 // DecisionTx-specific methods
@@ -216,29 +215,11 @@ func (mc *mempoolContent) PeekProposalTx() *Tx {
 func (mc *mempoolContent) HasProposalTxs() bool { return len(mc.unissuedProposalTxs) > 0 }
 
 // RejectionTx-specific methods
-func (mc *mempoolContent) markReject(tx *Tx) error {
-	switch tx.UnsignedTx.(type) {
-	case TimedTx:
-		mc.rejectedProposalTxs.Put(tx.ID(), struct{}{})
-	case UnsignedDecisionTx:
-		mc.rejectedDecisionTxs.Put(tx.ID(), struct{}{})
-	case UnsignedAtomicTx:
-		mc.rejectedAtomicTxs.Put(tx.ID(), struct{}{})
-	default:
-		return errUnknownTxType
-	}
-	return nil
+func (mc *mempoolContent) markReject(txID ids.ID) {
+	mc.rejectedTxs.Put(txID, struct{}{})
 }
 
 func (mc *mempoolContent) isAlreadyRejected(txID ids.ID) bool {
-	res := false
-	if _, exist := mc.rejectedProposalTxs.Get(txID); exist {
-		res = true
-	} else if _, exist := mc.rejectedDecisionTxs.Get(txID); exist {
-		res = true
-	} else if _, exist := mc.rejectedAtomicTxs.Get(txID); exist {
-		res = true
-	}
-
-	return res
+	_, exist := mc.rejectedTxs.Get(txID)
+	return exist
 }

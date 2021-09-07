@@ -313,8 +313,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	tx := getTheValidTx(vm, t)
 	txID := tx.ID()
 
-	err := mempool.markReject(tx)
-	assert.NoError(err, "could not mark tx as rejected")
+	mempool.markReject(txID)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestShortID()

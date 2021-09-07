@@ -290,7 +290,8 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 			txID,
 			err,
 		)
-		return h.net.vm.mempool.markReject(tx)
+		h.net.vm.mempool.markReject(txID)
+		return nil
 	}
 
 	// add to mempool
@@ -307,13 +308,7 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 			err,
 		)
 
-		if err := h.net.mempool.markReject(tx); err != nil {
-			h.net.log.Trace(
-				"AppResponse failed to mark %s as rejected with: %s",
-				txID,
-				err,
-			)
-		}
+		h.net.mempool.markReject(txID)
 		return nil
 	}
 	return h.net.GossipTx(tx)
