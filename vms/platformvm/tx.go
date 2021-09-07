@@ -17,6 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+type TimedTx interface {
+	ID() ids.ID
+	StartTime() time.Time
+	EndTime() time.Time
+	Weight() uint64
+	Bytes() []byte
+}
+
 // UnsignedTx is an unsigned transaction
 type UnsignedTx interface {
 	// TODO: Remove this initialization pattern from both the platformvm and the
