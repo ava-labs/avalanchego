@@ -38,9 +38,8 @@ func (t timeOrderedTxs) Swap(i, j int) { t[i], t[j] = t[j], t[i] }
 type mempoolContent struct {
 	unissuedProposalTxs map[ids.ID]timeOrderedTx
 	unissuedDecisionTxs map[ids.ID]poolOrderedTx
-	decisionTxCounter   int
 	unissuedAtomicTxs   map[ids.ID]poolOrderedTx
-	atomicTxCounter     int
+	txCounter           int
 
 	unissuedTxs    ids.Set
 	totalBytesSize int
@@ -76,7 +75,7 @@ func (mc *mempoolContent) has(txID ids.ID) bool {
 }
 
 func (mc *mempoolContent) get(txID ids.ID) *Tx {
-	if _, ok := mc.unissuedTxs[txID]; !ok {
+	if !mc.unissuedTxs.Contains(txID) {
 		return nil
 	}
 	if res, ok := mc.unissuedDecisionTxs[txID]; ok {
@@ -88,6 +87,7 @@ func (mc *mempoolContent) get(txID ids.ID) *Tx {
 	if res, ok := mc.unissuedProposalTxs[txID]; ok {
 		return res.tx
 	}
+	// This should never happen
 	return nil
 }
 
@@ -100,9 +100,9 @@ func (mc *mempoolContent) hasRoomFor(tx *Tx) bool {
 func (mc *mempoolContent) AddDecisionTx(tx *Tx) error {
 	mc.unissuedDecisionTxs[tx.ID()] = poolOrderedTx{
 		tx:            tx,
-		entryPosition: mc.decisionTxCounter,
+		entryPosition: mc.txCounter,
 	}
-	mc.decisionTxCounter++
+	mc.txCounter++
 	mc.register(tx)
 	return nil
 }
@@ -124,10 +124,7 @@ func (mc *mempoolContent) ExtractNextDecisionTxs(numTxs int) []*Tx {
 	orderedTxs := make(poolOrderedTxs, len(mc.unissuedDecisionTxs))
 	i := 0
 	for _, v := range mc.unissuedDecisionTxs {
-		orderedTxs[i] = poolOrderedTx{
-			tx:            v.tx,
-			entryPosition: v.entryPosition,
-		}
+		orderedTxs[i] = v
 		i++
 	}
 	sort.Sort(orderedTxs)
@@ -151,9 +148,9 @@ func (mc *mempoolContent) HasDecisionTxs() bool { return len(mc.unissuedDecision
 func (mc *mempoolContent) AddAtomicTx(tx *Tx) error {
 	mc.unissuedAtomicTxs[tx.ID()] = poolOrderedTx{
 		tx:            tx,
-		entryPosition: mc.atomicTxCounter,
+		entryPosition: mc.txCounter,
 	}
-	mc.atomicTxCounter++
+	mc.txCounter++
 	mc.register(tx)
 	return nil
 }
@@ -167,10 +164,7 @@ func (mc *mempoolContent) ExtractNextAtomicTx() *Tx {
 	orderedTxs := make(poolOrderedTxs, len(mc.unissuedAtomicTxs))
 	i := 0
 	for _, v := range mc.unissuedAtomicTxs {
-		orderedTxs[i] = poolOrderedTx{
-			tx:            v.tx,
-			entryPosition: v.entryPosition,
-		}
+		orderedTxs[i] = v
 		i++
 	}
 	sort.Sort(orderedTxs)
@@ -200,9 +194,7 @@ func (mc *mempoolContent) PeekProposalTx() *Tx {
 	timedTxs := make(timeOrderedTxs, len(mc.unissuedProposalTxs))
 	i := 0
 	for _, v := range mc.unissuedProposalTxs {
-		timedTxs[i] = timeOrderedTx{
-			tx: v.tx,
-		}
+		timedTxs[i] = v
 		i++
 	}
 	sort.Sort(timedTxs)
