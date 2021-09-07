@@ -247,7 +247,7 @@ func calcBlockGasCost(maxBlockFee *big.Int, blockFeeDuration, parentTime, curren
 		return big.NewInt(0)
 	}
 
-	// requiredBlockGasFee = (maxBlockGasFee * (blockFeeDuration - timeElapsed)) / blockFeeDuration
+	// blockGasCost = (maxBlockGasFee * (blockFeeDuration - timeElapsed)) / blockFeeDuration
 	bigBlockFeeDuration := new(big.Int).SetUint64(blockFeeDuration)
 	feeTimeRemaining := new(big.Int).Sub(
 		bigBlockFeeDuration,
@@ -261,4 +261,39 @@ func calcBlockGasCost(maxBlockFee *big.Int, blockFeeDuration, parentTime, curren
 		requiredBlockGasFeeNum,
 		bigBlockFeeDuration,
 	)
+}
+
+// MinRequiredTip is the estimated minimum tip a transaction would have
+// needed to pay to be included in a given block (assuming it paid a tip
+// proportional to its gas usage). In reality, there is no minimum tip that
+// is enforced by the consensus engine and high tip paying transactions can
+// subsidize the inclusion of low tip paying transactions. The only
+// correctness check performed is that the some of all tips is >= the
+// required block fee.
+//
+// This function will return nil for all return values prior to Apricot Phase 4.
+func MinRequiredTip(config *params.ChainConfig, header *types.Header) (*big.Int, error) {
+	if !config.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
+		return nil, nil
+	}
+	if header.BaseFee == nil {
+		return nil, errBaseFeeNil
+	}
+	if header.BlockGasCost == nil {
+		return nil, errBlockGasCostNil
+	}
+	if header.ExtDataGasUsed == nil {
+		return nil, errExtDataGasUsedNil
+	}
+
+	// minTip = requiredBlockFee/blockGasUsage
+	requiredBlockFee := new(big.Int).Mul(
+		header.BlockGasCost,
+		header.BaseFee,
+	)
+	blockGasUsage := new(big.Int).Add(
+		new(big.Int).SetUint64(header.GasUsed),
+		header.ExtDataGasUsed,
+	)
+	return new(big.Int).Div(requiredBlockFee, blockGasUsage), nil
 }
