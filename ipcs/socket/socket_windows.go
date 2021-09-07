@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 // (c) 2020, Ava Labs, Inc. All rights reserved.

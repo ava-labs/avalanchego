@@ -1,3 +1,4 @@
+//go:build linux && amd64 && rocksdballowed
 // +build linux,amd64,rocksdballowed
 
 // ^ Only build this file if this computer runs Linux AND is AMD64 AND rocksdb is allowed

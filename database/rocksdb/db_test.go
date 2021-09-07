@@ -1,3 +1,4 @@
+//go:build linux && amd64 && rocksdballowed
 // +build linux,amd64,rocksdballowed
 
 // (c) 2019-2020, Ava Labs, Inc. All rights reserved.
