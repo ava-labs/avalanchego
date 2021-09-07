@@ -181,12 +181,12 @@ func TestSuggestTipCapSimple(t *testing.T) {
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestChainConfig)
+			signer := types.LatestSigner(params.TestApricotPhase4Config)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
+					ChainID:   params.TestApricotPhase4Config.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -208,18 +208,18 @@ func TestSuggestTipCapSimple(t *testing.T) {
 func TestSuggestTipCapSmallTips(t *testing.T) {
 	tip := big.NewInt(550 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig:     params.TestChainConfig,
+		chainConfig:     params.TestApricotPhase4Config,
 		numBlocks:       3,
 		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestChainConfig)
+			signer := types.LatestSigner(params.TestApricotPhase4Config)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, tip)
 			for j := 0; j < 25; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
+					ChainID:   params.TestApricotPhase4Config.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -233,7 +233,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 				}
 				b.AddTx(tx)
 				tx = types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
+					ChainID:   params.TestApricotPhase4Config.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -262,12 +262,12 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestChainConfig)
+			signer := types.LatestSigner(params.TestApricotPhase4Config)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
+					ChainID:   params.TestApricotPhase4Config.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -295,12 +295,12 @@ func TestSuggestTipCapLongRunning(t *testing.T) {
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestChainConfig)
+			signer := types.LatestSigner(params.TestApricotPhase4Config)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
+					ChainID:   params.TestApricotPhase4Config.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
