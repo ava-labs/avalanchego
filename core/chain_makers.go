@@ -31,6 +31,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/consensus/misc"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
@@ -295,7 +296,7 @@ func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent 
 	}
 	if chain.Config().IsApricotPhase3(timestamp) {
 		var err error
-		header.Extra, header.BaseFee, err = engine.CalcBaseFee(chain.Config(), parent.Header(), time)
+		header.Extra, header.BaseFee, err = dummy.CalcBaseFee(chain.Config(), parent.Header(), time)
 		if err != nil {
 			panic(err)
 		}

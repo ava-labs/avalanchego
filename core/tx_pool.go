@@ -35,7 +35,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/coreth/consensus"
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
@@ -148,7 +148,6 @@ type blockChain interface {
 	CurrentBlock() *types.Block
 	GetBlock(hash common.Hash, number uint64) *types.Block
 	StateAt(root common.Hash) (*state.StateDB, error)
-	Engine() consensus.Engine
 
 	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
 }
@@ -1197,7 +1196,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 	if reset != nil {
 		pool.demoteUnexecutables()
 		if reset.newHead != nil && pool.chainconfig.IsApricotPhase3(new(big.Int).SetUint64(reset.newHead.Time)) {
-			_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, reset.newHead, uint64(time.Now().Unix()))
+			_, baseFeeEstimate, err := dummy.CalcBaseFee(pool.chainconfig, reset.newHead, uint64(time.Now().Unix()))
 			if err == nil {
 				pool.priced.SetBaseFee(baseFeeEstimate)
 			}
@@ -1627,7 +1626,7 @@ func (pool *TxPool) updateBaseFee() {
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
-	_, baseFeeEstimate, err := pool.chain.Engine().CalcBaseFee(pool.chainconfig, pool.currentHead, uint64(time.Now().Unix()))
+	_, baseFeeEstimate, err := dummy.CalcBaseFee(pool.chainconfig, pool.currentHead, uint64(time.Now().Unix()))
 	if err == nil {
 		pool.priced.SetBaseFee(baseFeeEstimate)
 	} else {

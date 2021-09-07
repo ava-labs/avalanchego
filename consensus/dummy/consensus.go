@@ -111,7 +111,7 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 
 	// Enforce Apricot Phase 3 constraints
 	// Verify baseFee and rollupWindow encoding as part of header verification
-	expectedRollupWindowBytes, expectedBaseFee, err := self.CalcBaseFee(config, parent, header.Time)
+	expectedRollupWindowBytes, expectedBaseFee, err := CalcBaseFee(config, parent, header.Time)
 	if err != nil {
 		return fmt.Errorf("failed to calculate base fee: %w", err)
 	}

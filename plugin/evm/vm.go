@@ -1013,7 +1013,7 @@ func (vm *VM) verifyTxAtTip(tx *Tx) error {
 	timestamp := time.Now().Unix()
 	bigTimestamp := big.NewInt(timestamp)
 	if vm.chainConfig.IsApricotPhase3(bigTimestamp) {
-		_, nextBaseFee, err = vm.chain.Engine().CalcBaseFee(vm.chainConfig, parentHeader, uint64(timestamp))
+		_, nextBaseFee, err = dummy.CalcBaseFee(vm.chainConfig, parentHeader, uint64(timestamp))
 		if err != nil {
 			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
 			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
