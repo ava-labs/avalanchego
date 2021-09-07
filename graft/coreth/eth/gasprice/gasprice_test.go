@@ -101,7 +101,7 @@ func (b *testBackend) Engine() consensus.Engine {
 }
 
 func (b *testBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
-	return dummy.MinRequiredTip(header)
+	return dummy.MinRequiredTip(b.chain.Config(), header)
 }
 
 func (b *testBackend) CurrentHeader() *types.Header {
@@ -172,7 +172,7 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 }
 
 func TestSuggestTipCapIdenticalTip(t *testing.T) {
-	tip := big.NewInt(0)
+	tip := big.NewInt(10 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
@@ -261,7 +261,7 @@ func TestSuggestTipCapIdenticalTip(t *testing.T) {
 // }
 
 func TestSuggestTipCapIgnoreSmallTips(t *testing.T) {
-	tip := big.NewInt(0)
+	tip := big.NewInt(10 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
@@ -309,7 +309,7 @@ func TestSuggestTipCapIgnoreSmallTips(t *testing.T) {
 }
 
 func TestSuggestTipcapLegacyTxs(t *testing.T) {
-	tip := big.NewInt(0)
+	tip := big.NewInt(10 * params.GWei)
 
 	// what should we do if we reach further than 20s back when retrieving block values
 	applyGasPriceTest(t, suggestTipCapTest{

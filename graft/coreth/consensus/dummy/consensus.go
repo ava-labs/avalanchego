@@ -25,6 +25,8 @@ var (
 	errInvalidBlockTime       = errors.New("timestamp less than parent's")
 	errUnclesUnsupported      = errors.New("uncles unsupported")
 	errMinRequiredTipNegative = errors.New("minimum required tip is negative")
+	errBlockGasCostNil        = errors.New("block gas cost is nil")
+	errBaseFeeNil             = errors.New("base fee is nil")
 )
 
 type (
@@ -360,9 +362,15 @@ func (self *DummyEngine) Close() error {
 // required block fee.
 //
 // This function will return nil for all return values prior to Apricot Phase 4.
-func MinRequiredTip(header *types.Header) (*big.Int, error) {
-	if header.Number.Int64() == 0 {
+func MinRequiredTip(config *params.ChainConfig, header *types.Header) (*big.Int, error) {
+	if config.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		return nil, nil
+	}
+	if header.BaseFee == nil {
+		return nil, errBaseFeeNil
+	}
+	if header.BlockGasCost == nil {
+		return nil, errBlockGasCostNil
 	}
 
 	// minTip = requiredBlockFee/blockGasUsage - baseFee
