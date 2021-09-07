@@ -1431,13 +1431,15 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
 	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
+		tip := big.NewInt(1000 * params.GWei)
+		feeCap := new(big.Int).Add(gen.BaseFee(), tip)
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   params.TestApricotPhase4Config.ChainID,
 			Nonce:     gen.TxNonce(addr1),
 			To:        &addr2,
 			Gas:       params.TxGas,
-			GasFeeCap: gen.BaseFee(),
-			GasTipCap: big.NewInt(0),
+			GasFeeCap: feeCap,
+			GasTipCap: tip,
 			Data:      []byte{},
 		})
 
