@@ -48,7 +48,7 @@ const (
 	pluginsDirName       = "plugins"
 	chainConfigFileName  = "config"
 	chainUpgradeFileName = "upgrade"
-	subnetConfigFileType = "json"
+	subnetConfigFileExt  = ".json"
 )
 
 var (
@@ -717,9 +717,8 @@ func getSubnetConfigs(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]chains.Sub
 // readSubnetConfigs reads subnet config files from a path and given subnetIDs and returns a map.
 func readSubnetConfigs(subnetConfigPath string, subnetIDs []ids.ID) (map[ids.ID]chains.SubnetConfig, error) {
 	subnetConfigs := make(map[ids.ID]chains.SubnetConfig)
-	extension := "." + subnetConfigFileType
 	for _, subnetID := range subnetIDs {
-		filePath := path.Join(subnetConfigPath, subnetID.String()+extension)
+		filePath := path.Join(subnetConfigPath, subnetID.String()+subnetConfigFileExt)
 		fileInfo, err := os.Stat(filePath)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
