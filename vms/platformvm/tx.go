@@ -29,13 +29,13 @@ type UnsignedTx interface {
 	Bytes() []byte
 }
 
-// UnsignedDecisionTx is an unsigned operation that can be immediately decided
 type DecisionSyntacticVerificationContext struct {
 	ctx        *snow.Context
 	feeAmount  uint64
 	feeAssetID ids.ID
 }
 
+// UnsignedDecisionTx is an unsigned operation that can be immediately decided
 type UnsignedDecisionTx interface {
 	UnsignedTx
 
@@ -49,7 +49,6 @@ type UnsignedDecisionTx interface {
 	)
 }
 
-// UnsignedProposalTx is an unsigned operation that can be proposed
 type ProposalSyntacticVerificationContext struct {
 	ctx              *snow.Context
 	minStakeDuration time.Duration
@@ -65,6 +64,7 @@ type ProposalSyntacticVerificationContext struct {
 	feeAssetID ids.ID
 }
 
+// UnsignedProposalTx is an unsigned operation that can be proposed
 type UnsignedProposalTx interface {
 	UnsignedTx
 
@@ -82,7 +82,6 @@ type UnsignedProposalTx interface {
 	InitiallyPrefersCommit(vm *VM) bool
 }
 
-// UnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type AtomicSyntacticVerificationContext struct {
 	ctx        *snow.Context
 	avmID      ids.ID
@@ -90,6 +89,7 @@ type AtomicSyntacticVerificationContext struct {
 	feeAssetID ids.ID
 }
 
+// UnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type UnsignedAtomicTx interface {
 	UnsignedTx
 

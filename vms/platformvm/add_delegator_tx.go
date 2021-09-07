@@ -44,13 +44,13 @@ type UnsignedAddDelegatorTx struct {
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [UnsignedAddDelegatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
 // the addresses can be json marshalled into human readable format
-func (t *UnsignedAddDelegatorTx) InitCtx(ctx *snow.Context) {
-	t.BaseTx.InitCtx(ctx)
-	for _, out := range t.Stake {
+func (tx *UnsignedAddDelegatorTx) InitCtx(ctx *snow.Context) {
+	tx.BaseTx.InitCtx(ctx)
+	for _, out := range tx.Stake {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
-	t.RewardsOwner.InitCtx(ctx)
+	tx.RewardsOwner.InitCtx(ctx)
 }
 
 // StartTime of this validator
@@ -68,7 +68,7 @@ func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// Verify return nil iff [tx] is valid
+// SyntacticVerify returns nil iff [tx] is valid
 func (tx *UnsignedAddDelegatorTx) SyntacticVerify(
 	synCtx ProposalSyntacticVerificationContext,
 ) error {

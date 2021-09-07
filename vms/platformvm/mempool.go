@@ -20,6 +20,7 @@ const (
 	// BatchSize is the number of decision transactions to place into a block
 	BatchSize = 30
 
+	// MaxMempoolByteSize is the maximum number of bytes allowed in the mempool
 	MaxMempoolByteSize   = 3 * units.GiB // TODO: Should be default, configurable by users
 	rejectedTxsCacheSize = 50
 )

@@ -28,7 +28,7 @@ type UnsignedAdvanceTimeTx struct {
 	Time uint64 `serialize:"true" json:"time"`
 }
 
-func (t *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
+func (tx *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
 
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {

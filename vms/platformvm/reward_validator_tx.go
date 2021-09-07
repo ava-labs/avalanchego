@@ -43,7 +43,7 @@ type UnsignedRewardValidatorTx struct {
 	shouldPreferCommit bool
 }
 
-func (t *UnsignedRewardValidatorTx) InitCtx(*snow.Context) {}
+func (tx *UnsignedRewardValidatorTx) InitCtx(*snow.Context) {}
 
 func (tx *UnsignedRewardValidatorTx) SyntacticVerify(
 	ctx ProposalSyntacticVerificationContext,

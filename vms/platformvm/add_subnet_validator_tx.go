@@ -48,7 +48,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
 	return tx.Validator.Weight()
 }
 
-// Verify return nil iff [tx] is valid
+// SyntacticVerify returns nil iff [tx] is valid
 func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(
 	synCtx ProposalSyntacticVerificationContext,
 ) error {

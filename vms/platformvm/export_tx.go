@@ -40,9 +40,9 @@ type UnsignedExportTx struct {
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [UnsignedExportTx]. Also sets the [ctx] to the given [vm.ctx] so that
 // the addresses can be json marshalled into human readable format
-func (t *UnsignedExportTx) InitCtx(ctx *snow.Context) {
-	t.BaseTx.InitCtx(ctx)
-	for _, out := range t.ExportedOutputs {
+func (tx *UnsignedExportTx) InitCtx(ctx *snow.Context) {
+	tx.BaseTx.InitCtx(ctx)
+	for _, out := range tx.ExportedOutputs {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}

@@ -27,12 +27,12 @@ type UnsignedCreateSubnetTx struct {
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [UnsignedCreateSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so that
 // the addresses can be json marshalled into human readable format
-func (t *UnsignedCreateSubnetTx) InitCtx(ctx *snow.Context) {
-	t.BaseTx.InitCtx(ctx)
-	t.Owner.InitCtx(ctx)
+func (tx *UnsignedCreateSubnetTx) InitCtx(ctx *snow.Context) {
+	tx.BaseTx.InitCtx(ctx)
+	tx.Owner.InitCtx(ctx)
 }
 
-// Verify this transaction is well-formed
+// SyntacticVerify verifies that this transaction is well-formed
 func (tx *UnsignedCreateSubnetTx) SyntacticVerify(
 	synCtx DecisionSyntacticVerificationContext,
 ) error {

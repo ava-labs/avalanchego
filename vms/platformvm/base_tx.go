@@ -20,11 +20,11 @@ type BaseTx struct {
 // InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
 // sets the [ctx] to the given [vm.ctx] so that the addresses can be json
 // marshalled into human readable format
-func (t *BaseTx) InitCtx(ctx *snow.Context) {
-	for _, in := range t.BaseTx.Ins {
+func (tx *BaseTx) InitCtx(ctx *snow.Context) {
+	for _, in := range tx.BaseTx.Ins {
 		in.FxID = secp256k1fx.ID
 	}
-	for _, out := range t.BaseTx.Outs {
+	for _, out := range tx.BaseTx.Outs {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}

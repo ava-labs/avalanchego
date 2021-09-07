@@ -131,7 +131,7 @@ type VM struct {
 	lastVdrUpdate time.Time
 }
 
-// implements SnowmanPlusPlusVM interface
+// GetActivationTime implements SnowmanPlusPlusVM interface
 func (vm *VM) GetActivationTime() time.Time {
 	return time.Unix(0, 0) // TODO: setup upon deploy
 }
