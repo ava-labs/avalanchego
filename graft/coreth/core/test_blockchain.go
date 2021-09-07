@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/rawdb"
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
@@ -63,7 +64,10 @@ var tests = []ChainTest{
 		"GenerateChainInvalidBlockFee",
 		TestGenerateChainInvalidBlockFee,
 	},
-	// TODO: InsertChain invalid (test correctness checking on import)
+	{
+		"InsertChainInvalidBlockFee",
+		TestInsertChainInvalidBlockFee,
+	},
 	// TODO: Generate/Insert Valid
 }
 
@@ -1324,6 +1328,66 @@ func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Databas
 		}
 		gen.AddTx(signedTx)
 	})
+	if err == nil {
+		t.Fatal("should not have been able to build a block because of insufficient block fee")
+	}
+	if !strings.Contains(err.Error(), "insufficient gas (0) to cover the block cost (50000)") {
+		t.Fatalf("should have gotten insufficient block fee error but got %v instead", err)
+	}
+}
+
+func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database, chainConfig *params.ChainConfig, lastAcceptedHash common.Hash) (*BlockChain, error)) {
+	var (
+		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
+		// We use two separate databases since GenerateChain commits the state roots to its underlying
+		// database.
+		genDB   = rawdb.NewMemoryDatabase()
+		chainDB = rawdb.NewMemoryDatabase()
+	)
+
+	// Ensure that key1 has some funds in the genesis block.
+	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
+	gspec := &Genesis{
+		Config: params.TestApricotPhase4Config,
+		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+	}
+	genesis := gspec.MustCommit(genDB)
+	_ = gspec.MustCommit(chainDB)
+
+	blockchain, err := create(chainDB, gspec.Config, common.Hash{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blockchain.Stop()
+
+	// This call generates a chain of 3 blocks.
+	signer := types.LatestSigner(params.TestApricotPhase4Config)
+	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
+	// to the BlockChain's database while generating blocks.
+	chain, _, err := GenerateChain(params.TestApricotPhase4Config, genesis, dummy.NewETHFaker(), genDB, 3, func(i int, gen *BlockGen) {
+		tx := types.NewTx(&types.DynamicFeeTx{
+			ChainID:   params.TestApricotPhase4Config.ChainID,
+			Nonce:     gen.TxNonce(addr1),
+			To:        &addr2,
+			Gas:       params.TxGas,
+			GasFeeCap: gen.BaseFee(),
+			GasTipCap: big.NewInt(0),
+			Data:      []byte{},
+		})
+
+		signedTx, err := types.SignTx(tx, signer, key1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		gen.AddTx(signedTx)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = blockchain.InsertChain(chain)
 	if err == nil {
 		t.Fatal("should not have been able to build a block because of insufficient block fee")
 	}
