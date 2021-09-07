@@ -241,7 +241,7 @@ type Config struct {
 	Validators validators.Set `json:"validators"`
 }
 
-// NewDefaultConfig returns a new Network Config some reasonable default values.
+// NewDefaultConfig returns a new Network Config with some reasonable default values.
 func NewDefaultConfig() Config {
 	return Config{
 		PeerListGossipConfig: PeerListGossipConfig{
