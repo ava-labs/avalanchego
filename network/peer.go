@@ -856,8 +856,6 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 		return
 	}
 
-	p.canHandleCompressed.SetValue(peerVersion.Compare(minVersionCanHandleCompressed) >= 0)
-
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
 		time:      versionTime,

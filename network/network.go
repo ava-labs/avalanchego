@@ -44,8 +44,6 @@ var (
 	errNetworkClosed         = errors.New("network closed")
 	errPeerIsMyself          = errors.New("peer is myself")
 	errNetworkLayerUnhealthy = errors.New("network layer is unhealthy")
-
-	minVersionCanHandleCompressed = version.NewDefaultVersion(1, 4, 11)
 )
 
 var _ Network = &network{}
@@ -233,10 +231,7 @@ type Config struct {
 	MaxMessageSize     uint32              `json:"maxMessageSize"`
 	MaxClockDifference time.Duration       `json:"maxClockDifference"`
 	AllowPrivateIPs    bool                `json:"allowPrivateIPs"`
-	// If true, compress PushQuery, Put, MultiPut and PeerList messages sent to peers.
-	// Whether true or false, expect messages from peers with version >= [minVersionCanHandleCompressed]
-	// to send these types of messages with the isCompressed flag.
-	CompressionEnabled bool `json:"compressionEnabled"`
+	CompressionEnabled bool                `json:"compressionEnabled"`
 	// This node's TLS key
 	TLSKey crypto.Signer `json:"-"`
 	// WhitelistedSubnets of the node
