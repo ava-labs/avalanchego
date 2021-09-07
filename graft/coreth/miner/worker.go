@@ -142,9 +142,6 @@ func (w *worker) commitNewWork() (*types.Block, error) {
 			return nil, fmt.Errorf("failed to calculate new base fee: %w", err)
 		}
 	}
-	if w.chainConfig.IsApricotPhase4(bigTimestamp) {
-		header.BlockGasCost = w.engine.CalcBlockGasCost(w.chainConfig, parent.Header(), uint64(timestamp))
-	}
 	if w.coinbase == (common.Address{}) {
 		return nil, errors.New("cannot mine without etherbase")
 	}
