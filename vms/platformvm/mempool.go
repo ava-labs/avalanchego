@@ -139,27 +139,6 @@ func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 	return nil
 }
 
-func (m *Mempool) RemoveTx(txs []*Tx) error {
-	for _, tx := range txs {
-		if !m.has(tx.ID()) {
-			continue
-		}
-
-		switch tx.UnsignedTx.(type) {
-		case TimedTx:
-			m.RemoveProposalTx(tx)
-		case UnsignedDecisionTx:
-			m.RemoveDecisionTxs([]*Tx{tx})
-		case UnsignedAtomicTx:
-			m.RemoveAtomicTx(tx)
-		default:
-			return errUnknownTxType
-		}
-	}
-
-	return nil
-}
-
 // BuildBlock builds a block to be added to consensus
 func (m *Mempool) BuildBlock() (snowman.Block, error) {
 	m.dropIncoming = true
