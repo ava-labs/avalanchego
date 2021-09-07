@@ -87,7 +87,11 @@ func (self *DummyEngine) CalcBaseFee(config *params.ChainConfig, parent *types.H
 		default:
 			blockGasCost = ApricotPhase3BlockGasFee
 		}
-		addedGas, overflow := math.SafeAdd(parent.GasUsed+parentExtraStateGasUsed, blockGasCost)
+		addedGas, overflow := math.SafeAdd(parent.GasUsed, parentExtraStateGasUsed)
+		if overflow {
+			addedGas = math.MaxUint64
+		}
+		addedGas, overflow = math.SafeAdd(addedGas, blockGasCost)
 		if overflow {
 			addedGas = math.MaxUint64
 		}
