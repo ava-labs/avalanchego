@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/eth/gasprice"
 	"github.com/ava-labs/coreth/eth/tracers"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/node"
@@ -52,7 +53,6 @@ import (
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/eth/downloader"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
 )
