@@ -117,7 +117,4 @@ type Engine interface {
 
 	// Close terminates any background threads maintained by the consensus engine.
 	Close() error
-
-	// CalcBaseFee computes the BaseFee of a block produced at [timestamp].
-	CalcBaseFee(config *params.ChainConfig, parent *types.Header, timestamp uint64) ([]byte, *big.Int, error)
 }
