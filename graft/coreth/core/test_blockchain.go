@@ -1430,14 +1430,16 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 	signer := types.LatestSigner(params.TestApricotPhase4Config)
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
+	tip := big.NewInt(1000 * params.GWei)
+	transfer := big.NewInt(10000)
 	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
-		tip := big.NewInt(1000 * params.GWei)
 		feeCap := new(big.Int).Add(gen.BaseFee(), tip)
 		tx := types.NewTx(&types.DynamicFeeTx{
 			ChainID:   params.TestApricotPhase4Config.ChainID,
 			Nonce:     gen.TxNonce(addr1),
 			To:        &addr2,
 			Gas:       params.TxGas,
+			Value:     transfer,
 			GasFeeCap: feeCap,
 			GasTipCap: tip,
 			Data:      []byte{},
@@ -1467,15 +1469,16 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 		if nonce != 1 {
 			return fmt.Errorf("expected nonce addr1: 1, found nonce: %d", nonce)
 		}
-		transferredFunds := big.NewInt(10000)
 		balance1 := sdb.GetBalance(addr1)
-		expectedBalance1 := new(big.Int).Sub(genesisBalance, transferredFunds)
+		expectedBalance1 := new(big.Int).Sub(genesisBalance, transfer)
+		feeSpend := new(big.Int).Mul(new(big.Int).Add(big.NewInt(225*params.GWei), tip), new(big.Int).SetUint64(params.TxGas))
+		expectedBalance1.Sub(expectedBalance1, feeSpend)
 		if balance1.Cmp(expectedBalance1) != 0 {
 			return fmt.Errorf("expected addr1 balance: %d, found balance: %d", expectedBalance1, balance1)
 		}
 
 		balance2 := sdb.GetBalance(addr2)
-		expectedBalance2 := transferredFunds
+		expectedBalance2 := transfer
 		if balance2.Cmp(expectedBalance2) != 0 {
 			return fmt.Errorf("expected addr2 balance: %d, found balance: %d", expectedBalance2, balance2)
 		}
