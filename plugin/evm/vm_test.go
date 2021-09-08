@@ -3767,6 +3767,7 @@ func TestConfigureLogLevel(t *testing.T) {
 				[]byte(test.logConfig),
 				issuer,
 				[]*engCommon.Fx{},
+				nil,
 			)
 			if len(test.expectedErr) == 0 && err != nil {
 				t.Fatal(err)
