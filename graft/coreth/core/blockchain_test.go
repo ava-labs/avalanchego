@@ -30,9 +30,9 @@ func TestArchiveBlockChain(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
@@ -64,9 +64,9 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
@@ -98,9 +98,9 @@ func TestPruningBlockChain(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
@@ -132,9 +132,9 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
@@ -172,9 +172,9 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
@@ -213,9 +213,9 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
@@ -256,9 +256,9 @@ func TestEnableSnapshots(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
@@ -299,9 +299,9 @@ func TestCorruptSnapshots(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
