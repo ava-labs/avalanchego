@@ -42,13 +42,12 @@ type network struct {
 	gossipHandler   message.Handler
 }
 
-func newNetwork(
+func (vm *VM) NewNetwork(
 	activationTime time.Time,
 	appSender commonEng.AppSender,
 	chain *coreth.ETHChain,
 	mempool *Mempool,
 	signer types.Signer,
-	vm *VM,
 ) *network {
 	net := &network{
 		gossipActivationTime: activationTime,

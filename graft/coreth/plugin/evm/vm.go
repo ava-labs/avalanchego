@@ -337,20 +337,25 @@ func (vm *VM) Initialize(
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
-	// start goroutines to manage block building
-	vm.builder = vm.NewBlockBuilder(toEngine)
-	vm.builder.handleBlockBuilding()
-
-	vm.chain.Start()
-
-	vm.network = newNetwork(
+	// initialize new gossip network
+	//
+	// NOTE: This network must be initialized after the atomic mempool.
+	vm.network = vm.NewNetwork(
 		time.Unix(0, 0), // TODO: setup upon deploy
 		appSender,
 		ethChain,
 		vm.mempool,
 		types.LatestSigner(g.Config),
-		vm,
 	)
+
+	// start goroutines to manage block building
+	//
+	// NOTE: gossip network must be initialized first otherwie ETH tx gossip will
+	// not work.
+	vm.builder = vm.NewBlockBuilder(toEngine)
+	vm.builder.handleBlockBuilding()
+
+	vm.chain.Start()
 
 	vm.genesisHash = vm.chain.GetGenesisBlock().Hash()
 	log.Info(fmt.Sprintf("lastAccepted = %s", lastAccepted.Hash().Hex()))
