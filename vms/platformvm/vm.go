@@ -93,7 +93,7 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	mempool Mempool
+	mempool mempool
 
 	// The context of this vm
 	ctx       *snow.Context

@@ -33,8 +33,8 @@ var (
 	errTxExceedingMempoolSize = errors.New("dropping incoming tx since mempool would breach maximum size")
 )
 
-// Mempool implements a simple mempool to convert txs into valid blocks
-type Mempool struct {
+// mempool implements a simple mempool to convert txs into valid blocks
+type mempool struct {
 	vm *VM
 
 	// TODO: factor out VM into separable interfaces
@@ -75,7 +75,7 @@ type Mempool struct {
 }
 
 // Initialize this mempool.
-func (m *Mempool) Initialize(vm *VM) {
+func (m *mempool) Initialize(vm *VM) {
 	m.vm = vm
 
 	m.vm.ctx.Log.Verbo("initializing platformVM mempool")
@@ -91,7 +91,7 @@ func (m *Mempool) Initialize(vm *VM) {
 }
 
 // IssueTx enqueues the [tx] to be put into a block
-func (m *Mempool) IssueTx(tx *Tx) error {
+func (m *mempool) IssueTx(tx *Tx) error {
 	if m.dropIncoming {
 		return nil
 	}
@@ -111,9 +111,9 @@ func (m *Mempool) IssueTx(tx *Tx) error {
 	}
 }
 
-func (m *Mempool) AddUncheckedTx(tx *Tx) error {
+func (m *mempool) AddUncheckedTx(tx *Tx) error {
 	txID := tx.ID()
-	if m.has(txID) {
+	if m.Has(txID) {
 		return errAttemptReRegisterTx
 	}
 	if !m.hasRoomFor(tx) {
@@ -122,17 +122,11 @@ func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 
 	switch tx.UnsignedTx.(type) {
 	case TimedTx:
-		if err := m.AddProposalTx(tx); err != nil {
-			return err
-		}
+		m.AddProposalTx(tx)
 	case UnsignedDecisionTx:
-		if err := m.AddDecisionTx(tx); err != nil {
-			return err
-		}
+		m.AddDecisionTx(tx)
 	case UnsignedAtomicTx:
-		if err := m.AddAtomicTx(tx); err != nil {
-			return err
-		}
+		m.AddAtomicTx(tx)
 	default:
 		return errUnknownTxType
 	}
@@ -141,7 +135,7 @@ func (m *Mempool) AddUncheckedTx(tx *Tx) error {
 }
 
 // BuildBlock builds a block to be added to consensus
-func (m *Mempool) BuildBlock() (snowman.Block, error) {
+func (m *mempool) BuildBlock() (snowman.Block, error) {
 	m.dropIncoming = true
 	defer func() {
 		m.dropIncoming = false
@@ -334,7 +328,7 @@ func (m *Mempool) BuildBlock() (snowman.Block, error) {
 
 // ResetTimer Check if there is a block ready to be added to consensus. If so, notify the
 // consensus engine.
-func (m *Mempool) ResetTimer() {
+func (m *mempool) ResetTimer() {
 	// If there is a pending transaction trigger building of a block with that
 	// transaction
 	if m.HasDecisionTxs() || m.HasAtomicTxs() {
@@ -414,7 +408,7 @@ func (m *Mempool) ResetTimer() {
 }
 
 // Shutdown this mempool
-func (m *Mempool) Shutdown() {
+func (m *mempool) Shutdown() {
 	if m.timer == nil {
 		return
 	}

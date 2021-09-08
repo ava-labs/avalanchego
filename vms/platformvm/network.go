@@ -19,7 +19,7 @@ type network struct {
 	// gossip related attributes
 	gossipActivationTime time.Time
 	appSender            common.AppSender
-	mempool              *Mempool
+	mempool              *mempool
 	vm                   *VM
 
 	requestID uint32
@@ -162,7 +162,7 @@ func (h *RequestHandler) HandleTxNotify(nodeID ids.ShortID, requestID uint32, ms
 		msg.TxID,
 	)
 
-	tx := h.net.mempool.get(msg.TxID)
+	tx := h.net.mempool.Get(msg.TxID)
 	if tx == nil {
 		h.net.log.Trace(
 			"dropping AppRequest from %s with requestID %d for unknown tx %s",
@@ -240,7 +240,7 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 	// TODO: call vm.IssueTx here?
 
 	switch {
-	case h.net.mempool.has(txID):
+	case h.net.mempool.Has(txID):
 		return nil
 	case h.net.mempool.isAlreadyRejected(txID):
 		return nil
@@ -329,7 +329,7 @@ func (h *GossipHandler) HandleTxNotify(nodeID ids.ShortID, requestID uint32, msg
 	)
 
 	switch {
-	case h.net.mempool.has(msg.TxID):
+	case h.net.mempool.Has(msg.TxID):
 		return nil
 	case h.net.mempool.isAlreadyRejected(msg.TxID):
 		return nil

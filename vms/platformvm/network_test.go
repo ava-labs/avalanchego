@@ -62,7 +62,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	err = vm.AppResponse(nodeID, vm.requestID, msgBytes)
 	assert.NoError(err)
 
-	has := mempool.has(txID)
+	has := mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
@@ -74,7 +74,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")
 
-	has = mempool.has(txID)
+	has = mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 
@@ -119,7 +119,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	err = vm.AppResponse(nodeID, 0, msgBytes)
 	assert.NoError(err, "responses with unknown requestID should be dropped")
 
-	has := mempool.has(txID)
+	has := mempool.Has(txID)
 	assert.False(has, "responses with unknown requestID should not affect mempool")
 	assert.False(wasGossiped, "responses with unknown requestID should not result in gossiping")
 
@@ -130,7 +130,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	err = vm.AppResponse(nodeID, vm.requestID, msgBytes)
 	assert.NoError(err, "error in reception of tx")
 
-	has = mempool.has(txID)
+	has = mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 	assert.True(wasGossiped, "tx accepted in mempool should have been re-gossiped")
 

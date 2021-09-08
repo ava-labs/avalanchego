@@ -29,7 +29,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	err := mempool.IssueTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
-	has := mempool.has(txID)
+	has := mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
@@ -41,7 +41,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")
 
-	has = mempool.has(txID)
+	has = mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 

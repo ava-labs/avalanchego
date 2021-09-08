@@ -2135,7 +2135,7 @@ func (service *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, resp
 		return err
 	}
 
-	if service.vm.mempool.has(args.TxID) {
+	if service.vm.mempool.Has(args.TxID) {
 		// Found the tx in the mempool. Report tx is processing.
 		response.Status = Processing
 		return nil

@@ -5,6 +5,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
+var _ Mempool = &mempoolContent{}
+
+type Mempool interface {
+	Has(txID ids.ID) bool
+	Get(txID ids.ID) *Tx
+}
+
 // Transactions from clients that have not yet been put into blocks and added to
 // consensus
 type mempoolContent struct {
@@ -25,6 +32,20 @@ func newMempoolContent() *mempoolContent {
 	}
 }
 
+func (mc *mempoolContent) Has(txID ids.ID) bool {
+	return mc.Get(txID) != nil
+}
+
+func (mc *mempoolContent) Get(txID ids.ID) *Tx {
+	if tx := mc.unissuedDecisionTxs.Get(txID); tx != nil {
+		return tx
+	}
+	if tx := mc.unissuedAtomicTxs.Get(txID); tx != nil {
+		return tx
+	}
+	return mc.unissuedProposalTxs.Get(txID)
+}
+
 func (mc *mempoolContent) register(tx *Tx) {
 	txBytes := tx.Bytes()
 	mc.totalBytesSize += len(txBytes)
@@ -35,30 +56,15 @@ func (mc *mempoolContent) deregister(tx *Tx) {
 	mc.totalBytesSize -= len(txBytes)
 }
 
-func (mc *mempoolContent) has(txID ids.ID) bool {
-	return mc.get(txID) != nil
-}
-
-func (mc *mempoolContent) get(txID ids.ID) *Tx {
-	if tx := mc.unissuedDecisionTxs.Get(txID); tx != nil {
-		return tx
-	}
-	if tx := mc.unissuedAtomicTxs.Get(txID); tx != nil {
-		return tx
-	}
-	return mc.unissuedProposalTxs.Get(txID)
-}
-
 func (mc *mempoolContent) hasRoomFor(tx *Tx) bool {
 	txBytes := tx.Bytes()
 	return mc.totalBytesSize+len(txBytes) <= MaxMempoolByteSize
 }
 
 // DecisionTx-specific methods
-func (mc *mempoolContent) AddDecisionTx(tx *Tx) error {
+func (mc *mempoolContent) AddDecisionTx(tx *Tx) {
 	mc.unissuedDecisionTxs.Add(tx)
 	mc.register(tx)
-	return nil
 }
 
 func (mc *mempoolContent) RemoveDecisionTxs(txs []*Tx) {
@@ -87,10 +93,9 @@ func (mc *mempoolContent) ExtractNextDecisionTxs(numTxs int) []*Tx {
 func (mc *mempoolContent) HasDecisionTxs() bool { return mc.unissuedDecisionTxs.Len() > 0 }
 
 // AtomicTx-specific methods
-func (mc *mempoolContent) AddAtomicTx(tx *Tx) error {
+func (mc *mempoolContent) AddAtomicTx(tx *Tx) {
 	mc.unissuedAtomicTxs.Add(tx)
 	mc.register(tx)
-	return nil
 }
 
 func (mc *mempoolContent) RemoveAtomicTx(tx *Tx) {
@@ -108,10 +113,9 @@ func (mc *mempoolContent) ExtractNextAtomicTx() *Tx {
 func (mc *mempoolContent) HasAtomicTxs() bool { return mc.unissuedAtomicTxs.Len() > 0 }
 
 // ProposalTx-specific methods
-func (mc *mempoolContent) AddProposalTx(tx *Tx) error {
+func (mc *mempoolContent) AddProposalTx(tx *Tx) {
 	mc.unissuedProposalTxs.Add(tx)
 	mc.register(tx)
-	return nil
 }
 
 func (mc *mempoolContent) RemoveProposalTx(tx *Tx) {
