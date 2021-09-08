@@ -190,6 +190,21 @@ var Forks = map[string]*params.ChainConfig{
 		ApricotPhase2BlockTimestamp: big.NewInt(0),
 		ApricotPhase3BlockTimestamp: big.NewInt(0),
 	},
+	"ApricotPhase4": {
+		ChainID:                     big.NewInt(1),
+		HomesteadBlock:              big.NewInt(0),
+		EIP150Block:                 big.NewInt(0),
+		EIP155Block:                 big.NewInt(0),
+		EIP158Block:                 big.NewInt(0),
+		ByzantiumBlock:              big.NewInt(0),
+		ConstantinopleBlock:         big.NewInt(0),
+		PetersburgBlock:             big.NewInt(0),
+		IstanbulBlock:               big.NewInt(0),
+		ApricotPhase1BlockTimestamp: big.NewInt(0),
+		ApricotPhase2BlockTimestamp: big.NewInt(0),
+		ApricotPhase3BlockTimestamp: big.NewInt(0),
+		ApricotPhase4BlockTimestamp: big.NewInt(0),
+	},
 }
 
 // Returns the set of defined fork names

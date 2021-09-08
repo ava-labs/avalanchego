@@ -92,9 +92,6 @@ func (bc *testBlockChain) CurrentBlock() *types.Block {
 }
 
 func (bc *testBlockChain) GetBlock(hash common.Hash, number uint64) *types.Block {
-	bc.lock.Lock()
-	defer bc.lock.Unlock()
-
 	return bc.CurrentBlock()
 }
 

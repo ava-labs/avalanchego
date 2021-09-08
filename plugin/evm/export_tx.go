@@ -80,7 +80,7 @@ func (tx *UnsignedExportTx) Verify(
 	return nil
 }
 
-func (tx *UnsignedExportTx) Cost() (uint64, error) {
+func (tx *UnsignedExportTx) GasUsed() (uint64, error) {
 	byteCost := calcBytesCost(len(tx.UnsignedBytes()))
 	numSigs := uint64(len(tx.Ins))
 	sigCost, err := math.Mul64(numSigs, secp256k1fx.CostPerSignature)
@@ -134,11 +134,11 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	switch {
 	// Apply dynamic fees to export transactions as of Apricot Phase 3
 	case rules.IsApricotPhase3:
-		cost, err := stx.Cost()
+		gasUsed, err := stx.GasUsed()
 		if err != nil {
 			return err
 		}
-		txFee, err := calculateDynamicFee(cost, baseFee)
+		txFee, err := calculateDynamicFee(gasUsed, baseFee)
 		if err != nil {
 			return err
 		}
@@ -284,7 +284,7 @@ func (vm *VM) newExportTx(
 		}
 
 		var cost uint64
-		cost, err = tx.Cost()
+		cost, err = tx.GasUsed()
 		if err != nil {
 			return nil, err
 		}
