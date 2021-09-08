@@ -58,7 +58,7 @@ func (m *blockBuilder) Initialize(vm *VM) {
 	go m.vm.ctx.Log.RecoverAndPanic(m.timer.Dispatch)
 }
 
-// IssueTx enqueues the [tx] to be put into a block
+// AddUnverifiedTx verifies a transaction and attempts to add it to the mempool
 func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 	// Initialize the transaction
 	if err := tx.Sign(Codec, nil); err != nil {
@@ -82,6 +82,7 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 	return m.vm.GossipTx(tx)
 }
 
+// AddVerifiedTx attempts to add a transaction to the mempool
 func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
 	if m.dropIncoming {
 		return errMempoolReentrancy
