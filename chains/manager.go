@@ -503,7 +503,16 @@ func (m *manager) createAvalancheChain(
 	}
 
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs, &sender); err != nil {
+	if err := vm.Initialize(
+		ctx,
+		vmDBManager,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		&sender,
+	); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -663,9 +672,16 @@ func (m *manager) createSnowmanChain(
 
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData,
-		chainConfig.Upgrade, chainConfig.Config, msgChan,
-		fxs, &sender); err != nil {
+	if err := vm.Initialize(
+		ctx,
+		vmDBManager,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		&sender,
+	); err != nil {
 		return nil, err
 	}
 
