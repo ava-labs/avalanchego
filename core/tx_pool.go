@@ -561,13 +561,10 @@ func (pool *TxPool) ContentFrom(addr common.Address) (types.Transactions, types.
 // transactions and only return those whose **effective** tip is large enough in
 // the next pending execution environment.
 func (pool *TxPool) Pending(enforceTips bool) (map[common.Address]types.Transactions, error) {
-	// TODO: allow for effective tip enforcement on the pool (assuming
-	// a syntehtic block of size X)
 	pool.mu.Lock()
 	defer pool.mu.Unlock()
 
 	pending := make(map[common.Address]types.Transactions)
-	// TODO: sort by what would be used to build a block
 	for addr, list := range pool.pending {
 		txs := list.Flatten()
 
