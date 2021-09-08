@@ -112,62 +112,6 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		t.Fatal("should have errored because sig indices weren't unique")
 	}
 
-	// Case: Validation length is too short
-	tx, err = vm.newAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End-- // 1 less than min duration
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(
-		vm.ctx,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinDelegationFee,
-		defaultMinDelegatorStake,
-	); err == nil {
-		t.Fatal("should have errored because validation length too short")
-	}
-
-	// Case: Validation length is too long
-	tx, err = vm.newAddSubnetValidatorTx(
-		defaultWeight,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(defaultMaxStakingDuration).Unix()),
-		nodeID,
-		testSubnet1.ID(),
-		[]*crypto.PrivateKeySECP256K1R{testSubnet1ControlKeys[0], testSubnet1ControlKeys[1]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).Validator.End++ // 1 more than max duration
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).syntacticallyVerified = false
-	if err := tx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(
-		vm.ctx,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinDelegationFee,
-		defaultMinDelegatorStake,
-	); err == nil {
-		t.Fatal("should have errored because validation length too long")
-	}
-
 	// Case: Valid
 	if tx, err = vm.newAddSubnetValidatorTx(
 		defaultWeight,
@@ -535,15 +479,7 @@ func TestAddSubnetValidatorMarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(
-		vm.ctx,
-		defaultMinStakingDuration,
-		defaultMaxStakingDuration,
-		vm.MinValidatorStake,
-		vm.MaxValidatorStake,
-		defaultMinDelegationFee,
-		defaultMinDelegatorStake,
-	); err != nil {
+	if err := unmarshaledTx.UnsignedTx.(*UnsignedAddSubnetValidatorTx).SyntacticVerify(vm.ctx); err != nil {
 		t.Fatal(err)
 	}
 }
