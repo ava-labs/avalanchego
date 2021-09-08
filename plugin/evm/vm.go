@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -138,6 +139,7 @@ var (
 	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
+	defaultLogLevel                   = log.LvlDebug
 )
 
 // buildingBlkStatus denotes the current status of the VM in block production.
@@ -327,6 +329,18 @@ func (vm *VM) Initialize(
 
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
+
+	// Set log level
+	logLevel := defaultLogLevel
+	if vm.config.LogLevel != "" {
+		configLogLevel, err := log.LvlFromString(vm.config.LogLevel)
+		if err != nil {
+			return fmt.Errorf("failed to initialize logger due to: %w ", err)
+		}
+		logLevel = configLogLevel
+	}
+
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
