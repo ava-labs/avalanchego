@@ -257,10 +257,14 @@ func calcBlockGasCost(maxBlockFee *big.Int, blockFeeDuration, parentTime, curren
 		maxBlockFee,
 		feeTimeRemaining,
 	)
-	return new(big.Int).Div(
+	blockGasCost := new(big.Int).Div(
 		requiredBlockGasFeeNum,
 		bigBlockFeeDuration,
 	)
+	if !blockGasCost.IsUint64() {
+		blockGasCost = new(big.Int).SetUint64(math.MaxUint64)
+	}
+	return blockGasCost
 }
 
 // MinRequiredTip is the estimated minimum tip a transaction would have

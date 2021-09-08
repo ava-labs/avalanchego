@@ -112,6 +112,9 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 		if header.BaseFee == nil {
 			return errors.New("expected baseFee to be non-nil")
 		}
+		if bfLen := header.BaseFee.BitLen(); bfLen > 256 {
+			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
+		}
 		if header.BaseFee.Cmp(expectedBaseFee) != 0 {
 			return fmt.Errorf("expected base fee (%d), found (%d)", expectedBaseFee, header.BaseFee)
 		}
@@ -304,11 +307,11 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		if extDataGasUsed == nil {
 			extDataGasUsed = common.Big0
 		}
-		if block.ExtDataGasUsed() == nil || block.ExtDataGasUsed().Cmp(extDataGasUsed) != 0 {
+		if block.ExtDataGasUsed() == nil || !block.ExtDataGasUsed().IsUint64() || block.ExtDataGasUsed().Cmp(extDataGasUsed) != 0 {
 			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", block.ExtDataGasUsed(), extDataGasUsed)
 		}
 		blockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, block.Time())
-		if block.BlockGasCost() == nil || block.BlockGasCost().Cmp(blockGasCost) != 0 {
+		if block.BlockGasCost() == nil || !block.BlockGasCost().IsUint64() || block.BlockGasCost().Cmp(blockGasCost) != 0 {
 			return fmt.Errorf("invalid blockGasCost: have %d, want %d", block.BlockGasCost(), blockGasCost)
 		}
 		if err := self.verifyBlockFee(
