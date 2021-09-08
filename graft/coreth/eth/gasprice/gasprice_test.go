@@ -81,6 +81,9 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, ext
 		OnFinalizeAndAssemble: func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 			return nil, common.Big0, extDataGasUsage, nil
 		},
+		OnExtraStateChange: func(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
+			return common.Big0, extDataGasUsage, nil
+		},
 	})
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
@@ -164,7 +167,7 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 		},
 		"apricot phase 4": {
 			chainConfig: params.TestApricotPhase4Config,
-			expectedTip: DefaultStartPrice,
+			expectedTip: DefaultMinPrice,
 		},
 	}
 
@@ -178,18 +181,18 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 func TestSuggestTipCapSimple(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig:     params.TestApricotPhase4Config,
-		numBlocks:       3,
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       1,
 		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestApricotPhase4Config)
+			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestApricotPhase4Config.ChainID,
+					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -204,25 +207,58 @@ func TestSuggestTipCapSimple(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(9_821_428_571),
+		expectedTip: big.NewInt(10_714_285_714),
+	})
+}
+
+func TestSuggestTipCapSimpleFloor(t *testing.T) {
+	txTip := big.NewInt(55 * params.GWei)
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       3,
+		extDataGasUsage: common.Big0,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, txTip)
+			for j := 0; j < 50; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: txTip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: big.NewInt(10_000_000_000),
 	})
 }
 
 func TestSuggestTipCapSmallTips(t *testing.T) {
 	tip := big.NewInt(550 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig:     params.TestApricotPhase4Config,
-		numBlocks:       3,
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       1,
 		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestApricotPhase4Config)
+			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, tip)
 			for j := 0; j < 25; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestApricotPhase4Config.ChainID,
+					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -236,7 +272,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 				}
 				b.AddTx(tx)
 				tx = types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestApricotPhase4Config.ChainID,
+					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -252,25 +288,25 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 			}
 		},
 		// NOTE: small tips do not bias estimate
-		expectedTip: big.NewInt(9_821_428_571),
+		expectedTip: big.NewInt(10_714_285_714),
 	})
 }
 
 func TestSuggestTipCapExtDataUsage(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig:     params.TestApricotPhase4Config,
-		numBlocks:       3,
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       1,
 		extDataGasUsage: big.NewInt(10_000),
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestApricotPhase4Config)
+			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestApricotPhase4Config.ChainID,
+					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -285,25 +321,25 @@ func TestSuggestTipCapExtDataUsage(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(9_728_773_584),
+		expectedTip: big.NewInt(10_613_207_547),
 	})
 }
 
 func TestSuggestTipCapLongRunning(t *testing.T) {
 	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig:     params.TestApricotPhase4Config,
+		chainConfig:     params.TestChainConfig,
 		numBlocks:       50,
 		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestApricotPhase4Config)
+			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestApricotPhase4Config.ChainID,
+					ChainID:   params.TestChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       params.TxGas,
@@ -318,6 +354,6 @@ func TestSuggestTipCapLongRunning(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(1_190_476_190),
+		expectedTip: big.NewInt(10_000_000_000),
 	})
 }

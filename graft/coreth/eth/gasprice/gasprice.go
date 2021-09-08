@@ -42,15 +42,15 @@ import (
 )
 
 var (
-	DefaultMaxPrice   = big.NewInt(50 * params.GWei)
-	DefaultStartPrice = big.NewInt(10 * params.GWei)
+	DefaultMaxPrice = big.NewInt(150 * params.GWei)
+	DefaultMinPrice = big.NewInt(10 * params.GWei)
 )
 
 type Config struct {
 	Blocks     int
 	Percentile int
 	MaxPrice   *big.Int `toml:",omitempty"`
-	StartPrice *big.Int `toml:",omitempty"`
+	MinPrice   *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
@@ -67,6 +67,11 @@ type Oracle struct {
 	backend   OracleBackend
 	lastHead  common.Hash
 	lastPrice *big.Int
+	// minPrice ensures we don't get into a positive feedback loop where tips
+	// sink to 0 during a period of slow block production, such that nobody's
+	// transactions will be included until the full block fee duration has
+	// elapsed.
+	minPrice  *big.Int
 	maxPrice  *big.Int
 	cacheLock sync.RWMutex
 	fetchLock sync.Mutex
@@ -97,16 +102,17 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	maxPrice := config.MaxPrice
 	if maxPrice == nil || maxPrice.Int64() <= 0 {
 		maxPrice = DefaultMaxPrice
-		log.Warn("Sanitizing invalid gasprice oracle price cap", "provided", config.MaxPrice, "updated", maxPrice)
+		log.Warn("Sanitizing invalid gasprice oracle max price", "provided", config.MaxPrice, "updated", maxPrice)
 	}
-	startPrice := config.StartPrice
-	if startPrice == nil || startPrice.Int64() <= 0 {
-		startPrice = DefaultStartPrice
-		log.Warn("Sanitizing invalid gasprice oracle start price", "provided", config.StartPrice, "updated", startPrice)
+	minPrice := config.MinPrice
+	if minPrice == nil || minPrice.Int64() <= 0 {
+		minPrice = DefaultMinPrice
+		log.Warn("Sanitizing invalid gasprice oracle min price", "provided", config.MinPrice, "updated", minPrice)
 	}
 	return &Oracle{
 		backend:     backend,
-		lastPrice:   startPrice,
+		lastPrice:   minPrice,
+		minPrice:    minPrice,
 		maxPrice:    maxPrice,
 		checkBlocks: blocks,
 		percentile:  percent,
@@ -243,6 +249,9 @@ func (oracle *Oracle) suggestDynamicTipCap(ctx context.Context) (*big.Int, error
 	}
 	if price.Cmp(oracle.maxPrice) > 0 {
 		price = new(big.Int).Set(oracle.maxPrice)
+	}
+	if price.Cmp(oracle.minPrice) < 0 {
+		price = new(big.Int).Set(oracle.minPrice)
 	}
 	oracle.cacheLock.Lock()
 	oracle.lastHead = headHash
