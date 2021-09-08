@@ -464,8 +464,8 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 	if ethHeader.ExtDataGasUsed == nil {
 		return errNilExtDataGasUsedApricotPhase4
 	}
-	if edguLen := ethHeader.ExtDataGasUsed.BitLen(); edguLen > 256 {
-		return fmt.Errorf("too large extDataGasUsed : bitlen %d", edguLen)
+	if !ethHeader.ExtDataGasUsed.IsUint64() {
+		return fmt.Errorf("too large extDataGasUsed : bitlen %d", ethHeader.ExtDataGasUsed.BitLen())
 	}
 	if atomicTx != nil {
 		// We perform this check manually here to avoid the overhead of having to
@@ -484,8 +484,8 @@ func (blockValidatorPhase4) SyntacticVerify(b *Block) error {
 	if ethHeader.BlockGasCost == nil {
 		return errNilBlockGasCostApricotPhase4
 	}
-	if bgcLen := ethHeader.BlockGasCost.BitLen(); bgcLen > 256 {
-		return fmt.Errorf("too large blockGasCost: bitlen %d", bgcLen)
+	if !ethHeader.BlockGasCost.IsUint64() {
+		return fmt.Errorf("too large blockGasCost: bitlen %d", ethHeader.BlockGasCost.BitLen())
 	}
 
 	return nil

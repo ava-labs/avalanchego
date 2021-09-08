@@ -30,16 +30,13 @@ func TestArchiveBlockChain(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
@@ -67,16 +64,13 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
@@ -104,16 +98,13 @@ func TestPruningBlockChain(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
@@ -141,16 +132,13 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
@@ -184,16 +172,13 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
@@ -228,16 +213,13 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
@@ -274,16 +256,13 @@ func TestEnableSnapshots(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
@@ -320,16 +299,13 @@ func TestCorruptSnapshots(t *testing.T) {
 			},
 			chainConfig,
 			dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
-				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, error) {
+				OnExtraStateChange: func(block *types.Block, sdb *state.StateDB) (*big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(block.Number().Int64()))
-					return nil, nil
+					return nil, nil, nil
 				},
 				OnFinalizeAndAssemble: func(header *types.Header, sdb *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 					sdb.SetBalanceMultiCoin(common.HexToAddress("0xdeadbeef"), common.HexToHash("0xdeadbeef"), big.NewInt(header.Number.Int64()))
-					if !chainConfig.IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
-						return nil, nil, nil, nil
-					}
-					return nil, nil, big.NewInt(0), nil
+					return nil, nil, nil, nil
 				},
 			}),
 			vm.Config{},
