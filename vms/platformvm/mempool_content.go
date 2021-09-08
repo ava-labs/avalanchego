@@ -10,6 +10,18 @@ var _ Mempool = &mempoolContent{}
 type Mempool interface {
 	Has(txID ids.ID) bool
 	Get(txID ids.ID) *Tx
+
+	AddDecisionTx(tx *Tx)
+	AddAtomicTx(tx *Tx)
+	AddProposalTx(tx *Tx)
+
+	RemoveDecisionTxs(txs []*Tx)
+	RemoveAtomicTx(tx *Tx)
+	RemoveProposalTx(tx *Tx)
+
+	NextDecisionTxs(numTxs int) []*Tx
+	NextAtomicTx() *Tx
+	NextProposalTx() *Tx
 }
 
 // Transactions from clients that have not yet been put into blocks and added to
@@ -76,7 +88,7 @@ func (mc *mempoolContent) RemoveDecisionTxs(txs []*Tx) {
 }
 
 // select first numTxs decision tx and remove them from mempool
-func (mc *mempoolContent) ExtractNextDecisionTxs(numTxs int) []*Tx {
+func (mc *mempoolContent) NextDecisionTxs(numTxs int) []*Tx {
 	if maxLen := mc.unissuedDecisionTxs.Len(); numTxs > maxLen {
 		numTxs = maxLen
 	}
@@ -104,7 +116,7 @@ func (mc *mempoolContent) RemoveAtomicTx(tx *Tx) {
 	mc.deregister(tx)
 }
 
-func (mc *mempoolContent) ExtractNextAtomicTx() *Tx {
+func (mc *mempoolContent) NextAtomicTx() *Tx {
 	tx := mc.unissuedAtomicTxs.RemoveTop()
 	mc.deregister(tx)
 	return tx
@@ -124,8 +136,8 @@ func (mc *mempoolContent) RemoveProposalTx(tx *Tx) {
 	mc.deregister(tx)
 }
 
-func (mc *mempoolContent) PeekProposalTx() *Tx {
-	return mc.unissuedProposalTxs.Peek()
+func (mc *mempoolContent) NextProposalTx() *Tx {
+	return mc.unissuedProposalTxs.RemoveTop()
 }
 
 func (mc *mempoolContent) HasProposalTxs() bool { return mc.unissuedProposalTxs.Len() > 0 }

@@ -160,7 +160,7 @@ func (m *mempool) BuildBlock() (snowman.Block, error) {
 
 	// If there are pending decision txs, build a block with a batch of them
 	if m.HasDecisionTxs() {
-		txs := m.ExtractNextDecisionTxs(BatchSize)
+		txs := m.NextDecisionTxs(BatchSize)
 		blk, err := m.vm.newStandardBlock(preferredID, nextHeight, txs)
 		if err != nil {
 			m.ResetTimer()
@@ -179,7 +179,7 @@ func (m *mempool) BuildBlock() (snowman.Block, error) {
 
 	// If there is a pending atomic tx, build a block with it
 	if m.HasAtomicTxs() {
-		tx := m.ExtractNextAtomicTx()
+		tx := m.NextAtomicTx()
 
 		blk, err := m.vm.newAtomicBlock(preferredID, nextHeight, *tx)
 		if err != nil {
@@ -262,13 +262,11 @@ func (m *mempool) BuildBlock() (snowman.Block, error) {
 	// future relative to local time (plus Delta)
 	syncTime := localTime.Add(syncBound)
 	for m.HasProposalTxs() {
-		tx := m.PeekProposalTx()
+		tx := m.NextProposalTx()
 		txID := tx.ID()
 		utx := tx.UnsignedTx.(TimedTx)
 		startTime := utx.StartTime()
 		if startTime.Before(syncTime) {
-			m.RemoveProposalTx(tx)
-
 			errMsg := fmt.Sprintf(
 				"synchrony bound (%s) is later than staker start time (%s)",
 				syncTime,
@@ -283,7 +281,6 @@ func (m *mempool) BuildBlock() (snowman.Block, error) {
 		// If the start time is too far in the future relative to local time
 		// drop the transaction and continue
 		if startTime.After(maxLocalStartTime) {
-			m.RemoveProposalTx(tx)
 			continue
 		}
 
@@ -292,6 +289,8 @@ func (m *mempool) BuildBlock() (snowman.Block, error) {
 		// then attempt to advance the timestamp, so it can be issued.
 		maxChainStartTime := currentChainTimestamp.Add(maxFutureStartTime)
 		if startTime.After(maxChainStartTime) {
+			m.AddProposalTx(tx)
+
 			advanceTimeTx, err := m.vm.newAdvanceTimeTx(localTime)
 			if err != nil {
 				return nil, err
@@ -306,7 +305,6 @@ func (m *mempool) BuildBlock() (snowman.Block, error) {
 		}
 
 		// Attempt to issue the transaction
-		m.RemoveProposalTx(tx)
 		blk, err := m.vm.newProposalBlock(preferredID, nextHeight, *tx)
 		if err != nil {
 			m.ResetTimer()
@@ -379,14 +377,14 @@ func (m *mempool) ResetTimer() {
 
 	syncTime := localTime.Add(syncBound)
 	for m.HasProposalTxs() {
-		tx := m.PeekProposalTx()
+		tx := m.NextProposalTx()
 		startTime := tx.UnsignedTx.(TimedTx).StartTime()
 		if !syncTime.After(startTime) {
+			m.AddProposalTx(tx)
 			m.vm.NotifyBlockReady() // Should issue a ProposeAddValidator
 			return
 		}
 		// If the tx doesn't meet the synchrony bound, drop it
-		m.RemoveProposalTx(tx)
 		txID := tx.ID()
 		errMsg := fmt.Sprintf(
 			"synchrony bound (%s) is later than staker start time (%s)",
