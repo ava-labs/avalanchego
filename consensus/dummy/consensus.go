@@ -22,11 +22,13 @@ import (
 var (
 	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 
-	errInvalidBlockTime  = errors.New("timestamp less than parent's")
-	errUnclesUnsupported = errors.New("uncles unsupported")
-	errBlockGasCostNil   = errors.New("block gas cost is nil")
-	errBaseFeeNil        = errors.New("base fee is nil")
-	errExtDataGasUsedNil = errors.New("extDataGasUsed is nil")
+	errInvalidBlockTime       = errors.New("timestamp less than parent's")
+	errUnclesUnsupported      = errors.New("uncles unsupported")
+	errBlockGasCostNil        = errors.New("block gas cost is nil")
+	errBlockGasCostTooLarge   = errors.New("block gas cost is not uint64")
+	errBaseFeeNil             = errors.New("base fee is nil")
+	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
+	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
 )
 
 type (
@@ -129,7 +131,10 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 	// Enforce Apricot Phase 4 constraints
 	expectedBlockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, header.Time)
 	if header.BlockGasCost == nil {
-		return errors.New("expected blockGasCost to be non-nil")
+		return errBlockGasCostNil
+	}
+	if !header.BlockGasCost.IsUint64() {
+		return errBlockGasCostTooLarge
 	}
 	if header.BlockGasCost.Cmp(expectedBlockGasCost) != 0 {
 		return fmt.Errorf("expected block gas cost (%d), found (%d)", expectedBlockGasCost, header.BlockGasCost)
@@ -137,7 +142,10 @@ func (self *DummyEngine) verifyHeaderGasFields(config *params.ChainConfig, heade
 	// ExtDataGasUsed correctness is checked during block validation
 	// (when the validator has access to the block contents)
 	if header.ExtDataGasUsed == nil {
-		return errors.New("expected extDataGasUsed to be non-nil")
+		return errExtDataGasUsedNil
+	}
+	if !header.ExtDataGasUsed.IsUint64() {
+		return errExtDataGasUsedTooLarge
 	}
 	return nil
 }
@@ -229,7 +237,7 @@ func (self *DummyEngine) verifyBlockFee(
 	if baseFee == nil || baseFee.Sign() <= 0 {
 		return fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
 	}
-	if requiredBlockGasCost == nil || requiredBlockGasCost.Sign() < 0 {
+	if requiredBlockGasCost == nil || !requiredBlockGasCost.IsUint64() {
 		return fmt.Errorf("invalid block gas cost (%d) in apricot phase 4", requiredBlockGasCost)
 	}
 
