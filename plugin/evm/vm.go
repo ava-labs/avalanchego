@@ -390,8 +390,8 @@ func (vm *VM) Initialize(
 		BuildBlock:         vm.buildBlock,
 	})
 
-	// TODO: handle recover and panic?
-	vm.builder.awaitSubmittedTxs()
+	vm.shutdownWg.Add(1)
+	go vm.ctx.Log.RecoverAndPanic(vm.builder.awaitSubmittedTxs)
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
