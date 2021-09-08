@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
@@ -24,10 +23,10 @@ func TestCodecPackInvalidOp(t *testing.T) {
 	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
-	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false, false)
+	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), false)
 	assert.Error(t, err)
 
-	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), true, true)
+	_, err = codec.Pack(math.MaxUint8, make(map[Field]interface{}), true)
 	assert.Error(t, err)
 }
 
@@ -35,10 +34,10 @@ func TestCodecPackMissingField(t *testing.T) {
 	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
-	_, err = codec.Pack(Get, make(map[Field]interface{}), false, false)
+	_, err = codec.Pack(Get, make(map[Field]interface{}), false)
 	assert.Error(t, err)
 
-	_, err = codec.Pack(Get, make(map[Field]interface{}), true, true)
+	_, err = codec.Pack(Get, make(map[Field]interface{}), true)
 	assert.Error(t, err)
 }
 
@@ -46,10 +45,7 @@ func TestCodecParseInvalidOp(t *testing.T) {
 	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
-	_, err = codec.Parse([]byte{math.MaxUint8}, true)
-	assert.Error(t, err)
-
-	_, err = codec.Parse([]byte{math.MaxUint8}, false)
+	_, err = codec.Parse([]byte{math.MaxUint8})
 	assert.Error(t, err)
 }
 
@@ -57,27 +53,8 @@ func TestCodecParseExtraSpace(t *testing.T) {
 	codec, err := NewCodec("", prometheus.NewRegistry(), 2*units.MiB)
 	assert.NoError(t, err)
 
-	_, err = codec.Parse([]byte{byte(GetVersion), 0x00}, false)
+	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x01})
 	assert.Error(t, err)
-
-	_, err = codec.Parse([]byte{byte(GetVersion), 0x00, 0x01}, true)
-	assert.Error(t, err)
-}
-
-// If [compress] == true and [includeIsCompressedFlag] == false, error
-func TestCodecCompressNoIsCompressedFlag(t *testing.T) {
-	c := codec{
-		compressor: compression.NewGzipCompressor(2 * units.MiB),
-	}
-	id := ids.GenerateTestID()
-	fields := map[Field]interface{}{
-		ChainID:      id[:],
-		RequestID:    uint32(1337),
-		ContainerIDs: [][]byte{id[:]},
-	}
-	// [compress] == true and [includeIsCompressedFlag] == false
-	_, err := c.Pack(Chits, fields, false, true)
-	assert.EqualValues(t, errCompressNeedsFlag, err)
 }
 
 // Test packing and then parsing messages
@@ -231,14 +208,13 @@ func TestCodecPackParseGzip(t *testing.T) {
 		},
 	}
 
-	peerSupportsCompression := false
 	compressionEnabledOnNode := false
 	// Test without compression
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode)
+		packedIntf, err := c.Pack(m.op, m.fields, compressionEnabledOnNode)
 		assert.NoError(t, err, "failed on operation %s", m.op)
 
-		unpackedIntf, err := c.Parse(packedIntf.Bytes(), peerSupportsCompression)
+		unpackedIntf, err := c.Parse(packedIntf.Bytes())
 		assert.NoError(t, err)
 
 		packed := packedIntf.(*message)
@@ -255,13 +231,12 @@ func TestCodecPackParseGzip(t *testing.T) {
 	}
 
 	// Test with Op based compression
-	peerSupportsCompression = true
 	compressionEnabledOnNode = true
 	for _, m := range msgs {
-		packedIntf, err := c.Pack(m.op, m.fields, peerSupportsCompression, compressionEnabledOnNode && m.op.Compressable())
+		packedIntf, err := c.Pack(m.op, m.fields, compressionEnabledOnNode && m.op.Compressable())
 		assert.NoError(t, err, "failed to pack on operation %s", m.op)
 
-		unpackedIntf, err := c.Parse(packedIntf.Bytes(), peerSupportsCompression)
+		unpackedIntf, err := c.Parse(packedIntf.Bytes())
 		assert.NoError(t, err, "failed to parse w/ compression on operation %s", m.op)
 
 		packed := packedIntf.(*message)

@@ -540,10 +540,9 @@ func (n *network) MultiPut(nodeID ids.ShortID, chainID ids.ID, requestID uint32,
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
-	includeIsCompressedFlag := peer != nil && peer.canHandleCompressed.GetValue()
 	// Compress this message only if the peer can handle compressed
 	// messages and we have compression enabled
-	msg, err := n.b.MultiPut(chainID, requestID, containers, includeIsCompressedFlag, includeIsCompressedFlag && n.config.CompressionEnabled)
+	msg, err := n.b.MultiPut(chainID, requestID, containers, n.config.CompressionEnabled)
 	if err != nil {
 		n.log.Error("failed to build MultiPut message because of container of size %d", len(containers))
 		n.sendFailRateCalculator.Observe(1, now)
@@ -606,10 +605,9 @@ func (n *network) Put(nodeID ids.ShortID, chainID ids.ID, requestID uint32, cont
 	now := n.clock.Time()
 
 	peer := n.getPeer(nodeID)
-	includeIsCompressedFlag := peer != nil && peer.canHandleCompressed.GetValue()
 	// Compress this message only if the peer can handle compressed
 	// messages and we have compression enabled
-	msg, err := n.b.Put(chainID, requestID, containerID, container, includeIsCompressedFlag, includeIsCompressedFlag && n.config.CompressionEnabled)
+	msg, err := n.b.Put(chainID, requestID, containerID, container, n.config.CompressionEnabled)
 	if err != nil {
 		n.log.Error("failed to build Put(%s, %d, %s): %s. len(container) : %d",
 			chainID,
@@ -647,19 +645,7 @@ func (n *network) Put(nodeID ids.ShortID, chainID ids.ID, requestID uint32, cont
 func (n *network) PushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint32, deadline time.Duration, containerID ids.ID, container []byte) []ids.ShortID {
 	now := n.clock.Time()
 
-	msgWithIsCompressedFlag, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, true, n.config.CompressionEnabled)
-	if err != nil {
-		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
-			chainID,
-			requestID,
-			containerID,
-			err,
-			len(container))
-		n.log.Verbo("container: %s", formatting.DumpBytes{Bytes: container})
-		n.sendFailRateCalculator.Observe(1, now)
-		return nil // Packing message failed
-	}
-	msgWithoutIsCompressedFlag, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, false, false)
+	msg, err := n.b.PushQuery(chainID, requestID, uint64(deadline), containerID, container, n.config.CompressionEnabled)
 	if err != nil {
 		n.log.Error("failed to build PushQuery(%s, %d, %s): %s. len(container): %d",
 			chainID,
@@ -676,13 +662,7 @@ func (n *network) PushQuery(nodeIDs ids.ShortSet, chainID ids.ID, requestID uint
 	for _, peerElement := range n.getPeers(nodeIDs) {
 		peer := peerElement.peer
 		vID := peerElement.id
-		canHandleCompressed := peer != nil && peer.canHandleCompressed.GetValue()
-		var msg message.Message
-		if canHandleCompressed {
-			msg = msgWithIsCompressedFlag
-		} else {
-			msg = msgWithoutIsCompressedFlag
-		}
+
 		if peer == nil || !peer.finishedHandshake.GetValue() || !peer.Send(msg, false) {
 			n.log.Debug("failed to send PushQuery(%s, %s, %d, %s)",
 				vID,
@@ -1012,12 +992,7 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 	now := n.clock.Time()
 
 	// Sent to peers that handle compressed messages (and messages with the isCompress flag)
-	msgWithIsCompressedFlag, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container, true, n.config.CompressionEnabled)
-	if err != nil {
-		n.sendFailRateCalculator.Observe(1, now)
-		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
-	}
-	msgWithoutIsCompressedFlag, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container, false, false)
+	msg, err := n.b.Put(chainID, constants.GossipMsgRequestID, containerID, container, n.config.CompressionEnabled)
 	if err != nil {
 		n.sendFailRateCalculator.Observe(1, now)
 		return fmt.Errorf("attempted to pack too large of a Put message.\nContainer length: %d", len(container))
@@ -1031,13 +1006,6 @@ func (n *network) gossipContainer(subnetID, chainID, containerID ids.ID, contain
 	}
 
 	for _, peer := range peers {
-		canHandleCompressed := peer.canHandleCompressed.GetValue()
-		var msg message.Message
-		if canHandleCompressed {
-			msg = msgWithIsCompressedFlag
-		} else {
-			msg = msgWithoutIsCompressedFlag
-		}
 		sent := peer.Send(msg, false)
 		if sent {
 			n.metrics.put.numSent.Inc()
@@ -1162,15 +1130,7 @@ func (n *network) gossipPeerList() {
 		}
 
 		// Sent to peers that handle compressed messages (and messages with the isCompress flag)
-		msgWithIsCompressedFlag, err := n.b.PeerList(ipCerts, true, n.config.CompressionEnabled)
-		if err != nil {
-			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
-				err,
-				len(ipCerts))
-			continue
-		}
-		// Sent to peers that can't handle compressed messages
-		msgWithoutIsCompressedFlag, err := n.b.PeerList(ipCerts, false, false)
+		msg, err := n.b.PeerList(ipCerts, n.config.CompressionEnabled)
 		if err != nil {
 			n.log.Error("failed to build signed peerlist to gossip: %s. len(ips): %d",
 				err,
@@ -1180,19 +1140,11 @@ func (n *network) gossipPeerList() {
 
 		for _, index := range stakerIndices {
 			peer := stakers[int(index)]
-			if peer.canHandleCompressed.GetValue() {
-				peer.Send(msgWithIsCompressedFlag, false)
-			} else {
-				peer.Send(msgWithoutIsCompressedFlag, false)
-			}
+			peer.Send(msg, false)
 		}
 		for _, index := range nonStakerIndices {
 			peer := nonStakers[int(index)]
-			if peer.canHandleCompressed.GetValue() {
-				peer.Send(msgWithIsCompressedFlag, false)
-			} else {
-				peer.Send(msgWithoutIsCompressedFlag, false)
-			}
+			peer.Send(msg, false)
 		}
 	}
 }

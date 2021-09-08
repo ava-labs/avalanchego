@@ -17,22 +17,19 @@ import (
 )
 
 var (
-	errMissingField      = errors.New("message missing field")
-	errBadOp             = errors.New("input field has invalid operation")
-	errCompressNeedsFlag = errors.New("compressed message requires isCompressed flag")
-
-	_ Codec = &codec{}
+	errMissingField       = errors.New("message missing field")
+	errBadOp              = errors.New("input field has invalid operation")
+	_               Codec = &codec{}
 )
 
 type Codec interface {
 	Pack(
 		op Op,
 		fieldValues map[Field]interface{},
-		includeIsCompressedFlag bool,
 		compress bool,
 	) (Message, error)
 
-	Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error)
+	Parse(bytes []byte) (Message, error)
 }
 
 // codec defines the serialization and deserialization of network messages.
@@ -93,20 +90,12 @@ func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getB
 // Uses [buffer] to hold the message's byte repr.
 // [buffer]'s contents may be overwritten by this method.
 // [buffer] may be nil.
-// If [includeIsCompressedFlag], include a flag that marks whether the payload
-// is compressed or not.
-// If [compress] and [includeIsCompressedFlag], compress the payload.
-// If [compress] == true, [includeIsCompressedFlag] must be true
-// TODO remove [includeIsCompressedFlag] after network upgrade.
+// If [compress]  compress the payload.
 func (c *codec) Pack(
 	op Op,
 	fieldValues map[Field]interface{},
-	includeIsCompressedFlag bool,
 	compress bool,
 ) (Message, error) {
-	if compress && !includeIsCompressedFlag {
-		return nil, errCompressNeedsFlag
-	}
 	msgFields, ok := messages[op]
 	if !ok {
 		return nil, errBadOp
@@ -121,7 +110,7 @@ func (c *codec) Pack(
 	p.PackByte(byte(op))
 
 	// Optionally, pack whether the payload is compressed
-	if includeIsCompressedFlag && op.Compressable() {
+	if op.Compressable() {
 		p.PackBool(compress)
 	}
 
@@ -165,11 +154,7 @@ func (c *codec) Pack(
 
 // Parse attempts to convert bytes into a message.
 // The first byte of the message is the opcode of the message.
-// If [parseIsCompressedFlag], try to parse the flag that indicates
-// whether the message payload is compressed. Should only be true
-// if we expect this peer to send us compressed messages.
-// TODO remove [parseIsCompressedFlag] after network upgrade
-func (c *codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error) {
+func (c *codec) Parse(bytes []byte) (Message, error) {
 	p := wrappers.Packer{Bytes: bytes}
 
 	// Unpack the op code (message type)
@@ -182,7 +167,7 @@ func (c *codec) Parse(bytes []byte, parseIsCompressedFlag bool) (Message, error)
 
 	// See if messages of this type may be compressed
 	compressed := false
-	if parseIsCompressedFlag && op.Compressable() {
+	if op.Compressable() {
 		compressed = p.UnpackBool()
 	}
 	if p.Err != nil {

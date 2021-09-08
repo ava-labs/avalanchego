@@ -38,7 +38,7 @@ func TestBuildGetVersion(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetVersion, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetVersion, parsedMsg.Op())
@@ -74,7 +74,7 @@ func TestBuildVersion(t *testing.T) {
 	assert.EqualValues(t, myVersionTime, msg.Get(VersionTime))
 	assert.EqualValues(t, sig, msg.Get(SigBytes))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
@@ -123,7 +123,7 @@ func TestBuildVersionWithSubnets(t *testing.T) {
 	assert.EqualValues(t, sig, msg.Get(SigBytes))
 	assert.EqualValues(t, subnetIDs, msg.Get(TrackedSubnets))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
@@ -145,7 +145,7 @@ func TestBuildGetPeerList(t *testing.T) {
 	assert.NotNil(t, msg)
 	assert.Equal(t, GetPeerList, msg.Op())
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetPeerList, parsedMsg.Op())
@@ -165,7 +165,7 @@ func TestBuildGetAcceptedFrontier(t *testing.T) {
 	assert.Equal(t, requestID, msg.Get(RequestID))
 	assert.Equal(t, deadline, msg.Get(Deadline))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetAcceptedFrontier, parsedMsg.Op())
@@ -189,7 +189,7 @@ func TestBuildAcceptedFrontier(t *testing.T) {
 	assert.Equal(t, requestID, msg.Get(RequestID))
 	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, AcceptedFrontier, parsedMsg.Op())
@@ -215,7 +215,7 @@ func TestBuildGetAccepted(t *testing.T) {
 	assert.Equal(t, deadline, msg.Get(Deadline))
 	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, GetAccepted, parsedMsg.Op())
@@ -240,7 +240,7 @@ func TestBuildAccepted(t *testing.T) {
 	assert.Equal(t, requestID, msg.Get(RequestID))
 	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Accepted, parsedMsg.Op())
@@ -265,7 +265,7 @@ func TestBuildGet(t *testing.T) {
 	assert.Equal(t, deadline, msg.Get(Deadline))
 	assert.Equal(t, containerID[:], msg.Get(ContainerID))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Get, parsedMsg.Op())
@@ -283,7 +283,7 @@ func TestBuildPut(t *testing.T) {
 	container := []byte{2}
 
 	{ // no compression
-		msg, err := TestBuilder.Put(chainID, requestID, containerID, container, false, false)
+		msg, err := TestBuilder.Put(chainID, requestID, containerID, container, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, Put, msg.Op())
@@ -292,7 +292,7 @@ func TestBuildPut(t *testing.T) {
 		assert.Equal(t, containerID[:], msg.Get(ContainerID))
 		assert.Equal(t, container, msg.Get(ContainerBytes))
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, Put, parsedMsg.Op())
@@ -301,34 +301,10 @@ func TestBuildPut(t *testing.T) {
 		assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
 		assert.Equal(t, container, parsedMsg.Get(ContainerBytes))
 		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
-	}
-
-	{ // no compression, with isCompressed flag
-		msg, err := TestBuilder.Put(chainID, requestID, containerID, container, true, false)
-		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-		assert.Equal(t, Put, msg.Op())
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
-		assert.Equal(t, requestID, msg.Get(RequestID))
-		assert.Equal(t, containerID[:], msg.Get(ContainerID))
-		assert.Equal(t, container, msg.Get(ContainerBytes))
-
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), true)
-		assert.NoError(t, err)
-		assert.NotNil(t, parsedMsg)
-		assert.Equal(t, Put, parsedMsg.Op())
-		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-		assert.Equal(t, requestID, parsedMsg.Get(RequestID))
-		assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-		assert.Equal(t, container, parsedMsg.Get(ContainerBytes))
-		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
-
-		_, err = TestCodec.Parse(msg.Bytes(), false)
-		assert.Error(t, err)
 	}
 
 	{ // with compression
-		msg, err := TestBuilder.Put(chainID, requestID, containerID, container, true, true)
+		msg, err := TestBuilder.Put(chainID, requestID, containerID, container, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, Put, msg.Op())
@@ -337,7 +313,7 @@ func TestBuildPut(t *testing.T) {
 		assert.Equal(t, containerID[:], msg.Get(ContainerID))
 		assert.Equal(t, container, msg.Get(ContainerBytes))
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), true)
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, Put, parsedMsg.Op())
@@ -356,7 +332,7 @@ func TestBuildPushQuery(t *testing.T) {
 	container := []byte{2}
 
 	{ // no compression
-		msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, false, false)
+		msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, PushQuery, msg.Op())
@@ -366,7 +342,7 @@ func TestBuildPushQuery(t *testing.T) {
 		assert.Equal(t, containerID[:], msg.Get(ContainerID))
 		assert.Equal(t, container, msg.Get(ContainerBytes))
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, PushQuery, parsedMsg.Op())
@@ -376,36 +352,10 @@ func TestBuildPushQuery(t *testing.T) {
 		assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
 		assert.Equal(t, container, parsedMsg.Get(ContainerBytes))
 		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
-	}
-
-	{ // no compression, with isCompressed flag
-		msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, true, false)
-		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-		assert.Equal(t, PushQuery, msg.Op())
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
-		assert.Equal(t, requestID, msg.Get(RequestID))
-		assert.Equal(t, deadline, msg.Get(Deadline))
-		assert.Equal(t, containerID[:], msg.Get(ContainerID))
-		assert.Equal(t, container, msg.Get(ContainerBytes))
-
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), true)
-		assert.NoError(t, err)
-		assert.NotNil(t, parsedMsg)
-		assert.Equal(t, PushQuery, parsedMsg.Op())
-		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-		assert.Equal(t, requestID, parsedMsg.Get(RequestID))
-		assert.Equal(t, deadline, parsedMsg.Get(Deadline))
-		assert.Equal(t, containerID[:], parsedMsg.Get(ContainerID))
-		assert.Equal(t, container, parsedMsg.Get(ContainerBytes))
-		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
-
-		_, err = TestCodec.Parse(msg.Bytes(), false)
-		assert.Error(t, err)
 	}
 
 	{ // with compression
-		msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, true, true)
+		msg, err := TestBuilder.PushQuery(chainID, requestID, deadline, containerID, container, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, PushQuery, msg.Op())
@@ -415,7 +365,7 @@ func TestBuildPushQuery(t *testing.T) {
 		assert.Equal(t, containerID[:], msg.Get(ContainerID))
 		assert.Equal(t, container, msg.Get(ContainerBytes))
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), true)
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, PushQuery, parsedMsg.Op())
@@ -442,7 +392,7 @@ func TestBuildPullQuery(t *testing.T) {
 	assert.Equal(t, deadline, msg.Get(Deadline))
 	assert.Equal(t, containerID[:], msg.Get(ContainerID))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, PullQuery, parsedMsg.Op())
@@ -467,7 +417,7 @@ func TestBuildChits(t *testing.T) {
 	assert.Equal(t, requestID, msg.Get(RequestID))
 	assert.Equal(t, containerIDs, msg.Get(ContainerIDs))
 
-	parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+	parsedMsg, err := TestCodec.Parse(msg.Bytes())
 	assert.NoError(t, err)
 	assert.NotNil(t, parsedMsg)
 	assert.Equal(t, Chits, parsedMsg.Op())
@@ -485,7 +435,7 @@ func TestBuildMultiPut(t *testing.T) {
 	containers := [][]byte{container[:], container2[:]}
 
 	{ // no compression
-		msg, err := TestBuilder.MultiPut(chainID, requestID, containers, false, false)
+		msg, err := TestBuilder.MultiPut(chainID, requestID, containers, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, MultiPut, msg.Op())
@@ -493,7 +443,7 @@ func TestBuildMultiPut(t *testing.T) {
 		assert.Equal(t, requestID, msg.Get(RequestID))
 		assert.Equal(t, containers, msg.Get(MultiContainerBytes))
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), false)
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, MultiPut, parsedMsg.Op())
@@ -501,32 +451,10 @@ func TestBuildMultiPut(t *testing.T) {
 		assert.Equal(t, requestID, parsedMsg.Get(RequestID))
 		assert.Equal(t, containers, parsedMsg.Get(MultiContainerBytes))
 		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
-	}
-
-	{ // no compression, with isCompress flag
-		msg, err := TestBuilder.MultiPut(chainID, requestID, containers, true, false)
-		assert.NoError(t, err)
-		assert.NotNil(t, msg)
-		assert.Equal(t, MultiPut, msg.Op())
-		assert.Equal(t, chainID[:], msg.Get(ChainID))
-		assert.Equal(t, requestID, msg.Get(RequestID))
-		assert.Equal(t, containers, msg.Get(MultiContainerBytes))
-
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), true)
-		assert.NoError(t, err)
-		assert.NotNil(t, parsedMsg)
-		assert.Equal(t, MultiPut, parsedMsg.Op())
-		assert.Equal(t, chainID[:], parsedMsg.Get(ChainID))
-		assert.Equal(t, requestID, parsedMsg.Get(RequestID))
-		assert.Equal(t, containers, parsedMsg.Get(MultiContainerBytes))
-		assert.EqualValues(t, msg.Bytes(), parsedMsg.Bytes())
-
-		_, err = TestCodec.Parse(msg.Bytes(), false)
-		assert.Error(t, err)
 	}
 
 	{ // with compression
-		msg, err := TestBuilder.MultiPut(chainID, requestID, containers, true, true)
+		msg, err := TestBuilder.MultiPut(chainID, requestID, containers, true)
 		assert.NoError(t, err)
 		assert.NotNil(t, msg)
 		assert.Equal(t, MultiPut, msg.Op())
@@ -534,7 +462,7 @@ func TestBuildMultiPut(t *testing.T) {
 		assert.Equal(t, requestID, msg.Get(RequestID))
 		assert.Equal(t, containers, msg.Get(MultiContainerBytes))
 
-		parsedMsg, err := TestCodec.Parse(msg.Bytes(), true)
+		parsedMsg, err := TestCodec.Parse(msg.Bytes())
 		assert.NoError(t, err)
 		assert.NotNil(t, parsedMsg)
 		assert.Equal(t, MultiPut, parsedMsg.Op())
