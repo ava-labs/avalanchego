@@ -81,7 +81,7 @@ func (b *blockBuilder) handleBlockBuilding() {
 		b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
 		go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 
-		// Stop buildBlockTimer when AP4 activates
+		// Stop [buildBlockTwoStageTimer] at the start of AP4.
 		b.shutdownWg.Add(1)
 		go b.ctx.Log.RecoverAndPanic(b.stopBlockTimer)
 	}
@@ -91,8 +91,10 @@ func (b *blockBuilder) stopBlockTimer() {
 	defer b.shutdownWg.Done()
 
 	// In some tests, the AP4 timestamp is not populated. If this is the case, we
-	// should never stop [buildBlockTwoStageTimer].
+	// should only stop [buildBlockTwoStageTimer] on shutdown.
 	if b.chainConfig.ApricotPhase4BlockTimestamp == nil {
+		<-b.shutdownChan
+		b.buildBlockTimer.Stop()
 		return
 	}
 
@@ -111,9 +113,9 @@ func (b *blockBuilder) stopBlockTimer() {
 		b.buildStatus = dontBuild
 		b.buildBlockLock.Unlock()
 	case <-b.shutdownChan:
-		if b.buildBlockTimer != nil {
-			b.buildBlockTimer.Stop()
-		}
+		// buildBlockTimer will never be nil because we exit as soon as it is ever
+		// set to nil.
+		b.buildBlockTimer.Stop()
 	}
 }
 
@@ -247,7 +249,7 @@ func (b *blockBuilder) signalTxsReady() {
 // put into a new block.
 func (b *blockBuilder) awaitSubmittedTxs() {
 	b.shutdownWg.Add(1)
-	go func() {
+	go b.ctx.Log.RecoverAndPanic(func() {
 		defer b.shutdownWg.Done()
 
 		// txSubmitChan is invoked on reorgs
@@ -264,5 +266,5 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				return
 			}
 		}
-	}()
+	})
 }
