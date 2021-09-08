@@ -20,6 +20,8 @@ const (
 )
 
 var (
+	// TODO: create a single gossip message used to notify peers of both EthTxs and
+	// AtomicTxs
 	_ Message = &AtomicTxNotify{}
 	_ Message = &AtomicTx{}
 	_ Message = &EthTxsNotify{}

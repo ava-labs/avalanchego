@@ -58,6 +58,8 @@ func (m *Mempool) length() int {
 	return len(m.txs) + len(m.issuedTxs)
 }
 
+// has indicates if a given [txID] is in the mempool and has not been
+// discarded.
 func (m *Mempool) has(txID ids.ID) bool {
 	_, dropped, found := m.GetTx(txID)
 	return found && !dropped
