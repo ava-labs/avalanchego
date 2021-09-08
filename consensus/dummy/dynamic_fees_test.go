@@ -5,7 +5,6 @@ package dummy
 
 import (
 	"encoding/binary"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -411,7 +410,7 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 		block := event.block
 		nextExtraData, nextBaseFee, err := CalcBaseFee(params.TestApricotPhase4Config, header, block.timestamp)
 		assert.NoError(t, err)
-		fmt.Println("Update", "baseFee", nextBaseFee)
+		log.Info("Update", "baseFee", nextBaseFee)
 		header = &types.Header{
 			Time:    block.timestamp,
 			GasUsed: block.gasUsed,
@@ -422,7 +421,7 @@ func TestCalcBaseFeeAP4(t *testing.T) {
 
 		nextExtraData, nextBaseFee, err = CalcBaseFee(params.TestApricotPhase4Config, extDataHeader, block.timestamp)
 		assert.NoError(t, err)
-		fmt.Println("Update", "baseFee (w/extData)", nextBaseFee)
+		log.Info("Update", "baseFee (w/extData)", nextBaseFee)
 		extDataHeader = &types.Header{
 			Time:           block.timestamp,
 			GasUsed:        block.gasUsed,
