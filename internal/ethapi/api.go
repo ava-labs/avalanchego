@@ -919,13 +919,18 @@ func DoCall(ctx context.Context, b Backend, args TransactionArgs, blockNrOrHash 
 	if err := overrides.Apply(state); err != nil {
 		return nil, err
 	}
-	// If the request is for the pending block, set the block timestamp to the current time
-	// so that timing assumptions will behave as if a new block were issued.
+	// If the request is for the pending block, override the block timestamp, number, and estimated
+	// base fee, so that the check runs as if it were run on a newly generated block.
 	if blkNumber, isNum := blockNrOrHash.Number(); isNum && blkNumber == rpc.PendingBlockNumber {
 		// Override header with a copy to ensure the original header is not modified
 		header = types.CopyHeader(header)
 		header.Time = uint64(time.Now().Unix())
 		header.Number = new(big.Int).Add(header.Number, big.NewInt(1))
+		estimatedBaseFee, err := b.EstimateBaseFee(ctx)
+		if err != nil {
+			return nil, err
+		}
+		header.BaseFee = estimatedBaseFee
 	}
 
 	// Setup context so it may be cancelled the call has completed
