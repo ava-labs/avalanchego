@@ -82,12 +82,9 @@ var (
 )
 
 const (
-	minBlockTime = 2 * time.Second
-	maxBlockTime = 3 * time.Second
 	// Max time from current time allowed for blocks, before they're considered future blocks
 	// and fail verification
 	maxFutureBlockTime   = 10 * time.Second
-	batchSize            = 250
 	maxUTXOsToFetch      = 1024
 	defaultMempoolSize   = 1024
 	codecVersion         = uint16(0)
@@ -140,16 +137,6 @@ var (
 	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
 	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
 	defaultLogLevel                   = log.LvlDebug
-)
-
-// buildingBlkStatus denotes the current status of the VM in block production.
-type buildingBlkStatus uint8
-
-const (
-	dontBuild buildingBlkStatus = iota
-	conditionalBuild
-	mayBuild
-	building
 )
 
 // Codec does serialization and deserialization
@@ -209,22 +196,7 @@ type VM struct {
 	// [acceptedAtomicTxDB] maintains an index of accepted atomic txs.
 	acceptedAtomicTxDB database.Database
 
-	// A message is sent on this channel when a new block
-	// is ready to be build. This notifies the consensus engine.
-	notifyBuildBlockChan chan<- commonEng.Message
-
-	// [buildBlockLock] must be held when accessing [buildStatus]
-	buildBlockLock sync.Mutex
-	// [buildBlockTimer] is a two stage timer handling block production.
-	// Stage1 build a block if the batch size has been reached.
-	// Stage2 build a block regardless of the size.
-	buildBlockTimer *timer.Timer
-	// buildStatus signals the phase of block building the VM is currently in.
-	// [dontBuild] indicates there's no need to build a block.
-	// [conditionalBuild] indicates build a block if the batch size has been reached.
-	// [mayBuild] indicates the VM should proceed to build a block.
-	// [building] indicates the VM has sent a request to the engine to build a block.
-	buildStatus buildingBlkStatus
+	builder *blockBuilder
 
 	baseCodec codec.Registry
 	codec     codec.Manager
@@ -393,30 +365,9 @@ func (vm *VM) Initialize(
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
-	vm.notifyBuildBlockChan = toEngine
-
-	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
-	// TODO: create block builder class to avoid all these inits in initialize
-	vm.buildStatus = dontBuild
-	if !vm.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
-		// TODO: need to stop this timer after AP4 activation
-		vm.buildBlockTimer = timer.NewStagedTimer(vm.buildBlockTwoStageTimer)
-		go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
-
-		// TODO: goroutine to stop buildBlockTimer at activation
-		vm.shutdownWg.Add(1)
-		go func() {
-			defer vm.shutdownWg.Done()
-			timestamp := time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
-			duration := time.Until(timestamp)
-			select {
-			case <-time.After(duration):
-				vm.buildBlockTimer.Stop()
-				// TODO: get lock and signal ready to build to flush any bad statuses
-			case <-vm.shutdownChan:
-			}
-		}()
-	}
+	// start goroutines to manage block building
+	vm.builder = vm.NewBlockBuilder(toEngine)
+	vm.builder.handleBlockBuilding()
 
 	vm.chain.Start()
 
@@ -439,9 +390,8 @@ func (vm *VM) Initialize(
 		BuildBlock:         vm.buildBlock,
 	})
 
-	vm.shutdownWg.Add(1)
-	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
-
+	// TODO: handle recover and panic?
+	vm.builder.awaitSubmittedTxs()
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
@@ -574,7 +524,6 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.buildBlockTimer.Stop()
 	close(vm.shutdownChan)
 	vm.chain.Stop()
 	vm.shutdownWg.Wait()
@@ -586,29 +535,7 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 	// TODO: check to see if mempool has enough minimum tip to build rn
 	// -> don't check because had at some point and verification will fail
 	block, err := vm.chain.GenerateBlock()
-	// Set the buildStatus before calling Cancel or Issue on
-	// the mempool and after generating the block.
-	// This prevents [needToBuild] from returning true when the
-	// produced block will change whether or not we need to produce
-	// another block and also ensures that when the mempool adds a
-	// new item to Pending it will be handled appropriately by [signalTxsReady]
-
-	// TODO: bypass logic if AP4
-	vm.buildBlockLock.Lock()
-	timestamp := big.NewInt(time.Now().Unix())
-	if !vm.chainConfig.IsApricotPhase4(timestamp) {
-		if vm.needToBuild() {
-			vm.buildStatus = conditionalBuild
-			vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		} else {
-			vm.buildStatus = dontBuild
-		}
-	} else {
-		// TODO: DON'T SET TO RETRY IN AP4 as it could cause more contention
-		vm.buildStatus = dontBuild
-	}
-	vm.buildBlockLock.Unlock()
-
+	vm.builder.buildBlock()
 	if err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, err
@@ -911,124 +838,6 @@ func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
 	txID := tx.ID()
 
 	return vm.acceptedAtomicTxDB.Put(txID[:], packer.Bytes)
-}
-
-// needToBuild returns true if there are outstanding transactions to be issued
-// into a block.
-func (vm *VM) needToBuild() bool {
-	// TODO: can modify to be sufficient tip in pool to pay fee...may not even
-	// need?
-	size, err := vm.chain.PendingSize()
-	if err != nil {
-		log.Error("Failed to get chain pending size", "error", err)
-		return false
-	}
-	return size > 0 || vm.mempool.Len() > 0
-}
-
-// buildEarly returns true if there are sufficient outstanding transactions to
-// be issued into a block to build a block early.
-func (vm *VM) buildEarly() bool {
-	size, err := vm.chain.PendingSize()
-	if err != nil {
-		log.Error("Failed to get chain pending size", "error", err)
-		return false
-	}
-	return size > batchSize || vm.mempool.Len() > 1
-}
-
-// buildBlockTwoStageTimer is a two stage timer that sends a notification
-// to the engine when the VM is ready to build a block.
-// If it should be called back again, it returns the timeout duration at
-// which it should be called again.
-func (vm *VM) buildBlockTwoStageTimer() (time.Duration, bool) {
-	vm.buildBlockLock.Lock()
-	defer vm.buildBlockLock.Unlock()
-
-	switch vm.buildStatus {
-	case dontBuild:
-		return 0, false
-	case conditionalBuild:
-		if !vm.buildEarly() {
-			vm.buildStatus = mayBuild
-			return (maxBlockTime - minBlockTime), true
-		}
-	case mayBuild:
-	case building:
-		// If the status has already been set to building, there is no need
-		// to send an additional request to the consensus engine until the call
-		// to BuildBlock resets the block status.
-		return 0, false
-	default:
-		// Log an error if an invalid status is found.
-		log.Error("Found invalid build status in build block timer", "buildStatus", vm.buildStatus)
-	}
-
-	select {
-	case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
-		vm.buildStatus = building
-	default:
-		log.Error("Failed to push PendingTxs notification to the consensus engine.")
-	}
-
-	// No need for the timeout to fire again until BuildBlock is called.
-	return 0, false
-}
-
-// signalTxsReady sets the initial timeout on the two stage timer if the process
-// has not already begun from an earlier notification. If [buildStatus] is anything
-// other than [dontBuild], then the attempt has already begun and this notification
-// can be safely skipped.
-func (vm *VM) signalTxsReady() {
-	vm.buildBlockLock.Lock()
-	defer vm.buildBlockLock.Unlock()
-
-	timestamp := big.NewInt(time.Now().Unix())
-	if !vm.chainConfig.IsApricotPhase4(timestamp) {
-		// Set the build block timer in motion if it has not been started.
-		if vm.buildStatus == dontBuild {
-			vm.buildStatus = conditionalBuild
-			vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		}
-		return
-	}
-
-	// Check to see if mempool could pay effective tip? Or just yolo build and
-	// leave all validation to build block time (could be some time)?
-	// -> don't re-signal if already signaled
-	if vm.buildStatus == dontBuild {
-		select {
-		case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
-			vm.buildStatus = building
-		default:
-			log.Error("Failed to push PendingTxs notification to the consensus engine.")
-		}
-	}
-}
-
-// awaitSubmittedTxs waits for new transactions to be submitted
-// and notifies the VM when the tx pool has transactions to be
-// put into a new block.
-func (vm *VM) awaitSubmittedTxs() {
-	// TODO: entry point for signaling ready to build
-	defer vm.shutdownWg.Done()
-	// TODO: does this get called on reorg->yes?
-	txSubmitChan := vm.chain.GetTxSubmitCh()
-	for {
-		select {
-		// TODO: check if pool has sufficient tip, if yes than send notify block
-		// channel
-		// 	case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
-		case <-txSubmitChan:
-			log.Trace("New tx detected, trying to generate a block")
-			vm.signalTxsReady()
-		case <-vm.mempool.Pending:
-			log.Trace("New atomic Tx detected, trying to generate a block")
-			vm.signalTxsReady()
-		case <-vm.shutdownChan:
-			return
-		}
-	}
 }
 
 // ParseAddress takes in an address and produces the ID of the chain it's for
