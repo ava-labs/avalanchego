@@ -71,7 +71,9 @@ func TestBlockBuilderStopsTimer(t *testing.T) {
 	if builder.buildBlockTimer == nil {
 		t.Fatal("expected block timer to not be nil")
 	}
+	builder.buildBlockLock.Lock()
 	builder.buildStatus = conditionalBuild
+	builder.buildBlockLock.Unlock()
 
 	// With ApricotPhase4 set slightly in the future, the builder should create a
 	// goroutine to sleep until its time to update and mark the wait group as done when it has
