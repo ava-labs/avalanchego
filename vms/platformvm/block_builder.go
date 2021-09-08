@@ -42,7 +42,7 @@ type blockBuilder struct {
 	dropIncoming bool
 }
 
-// Initialize this mempool.
+// Initialize this builder.
 func (m *blockBuilder) Initialize(vm *VM) {
 	m.vm = vm
 
@@ -67,7 +67,9 @@ func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 
 	txID := tx.ID()
 	if m.Has(txID) {
-		return nil // backward compatibility
+		// If the transaction is already in the mempool - then it looks the same
+		// as if it was successfully added
+		return nil
 	}
 
 	if err := tx.UnsignedTx.SyntacticVerify(m.vm.ctx); err != nil {

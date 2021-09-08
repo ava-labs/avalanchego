@@ -642,7 +642,7 @@ func (m *manager) createSnowmanChain(
 	if m.validatorState == nil {
 		valState, ok := vm.(validators.State)
 		if !ok {
-			return nil, fmt.Errorf("could not record validator vm interface")
+			return nil, fmt.Errorf("expected validators.State but got %T", vm)
 		}
 
 		// Initialize the validator state for future chains.
