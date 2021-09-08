@@ -147,6 +147,12 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 
 	pool := n.chain.GetTxPool()
 	txsData := make([]message.EthTxNotify, 0)
+
+	// Recover signatures before `core` package processing
+	if cache := n.chain.SenderCacher(); cache != nil {
+		cache.Recover(n.signer, txs)
+	}
+
 	for _, tx := range txs {
 		txStatus := pool.Status([]common.Hash{tx.Hash()})[0]
 		if txStatus != core.TxStatusPending {

@@ -188,3 +188,7 @@ func (self *ETHChain) GetTxAcceptedSubmitCh() <-chan core.NewTxsEvent {
 func (self *ETHChain) GetTxPool() *core.TxPool {
 	return self.backend.TxPool()
 }
+
+func (self *ETHChain) SenderCacher() *core.TxSenderCacher {
+	return self.backend.BlockChain().SenderCacher()
+}

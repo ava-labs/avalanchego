@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
-func getTheValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
+func getValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
@@ -68,7 +68,7 @@ func getTheValidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 	return importTx
 }
 
-func getTheIllFormedTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
+func getInvalidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 	importAmount := uint64(50000000)
 	utxoID := avax.UTXOID{
 		TxID: ids.ID{
@@ -202,7 +202,7 @@ func getTheIllFormedTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 
 // shows that an atomic tx received as gossip response can be added to the
 // mempool and then removed by inclusion in a block
-func TestMempool_Add_Gossiped_AtomicTx(t *testing.T) {
+func TestMempoolAddGossipedAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
 	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -215,7 +215,7 @@ func TestMempool_Add_Gossiped_AtomicTx(t *testing.T) {
 	net := vm.network
 
 	// create tx to be gossiped
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	// gossip tx and check it is accepted
@@ -262,7 +262,7 @@ func TestMempool_Add_Gossiped_AtomicTx(t *testing.T) {
 
 // show that a tx discovered by a GossipResponse is re-gossiped after being
 // added to the mempool
-func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
+func TestMempoolAtmTxsAppResponseHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -285,7 +285,7 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 	}
 
 	// create tx to be received from AppGossipResponse
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	// responses with unknown requestID are rejected
@@ -335,7 +335,7 @@ func TestMempool_AtmTxs_AppResponseHandling(t *testing.T) {
 }
 
 // show that invalid txs are not accepted to mempool, nor rejected
-func TestMempool_AtmTxs_AppResponseHandling_InvalidTx(t *testing.T) {
+func TestMempoolAtmTxsAppResponseHandlingInvalidTx(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -354,7 +354,7 @@ func TestMempool_AtmTxs_AppResponseHandling_InvalidTx(t *testing.T) {
 	}
 
 	// create an invalid tx
-	tx := getTheIllFormedTx(vm, sharedMemory, t)
+	tx := getInvalidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	// gossip tx and check it is accepted and re-gossiped
@@ -378,7 +378,7 @@ func TestMempool_AtmTxs_AppResponseHandling_InvalidTx(t *testing.T) {
 
 // show that a txID discovered from gossip is requested to the same node only if
 // the txID is unknown
-func TestMempool_AtmTxs_AppGossipHandling(t *testing.T) {
+func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -406,7 +406,7 @@ func TestMempool_AtmTxs_AppGossipHandling(t *testing.T) {
 	}
 
 	// create a tx
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	// gossip tx and check it is accepted and re-gossiped
@@ -440,7 +440,7 @@ func TestMempool_AtmTxs_AppGossipHandling(t *testing.T) {
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
-func TestMempool_AtmTxs_AppGossipHandling_InvalidTx(t *testing.T) {
+func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -458,7 +458,7 @@ func TestMempool_AtmTxs_AppGossipHandling_InvalidTx(t *testing.T) {
 	}
 
 	// create a tx and mark as invalid
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	mempool.AddTx(tx)
@@ -483,7 +483,7 @@ func TestMempool_AtmTxs_AppGossipHandling_InvalidTx(t *testing.T) {
 
 // show that a node answers to a request with a response if it has the requested
 // tx
-func TestMempool_AtmTxs_AppRequestHandling(t *testing.T) {
+func TestMempoolAtmTxsAppRequestHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -505,7 +505,7 @@ func TestMempool_AtmTxs_AppRequestHandling(t *testing.T) {
 	}
 
 	// create a tx
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	// show that there is no response if tx is unknown
@@ -537,7 +537,7 @@ func TestMempool_AtmTxs_AppRequestHandling(t *testing.T) {
 }
 
 // locally issued txs should be gossiped
-func TestMempool_AtmTxs_IssueTxAndGossiping(t *testing.T) {
+func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -554,7 +554,7 @@ func TestMempool_AtmTxs_IssueTxAndGossiping(t *testing.T) {
 	}
 
 	// add a tx to it
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 	err := vm.issueTx(tx, true /*=local*/)
 	assert.NoError(err)
 	assert.True(gossiped, "expected call to SendAppGossip not issued")

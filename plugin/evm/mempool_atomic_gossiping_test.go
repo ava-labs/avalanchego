@@ -14,7 +14,7 @@ import (
 
 // shows that a locally generated AtomicTx can be added to mempool and then
 // removed by inclusion in a block
-func TestMempool_Add_LocallyCreate_AtomicTx(t *testing.T) {
+func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 	assert := assert.New(t)
 
 	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -26,7 +26,7 @@ func TestMempool_Add_LocallyCreate_AtomicTx(t *testing.T) {
 	mempool := vm.mempool
 
 	// add a tx to it
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 	txID := tx.ID()
 
 	err := vm.issueTx(tx, true /*=local*/)
@@ -63,7 +63,7 @@ func TestMempool_Add_LocallyCreate_AtomicTx(t *testing.T) {
 
 // a valid tx shouldn't be added to the mempool if this would exceed the
 // mempool's max size
-func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
+func TestMempoolMaxMempoolSizeHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	_, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
@@ -75,7 +75,7 @@ func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
 	mempool := vm.mempool
 
 	// create candidate tx
-	tx := getTheValidTx(vm, sharedMemory, t)
+	tx := getValidTx(vm, sharedMemory, t)
 
 	// shortcut to simulated almost filled mempool
 	mempool.maxSize = 0

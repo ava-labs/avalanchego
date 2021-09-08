@@ -54,7 +54,7 @@ func getValidEthTxs(key *ecdsa.PrivateKey) []*types.Transaction {
 	gaslimit := uint64(100000)
 	gasprice := big.NewInt(1)
 
-	tx_1, _ := types.SignTx(
+	tx1, _ := types.SignTx(
 		types.NewTransaction(nonce,
 			to,
 			amount,
@@ -62,10 +62,10 @@ func getValidEthTxs(key *ecdsa.PrivateKey) []*types.Transaction {
 			gasprice,
 			nil),
 		types.HomesteadSigner{}, key)
-	res = append(res, tx_1)
+	res = append(res, tx1)
 
 	nonce++
-	tx_2, _ := types.SignTx(
+	tx2, _ := types.SignTx(
 		types.NewTransaction(
 			nonce,
 			to,
@@ -75,7 +75,7 @@ func getValidEthTxs(key *ecdsa.PrivateKey) []*types.Transaction {
 			nil,
 		),
 		types.HomesteadSigner{}, key)
-	res = append(res, tx_2)
+	res = append(res, tx2)
 	return res
 }
 
@@ -83,7 +83,7 @@ func getValidEthTxs(key *ecdsa.PrivateKey) []*types.Transaction {
 // Note: channel through which coreth mempool push txs to vm is injected here
 // to ease up UT, which target only VM behaviors in response to coreth mempool
 // signals
-func TestMempool_EthTxs_AddedTxesGossipedAfterActivation(t *testing.T) {
+func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -123,7 +123,7 @@ func TestMempool_EthTxs_AddedTxesGossipedAfterActivation(t *testing.T) {
 
 // show that a geth tx discovered from gossip is requested to the same node that
 // gossiped it
-func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
+func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -190,7 +190,7 @@ func TestMempool_EthTxs_AppGossipHandling(t *testing.T) {
 
 // show that a tx discovered by a GossipResponse is re-gossiped if it is added
 // to the mempool
-func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
+func TestMempoolEthTxsAppResponseHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
@@ -269,7 +269,7 @@ func TestMempool_EthTxs_AppResponseHandling(t *testing.T) {
 
 // show that a node answers to a request with a response if it has the requested
 // tx
-func TestMempool_EthTxs_AppRequestHandling(t *testing.T) {
+func TestMempoolEthTxsAppRequestHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	key, err := crypto.GenerateKey()
