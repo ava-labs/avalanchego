@@ -73,6 +73,7 @@ func NewMempool() Mempool {
 }
 
 func (m *mempool) Add(tx *Tx) error {
+	// Note: a previously dropped tx can be re-added
 	if txID := tx.ID(); m.Has(txID) {
 		return errDuplicatedTx
 	}
@@ -90,6 +91,8 @@ func (m *mempool) Add(tx *Tx) error {
 	default:
 		return errUnknownTxType
 	}
+
+	m.droppedTxIDs.Evict(tx.ID())
 	return nil
 }
 
