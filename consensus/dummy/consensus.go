@@ -224,15 +224,21 @@ func (self *DummyEngine) Prepare(chain consensus.ChainHeaderReader, header *type
 	return nil
 }
 
-func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, blockGasCost *big.Int, txs []*types.Transaction, receipts []*types.Receipt, extraStateChangeContribution *big.Int) error {
+func (self *DummyEngine) verifyBlockFee(
+	baseFee *big.Int,
+	requiredBlockGasCost *big.Int,
+	txs []*types.Transaction,
+	receipts []*types.Receipt,
+	extraStateChangeContribution *big.Int,
+) error {
 	if self.ethFaker {
 		return nil
 	}
 	if baseFee == nil || baseFee.Sign() <= 0 {
 		return fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
 	}
-	if blockGasCost == nil || blockGasCost.Sign() < 0 {
-		return fmt.Errorf("invalid block gas cost (%d) in apricot phase 4", blockGasCost)
+	if requiredBlockGasCost == nil || requiredBlockGasCost.Sign() < 0 {
+		return fmt.Errorf("invalid block gas cost (%d) in apricot phase 4", requiredBlockGasCost)
 	}
 
 	var (
@@ -265,9 +271,15 @@ func (self *DummyEngine) verifyBlockFee(baseFee *big.Int, blockGasCost *big.Int,
 	blockGas := new(big.Int).Div(totalBlockFee, baseFee)
 
 	// Require that the amount of gas purchased by the effective tips within the block, [blockGas],
-	// covers at least [blockGasCost].
-	if blockGas.Cmp(blockGasCost) < 0 {
-		return fmt.Errorf("insufficient gas (%d) to cover the block cost (%d) at base fee (%d) (total block fee: %d)", blockGas, blockGasCost, baseFee, totalBlockFee)
+	// covers at least [requiredBlockGasCost].
+	//
+	// NOTE: To determine the [requiredBlockFee], multiply [requiredBlockGasCost]
+	// by [baseFee].
+	if blockGas.Cmp(requiredBlockGasCost) < 0 {
+		return fmt.Errorf(
+			"insufficient gas (%d) to cover the block cost (%d) at base fee (%d) (total block fee: %d)",
+			blockGas, requiredBlockGasCost, baseFee, totalBlockFee,
+		)
 	}
 	return nil
 }
@@ -316,6 +328,9 @@ func (self *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, 
 	}
 	if chain.Config().IsApricotPhase4(new(big.Int).SetUint64(header.Time)) {
 		header.ExtDataGasUsed = extDataGasUsed
+		if header.ExtDataGasUsed == nil {
+			header.ExtDataGasUsed = common.Big0
+		}
 		header.BlockGasCost = calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, header.Time)
 		if err := self.verifyBlockFee(
 			header.BaseFee,
