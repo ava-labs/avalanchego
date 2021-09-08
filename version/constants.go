@@ -4,15 +4,13 @@
 package version
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
+// These are globals that describe network upgrades and node versions
 var (
-	String                       string // Printed when CLI arg --version is used
-	GitCommit                    string // Set in the build script (i.e. at compile time)
 	Current                      = NewDefaultVersion(1, 5, 2)
 	CurrentApp                   = NewDefaultApplication(constants.PlatformName, Current.Major(), Current.Minor(), Current.Patch())
 	MinimumCompatibleVersion     = NewDefaultApplication(constants.PlatformName, 1, 5, 0)
@@ -50,21 +48,18 @@ var (
 		constants.FujiID:    time.Date(2021, time.August, 16, 19, 0, 0, 0, time.UTC),
 	}
 	ApricotPhase3DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
-)
 
-func init() {
-	format := "%s [database=%s"
-	args := []interface{}{
-		CurrentApp,
-		CurrentDatabase,
+	ApricotPhase4Times = map[uint32]time.Time{
+		constants.MainnetID: time.Date(2029, time.August, 24, 14, 0, 0, 0, time.UTC),
+		constants.FujiID:    time.Date(2029, time.August, 16, 19, 0, 0, 0, time.UTC),
 	}
-	if GitCommit != "" {
-		format += ", commit=%s"
-		args = append(args, GitCommit)
+	ApricotPhase4DefaultTime     = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
+	ApricotPhase4MinPChainHeight = map[uint32]uint64{
+		constants.MainnetID: 0,
+		constants.FujiID:    0,
 	}
-	format += "]\n"
-	String = fmt.Sprintf(format, args...)
-}
+	ApricotPhase4DefaultMinPChainHeight uint64
+)
 
 func GetApricotPhase0Time(networkID uint32) time.Time {
 	if upgradeTime, exists := ApricotPhase0Times[networkID]; exists {
@@ -92,6 +87,20 @@ func GetApricotPhase3Time(networkID uint32) time.Time {
 		return upgradeTime
 	}
 	return ApricotPhase3DefaultTime
+}
+
+func GetApricotPhase4Time(networkID uint32) time.Time {
+	if upgradeTime, exists := ApricotPhase4Times[networkID]; exists {
+		return upgradeTime
+	}
+	return ApricotPhase4DefaultTime
+}
+
+func GetApricotPhase4MinPChainHeight(networkID uint32) uint64 {
+	if minHeight, exists := ApricotPhase4MinPChainHeight[networkID]; exists {
+		return minHeight
+	}
+	return ApricotPhase4DefaultMinPChainHeight
 }
 
 func GetCompatibility(networkID uint32) Compatibility {

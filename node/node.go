@@ -675,6 +675,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		BootstrapMaxTimeGetAncestors:           n.Config.BootstrapMaxTimeGetAncestors,
 		BootstrapMultiputMaxContainersSent:     n.Config.BootstrapMultiputMaxContainersSent,
 		BootstrapMultiputMaxContainersReceived: n.Config.BootstrapMultiputMaxContainersReceived,
+		ApricotPhase4Time:                      version.GetApricotPhase4Time(n.Config.NetworkID),
+		ApricotPhase4MinPChainHeight:           version.GetApricotPhase4MinPChainHeight(n.Config.NetworkID),
 	})
 
 	vdrs := n.vdrs
@@ -707,6 +709,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			MaxStakeDuration:      n.Config.MaxStakeDuration,
 			StakeMintingPeriod:    n.Config.StakeMintingPeriod,
 			ApricotPhase3Time:     version.GetApricotPhase3Time(n.Config.NetworkID),
+			ApricotPhase4Time:     version.GetApricotPhase4Time(n.Config.NetworkID),
 		}),
 		n.vmManager.RegisterFactory(avm.ID, &avm.Factory{
 			TxFee:            n.Config.TxFee,

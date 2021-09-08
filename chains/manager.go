@@ -167,6 +167,9 @@ type ManagerConfig struct {
 	// This node will only consider the first [MultiputMaxContainersReceived]
 	// containers in a multiput it receives.
 	BootstrapMultiputMaxContainersReceived int
+
+	ApricotPhase4Time            time.Time
+	ApricotPhase4MinPChainHeight uint64
 }
 
 type manager struct {
@@ -663,12 +666,8 @@ func (m *manager) createSnowmanChain(
 		ctx.ValidatorState = valState
 	}
 
-	// TODO: setup upon deploy
-	ap4Timestamp := time.Unix(0, 0)
-	ap4MinPChainHeight := uint64(0)
-
 	// enable ProposerVM on this VM
-	vm = proposervm.New(vm, ap4Timestamp, ap4MinPChainHeight)
+	vm = proposervm.New(vm, m.ApricotPhase4Time, m.ApricotPhase4MinPChainHeight)
 
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)

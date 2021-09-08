@@ -171,7 +171,7 @@ func (vm *VM) Initialize(
 	vm.currentBlocks = make(map[ids.ID]Block)
 
 	vm.blockBuilder.Initialize(vm)
-	vm.network = newNetwork(timer.MaxTime, appSender, vm)
+	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
 	if err != nil {
