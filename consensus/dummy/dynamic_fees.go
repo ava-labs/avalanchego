@@ -268,7 +268,7 @@ func calcBlockGasCost(maxBlockFee *big.Int, blockFeeDuration, parentTime, curren
 // proportional to its gas usage). In reality, there is no minimum tip that
 // is enforced by the consensus engine and high tip paying transactions can
 // subsidize the inclusion of low tip paying transactions. The only
-// correctness check performed is that the some of all tips is >= the
+// correctness check performed is that the sum of all tips is >= the
 // required block fee.
 //
 // This function will return nil for all return values prior to Apricot Phase 4.

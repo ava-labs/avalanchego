@@ -135,9 +135,9 @@ var (
 	errHeaderExtraDataTooBig          = errors.New("header extra data too big")
 	errInsufficientFundsForFee        = errors.New("insufficient AVAX funds to pay transaction fee")
 	errNoEVMOutputs                   = errors.New("tx has no EVM outputs")
-	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid in apricotPhase3")
-	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid in apricotPhase4")
-	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid in apricotPhase4")
+	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
+	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
+	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
 )
 
 // buildingBlkStatus denotes the current status of the VM in block production.
@@ -476,28 +476,27 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 	return nil, nil, nil, nil
 }
 
-func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big.Int, error) {
+func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
 	tx, err := vm.extractAtomicTx(block)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// If [tx] is nil, we can return nil for the extra state contribution instead of allocating
 	// a big Int for 0.
 	if tx == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	switch {
 	// If ApricotPahse4 is enabled, calculate the block fee contribution
 	case vm.chainConfig.IsApricotPhase4(new(big.Int).SetUint64(block.Time())):
-		contribution, _, err := tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
-		return contribution, err
+		return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
 	default:
 		// Otherwise, there is no contribution
-		return nil, nil
+		return nil, nil, nil
 	}
 }
 
