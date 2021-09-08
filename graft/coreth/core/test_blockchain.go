@@ -1298,7 +1298,7 @@ func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Databas
 	// Ensure that key1 has some funds in the genesis block.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
 	gspec := &Genesis{
-		Config: params.TestApricotPhase4Config,
+		Config: params.TestChainConfig,
 		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 	genesis := gspec.MustCommit(genDB)
@@ -1311,12 +1311,12 @@ func TestGenerateChainInvalidBlockFee(t *testing.T, create func(db ethdb.Databas
 	defer blockchain.Stop()
 
 	// This call generates a chain of 3 blocks.
-	signer := types.LatestSigner(params.TestApricotPhase4Config)
+	signer := types.LatestSigner(params.TestChainConfig)
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
 	_, _, err = GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
 		tx := types.NewTx(&types.DynamicFeeTx{
-			ChainID:   params.TestApricotPhase4Config.ChainID,
+			ChainID:   params.TestChainConfig.ChainID,
 			Nonce:     gen.TxNonce(addr1),
 			To:        &addr2,
 			Gas:       params.TxGas,
@@ -1354,7 +1354,7 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	// Ensure that key1 has some funds in the genesis block.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
 	gspec := &Genesis{
-		Config: params.TestApricotPhase4Config,
+		Config: params.TestChainConfig,
 		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 	genesis := gspec.MustCommit(genDB)
@@ -1367,12 +1367,12 @@ func TestInsertChainInvalidBlockFee(t *testing.T, create func(db ethdb.Database,
 	defer blockchain.Stop()
 
 	// This call generates a chain of 3 blocks.
-	signer := types.LatestSigner(params.TestApricotPhase4Config)
+	signer := types.LatestSigner(params.TestChainConfig)
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
-	chain, _, err := GenerateChain(params.TestApricotPhase4Config, genesis, dummy.NewETHFaker(), genDB, 3, func(i int, gen *BlockGen) {
+	chain, _, err := GenerateChain(params.TestChainConfig, genesis, dummy.NewETHFaker(), genDB, 3, func(i int, gen *BlockGen) {
 		tx := types.NewTx(&types.DynamicFeeTx{
-			ChainID:   params.TestApricotPhase4Config.ChainID,
+			ChainID:   params.TestChainConfig.ChainID,
 			Nonce:     gen.TxNonce(addr1),
 			To:        &addr2,
 			Gas:       params.TxGas,
@@ -1414,7 +1414,7 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 	// Ensure that key1 has some funds in the genesis block.
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
 	gspec := &Genesis{
-		Config: params.TestApricotPhase4Config,
+		Config: params.TestChainConfig,
 		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 	genesis := gspec.MustCommit(genDB)
@@ -1427,7 +1427,7 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 	defer blockchain.Stop()
 
 	// This call generates a chain of 3 blocks.
-	signer := types.LatestSigner(params.TestApricotPhase4Config)
+	signer := types.LatestSigner(params.TestChainConfig)
 	// Generate chain of blocks using [genDB] instead of [chainDB] to avoid writing
 	// to the BlockChain's database while generating blocks.
 	tip := big.NewInt(1000 * params.GWei)
@@ -1435,7 +1435,7 @@ func TestInsertChainValidBlockFee(t *testing.T, create func(db ethdb.Database, c
 	chain, _, err := GenerateChain(gspec.Config, genesis, blockchain.engine, genDB, 3, func(i int, gen *BlockGen) {
 		feeCap := new(big.Int).Add(gen.BaseFee(), tip)
 		tx := types.NewTx(&types.DynamicFeeTx{
-			ChainID:   params.TestApricotPhase4Config.ChainID,
+			ChainID:   params.TestChainConfig.ChainID,
 			Nonce:     gen.TxNonce(addr1),
 			To:        &addr2,
 			Gas:       params.TxGas,
