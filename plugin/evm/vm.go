@@ -283,6 +283,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- commonEng.Message,
 	fxs []*commonEng.Fx,
+	_ commonEng.AppSender,
 ) error {
 	vm.config.SetDefaults()
 	if len(configBytes) > 0 {
@@ -666,6 +667,22 @@ func (vm *VM) getBlockIDAtHeight(blkHeight uint64) (ids.ID, error) {
 
 func (vm *VM) Version() (string, error) {
 	return Version, nil
+}
+
+func (vm *VM) AppRequest(nodeID ids.ShortID, requestID uint32, request []byte) error {
+	return nil
+}
+
+func (vm *VM) AppResponse(nodeID ids.ShortID, requestID uint32, response []byte) error {
+	return nil
+}
+
+func (vm *VM) AppRequestFailed(nodeID ids.ShortID, requestID uint32) error {
+	return nil
+}
+
+func (vm *VM) AppGossip(nodeID ids.ShortID, msg []byte) error {
+	return nil
 }
 
 // NewHandler returns a new Handler for a service where:
