@@ -40,6 +40,7 @@ import (
 
 	engCommon "github.com/ava-labs/avalanchego/snow/engine/common"
 
+	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/eth"
@@ -3804,5 +3805,195 @@ func TestConfigureLogLevel(t *testing.T) {
 			}
 		})
 	}
+}
 
+// Regression test to ensure we can build blocks if we are starting with the
+// Apricot Phase 4 ruleset in genesis.
+func TestBuildApricotPhase4Block(t *testing.T) {
+	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
+
+	defer func() {
+		if err := vm.Shutdown(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	vm.chain.GetTxPool().SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	key, err := accountKeystore.NewKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	importAmount := uint64(1000000000)
+	utxoID := avax.UTXOID{
+		TxID: ids.ID{
+			0x0f, 0x2f, 0x4f, 0x6f, 0x8e, 0xae, 0xce, 0xee,
+			0x0d, 0x2d, 0x4d, 0x6d, 0x8c, 0xac, 0xcc, 0xec,
+			0x0b, 0x2b, 0x4b, 0x6b, 0x8a, 0xaa, 0xca, 0xea,
+			0x09, 0x29, 0x49, 0x69, 0x88, 0xa8, 0xc8, 0xe8,
+		},
+	}
+
+	utxo := &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  avax.Asset{ID: vm.ctx.AVAXAssetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: importAmount,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Threshold: 1,
+				Addrs:     []ids.ShortID{testKeys[0].PublicKey().Address()},
+			},
+		},
+	}
+	utxoBytes, err := vm.codec.Marshal(codecVersion, utxo)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.ctx.XChainID)
+	inputID := utxo.InputID()
+	if err := xChainSharedMemory.Apply(map[ids.ID]*atomic.Requests{vm.ctx.ChainID: {PutRequests: []*atomic.Element{{
+		Key:   inputID[:],
+		Value: utxoBytes,
+		Traits: [][]byte{
+			testKeys[0].PublicKey().Address().Bytes(),
+		},
+	}}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	importTx, err := vm.newImportTx(vm.ctx.XChainID, key.Address, initialBaseFee, []*crypto.PrivateKeySECP256K1R{testKeys[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := vm.issueTx(importTx); err != nil {
+		t.Fatal(err)
+	}
+
+	<-issuer
+
+	blk, err := vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := vm.SetPreference(blk.ID()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	ethBlk := blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(common.Big0) != 0 {
+		t.Fatalf("expected blockGasCost to be 0 but got %d", ethBlk.BlockGasCost())
+	}
+	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(big.NewInt(1230)) != 0 {
+		t.Fatalf("expected extDataGasUsed to be 1000 but got %d", ethBlk.ExtDataGasUsed())
+	}
+	minRequiredTip, err := dummy.MinRequiredTip(vm.chainConfig, ethBlk.Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if minRequiredTip == nil || minRequiredTip.Cmp(common.Big0) != 0 {
+		t.Fatalf("expected minRequiredTip to be 0 but got %d", minRequiredTip)
+	}
+
+	newHead := <-newTxPoolHeadChan
+	if newHead.Head.Hash() != common.Hash(blk.ID()) {
+		t.Fatalf("Expected new block to match")
+	}
+
+	txs := make([]*types.Transaction, 10)
+	for i := 0; i < 5; i++ {
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.LaunchMinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txs[i] = signedTx
+	}
+	for i := 5; i < 10; i++ {
+		tx := types.NewTransaction(uint64(i), key.Address, big.NewInt(10), 21000, big.NewInt(params.ApricotPhase1MinGasPrice), nil)
+		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), key.PrivateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		txs[i] = signedTx
+	}
+	errs := vm.chain.AddRemoteTxs(txs)
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("Failed to add tx at index %d: %s", i, err)
+		}
+	}
+
+	<-issuer
+
+	blk, err = vm.BuildBlock()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := blk.Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	if status := blk.Status(); status != choices.Processing {
+		t.Fatalf("Expected status of built block to be %s, but found %s", choices.Processing, status)
+	}
+
+	if err := blk.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
+	ethBlk = blk.(*chain.BlockWrapper).Block.(*Block).ethBlock
+	if ethBlk.BlockGasCost() == nil || ethBlk.BlockGasCost().Cmp(big.NewInt(100_000)) != 0 {
+		t.Fatalf("expected blockGasCost to be 100000 but got %d", ethBlk.BlockGasCost())
+	}
+	if ethBlk.ExtDataGasUsed() == nil || ethBlk.ExtDataGasUsed().Cmp(common.Big0) != 0 {
+		t.Fatalf("expected extDataGasUsed to be 0 but got %d", ethBlk.ExtDataGasUsed())
+	}
+	minRequiredTip, err = dummy.MinRequiredTip(vm.chainConfig, ethBlk.Header())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if minRequiredTip == nil || minRequiredTip.Cmp(big.NewInt(98*params.GWei)) < 0 {
+		t.Fatalf("expected minRequiredTip to be at least 98 gwei but got %d", minRequiredTip)
+	}
+
+	if status := blk.Status(); status != choices.Accepted {
+		t.Fatalf("Expected status of accepted block to be %s, but found %s", choices.Accepted, status)
+	}
+
+	lastAcceptedID, err := vm.LastAccepted()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if lastAcceptedID != blk.ID() {
+		t.Fatalf("Expected last accepted blockID to be the accepted block: %s, but found %s", blk.ID(), lastAcceptedID)
+	}
+
+	// Confirm all txs are present
+	ethBlkTxs := vm.chain.GetBlockByNumber(2).Transactions()
+	for i, tx := range txs {
+		if len(ethBlkTxs) <= i {
+			t.Fatalf("missing transactions expected: %d but found: %d", len(txs), len(ethBlkTxs))
+		}
+		if ethBlkTxs[i].Hash() != tx.Hash() {
+			t.Fatalf("expected tx at index %d to have hash: %x but has: %x", i, txs[i].Hash(), tx.Hash())
+		}
+	}
 }
