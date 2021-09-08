@@ -390,7 +390,6 @@ func (vm *VM) Initialize(
 		BuildBlock:         vm.buildBlock,
 	})
 
-	vm.shutdownWg.Add(1)
 	go vm.ctx.Log.RecoverAndPanic(vm.builder.awaitSubmittedTxs)
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 

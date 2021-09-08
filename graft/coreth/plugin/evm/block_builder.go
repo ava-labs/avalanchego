@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package evm
 
 import (
@@ -22,20 +25,21 @@ const (
 	maxBlockTime = 3 * time.Second
 	batchSize    = 250
 
-	dontBuild buildingBlkStatus = iota
-	conditionalBuild
-	mayBuild
+	dontBuild        buildingBlkStatus = iota
+	conditionalBuild                   // Only used prior to AP4
+	mayBuild                           // Only used prior to AP4
 	building
 )
 
 type blockBuilder struct {
-	ctx          *snow.Context
-	chainConfig  *params.ChainConfig
-	shutdownChan <-chan struct{}
-	shutdownWg   *sync.WaitGroup
+	ctx         *snow.Context
+	chainConfig *params.ChainConfig
 
 	chain   *coreth.ETHChain
 	mempool *Mempool
+
+	shutdownChan <-chan struct{}
+	shutdownWg   *sync.WaitGroup
 
 	// A message is sent on this channel when a new block
 	// is ready to be build. This notifies the consensus engine.
@@ -43,10 +47,14 @@ type blockBuilder struct {
 
 	// [buildBlockLock] must be held when accessing [buildStatus]
 	buildBlockLock sync.Mutex
+
 	// [buildBlockTimer] is a two stage timer handling block production.
 	// Stage1 build a block if the batch size has been reached.
 	// Stage2 build a block regardless of the size.
+	//
+	// NOTE: Only used prior to AP4.
 	buildBlockTimer *timer.Timer
+
 	// buildStatus signals the phase of block building the VM is currently in.
 	// [dontBuild] indicates there's no need to build a block.
 	// [conditionalBuild] indicates build a block if the batch size has been reached.
@@ -88,12 +96,13 @@ func (b *blockBuilder) stopBlockTimer() {
 		b.buildBlockTimer.Stop()
 		b.buildBlockTimer = nil
 
-		// Flush any invalid statuses
+		// Flush any invalid statuses leftover from legacy block timer builder
+		//
+		// NOTE: we don't trigger a build block here to avoid a case where everyone
+		// tries to build at the same time right at the AP4 boundary.
 		b.buildBlockLock.Lock()
 		b.buildStatus = dontBuild
 		b.buildBlockLock.Unlock()
-		// NOTE: we don't trigger a build block here to avoid a case where everyone
-		// tries to build at the same time right at the AP4 boundary.
 	case <-b.shutdownChan:
 		if b.buildBlockTimer != nil {
 			b.buildBlockTimer.Stop()
@@ -101,19 +110,18 @@ func (b *blockBuilder) stopBlockTimer() {
 	}
 }
 
-// Set the buildStatus before calling Cancel or Issue on
-// the mempool and after generating the block.
-// This prevents [needToBuild] from returning true when the
-// produced block will change whether or not we need to produce
-// another block and also ensures that when the mempool adds a
-// new item to Pending it will be handled appropriately by [signalTxsReady]
-// TODO: move comment
 func (b *blockBuilder) buildBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
 
 	timestamp := big.NewInt(time.Now().Unix())
 	if !b.chainConfig.IsApricotPhase4(timestamp) {
+		// Set the buildStatus before calling Cancel or Issue on
+		// the mempool and after generating the block.
+		// This prevents [needToBuild] from returning true when the
+		// produced block will change whether or not we need to produce
+		// another block and also ensures that when the mempool adds a
+		// new item to Pending it will be handled appropriately by [signalTxsReady]
 		if b.needToBuild() {
 			b.buildStatus = conditionalBuild
 			b.buildBlockTimer.SetTimeoutIn(minBlockTime)
@@ -121,7 +129,9 @@ func (b *blockBuilder) buildBlock() {
 			b.buildStatus = dontBuild
 		}
 	} else {
-		// We never retry block building to prevent contention
+		// We never retry block building to prevent inadvertently adding
+		// contention to block production (if that would push the start of block
+		// propagation closer to the next producer's window)
 		b.buildStatus = dontBuild
 	}
 }
@@ -199,6 +209,7 @@ func (b *blockBuilder) buildBlockTwoStageTimer() (time.Duration, bool) {
 func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
+
 	if b.buildStatus != dontBuild {
 		return
 	}
@@ -210,10 +221,12 @@ func (b *blockBuilder) signalTxsReady() {
 		return
 	}
 
-	// Check to see if mempool could pay effective tip? Or just yolo build and
-	// leave all validation to build block time (could be some time)?
-	// -> don't re-signal if already signaled
-	// TODO: fix comment
+	// We take a naive approach here and signal the engine that we should build
+	// a block as soon as we receive at least one transaction.
+	//
+	// In the future, we may wish to add optimization here to only signal the
+	// engine if the sum of the projected tips in the mempool satisfies the
+	// required block fee.
 	select {
 	case b.notifyBuildBlockChan <- commonEng.PendingTxs:
 		b.buildStatus = building
@@ -226,20 +239,23 @@ func (b *blockBuilder) signalTxsReady() {
 // and notifies the VM when the tx pool has transactions to be
 // put into a new block.
 func (b *blockBuilder) awaitSubmittedTxs() {
-	defer b.shutdownWg.Done()
+	b.shutdownWg.Add(1)
+	go func() {
+		defer b.shutdownWg.Done()
 
-	// txSubmitChan is invoked on reorgs
-	txSubmitChan := b.chain.GetTxSubmitCh()
-	for {
-		select {
-		case <-txSubmitChan:
-			log.Trace("New tx detected, trying to generate a block")
-			b.signalTxsReady()
-		case <-b.mempool.Pending:
-			log.Trace("New atomic Tx detected, trying to generate a block")
-			b.signalTxsReady()
-		case <-b.shutdownChan:
-			return
+		// txSubmitChan is invoked on reorgs
+		txSubmitChan := b.chain.GetTxSubmitCh()
+		for {
+			select {
+			case <-txSubmitChan:
+				log.Trace("New tx detected, trying to generate a block")
+				b.signalTxsReady()
+			case <-b.mempool.Pending:
+				log.Trace("New atomic Tx detected, trying to generate a block")
+				b.signalTxsReady()
+			case <-b.shutdownChan:
+				return
+			}
 		}
-	}
+	}()
 }
