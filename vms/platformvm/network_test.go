@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -43,7 +46,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	// create tx to be gossiped
 	tx := getTheValidTx(vm, t)
@@ -92,7 +95,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := vm.blockBuilder.Mempool.(*mempool)
 
 	var (
 		wasGossiped   bool
@@ -170,7 +173,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	vm.requestID++
 	vm.requestsContent[vm.requestID] = txID2
 
-	vm.mempool.totalBytesSize = MaxMempoolByteSize
+	mempool.totalBytesSize = maxMempoolSize
 	err = vm.AppResponse(nodeID, vm.requestID, msgBytes)
 	assert.NoError(err, "error in reception of tx")
 	assert.False(wasGossiped, "unaccepted tx should have not been re-gossiped")
@@ -301,7 +304,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	var wasRequested bool
 	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
@@ -313,7 +316,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	tx := getTheValidTx(vm, t)
 	txID := tx.ID()
 
-	mempool.markReject(txID)
+	mempool.MarkDropped(txID)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestShortID()
@@ -342,7 +345,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	var (
 		wasResponded   bool
@@ -399,7 +402,7 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	var gossipedBytes []byte
 	sender.SendAppGossipF = func(b []byte) error {

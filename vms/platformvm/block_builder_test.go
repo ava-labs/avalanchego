@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -9,7 +12,7 @@ import (
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
 // removed by inclusion in a block
-func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
+func TestBlockBuilder_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, _, _ := defaultVM()
@@ -20,7 +23,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	// add a tx to it
 	tx := getTheValidTx(vm, t)
@@ -47,7 +50,7 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
-func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
+func TestBlockBuilder_MaxMempoolSizeHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, _, _ := defaultVM()
@@ -58,20 +61,21 @@ func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	blockBuilder := &vm.blockBuilder
+	mempool := blockBuilder.Mempool.(*mempool)
 
 	// create candidate tx
 	tx := getTheValidTx(vm, t)
 
 	// shortcut to simulated almost filled mempool
-	mempool.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes()) + 1
+	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes()) + 1
 
-	err := mempool.AddUncheckedTx(tx)
-	assert.Equal(errTxExceedingMempoolSize, err, "max mempool size breached")
+	err := blockBuilder.AddUncheckedTx(tx)
+	assert.Equal(errMempoolFull, err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
-	mempool.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes())
+	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes())
 
-	err = mempool.AddUncheckedTx(tx)
+	err = blockBuilder.AddUncheckedTx(tx)
 	assert.NoError(err, "should have added tx to mempool")
 }

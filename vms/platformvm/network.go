@@ -19,7 +19,7 @@ type network struct {
 	// gossip related attributes
 	gossipActivationTime time.Time
 	appSender            common.AppSender
-	mempool              *mempool
+	mempool              *blockBuilder
 	vm                   *VM
 
 	requestID uint32
@@ -37,7 +37,7 @@ func newNetwork(activationTime time.Time, appSender common.AppSender, vm *VM) *n
 		log:                  vm.ctx.Log,
 		gossipActivationTime: activationTime,
 		appSender:            appSender,
-		mempool:              &vm.mempool,
+		mempool:              &vm.blockBuilder,
 		vm:                   vm,
 		requestsContent:      make(map[uint32]ids.ID),
 	}
@@ -242,7 +242,7 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 	switch {
 	case h.net.mempool.Has(txID):
 		return nil
-	case h.net.mempool.isAlreadyRejected(txID):
+	case h.net.mempool.WasDropped(txID):
 		return nil
 	}
 
@@ -290,13 +290,13 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 			txID,
 			err,
 		)
-		h.net.vm.mempool.markReject(txID)
+		h.net.vm.blockBuilder.MarkDropped(txID)
 		return nil
 	}
 
 	// add to mempool
 	err = h.net.mempool.AddUncheckedTx(tx)
-	if err == errTxExceedingMempoolSize {
+	if err == errMempoolFull {
 		// tx has not been accepted to mempool due to size do not gossip since
 		// we cannot serve it
 		return nil
@@ -308,7 +308,7 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 			err,
 		)
 
-		h.net.mempool.markReject(txID)
+		h.net.mempool.MarkDropped(txID)
 		return nil
 	}
 	return h.net.GossipTx(tx)
@@ -331,7 +331,7 @@ func (h *GossipHandler) HandleTxNotify(nodeID ids.ShortID, requestID uint32, msg
 	switch {
 	case h.net.mempool.Has(msg.TxID):
 		return nil
-	case h.net.mempool.isAlreadyRejected(msg.TxID):
+	case h.net.mempool.WasDropped(msg.TxID):
 		return nil
 	}
 
