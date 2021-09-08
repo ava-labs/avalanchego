@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -49,9 +50,7 @@ func (tx *UnsignedAddSubnetValidatorTx) Weight() uint64 {
 }
 
 // SyntacticVerify returns nil iff [tx] is valid
-func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(
-	synCtx ProposalSyntacticVerificationContext,
-) error {
+func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -59,15 +58,7 @@ func (tx *UnsignedAddSubnetValidatorTx) SyntacticVerify(
 		return nil
 	}
 
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < synCtx.minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case duration > synCtx.maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
-	}
-
-	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.SubnetAuth); err != nil {
@@ -91,19 +82,18 @@ func (tx *UnsignedAddSubnetValidatorTx) SemanticVerify(
 	func() error,
 	TxError,
 ) {
-	synCtx := ProposalSyntacticVerificationContext{
-		ctx:              vm.ctx,
-		feeAmount:        vm.TxFee,
-		feeAssetID:       vm.ctx.AVAXAssetID,
-		minStakeDuration: vm.MinStakeDuration,
-		maxStakeDuration: vm.MaxStakeDuration,
-	}
-	if err := tx.SyntacticVerify(synCtx); err != nil {
+	// Verify the tx is well-formed
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, nil, nil, nil, permError{err}
 	}
 
-	// Verify the tx is well-formed
-	if len(stx.Creds) == 0 {
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
+		return nil, nil, nil, nil, permError{errStakeTooShort}
+	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
+		return nil, nil, nil, nil, permError{errStakeTooLong}
+	case len(stx.Creds) == 0:
 		return nil, nil, nil, nil, permError{errWrongNumberOfCredentials}
 	}
 
@@ -302,13 +292,5 @@ func (vm *VM) newAddSubnetValidatorTx(
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-
-	synCtx := ProposalSyntacticVerificationContext{
-		ctx:              vm.ctx,
-		feeAmount:        vm.TxFee,
-		feeAssetID:       vm.ctx.AVAXAssetID,
-		minStakeDuration: vm.MinStakeDuration,
-		maxStakeDuration: vm.MaxStakeDuration,
-	}
-	return tx, utx.SyntacticVerify(synCtx)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }

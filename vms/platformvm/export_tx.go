@@ -52,22 +52,20 @@ func (tx *UnsignedExportTx) InitCtx(ctx *snow.Context) {
 func (tx *UnsignedExportTx) InputUTXOs() ids.Set { return ids.Set{} }
 
 // SyntacticVerify this transaction is well-formed
-func (tx *UnsignedExportTx) SyntacticVerify(
-	synCtx AtomicSyntacticVerificationContext,
-) error {
+func (tx *UnsignedExportTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.DestinationChain != synCtx.avmID:
+	case tx.DestinationChain != ctx.XChainID:
 		// TODO: remove this check if we allow for P->C swaps
 		return errWrongChainID
 	case len(tx.ExportedOutputs) == 0:
 		return errNoExportOutputs
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 
@@ -93,13 +91,7 @@ func (tx *UnsignedExportTx) SemanticVerify(
 	parentState MutableState,
 	stx *Tx,
 ) (VersionedState, TxError) {
-	synCtx := AtomicSyntacticVerificationContext{
-		ctx:        vm.ctx,
-		avmID:      vm.ctx.XChainID,
-		feeAmount:  vm.TxFee,
-		feeAssetID: vm.ctx.AVAXAssetID,
-	}
-	if err := tx.SyntacticVerify(synCtx); err != nil {
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, permError{err}
 	}
 
@@ -215,12 +207,5 @@ func (vm *VM) newExportTx(
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-
-	synCtx := AtomicSyntacticVerificationContext{
-		ctx:        vm.ctx,
-		avmID:      vm.ctx.XChainID,
-		feeAmount:  vm.TxFee,
-		feeAssetID: vm.ctx.AVAXAssetID,
-	}
-	return tx, utx.SyntacticVerify(synCtx)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }

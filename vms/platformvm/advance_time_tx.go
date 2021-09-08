@@ -35,9 +35,7 @@ func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(
-	ctx ProposalSyntacticVerificationContext,
-) error {
+func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(*snow.Context) error {
 	return nil
 }
 

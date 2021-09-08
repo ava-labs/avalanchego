@@ -247,43 +247,7 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 	}
 
 	// validate tx
-	switch typedTx := tx.UnsignedTx.(type) {
-	case UnsignedDecisionTx:
-		synCtx := DecisionSyntacticVerificationContext{
-			ctx:        h.net.vm.ctx,
-			feeAmount:  h.net.vm.TxFee,
-			feeAssetID: h.net.vm.ctx.AVAXAssetID,
-		}
-		err = typedTx.SyntacticVerify(synCtx)
-	case UnsignedProposalTx:
-		synCtx := ProposalSyntacticVerificationContext{
-			ctx:               h.net.vm.ctx,
-			minStakeDuration:  h.net.vm.MinStakeDuration,
-			maxStakeDuration:  h.net.vm.MaxStakeDuration,
-			minStake:          h.net.vm.MinValidatorStake,
-			maxStake:          h.net.vm.MaxValidatorStake,
-			minDelegationFee:  h.net.vm.MinDelegationFee,
-			minDelegatorStake: h.net.vm.MinDelegatorStake,
-			feeAmount:         h.net.vm.TxFee,
-			feeAssetID:        h.net.vm.ctx.AVAXAssetID,
-		}
-		err = typedTx.SyntacticVerify(synCtx)
-	case UnsignedAtomicTx:
-		synCtx := AtomicSyntacticVerificationContext{
-			ctx:        h.net.vm.ctx,
-			avmID:      h.net.vm.ctx.XChainID,
-			feeAmount:  h.net.vm.TxFee,
-			feeAssetID: h.net.vm.ctx.AVAXAssetID,
-		}
-		err = typedTx.SyntacticVerify(synCtx)
-	default:
-		h.net.log.Error(
-			"AppResponse provided unknown tx type %T with txID %s",
-			typedTx,
-			txID,
-		)
-		return nil
-	}
+	err = tx.UnsignedTx.SyntacticVerify(h.net.vm.ctx)
 	if err != nil {
 		h.net.log.Trace(
 			"AppResponse provided tx %s that is syntactically invalid: %s",

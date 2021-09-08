@@ -35,20 +35,14 @@ type UnsignedTx interface {
 	ID() ids.ID
 	UnsignedBytes() []byte
 	Bytes() []byte
-}
 
-type DecisionSyntacticVerificationContext struct {
-	ctx        *snow.Context
-	feeAmount  uint64
-	feeAssetID ids.ID
+	// Attempts to verify this transaction without any provided state.
+	SyntacticVerify(ctx *snow.Context) error
 }
 
 // UnsignedDecisionTx is an unsigned operation that can be immediately decided
 type UnsignedDecisionTx interface {
 	UnsignedTx
-
-	// Attempts to verify this transaction without any provided state.
-	SyntacticVerify(synCtx DecisionSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, vs VersionedState, stx *Tx) (
@@ -57,27 +51,9 @@ type UnsignedDecisionTx interface {
 	)
 }
 
-type ProposalSyntacticVerificationContext struct {
-	ctx              *snow.Context
-	minStakeDuration time.Duration
-	maxStakeDuration time.Duration
-
-	minStake         uint64
-	maxStake         uint64
-	minDelegationFee uint32
-
-	minDelegatorStake uint64
-
-	feeAmount  uint64
-	feeAssetID ids.ID
-}
-
 // UnsignedProposalTx is an unsigned operation that can be proposed
 type UnsignedProposalTx interface {
 	UnsignedTx
-
-	// Attempts to verify this transaction without any provided state.
-	SyntacticVerify(synCtx ProposalSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, state MutableState, stx *Tx) (
@@ -90,22 +66,12 @@ type UnsignedProposalTx interface {
 	InitiallyPrefersCommit(vm *VM) bool
 }
 
-type AtomicSyntacticVerificationContext struct {
-	ctx        *snow.Context
-	avmID      ids.ID
-	feeAmount  uint64
-	feeAssetID ids.ID
-}
-
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
 type UnsignedAtomicTx interface {
 	UnsignedTx
 
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
-
-	// Attempts to verify this transaction without any provided state.
-	SyntacticVerify(synCtx AtomicSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)

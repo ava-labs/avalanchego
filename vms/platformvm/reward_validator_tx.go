@@ -45,9 +45,7 @@ type UnsignedRewardValidatorTx struct {
 
 func (tx *UnsignedRewardValidatorTx) InitCtx(*snow.Context) {}
 
-func (tx *UnsignedRewardValidatorTx) SyntacticVerify(
-	ctx ProposalSyntacticVerificationContext,
-) error {
+func (tx *UnsignedRewardValidatorTx) SyntacticVerify(*snow.Context) error {
 	return nil
 }
 

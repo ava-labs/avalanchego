@@ -76,33 +76,17 @@ func (tx *UnsignedAddValidatorTx) Weight() uint64 {
 }
 
 // SyntacticVerify returns nil iff [tx] is valid
-func (tx *UnsignedAddValidatorTx) SyntacticVerify(
-	synCtx ProposalSyntacticVerificationContext,
-) error {
+func (tx *UnsignedAddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
 	case tx.syntacticallyVerified: // already passed syntactic verification
 		return nil
-	case tx.Validator.Wght < synCtx.minStake: // Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-	case tx.Validator.Wght > synCtx.maxStake: // Ensure validator isn't staking too much
-		return errWeightTooLarge
 	case tx.Shares > PercentDenominator: // Ensure delegators shares are in the allowed amount
 		return errTooManyShares
-	case tx.Shares < synCtx.minDelegationFee:
-		return errInsufficientDelegationFee
 	}
 
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < synCtx.minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case duration > synCtx.maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
-	}
-
-	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return fmt.Errorf("failed to verify BaseTx: %w", err)
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -146,17 +130,25 @@ func (tx *UnsignedAddValidatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	synCtx := ProposalSyntacticVerificationContext{
-		ctx:              vm.ctx,
-		minStake:         vm.MinValidatorStake,
-		maxStake:         vm.MaxValidatorStake,
-		minStakeDuration: vm.MinStakeDuration,
-		maxStakeDuration: vm.MaxStakeDuration,
-		minDelegationFee: vm.MinDelegationFee,
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
+		return nil, nil, nil, nil, permError{err}
 	}
 
-	if err := tx.SyntacticVerify(synCtx); err != nil {
-		return nil, nil, nil, nil, permError{err}
+	switch {
+	case tx.Validator.Wght < vm.MinValidatorStake: // Ensure validator is staking at least the minimum amount
+		return nil, nil, nil, nil, permError{errWeightTooSmall}
+	case tx.Validator.Wght > vm.MaxValidatorStake: // Ensure validator isn't staking too much
+		return nil, nil, nil, nil, permError{errWeightTooLarge}
+	case tx.Shares < vm.MinDelegationFee:
+		return nil, nil, nil, nil, permError{errInsufficientDelegationFee}
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
+		return nil, nil, nil, nil, permError{errStakeTooShort}
+	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
+		return nil, nil, nil, nil, permError{errStakeTooLong}
 	}
 
 	currentStakers := parentState.CurrentStakerChainState()
@@ -309,14 +301,5 @@ func (vm *VM) newAddValidatorTx(
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-
-	synCtx := ProposalSyntacticVerificationContext{
-		ctx:              vm.ctx,
-		minStake:         vm.MinValidatorStake,
-		maxStake:         vm.MaxValidatorStake,
-		minStakeDuration: vm.MinStakeDuration,
-		maxStakeDuration: vm.MaxStakeDuration,
-		minDelegationFee: vm.MinDelegationFee,
-	}
-	return tx, utx.SyntacticVerify(synCtx)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }

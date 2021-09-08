@@ -33,8 +33,8 @@ func (tx *BaseTx) InitCtx(ctx *snow.Context) {
 	}
 }
 
-// Verify returns nil iff this tx is well formed
-func (tx *BaseTx) Verify(ctx *snow.Context) error {
+// SyntacticVerify returns nil iff this tx is well formed
+func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx

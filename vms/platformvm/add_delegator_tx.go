@@ -69,9 +69,7 @@ func (tx *UnsignedAddDelegatorTx) Weight() uint64 {
 }
 
 // SyntacticVerify returns nil iff [tx] is valid
-func (tx *UnsignedAddDelegatorTx) SyntacticVerify(
-	synCtx ProposalSyntacticVerificationContext,
-) error {
+func (tx *UnsignedAddDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -79,18 +77,7 @@ func (tx *UnsignedAddDelegatorTx) SyntacticVerify(
 		return nil
 	}
 
-	duration := tx.Validator.Duration()
-	switch {
-	case duration < synCtx.minStakeDuration: // Ensure staking length is not too short
-		return errStakeTooShort
-	case duration > synCtx.maxStakeDuration: // Ensure staking length is not too long
-		return errStakeTooLong
-	case tx.Validator.Wght < synCtx.minDelegatorStake:
-		// Ensure validator is staking at least the minimum amount
-		return errWeightTooSmall
-	}
-
-	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 	if err := verify.All(&tx.Validator, tx.RewardsOwner); err != nil {
@@ -134,14 +121,19 @@ func (tx *UnsignedAddDelegatorTx) SemanticVerify(
 	TxError,
 ) {
 	// Verify the tx is well-formed
-	synCtx := ProposalSyntacticVerificationContext{
-		ctx:               vm.ctx,
-		minDelegatorStake: vm.MinDelegatorStake,
-		minStakeDuration:  vm.MinStakeDuration,
-		maxStakeDuration:  vm.MaxStakeDuration,
-	}
-	if err := tx.SyntacticVerify(synCtx); err != nil {
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, nil, nil, nil, permError{err}
+	}
+
+	duration := tx.Validator.Duration()
+	switch {
+	case duration < vm.MinStakeDuration: // Ensure staking length is not too short
+		return nil, nil, nil, nil, permError{errStakeTooShort}
+	case duration > vm.MaxStakeDuration: // Ensure staking length is not too long
+		return nil, nil, nil, nil, permError{errStakeTooLong}
+	case tx.Validator.Wght < vm.MinDelegatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return nil, nil, nil, nil, permError{errWeightTooSmall}
 	}
 
 	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.Stake))
@@ -332,14 +324,7 @@ func (vm *VM) newAddDelegatorTx(
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-
-	synCtx := ProposalSyntacticVerificationContext{
-		ctx:               vm.ctx,
-		minDelegatorStake: vm.MinDelegatorStake,
-		minStakeDuration:  vm.MinStakeDuration,
-		maxStakeDuration:  vm.MaxStakeDuration,
-	}
-	return tx, utx.SyntacticVerify(synCtx)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
 // CanDelegate returns if the [new] delegator can be added to a validator who
