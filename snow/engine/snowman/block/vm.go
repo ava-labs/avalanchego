@@ -4,8 +4,6 @@
 package block
 
 import (
-	"time"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -52,11 +50,6 @@ type ChainVM interface {
 	// a definitionally accepted block, the Genesis block, that will be
 	// returned.
 	LastAccepted() (ids.ID, error)
-}
-
-type SnowmanPlusPlusVM interface {
-	ChainVM
-	GetActivationTime() time.Time
 }
 
 // Getter defines the functionality for fetching a block by its ID.

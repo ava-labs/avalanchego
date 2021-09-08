@@ -654,9 +654,12 @@ func (m *manager) createSnowmanChain(
 		ctx.ValidatorState = valState
 	}
 
-	if vmPlus, ok := vm.(block.SnowmanPlusPlusVM); ok {
-		vm = proposervm.New(vm, vmPlus.GetActivationTime(), 0) // enable ProposerVM on this VM
-	}
+	// TODO: setup upon deploy
+	ap4Timestamp := time.Unix(0, 0)
+	ap4MinPChainHeight := uint64(0)
+
+	// enable ProposerVM on this VM
+	vm = proposervm.New(vm, ap4Timestamp, ap4MinPChainHeight)
 
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig := m.getChainConfig(ctx.ChainID)
