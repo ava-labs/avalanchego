@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ava-labs/coreth/trie"
 )
 
 // BlockValidator is responsible for validating block headers, uncles and
