@@ -278,6 +278,7 @@ func TestMempoolAtmTxsAppResponseHandling(t *testing.T) {
 		wasGossiped   bool
 		gossipedBytes []byte
 	)
+	sender.CantSendAppGossip = false
 	sender.SendAppGossipF = func(b []byte) error {
 		wasGossiped = true
 		gossipedBytes = b
@@ -348,6 +349,7 @@ func TestMempoolAtmTxsAppResponseHandlingInvalidTx(t *testing.T) {
 	net := vm.network
 
 	var wasGossiped bool
+	sender.CantSendAppGossip = false
 	sender.SendAppGossipF = func([]byte) error {
 		wasGossiped = true
 		return nil
@@ -396,6 +398,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 		txRequestedByNode bool
 		requestedBytes    []byte
 	)
+	sender.CantSendAppGossip = false
 	sender.SendAppRequestF = func(nodes ids.ShortSet, reqID uint32, resp []byte) error {
 		txRequested = true
 		if nodes.Contains(nodeID) {
@@ -452,6 +455,7 @@ func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
 	mempool := vm.mempool
 
 	var txRequested bool
+	sender.CantSendAppGossip = false
 	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
 		txRequested = true
 		return nil
@@ -498,6 +502,7 @@ func TestMempoolAtmTxsAppRequestHandling(t *testing.T) {
 		responded      bool
 		respondedBytes []byte
 	)
+	sender.CantSendAppGossip = false
 	sender.SendAppResponseF = func(nodeID ids.ShortID, reqID uint32, resp []byte) error {
 		responded = true
 		respondedBytes = resp
@@ -548,6 +553,7 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 
 	var gossiped bool
+	sender.CantSendAppGossip = false
 	sender.SendAppGossipF = func([]byte) error {
 		gossiped = true
 		return nil
