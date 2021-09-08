@@ -352,7 +352,6 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
-	// store block and cleanup mempool
 	vm.internalState.AddBlock(blk)
 	return blk, vm.internalState.Commit()
 }
@@ -455,13 +454,13 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 }
 
 // GetValidatorSet returns the validator set at the specified height for the
-// provided subnetID. Implements validators.VM interface
+// provided subnetID.
 func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 	lastAcceptedHeight, err := vm.GetCurrentHeight()
-	switch {
-	case err != nil:
+	if err != nil {
 		return nil, err
-	case lastAcceptedHeight < height:
+	}
+	if lastAcceptedHeight < height {
 		return nil, database.ErrNotFound
 	}
 
@@ -508,7 +507,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	return vdrSet, nil
 }
 
-// GetCurrentHeight implements validators.VM interface
+// GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetCurrentHeight() (uint64, error) {
 	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
 	if err != nil {
