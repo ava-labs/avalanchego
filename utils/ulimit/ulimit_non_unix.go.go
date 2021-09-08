@@ -1,10 +1,8 @@
 // This file was taken from:
 // https://github.com/OpenBazaar/openbazaar-go/blob/master/core/ulimit_non_unix.go
 
-// +build !darwin
-// +build !linux
-// +build !netbsd
-// +build !openbsd
+//go:build !darwin && !linux && !netbsd && !openbsd
+// +build !darwin,!linux,!netbsd,!openbsd
 
 package ulimit
 
