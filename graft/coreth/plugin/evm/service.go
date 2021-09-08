@@ -88,7 +88,7 @@ func (api *SnowmanAPI) GetAcceptedFront(ctx context.Context) (*GetAcceptedFrontR
 func (api *SnowmanAPI) IssueBlock(ctx context.Context) error {
 	log.Info("Issuing a new block")
 
-	api.vm.signalTxsReady()
+	api.vm.builder.signalTxsReady()
 	return nil
 }
 

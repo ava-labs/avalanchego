@@ -56,6 +56,7 @@ type environment struct {
 	tcount  int            // tx count in cycle
 	gasPool *core.GasPool  // available gas used to pack transactions
 
+	parent   *types.Header
 	header   *types.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
@@ -193,6 +194,7 @@ func (w *worker) createCurrentEnvironment(parent *types.Block, header *types.Hea
 	return &environment{
 		signer:  types.MakeSigner(w.chainConfig, header.Number, new(big.Int).SetUint64(header.Time)),
 		state:   state,
+		parent:  parent.Header(),
 		header:  header,
 		tcount:  0,
 		gasPool: new(core.GasPool).AddGas(header.GasLimit),
@@ -282,7 +284,7 @@ func (w *worker) commitTransactions(env *environment, txs *types.TransactionsByP
 func (w *worker) commit(env *environment) (*types.Block, error) {
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := copyReceipts(env.receipts)
-	block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.state, env.txs, nil, receipts)
+	block, err := w.engine.FinalizeAndAssemble(w.chain, env.header, env.parent, env.state, env.txs, nil, receipts)
 	if err != nil {
 		return nil, err
 	}
