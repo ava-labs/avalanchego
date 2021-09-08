@@ -107,35 +107,37 @@ var (
 )
 
 var (
-	errEmptyBlock                 = errors.New("empty block")
-	errUnsupportedFXs             = errors.New("unsupported feature extensions")
-	errInvalidBlock               = errors.New("invalid block")
-	errInvalidAddr                = errors.New("invalid hex address")
-	errTooManyAtomicTx            = errors.New("too many pending atomic txs")
-	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
-	errNoImportInputs             = errors.New("tx has no imported inputs")
-	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
-	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errWrongChainID               = errors.New("tx has wrong chain ID")
-	errInsufficientFunds          = errors.New("insufficient funds")
-	errNoExportOutputs            = errors.New("tx has no export outputs")
-	errOutputsNotSorted           = errors.New("tx outputs not sorted")
-	errOutputsNotSortedUnique     = errors.New("outputs not sorted and unique")
-	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
-	errInvalidNonce               = errors.New("invalid nonce")
-	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
-	errUnclesUnsupported          = errors.New("uncles unsupported")
-	errTxHashMismatch             = errors.New("txs hash does not match header")
-	errUncleHashMismatch          = errors.New("uncle hash mismatch")
-	errRejectedParent             = errors.New("rejected parent")
-	errInvalidDifficulty          = errors.New("invalid difficulty")
-	errInvalidBlockVersion        = errors.New("invalid block version")
-	errInvalidMixDigest           = errors.New("invalid mix digest")
-	errInvalidExtDataHash         = errors.New("invalid extra data hash")
-	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
-	errInsufficientFundsForFee    = errors.New("insufficient AVAX funds to pay transaction fee")
-	errNoEVMOutputs               = errors.New("tx has no EVM outputs")
-	errNilBaseFeeApricotPhase3    = errors.New("nil base fee is invalid in apricotPhase3")
+	errEmptyBlock                     = errors.New("empty block")
+	errUnsupportedFXs                 = errors.New("unsupported feature extensions")
+	errInvalidBlock                   = errors.New("invalid block")
+	errInvalidAddr                    = errors.New("invalid hex address")
+	errTooManyAtomicTx                = errors.New("too many pending atomic txs")
+	errAssetIDMismatch                = errors.New("asset IDs in the input don't match the utxo")
+	errNoImportInputs                 = errors.New("tx has no imported inputs")
+	errInputsNotSortedUnique          = errors.New("inputs not sorted and unique")
+	errPublicKeySignatureMismatch     = errors.New("signature doesn't match public key")
+	errWrongChainID                   = errors.New("tx has wrong chain ID")
+	errInsufficientFunds              = errors.New("insufficient funds")
+	errNoExportOutputs                = errors.New("tx has no export outputs")
+	errOutputsNotSorted               = errors.New("tx outputs not sorted")
+	errOutputsNotSortedUnique         = errors.New("outputs not sorted and unique")
+	errOverflowExport                 = errors.New("overflow when computing export amount + txFee")
+	errInvalidNonce                   = errors.New("invalid nonce")
+	errConflictingAtomicInputs        = errors.New("invalid block due to conflicting atomic inputs")
+	errUnclesUnsupported              = errors.New("uncles unsupported")
+	errTxHashMismatch                 = errors.New("txs hash does not match header")
+	errUncleHashMismatch              = errors.New("uncle hash mismatch")
+	errRejectedParent                 = errors.New("rejected parent")
+	errInvalidDifficulty              = errors.New("invalid difficulty")
+	errInvalidBlockVersion            = errors.New("invalid block version")
+	errInvalidMixDigest               = errors.New("invalid mix digest")
+	errInvalidExtDataHash             = errors.New("invalid extra data hash")
+	errHeaderExtraDataTooBig          = errors.New("header extra data too big")
+	errInsufficientFundsForFee        = errors.New("insufficient AVAX funds to pay transaction fee")
+	errNoEVMOutputs                   = errors.New("tx has no EVM outputs")
+	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
+	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
+	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
 )
 
 // buildingBlkStatus denotes the current status of the VM in block production.
@@ -434,7 +436,7 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 	}
 }
 
-func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, error) {
+func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 	snapshot := state.Snapshot()
 	for {
 		tx, exists := vm.mempool.NextTx()
@@ -454,38 +456,38 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			// Discard the transaction from the mempool and error if the transaction
 			// cannot be marshalled. This should never happen.
 			vm.mempool.DiscardCurrentTx()
-			return nil, nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
+			return nil, nil, nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 		}
-		var contribution *big.Int
+		var contribution, gasUsed *big.Int
 		if rules.IsApricotPhase4 {
-			contribution, err = tx.BlockFeeContribution(vm.ctx.AVAXAssetID, header.BaseFee)
+			contribution, gasUsed, err = tx.BlockFeeContribution(vm.ctx.AVAXAssetID, header.BaseFee)
 			if err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
-		return atomicTxBytes, contribution, nil
+		return atomicTxBytes, contribution, gasUsed, nil
 	}
 
 	if len(txs) == 0 {
 		// this could happen due to the async logic of geth tx pool
-		return nil, nil, errEmptyBlock
+		return nil, nil, nil, errEmptyBlock
 	}
 
-	return nil, nil, nil
+	return nil, nil, nil, nil
 }
 
-func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big.Int, error) {
+func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
 	tx, err := vm.extractAtomicTx(block)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// If [tx] is nil, we can return nil for the extra state contribution instead of allocating
 	// a big Int for 0.
 	if tx == nil {
-		return nil, nil
+		return nil, nil, nil
 	}
 	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	switch {
@@ -494,7 +496,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big
 		return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
 	default:
 		// Otherwise, there is no contribution
-		return nil, nil
+		return nil, nil, nil
 	}
 }
 
@@ -1269,6 +1271,8 @@ func (vm *VM) currentRules() params.Rules {
 // follows the ruleset defined by [rules]
 func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
 	switch {
+	case rules.IsApricotPhase4:
+		return phase4BlockValidator
 	case rules.IsApricotPhase3:
 		return phase3BlockValidator
 	case rules.IsApricotPhase2, rules.IsApricotPhase1:

@@ -75,6 +75,10 @@ type Engine interface {
 	// VerifyHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
 	// via the VerifySeal method.
+	//
+	// NOTE: VerifyHeader does not validate the correctness of fields that rely
+	// on the contents of the block (as opposed to the current and/or parent
+	// header).
 	VerifyHeader(chain ChainHeaderReader, header *types.Header) error
 
 	// VerifyUncles verifies that the given block's uncles conform to the consensus

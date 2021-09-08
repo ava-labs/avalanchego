@@ -215,14 +215,15 @@ func TestVerifyBlockFee(t *testing.T) {
 			txs:                    nil,
 			receipts:               nil,
 			extraStateContribution: big.NewInt(100000),
-			shouldErr:              true,
+			shouldErr:              false,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			engine := NewDummyEngine(new(ConsensusCallbacks))
-			if err := engine.verifyBlockFee(test.baseFee, test.maxGasBlockFee, test.blockFeeDuration, test.parentTime, test.currentTime, test.txs, test.receipts, test.extraStateContribution); err != nil {
+			blockGasCost := calcBlockGasCost(test.maxGasBlockFee, test.blockFeeDuration, test.parentTime, test.currentTime)
+			engine := NewFaker()
+			if err := engine.verifyBlockFee(test.baseFee, blockGasCost, test.txs, test.receipts, test.extraStateContribution); err != nil {
 				if !test.shouldErr {
 					t.Fatalf("Unexpected error: %s", err)
 				}
