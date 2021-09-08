@@ -151,7 +151,10 @@ const (
 )
 
 // Codec does serialization and deserialization
-var Codec codec.Manager
+var (
+	Codec          codec.Manager
+	originalStderr *os.File
+)
 
 func init() {
 	Codec = codec.NewDefaultManager()
@@ -181,6 +184,12 @@ func init() {
 	if errs.Errored() {
 		panic(errs.Err)
 	}
+
+	// Preserve [os.Stderr] prior to the call in plugin/main.go to plugin.Serve(...).
+	// Preserving the log level allows us to update the root handler while writing to the original
+	// [os.Stderr] that is being piped through to the logger via the rpcchainvm.
+	originalStderr = os.Stderr
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
 }
 
 // VM implements the snowman.ChainVM interface
@@ -338,7 +347,7 @@ func (vm *VM) Initialize(
 		logLevel = configLogLevel
 	}
 
-	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(originalStderr, log.TerminalFormat(false))))
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
