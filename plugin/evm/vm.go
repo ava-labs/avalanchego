@@ -531,8 +531,6 @@ func (vm *VM) Shutdown() error {
 
 // buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock() (snowman.Block, error) {
-	// TODO: check to see if mempool has enough minimum tip to build rn
-	// -> don't check because had at some point and verification will fail
 	block, err := vm.chain.GenerateBlock()
 	vm.builder.buildBlock()
 	if err != nil {
