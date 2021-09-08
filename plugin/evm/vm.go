@@ -57,11 +57,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+
 	avalancheJSON "github.com/ava-labs/avalanchego/utils/json"
 )
 
 const (
-	x2cRateInt64       int64 = 1000000000
+	x2cRateInt64       int64 = 1_000_000_000
 	x2cRateMinus1Int64 int64 = x2cRateInt64 - 1
 )
 
@@ -72,11 +73,6 @@ var (
 	// places on the X and P chains, but is 18 decimal places within the EVM.
 	x2cRate       = big.NewInt(x2cRateInt64)
 	x2cRateMinus1 = big.NewInt(x2cRateMinus1Int64)
-
-	// GitCommit is set by the build script
-	GitCommit string
-	// Version is the version of Coreth
-	Version string
 
 	_ block.ChainVM = &VM{}
 )
@@ -139,41 +135,10 @@ var (
 	defaultLogLevel                   = log.LvlDebug
 )
 
-// Codec does serialization and deserialization
-var Codec codec.Manager
-
-func init() {
-	Codec = codec.NewDefaultManager()
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(&UnsignedImportTx{}),
-		c.RegisterType(&UnsignedExportTx{}),
-	)
-	c.SkipRegistrations(3)
-	errs.Add(
-		c.RegisterType(&secp256k1fx.TransferInput{}),
-		c.RegisterType(&secp256k1fx.MintOutput{}),
-		c.RegisterType(&secp256k1fx.TransferOutput{}),
-		c.RegisterType(&secp256k1fx.MintOperation{}),
-		c.RegisterType(&secp256k1fx.Credential{}),
-		c.RegisterType(&secp256k1fx.Input{}),
-		c.RegisterType(&secp256k1fx.OutputOwners{}),
-		Codec.RegisterCodec(codecVersion, c),
-	)
-
-	if len(GitCommit) != 0 {
-		Version = fmt.Sprintf("%s@%s", Version, GitCommit)
-	}
-
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-}
-
 // VM implements the snowman.ChainVM interface
 type VM struct {
+	*network
+
 	ctx *snow.Context
 	// *chain.State helps to implement the VM interface by wrapping blocks
 	// with an efficient caching layer.
@@ -239,7 +204,13 @@ func (vm *VM) Logger() logging.Logger { return vm.ctx.Log }
  ******************************************************************************
  */
 
+// implements SnowmanPlusPlusVM interface
+func (vm *VM) GetActivationTime() time.Time {
+	return time.Unix(0, 0) // TODO: setup upon deploy
+}
+
 // Initialize implements the snowman.ChainVM interface
+
 func (vm *VM) Initialize(
 	ctx *snow.Context,
 	dbManager manager.Manager,
@@ -248,6 +219,7 @@ func (vm *VM) Initialize(
 	configBytes []byte,
 	toEngine chan<- commonEng.Message,
 	fxs []*commonEng.Fx,
+	appSender commonEng.AppSender,
 ) error {
 	vm.config.SetDefaults()
 	if len(configBytes) > 0 {
@@ -365,7 +337,21 @@ func (vm *VM) Initialize(
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
+	// initialize new gossip network
+	//
+	// NOTE: This network must be initialized after the atomic mempool.
+	vm.network = vm.NewNetwork(
+		time.Unix(0, 0), // TODO: setup upon deploy
+		appSender,
+		ethChain,
+		vm.mempool,
+		types.LatestSigner(g.Config),
+	)
+
 	// start goroutines to manage block building
+	//
+	// NOTE: gossip network must be initialized first otherwie ETH tx gossip will
+	// not work.
 	vm.builder = vm.NewBlockBuilder(toEngine)
 	vm.builder.handleBlockBuilding()
 
@@ -865,11 +851,40 @@ func (vm *VM) ParseAddress(addrStr string) (ids.ID, ids.ShortID, error) {
 
 // issueTx verifies [tx] as valid to be issued on top of the currently preferred block
 // and then issues [tx] into the mempool if valid.
-func (vm *VM) issueTx(tx *Tx) error {
+func (vm *VM) issueTx(tx *Tx, local bool) error {
 	if err := vm.verifyTxAtTip(tx); err != nil {
+		if !local {
+			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// so that they won't be requested again
+			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+			return nil
+		}
+
 		return err
 	}
-	return vm.mempool.AddTx(tx)
+
+	// add to mempool and possibly re-gossip
+	switch err := vm.mempool.AddTx(tx); err {
+	case nil:
+		return vm.GossipAtomicTx(tx)
+
+	case errTooManyAtomicTx:
+		if !local {
+			// tx has not been accepted to mempool due to size
+			// do not gossip since we cannot serve it
+			return nil
+		}
+
+		return errTooManyAtomicTx // backward compatibility for local txs
+
+	default:
+		if !local {
+			// unlike local txes, currently invalid remote txes are recorded as discarded
+			// so that they won't be requested again
+			vm.mempool.discardedTxs.Put(tx.ID(), tx)
+		}
+		return err
+	}
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block
