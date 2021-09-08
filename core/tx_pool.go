@@ -250,10 +250,16 @@ type TxPool struct {
 	eip2718  bool // Fork indicator whether we are using EIP-2718 type transactions.
 	eip1559  bool // Fork indicator whether we are using EIP-1559 type transactions.
 
-	currentHead   *types.Header
-	currentState  *state.StateDB // Current state in the blockchain head
-	pendingNonces *txNoncer      // Pending state tracking virtual nonces
-	currentMaxGas uint64         // Current gas limit for transaction caps
+	currentHead *types.Header
+	// [currentState] is the state of the blockchain head. It is reset whenever
+	// head changes.
+	currentState *state.StateDB
+	// [currentStateLock] is required to allow concurrent access to address nonces
+	// and balances during reorgs and gossip handling.
+	currentStateLock sync.Mutex
+
+	pendingNonces *txNoncer // Pending state tracking virtual nonces
+	currentMaxGas uint64    // Current gas limit for transaction caps
 
 	locals  *accountSet // Set of local transaction to exempt from eviction rules
 	journal *txJournal  // Journal of local transaction to back up to disk
@@ -609,6 +615,9 @@ func (pool *TxPool) local() map[common.Address]types.Transactions {
 }
 
 func (pool *TxPool) CheckNonceOrdering(from common.Address, txNonce uint64) error {
+	pool.currentStateLock.Lock()
+	defer pool.currentStateLock.Unlock()
+
 	// Ensure the transaction adheres to nonce ordering
 	if currentNonce, txNonce := pool.currentState.GetNonce(from), txNonce; currentNonce > txNonce {
 		return fmt.Errorf("%w: address %s current nonce (%d) > tx nonce (%d)",
@@ -671,9 +680,12 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	}
 	// Transactor should have enough funds to cover the costs
 	// cost == V + GP * GL
+	pool.currentStateLock.Lock()
 	if balance, cost := pool.currentState.GetBalance(from), tx.Cost(); balance.Cmp(cost) < 0 {
+		pool.currentStateLock.Unlock()
 		return fmt.Errorf("%w: address %s have (%d) want (%d)", ErrInsufficientFunds, from.Hex(), balance, cost)
 	}
+	pool.currentStateLock.Unlock()
 	// Ensure the transaction has more gas than the basic tx fee.
 	intrGas, err := IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, true, pool.istanbul)
 	if err != nil {
@@ -1319,7 +1331,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 		return
 	}
 	pool.currentHead = newHead
+	pool.currentStateLock.Lock()
 	pool.currentState = statedb
+	pool.currentStateLock.Unlock()
 	pool.pendingNonces = newTxNoncer(statedb)
 	pool.currentMaxGas = newHead.GasLimit
 
@@ -1341,6 +1355,9 @@ func (pool *TxPool) reset(oldHead, newHead *types.Header) {
 // future queue to the set of pending transactions. During this process, all
 // invalidated transactions (low nonce, low balance) are deleted.
 func (pool *TxPool) promoteExecutables(accounts []common.Address) []*types.Transaction {
+	pool.currentStateLock.Lock()
+	defer pool.currentStateLock.Unlock()
+
 	// Track the promoted transactions to broadcast them at once
 	var promoted []*types.Transaction
 
@@ -1543,6 +1560,9 @@ func (pool *TxPool) truncateQueue() {
 // is always explicitly triggered by SetBaseFee and it would be unnecessary and wasteful
 // to trigger a re-heap is this function
 func (pool *TxPool) demoteUnexecutables() {
+	pool.currentStateLock.Lock()
+	defer pool.currentStateLock.Unlock()
+
 	// Iterate over all accounts and demote any non-executable transactions
 	for addr, list := range pool.pending {
 		nonce := pool.currentState.GetNonce(addr)
