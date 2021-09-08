@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -77,12 +78,9 @@ var (
 )
 
 const (
-	minBlockTime = 2 * time.Second
-	maxBlockTime = 3 * time.Second
 	// Max time from current time allowed for blocks, before they're considered future blocks
 	// and fail verification
 	maxFutureBlockTime   = 10 * time.Second
-	batchSize            = 250
 	maxUTXOsToFetch      = 1024
 	defaultMempoolSize   = 1024
 	codecVersion         = uint16(0)
@@ -103,45 +101,38 @@ var (
 )
 
 var (
-	errEmptyBlock                 = errors.New("empty block")
-	errUnsupportedFXs             = errors.New("unsupported feature extensions")
-	errInvalidBlock               = errors.New("invalid block")
-	errInvalidAddr                = errors.New("invalid hex address")
-	errTooManyAtomicTx            = errors.New("too many pending atomic txs")
-	errAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
-	errNoImportInputs             = errors.New("tx has no imported inputs")
-	errInputsNotSortedUnique      = errors.New("inputs not sorted and unique")
-	errPublicKeySignatureMismatch = errors.New("signature doesn't match public key")
-	errWrongChainID               = errors.New("tx has wrong chain ID")
-	errInsufficientFunds          = errors.New("insufficient funds")
-	errNoExportOutputs            = errors.New("tx has no export outputs")
-	errOutputsNotSorted           = errors.New("tx outputs not sorted")
-	errOutputsNotSortedUnique     = errors.New("outputs not sorted and unique")
-	errOverflowExport             = errors.New("overflow when computing export amount + txFee")
-	errInvalidNonce               = errors.New("invalid nonce")
-	errConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
-	errUnclesUnsupported          = errors.New("uncles unsupported")
-	errTxHashMismatch             = errors.New("txs hash does not match header")
-	errUncleHashMismatch          = errors.New("uncle hash mismatch")
-	errRejectedParent             = errors.New("rejected parent")
-	errInvalidDifficulty          = errors.New("invalid difficulty")
-	errInvalidBlockVersion        = errors.New("invalid block version")
-	errInvalidMixDigest           = errors.New("invalid mix digest")
-	errInvalidExtDataHash         = errors.New("invalid extra data hash")
-	errHeaderExtraDataTooBig      = errors.New("header extra data too big")
-	errInsufficientFundsForFee    = errors.New("insufficient AVAX funds to pay transaction fee")
-	errNoEVMOutputs               = errors.New("tx has no EVM outputs")
-	errNilBaseFeeApricotPhase3    = errors.New("nil base fee is invalid in apricotPhase3")
-)
-
-// buildingBlkStatus denotes the current status of the VM in block production.
-type buildingBlkStatus uint8
-
-const (
-	dontBuild buildingBlkStatus = iota
-	conditionalBuild
-	mayBuild
-	building
+	errEmptyBlock                     = errors.New("empty block")
+	errUnsupportedFXs                 = errors.New("unsupported feature extensions")
+	errInvalidBlock                   = errors.New("invalid block")
+	errInvalidAddr                    = errors.New("invalid hex address")
+	errTooManyAtomicTx                = errors.New("too many pending atomic txs")
+	errAssetIDMismatch                = errors.New("asset IDs in the input don't match the utxo")
+	errNoImportInputs                 = errors.New("tx has no imported inputs")
+	errInputsNotSortedUnique          = errors.New("inputs not sorted and unique")
+	errPublicKeySignatureMismatch     = errors.New("signature doesn't match public key")
+	errWrongChainID                   = errors.New("tx has wrong chain ID")
+	errInsufficientFunds              = errors.New("insufficient funds")
+	errNoExportOutputs                = errors.New("tx has no export outputs")
+	errOutputsNotSorted               = errors.New("tx outputs not sorted")
+	errOutputsNotSortedUnique         = errors.New("outputs not sorted and unique")
+	errOverflowExport                 = errors.New("overflow when computing export amount + txFee")
+	errInvalidNonce                   = errors.New("invalid nonce")
+	errConflictingAtomicInputs        = errors.New("invalid block due to conflicting atomic inputs")
+	errUnclesUnsupported              = errors.New("uncles unsupported")
+	errTxHashMismatch                 = errors.New("txs hash does not match header")
+	errUncleHashMismatch              = errors.New("uncle hash mismatch")
+	errRejectedParent                 = errors.New("rejected parent")
+	errInvalidDifficulty              = errors.New("invalid difficulty")
+	errInvalidBlockVersion            = errors.New("invalid block version")
+	errInvalidMixDigest               = errors.New("invalid mix digest")
+	errInvalidExtDataHash             = errors.New("invalid extra data hash")
+	errHeaderExtraDataTooBig          = errors.New("header extra data too big")
+	errInsufficientFundsForFee        = errors.New("insufficient AVAX funds to pay transaction fee")
+	errNoEVMOutputs                   = errors.New("tx has no EVM outputs")
+	errNilBaseFeeApricotPhase3        = errors.New("nil base fee is invalid after apricotPhase3")
+	errNilExtDataGasUsedApricotPhase4 = errors.New("nil extDataGasUsed is invalid after apricotPhase4")
+	errNilBlockGasCostApricotPhase4   = errors.New("nil blockGasCost is invalid after apricotPhase4")
+	defaultLogLevel                   = log.LvlDebug
 )
 
 // VM implements the snowman.ChainVM interface
@@ -170,22 +161,7 @@ type VM struct {
 	// [acceptedAtomicTxDB] maintains an index of accepted atomic txs.
 	acceptedAtomicTxDB database.Database
 
-	// A message is sent on this channel when a new block
-	// is ready to be build. This notifies the consensus engine.
-	notifyBuildBlockChan chan<- commonEng.Message
-
-	// [buildBlockLock] must be held when accessing [buildStatus]
-	buildBlockLock sync.Mutex
-	// [buildBlockTimer] is a two stage timer handling block production.
-	// Stage1 build a block if the batch size has been reached.
-	// Stage2 build a block regardless of the size.
-	buildBlockTimer *timer.Timer
-	// buildStatus signals the phase of block building the VM is currently in.
-	// [dontBuild] indicates there's no need to build a block.
-	// [conditionalBuild] indicates build a block if the batch size has been reached.
-	// [mayBuild] indicates the VM should proceed to build a block.
-	// [building] indicates the VM has sent a request to the engine to build a block.
-	buildStatus buildingBlkStatus
+	builder *blockBuilder
 
 	baseCodec codec.Registry
 	codec     codec.Manager
@@ -298,6 +274,18 @@ func (vm *VM) Initialize(
 	ethConfig := ethconfig.NewDefaultConfig()
 	ethConfig.Genesis = g
 
+	// Set log level
+	logLevel := defaultLogLevel
+	if vm.config.LogLevel != "" {
+		configLogLevel, err := log.LvlFromString(vm.config.LogLevel)
+		if err != nil {
+			return fmt.Errorf("failed to initialize logger due to: %w ", err)
+		}
+		logLevel = configLogLevel
+	}
+
+	log.Root().SetHandler(log.LvlFilterHandler(logLevel, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
+
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
 	ethConfig.RPCGasCap = vm.config.RPCGasCap
@@ -321,7 +309,8 @@ func (vm *VM) Initialize(
 
 	vm.codec = Codec
 
-	vm.mempool = NewMempool(defaultMempoolSize) // TODO: read size from settings
+	// TODO: read size from settings
+	vm.mempool = NewMempool(defaultMempoolSize)
 
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
@@ -348,12 +337,9 @@ func (vm *VM) Initialize(
 	// start goroutines to update the tx pool gas minimum gas price when upgrades go into effect
 	vm.handleGasPriceUpdates()
 
-	vm.notifyBuildBlockChan = toEngine
-
-	// buildBlockTimer handles passing PendingTxs messages to the consensus engine.
-	vm.buildBlockTimer = timer.NewStagedTimer(vm.buildBlockTwoStageTimer)
-	vm.buildStatus = dontBuild
-	go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
+	// start goroutines to manage block building
+	vm.builder = vm.NewBlockBuilder(toEngine)
+	vm.builder.handleBlockBuilding()
 
 	vm.chain.Start()
 
@@ -385,9 +371,7 @@ func (vm *VM) Initialize(
 		BuildBlock:         vm.buildBlock,
 	})
 
-	vm.shutdownWg.Add(1)
-	go vm.ctx.Log.RecoverAndPanic(vm.awaitSubmittedTxs)
-
+	vm.builder.awaitSubmittedTxs()
 	go vm.ctx.Log.RecoverAndPanic(vm.startContinuousProfiler)
 
 	// The Codec explicitly registers the types it requires from the secp256k1fx
@@ -414,7 +398,7 @@ func (vm *VM) createConsensusCallbacks() *dummy.ConsensusCallbacks {
 	}
 }
 
-func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, error) {
+func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 	snapshot := state.Snapshot()
 	for {
 		tx, exists := vm.mempool.NextTx()
@@ -434,28 +418,48 @@ func (vm *VM) onFinalizeAndAssemble(header *types.Header, state *state.StateDB, 
 			// Discard the transaction from the mempool and error if the transaction
 			// cannot be marshalled. This should never happen.
 			vm.mempool.DiscardCurrentTx()
-			return nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
+			return nil, nil, nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 		}
-		return atomicTxBytes, nil
+		var contribution, gasUsed *big.Int
+		if rules.IsApricotPhase4 {
+			contribution, gasUsed, err = tx.BlockFeeContribution(vm.ctx.AVAXAssetID, header.BaseFee)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+		}
+		return atomicTxBytes, contribution, gasUsed, nil
 	}
 
 	if len(txs) == 0 {
 		// this could happen due to the async logic of geth tx pool
-		return nil, errEmptyBlock
+		return nil, nil, nil, errEmptyBlock
 	}
 
-	return nil, nil
+	return nil, nil, nil, nil
 }
 
-func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) error {
+func (vm *VM) onExtraStateChange(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
 	tx, err := vm.extractAtomicTx(block)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
+	// If [tx] is nil, we can return nil for the extra state contribution instead of allocating
+	// a big Int for 0.
 	if tx == nil {
-		return nil
+		return nil, nil, nil
 	}
-	return tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state)
+	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.ctx, state); err != nil {
+		return nil, nil, err
+	}
+
+	switch {
+	// If ApricotPahse4 is enabled, calculate the block fee contribution
+	case vm.chainConfig.IsApricotPhase4(new(big.Int).SetUint64(block.Time())):
+		return tx.BlockFeeContribution(vm.ctx.AVAXAssetID, block.BaseFee())
+	default:
+		// Otherwise, there is no contribution
+		return nil, nil, nil
+	}
 }
 
 func (vm *VM) pruneChain() error {
@@ -500,7 +504,6 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.buildBlockTimer.Stop()
 	close(vm.shutdownChan)
 	vm.chain.Stop()
 	vm.shutdownWg.Wait()
@@ -510,21 +513,7 @@ func (vm *VM) Shutdown() error {
 // buildBlock builds a block to be wrapped by ChainState
 func (vm *VM) buildBlock() (snowman.Block, error) {
 	block, err := vm.chain.GenerateBlock()
-	// Set the buildStatus before calling Cancel or Issue on
-	// the mempool and after generating the block.
-	// This prevents [needToBuild] from returning true when the
-	// produced block will change whether or not we need to produce
-	// another block and also ensures that when the mempool adds a
-	// new item to Pending it will be handled appropriately by [signalTxsReady]
-	vm.buildBlockLock.Lock()
-	if vm.needToBuild() {
-		vm.buildStatus = conditionalBuild
-		vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
-	} else {
-		vm.buildStatus = dontBuild
-	}
-	vm.buildBlockLock.Unlock()
-
+	vm.builder.buildBlock()
 	if err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, err
@@ -539,15 +528,17 @@ func (vm *VM) buildBlock() (snowman.Block, error) {
 
 	// Verify is called on a non-wrapped block here, such that this
 	// does not add [blk] to the processing blocks map in ChainState.
+	//
 	// TODO cache verification since Verify() will be called by the
 	// consensus engine as well.
+	//
 	// Note: this is only called when building a new block, so caching
 	// verification will only be a significant optimization for nodes
 	// that produce a large number of blocks.
 	// We call verify without writes here to avoid generating a reference
 	// to the blk state root in the triedb when we are going to call verify
 	// again from the consensus engine with writes enabled.
-	if err := blk.verify(false); err != nil {
+	if err := blk.verify( /*writes*/ false); err != nil {
 		vm.mempool.CancelCurrentTx()
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}
@@ -825,110 +816,6 @@ func (vm *VM) writeAtomicTx(blk *Block, tx *Tx) error {
 	txID := tx.ID()
 
 	return vm.acceptedAtomicTxDB.Put(txID[:], packer.Bytes)
-}
-
-// needToBuild returns true if there are outstanding transactions to be issued
-// into a block.
-func (vm *VM) needToBuild() bool {
-	size, err := vm.chain.PendingSize()
-	if err != nil {
-		log.Error("Failed to get chain pending size", "error", err)
-		return false
-	}
-	return size > 0 || vm.mempool.Len() > 0
-}
-
-// buildEarly returns true if there are sufficient outstanding transactions to
-// be issued into a block to build a block early.
-func (vm *VM) buildEarly() bool {
-	size, err := vm.chain.PendingSize()
-	if err != nil {
-		log.Error("Failed to get chain pending size", "error", err)
-		return false
-	}
-	return size > batchSize || vm.mempool.Len() > 1
-}
-
-// buildBlockTwoStageTimer is a two stage timer that sends a notification
-// to the engine when the VM is ready to build a block.
-// If it should be called back again, it returns the timeout duration at
-// which it should be called again.
-func (vm *VM) buildBlockTwoStageTimer() (time.Duration, bool) {
-	vm.buildBlockLock.Lock()
-	defer vm.buildBlockLock.Unlock()
-
-	switch vm.buildStatus {
-	case dontBuild:
-		return 0, false
-	case conditionalBuild:
-		if !vm.buildEarly() {
-			vm.buildStatus = mayBuild
-			return (maxBlockTime - minBlockTime), true
-		}
-	case mayBuild:
-	case building:
-		// If the status has already been set to building, there is no need
-		// to send an additional request to the consensus engine until the call
-		// to BuildBlock resets the block status.
-		return 0, false
-	default:
-		// Log an error if an invalid status is found.
-		log.Error("Found invalid build status in build block timer", "buildStatus", vm.buildStatus)
-	}
-
-	select {
-	case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
-		vm.buildStatus = building
-	default:
-		log.Error("Failed to push PendingTxs notification to the consensus engine.")
-	}
-
-	// No need for the timeout to fire again until BuildBlock is called.
-	return 0, false
-}
-
-// signalTxsReady sets the initial timeout on the two stage timer if the process
-// has not already begun from an earlier notification. If [buildStatus] is anything
-// other than [dontBuild], then the attempt has already begun and this notification
-// can be safely skipped.
-func (vm *VM) signalTxsReady() {
-	vm.buildBlockLock.Lock()
-	defer vm.buildBlockLock.Unlock()
-
-	// Set the build block timer in motion if it has not been started.
-	if vm.buildStatus == dontBuild {
-		vm.buildStatus = conditionalBuild
-		vm.buildBlockTimer.SetTimeoutIn(minBlockTime)
-	}
-}
-
-// awaitSubmittedTxs waits for new transactions to be submitted
-// and notifies the VM when the tx pool has transactions to be
-// put into a new block.
-func (vm *VM) awaitSubmittedTxs() {
-	defer vm.shutdownWg.Done()
-	txSubmitChan := vm.chain.GetTxSubmitCh()
-
-	for {
-		select {
-		case <-vm.shutdownChan:
-			return
-		case ethTxsEvent := <-txSubmitChan:
-			log.Trace("New tx detected, trying to generate a block")
-			vm.signalTxsReady()
-
-			if err := vm.GossipEthTxs(ethTxsEvent.Txs); err != nil {
-				log.Warn(
-					"failed to gossip new eth transactions",
-					"err", err,
-				)
-			}
-
-		case <-vm.mempool.Pending:
-			log.Trace("New atomic Tx detected, trying to generate a block")
-			vm.signalTxsReady()
-		}
-	}
 }
 
 // ParseAddress takes in an address and produces the ID of the chain it's for
@@ -1267,6 +1154,8 @@ func (vm *VM) currentRules() params.Rules {
 // follows the ruleset defined by [rules]
 func (vm *VM) getBlockValidator(rules params.Rules) BlockValidator {
 	switch {
+	case rules.IsApricotPhase4:
+		return phase4BlockValidator
 	case rules.IsApricotPhase3:
 		return phase3BlockValidator
 	case rules.IsApricotPhase2, rules.IsApricotPhase1:

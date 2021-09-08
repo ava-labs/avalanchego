@@ -42,12 +42,12 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
+	"github.com/ava-labs/coreth/ethdb"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/trie"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/trie"
 	lru "github.com/hashicorp/golang-lru"
 )
 
@@ -264,9 +264,6 @@ func (bc *BlockChain) SenderCacher() *TxSenderCacher {
 }
 
 // empty returns an indicator whether the blockchain is empty.
-// Note, it's a special case that we connect a non-empty ancient
-// database with an empty node, so that we can plugin the ancient
-// into node seamlessly.
 func (bc *BlockChain) empty() bool {
 	genesis := bc.genesisBlock.Hash()
 	for _, hash := range []common.Hash{rawdb.ReadHeadBlockHash(bc.db), rawdb.ReadHeadHeaderHash(bc.db), rawdb.ReadHeadFastBlockHash(bc.db)} {
@@ -1159,7 +1156,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	// If we have a followup block, run that against the current state to pre-cache
 	// transactions and probabilistically some of the account/storage trie nodes.
 	// Process block using the parent state as reference point
-	receipts, logs, usedGas, err := bc.processor.Process(block, statedb, bc.vmConfig)
+	receipts, logs, usedGas, err := bc.processor.Process(block, parent, statedb, bc.vmConfig)
 	if err != nil {
 		bc.reportBlock(block, receipts, err)
 		return err
@@ -1614,11 +1611,12 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64, report
 			logged = time.Now()
 		}
 		// Retrieve the next block to regenerate and process it
+		parent := current
 		next := current.NumberU64() + 1
 		if current = bc.GetBlockByNumber(next); current == nil {
 			return fmt.Errorf("failed to retrieve block %d while re-generating state", next)
 		}
-		receipts, _, usedGas, err := bc.processor.Process(current, statedb, vm.Config{})
+		receipts, _, usedGas, err := bc.processor.Process(current, parent.Header(), statedb, vm.Config{})
 		if err != nil {
 			return fmt.Errorf("failed to re-process block (%s: %d): %v", current.Hash().Hex(), current.NumberU64(), err)
 		}

@@ -22,4 +22,6 @@ var (
 	ApricotPhase3MinBaseFee     int64 = 75_000_000_000
 	ApricotPhase3MaxBaseFee     int64 = 225_000_000_000
 	ApricotPhase3InitialBaseFee int64 = 225_000_000_000
+	ApricotPhase4MinBaseFee     int64 = 25_000_000_000
+	ApricotPhase4MaxBaseFee     int64 = 1_000_000_000_000
 )
