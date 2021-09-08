@@ -121,6 +121,7 @@ func (sb *StandardBlock) Verify() error {
 
 	sb.timestamp = sb.onAcceptState.GetTimestamp()
 
+	sb.vm.blockBuilder.RemoveDecisionTxs(sb.Txs)
 	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil

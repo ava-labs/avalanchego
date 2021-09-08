@@ -199,6 +199,7 @@ func (pb *ProposalBlock) Verify() error {
 
 	pb.timestamp = parentState.GetTimestamp()
 
+	pb.vm.blockBuilder.RemoveProposalTx(&pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
 	parentIntf.addChild(pb)
 	return nil

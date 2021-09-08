@@ -359,20 +359,7 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 
 	// store block and cleanup mempool
 	vm.internalState.AddBlock(blk)
-	err := vm.internalState.Commit()
-
-	switch typedBlk := blk.(type) {
-	case *StandardBlock:
-		vm.blockBuilder.RemoveDecisionTxs(typedBlk.Txs)
-	case *AtomicBlock:
-		vm.blockBuilder.RemoveAtomicTx(&typedBlk.Tx)
-	case *ProposalBlock:
-		vm.blockBuilder.RemoveProposalTx(&typedBlk.Tx)
-	default:
-		vm.ctx.Log.Warn("Unknown tx type. Could not cleanup mempool")
-	}
-
-	return blk, err
+	return blk, vm.internalState.Commit()
 }
 
 // GetBlock implements the snowman.ChainVM interface
