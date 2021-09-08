@@ -268,7 +268,7 @@ func TestGetTxStatus(t *testing.T) {
 	}
 
 	// put the chain in existing chain list
-	if err := service.vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if _, err := service.vm.BuildBlock(); err == nil {
 		t.Fatal("should have errored because of missing funds")
@@ -299,7 +299,7 @@ func TestGetTxStatus(t *testing.T) {
 	service.vm.AtomicUTXOManager = newAtomicUTXOManager
 	service.vm.ctx.SharedMemory = sm
 
-	if err := service.vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if block, err := service.vm.BuildBlock(); err != nil {
 		t.Fatal(err)
@@ -396,7 +396,7 @@ func TestGetTx(t *testing.T) {
 		var response api.FormattedTx
 		if err := service.GetTx(nil, arg, &response); err == nil {
 			t.Fatalf("failed test '%s': haven't issued tx yet so shouldn't be able to get it", test.description)
-		} else if err := service.vm.blockBuilder.IssueTx(tx); err != nil {
+		} else if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)
 		} else if block, err := service.vm.BuildBlock(); err != nil {
 			t.Fatalf("failed test '%s': %s", test.description, err)

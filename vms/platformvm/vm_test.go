@@ -336,7 +336,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -409,7 +409,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
-	} else if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -626,7 +626,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -773,7 +773,7 @@ func TestAddValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -849,7 +849,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	_, err = vm.BuildBlock()
@@ -894,7 +894,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -977,7 +977,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -1338,7 +1338,7 @@ func TestCreateChain(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
@@ -1396,7 +1396,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.blockBuilder.IssueTx(createSubnetTx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(createSubnetTx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create subnet
 		t.Fatal(err)
@@ -1440,7 +1440,7 @@ func TestCreateSubnet(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := vm.blockBuilder.IssueTx(addValidatorTx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(addValidatorTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1677,7 +1677,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		t.Fatal(err)

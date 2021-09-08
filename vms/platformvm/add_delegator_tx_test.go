@@ -372,7 +372,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.IssueTx(addValidatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
 	assert.NoError(err)
 
 	addValidatorBlock, err := vm.BuildBlock()
@@ -403,7 +403,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.IssueTx(addFirstDelegatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
 	assert.NoError(err)
 
 	addFirstDelegatorBlock, err := vm.BuildBlock()
@@ -436,7 +436,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.IssueTx(addSecondDelegatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
 	assert.NoError(err)
 
 	addSecondDelegatorBlock, err := vm.BuildBlock()
@@ -460,7 +460,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.blockBuilder.IssueTx(addThirdDelegatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
 	assert.NoError(err)
 
 	// Verify the proposed tx is invalid
@@ -541,7 +541,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the add validator tx
-			err = vm.blockBuilder.IssueTx(addValidatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the validator tx
@@ -563,7 +563,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the first add delegator tx
-			err = vm.blockBuilder.IssueTx(addFirstDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the first add delegator tx
@@ -585,7 +585,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the second add delegator tx
-			err = vm.blockBuilder.IssueTx(addSecondDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the second add delegator tx
@@ -607,7 +607,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the third add delegator tx
-			err = vm.blockBuilder.IssueTx(addThirdDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the third add delegator tx
@@ -629,7 +629,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the fourth add delegator tx
-			err = vm.blockBuilder.IssueTx(addFourthDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx

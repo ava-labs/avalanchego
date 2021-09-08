@@ -237,42 +237,19 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 		return nil
 	}
 
-	// TODO: call vm.IssueTx here?
-
-	switch {
-	case h.net.mempool.Has(txID):
-		return nil
-	case h.net.mempool.WasDropped(txID):
-		return nil
-	}
-
-	// validate tx
-	err = tx.UnsignedTx.SyntacticVerify(h.net.vm.ctx)
-	if err != nil {
-		h.net.log.Trace(
-			"AppResponse provided tx %s that is syntactically invalid: %s",
-			txID,
-			err,
-		)
-		h.net.vm.blockBuilder.MarkDropped(txID)
+	if h.net.mempool.WasDropped(txID) {
+		// If the tx is being dropped - just ignore it
 		return nil
 	}
 
 	// add to mempool
-	err = h.net.mempool.AddUncheckedTx(tx)
-	if err == errMempoolFull {
-		// tx has not been accepted to mempool due to size do not gossip since
-		// we cannot serve it
-		return nil
-	}
+	err = h.net.mempool.AddUnverifiedTx(tx)
 	if err != nil {
 		h.net.log.Debug(
-			"AppResponse failed AddUnchecked from %s with: %s",
+			"AppResponse failed AddUnverifiedTx from %s with: %s",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			err,
 		)
-
-		h.net.mempool.MarkDropped(txID)
 		return nil
 	}
 	return h.net.GossipTx(tx)

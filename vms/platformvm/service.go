@@ -1096,7 +1096,7 @@ func (service *Service) AddValidator(_ *http.Request, args *AddValidatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1220,7 +1220,7 @@ func (service *Service) AddDelegator(_ *http.Request, args *AddDelegatorArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1341,7 +1341,7 @@ func (service *Service) AddSubnetValidator(_ *http.Request, args *AddSubnetValid
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1435,7 +1435,7 @@ func (service *Service) CreateSubnet(_ *http.Request, args *CreateSubnetArgs, re
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1535,7 +1535,7 @@ func (service *Service) ExportAVAX(_ *http.Request, args *ExportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1629,7 +1629,7 @@ func (service *Service) ImportAVAX(_ *http.Request, args *ImportAVAXArgs, respon
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -1768,7 +1768,7 @@ func (service *Service) CreateBlockchain(_ *http.Request, args *CreateBlockchain
 	errs := wrappers.Errs{}
 	errs.Add(
 		err,
-		service.vm.blockBuilder.IssueTx(tx),
+		service.vm.blockBuilder.AddUnverifiedTx(tx),
 		db.Close(),
 	)
 	return errs.Err
@@ -2045,7 +2045,7 @@ func (service *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	if _, err := Codec.Unmarshal(txBytes, tx); err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
-	if err := service.vm.blockBuilder.IssueTx(tx); err != nil {
+	if err := service.vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		return fmt.Errorf("couldn't issue tx: %w", err)
 	}
 

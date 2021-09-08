@@ -70,7 +70,7 @@ func (pb *ProposalBlock) Reject() error {
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
-	if err := pb.vm.blockBuilder.IssueTx(&pb.Tx); err != nil {
+	if err := pb.vm.blockBuilder.AddVerifiedTx(&pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			pb.Tx.ID(),

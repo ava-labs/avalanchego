@@ -21,8 +21,9 @@ const (
 )
 
 var (
-	errEndOfTime       = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
-	errNoPendingBlocks = errors.New("no pending blocks")
+	errEndOfTime         = errors.New("program time is suspiciously far in the future. Either this codebase was way more successful than expected, or a critical error has occurred")
+	errNoPendingBlocks   = errors.New("no pending blocks")
+	errMempoolReentrancy = errors.New("mempool reentrancy")
 )
 
 // blockBuilder implements a simple blockBuilder to convert txs into valid blocks
@@ -58,27 +59,34 @@ func (m *blockBuilder) Initialize(vm *VM) {
 }
 
 // IssueTx enqueues the [tx] to be put into a block
-func (m *blockBuilder) IssueTx(tx *Tx) error {
-	if m.dropIncoming {
-		return nil
-	}
-
+func (m *blockBuilder) AddUnverifiedTx(tx *Tx) error {
 	// Initialize the transaction
 	if err := tx.Sign(Codec, nil); err != nil {
 		return err
 	}
 
-	switch err := m.AddUncheckedTx(tx); err {
-	case nil:
-		return m.vm.GossipTx(tx)
-	case errDuplicatedTx:
+	txID := tx.ID()
+	if m.Has(txID) {
 		return nil // backward compatibility
-	default:
+	}
+
+	if err := tx.UnsignedTx.SyntacticVerify(m.vm.ctx); err != nil {
+		txID := tx.ID()
+		m.MarkDropped(txID)
 		return err
 	}
+
+	if err := m.AddVerifiedTx(tx); err != nil {
+		return err
+	}
+	return m.vm.GossipTx(tx)
 }
 
-func (m *blockBuilder) AddUncheckedTx(tx *Tx) error {
+func (m *blockBuilder) AddVerifiedTx(tx *Tx) error {
+	if m.dropIncoming {
+		return errMempoolReentrancy
+	}
+
 	if err := m.Add(tx); err != nil {
 		return err
 	}

@@ -29,7 +29,7 @@ func TestBlockBuilder_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	tx := getTheValidTx(vm, t)
 	txID := tx.ID()
 
-	err := mempool.IssueTx(tx)
+	err := mempool.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
 	has := mempool.Has(txID)
@@ -70,12 +70,12 @@ func TestBlockBuilder_MaxMempoolSizeHandling(t *testing.T) {
 	// shortcut to simulated almost filled mempool
 	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes()) + 1
 
-	err := blockBuilder.AddUncheckedTx(tx)
+	err := blockBuilder.AddVerifiedTx(tx)
 	assert.Equal(errMempoolFull, err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
 	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes())
 
-	err = blockBuilder.AddUncheckedTx(tx)
+	err = blockBuilder.AddVerifiedTx(tx)
 	assert.NoError(err, "should have added tx to mempool")
 }

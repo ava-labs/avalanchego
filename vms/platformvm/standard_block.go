@@ -135,7 +135,7 @@ func (sb *StandardBlock) Reject() error {
 	)
 
 	for _, tx := range sb.Txs {
-		if err := sb.vm.blockBuilder.IssueTx(tx); err != nil {
+		if err := sb.vm.blockBuilder.AddVerifiedTx(tx); err != nil {
 			sb.vm.ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
 				tx.ID(),

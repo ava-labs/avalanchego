@@ -374,7 +374,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	assert.False(wasResponded, "there should be no response with an unknown tx")
 
 	// show that there is response if tx is known
-	err = mempool.AddUncheckedTx(tx)
+	err = mempool.AddVerifiedTx(tx)
 	assert.NoError(err, "could not add tx to mempool")
 
 	err = vm.AppRequest(nodeID, 0, msgBytes)
@@ -414,7 +414,7 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 	tx := getTheValidTx(vm, t)
 	txID := tx.ID()
 
-	err := mempool.IssueTx(tx)
+	err := mempool.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
 	replyIntf, err := message.Parse(gossipedBytes)
