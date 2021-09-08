@@ -258,6 +258,11 @@ func (bc *BlockChain) GetVMConfig() *vm.Config {
 	return &bc.vmConfig
 }
 
+// SenderCacher returns the *TxSenderCacher used within the core package.
+func (bc *BlockChain) SenderCacher() *TxSenderCacher {
+	return senderCacher
+}
+
 // empty returns an indicator whether the blockchain is empty.
 func (bc *BlockChain) empty() bool {
 	genesis := bc.genesisBlock.Hash()
@@ -1080,7 +1085,7 @@ func (bc *BlockChain) gatherBlockLogs(hash common.Hash, number uint64, removed b
 }
 
 func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
-	senderCacher.recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
+	senderCacher.Recover(types.MakeSigner(bc.chainConfig, block.Number(), new(big.Int).SetUint64(block.Time())), block.Transactions())
 
 	err := bc.engine.VerifyHeader(bc, block.Header())
 	if err == nil {
