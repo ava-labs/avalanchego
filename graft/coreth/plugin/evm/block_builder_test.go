@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/params"
+
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 func TestBlockBuilderShutsDown(t *testing.T) {
@@ -21,6 +23,7 @@ func TestBlockBuilderShutsDown(t *testing.T) {
 	// buildBlocktimer.
 	config.ApricotPhase4BlockTimestamp = big.NewInt(time.Now().Add(time.Hour).Unix())
 	builder := &blockBuilder{
+		ctx:          snow.DefaultContextTest(),
 		chainConfig:  &config,
 		shutdownChan: shutdownChan,
 		shutdownWg:   wg,
@@ -37,6 +40,7 @@ func TestBlockBuilderSkipsTimerInitialization(t *testing.T) {
 	shutdownChan := make(chan struct{})
 	wg := &sync.WaitGroup{}
 	builder := &blockBuilder{
+		ctx:          snow.DefaultContextTest(),
 		chainConfig:  params.TestChainConfig,
 		shutdownChan: shutdownChan,
 		shutdownWg:   wg,
@@ -54,8 +58,9 @@ func TestBlockBuilderStopsTimer(t *testing.T) {
 	config := *params.TestChainConfig
 	// Set ApricotPhase4BlockTime 250ms in the future so that it will
 	// create a goroutine waiting for the time to stop timer
-	config.ApricotPhase4BlockTimestamp = big.NewInt(time.Now().Add(250 * time.Millisecond).Unix())
+	config.ApricotPhase4BlockTimestamp = big.NewInt(time.Now().Add(1 * time.Second).Unix())
 	builder := &blockBuilder{
+		ctx:          snow.DefaultContextTest(),
 		chainConfig:  &config,
 		shutdownChan: shutdownChan,
 		shutdownWg:   wg,
