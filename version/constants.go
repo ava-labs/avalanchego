@@ -49,6 +49,7 @@ var (
 	}
 	ApricotPhase3DefaultTime = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 
+	// TODO: populate with real values
 	ApricotPhase4Times = map[uint32]time.Time{
 		constants.MainnetID: time.Date(2029, time.August, 24, 14, 0, 0, 0, time.UTC),
 		constants.FujiID:    time.Date(2029, time.August, 16, 19, 0, 0, 0, time.UTC),
