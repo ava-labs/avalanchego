@@ -37,6 +37,7 @@ type blockBuilder struct {
 
 	chain   *coreth.ETHChain
 	mempool *Mempool
+	network *network
 
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -69,6 +70,7 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 		chainConfig:          vm.chainConfig,
 		chain:                vm.chain,
 		mempool:              vm.mempool,
+		network:              vm.network,
 		shutdownChan:         vm.shutdownChan,
 		shutdownWg:           &vm.shutdownWg,
 		notifyBuildBlockChan: notifyBuildBlockChan,
@@ -256,12 +258,23 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 		txSubmitChan := b.chain.GetTxSubmitCh()
 		for {
 			select {
-			case <-txSubmitChan:
+			case ethTxsEvent := <-txSubmitChan:
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
+
+				if b.network != nil {
+					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
+						log.Warn(
+							"failed to gossip new eth transactions",
+							"err", err,
+						)
+					}
+				}
 			case <-b.mempool.Pending:
 				log.Trace("New atomic Tx detected, trying to generate a block")
 				b.signalTxsReady()
+				// Unlike EthTxs, AtomicTxs are gossiped in [issueTx] when they are
+				// successfully added to the mempool.
 			case <-b.shutdownChan:
 				return
 			}
