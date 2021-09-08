@@ -202,7 +202,7 @@ func getInvalidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 
 // shows that an atomic tx received as gossip response can be added to the
 // mempool and then removed by inclusion in a block
-func TestMempoolAddGossipedAtomicTx(t *testing.T) {
+func TestMempoolAtmTxsAddGossiped(t *testing.T) {
 	assert := assert.New(t)
 
 	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")

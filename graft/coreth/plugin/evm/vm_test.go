@@ -3786,8 +3786,10 @@ func TestConfigureLogLevel(t *testing.T) {
 	for _, test := range configTests {
 		t.Run(test.name, func(t *testing.T) {
 			vm := &VM{}
-			appSender := &engCommon.SenderTest{}
 			ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
+			appSender := &engCommon.SenderTest{}
+			appSender.CantSendAppGossip = true
+			appSender.SendAppGossipF = func([]byte) error { return nil }
 			err := vm.Initialize(
 				ctx,
 				dbManager,
