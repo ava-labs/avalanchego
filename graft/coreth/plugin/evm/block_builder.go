@@ -8,6 +8,7 @@ import (
 	coreth "github.com/ava-labs/coreth/chain"
 	"github.com/ava-labs/coreth/params"
 
+	"github.com/ava-labs/avalanchego/snow"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ethereum/go-ethereum/log"
@@ -28,6 +29,7 @@ const (
 )
 
 type blockBuilder struct {
+	ctx          *snow.Context
 	chainConfig  *params.ChainConfig
 	shutdownChan <-chan struct{}
 	shutdownWg   *sync.WaitGroup
@@ -55,6 +57,7 @@ type blockBuilder struct {
 
 func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *blockBuilder {
 	return &blockBuilder{
+		ctx:                  vm.ctx,
 		chainConfig:          vm.chainConfig,
 		chain:                vm.chain,
 		mempool:              vm.mempool,
@@ -67,29 +70,34 @@ func (vm *VM) NewBlockBuilder(notifyBuildBlockChan chan<- commonEng.Message) *bl
 
 func (b *blockBuilder) handleBlockBuilding() {
 	if !b.chainConfig.IsApricotPhase4(big.NewInt(time.Now().Unix())) {
-		// TODO: need to stop this timer after AP4 activation
 		b.buildBlockTimer = timer.NewStagedTimer(b.buildBlockTwoStageTimer)
+		go b.ctx.Log.RecoverAndPanic(b.buildBlockTimer.Dispatch)
 
-		// TODO: handle recover and panic
-		go ctx.Log.RecoverAndPanic(vm.buildBlockTimer.Dispatch)
-
-		// TODO: goroutine to stop buildBlockTimer at activation
+		// Stop buildBlockTimer when AP4 activates
 		b.shutdownWg.Add(1)
-		go func() {
-			defer b.shutdownWg.Done()
-			timestamp := time.Unix(b.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
-			duration := time.Until(timestamp)
-			select {
-			case <-time.After(duration):
-				b.buildBlockTimer.Stop()
-				b.buildBlockTimer = nil
-				// TODO: get lock and signal ready to build to flush any bad statuses
-			case <-b.shutdownChan:
-				if b.buildBlockTimer != nil {
-					b.buildBlockTimer.Stop()
-				}
-			}
-		}()
+		go b.ctx.Log.RecoverAndPanic(b.stopBlockTimer)
+	}
+}
+
+func (b *blockBuilder) stopBlockTimer() {
+	defer b.shutdownWg.Done()
+	timestamp := time.Unix(b.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
+	duration := time.Until(timestamp)
+	select {
+	case <-time.After(duration):
+		b.buildBlockTimer.Stop()
+		b.buildBlockTimer = nil
+
+		// Flush any invalid statuses
+		b.buildBlockLock.Lock()
+		b.buildStatus = dontBuild
+		b.buildBlockLock.Unlock()
+		// NOTE: we don't trigger a build block here to avoid a case where everyone
+		// tries to build at the same time right at the AP4 boundary.
+	case <-b.shutdownChan:
+		if b.buildBlockTimer != nil {
+			b.buildBlockTimer.Stop()
+		}
 	}
 }
 
@@ -99,6 +107,7 @@ func (b *blockBuilder) handleBlockBuilding() {
 // produced block will change whether or not we need to produce
 // another block and also ensures that when the mempool adds a
 // new item to Pending it will be handled appropriately by [signalTxsReady]
+// TODO: move comment
 func (b *blockBuilder) buildBlock() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
@@ -112,16 +121,16 @@ func (b *blockBuilder) buildBlock() {
 			b.buildStatus = dontBuild
 		}
 	} else {
-		// TODO: DON'T SET TO RETRY IN AP4 as it could cause more contention
+		// We never retry block building to prevent contention
 		b.buildStatus = dontBuild
 	}
 }
 
 // needToBuild returns true if there are outstanding transactions to be issued
 // into a block.
+//
+// NOTE: Only used prior to AP4.
 func (b *blockBuilder) needToBuild() bool {
-	// TODO: can modify to be sufficient tip in pool to pay fee...may not even
-	// need?
 	size, err := b.chain.PendingSize()
 	if err != nil {
 		log.Error("Failed to get chain pending size", "error", err)
@@ -132,6 +141,8 @@ func (b *blockBuilder) needToBuild() bool {
 
 // buildEarly returns true if there are sufficient outstanding transactions to
 // be issued into a block to build a block early.
+//
+// NOTE: Only used prior to AP4.
 func (b *blockBuilder) buildEarly() bool {
 	size, err := b.chain.PendingSize()
 	if err != nil {
@@ -145,6 +156,8 @@ func (b *blockBuilder) buildEarly() bool {
 // to the engine when the VM is ready to build a block.
 // If it should be called back again, it returns the timeout duration at
 // which it should be called again.
+//
+// NOTE: Only used prior to AP4.
 func (b *blockBuilder) buildBlockTwoStageTimer() (time.Duration, bool) {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
@@ -186,27 +199,26 @@ func (b *blockBuilder) buildBlockTwoStageTimer() (time.Duration, bool) {
 func (b *blockBuilder) signalTxsReady() {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
+	if b.buildStatus != dontBuild {
+		return
+	}
 
 	timestamp := big.NewInt(time.Now().Unix())
 	if !b.chainConfig.IsApricotPhase4(timestamp) {
-		// Set the build block timer in motion if it has not been started.
-		if b.buildStatus == dontBuild {
-			b.buildStatus = conditionalBuild
-			b.buildBlockTimer.SetTimeoutIn(minBlockTime)
-		}
+		b.buildStatus = conditionalBuild
+		b.buildBlockTimer.SetTimeoutIn(minBlockTime)
 		return
 	}
 
 	// Check to see if mempool could pay effective tip? Or just yolo build and
 	// leave all validation to build block time (could be some time)?
 	// -> don't re-signal if already signaled
-	if b.buildStatus == dontBuild {
-		select {
-		case b.notifyBuildBlockChan <- commonEng.PendingTxs:
-			b.buildStatus = building
-		default:
-			log.Error("Failed to push PendingTxs notification to the consensus engine.")
-		}
+	// TODO: fix comment
+	select {
+	case b.notifyBuildBlockChan <- commonEng.PendingTxs:
+		b.buildStatus = building
+	default:
+		log.Error("Failed to push PendingTxs notification to the consensus engine.")
 	}
 }
 
@@ -214,26 +226,20 @@ func (b *blockBuilder) signalTxsReady() {
 // and notifies the VM when the tx pool has transactions to be
 // put into a new block.
 func (b *blockBuilder) awaitSubmittedTxs() {
-	b.shutdownWg.Add(1)
-	go func() {
-		// TODO: entry point for signaling ready to build
-		defer b.shutdownWg.Done()
-		// TODO: does this get called on reorg->yes?
-		txSubmitChan := b.chain.GetTxSubmitCh()
-		for {
-			select {
-			// TODO: check if pool has sufficient tip, if yes than send notify block
-			// channel
-			// 	case vm.notifyBuildBlockChan <- commonEng.PendingTxs:
-			case <-txSubmitChan:
-				log.Trace("New tx detected, trying to generate a block")
-				b.signalTxsReady()
-			case <-b.mempool.Pending:
-				log.Trace("New atomic Tx detected, trying to generate a block")
-				b.signalTxsReady()
-			case <-b.shutdownChan:
-				return
-			}
+	defer b.shutdownWg.Done()
+
+	// txSubmitChan is invoked on reorgs
+	txSubmitChan := b.chain.GetTxSubmitCh()
+	for {
+		select {
+		case <-txSubmitChan:
+			log.Trace("New tx detected, trying to generate a block")
+			b.signalTxsReady()
+		case <-b.mempool.Pending:
+			log.Trace("New atomic Tx detected, trying to generate a block")
+			b.signalTxsReady()
+		case <-b.shutdownChan:
+			return
 		}
-	}()
+	}
 }
