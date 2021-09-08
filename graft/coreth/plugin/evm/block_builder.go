@@ -89,18 +89,25 @@ func (b *blockBuilder) handleBlockBuilding() {
 
 func (b *blockBuilder) stopBlockTimer() {
 	defer b.shutdownWg.Done()
+
+	// In some tests, the AP4 timestamp is not populated. If this is the case, we
+	// should never stop [buildBlockTwoStageTimer].
+	if b.chainConfig.ApricotPhase4BlockTimestamp == nil {
+		return
+	}
+
 	timestamp := time.Unix(b.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0)
 	duration := time.Until(timestamp)
 	select {
 	case <-time.After(duration):
 		b.buildBlockTimer.Stop()
-		b.buildBlockTimer = nil
 
+		b.buildBlockLock.Lock()
+		b.buildBlockTimer = nil
 		// Flush any invalid statuses leftover from legacy block timer builder
 		//
 		// NOTE: we don't trigger a build block here to avoid a case where everyone
 		// tries to build at the same time right at the AP4 boundary.
-		b.buildBlockLock.Lock()
 		b.buildStatus = dontBuild
 		b.buildBlockLock.Unlock()
 	case <-b.shutdownChan:
