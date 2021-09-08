@@ -3785,7 +3785,9 @@ func TestConfigureLogLevel(t *testing.T) {
 	}
 	for _, test := range configTests {
 		t.Run(test.name, func(t *testing.T) {
-			vm, ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
+			vm := &VM{}
+			appSender := &engCommon.SenderTest{}
+			ctx, dbManager, genesisBytes, issuer, _ := setupGenesis(t, test.genesisJSON)
 			err := vm.Initialize(
 				ctx,
 				dbManager,
@@ -3794,6 +3796,7 @@ func TestConfigureLogLevel(t *testing.T) {
 				[]byte(test.logConfig),
 				issuer,
 				[]*engCommon.Fx{},
+				appSender,
 			)
 			if len(test.expectedErr) == 0 && err != nil {
 				t.Fatal(err)
@@ -3832,7 +3835,7 @@ func TestConfigureLogLevel(t *testing.T) {
 // Regression test to ensure we can build blocks if we are starting with the
 // Apricot Phase 4 ruleset in genesis.
 func TestBuildApricotPhase4Block(t *testing.T) {
-	issuer, vm, _, sharedMemory := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 
 	defer func() {
 		if err := vm.Shutdown(); err != nil {
@@ -3891,7 +3894,7 @@ func TestBuildApricotPhase4Block(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.issueTx(importTx); err != nil {
+	if err := vm.issueTx(importTx, true /*=local*/); err != nil {
 		t.Fatal(err)
 	}
 
