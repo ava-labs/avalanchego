@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/rawdb"
+	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/core/vm"
 	"github.com/ava-labs/coreth/params"
@@ -70,18 +71,28 @@ func (b *testBackend) ChainConfig() *params.ChainConfig {
 	return b.chain.Config()
 }
 
-func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
+func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, extDataGasUsage *big.Int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
 	var gspec = &core.Genesis{
 		Config: config,
 		Alloc:  core.GenesisAlloc{addr: core.GenesisAccount{Balance: bal}},
 	}
 
-	engine := dummy.NewFakerSkipBlockFee()
+	engine := dummy.NewDummyEngine(&dummy.ConsensusCallbacks{
+		OnFinalizeAndAssemble: func(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
+			return nil, common.Big0, extDataGasUsage, nil
+		},
+		OnExtraStateChange: func(block *types.Block, state *state.StateDB) (*big.Int, *big.Int, error) {
+			return common.Big0, extDataGasUsage, nil
+		},
+	})
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
 
 	// Generate testing blocks
-	blocks, _ := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, genBlocks)
+	blocks, _, err := core.GenerateChain(gspec.Config, genesis, engine, db, numBlocks, genBlocks)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Construct testing chain
 	diskdb := rawdb.NewMemoryDatabase()
 	gspec.Commit(diskdb)
@@ -95,6 +106,10 @@ func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, gen
 	return &testBackend{chain: chain}
 }
 
+func (b *testBackend) MinRequiredTip(ctx context.Context, header *types.Header) (*big.Int, error) {
+	return dummy.MinRequiredTip(b.chain.Config(), header)
+}
+
 func (b *testBackend) CurrentHeader() *types.Header {
 	return b.chain.CurrentHeader()
 }
@@ -104,23 +119,23 @@ func (b *testBackend) GetBlockByNumber(number uint64) *types.Block {
 }
 
 type suggestTipCapTest struct {
-	chainConfig *params.ChainConfig
-	numBlocks   int
-	genBlock    func(i int, b *core.BlockGen)
-	expectedTip *big.Int
+	chainConfig     *params.ChainConfig
+	numBlocks       int
+	extDataGasUsage *big.Int
+	genBlock        func(i int, b *core.BlockGen)
+	expectedTip     *big.Int
 }
 
 func applyGasPriceTest(t *testing.T, test suggestTipCapTest) {
 	config := Config{
-		Blocks:      3,
-		TxsPerBlock: 100,
-		Percentile:  60,
+		Blocks:     20,
+		Percentile: 60,
 	}
 
 	if test.genBlock == nil {
 		test.genBlock = func(i int, b *core.BlockGen) {}
 	}
-	backend := newTestBackend(t, test.chainConfig, test.numBlocks, test.genBlock)
+	backend := newTestBackend(t, test.chainConfig, test.numBlocks, test.extDataGasUsage, test.genBlock)
 	oracle := NewOracle(backend, config)
 
 	got, err := oracle.SuggestTipCap(context.Background())
@@ -151,8 +166,8 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 			expectedTip: big.NewInt(0),
 		},
 		"apricot phase 4": {
-			chainConfig: params.TestChainConfig,
-			expectedTip: big.NewInt(0),
+			chainConfig: params.TestApricotPhase4Config,
+			expectedTip: DefaultMinPrice,
 		},
 	}
 
@@ -163,19 +178,18 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 	}
 }
 
-func TestSuggestTipCapIdenticalTip(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
+func TestSuggestTipCapSimple(t *testing.T) {
+	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
-		numBlocks:   3,
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       1,
+		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
 			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
-			feeCap := new(big.Int).Add(baseFee, tip)
-			// Need to add 50 transactions, so that the block consumes more than the skip block
-			// gas limit
+			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   params.TestChainConfig.ChainID,
@@ -183,7 +197,7 @@ func TestSuggestTipCapIdenticalTip(t *testing.T) {
 					To:        &common.Address{},
 					Gas:       params.TxGas,
 					GasFeeCap: feeCap,
-					GasTipCap: tip,
+					GasTipCap: txTip,
 					Data:      []byte{},
 				})
 				tx, err := types.SignTx(tx, signer, key)
@@ -193,29 +207,22 @@ func TestSuggestTipCapIdenticalTip(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: tip,
+		expectedTip: big.NewInt(10_714_285_714),
 	})
 }
 
-func TestSuggestTipCapDifferentTips(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
-	signer := types.LatestSigner(params.TestChainConfig)
-
-	highTip := new(big.Int).Add(tip, common.Big1)
-	lowTip := new(big.Int).Sub(tip, common.Big1)
-
+func TestSuggestTipCapSimpleFloor(t *testing.T) {
+	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
-		numBlocks:   3,
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       3,
+		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
+			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
-			feeCap := new(big.Int).Add(baseFee, highTip)
-			// Need to add 50 transactions, so that the block consumes more than the skip block
-			// gas limit
-			// Add 50 transactions each at the low and high tip amount. This should result in the high tip
-			// being selected, since we select the 60th percentile.
+			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   params.TestChainConfig.ChainID,
@@ -223,7 +230,7 @@ func TestSuggestTipCapDifferentTips(t *testing.T) {
 					To:        &common.Address{},
 					Gas:       params.TxGas,
 					GasFeeCap: feeCap,
-					GasTipCap: highTip,
+					GasTipCap: txTip,
 					Data:      []byte{},
 				})
 				tx, err := types.SignTx(tx, signer, key)
@@ -231,39 +238,24 @@ func TestSuggestTipCapDifferentTips(t *testing.T) {
 					t.Fatalf("failed to create tx: %s", err)
 				}
 				b.AddTx(tx)
-				tx = types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
-					Nonce:     b.TxNonce(addr),
-					To:        &common.Address{},
-					Gas:       params.TxGas,
-					GasFeeCap: feeCap,
-					GasTipCap: lowTip,
-					Data:      []byte{},
-				})
-				tx, err = types.SignTx(tx, signer, key)
-				if err != nil {
-					t.Fatalf("failed to create tx: %s", err)
-				}
-				b.AddTx(tx)
 			}
 		},
-		expectedTip: highTip,
+		expectedTip: big.NewInt(10_000_000_000),
 	})
 }
 
-func TestSuggestTipCapIgnoreSmallTips(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
+func TestSuggestTipCapSmallTips(t *testing.T) {
+	tip := big.NewInt(550 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
-		numBlocks:   3,
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       1,
+		extDataGasUsage: common.Big0,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
 			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, tip)
-			// Need to add 50 transactions, so that the block consumes more than the skip block
-			// gas limit
 			for j := 0; j < 25; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
 					ChainID:   params.TestChainConfig.ChainID,
@@ -295,31 +287,32 @@ func TestSuggestTipCapIgnoreSmallTips(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: tip,
+		// NOTE: small tips do not bias estimate
+		expectedTip: big.NewInt(10_714_285_714),
 	})
 }
-func TestSuggestTipcapLegacyTxs(t *testing.T) {
-	tip := big.NewInt(10 * params.GWei)
 
-	// what should we do if we reach further than 20s back when retrieving block values
+func TestSuggestTipCapExtDataUsage(t *testing.T) {
+	txTip := big.NewInt(55 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
-		numBlocks:   3,
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       1,
+		extDataGasUsage: big.NewInt(10_000),
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
 			signer := types.LatestSigner(params.TestChainConfig)
 			baseFee := b.BaseFee()
-			feeCap := new(big.Int).Add(baseFee, tip)
-			// Need to add 50 transactions, so that the block consumes more than the skip block
-			// gas limit
+			feeCap := new(big.Int).Add(baseFee, txTip)
 			for j := 0; j < 50; j++ {
-				tx := types.NewTx(&types.LegacyTx{
-					Nonce:    b.TxNonce(addr),
-					To:       &common.Address{},
-					Gas:      params.TxGas,
-					GasPrice: feeCap,
-					Data:     []byte{},
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: txTip,
+					Data:      []byte{},
 				})
 				tx, err := types.SignTx(tx, signer, key)
 				if err != nil {
@@ -328,6 +321,39 @@ func TestSuggestTipcapLegacyTxs(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: tip,
+		expectedTip: big.NewInt(10_613_207_547),
+	})
+}
+
+func TestSuggestTipCapLongRunning(t *testing.T) {
+	txTip := big.NewInt(55 * params.GWei)
+	applyGasPriceTest(t, suggestTipCapTest{
+		chainConfig:     params.TestChainConfig,
+		numBlocks:       50,
+		extDataGasUsage: common.Big0,
+		genBlock: func(i int, b *core.BlockGen) {
+			b.SetCoinbase(common.Address{1})
+
+			signer := types.LatestSigner(params.TestChainConfig)
+			baseFee := b.BaseFee()
+			feeCap := new(big.Int).Add(baseFee, txTip)
+			for j := 0; j < 50; j++ {
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   params.TestChainConfig.ChainID,
+					Nonce:     b.TxNonce(addr),
+					To:        &common.Address{},
+					Gas:       params.TxGas,
+					GasFeeCap: feeCap,
+					GasTipCap: txTip,
+					Data:      []byte{},
+				})
+				tx, err := types.SignTx(tx, signer, key)
+				if err != nil {
+					t.Fatalf("failed to create tx: %s", err)
+				}
+				b.AddTx(tx)
+			}
+		},
+		expectedTip: big.NewInt(10_000_000_000),
 	})
 }

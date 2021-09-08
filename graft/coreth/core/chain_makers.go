@@ -206,13 +206,13 @@ func (b *BlockGen) OffsetTime(seconds int64) {
 // Blocks created by GenerateChain do not contain valid proof of work
 // values. Inserting them into BlockChain requires use of FakePow or
 // a similar non-validating proof of work implementation.
-func GenerateChain(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts) {
+func GenerateChain(config *params.ChainConfig, parent *types.Block, engine consensus.Engine, db ethdb.Database, n int, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts, error) {
 	if config == nil {
 		config = params.TestChainConfig
 	}
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
 	chainreader := &fakeChainReader{config: config}
-	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
+	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts, error) {
 		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
 		b.header = makeHeader(chainreader, config, parent, statedb, b.engine)
 
@@ -236,7 +236,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			// Finalize and seal the block
 			block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, parent.Header(), statedb, b.txs, b.uncles, b.receipts)
 			if err != nil {
-				panic(fmt.Sprintf("Failed to finalize and assemble block at index %d: %s", i, err))
+				return nil, nil, fmt.Errorf("Failed to finalize and assemble block at index %d: %w", i, err)
 			}
 
 			// Write state changes to db
@@ -247,21 +247,24 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			if err := statedb.Database().TrieDB().Commit(root, false, nil); err != nil {
 				panic(fmt.Sprintf("trie write error: %v", err))
 			}
-			return block, b.receipts
+			return block, b.receipts, nil
 		}
-		return nil, nil
+		return nil, nil, nil
 	}
 	for i := 0; i < n; i++ {
 		statedb, err := state.New(parent.Root(), state.NewDatabase(db), nil)
 		if err != nil {
-			panic(err)
+			return nil, nil, err
 		}
-		block, receipt := genblock(i, parent, statedb)
+		block, receipt, err := genblock(i, parent, statedb)
+		if err != nil {
+			return nil, nil, err
+		}
 		blocks[i] = block
 		receipts[i] = receipt
 		parent = block
 	}
-	return blocks, receipts
+	return blocks, receipts, nil
 }
 
 func makeHeader(chain consensus.ChainReader, config *params.ChainConfig, parent *types.Block, state *state.StateDB, engine consensus.Engine) *types.Header {
