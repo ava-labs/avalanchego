@@ -134,6 +134,10 @@ To create a single node testnet, run:
 
 This launches an Avalanche network with one node.
 
+## Generating Code
+
+Avalanchego uses multiple tools to generate efficient and boilerplate code.
+
 ### Running protobuf codegen
 
 To regenerate the protobuf go code, run `scripts/protobuf_codegen.sh` from the root of the repo.

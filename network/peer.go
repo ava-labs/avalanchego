@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 // The signature of a peer's certificate on the byte representation
@@ -136,9 +137,6 @@ type peer struct {
 	// Should be cleared before use.
 	// Should only be used in peer's reader goroutine.
 	idSet ids.Set
-
-	// True if we can compress messages sent to this peer
-	canHandleCompressed utils.AtomicBool
 
 	// trackedSubnets hold subnetIDs that this peer is interested in.
 	trackedSubnets ids.Set
@@ -296,7 +294,7 @@ func (p *peer) ReadMessages() {
 		p.net.log.Verbo("parsing message from %s%s at %s:\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes})
 
 		// Parse the message
-		msg, err := p.net.c.Parse(msgBytes, p.canHandleCompressed.GetValue())
+		msg, err := p.net.c.Parse(msgBytes)
 		if err != nil {
 			p.net.log.Verbo("failed to parse message from %s%s at %s:\n%s\n%s", constants.NodeIDPrefix, p.nodeID, p.getIP(), formatting.DumpBytes{Bytes: msgBytes}, err)
 			// Couldn't parse the message. Read the next one.
@@ -471,7 +469,7 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 		return
 	}
 
-	switch op { // Consensus-related messages
+	switch op { // Consensus and app-level messages
 	case message.GetAcceptedFrontier:
 		p.handleGetAcceptedFrontier(msg, onFinishedHandling)
 	case message.AcceptedFrontier:
@@ -494,6 +492,12 @@ func (p *peer) handle(msg message.Message, onFinishedHandling func()) {
 		p.handlePullQuery(msg, onFinishedHandling)
 	case message.Chits:
 		p.handleChits(msg, onFinishedHandling)
+	case message.AppRequest:
+		p.handleAppRequest(msg, onFinishedHandling)
+	case message.AppResponse:
+		p.handleAppResponse(msg, onFinishedHandling)
+	case message.AppGossip:
+		p.handleAppGossip(msg, onFinishedHandling)
 	default:
 		p.net.log.Debug("dropping an unknown message from %s%s at %s with op %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), op)
 		onFinishedHandling()
@@ -658,8 +662,7 @@ func (p *peer) sendPeerList() {
 
 	// Compress this message only if the peer can handle compressed
 	// messages and we have compression enabled
-	canHandleCompressed := p.canHandleCompressed.GetValue()
-	msg, err := p.net.b.PeerList(peers, canHandleCompressed, canHandleCompressed && p.net.compressionEnabled)
+	msg, err := p.net.b.PeerList(peers, p.net.compressionEnabled)
 	if err != nil {
 		p.net.log.Warn("failed to send PeerList to %s%s at %s: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), err)
 		return
@@ -856,8 +859,6 @@ func (p *peer) versionCheck(msg message.Message, isVersionWithSubnets bool) {
 		return
 	}
 
-	p.canHandleCompressed.SetValue(peerVersion.Compare(minVersionCanHandleCompressed) >= 0)
-
 	signedPeerIP := signedPeerIP{
 		ip:        peerIP,
 		time:      versionTime,
@@ -978,7 +979,18 @@ func (p *peer) handlePing(_ message.Message) {
 }
 
 // assumes the [stateLock] is not held
-func (p *peer) handlePong(_ message.Message) {}
+func (p *peer) handlePong(_ message.Message) {
+	if !p.finishedHandshake.GetValue() {
+		// If the handshake isn't finished - do nothing
+		return
+	}
+
+	peerVersion := p.versionStruct.GetValue().(version.Application)
+	if err := p.net.versionCompatibility.Compatible(peerVersion); err != nil {
+		p.net.log.Debug("disconnecting from peer %s%s at %s version (%s) not compatible: %s", constants.NodeIDPrefix, p.nodeID, p.getIP(), peerVersion, err)
+		p.discardIP()
+	}
+}
 
 // assumes the [stateLock] is not held
 func (p *peer) handleGetAcceptedFrontier(msg message.Message, onFinishedHandling func()) {
@@ -1273,6 +1285,54 @@ func (p *peer) handleChits(msg message.Message, onFinishedHandling func()) {
 		chainID,
 		requestID,
 		containerIDs,
+		onFinishedHandling,
+	)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) handleAppRequest(msg message.Message, onFinishedHandling func()) {
+	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(message.RequestID).(uint32)
+	deadline := p.net.clock.Time().Add(time.Duration(msg.Get(message.Deadline).(uint64)))
+	request := msg.Get(message.AppRequestBytes).([]byte)
+
+	p.net.router.AppRequest(
+		p.nodeID,
+		chainID,
+		requestID,
+		deadline,
+		request,
+		onFinishedHandling,
+	)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) handleAppResponse(msg message.Message, onFinishedHandling func()) {
+	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	requestID := msg.Get(message.RequestID).(uint32)
+	response := msg.Get(message.AppResponseBytes).([]byte)
+
+	p.net.router.AppResponse(
+		p.nodeID,
+		chainID,
+		requestID,
+		response,
+		onFinishedHandling,
+	)
+}
+
+// assumes the [stateLock] is not held
+func (p *peer) handleAppGossip(msg message.Message, onFinishedHandling func()) {
+	chainID, err := ids.ToID(msg.Get(message.ChainID).([]byte))
+	p.net.log.AssertNoError(err)
+	gossipedMsg := msg.Get(message.AppGossipBytes).([]byte)
+
+	p.net.router.AppGossip(
+		p.nodeID,
+		chainID,
+		gossipedMsg,
 		onFinishedHandling,
 	)
 }

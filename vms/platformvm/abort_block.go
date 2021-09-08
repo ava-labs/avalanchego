@@ -53,6 +53,7 @@ func (a *AbortBlock) Verify() error {
 	}
 
 	a.onAcceptState, a.onAcceptFunc = parent.onAbort()
+	a.timestamp = a.onAcceptState.GetTimestamp()
 
 	a.vm.currentBlocks[blkID] = a
 	parent.addChild(a)

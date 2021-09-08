@@ -359,16 +359,19 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 
 func getGossipConfig(v *viper.Viper) (node.GossipConfig, error) {
 	config := node.GossipConfig{
-		ConsensusGossipConfig: node.ConsensusGossipConfig{
-			ConsensusGossipFrequency:            v.GetDuration(ConsensusGossipFrequencyKey),
-			ConsensusGossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
-			ConsensusGossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
-		},
 		PeerListGossipConfig: node.PeerListGossipConfig{
 			// Node will gossip [PeerListSize] peers to [PeerListGossipSize] every [PeerListGossipFreq]
 			PeerListSize:       v.GetUint32(NetworkPeerListSizeKey),
 			PeerListGossipFreq: v.GetDuration(NetworkPeerListGossipFreqKey),
 			PeerListGossipSize: v.GetUint32(NetworkPeerListGossipSizeKey),
+		},
+		ConsensusGossipConfig: node.ConsensusGossipConfig{
+			ConsensusGossipFrequency:            v.GetDuration(ConsensusGossipFrequencyKey),
+			ConsensusGossipAcceptedFrontierSize: uint(v.GetUint32(ConsensusGossipAcceptedFrontierSizeKey)),
+			ConsensusGossipOnAcceptSize:         uint(v.GetUint32(ConsensusGossipOnAcceptSizeKey)),
+		},
+		AppGossipConfig: node.AppGossipConfig{
+			AppGossipSize: uint(v.GetUint32(AppGossipSizeKey)),
 		},
 	}
 	switch {

@@ -284,6 +284,7 @@ func (n *Node) initNetworking() error {
 		n.Config.PeerListGossipFreq,
 		n.Config.ConsensusGossipAcceptedFrontierSize,
 		n.Config.ConsensusGossipOnAcceptSize,
+		n.Config.AppGossipSize,
 		n.Config.NetworkConfig.CompressionEnabled,
 		inboundMsgThrottler,
 		outboundMsgThrottler,
