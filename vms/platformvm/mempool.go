@@ -74,7 +74,8 @@ func NewMempool() Mempool {
 
 func (m *mempool) Add(tx *Tx) error {
 	// Note: a previously dropped tx can be re-added
-	if txID := tx.ID(); m.Has(txID) {
+	txID := tx.ID()
+	if m.Has(txID) {
 		return errDuplicatedTx
 	}
 	if txBytes := tx.Bytes(); m.totalBytesSize+len(txBytes) > maxMempoolSize {
@@ -92,7 +93,7 @@ func (m *mempool) Add(tx *Tx) error {
 		return errUnknownTxType
 	}
 
-	m.droppedTxIDs.Evict(tx.ID())
+	m.droppedTxIDs.Evict(txID)
 	return nil
 }
 
