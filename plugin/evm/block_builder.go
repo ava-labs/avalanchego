@@ -21,7 +21,7 @@ import (
 type buildingBlkStatus uint8
 
 const (
-	// AP3 Paramters
+	// AP3 Parameters
 	minBlockTime = 2 * time.Second
 	maxBlockTime = 3 * time.Second
 	batchSize    = 250
