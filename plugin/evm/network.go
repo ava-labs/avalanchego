@@ -579,6 +579,11 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 	reqMsg := message.AtomicTxRequest{
 		TxID: msg.TxID,
 	}
+
+	// If we had to fetch an atomic tx, we shouldn't consider gossiping its full
+	// content.
+	h.net.recentAtomicTxs.Put(msg.TxID, nil)
+
 	reqMsgBytes, err := message.Build(&reqMsg)
 	if err != nil {
 		log.Warn(
@@ -650,6 +655,10 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 		}
 
 		dataToRequest = append(dataToRequest, txData)
+
+		// If we had to fetch an eth tx, we shouldn't consider gossiping its full
+		// content.
+		h.net.recentEthTxs.Put(txData.Hash, nil)
 	}
 
 	if len(dataToRequest) == 0 {
