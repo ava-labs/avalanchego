@@ -274,11 +274,6 @@ func (vm *VM) Initialize(
 		g.Config = params.AvalancheLocalChainConfig
 	}
 
-	// Allow ExtDataHashes to be garbage collected as soon as freed from block
-	// validator
-	fujiExtDataHashes = nil
-	mainnetExtDataHashes = nil
-
 	vm.chainID = g.Config.ChainID
 
 	ethConfig := ethconfig.NewDefaultConfig()
