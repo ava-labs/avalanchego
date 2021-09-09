@@ -21,7 +21,9 @@ func init() {
 	if err := json.Unmarshal(rawFujiExtDataHashes, &fujiExtDataHashes); err != nil {
 		panic(err)
 	}
+	rawFujiExtDataHashes = nil
 	if err := json.Unmarshal(rawMainnetExtDataHashes, &mainnetExtDataHashes); err != nil {
 		panic(err)
 	}
+	rawMainnetExtDataHashes = nil
 }
