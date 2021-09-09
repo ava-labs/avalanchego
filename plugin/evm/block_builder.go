@@ -311,6 +311,7 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
+				// TODO: only do on AP4
 				if b.network != nil {
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(

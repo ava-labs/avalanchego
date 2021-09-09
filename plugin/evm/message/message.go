@@ -84,8 +84,8 @@ func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint3
 type EthTxsNotify struct {
 	message
 
-	Txs     []EthTxNotify `serialize:"true" len:"10"`
-	TxBytes []byte        `serialize:"true"`
+	Txs      []EthTxNotify `serialize:"true" len:"10"`
+	TxsBytes []byte        `serialize:"true"`
 }
 
 // Information about an Ethereum transaction for gossiping

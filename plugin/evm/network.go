@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -124,7 +123,7 @@ func (n *network) AppGossip(nodeID ids.ShortID, msgBytes []byte) error {
 	)
 }
 
-func (n *network) GossipAtomicTx(tx *Tx, optimistic bool) error {
+func (n *network) GossipAtomicTx(tx *Tx) error {
 	txID := tx.ID()
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
@@ -134,21 +133,14 @@ func (n *network) GossipAtomicTx(tx *Tx, optimistic bool) error {
 		return nil
 	}
 
-	if _, has := n.recentAtomicTxs.Get(txID); has {
-		log.Debug(
-			"not gossiping recently gossiped atomic tx",
-			"txID", txID,
-		)
-		return nil
-	}
-	n.recentAtomicTxs.Put(txID, nil)
-
 	var msg message.AtomicTxNotify
-	if optimistic {
+	if _, has := n.recentAtomicTxs.Get(txID); !has {
 		msg.Tx = tx.Bytes()
+		n.recentAtomicTxs.Put(txID, nil)
 	} else {
 		msg.TxID = txID
 	}
+
 	msgBytes, err := message.Build(&msg)
 	if err != nil {
 		return err
@@ -161,7 +153,7 @@ func (n *network) GossipAtomicTx(tx *Tx, optimistic bool) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
-func (n *network) GossipEthTxs(txs []*types.Transaction, optimistic *types.Transaction) error {
+func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
 			"not gossiping eth txs before the gossiping activation time",
@@ -170,110 +162,95 @@ func (n *network) GossipEthTxs(txs []*types.Transaction, optimistic *types.Trans
 		return nil
 	}
 
-	if len(txs) == 0 && optimistic == nil {
-		return errors.New("cannot gossip empty EthTxsNotify message")
+	pool := n.chain.GetTxPool()
+	selectedTxs := make([]*types.Transaction, 0)
+	txsData := make([]message.EthTxNotify, 0)
+
+	// Recover signatures before `core` package processing
+	if cache := n.chain.SenderCacher(); cache != nil {
+		cache.Recover(n.signer, txs)
 	}
 
-	var optimisticBytes []byte
-	var err error
-	if optimistic != nil {
-		optimisticBytes, err = rlp.EncodeToBytes(optimistic)
+	for _, tx := range txs {
+		txHash := tx.Hash()
+		txStatus := pool.Status([]common.Hash{txHash})[0]
+		if txStatus != core.TxStatusPending {
+			continue
+		}
+
+		sender, err := types.Sender(n.signer, tx)
 		if err != nil {
-			log.Warn(
-				"failed to encode optimistic eth transaction",
-				"hash", optimistic.Hash(),
+			log.Debug(
+				"couldn't retrieve sender for eth tx",
 				"err", err,
 			)
-			return nil
-		}
-		// We wait to encode [optimisticBytes] in a message until we determine if
-		// we have more to send.
-	}
-
-	if len(txs) > 0 {
-		pool := n.chain.GetTxPool()
-		txsData := make([]message.EthTxNotify, 0)
-
-		// Recover signatures before `core` package processing
-		if cache := n.chain.SenderCacher(); cache != nil {
-			cache.Recover(n.signer, txs)
+			continue
 		}
 
-		for _, tx := range txs {
-			txHash := tx.Hash()
-			if _, has := n.recentEthTxs.Get(txHash); has {
-				log.Debug(
-					"not gossiping recently gossiped eth tx",
-					"hash", txHash,
-				)
-				continue
-			}
+		if _, has := n.recentEthTxs.Get(txHash); !has {
+			selectedTxs = append(selectedTxs, tx)
 			n.recentEthTxs.Put(txHash, nil)
-
-			txStatus := pool.Status([]common.Hash{txHash})[0]
-			if txStatus != core.TxStatusPending {
-				continue
-			}
-
-			sender, err := types.Sender(n.signer, tx)
-			if err != nil {
-				log.Debug(
-					"couldn't retrieve sender for eth tx",
-					"err", err,
-				)
-				continue
-			}
-
+		} else {
 			txsData = append(txsData, message.EthTxNotify{
 				Hash:   txHash,
 				Sender: sender,
 				Nonce:  tx.Nonce(),
 			})
 		}
-
-		for start, end := 0, message.MaxEthTxsLen; start < len(txsData); start, end = end, end+message.MaxEthTxsLen {
-			if end > len(txsData) {
-				end = len(txsData)
-			}
-
-			data := txsData[start:end]
-			msg := message.EthTxsNotify{
-				Txs: data,
-			}
-			if len(optimisticBytes) > 0 {
-				msg.TxBytes = optimisticBytes
-				optimisticBytes = nil
-			}
-			msgBytes, err := message.Build(&msg)
-			if err != nil {
-				return err
-			}
-			log.Debug(
-				"gossiping eth txs",
-				"len(txs)", len(data),
-				"len(txBytes)", len(msg.TxBytes),
-			)
-			if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-				return err
-			}
-		}
-	} else {
-		msg := message.EthTxsNotify{
-			TxBytes: optimisticBytes,
-		}
-		msgBytes, err := message.Build(&msg)
-		if err != nil {
-			return err
-		}
-
-		log.Debug(
-			"gossiping optimistic eth tx",
-			"hash", optimistic.Hash(),
-		)
-		if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-			return err
-		}
 	}
+
+	var msg message.EthTxsNotify
+	if len(txsData) > 0 {
+		msg.Txs = txsData
+	}
+	if len(selectedTxs) > 0 {
+		txBytes, err := rlp.EncodeToBytes(selectedTxs)
+		if err != nil {
+			log.Warn(
+				"failed to encode eth transactions",
+				"len(selectedTxs)", len(selectedTxs),
+				"err", err,
+			)
+			return nil
+		}
+		msg.TxsBytes = txBytes
+	}
+	msgBytes, err := message.Build(&msg)
+	if err != nil {
+		return err
+	}
+	log.Debug(
+		"gossiping eth txs",
+		"len(txs)", len(msg.Txs),
+		"len(txsBytes)", len(msg.TxsBytes),
+	)
+	if err := n.appSender.SendAppGossip(msgBytes); err != nil {
+		return err
+	}
+
+	// TODO: write algorithm using size
+	// for start, end := 0, message.MaxEthTxsLen; start < len(txsData); start, end = end, end+message.MaxEthTxsLen {
+	// 	if end > len(txsData) {
+	// 		end = len(txsData)
+	// 	}
+
+	// 	data := txsData[start:end]
+	// 	msg := message.EthTxsNotify{
+	// 		Txs: data,
+	// 	}
+	// 	msgBytes, err := message.Build(&msg)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	log.Debug(
+	// 		"gossiping eth txs",
+	// 		"len(txs)", len(data),
+	// 		"len(txsBytes)", len(msg.TxsBytes),
+	// 	)
+	// 	if err := n.appSender.SendAppGossip(msgBytes); err != nil {
+	// 		return err
+	// 	}
+	// }
 	return nil
 }
 
@@ -628,25 +605,30 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 		"AppGossip called with EthTxsNotify",
 		"peerID", nodeID,
 		"len(txs)", len(msg.Txs),
+		"len(txsBytes)", len(msg.TxsBytes),
 	)
 
 	// In the case that the gossip message contains a fully-formed transaction,
 	// attempt to parse it and add it as a remote.
-	if len(msg.TxBytes) > 0 {
-		var tx types.Transaction
-		if err := rlp.DecodeBytes(msg.TxBytes, &tx); err != nil {
+	if len(msg.TxsBytes) > 0 {
+		txs := make([]*types.Transaction, 0)
+		if err := rlp.DecodeBytes(msg.TxsBytes, &txs); err != nil {
 			log.Trace(
-				"AppGossip provided invalid tx",
+				"AppGossip provided invalid txs",
 				"peerID", nodeID,
 				"err", err,
 			)
 			return nil
 		}
-		if err := h.net.chain.GetTxPool().AddRemote(&tx); err != nil {
-			log.Debug(
-				"AppResponse failed to issue AddRemote",
-				"err", err,
-			)
+		// TODO: validate not too many txs
+		errs := h.net.chain.GetTxPool().AddRemotes(txs)
+		for _, err := range errs {
+			if err != nil {
+				log.Debug(
+					"AppResponse failed to issue AddRemotes",
+					"err", err,
+				)
+			}
 		}
 	}
 
