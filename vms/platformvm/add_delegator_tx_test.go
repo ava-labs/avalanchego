@@ -590,9 +590,9 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		shouldFail bool
 	}{
 		{
-			name:       "pre-upgrade fail too aggressively",
+			name:       "pre-upgrade is no longer restrictive",
 			ap3Time:    validatorEndTime,
-			shouldFail: true,
+			shouldFail: false,
 		},
 		{
 			name:       "post-upgrade calculate max stake correctly",

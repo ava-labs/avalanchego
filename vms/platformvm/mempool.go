@@ -41,7 +41,6 @@ type Mempool struct {
 	// vm.State.PutBlock()
 	// vm.DB.Commit()
 
-	// vm.preferredHeight()
 	// vm.Preferred()
 	// vm.getBlock()
 

@@ -118,6 +118,8 @@ func (ab *AtomicBlock) Verify() error {
 	onAccept.AddTx(&ab.Tx, Committed)
 
 	ab.onAcceptState = onAccept
+	ab.timestamp = onAccept.GetTimestamp()
+
 	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
