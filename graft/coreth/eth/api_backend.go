@@ -288,6 +288,7 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	if deadline, exists := ctx.Deadline(); exists && time.Until(deadline) < 0 {
 		return errExpired
 	}
+	// TODO: send to channel indicating local
 	return b.eth.txPool.AddLocal(signedTx)
 }
 
