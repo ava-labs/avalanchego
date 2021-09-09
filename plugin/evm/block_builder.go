@@ -31,11 +31,15 @@ const (
 	// [buildRetryTime] is the frequency the node will attempt to build a block
 	// (even if no new transaction has been received).
 	//
+	// Nodes that are currently designated to propose should frequently (once per second)
+	// try to create a valid block during their window. We use 500ms here in case
+	// the retry ticker starts on the boundary of a second interval (in which
+	// case, may only retry 1 time in a 2 second period).
+	//
 	// NOTE: Because build block retries aren't activated until AP4, we don't need
 	// to worry about putting nodes in a busy loop building blocks (in AP4 the engine
-	// will only call build block during a node's proposer window). Nodes that are currently
-	// designated to propose should frequently try to create a valid block during their window.
-	buildRetryTime = 1 * time.Second
+	// will only call build block during a node's proposer window).
+	buildRetryTime = 500 * time.Millisecond
 
 	dontBuild        buildingBlkStatus = iota
 	conditionalBuild                   // Only used prior to AP4
