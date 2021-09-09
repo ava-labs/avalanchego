@@ -119,7 +119,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 					StatusV: choices.Processing,
 				},
 				BytesV:     []byte{2},
-				ParentV:    xBlockID, // valid block should reference oracleCoreBlk
+				ParentV:    xBlockID,
 				TimestampV: coreGenBlk.Timestamp(),
 			},
 			&snowman.TestBlock{
@@ -128,7 +128,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 					StatusV: choices.Processing,
 				},
 				BytesV:     []byte{3},
-				ParentV:    xBlockID, // valid block should reference oracleCoreBlk
+				ParentV:    xBlockID,
 				TimestampV: coreGenBlk.Timestamp(),
 			},
 		},
