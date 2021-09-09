@@ -40,6 +40,7 @@ const (
 	defaultGossipPeerListTo           = 100
 	defaultGossipAcceptedFrontierSize = 35
 	defaultGossipOnAcceptSize         = 20
+	defaultAppGossipSize              = 20
 )
 
 var (
@@ -2587,8 +2588,8 @@ func TestPeerGossip(t *testing.T) {
 	wg1.Wait()
 	wg2.Wait()
 
-	net0.Gossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"))
-	net0.Gossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"))
+	net0.SendGossip(testSubnetID, ids.GenerateTestID(), testSubnetContainerID, []byte("test"))
+	net0.SendGossip(constants.PrimaryNetworkID, ids.GenerateTestID(), testPrimaryContainerID, []byte("test2"))
 
 	wg1P.Wait()
 	wg2P.Wait()
@@ -2719,6 +2720,9 @@ func newDefaultConfig() Config {
 			GetVersionTimeout:    10 * time.Second,
 			PingPongTimeout:      30 * time.Second,
 			ReadHandshakeTimeout: 15 * time.Second,
+		},
+		GossipConfig: GossipConfig{
+			AppGossipSize: defaultAppGossipSize,
 		},
 		MaxClockDifference: time.Minute,
 		AllowPrivateIPs:    true,

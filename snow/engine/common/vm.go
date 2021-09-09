@@ -12,6 +12,8 @@ import (
 
 // VM describes the interface that all consensus VMs must implement
 type VM interface {
+	AppHandler
+
 	// Returns nil if the VM is healthy.
 	// Periodically called and reported via the node's Health API.
 	health.Checkable
@@ -45,6 +47,7 @@ type VM interface {
 		configBytes []byte,
 		toEngine chan<- Message,
 		fxs []*Fx,
+		appSender AppSender,
 	) error
 
 	// Bootstrapping is called when the node is starting to bootstrap this chain.

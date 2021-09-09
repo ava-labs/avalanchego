@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	errMissingField       = errors.New("message missing field")
-	errBadOp              = errors.New("input field has invalid operation")
-	_               Codec = &codec{}
+	errMissingField = errors.New("message missing field")
+	errBadOp        = errors.New("input field has invalid operation")
+
+	_ Codec = &codec{}
 )
 
 type Codec interface {
@@ -90,7 +91,7 @@ func NewCodecWithAllocator(namespace string, metrics prometheus.Registerer, getB
 // Uses [buffer] to hold the message's byte repr.
 // [buffer]'s contents may be overwritten by this method.
 // [buffer] may be nil.
-// If [compress]  compress the payload.
+// If [compress], compress the payload.
 func (c *codec) Pack(
 	op Op,
 	fieldValues map[Field]interface{},

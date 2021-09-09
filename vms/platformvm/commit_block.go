@@ -53,6 +53,7 @@ func (c *CommitBlock) Verify() error {
 	}
 
 	c.onAcceptState, c.onAcceptFunc = parent.onCommit()
+	c.timestamp = c.onAcceptState.GetTimestamp()
 
 	c.vm.currentBlocks[blkID] = c
 	parent.addChild(c)

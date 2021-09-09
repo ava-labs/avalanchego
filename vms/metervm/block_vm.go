@@ -37,12 +37,13 @@ func (vm *blockVM) Initialize(
 	configBytes []byte,
 	toEngine chan<- common.Message,
 	fxs []*common.Fx,
+	appSender common.AppSender,
 ) error {
 	if err := vm.blockMetrics.Initialize(fmt.Sprintf("metervm_%s", ctx.Namespace), ctx.Metrics); err != nil {
 		return err
 	}
 
-	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs)
+	return vm.ChainVM.Initialize(ctx, db, genesisBytes, upgradeBytes, configBytes, toEngine, fxs, appSender)
 }
 
 func (vm *blockVM) BuildBlock() (snowman.Block, error) {
