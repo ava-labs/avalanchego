@@ -19,8 +19,9 @@ import (
 
 var errUnknownBlock = errors.New("unknown block")
 
-// Ensure that a byzantine node issuing an invalid block (Y) will not be
-// verified correctly.
+// Ensure that a byzantine node issuing an invalid PreForkBlock (Y) when the
+// parent block (X) is issued into a PostForkBlock (A) will be marked as invalid
+// correctly.
 //     G
 //   / |
 // A - X
@@ -88,54 +89,62 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	}
 }
 
-func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
+// Ensure that a byzantine node issuing an invalid PreForkBlock (Y or Z) when
+// the parent block (X) is issued into a PostForkBlock (A) will be marked as
+// invalid correctly.
+//     G
+//   / |
+// A - X
+//    / \
+//   Y   Z
+func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
 	proVM.Set(coreGenBlk.Timestamp())
 
-	// create post fork oracle block ...
-	oracleCoreBlk := &TestOptionsBlock{
+	xBlockID := ids.GenerateTestID()
+	xBlock := &TestOptionsBlock{
 		TestBlock: snowman.TestBlock{
 			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(1111),
+				IDV:     xBlockID,
 				StatusV: choices.Processing,
 			},
 			BytesV:     []byte{1},
 			ParentV:    coreGenBlk.ID(),
 			TimestampV: coreGenBlk.Timestamp(),
 		},
-	}
-	oracleCoreBlk.opts = [2]snowman.Block{
-		&snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(2222),
-				StatusV: choices.Processing,
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    xBlockID, // valid block should reference oracleCoreBlk
+				TimestampV: coreGenBlk.Timestamp(),
 			},
-			BytesV:     []byte{2},
-			ParentV:    coreGenBlk.ID(), // valid block should reference oracleCoreBlk
-			TimestampV: coreGenBlk.Timestamp(),
-		},
-		&snowman.TestBlock{
-			TestDecidable: choices.TestDecidable{
-				IDV:     ids.Empty.Prefix(3333),
-				StatusV: choices.Processing,
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    xBlockID, // valid block should reference oracleCoreBlk
+				TimestampV: coreGenBlk.Timestamp(),
 			},
-			BytesV:     []byte{3},
-			ParentV:    coreGenBlk.ID(), // valid block should reference oracleCoreBlk
-			TimestampV: coreGenBlk.Timestamp(),
 		},
 	}
 
-	coreVM.BuildBlockF = func() (snowman.Block, error) { return oracleCoreBlk, nil }
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
 	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
 		case coreGenBlk.ID():
 			return coreGenBlk, nil
-		case oracleCoreBlk.ID():
-			return oracleCoreBlk, nil
-		case oracleCoreBlk.opts[0].ID():
-			return oracleCoreBlk.opts[0], nil
-		case oracleCoreBlk.opts[1].ID():
-			return oracleCoreBlk.opts[1], nil
+		case xBlock.ID():
+			return xBlock, nil
+		case xBlock.opts[0].ID():
+			return xBlock.opts[0], nil
+		case xBlock.opts[1].ID():
+			return xBlock.opts[1], nil
 		default:
 			return nil, database.ErrNotFound
 		}
@@ -144,28 +153,132 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		switch {
 		case bytes.Equal(b, coreGenBlk.Bytes()):
 			return coreGenBlk, nil
-		case bytes.Equal(b, oracleCoreBlk.Bytes()):
-			return oracleCoreBlk, nil
-		case bytes.Equal(b, oracleCoreBlk.opts[0].Bytes()):
-			return oracleCoreBlk.opts[0], nil
-		case bytes.Equal(b, oracleCoreBlk.opts[1].Bytes()):
-			return oracleCoreBlk.opts[1], nil
+		case bytes.Equal(b, xBlock.Bytes()):
+			return xBlock, nil
+		case bytes.Equal(b, xBlock.opts[0].Bytes()):
+			return xBlock.opts[0], nil
+		case bytes.Equal(b, xBlock.opts[1].Bytes()):
+			return xBlock.opts[1], nil
 		default:
 			return nil, fmt.Errorf("Unknown block")
 		}
 	}
 
-	parentBlk, err := proVM.BuildBlock()
+	aBlockIntf, err := proVM.BuildBlock()
 	if err != nil {
 		t.Fatal("could not build post fork oracle block")
 	}
 
-	// retrieve options ...
-	postForkOracleBlk, ok := parentBlk.(*postForkBlock)
+	aBlock, ok := aBlockIntf.(*postForkBlock)
 	if !ok {
 		t.Fatal("expected post fork block")
 	}
-	opts, err := postForkOracleBlk.Options()
+	opts, err := aBlock.Options()
+	if err != nil {
+		t.Fatal("could not retrieve options from post fork oracle block")
+	}
+
+	if err := opts[0].Verify(); err != nil {
+		t.Fatal(err)
+	}
+	if err := opts[1].Verify(); err != nil {
+		t.Fatal(err)
+	}
+
+	yBlock, err := proVM.ParseBlock(xBlock.opts[0].Bytes())
+	if err != nil {
+		// It's okay for this block not to be parsed
+		return
+	}
+	if err := yBlock.Verify(); err == nil {
+		t.Fatal("unexpectedly passed block verification")
+	}
+}
+
+// Ensure that a byzantine node issuing an invalid OptionBlock (B) which
+// contains core block (Y) whose parent (G) doesn't match (B)'s parent (A)'s
+// inner block (X) will be marked as invalid correctly.
+//     G
+//   / | \
+// A - X  |
+// |     /
+// B - Y
+func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
+	coreVM, _, proVM, coreGenBlk := initTestProposerVM(t, time.Time{}, 0)
+	proVM.Set(coreGenBlk.Timestamp())
+
+	xBlock := &TestOptionsBlock{
+		TestBlock: snowman.TestBlock{
+			TestDecidable: choices.TestDecidable{
+				IDV:     ids.GenerateTestID(),
+				StatusV: choices.Processing,
+			},
+			BytesV:     []byte{1},
+			ParentV:    coreGenBlk.ID(),
+			TimestampV: coreGenBlk.Timestamp(),
+		},
+		opts: [2]snowman.Block{
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{2},
+				ParentV:    coreGenBlk.ID(), // valid block should reference xBlock
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+			&snowman.TestBlock{
+				TestDecidable: choices.TestDecidable{
+					IDV:     ids.GenerateTestID(),
+					StatusV: choices.Processing,
+				},
+				BytesV:     []byte{3},
+				ParentV:    coreGenBlk.ID(), // valid block should reference xBlock
+				TimestampV: coreGenBlk.Timestamp(),
+			},
+		},
+	}
+
+	coreVM.BuildBlockF = func() (snowman.Block, error) { return xBlock, nil }
+	coreVM.GetBlockF = func(blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case coreGenBlk.ID():
+			return coreGenBlk, nil
+		case xBlock.ID():
+			return xBlock, nil
+		case xBlock.opts[0].ID():
+			return xBlock.opts[0], nil
+		case xBlock.opts[1].ID():
+			return xBlock.opts[1], nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, coreGenBlk.Bytes()):
+			return coreGenBlk, nil
+		case bytes.Equal(b, xBlock.Bytes()):
+			return xBlock, nil
+		case bytes.Equal(b, xBlock.opts[0].Bytes()):
+			return xBlock.opts[0], nil
+		case bytes.Equal(b, xBlock.opts[1].Bytes()):
+			return xBlock.opts[1], nil
+		default:
+			return nil, fmt.Errorf("Unknown block")
+		}
+	}
+
+	aBlockIntf, err := proVM.BuildBlock()
+	if err != nil {
+		t.Fatal("could not build post fork oracle block")
+	}
+
+	aBlock, ok := aBlockIntf.(*postForkBlock)
+	if !ok {
+		t.Fatal("expected post fork block")
+	}
+	opts, err := aBlock.Options()
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
@@ -173,7 +286,6 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		t.Fatal("unexpected option type")
 	}
 
-	// ... and verify them
 	if err := opts[0].Verify(); err == nil {
 		t.Fatal("option 0 has invalid parent, should not verify")
 	}
