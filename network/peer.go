@@ -259,7 +259,7 @@ func (p *peer) ReadMessages() {
 		msgLen := binary.BigEndian.Uint32(msgLenBytes)
 
 		// Make sure the message length is valid.
-		if int64(msgLen) > int64(p.net.config.MaxMessageSize) {
+		if int64(msgLen) > int64(constants.DefaultMaxMessageSize) {
 			p.net.log.Verbo("too large message length %d from %s%s at %s", msgLen, constants.NodeIDPrefix, p.nodeID, p.getIP())
 			return
 		}

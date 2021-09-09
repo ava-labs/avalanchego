@@ -195,7 +195,6 @@ type PeerListGossipConfig struct {
 type TimeoutConfig struct {
 	GetVersionTimeout    time.Duration `json:"getVersionTimeout"`
 	PingPongTimeout      time.Duration `json:"pingPongTimeout"`
-	PingFrequency        time.Duration `json:"pingFrequency"`
 	ReadHandshakeTimeout time.Duration `json:"readHandshakeTimeout"`
 	// peerAliasTimeout is the age a peer alias must
 	// be before we attempt to release it (so that we
@@ -230,8 +229,8 @@ type Config struct {
 	MyNodeID           ids.ShortID         `json:"myNodeID"`
 	MyIP               utils.DynamicIPDesc `json:"myIP"`
 	NetworkID          uint32              `json:"networkID"`
-	MaxMessageSize     uint32              `json:"maxMessageSize"`
 	MaxClockDifference time.Duration       `json:"maxClockDifference"`
+	PingFrequency      time.Duration       `json:"pingFrequency"`
 	AllowPrivateIPs    bool                `json:"allowPrivateIPs"`
 	CompressionEnabled bool                `json:"compressionEnabled"`
 	// This node's TLS key
@@ -241,28 +240,6 @@ type Config struct {
 	Beacons            validators.Set `json:"beacons"`
 	// Set of current validators in the Avalanche network
 	Validators validators.Set `json:"validators"`
-}
-
-// NewDefaultConfig returns a new Network Config with some reasonable default values.
-func NewDefaultConfig() Config {
-	return Config{
-		PeerListGossipConfig: PeerListGossipConfig{
-			PeerListStakerGossipFraction: constants.DefaultPeerListStakerGossipFraction,
-		},
-		DelayConfig: DelayConfig{
-			MaxReconnectDelay:     constants.DefaultMaxReconnectDelay,
-			InitialReconnectDelay: constants.DefaultInitialReconnectDelay,
-		},
-		TimeoutConfig: TimeoutConfig{
-			GetVersionTimeout:    constants.DefaultGetVersionTimeout,
-			PingPongTimeout:      constants.DefaultPingPongTimeout,
-			PingFrequency:        constants.DefaultPingFrequency,
-			ReadHandshakeTimeout: constants.DefaultReadHandshakeTimeout,
-		},
-		MaxMessageSize:     constants.DefaultMaxMessageSize,
-		MaxClockDifference: constants.DefaultMaxClockDifference,
-		AllowPrivateIPs:    constants.DefaultAllowPrivateIPs,
-	}
 }
 
 // NewNetwork returns a new Network implementation with the provided parameters.
@@ -334,7 +311,7 @@ func NewNetwork(
 		func() []byte {
 			return netw.byteSlicePool.Get().([]byte)
 		},
-		int64(config.MaxMessageSize),
+		int64(constants.DefaultMaxMessageSize),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initializing codec failed with: %s", err)

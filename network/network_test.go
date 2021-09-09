@@ -1924,7 +1924,7 @@ func TestPeerSignature(t *testing.T) {
 }
 
 func TestValidatorIPs(t *testing.T) {
-	netConfig := NewDefaultConfig()
+	netConfig := newDefaultConfig()
 	dummyNetwork := network{config: &netConfig}
 	dummyNetwork.config.PeerListSize = 50
 
@@ -2658,7 +2658,7 @@ func newDefaultNetwork(
 	networkID := uint32(0)
 	benchlistManager := benchlist.NewManager(&benchlist.Config{})
 
-	netConfig := NewDefaultConfig()
+	netConfig := newDefaultConfig()
 	netConfig.Namespace = ""
 	netConfig.MyNodeID = id
 	netConfig.MyIP = ip
@@ -2704,4 +2704,24 @@ func newTestNetwork(id ids.ShortID,
 	netw.inboundMsgThrottler = defaultInboundMsgThrottler
 	netw.outboundMsgThrottler = defaultOutboundMsgThrottler
 	return netw, nil
+}
+
+func newDefaultConfig() Config {
+	return Config{
+		PeerListGossipConfig: PeerListGossipConfig{
+			PeerListStakerGossipFraction: 2,
+		},
+		DelayConfig: DelayConfig{
+			MaxReconnectDelay:     time.Hour,
+			InitialReconnectDelay: time.Second,
+		},
+		TimeoutConfig: TimeoutConfig{
+			GetVersionTimeout:    10 * time.Second,
+			PingPongTimeout:      30 * time.Second,
+			ReadHandshakeTimeout: 15 * time.Second,
+		},
+		MaxClockDifference: time.Minute,
+		AllowPrivateIPs:    true,
+		PingFrequency:      constants.DefaultPingFrequency,
+	}
 }
