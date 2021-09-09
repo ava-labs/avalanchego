@@ -22,7 +22,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
 )
 
-var _ gresponsewriterproto.WriterServer = &Server{}
+var (
+	errUnsupportedFlushing  = errors.New("response writer doesn't support flushing")
+	errUnsupportedHijacking = errors.New("response writer doesn't support hijacking")
+
+	_ gresponsewriterproto.WriterServer = &Server{}
+)
 
 // Server is an http.ResponseWriter that is managed over RPC.
 type Server struct {
@@ -72,7 +77,7 @@ func (s *Server) WriteHeader(ctx context.Context, req *gresponsewriterproto.Writ
 func (s *Server) Flush(ctx context.Context, req *gresponsewriterproto.FlushRequest) (*gresponsewriterproto.FlushResponse, error) {
 	flusher, ok := s.writer.(http.Flusher)
 	if !ok {
-		return nil, errors.New("response writer doesn't support flushing")
+		return nil, errUnsupportedFlushing
 	}
 	flusher.Flush()
 	return &gresponsewriterproto.FlushResponse{}, nil
@@ -81,7 +86,7 @@ func (s *Server) Flush(ctx context.Context, req *gresponsewriterproto.FlushReque
 func (s *Server) Hijack(ctx context.Context, req *gresponsewriterproto.HijackRequest) (*gresponsewriterproto.HijackResponse, error) {
 	hijacker, ok := s.writer.(http.Hijacker)
 	if !ok {
-		return nil, errors.New("response writer doesn't support hijacking")
+		return nil, errUnsupportedHijacking
 	}
 	conn, readWriter, err := hijacker.Hijack()
 	if err != nil {

@@ -12,11 +12,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+var (
+	errNotIDType     = errors.New("expected ids.ID but got unexpected type")
+	errNotStatusType = errors.New("expected choices.Status but got unexpected type")
+	errNotTimeType   = errors.New("expected time.Time but got unexpected type")
+)
+
 func marshalID(idIntf interface{}) ([]byte, error) {
 	if id, ok := idIntf.(ids.ID); ok {
 		return id[:], nil
 	}
-	return nil, errors.New("expected ids.ID but got unexpected type")
+	return nil, errNotIDType
 }
 
 func unmarshalID(bytes []byte) (interface{}, error) {
@@ -27,7 +33,7 @@ func marshalStatus(statusIntf interface{}) ([]byte, error) {
 	if status, ok := statusIntf.(choices.Status); ok {
 		return status.Bytes(), nil
 	}
-	return nil, errors.New("expected choices.Status but got unexpected type")
+	return nil, errNotStatusType
 }
 
 func unmarshalStatus(bytes []byte) (interface{}, error) {
@@ -45,7 +51,7 @@ func marshalTime(timeIntf interface{}) ([]byte, error) {
 		p.PackLong(uint64(t.Unix()))
 		return p.Bytes, p.Err
 	}
-	return nil, errors.New("expected time.Time but got unexpected type")
+	return nil, errNotTimeType
 }
 
 func unmarshalTime(bytes []byte) (interface{}, error) {

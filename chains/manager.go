@@ -49,8 +49,9 @@ const (
 )
 
 var (
-	BootstrappedKey         = []byte{0x00}
-	_               Manager = &manager{}
+	errUnknownChainID = errors.New("unknown chain ID")
+
+	_ Manager = &manager{}
 )
 
 // Manager manages the chains running on this node.
@@ -239,19 +240,7 @@ func (m *manager) ForceCreateChain(chainParams ChainParameters) {
 
 	sb, exists := m.subnets[chainParams.SubnetID]
 	if !exists {
-		var onBootstrapped func()
-		if chainParams.SubnetID == constants.PrimaryNetworkID {
-			onBootstrapped = func() {
-				// When this subnet is done bootstrapping, mark that we have
-				// bootstrapped this database version. If running in fetch only
-				// mode, shut down node since fetching is complete.
-				if err := m.DBManager.Current().Database.Put(BootstrappedKey, nil); err != nil {
-					m.Log.Fatal("couldn't mark database as bootstrapped: %s", err)
-					go m.ShutdownNodeFunc(1)
-				}
-			}
-		}
-		sb = newSubnet(onBootstrapped, chainParams.ID)
+		sb = newSubnet(nil, chainParams.ID)
 		m.subnets[chainParams.SubnetID] = sb
 	} else {
 		sb.addChain(chainParams.ID)
@@ -491,8 +480,21 @@ func (m *manager) createAvalancheChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
+	// Passes messages from the consensus engine to the network
+	sender := sender.Sender{}
+	if err := sender.Initialize(
+		ctx,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		consensusParams.Namespace,
+		consensusParams.Metrics,
+	); err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
 	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs, &sender); err != nil {
 		return nil, fmt.Errorf("error during vm's Initialize: %w", err)
 	}
 
@@ -500,13 +502,6 @@ func (m *manager) createAvalancheChain(
 	// persistence of vertices
 	vtxManager := &state.Serializer{}
 	vtxManager.Initialize(ctx, vm, vertexDB)
-
-	// Passes messages from the consensus engine to the network
-	sender := sender.Sender{}
-	err = sender.Initialize(ctx, m.Net, m.ManagerConfig.Router, m.TimeoutManager, consensusParams.Namespace, consensusParams.Metrics)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
-	}
 
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -622,24 +617,23 @@ func (m *manager) createSnowmanChain(
 	// VM uses this channel to notify engine that a block is ready to be made
 	msgChan := make(chan common.Message, defaultChannelSize)
 
-	// Initialize the VM
-	chainConfig := m.getChainConfig(ctx.ChainID)
-	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs); err != nil {
-		return nil, err
-	}
-
 	// Passes messages from the consensus engine to the network
 	sender := sender.Sender{}
-	err = sender.Initialize(
+	if err := sender.Initialize(
 		ctx,
 		m.Net,
 		m.ManagerConfig.Router,
 		m.TimeoutManager,
 		consensusParams.Namespace,
 		consensusParams.Metrics,
-	)
-	if err != nil {
+	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	// Initialize the VM
+	chainConfig := m.getChainConfig(ctx.ChainID)
+	if err := vm.Initialize(ctx, vmDBManager, genesisData, chainConfig.Upgrade, chainConfig.Config, msgChan, fxs, &sender); err != nil {
+		return nil, err
 	}
 
 	sampleK := consensusParams.K
@@ -726,7 +720,7 @@ func (m *manager) SubnetID(chainID ids.ID) (ids.ID, error) {
 
 	chain, exists := m.chains[chainID]
 	if !exists {
-		return ids.ID{}, errors.New("unknown chain ID")
+		return ids.ID{}, errUnknownChainID
 	}
 	return chain.Context().SubnetID, nil
 }

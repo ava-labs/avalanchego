@@ -33,6 +33,10 @@ const (
 	Version
 	PeerList
 	VersionWithSubnets
+	// Application level:
+	AppRequest
+	AppResponse
+	AppGossip
 )
 
 var (
@@ -56,6 +60,9 @@ var (
 		Version,
 		VersionWithSubnets,
 		PeerList,
+		AppRequest,
+		AppResponse,
+		AppGossip,
 	}
 
 	// Defines the messages that can be sent/received with this network
@@ -81,12 +88,16 @@ var (
 		PushQuery: {ChainID, RequestID, Deadline, ContainerID, ContainerBytes},
 		PullQuery: {ChainID, RequestID, Deadline, ContainerID},
 		Chits:     {ChainID, RequestID, ContainerIDs},
+		// Application level:
+		AppRequest:  {ChainID, RequestID, Deadline, AppRequestBytes},
+		AppResponse: {ChainID, RequestID, AppResponseBytes},
+		AppGossip:   {ChainID, AppGossipBytes},
 	}
 )
 
 func (op Op) Compressable() bool {
 	switch op {
-	case PeerList, Put, MultiPut, PushQuery:
+	case PeerList, Put, MultiPut, PushQuery, AppRequest, AppResponse, AppGossip:
 		return true
 	default:
 		return false
@@ -131,6 +142,12 @@ func (op Op) String() string {
 		return "pull_query"
 	case Chits:
 		return "chits"
+	case AppRequest:
+		return "app_request"
+	case AppResponse:
+		return "app_response"
+	case AppGossip:
+		return "app_gossip"
 	default:
 		return "Unknown Op"
 	}

@@ -118,6 +118,8 @@ func (sb *StandardBlock) Verify() error {
 		}
 	}
 
+	sb.timestamp = sb.onAcceptState.GetTimestamp()
+
 	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil

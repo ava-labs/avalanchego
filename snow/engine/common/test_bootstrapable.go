@@ -10,7 +10,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Bootstrapable = &BootstrapableTest{}
+var (
+	errForceAccepted = errors.New("unexpectedly called ForceAccepted")
+
+	_ Bootstrapable = &BootstrapableTest{}
+)
 
 // BootstrapableTest is a test engine that supports bootstrapping
 type BootstrapableTest struct {
@@ -62,7 +66,7 @@ func (b *BootstrapableTest) ForceAccepted(containerIDs []ids.ID) error {
 		if b.T != nil {
 			b.T.Fatalf("Unexpectedly called ForceAccepted")
 		}
-		return errors.New("unexpectedly called ForceAccepted")
+		return errForceAccepted
 	}
 	return nil
 }
