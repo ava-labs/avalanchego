@@ -73,7 +73,7 @@ var (
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	defaultBalance uint64 = 100 * defaultMinValidatorStake
+	defaultBalance = 100 * defaultMinValidatorStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
