@@ -34,11 +34,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/types"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/log"
+	lru "github.com/hashicorp/golang-lru"
 )
 
 const sampleNumber = 3 // Number of transactions sampled in a block
@@ -49,17 +52,22 @@ var (
 )
 
 type Config struct {
-	Blocks      int
-	Percentile  int
-	MaxPrice    *big.Int `toml:",omitempty"`
-	IgnorePrice *big.Int `toml:",omitempty"`
+	Blocks           int
+	Percentile       int
+	MaxHeaderHistory int
+	MaxBlockHistory  int
+	MaxPrice         *big.Int `toml:",omitempty"`
+	IgnorePrice      *big.Int `toml:",omitempty"`
 }
 
 // OracleBackend includes all necessary background APIs for oracle.
 type OracleBackend interface {
 	HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error)
 	BlockByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Block, error)
+	GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error)
+	PendingBlockAndReceipts() (*types.Block, types.Receipts)
 	ChainConfig() *params.ChainConfig
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -76,7 +84,9 @@ type Oracle struct {
 	// clock to decide what set of rules to use when recommending a gas price
 	clock timer.Clock
 
-	checkBlocks, percentile int
+	checkBlocks, percentile           int
+	maxHeaderHistory, maxBlockHistory int
+	historyCache                      *lru.Cache
 }
 
 // NewOracle returns a new gasprice oracle which can recommend suitable
@@ -108,13 +118,30 @@ func NewOracle(backend OracleBackend, config Config) *Oracle {
 	} else if ignorePrice.Int64() > 0 {
 		log.Info("Gasprice oracle is ignoring threshold set", "threshold", ignorePrice)
 	}
+
+	cache, _ := lru.New(2048)
+	headEvent := make(chan core.ChainHeadEvent, 1)
+	backend.SubscribeChainHeadEvent(headEvent)
+	go func() {
+		var lastHead common.Hash
+		for ev := range headEvent {
+			if ev.Block.ParentHash() != lastHead {
+				cache.Purge()
+			}
+			lastHead = ev.Block.Hash()
+		}
+	}()
+
 	return &Oracle{
-		backend:     backend,
-		lastPrice:   new(big.Int).Set(maxPrice),
-		maxPrice:    maxPrice,
-		ignorePrice: ignorePrice,
-		checkBlocks: blocks,
-		percentile:  percent,
+		backend:          backend,
+		lastPrice:        new(big.Int).Set(maxPrice),
+		maxPrice:         maxPrice,
+		ignorePrice:      ignorePrice,
+		checkBlocks:      blocks,
+		percentile:       percent,
+		maxHeaderHistory: config.MaxHeaderHistory,
+		maxBlockHistory:  config.MaxBlockHistory,
+		historyCache:     cache,
 	}
 }
 
