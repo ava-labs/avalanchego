@@ -173,11 +173,15 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	if !ok {
 		t.Fatal("expected post fork block")
 	}
+
 	opts, err := aBlock.Options()
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
 
+	if err := aBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
 	if err := opts[0].Verify(); err != nil {
 		t.Fatal(err)
 	}
@@ -190,6 +194,14 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		// It's okay for this block not to be parsed
 		return
 	}
+	if err := yBlock.Verify(); err == nil {
+		t.Fatal("unexpectedly passed block verification")
+	}
+
+	if err := aBlock.Accept(); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := yBlock.Verify(); err == nil {
 		t.Fatal("unexpectedly passed block verification")
 	}
@@ -282,10 +294,10 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	if err != nil {
 		t.Fatal("could not retrieve options from post fork oracle block")
 	}
-	if _, ok := opts[0].(*postForkOption); !ok {
-		t.Fatal("unexpected option type")
-	}
 
+	if err := aBlock.Verify(); err != nil {
+		t.Fatal(err)
+	}
 	if err := opts[0].Verify(); err == nil {
 		t.Fatal("option 0 has invalid parent, should not verify")
 	}

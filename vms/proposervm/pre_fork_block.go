@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -69,6 +70,23 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 	if !parentTimestamp.Before(b.vm.activationTime) {
 		if err := verifyIsOracleBlock(b.Block); err != nil {
 			return err
+		}
+
+		if parentStatus := b.Status(); parentStatus == choices.Accepted {
+			_, err := b.vm.GetLastAccepted()
+			if err != database.ErrNotFound {
+				// If the parent block is accepted and it was a preForkBlock,
+				// then there shouldn't have been an accepted postForkBlock yet.
+				// If there was an accepted postForkBlock, then the parent
+				// wasn't a preForkBlock and this child block is invalid.
+				return errUnexpectedBlockType
+			}
+		} else if b.vm.Tree.Contains(b.Block) {
+			// If the parent block is a preForkBlock, then it's inner block
+			// shouldn't have been registered into the inner block tree. If the
+			// parent block was registered into the inner block tree, then the
+			// parent wasn't a preForkBlock and this child block is invalid.
+			return errUnexpectedBlockType
 		}
 
 		b.vm.ctx.Log.Debug("allowing pre-fork block %s after the fork time because the parent is an oracle block",
