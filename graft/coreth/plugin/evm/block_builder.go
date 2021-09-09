@@ -278,7 +278,7 @@ func (b *blockBuilder) retryBlockBuild() {
 		return
 	}
 
-	log.Debug("Retrying block building")
+	log.Trace("Retrying block building")
 	select {
 	case b.notifyBuildBlockChan <- commonEng.PendingTxs:
 		b.buildStatus = building
