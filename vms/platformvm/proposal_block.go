@@ -70,7 +70,7 @@ func (pb *ProposalBlock) Reject() error {
 	pb.onCommitState = nil
 	pb.onAbortState = nil
 
-	if err := pb.vm.mempool.IssueTx(&pb.Tx); err != nil {
+	if err := pb.vm.blockBuilder.AddVerifiedTx(&pb.Tx); err != nil {
 		pb.vm.ctx.Log.Verbo(
 			"failed to reissue tx %q due to: %s",
 			pb.Tx.ID(),
@@ -199,6 +199,7 @@ func (pb *ProposalBlock) Verify() error {
 
 	pb.timestamp = parentState.GetTimestamp()
 
+	pb.vm.blockBuilder.RemoveProposalTx(&pb.Tx)
 	pb.vm.currentBlocks[blkID] = pb
 	parentIntf.addChild(pb)
 	return nil

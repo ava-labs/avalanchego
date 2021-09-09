@@ -28,16 +28,14 @@ type UnsignedAdvanceTimeTx struct {
 	Time uint64 `serialize:"true" json:"time"`
 }
 
-func (t *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
+func (tx *UnsignedAdvanceTimeTx) InitCtx(*snow.Context) {}
 
 // Timestamp returns the time this block is proposing the chain should be set to
 func (tx *UnsignedAdvanceTimeTx) Timestamp() time.Time {
 	return time.Unix(int64(tx.Time), 0)
 }
 
-func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(
-	ctx ProposalSyntacticVerificationContext,
-) error {
+func (tx *UnsignedAdvanceTimeTx) SyntacticVerify(*snow.Context) error {
 	return nil
 }
 

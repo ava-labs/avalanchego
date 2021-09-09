@@ -143,12 +143,7 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 		}
 		tx.UnsignedTx.(*UnsignedCreateChainTx).syntacticallyVerified = false
 		tx.UnsignedTx = test.setup(tx.UnsignedTx.(*UnsignedCreateChainTx))
-		synCtx := DecisionSyntacticVerificationContext{
-			ctx:        vm.ctx,
-			feeAmount:  vm.TxFee,
-			feeAssetID: vm.ctx.AVAXAssetID,
-		}
-		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).SyntacticVerify(synCtx); err != nil && !test.shouldErr {
+		if err := tx.UnsignedTx.(*UnsignedCreateChainTx).SyntacticVerify(vm.ctx); err != nil && !test.shouldErr {
 			t.Fatalf("test '%s' shouldn't have errored but got: %s", test.description, err)
 		} else if err == nil && test.shouldErr {
 			t.Fatalf("test '%s' didn't error but should have", test.description)

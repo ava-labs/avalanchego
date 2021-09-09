@@ -27,15 +27,13 @@ type UnsignedCreateSubnetTx struct {
 // InitCtx sets the FxID fields in the inputs and outputs of this
 // [UnsignedCreateSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so that
 // the addresses can be json marshalled into human readable format
-func (t *UnsignedCreateSubnetTx) InitCtx(ctx *snow.Context) {
-	t.BaseTx.InitCtx(ctx)
-	t.Owner.InitCtx(ctx)
+func (tx *UnsignedCreateSubnetTx) InitCtx(ctx *snow.Context) {
+	tx.BaseTx.InitCtx(ctx)
+	tx.Owner.InitCtx(ctx)
 }
 
-// Verify this transaction is well-formed
-func (tx *UnsignedCreateSubnetTx) SyntacticVerify(
-	synCtx DecisionSyntacticVerificationContext,
-) error {
+// SyntacticVerify verifies that this transaction is well-formed
+func (tx *UnsignedCreateSubnetTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -43,7 +41,7 @@ func (tx *UnsignedCreateSubnetTx) SyntacticVerify(
 		return nil
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 	if err := tx.Owner.Verify(); err != nil {
@@ -64,18 +62,13 @@ func (tx *UnsignedCreateSubnetTx) SemanticVerify(
 	TxError,
 ) {
 	// Make sure this transaction is well formed.
-	timestamp := vs.GetTimestamp()
-	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
-	synCtx := DecisionSyntacticVerificationContext{
-		ctx:        vm.ctx,
-		feeAmount:  createSubnetTxFee,
-		feeAssetID: vm.ctx.AVAXAssetID,
-	}
-	if err := tx.SyntacticVerify(synCtx); err != nil {
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, permError{err}
 	}
 
 	// Verify the flowcheck
+	timestamp := vs.GetTimestamp()
+	createSubnetTxFee := vm.getCreateSubnetTxFee(timestamp)
 	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, stx.Creds, createSubnetTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
@@ -127,12 +120,7 @@ func (vm *VM) newCreateSubnetTx(
 		return nil, err
 	}
 
-	synCtx := DecisionSyntacticVerificationContext{
-		ctx:        vm.ctx,
-		feeAmount:  createSubnetTxFee,
-		feeAssetID: vm.ctx.AVAXAssetID,
-	}
-	return tx, utx.SyntacticVerify(synCtx)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
 func (vm *VM) getCreateSubnetTxFee(t time.Time) uint64 {

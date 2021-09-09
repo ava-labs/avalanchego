@@ -121,6 +121,7 @@ func (sb *StandardBlock) Verify() error {
 
 	sb.timestamp = sb.onAcceptState.GetTimestamp()
 
+	sb.vm.blockBuilder.RemoveDecisionTxs(sb.Txs)
 	sb.vm.currentBlocks[blkID] = sb
 	parentIntf.addChild(sb)
 	return nil
@@ -135,7 +136,7 @@ func (sb *StandardBlock) Reject() error {
 	)
 
 	for _, tx := range sb.Txs {
-		if err := sb.vm.mempool.IssueTx(tx); err != nil {
+		if err := sb.vm.blockBuilder.AddVerifiedTx(tx); err != nil {
 			sb.vm.ctx.Log.Debug(
 				"failed to reissue tx %q due to: %s",
 				tx.ID(),

@@ -31,13 +31,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 
 	// Case : tx is nil
 	var unsignedTx *UnsignedAddDelegatorTx
-	synCtx := ProposalSyntacticVerificationContext{
-		ctx:               vm.ctx,
-		minDelegatorStake: vm.MinDelegatorStake,
-		minStakeDuration:  defaultMinStakingDuration,
-		maxStakeDuration:  defaultMaxStakingDuration,
-	}
-	if err := unsignedTx.SyntacticVerify(synCtx); err == nil {
+	if err := unsignedTx.SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because tx is nil")
 	}
 
@@ -57,91 +51,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).NetworkID++
 	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	synCtx = ProposalSyntacticVerificationContext{
-		ctx:               vm.ctx,
-		minDelegatorStake: vm.MinDelegatorStake,
-		minStakeDuration:  defaultMinStakingDuration,
-		maxStakeDuration:  defaultMaxStakingDuration,
-	}
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(synCtx); err == nil {
+	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(vm.ctx); err == nil {
 		t.Fatal("should have errored because the wrong network ID was used")
-	}
-
-	// Case: Not enough weight
-	tx, err = vm.newAddDelegatorTx(
-		vm.MinDelegatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateEndTime.Unix()),
-		nodeID,
-		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.Wght = vm.MinDelegatorStake - 1
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	synCtx = ProposalSyntacticVerificationContext{
-		ctx:               vm.ctx,
-		minDelegatorStake: vm.MinDelegatorStake,
-		minStakeDuration:  defaultMinStakingDuration,
-		maxStakeDuration:  defaultMaxStakingDuration,
-	}
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(synCtx); err == nil {
-		t.Fatal("should have errored because of not enough weight")
-	}
-
-	// Case: Validation length is too short
-	tx, err = vm.newAddDelegatorTx(
-		vm.MinDelegatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(defaultMinStakingDuration).Unix()),
-		nodeID,
-		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End-- // 1 shorter than minimum stake time
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	synCtx = ProposalSyntacticVerificationContext{
-		ctx:               vm.ctx,
-		minDelegatorStake: vm.MinDelegatorStake,
-		minStakeDuration:  defaultMinStakingDuration,
-		maxStakeDuration:  defaultMaxStakingDuration,
-	}
-	if err = tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(synCtx); err == nil {
-		t.Fatal("should have errored because validation length too short")
-	}
-
-	// Case: Validation length is too long
-	if tx, err = vm.newAddDelegatorTx(
-		vm.MinDelegatorStake,
-		uint64(defaultValidateStartTime.Unix()),
-		uint64(defaultValidateStartTime.Add(defaultMaxStakingDuration).Unix()),
-		nodeID,
-		rewardAddress,
-		[]*crypto.PrivateKeySECP256K1R{keys[0]},
-		ids.ShortEmpty, // change addr
-	); err != nil {
-		t.Fatal(err)
-	}
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).Validator.End++ // 1 longer than maximum stake time
-	// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
-	tx.UnsignedTx.(*UnsignedAddDelegatorTx).syntacticallyVerified = false
-	synCtx = ProposalSyntacticVerificationContext{
-		ctx:               vm.ctx,
-		minDelegatorStake: vm.MinDelegatorStake,
-		minStakeDuration:  defaultMinStakingDuration,
-		maxStakeDuration:  defaultMaxStakingDuration,
-	}
-	if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(synCtx); err == nil {
-		t.Fatal("should have errored because validation length too long")
 	}
 
 	// Case: Valid
@@ -155,16 +66,8 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else {
-		synCtx = ProposalSyntacticVerificationContext{
-			ctx:               vm.ctx,
-			minDelegatorStake: vm.MinDelegatorStake,
-			minStakeDuration:  defaultMinStakingDuration,
-			maxStakeDuration:  defaultMaxStakingDuration,
-		}
-		if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(synCtx); err != nil {
-			t.Fatal(err)
-		}
+	} else if err := tx.UnsignedTx.(*UnsignedAddDelegatorTx).SyntacticVerify(vm.ctx); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -469,7 +372,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.mempool.IssueTx(addValidatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
 	assert.NoError(err)
 
 	addValidatorBlock, err := vm.BuildBlock()
@@ -500,7 +403,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.mempool.IssueTx(addFirstDelegatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
 	assert.NoError(err)
 
 	addFirstDelegatorBlock, err := vm.BuildBlock()
@@ -533,7 +436,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.mempool.IssueTx(addSecondDelegatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
 	assert.NoError(err)
 
 	addSecondDelegatorBlock, err := vm.BuildBlock()
@@ -557,7 +460,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	assert.NoError(err)
 
 	// trigger block creation
-	err = vm.mempool.IssueTx(addThirdDelegatorTx)
+	err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
 	assert.NoError(err)
 
 	// Verify the proposed tx is invalid
@@ -638,7 +541,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the add validator tx
-			err = vm.mempool.IssueTx(addValidatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addValidatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the validator tx
@@ -660,7 +563,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the first add delegator tx
-			err = vm.mempool.IssueTx(addFirstDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addFirstDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the first add delegator tx
@@ -682,7 +585,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the second add delegator tx
-			err = vm.mempool.IssueTx(addSecondDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addSecondDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the second add delegator tx
@@ -704,7 +607,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the third add delegator tx
-			err = vm.mempool.IssueTx(addThirdDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addThirdDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the third add delegator tx
@@ -726,7 +629,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			assert.NoError(err)
 
 			// issue the fourth add delegator tx
-			err = vm.mempool.IssueTx(addFourthDelegatorTx)
+			err = vm.blockBuilder.AddUnverifiedTx(addFourthDelegatorTx)
 			assert.NoError(err)
 
 			// trigger block creation for the fourth add delegator tx

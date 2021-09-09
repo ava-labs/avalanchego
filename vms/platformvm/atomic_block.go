@@ -121,6 +121,7 @@ func (ab *AtomicBlock) Verify() error {
 	ab.onAcceptState = onAccept
 	ab.timestamp = onAccept.GetTimestamp()
 
+	ab.vm.blockBuilder.RemoveAtomicTx(&ab.Tx)
 	ab.vm.currentBlocks[blkID] = ab
 	parentIntf.addChild(ab)
 	return nil
@@ -190,7 +191,7 @@ func (ab *AtomicBlock) Reject() error {
 		ab.Parent(),
 	)
 
-	if err := ab.vm.mempool.IssueTx(&ab.Tx); err != nil {
+	if err := ab.vm.blockBuilder.AddVerifiedTx(&ab.Tx); err != nil {
 		ab.vm.ctx.Log.Debug(
 			"failed to reissue tx %q due to: %s",
 			ab.Tx.ID(),

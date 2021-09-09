@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -51,9 +52,7 @@ type UnsignedCreateChainTx struct {
 	SubnetAuth verify.Verifiable `serialize:"true" json:"subnetAuthorization"`
 }
 
-func (tx *UnsignedCreateChainTx) SyntacticVerify(
-	synCtx DecisionSyntacticVerificationContext,
-) error {
+func (tx *UnsignedCreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx
@@ -77,7 +76,7 @@ func (tx *UnsignedCreateChainTx) SyntacticVerify(
 		}
 	}
 
-	if err := tx.BaseTx.Verify(synCtx.ctx); err != nil {
+	if err := tx.BaseTx.SyntacticVerify(ctx); err != nil {
 		return err
 	}
 	if err := tx.SubnetAuth.Verify(); err != nil {
@@ -102,14 +101,7 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 		return nil, permError{errWrongNumberOfCredentials}
 	}
 
-	timestamp := vs.GetTimestamp()
-	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
-	synCtx := DecisionSyntacticVerificationContext{
-		ctx:        vm.ctx,
-		feeAmount:  createBlockchainTxFee,
-		feeAssetID: vm.ctx.AVAXAssetID,
-	}
-	if err := tx.SyntacticVerify(synCtx); err != nil {
+	if err := tx.SyntacticVerify(vm.ctx); err != nil {
 		return nil, permError{err}
 	}
 
@@ -119,6 +111,8 @@ func (tx *UnsignedCreateChainTx) SemanticVerify(
 	subnetCred := stx.Creds[baseTxCredsLen]
 
 	// Verify the flowcheck
+	timestamp := vs.GetTimestamp()
+	createBlockchainTxFee := vm.getCreateBlockchainTxFee(timestamp)
 	if err := vm.semanticVerifySpend(vs, tx, tx.Ins, tx.Outs, baseTxCreds, createBlockchainTxFee, vm.ctx.AVAXAssetID); err != nil {
 		return nil, err
 	}
@@ -204,13 +198,7 @@ func (vm *VM) newCreateChainTx(
 	if err := tx.Sign(Codec, signers); err != nil {
 		return nil, err
 	}
-
-	synCtx := DecisionSyntacticVerificationContext{
-		ctx:        vm.ctx,
-		feeAmount:  createBlockchainTxFee,
-		feeAssetID: vm.ctx.AVAXAssetID,
-	}
-	return tx, utx.SyntacticVerify(synCtx)
+	return tx, utx.SyntacticVerify(vm.ctx)
 }
 
 func (vm *VM) getCreateBlockchainTxFee(t time.Time) uint64 {

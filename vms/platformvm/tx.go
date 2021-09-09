@@ -1,4 +1,4 @@
-// (c) 2019-2020, Ava Labs, Inc. All rights reserved.
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -17,6 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+type TimedTx interface {
+	ID() ids.ID
+	StartTime() time.Time
+	EndTime() time.Time
+	Weight() uint64
+	Bytes() []byte
+}
+
 // UnsignedTx is an unsigned transaction
 type UnsignedTx interface {
 	// TODO: Remove this initialization pattern from both the platformvm and the
@@ -27,20 +35,14 @@ type UnsignedTx interface {
 	ID() ids.ID
 	UnsignedBytes() []byte
 	Bytes() []byte
+
+	// Attempts to verify this transaction without any provided state.
+	SyntacticVerify(ctx *snow.Context) error
 }
 
 // UnsignedDecisionTx is an unsigned operation that can be immediately decided
-type DecisionSyntacticVerificationContext struct {
-	ctx        *snow.Context
-	feeAmount  uint64
-	feeAssetID ids.ID
-}
-
 type UnsignedDecisionTx interface {
 	UnsignedTx
-
-	// Attempts to verify this transaction without any provided state.
-	SyntacticVerify(synCtx DecisionSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, vs VersionedState, stx *Tx) (
@@ -50,26 +52,8 @@ type UnsignedDecisionTx interface {
 }
 
 // UnsignedProposalTx is an unsigned operation that can be proposed
-type ProposalSyntacticVerificationContext struct {
-	ctx              *snow.Context
-	minStakeDuration time.Duration
-	maxStakeDuration time.Duration
-
-	minStake         uint64
-	maxStake         uint64
-	minDelegationFee uint32
-
-	minDelegatorStake uint64
-
-	feeAmount  uint64
-	feeAssetID ids.ID
-}
-
 type UnsignedProposalTx interface {
 	UnsignedTx
-
-	// Attempts to verify this transaction without any provided state.
-	SyntacticVerify(synCtx ProposalSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, state MutableState, stx *Tx) (
@@ -83,21 +67,11 @@ type UnsignedProposalTx interface {
 }
 
 // UnsignedAtomicTx is an unsigned operation that can be atomically accepted
-type AtomicSyntacticVerificationContext struct {
-	ctx        *snow.Context
-	avmID      ids.ID
-	feeAmount  uint64
-	feeAssetID ids.ID
-}
-
 type UnsignedAtomicTx interface {
 	UnsignedTx
 
 	// UTXOs this tx consumes
 	InputUTXOs() ids.Set
-
-	// Attempts to verify this transaction without any provided state.
-	SyntacticVerify(synCtx AtomicSyntacticVerificationContext) error
 
 	// Attempts to verify this transaction with the provided state.
 	SemanticVerify(vm *VM, parentState MutableState, stx *Tx) (VersionedState, TxError)

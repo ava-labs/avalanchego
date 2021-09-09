@@ -1,3 +1,6 @@
+// (c) 2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -43,7 +46,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	// create tx to be gossiped
 	tx := getTheValidTx(vm, t)
@@ -62,7 +65,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	err = vm.AppResponse(nodeID, vm.requestID, msgBytes)
 	assert.NoError(err)
 
-	has := mempool.has(txID)
+	has := mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
@@ -74,7 +77,7 @@ func TestMempool_Add_Gossiped_CreateChainTx(t *testing.T) {
 	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")
 
-	has = mempool.has(txID)
+	has = mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 
@@ -92,7 +95,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := vm.blockBuilder.Mempool.(*mempool)
 
 	var (
 		wasGossiped   bool
@@ -119,7 +122,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	err = vm.AppResponse(nodeID, 0, msgBytes)
 	assert.NoError(err, "responses with unknown requestID should be dropped")
 
-	has := mempool.has(txID)
+	has := mempool.Has(txID)
 	assert.False(has, "responses with unknown requestID should not affect mempool")
 	assert.False(wasGossiped, "responses with unknown requestID should not result in gossiping")
 
@@ -130,7 +133,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	err = vm.AppResponse(nodeID, vm.requestID, msgBytes)
 	assert.NoError(err, "error in reception of tx")
 
-	has = mempool.has(txID)
+	has = mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 	assert.True(wasGossiped, "tx accepted in mempool should have been re-gossiped")
 
@@ -170,7 +173,7 @@ func TestMempool_AppResponseHandling(t *testing.T) {
 	vm.requestID++
 	vm.requestsContent[vm.requestID] = txID2
 
-	vm.mempool.totalBytesSize = MaxMempoolByteSize
+	mempool.totalBytesSize = maxMempoolSize
 	err = vm.AppResponse(nodeID, vm.requestID, msgBytes)
 	assert.NoError(err, "error in reception of tx")
 	assert.False(wasGossiped, "unaccepted tx should have not been re-gossiped")
@@ -301,7 +304,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	var wasRequested bool
 	sender.SendAppRequestF = func(ids.ShortSet, uint32, []byte) error {
@@ -313,8 +316,7 @@ func TestMempool_AppGossipHandling_InvalidTx(t *testing.T) {
 	tx := getTheValidTx(vm, t)
 	txID := tx.ID()
 
-	err := mempool.markReject(tx)
-	assert.NoError(err, "could not mark tx as rejected")
+	mempool.MarkDropped(txID)
 
 	// show that the invalid tx is not requested
 	nodeID := ids.GenerateTestShortID()
@@ -343,7 +345,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	var (
 		wasResponded   bool
@@ -372,7 +374,7 @@ func TestMempool_AppRequestHandling(t *testing.T) {
 	assert.False(wasResponded, "there should be no response with an unknown tx")
 
 	// show that there is response if tx is known
-	err = mempool.AddUncheckedTx(tx)
+	err = mempool.AddVerifiedTx(tx)
 	assert.NoError(err, "could not add tx to mempool")
 
 	err = vm.AppRequest(nodeID, 0, msgBytes)
@@ -400,7 +402,7 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 	}()
 
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	var gossipedBytes []byte
 	sender.SendAppGossipF = func(b []byte) error {
@@ -412,7 +414,7 @@ func TestMempool_IssueTxAndGossiping(t *testing.T) {
 	tx := getTheValidTx(vm, t)
 	txID := tx.ID()
 
-	err := mempool.IssueTx(tx)
+	err := mempool.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
 	replyIntf, err := message.Parse(gossipedBytes)

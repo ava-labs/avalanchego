@@ -50,7 +50,6 @@ import (
 var (
 	defaultMinStakingDuration = 24 * time.Hour
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
-	defaultMinDelegationFee   uint32
 
 	// AVAX asset ID in tests
 	avaxAssetID = ids.ID{'y', 'e', 'e', 't'}
@@ -74,7 +73,7 @@ var (
 	defaultMinDelegatorStake = 1 * units.MilliAvax
 
 	// amount all genesis validators have in defaultVM
-	defaultBalance uint64 = 100 * defaultMinValidatorStake
+	defaultBalance = 100 * defaultMinValidatorStake
 
 	// subnet that exists at genesis in defaultVM
 	// Its controlKeys are keys[0], keys[1], keys[2]
@@ -337,7 +336,7 @@ func defaultVM() (*VM, database.Database, *common.SenderTest) {
 		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
-	} else if err := vm.mempool.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -410,7 +409,7 @@ func GenesisVMWithArgs(t *testing.T, args *BuildGenesisArgs) ([]byte, chan commo
 		keys[0].PublicKey().Address(),           // change addr
 	); err != nil {
 		panic(err)
-	} else if err := vm.mempool.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		panic(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		panic(err)
@@ -627,7 +626,7 @@ func TestAddValidatorCommit(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -774,7 +773,7 @@ func TestAddValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -850,7 +849,7 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	_, err = vm.BuildBlock()
@@ -858,9 +857,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 		t.Fatal("Expected BuildBlock to error due to adding a validator with a nodeID that is already in the validator set.")
 	}
 
-	if vm.mempool.HasProposalTxs() {
-		t.Fatalf("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but found %d",
-			len(vm.mempool.unissuedProposalTxs))
+	if vm.blockBuilder.HasProposalTx() {
+		t.Fatal("Expected there to be 0 unissued proposal transactions after BuildBlock failed, but reported txs")
 	}
 }
 
@@ -896,7 +894,7 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -979,7 +977,7 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	}
 
 	// trigger block creation
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	}
 	blk, err := vm.BuildBlock()
@@ -1340,7 +1338,7 @@ func TestCreateChain(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.mempool.IssueTx(tx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create chain
 		t.Fatal(err)
@@ -1398,7 +1396,7 @@ func TestCreateSubnet(t *testing.T) {
 	)
 	if err != nil {
 		t.Fatal(err)
-	} else if err := vm.mempool.IssueTx(createSubnetTx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(createSubnetTx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil { // should contain proposal to create subnet
 		t.Fatal(err)
@@ -1442,7 +1440,7 @@ func TestCreateSubnet(t *testing.T) {
 		ids.ShortEmpty, // change addr
 	); err != nil {
 		t.Fatal(err)
-	} else if err := vm.mempool.IssueTx(addValidatorTx); err != nil {
+	} else if err := vm.blockBuilder.AddUnverifiedTx(addValidatorTx); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1679,7 +1677,7 @@ func TestAtomicImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := vm.mempool.IssueTx(tx); err != nil {
+	if err := vm.blockBuilder.AddUnverifiedTx(tx); err != nil {
 		t.Fatal(err)
 	} else if blk, err := vm.BuildBlock(); err != nil {
 		t.Fatal(err)

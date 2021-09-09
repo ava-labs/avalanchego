@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -20,18 +23,18 @@ type BaseTx struct {
 // InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
 // sets the [ctx] to the given [vm.ctx] so that the addresses can be json
 // marshalled into human readable format
-func (t *BaseTx) InitCtx(ctx *snow.Context) {
-	for _, in := range t.BaseTx.Ins {
+func (tx *BaseTx) InitCtx(ctx *snow.Context) {
+	for _, in := range tx.BaseTx.Ins {
 		in.FxID = secp256k1fx.ID
 	}
-	for _, out := range t.BaseTx.Outs {
+	for _, out := range tx.BaseTx.Outs {
 		out.FxID = secp256k1fx.ID
 		out.InitCtx(ctx)
 	}
 }
 
-// Verify returns nil iff this tx is well formed
-func (tx *BaseTx) Verify(ctx *snow.Context) error {
+// SyntacticVerify returns nil iff this tx is well formed
+func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:
 		return errNilTx

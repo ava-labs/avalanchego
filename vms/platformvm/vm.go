@@ -93,7 +93,7 @@ type VM struct {
 	// Used to create and use keys.
 	factory crypto.FactorySECP256K1R
 
-	mempool Mempool
+	blockBuilder blockBuilder
 
 	// The context of this vm
 	ctx       *snow.Context
@@ -129,11 +129,6 @@ type VM struct {
 	currentBlocks map[ids.ID]Block
 
 	lastVdrUpdate time.Time
-}
-
-// implements SnowmanPlusPlusVM interface
-func (vm *VM) GetActivationTime() time.Time {
-	return time.Unix(0, 0) // TODO: setup upon deploy
 }
 
 // Initialize this blockchain.
@@ -175,8 +170,8 @@ func (vm *VM) Initialize(
 	vm.droppedTxCache = cache.LRU{Size: droppedTxCacheSize}
 	vm.currentBlocks = make(map[ids.ID]Block)
 
-	vm.mempool.Initialize(vm)
-	vm.network = newNetwork(timer.MaxTime, appSender, vm)
+	vm.blockBuilder.Initialize(vm)
+	vm.network = newNetwork(vm.ApricotPhase4Time, appSender, vm)
 
 	is, err := NewMeteredInternalState(vm, vm.dbManager.Current().Database, genesisBytes, ctx.Namespace, ctx.Metrics)
 	if err != nil {
@@ -308,7 +303,7 @@ func (vm *VM) Shutdown() error {
 		return nil
 	}
 
-	vm.mempool.Shutdown()
+	vm.blockBuilder.Shutdown()
 
 	if vm.bootstrapped {
 		primaryValidatorSet, exist := vm.Validators.GetValidators(constants.PrimaryNetworkID)
@@ -339,7 +334,7 @@ func (vm *VM) Shutdown() error {
 }
 
 // BuildBlock builds a block to be added to consensus
-func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.mempool.BuildBlock() }
+func (vm *VM) BuildBlock() (snowman.Block, error) { return vm.blockBuilder.BuildBlock() }
 
 // ParseBlock implements the snowman.ChainVM interface
 func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
@@ -357,22 +352,8 @@ func (vm *VM) ParseBlock(b []byte) (snowman.Block, error) {
 		return block, nil
 	}
 
-	// store block and cleanup mempool
 	vm.internalState.AddBlock(blk)
-	err := vm.internalState.Commit()
-
-	switch typedBlk := blk.(type) {
-	case *StandardBlock:
-		vm.mempool.RemoveDecisionTxs(typedBlk.Txs)
-	case *AtomicBlock:
-		vm.mempool.RemoveAtomicTx(&typedBlk.Tx)
-	case *ProposalBlock:
-		vm.mempool.RemoveProposalTx(&typedBlk.Tx)
-	default:
-		vm.ctx.Log.Warn("Unknown tx type. Could not cleanup mempool")
-	}
-
-	return blk, err
+	return blk, vm.internalState.Commit()
 }
 
 // GetBlock implements the snowman.ChainVM interface
@@ -398,7 +379,7 @@ func (vm *VM) SetPreference(blkID ids.ID) error {
 		return nil
 	}
 	vm.preferred = blkID
-	vm.mempool.ResetTimer()
+	vm.blockBuilder.ResetTimer()
 	return nil
 }
 
@@ -473,13 +454,13 @@ func (vm *VM) Disconnected(vdrID ids.ShortID) error {
 }
 
 // GetValidatorSet returns the validator set at the specified height for the
-// provided subnetID. Implements validators.VM interface
+// provided subnetID.
 func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]uint64, error) {
 	lastAcceptedHeight, err := vm.GetCurrentHeight()
-	switch {
-	case err != nil:
+	if err != nil {
 		return nil, err
-	case lastAcceptedHeight < height:
+	}
+	if lastAcceptedHeight < height {
 		return nil, database.ErrNotFound
 	}
 
@@ -526,7 +507,7 @@ func (vm *VM) GetValidatorSet(height uint64, subnetID ids.ID) (map[ids.ShortID]u
 	return vdrSet, nil
 }
 
-// GetCurrentHeight implements validators.VM interface
+// GetCurrentHeight returns the height of the last accepted block
 func (vm *VM) GetCurrentHeight() (uint64, error) {
 	lastAccepted, err := vm.getBlock(vm.lastAcceptedID)
 	if err != nil {

@@ -19,7 +19,7 @@ type network struct {
 	// gossip related attributes
 	gossipActivationTime time.Time
 	appSender            common.AppSender
-	mempool              *Mempool
+	mempool              *blockBuilder
 	vm                   *VM
 
 	requestID uint32
@@ -37,7 +37,7 @@ func newNetwork(activationTime time.Time, appSender common.AppSender, vm *VM) *n
 		log:                  vm.ctx.Log,
 		gossipActivationTime: activationTime,
 		appSender:            appSender,
-		mempool:              &vm.mempool,
+		mempool:              &vm.blockBuilder,
 		vm:                   vm,
 		requestsContent:      make(map[uint32]ids.ID),
 	}
@@ -162,7 +162,7 @@ func (h *RequestHandler) HandleTxNotify(nodeID ids.ShortID, requestID uint32, ms
 		msg.TxID,
 	)
 
-	tx := h.net.mempool.get(msg.TxID)
+	tx := h.net.mempool.Get(msg.TxID)
 	if tx == nil {
 		h.net.log.Trace(
 			"dropping AppRequest from %s with requestID %d for unknown tx %s",
@@ -237,83 +237,19 @@ func (h *ResponseHandler) HandleTx(nodeID ids.ShortID, requestID uint32, msg *me
 		return nil
 	}
 
-	// TODO: call vm.IssueTx here?
-
-	switch {
-	case h.net.mempool.has(txID):
+	if h.net.mempool.WasDropped(txID) {
+		// If the tx is being dropped - just ignore it
 		return nil
-	case h.net.mempool.isAlreadyRejected(txID):
-		return nil
-	}
-
-	// validate tx
-	switch typedTx := tx.UnsignedTx.(type) {
-	case UnsignedDecisionTx:
-		synCtx := DecisionSyntacticVerificationContext{
-			ctx:        h.net.vm.ctx,
-			feeAmount:  h.net.vm.TxFee,
-			feeAssetID: h.net.vm.ctx.AVAXAssetID,
-		}
-		err = typedTx.SyntacticVerify(synCtx)
-	case UnsignedProposalTx:
-		synCtx := ProposalSyntacticVerificationContext{
-			ctx:               h.net.vm.ctx,
-			minStakeDuration:  h.net.vm.MinStakeDuration,
-			maxStakeDuration:  h.net.vm.MaxStakeDuration,
-			minStake:          h.net.vm.MinValidatorStake,
-			maxStake:          h.net.vm.MaxValidatorStake,
-			minDelegationFee:  h.net.vm.MinDelegationFee,
-			minDelegatorStake: h.net.vm.MinDelegatorStake,
-			feeAmount:         h.net.vm.TxFee,
-			feeAssetID:        h.net.vm.ctx.AVAXAssetID,
-		}
-		err = typedTx.SyntacticVerify(synCtx)
-	case UnsignedAtomicTx:
-		synCtx := AtomicSyntacticVerificationContext{
-			ctx:        h.net.vm.ctx,
-			avmID:      h.net.vm.ctx.XChainID,
-			feeAmount:  h.net.vm.TxFee,
-			feeAssetID: h.net.vm.ctx.AVAXAssetID,
-		}
-		err = typedTx.SyntacticVerify(synCtx)
-	default:
-		h.net.log.Error(
-			"AppResponse provided unknown tx type %T with txID %s",
-			typedTx,
-			txID,
-		)
-		return nil
-	}
-	if err != nil {
-		h.net.log.Trace(
-			"AppResponse provided tx %s that is syntactically invalid: %s",
-			txID,
-			err,
-		)
-		return h.net.vm.mempool.markReject(tx)
 	}
 
 	// add to mempool
-	err = h.net.mempool.AddUncheckedTx(tx)
-	if err == errTxExceedingMempoolSize {
-		// tx has not been accepted to mempool due to size do not gossip since
-		// we cannot serve it
-		return nil
-	}
+	err = h.net.mempool.AddUnverifiedTx(tx)
 	if err != nil {
 		h.net.log.Debug(
-			"AppResponse failed AddUnchecked from %s with: %s",
+			"AppResponse failed AddUnverifiedTx from %s with: %s",
 			nodeID.PrefixedString(constants.NodeIDPrefix),
 			err,
 		)
-
-		if err := h.net.mempool.markReject(tx); err != nil {
-			h.net.log.Trace(
-				"AppResponse failed to mark %s as rejected with: %s",
-				txID,
-				err,
-			)
-		}
 		return nil
 	}
 	return h.net.GossipTx(tx)
@@ -334,9 +270,9 @@ func (h *GossipHandler) HandleTxNotify(nodeID ids.ShortID, requestID uint32, msg
 	)
 
 	switch {
-	case h.net.mempool.has(msg.TxID):
+	case h.net.mempool.Has(msg.TxID):
 		return nil
-	case h.net.mempool.isAlreadyRejected(msg.TxID):
+	case h.net.mempool.WasDropped(msg.TxID):
 		return nil
 	}
 

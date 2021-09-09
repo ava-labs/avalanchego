@@ -1,3 +1,6 @@
+// (c) 2019-2021, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package platformvm
 
 import (
@@ -9,7 +12,7 @@ import (
 
 // shows that a locally generated CreateChainTx can be added to mempool and then
 // removed by inclusion in a block
-func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
+func TestBlockBuilderAddLocalTx(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, _, _ := defaultVM()
@@ -20,16 +23,16 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	mempool := &vm.blockBuilder
 
 	// add a tx to it
 	tx := getTheValidTx(vm, t)
 	txID := tx.ID()
 
-	err := mempool.IssueTx(tx)
+	err := mempool.AddUnverifiedTx(tx)
 	assert.NoError(err, "couldn't add tx to mempool")
 
-	has := mempool.has(txID)
+	has := mempool.Has(txID)
 	assert.True(has, "valid tx not recorded into mempool")
 
 	// show that build block include that tx and removes it from mempool
@@ -41,13 +44,13 @@ func TestMempool_Add_LocallyCreate_CreateChainTx(t *testing.T) {
 	assert.Len(blk.Txs, 1, "standard block should include a single transaction")
 	assert.Equal(txID, blk.Txs[0].ID(), "standard block does not include expected transaction")
 
-	has = mempool.has(txID)
+	has = mempool.Has(txID)
 	assert.False(has, "tx included in block is still recorded into mempool")
 }
 
 // shows that valid tx is not added to mempool if this would exceed its maximum
 // size
-func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
+func TestBlockBuilderMaxMempoolSizeHandling(t *testing.T) {
 	assert := assert.New(t)
 
 	vm, _, _ := defaultVM()
@@ -58,20 +61,48 @@ func TestMempool_MaxMempoolSizeHandling(t *testing.T) {
 		vm.ctx.Lock.Unlock()
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
-	mempool := &vm.mempool
+	blockBuilder := &vm.blockBuilder
+	mempool := blockBuilder.Mempool.(*mempool)
 
 	// create candidate tx
 	tx := getTheValidTx(vm, t)
 
 	// shortcut to simulated almost filled mempool
-	mempool.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes()) + 1
+	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes()) + 1
 
-	err := mempool.AddUncheckedTx(tx)
-	assert.Equal(errTxExceedingMempoolSize, err, "max mempool size breached")
+	err := blockBuilder.AddVerifiedTx(tx)
+	assert.Equal(errMempoolFull, err, "max mempool size breached")
 
 	// shortcut to simulated almost filled mempool
-	mempool.totalBytesSize = MaxMempoolByteSize - len(tx.Bytes())
+	mempool.totalBytesSize = maxMempoolSize - len(tx.Bytes())
 
-	err = mempool.AddUncheckedTx(tx)
+	err = blockBuilder.AddVerifiedTx(tx)
 	assert.NoError(err, "should have added tx to mempool")
+}
+
+func TestPreviouslyDroppedTxsCanBeReAddedToMempool(t *testing.T) {
+	assert := assert.New(t)
+
+	vm, _, _ := defaultVM()
+	vm.ctx.Lock.Lock()
+	defer func() {
+		err := vm.Shutdown()
+		assert.NoError(err)
+		vm.ctx.Lock.Unlock()
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	blockBuilder := &vm.blockBuilder
+	mempool := blockBuilder.Mempool.(*mempool)
+
+	// create candidate tx
+	tx := getTheValidTx(vm, t)
+	txID := tx.ID()
+
+	mempool.MarkDropped(txID)
+	assert.True(mempool.WasDropped(txID))
+
+	// show that re-added tx is not dropped anymore
+	assert.NoError(mempool.Add(tx))
+	assert.True(mempool.Has(txID))
+	assert.False(mempool.WasDropped(txID))
 }
