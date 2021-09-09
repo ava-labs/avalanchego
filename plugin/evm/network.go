@@ -200,11 +200,12 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		}
 	}
 
+	// TODO: enforce that only try to put so many txs in 1 (prioritize
+	// selectedTxs first...most direct impact on TTF)
 	var msg message.EthTxsNotify
 	if len(txsData) > 0 {
 		msg.Txs = txsData
 	}
-	// TODO: enforce that only try to put so many txs in 1
 	if len(selectedTxs) > 0 {
 		txBytes, err := rlp.EncodeToBytes(selectedTxs)
 		if err != nil {
@@ -228,6 +229,28 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	)
 	if err := n.appSender.SendAppGossip(msgBytes); err != nil {
 		return err
+	}
+
+	// TODO: totally broken, just playing
+	var msg message.EthTxsNotify
+	for len(txData) > 0 || len(selectedTxs) > 0 {
+		// TODO: don't really like this approach
+	}
+
+	// Additional send to catch straggling bytes
+	if len(msg.Txs) > 0 || len(msg.TxsBytes) > 0 {
+		msgBytes, err := message.Build(&msg)
+		if err != nil {
+			return err
+		}
+		log.Debug(
+			"gossiping eth txs",
+			"len(txs)", len(msg.Txs),
+			"len(txsBytes)", len(msg.TxsBytes),
+		)
+		if err := n.appSender.SendAppGossip(msgBytes); err != nil {
+			return err
+		}
 	}
 
 	// TODO: write algorithm using size
