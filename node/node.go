@@ -743,6 +743,10 @@ func (n *Node) registerRPCVMs() error {
 		// Strip any extension from the file. This is to support windows .exe
 		// files.
 		name = name[:len(name)-len(filepath.Ext(name))]
+		// Skip hidden files.
+		if len(name) == 0 {
+			continue
+		}
 
 		vmID, err := n.vmManager.Lookup(name)
 		if err != nil {
