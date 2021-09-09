@@ -343,7 +343,7 @@ func getNetworkConfig(v *viper.Viper, halflife time.Duration) (network.Config, e
 	case config.InitialReconnectDelay < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkInitialReconnectDelayKey)
 	case config.MaxReconnectDelay < config.InitialReconnectDelay:
-		return network.Config{}, fmt.Errorf("%s must be >= %s", NetworkMaxReconnectDelayKey, NetworkMaxReconnectDelayKey)
+		return network.Config{}, fmt.Errorf("%s must be >= %s", NetworkMaxReconnectDelayKey, NetworkInitialReconnectDelayKey)
 	case config.PingPongTimeout < 0:
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkPingTimeoutKey)
 	case config.PingFrequency < 0:
