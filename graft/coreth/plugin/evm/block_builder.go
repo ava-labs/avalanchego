@@ -21,9 +21,21 @@ import (
 type buildingBlkStatus uint8
 
 const (
+	// AP3 Paramters
 	minBlockTime = 2 * time.Second
 	maxBlockTime = 3 * time.Second
 	batchSize    = 250
+
+	// AP4 Parameters
+	//
+	// [buildRetryTime] is the frequency the node will attempt to build a block
+	// (even if no new transaction has been received).
+	//
+	// NOTE: Because build block retries aren't activated until AP4, we don't need
+	// to worry about putting nodes in a busy loop building blocks (in AP4 the engine
+	// will only call build block during a node's proposer window). Nodes that are currently
+	// designated to propose should frequently try to create a valid block during their window.
+	buildRetryTime = 1 * time.Second
 
 	dontBuild        buildingBlkStatus = iota
 	conditionalBuild                   // Only used prior to AP4
@@ -109,9 +121,6 @@ func (b *blockBuilder) stopBlockTimer() {
 		b.buildBlockLock.Lock()
 		b.buildBlockTimer = nil
 		// Flush any invalid statuses leftover from legacy block timer builder
-		//
-		// NOTE: we don't trigger a build block here to avoid a case where everyone
-		// tries to build at the same time right at the AP4 boundary.
 		b.buildStatus = dontBuild
 		b.buildBlockLock.Unlock()
 	case <-b.shutdownChan:
@@ -140,9 +149,9 @@ func (b *blockBuilder) buildBlock() {
 			b.buildStatus = dontBuild
 		}
 	} else {
-		// We never retry block building to prevent inadvertently adding
-		// contention to block production (if that would push the start of block
-		// propagation closer to the next producer's window)
+		// We will periodically retry block building in case a block cannot be
+		// built now but could be built after the [baseFee] and/or
+		// [blockGasCost] decrease.
 		b.buildStatus = dontBuild
 	}
 }
@@ -246,6 +255,38 @@ func (b *blockBuilder) signalTxsReady() {
 	}
 }
 
+// retryBlockBuild triggers the rebuilding of a block if the [buildStatus] is
+// [dontBuild] but there are pending transactions. This may lead to a block
+// being built when it otherwise may not have due to a drop in [baseFee] or the
+// [blockGasCost].
+//
+// NOTE: Only used after AP4.
+func (b *blockBuilder) retryBlockBuild() {
+	b.buildBlockLock.Lock()
+	defer b.buildBlockLock.Unlock()
+
+	if b.buildStatus != dontBuild {
+		return
+	}
+
+	timestamp := big.NewInt(time.Now().Unix())
+	if !b.chainConfig.IsApricotPhase4(timestamp) {
+		return
+	}
+
+	if !b.needToBuild() {
+		return
+	}
+
+	log.Debug("Retrying block building")
+	select {
+	case b.notifyBuildBlockChan <- commonEng.PendingTxs:
+		b.buildStatus = building
+	default:
+		log.Error("Failed to push PendingTxs notification to the consensus engine.")
+	}
+}
+
 // awaitSubmittedTxs waits for new transactions to be submitted
 // and notifies the VM when the tx pool has transactions to be
 // put into a new block.
@@ -256,6 +297,10 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 
 		// txSubmitChan is invoked on reorgs
 		txSubmitChan := b.chain.GetTxSubmitCh()
+
+		// buildRetrier periodically triggers the engine to rebuild a block
+		// although it may not have received any new transactions.
+		buildRetrier := time.NewTicker(buildRetryTime)
 		for {
 			select {
 			case ethTxsEvent := <-txSubmitChan:
@@ -275,6 +320,8 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				b.signalTxsReady()
 				// Unlike EthTxs, AtomicTxs are gossiped in [issueTx] when they are
 				// successfully added to the mempool.
+			case <-buildRetrier.C:
+				b.retryBlockBuild()
 			case <-b.shutdownChan:
 				return
 			}
