@@ -41,10 +41,14 @@ import (
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/event"
 )
 
+const testHead = 32
+
 type testBackend struct {
-	chain *core.BlockChain
+	chain   *core.BlockChain
+	pending bool // pending block available
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
@@ -61,8 +65,24 @@ func (b *testBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumber)
 	return b.chain.GetBlockByNumber(uint64(number)), nil
 }
 
+func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
+	return b.chain.GetReceiptsByHash(hash), nil
+}
+
+func (b *testBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
+	if b.pending {
+		block := b.chain.GetBlockByNumber(testHead + 1)
+		return block, b.chain.GetReceiptsByHash(block.Hash())
+	}
+	return nil, nil
+}
+
 func (b *testBackend) ChainConfig() *params.ChainConfig {
 	return b.chain.Config()
+}
+
+func (b *testBackend) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return nil
 }
 
 func newTestBackend(t *testing.T, apricotPhase3BlockTimestamp *big.Int) *testBackend {
