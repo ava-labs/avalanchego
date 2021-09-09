@@ -74,12 +74,17 @@ func (b *preForkBlock) verifyPreForkChild(child *preForkBlock) error {
 
 		if parentStatus := b.Status(); parentStatus == choices.Accepted {
 			_, err := b.vm.GetLastAccepted()
-			if err != database.ErrNotFound {
+			if err == nil {
 				// If the parent block is accepted and it was a preForkBlock,
 				// then there shouldn't have been an accepted postForkBlock yet.
 				// If there was an accepted postForkBlock, then the parent
 				// wasn't a preForkBlock and this child block is invalid.
 				return errUnexpectedBlockType
+			}
+			if err != database.ErrNotFound {
+				// If an unexpected error was returned - propagate that that
+				// error.
+				return err
 			}
 		} else if b.vm.Tree.Contains(b.Block) {
 			// If the parent block is a preForkBlock, then it's inner block
