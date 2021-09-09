@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/ids"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -20,6 +21,10 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
 	coreth "github.com/ava-labs/coreth/chain"
+)
+
+const (
+	recentCacheSize = 100
 )
 
 type network struct {
@@ -40,6 +45,9 @@ type network struct {
 	requestHandler  message.Handler
 	responseHandler message.Handler
 	gossipHandler   message.Handler
+
+	recentAtomicTxs *cache.LRU
+	recentEthTxs    *cache.LRU
 }
 
 func (vm *VM) NewNetwork(
@@ -57,6 +65,8 @@ func (vm *VM) NewNetwork(
 		signer:               signer,
 		requestsAtmContent:   make(map[uint32]ids.ID),
 		requestsEthContent:   make(map[uint32]map[common.Hash]struct{}),
+		recentAtomicTxs:      &cache.LRU{Size: recentCacheSize},
+		recentEthTxs:         &cache.LRU{Size: recentCacheSize},
 	}
 	net.requestHandler = &RequestHandler{net: net}
 	net.responseHandler = &ResponseHandler{
@@ -120,6 +130,15 @@ func (n *network) GossipAtomicTx(tx *Tx) error {
 		return nil
 	}
 
+	if _, has := n.recentAtomicTxs.Get(txID); has {
+		log.Debug(
+			"not gossiping recently gossiped atomic tx",
+			"txID", txID,
+		)
+		return nil
+	}
+	n.recentAtomicTxs.Put(txID, nil)
+
 	msg := message.AtomicTxNotify{
 		TxID: txID,
 	}
@@ -153,7 +172,17 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	}
 
 	for _, tx := range txs {
-		txStatus := pool.Status([]common.Hash{tx.Hash()})[0]
+		txHash := tx.Hash()
+		if _, has := n.recentEthTxs.Get(txHash); has {
+			log.Debug(
+				"not gossiping recently gossiped eth tx",
+				"hash", txHash,
+			)
+			continue
+		}
+		n.recentEthTxs.Put(txHash, nil)
+
+		txStatus := pool.Status([]common.Hash{txHash})[0]
 		if txStatus != core.TxStatusPending {
 			continue
 		}
@@ -168,7 +197,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		}
 
 		txsData = append(txsData, message.EthTxNotify{
-			Hash:   tx.Hash(),
+			Hash:   txHash,
 			Sender: sender,
 			Nonce:  tx.Nonce(),
 		})
