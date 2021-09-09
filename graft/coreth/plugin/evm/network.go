@@ -166,6 +166,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	selectedTxs := make([]*types.Transaction, 0)
 	txsData := make([]message.EthTxNotify, 0)
 
+	// TODO: import SenderCacher correctly instead of using a global var
 	// Recover signatures before `core` package processing
 	if cache := n.chain.SenderCacher(); cache != nil {
 		cache.Recover(n.signer, txs)
@@ -203,6 +204,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	if len(txsData) > 0 {
 		msg.Txs = txsData
 	}
+	// TODO: enforce that only try to put so many txs in 1
 	if len(selectedTxs) > 0 {
 		txBytes, err := rlp.EncodeToBytes(selectedTxs)
 		if err != nil {
@@ -621,12 +623,19 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 			)
 			return nil
 		}
-		// TODO: validate not too many txs
+		// TODO: overhaul how limiting done here
+		if len(txs) > message.MaxEthTxsLen {
+			log.Trace(
+				"AppGossip provided too many txs",
+				"len(txs)", len(txs),
+			)
+			return nil
+		}
 		errs := h.net.chain.GetTxPool().AddRemotes(txs)
 		for _, err := range errs {
 			if err != nil {
 				log.Debug(
-					"AppResponse failed to issue AddRemotes",
+					"AppGossip failed to issue AddRemotes",
 					"err", err,
 				)
 			}
