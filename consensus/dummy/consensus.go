@@ -307,12 +307,12 @@ func (self *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *type
 		if extDataGasUsed == nil {
 			extDataGasUsed = common.Big0
 		}
-		if block.ExtDataGasUsed() == nil || !block.ExtDataGasUsed().IsUint64() || block.ExtDataGasUsed().Cmp(extDataGasUsed) != 0 {
-			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", block.ExtDataGasUsed(), extDataGasUsed)
+		if blockExtDataGasUsed := block.ExtDataGasUsed(); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
+			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
 		}
 		blockGasCost := calcBlockGasCost(ApricotPhase4MaxBlockFee, ApricotPhase4BlockGasFeeDuration, parent.Time, block.Time())
-		if block.BlockGasCost() == nil || !block.BlockGasCost().IsUint64() || block.BlockGasCost().Cmp(blockGasCost) != 0 {
-			return fmt.Errorf("invalid blockGasCost: have %d, want %d", block.BlockGasCost(), blockGasCost)
+		if blockBlockGasCost := block.BlockGasCost(); blockBlockGasCost == nil || !blockBlockGasCost.IsUint64() || blockBlockGasCost.Cmp(blockGasCost) != 0 {
+			return fmt.Errorf("invalid blockGasCost: have %d, want %d", blockBlockGasCost, blockGasCost)
 		}
 		if err := self.verifyBlockFee(
 			block.BaseFee(),

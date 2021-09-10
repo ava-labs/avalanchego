@@ -39,7 +39,11 @@ func fundAddressByGenesis(addr common.Address) (string, error) {
 	genesis.Alloc = funds
 
 	genesis.Config = &params.ChainConfig{
-		ChainID: params.AvalancheLocalChainID,
+		ChainID:                     params.AvalancheLocalChainID,
+		ApricotPhase1BlockTimestamp: big.NewInt(0),
+		ApricotPhase2BlockTimestamp: big.NewInt(0),
+		ApricotPhase3BlockTimestamp: big.NewInt(0),
+		ApricotPhase4BlockTimestamp: big.NewInt(0),
 	}
 
 	bytes, err := json.Marshal(genesis)
@@ -89,7 +93,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -189,7 +193,7 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -294,7 +298,7 @@ func TestMempoolEthTxsAppGossipHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -362,7 +366,7 @@ func TestMempoolEthTxsAppResponseHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 
@@ -443,7 +447,7 @@ func TestMempoolEthTxsAppRequestHandling(t *testing.T) {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	vm.chain.GetTxPool().SetGasPrice(common.Big1)
 	vm.chain.GetTxPool().SetMinFee(common.Big0)
 

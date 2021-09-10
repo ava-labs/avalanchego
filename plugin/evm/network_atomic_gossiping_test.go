@@ -206,12 +206,12 @@ func getInvalidTx(vm *VM, sharedMemory *atomic.Memory, t *testing.T) *Tx {
 func TestMempoolAtmTxsAddGossiped(t *testing.T) {
 	assert := assert.New(t)
 
-	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	issuer, vm, _, sharedMemory, _ := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 	net := vm.network
 
@@ -266,12 +266,12 @@ func TestMempoolAtmTxsAddGossiped(t *testing.T) {
 func TestMempoolAtmTxsAppResponseHandling(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 	net := vm.network
 
@@ -340,12 +340,12 @@ func TestMempoolAtmTxsAppResponseHandling(t *testing.T) {
 func TestMempoolAtmTxsAppResponseHandlingInvalidTx(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 	net := vm.network
 
@@ -384,12 +384,12 @@ func TestMempoolAtmTxsAppResponseHandlingInvalidTx(t *testing.T) {
 func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	nodeID := ids.GenerateTestShortID()
@@ -447,12 +447,12 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	var txRequested bool
@@ -491,12 +491,12 @@ func TestMempoolAtmTxsAppGossipHandlingInvalidTx(t *testing.T) {
 func TestMempoolAtmTxsAppRequestHandling(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 	mempool := vm.mempool
 
 	var (
@@ -546,12 +546,12 @@ func TestMempoolAtmTxsAppRequestHandling(t *testing.T) {
 func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	assert := assert.New(t)
 
-	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase0, "", "")
+	_, vm, _, sharedMemory, sender := GenesisVM(t, true, genesisJSONApricotPhase4, "", "")
 	defer func() {
 		err := vm.Shutdown()
 		assert.NoError(err)
 	}()
-	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.gossipActivationTime = time.Unix(vm.chainConfig.ApricotPhase4BlockTimestamp.Int64(), 0) // enable mempool gossiping
 
 	// Create a simple tx
 	tx := getValidTx(vm, sharedMemory, t)
