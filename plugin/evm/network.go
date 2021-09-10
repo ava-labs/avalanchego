@@ -200,45 +200,99 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		}
 	}
 
-	// TODO: enforce that only try to put so many txs in 1 (prioritize
-	// selectedTxs first...most direct impact on TTF)
-	var msg message.EthTxsNotify
-	if len(txsData) > 0 {
-		msg.Txs = txsData
-	}
-	if len(selectedTxs) > 0 {
-		txBytes, err := rlp.EncodeToBytes(selectedTxs)
-		if err != nil {
-			log.Warn(
-				"failed to encode eth transactions",
-				"len(selectedTxs)", len(selectedTxs),
-				"err", err,
+	// Attempt to gossip selectedTxs first
+	msgSelectedTxs := make([]*types.Transaction, 0)
+	msgSelectedTxsSize := 0
+	for _, tx := range selectedTxs {
+		size := tx.Size()
+		if msgSelectedTxsSize+size > message.IdealETHNotifySize {
+			// gossip existing
+			txBytes, err := rlp.EncodeToBytes(msgSelectedTxs)
+			if err != nil {
+				log.Warn(
+					"failed to encode eth transactions",
+					"len(selectedTxs)", len(msgSelectedTxs),
+					"err", err,
+				)
+				return nil
+			}
+			msg := message.EthTxsNotify{
+				TxsBytes: txBytes,
+			}
+			msgBytes, err := message.Build(&msg)
+			if err != nil {
+				return err
+			}
+			log.Debug(
+				"gossiping eth txs",
+				"len(txs)", len(msg.Txs),
+				"len(txsBytes)", len(msg.TxsBytes),
 			)
-			return nil
+			if err := n.appSender.SendAppGossip(msgBytes); err != nil {
+				return err
+			}
+
+			msgSelectedTxs = msgSelectedTxs[:0]
+			msgSelectedTxsSize = 0
 		}
-		msg.TxsBytes = txBytes
-	}
-	msgBytes, err := message.Build(&msg)
-	if err != nil {
-		return err
-	}
-	log.Debug(
-		"gossiping eth txs",
-		"len(txs)", len(msg.Txs),
-		"len(txsBytes)", len(msg.TxsBytes),
-	)
-	if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-		return err
+		msgSelectedTxs = append(msgSelectedTxs, tx)
+		msgSelectedTxsSize += size
 	}
 
-	// TODO: totally broken, just playing
-	var msg message.EthTxsNotify
-	for len(txData) > 0 || len(selectedTxs) > 0 {
-		// TODO: don't really like this approach
+	msgTxs := make([]EthTxNotify, 0)
+	for _, txData := range txsData {
+		if len(msgTxs) > message.MaxEthTxsLen {
+			msg := message.EthTxsNotify{
+				Txs: msgTxs,
+			}
+			if len(msgSelectedTxs) > 0 {
+				txBytes, err := rlp.EncodeToBytes(msgSelectedTxs)
+				if err != nil {
+					log.Warn(
+						"failed to encode eth transactions",
+						"len(selectedTxs)", len(msgSelectedTxs),
+						"err", err,
+					)
+					return nil
+				}
+				msg.TxsBytes = txBytes
+				msgSelectedTxs = nil
+			}
+			msgBytes, err := message.Build(&msg)
+			if err != nil {
+				return err
+			}
+			log.Debug(
+				"gossiping eth txs",
+				"len(txs)", len(msg.Txs),
+				"len(txsBytes)", len(msg.TxsBytes),
+			)
+			if err := n.appSender.SendAppGossip(msgBytes); err != nil {
+				return err
+			}
+			msgTxs = msgTxs[:0]
+		}
+		msgTxs = append(msgTxs, txData)
 	}
 
 	// Additional send to catch straggling bytes
-	if len(msg.Txs) > 0 || len(msg.TxsBytes) > 0 {
+	if len(msgSelectedTxs) > 0 || len(msgTxs) > 0 {
+		var msg message.EthTxsNotify
+		if len(msgSelectedTxs) > 0 {
+			txBytes, err := rlp.EncodeToBytes(msgSelectedTxs)
+			if err != nil {
+				log.Warn(
+					"failed to encode eth transactions",
+					"len(selectedTxs)", len(msgSelectedTxs),
+					"err", err,
+				)
+				return nil
+			}
+			msg.TxsBytes = txBytes
+		}
+		if len(msgTxs) > 0 {
+			msg.Txs = msgTxs
+		}
 		msgBytes, err := message.Build(&msg)
 		if err != nil {
 			return err
@@ -252,30 +306,6 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 			return err
 		}
 	}
-
-	// TODO: write algorithm using size
-	// for start, end := 0, message.MaxEthTxsLen; start < len(txsData); start, end = end, end+message.MaxEthTxsLen {
-	// 	if end > len(txsData) {
-	// 		end = len(txsData)
-	// 	}
-
-	// 	data := txsData[start:end]
-	// 	msg := message.EthTxsNotify{
-	// 		Txs: data,
-	// 	}
-	// 	msgBytes, err := message.Build(&msg)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	log.Debug(
-	// 		"gossiping eth txs",
-	// 		"len(txs)", len(data),
-	// 		"len(txsBytes)", len(msg.TxsBytes),
-	// 	)
-	// 	if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-	// 		return err
-	// 	}
-	// }
 	return nil
 }
 

@@ -9,14 +9,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (
-	// TODO choose a sensible value
-
 	// MaxEthTxsLen must be updated inside of EthTxsNotify's struct definition
 	// as well when changed
 	MaxEthTxsLen int = 10
+
+	// TODO: Add test to force multiple messages
+	IdealETHNotifySize = 20 * units.KiB
 )
 
 var (
