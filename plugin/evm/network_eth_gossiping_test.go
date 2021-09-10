@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/json"
 	"math/big"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -61,7 +62,7 @@ func getValidEthTxs(key *ecdsa.PrivateKey, count int) []*types.Transaction {
 				amount,
 				gaslimit,
 				gasprice,
-				nil),
+				[]byte(strings.Repeat("aaaaaaaaaa", 100))),
 			types.HomesteadSigner{}, key)
 		res[i] = tx
 	}
@@ -167,6 +168,110 @@ func TestMempoolEthTxsAddedTxsGossipedAfterActivation(t *testing.T) {
 	assert.Contains(errs[0].Error(), "already known")
 	assert.Contains(errs[1].Error(), "already known")
 	assert.NoError(errs[2], "failed adding coreth tx to mempool")
+
+	wg.Wait()
+}
+
+// show that locally issued eth txs are chunked correctly
+func TestMempoolEthTxsAddedTxsGossipedAfterActivationChunking(t *testing.T) {
+	assert := assert.New(t)
+
+	key, err := crypto.GenerateKey()
+	assert.NoError(err)
+
+	addr := crypto.PubkeyToAddress(key.PublicKey)
+
+	cfgJson, err := fundAddressByGenesis(addr)
+	assert.NoError(err)
+
+	_, vm, _, _, sender := GenesisVM(t, true, cfgJson, "", "")
+	defer func() {
+		err := vm.Shutdown()
+		assert.NoError(err)
+	}()
+	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
+	vm.chain.GetTxPool().SetGasPrice(common.Big1)
+	vm.chain.GetTxPool().SetMinFee(common.Big0)
+
+	// create eth txes
+	ethTxs := getValidEthTxs(key, 100)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	sender.CantSendAppGossip = false
+	seen := 0
+	signal := make(chan struct{})
+	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		if seen == 0 {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			assert.True(ok)
+			assert.Empty(requestMsg.Txs)
+			assert.NotEmpty(requestMsg.TxsBytes)
+
+			txs := make([]*types.Transaction, 0)
+			assert.NoError(rlp.DecodeBytes(requestMsg.TxsBytes, &txs))
+			assert.Len(txs, 59)
+			for i, tx := range txs {
+				assert.Equal(ethTxs[i].Hash(), tx.Hash())
+			}
+			seen++
+		} else {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+			assert.True(ok)
+			assert.Empty(requestMsg.Txs)
+			assert.NotEmpty(requestMsg.TxsBytes)
+
+			txs := make([]*types.Transaction, 0)
+			assert.NoError(rlp.DecodeBytes(requestMsg.TxsBytes, &txs))
+			assert.Len(txs, 41)
+			for i, tx := range txs {
+				assert.Equal(ethTxs[i+59].Hash(), tx.Hash())
+			}
+			close(signal)
+		}
+		wg.Done()
+		return nil
+	}
+
+	// Notify VM about eth txs
+	errs := vm.chain.GetTxPool().AddRemotesSync(ethTxs)
+	for _, err := range errs {
+		assert.NoError(err, "failed adding coreth tx to mempool")
+	}
+
+	// Test chunking of hashes
+	<-signal
+	seen = 0
+	wg.Add(4)
+	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		notifyMsgIntf, err := message.Parse(gossipedBytes)
+		assert.NoError(err)
+
+		requestMsg, ok := notifyMsgIntf.(*message.EthTxsNotify)
+		assert.True(ok)
+		assert.Empty(requestMsg.TxsBytes)
+		var offset int
+		if seen < 3 {
+			assert.Len(requestMsg.Txs, 32)
+			offset = 32 * seen
+		} else {
+			assert.Len(requestMsg.Txs, 4)
+			offset = 96
+		}
+		for i, tx := range requestMsg.Txs {
+			assert.Equal(ethTxs[i+offset].Hash(), tx.Hash)
+		}
+		seen++
+		wg.Done()
+		return nil
+	}
+	assert.NoError(vm.GossipEthTxs(ethTxs))
 
 	wg.Wait()
 }

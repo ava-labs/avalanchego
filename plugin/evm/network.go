@@ -253,7 +253,7 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	// Next, gossip [partialTxs] (optionally including leftover [msgFullTxs])
 	msgPartialTxs := make([]message.EthTxNotify, 0)
 	for _, tx := range partialTxs {
-		if len(msgPartialTxs) > message.MaxEthTxsLen {
+		if len(msgPartialTxs) >= message.MaxEthTxsLen {
 			if err := n.sendEthTxsNotify(msgFullTxs, msgPartialTxs); err != nil {
 				return err
 			}
