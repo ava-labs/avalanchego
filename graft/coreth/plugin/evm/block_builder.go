@@ -311,8 +311,9 @@ func (b *blockBuilder) awaitSubmittedTxs() {
 				log.Trace("New tx detected, trying to generate a block")
 				b.signalTxsReady()
 
-				// TODO: only do on AP4
-				if b.network != nil {
+				// TODO: add var so don't need to constantly check time
+				timestamp := big.NewInt(time.Now().Unix())
+				if b.chainConfig.IsApricotPhase4(timestamp) && b.network != nil {
 					if err := b.network.GossipEthTxs(ethTxsEvent.Txs); err != nil {
 						log.Warn(
 							"failed to gossip new eth transactions",
