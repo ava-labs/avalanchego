@@ -13,7 +13,7 @@ import (
 
 const (
 	codecVersion   uint16 = 0
-	maxMessageSize        = 128 * units.KiB
+	maxMessageSize        = 512 * units.KiB
 	maxSliceLen           = maxMessageSize
 )
 

@@ -200,6 +200,8 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	fullTxs := make([]*types.Transaction, 0)
 	partialTxs := make([]message.EthTxNotify, 0)
 
+	// Start recovering signatures before processing (cache shared with
+	// core/blockchain so should be barely any overhead to recover here).
 	if cache := n.chain.SenderCacher(); cache != nil {
 		cache.Recover(n.signer, txs)
 	}
@@ -579,16 +581,14 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 		tx.Initialize(unsignedBytes, msg.Tx)
 
 		txID := tx.ID()
-		if _, dropped, found := h.net.mempool.GetTx(txID); found || dropped {
-			return nil
-		}
-
-		if err := h.vm.issueTx(&tx, false /*=local*/); err != nil {
-			log.Trace(
-				"AppGossip provided invalid transaction",
-				"peerID", nodeID,
-				"err", err,
-			)
+		if _, dropped, found := h.net.mempool.GetTx(txID); !found && !dropped {
+			if err := h.vm.issueTx(&tx, false /*=local*/); err != nil {
+				log.Trace(
+					"AppGossip provided invalid transaction",
+					"peerID", nodeID,
+					"err", err,
+				)
+			}
 		}
 	}
 
@@ -598,7 +598,7 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 		return nil
 	}
 
-	if _, _, found := h.net.mempool.GetTx(msg.TxID); found {
+	if _, dropped, found := h.net.mempool.GetTx(msg.TxID); found || dropped {
 		// we already know the tx, no need to request it
 		return nil
 	}
