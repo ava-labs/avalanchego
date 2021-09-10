@@ -428,7 +428,7 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	requestMsgIntf, err := message.Parse(requestedBytes)
 	assert.NoError(err)
 
-	requestMsg, ok := requestMsgIntf.(*message.AtomicTxNotify)
+	requestMsg, ok := requestMsgIntf.(*message.AtomicTxRequest)
 	assert.True(ok)
 	assert.Equal(txID, requestMsg.TxID)
 
@@ -515,7 +515,7 @@ func TestMempoolAtmTxsAppRequestHandling(t *testing.T) {
 
 	// show that there is no response if tx is unknown
 	nodeID := ids.GenerateTestShortID()
-	msg := message.AtomicTxNotify{
+	msg := message.AtomicTxRequest{
 		TxID: txID,
 	}
 	msgBytes, err := message.Build(&msg)
