@@ -4,6 +4,7 @@
 package evm
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -552,16 +553,52 @@ func TestMempoolAtmTxsIssueTxAndGossiping(t *testing.T) {
 	}()
 	vm.gossipActivationTime = time.Unix(0, 0) // enable mempool gossiping
 
-	var gossiped bool
+	// Create a simple tx
+	tx := getValidTx(vm, sharedMemory, t)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
 	sender.CantSendAppGossip = false
-	sender.SendAppGossipF = func([]byte) error {
-		gossiped = true
+	signal := make(chan struct{})
+	seen := 0
+	sender.SendAppGossipF = func(gossipedBytes []byte) error {
+		if seen == 0 {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.AtomicTxNotify)
+			assert.NotEmpty(requestMsg.Tx)
+			assert.Equal(ids.ID{}, requestMsg.TxID)
+			assert.True(ok)
+
+			txg := Tx{}
+			_, err = Codec.Unmarshal(requestMsg.Tx, &txg)
+			assert.NoError(err)
+			unsignedBytes, err := Codec.Marshal(codecVersion, &txg.UnsignedAtomicTx)
+			assert.NoError(err)
+			txg.Initialize(unsignedBytes, requestMsg.Tx)
+			assert.Equal(tx.ID(), txg.ID())
+			seen++
+			close(signal)
+		} else {
+			notifyMsgIntf, err := message.Parse(gossipedBytes)
+			assert.NoError(err)
+
+			requestMsg, ok := notifyMsgIntf.(*message.AtomicTxNotify)
+			assert.Empty(requestMsg.Tx)
+			assert.Equal(tx.ID(), requestMsg.TxID)
+			assert.True(ok)
+		}
+		wg.Done()
 		return nil
 	}
 
-	// add a tx to it
-	tx := getValidTx(vm, sharedMemory, t)
-	err := vm.issueTx(tx, true /*=local*/)
-	assert.NoError(err)
-	assert.True(gossiped, "expected call to SendAppGossip not issued")
+	// Optimistically gossip raw tx
+	assert.NoError(vm.issueTx(tx, true /*=local*/))
+
+	// Test hash on retry
+	<-signal
+	assert.NoError(vm.GossipAtomicTx(tx))
+
+	wg.Wait()
 }
