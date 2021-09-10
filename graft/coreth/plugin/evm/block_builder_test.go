@@ -86,4 +86,7 @@ func TestBlockBuilderStopsTimer(t *testing.T) {
 	if builder.buildStatus != dontBuild {
 		t.Fatalf("expected build status to be %d but got %d", dontBuild, builder.buildStatus)
 	}
+	if !builder.isAP4 {
+		t.Fatal("expected isAP4 to be true")
+	}
 }
