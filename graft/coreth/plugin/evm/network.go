@@ -153,6 +153,40 @@ func (n *network) GossipAtomicTx(tx *Tx) error {
 	return n.appSender.SendAppGossip(msgBytes)
 }
 
+func (n *network) sendEthTxsNotify(fullTxs []*types.Transaction, partialTxs []message.EthTxNotify) error {
+	if len(fullTxs) == 0 || len(partialTxs) == 0 {
+		return nil
+	}
+
+	var msg message.EthTxsNotify
+	if len(fullTxs) > 0 {
+		txBytes, err := rlp.EncodeToBytes(fullTxs)
+		if err != nil {
+			log.Warn(
+				"failed to encode eth transactions",
+				"len(fullTxs)", len(fullTxs),
+				"err", err,
+			)
+			return nil
+		}
+		msg.TxsBytes = txBytes
+	}
+	if len(partialTxs) > 0 {
+		msg.Txs = partialTxs
+	}
+	msgBytes, err := message.Build(&msg)
+	if err != nil {
+		return err
+	}
+	log.Debug(
+		"gossiping eth txs",
+		"len(txs)", len(msg.Txs),
+		"len(txsBytes)", len(msg.TxsBytes),
+		"len(fullTxs)", len(fullTxs),
+	)
+	return n.appSender.SendAppGossip(msgBytes)
+}
+
 func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	if time.Now().Before(n.gossipActivationTime) {
 		log.Debug(
@@ -163,8 +197,8 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 	}
 
 	pool := n.chain.GetTxPool()
-	selectedTxs := make([]*types.Transaction, 0)
-	txsData := make([]message.EthTxNotify, 0)
+	fullTxs := make([]*types.Transaction, 0)
+	partialTxs := make([]message.EthTxNotify, 0)
 
 	// TODO: import SenderCacher correctly instead of using a global var
 	// Recover signatures before `core` package processing
@@ -189,10 +223,10 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		}
 
 		if _, has := n.recentEthTxs.Get(txHash); !has {
-			selectedTxs = append(selectedTxs, tx)
+			fullTxs = append(fullTxs, tx)
 			n.recentEthTxs.Put(txHash, nil)
 		} else {
-			txsData = append(txsData, message.EthTxNotify{
+			partialTxs = append(partialTxs, message.EthTxNotify{
 				Hash:   txHash,
 				Sender: sender,
 				Nonce:  tx.Nonce(),
@@ -200,113 +234,37 @@ func (n *network) GossipEthTxs(txs []*types.Transaction) error {
 		}
 	}
 
-	// Attempt to gossip selectedTxs first
-	msgSelectedTxs := make([]*types.Transaction, 0)
-	msgSelectedTxsSize := common.StorageSize(0)
-	for _, tx := range selectedTxs {
+	// Attempt to gossip [fullTxs] first
+	msgFullTxs := make([]*types.Transaction, 0)
+	msgFullTxsSize := common.StorageSize(0)
+	for _, tx := range fullTxs {
 		size := tx.Size()
-		if msgSelectedTxsSize+size > message.IdealETHMsgSize {
-			// gossip existing
-			txBytes, err := rlp.EncodeToBytes(msgSelectedTxs)
-			if err != nil {
-				log.Warn(
-					"failed to encode eth transactions",
-					"len(selectedTxs)", len(msgSelectedTxs),
-					"err", err,
-				)
-				return nil
-			}
-			msg := message.EthTxsNotify{
-				TxsBytes: txBytes,
-			}
-			msgBytes, err := message.Build(&msg)
-			if err != nil {
+		if msgFullTxsSize+size > message.IdealEthMsgSize {
+			if err := n.sendEthTxsNotify(msgFullTxs, nil); err != nil {
 				return err
 			}
-			log.Debug(
-				"gossiping eth txs",
-				"len(txs)", len(msg.Txs),
-				"len(txsBytes)", len(msg.TxsBytes),
-			)
-			if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-				return err
-			}
-
-			msgSelectedTxs = msgSelectedTxs[:0]
-			msgSelectedTxsSize = 0
+			msgFullTxs = msgFullTxs[:0]
+			msgFullTxsSize = 0
 		}
-		msgSelectedTxs = append(msgSelectedTxs, tx)
-		msgSelectedTxsSize += size
+		msgFullTxs = append(msgFullTxs, tx)
+		msgFullTxsSize += size
 	}
 
-	msgTxs := make([]message.EthTxNotify, 0)
-	for _, txData := range txsData {
-		if len(msgTxs) > message.MaxEthTxsLen {
-			msg := message.EthTxsNotify{
-				Txs: msgTxs,
-			}
-			if len(msgSelectedTxs) > 0 {
-				txBytes, err := rlp.EncodeToBytes(msgSelectedTxs)
-				if err != nil {
-					log.Warn(
-						"failed to encode eth transactions",
-						"len(selectedTxs)", len(msgSelectedTxs),
-						"err", err,
-					)
-					return nil
-				}
-				msg.TxsBytes = txBytes
-				msgSelectedTxs = nil
-			}
-			msgBytes, err := message.Build(&msg)
-			if err != nil {
+	// Next, gossip [partialTxs] (optionally including leftover [msgFullTxs])
+	msgPartialTxs := make([]message.EthTxNotify, 0)
+	for _, tx := range partialTxs {
+		if len(msgPartialTxs) > message.MaxEthTxsLen {
+			if err := n.sendEthTxsNotify(msgFullTxs, msgPartialTxs); err != nil {
 				return err
 			}
-			log.Debug(
-				"gossiping eth txs",
-				"len(txs)", len(msg.Txs),
-				"len(txsBytes)", len(msg.TxsBytes),
-			)
-			if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-				return err
-			}
-			msgTxs = msgTxs[:0]
+			msgFullTxs = nil
+			msgPartialTxs = msgPartialTxs[:0]
 		}
-		msgTxs = append(msgTxs, txData)
+		msgPartialTxs = append(msgPartialTxs, tx)
 	}
 
-	// Additional send to catch straggling bytes
-	if len(msgSelectedTxs) > 0 || len(msgTxs) > 0 {
-		var msg message.EthTxsNotify
-		if len(msgSelectedTxs) > 0 {
-			txBytes, err := rlp.EncodeToBytes(msgSelectedTxs)
-			if err != nil {
-				log.Warn(
-					"failed to encode eth transactions",
-					"len(selectedTxs)", len(msgSelectedTxs),
-					"err", err,
-				)
-				return nil
-			}
-			msg.TxsBytes = txBytes
-		}
-		if len(msgTxs) > 0 {
-			msg.Txs = msgTxs
-		}
-		msgBytes, err := message.Build(&msg)
-		if err != nil {
-			return err
-		}
-		log.Debug(
-			"gossiping eth txs",
-			"len(txs)", len(msg.Txs),
-			"len(txsBytes)", len(msg.TxsBytes),
-		)
-		if err := n.appSender.SendAppGossip(msgBytes); err != nil {
-			return err
-		}
-	}
-	return nil
+	// Send any remaining [msgFullTxs] and/or [msgPartialTxs]
+	return n.sendEthTxsNotify(msgFullTxs, msgPartialTxs)
 }
 
 func (n *network) handle(
@@ -400,9 +358,15 @@ func (h *RequestHandler) HandleEthTxsRequest(nodeID ids.ShortID, requestID uint3
 		tx := pool.Get(txData.Hash)
 		if tx != nil {
 			size := tx.Size()
-			if txsSize+size > message.IdealETHMsgSize {
-				// If the size of the response is larger than [IdealETHMsgSize], then
+			if txsSize+size > message.IdealEthMsgSize {
+				// If the size of the response is larger than [IdealEthMsgSize], then
 				// we stop appending txs to the response.
+				log.Trace(
+					"AppRequest reached IdealEthMsgSize",
+					"peerID", nodeID,
+					"requestID", requestID,
+					"len(txs)", len(msg.Txs),
+				)
 				break
 			}
 			txs = append(txs, tx)
@@ -595,7 +559,7 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 		"txID", msg.TxID,
 	)
 
-	// In the case that the gossip message contains a fully-formed transaction,
+	// In the case that the gossip message contains a transaction,
 	// attempt to parse it and add it as a remote.
 	tx := Tx{}
 	if _, err := Codec.Unmarshal(msg.Tx, &tx); err != nil {
@@ -628,7 +592,7 @@ func (h *GossipHandler) HandleAtomicTxNotify(nodeID ids.ShortID, _ uint32, msg *
 		)
 	}
 
-	// If only a fully-formed transaction was provided, exit early without making
+	// If only a transaction was provided, exit early without making
 	// any request.
 	if msg.TxID == (ids.ID{}) {
 		return nil
@@ -672,8 +636,9 @@ func (h *GossipHandler) HandleEthTxsNotify(nodeID ids.ShortID, _ uint32, msg *me
 		"len(txsBytes)", len(msg.TxsBytes),
 	)
 
-	// In the case that the gossip message contains a fully-formed transaction,
-	// attempt to parse it and add it as a remote.
+	// In the case that the gossip message contains transactions,
+	// attempt to parse it and add it as a remote. The maximum size of this
+	// encoded object is enforced by the codec.
 	if len(msg.TxsBytes) > 0 {
 		txs := make([]*types.Transaction, 0)
 		if err := rlp.DecodeBytes(msg.TxsBytes, &txs); err != nil {
