@@ -12,19 +12,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-// TODO: change name from Eth to Evm
 const (
 	// MaxEthTxsLen must be updated inside of EthTxsNotify's struct definition
 	// as well when changed
-	MaxEthTxsLen int = 25
+	MaxEthTxsLen int = 32
 
-	// TODO: Add test to force multiple messages
-	IdealETHMsgSize = common.StorageSize(20 * units.KiB)
+	// IdealEthMsgSize is the ideal size of encoded transaction bytes we send in
+	// any [EthTxsNotify] or [EthTxs] message. We do not limit inbound messages
+	// to this size, however. Max inbound message size is enforced by the codec
+	// (128KB).
+	IdealEthMsgSize = common.StorageSize(64 * units.KiB)
 )
 
 var (
-	// TODO: create a single gossip message used to notify peers of both EthTxs and
-	// AtomicTxs
 	_ Message = &AtomicTxNotify{}
 	_ Message = &AtomicTxRequest{}
 	_ Message = &AtomicTx{}
@@ -87,7 +87,7 @@ func (msg *AtomicTx) Handle(handler Handler, nodeID ids.ShortID, requestID uint3
 type EthTxsNotify struct {
 	message
 
-	Txs      []EthTxNotify `serialize:"true" len:"25"`
+	Txs      []EthTxNotify `serialize:"true" len:"32"`
 	TxsBytes []byte        `serialize:"true"`
 }
 
@@ -110,7 +110,7 @@ func (msg *EthTxsNotify) Handle(handler Handler, nodeID ids.ShortID, requestID u
 type EthTxsRequest struct {
 	message
 
-	Txs []EthTxNotify `serialize:"true" len:"25"`
+	Txs []EthTxNotify `serialize:"true" len:"32"`
 }
 
 func (msg *EthTxsRequest) Handle(handler Handler, nodeID ids.ShortID, requestID uint32) error {
