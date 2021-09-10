@@ -31,7 +31,7 @@ func (b *preForkBlock) Parent() ids.ID {
 }
 
 func (b *preForkBlock) Verify() error {
-	parent, err := b.vm.getBlock(b.Block.Parent())
+	parent, err := b.vm.getPreForkBlock(b.Block.Parent())
 	if err != nil {
 		return err
 	}

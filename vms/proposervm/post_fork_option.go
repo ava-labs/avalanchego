@@ -66,8 +66,8 @@ func (b *postForkOption) Parent() ids.ID {
 	return b.ParentID()
 }
 
-// If Verify returns nil, Accept or Reject is eventually called on
-// [b] a
+// If Verify returns nil, Accept or Reject is eventually called on [b] and
+// [b.innerBlk].
 func (b *postForkOption) Verify() error {
 	parent, err := b.vm.getBlock(b.ParentID())
 	if err != nil {
@@ -99,7 +99,7 @@ func (b *postForkOption) verifyPostForkChild(child *postForkBlock) error {
 }
 
 func (b *postForkOption) verifyPostForkOption(child *postForkOption) error {
-	// A *postForkOption's parent cant be a *postForkOption
+	// A *postForkOption's parent can't be a *postForkOption
 	return errUnexpectedBlockType
 }
 
